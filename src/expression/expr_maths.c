@@ -1213,19 +1213,6 @@ expr_t *deriv_coth(expr_t *dv)
     return expr_chain_rule_with_factor(dv, fac);
 }
 
-static expr_t *expr_deriv_inverse_reciprocal(const expr_t *dv, expr_t *(*inverse_fn)(const expr_t *))
-{
-    expr_t *one = expr_new_const(NUM_ONE);
-    expr_t *reciprocal = expr_div(one, dv->a);
-    expr_t *composed = inverse_fn(reciprocal);
-    expr_t *out = expr_get_dx_internal(composed);
-
-    expr_free(one);
-    expr_free(reciprocal);
-    expr_free(composed);
-    return out;
-}
-
 expr_t *deriv_exp(expr_t *dv)
 {
     return expr_chain_rule_with_factor(dv, expr_exp(dv->a));
@@ -1376,19 +1363,46 @@ expr_t *deriv_atan(expr_t *dv)
     return out;
 }
 
+/* Differentiate the principal inverse secant directly. */
 expr_t *deriv_asec(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_acos);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *square = expr_pow_long(dv->a, 2L);
+    expr_t *radicand = square ? expr_add_long(square, -1L) : NULL;
+    expr_t *root = radicand ? expr_sqrt(radicand) : NULL;
+    expr_t *denominator = root ? expr_mul(dv->a, root) : NULL;
+    expr_t *out = da && denominator ? expr_div(da, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(root);
+    expr_free(radicand);
+    expr_free(square);
+    expr_free(da);
+    return out;
 }
 
+/* Differentiate the principal inverse cosecant directly. */
 expr_t *deriv_acosec(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_asin);
+    expr_t *positive = deriv_asec(dv);
+
+    return expr_negate_owned(positive);
 }
 
+/* Differentiate the principal inverse cotangent directly. */
 expr_t *deriv_acot(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_atan);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *square = expr_pow_long(dv->a, 2L);
+    expr_t *denominator = square ? expr_add_long(square, 1L) : NULL;
+    expr_t *negative_da = da ? expr_neg(da) : NULL;
+    expr_t *out = negative_da && denominator ? expr_div(negative_da, denominator) : NULL;
+
+    expr_free(negative_da);
+    expr_free(denominator);
+    expr_free(square);
+    expr_free(da);
+    return out;
 }
 
 static expr_t *expr_haversine_inverse_arg(const expr_t *arg, int scale, int offset_sign)
@@ -1537,19 +1551,73 @@ expr_t *deriv_atanh(expr_t *dv)
     return out;
 }
 
+/* Differentiate the principal inverse hyperbolic secant directly. */
 expr_t *deriv_asech(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_acosh);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *square = expr_pow_long(dv->a, 2L);
+    expr_t *radicand = NULL;
+    expr_t *root = NULL;
+    expr_t *denominator = NULL;
+    expr_t *negative_da = NULL;
+    expr_t *out;
+
+    if (square) {
+        radicand = expr_sub_simplify_owned(expr_const_one(), square);
+        square = NULL;
+    }
+    root = radicand ? expr_sqrt(radicand) : NULL;
+    denominator = root ? expr_mul(dv->a, root) : NULL;
+    negative_da = da ? expr_neg(da) : NULL;
+    out = negative_da && denominator ? expr_div(negative_da, denominator) : NULL;
+
+    expr_free(negative_da);
+    expr_free(denominator);
+    expr_free(root);
+    expr_free(radicand);
+    expr_free(square);
+    expr_free(da);
+    return out;
 }
 
+/* Differentiate the principal inverse hyperbolic cosecant directly. */
 expr_t *deriv_acosech(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_asinh);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *square = expr_pow_long(dv->a, 2L);
+    expr_t *radicand = square ? expr_add_long(square, 1L) : NULL;
+    expr_t *root = radicand ? expr_sqrt(radicand) : NULL;
+    expr_t *denominator = root ? expr_mul(dv->a, root) : NULL;
+    expr_t *negative_da = da ? expr_neg(da) : NULL;
+    expr_t *out = negative_da && denominator ? expr_div(negative_da, denominator) : NULL;
+
+    expr_free(negative_da);
+    expr_free(denominator);
+    expr_free(root);
+    expr_free(radicand);
+    expr_free(square);
+    expr_free(da);
+    return out;
 }
 
+/* Differentiate the principal inverse hyperbolic cotangent directly. */
 expr_t *deriv_acoth(expr_t *dv)
 {
-    return expr_deriv_inverse_reciprocal(dv, expr_atanh);
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *square = expr_pow_long(dv->a, 2L);
+    expr_t *denominator = NULL;
+    expr_t *out;
+
+    if (square) {
+        denominator = expr_sub_simplify_owned(expr_const_one(), square);
+        square = NULL;
+    }
+    out = da && denominator ? expr_div(da, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(square);
+    expr_free(da);
+    return out;
 }
 
 expr_t *deriv_abs(expr_t *dv)

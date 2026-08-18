@@ -252,20 +252,32 @@ bool match_affine_unary(const expr_t *expr, const expr_t *wrt, expr_pattern_unar
     return match_affine_unary_data(expr, wrt, kind, constant_out, coeff_out);
 }
 
+/* Integrate a unary function whose argument is affine in the selected variable. */
 expr_t *integrate_affine_unary_kind(const expr_t *expr, const expr_t *wrt, expr_pattern_unary_affine_kind_t kind,
                                     expr_apply_unary_fn antiderivative_fn, number_t sign)
 {
     expr_t *vars[1];
+    expr_t *symbolic_constant = NULL;
+    expr_t *symbolic_coeff = NULL;
     number_t constant = num_new();
     number_t coeffs[1];
     expr_t *anti;
     expr_t *out;
+    bool numeric_affine;
 
     vars[0] = (expr_t *)wrt;
     coeffs[0] = num_new();
-    if (!expr_match_unary_affine_kind(expr, kind, 1u, vars, &constant, coeffs) || num_eq(coeffs[0], NUM_ZERO)) {
+    numeric_affine = expr_match_unary_affine_kind(expr, kind, 1u, vars, &constant, coeffs) &&
+                     !num_eq(coeffs[0], NUM_ZERO);
+    if (!numeric_affine &&
+        (!expr_integrate_contains_imaginary_unit(expr) ||
+        (!expr || !expr->a ||
+         !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &symbolic_constant, &symbolic_coeff) ||
+         expr_const_is_zero(symbolic_coeff)))) {
         num_destroy(&coeffs[0]);
         num_destroy(&constant);
+        expr_free(symbolic_coeff);
+        expr_free(symbolic_constant);
         return NULL;
     }
 
@@ -277,8 +289,17 @@ expr_t *integrate_affine_unary_kind(const expr_t *expr, const expr_t *wrt, expr_
         anti = negated;
     }
 
-    out = div_number_owned_consuming(anti, &coeffs[0]);
+    if (numeric_affine) {
+        out = div_number_owned_consuming(anti, &coeffs[0]);
+    } else {
+        out = anti && symbolic_coeff ? expr_div(anti, symbolic_coeff) : NULL;
+        out = simplify_owned(out);
+        expr_free(anti);
+        num_destroy(&coeffs[0]);
+    }
     num_destroy(&constant);
+    expr_free(symbolic_coeff);
+    expr_free(symbolic_constant);
     return out;
 }
 

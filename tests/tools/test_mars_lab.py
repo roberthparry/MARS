@@ -2343,6 +2343,50 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_all_supported_complex_elementary_functions_and_calculus_use_p_plus_qi_form(self) -> None:
+        functions = (
+            "exp", "ln", "log10",
+            "sin", "cos", "tan", "sec", "cosec", "cot",
+            "sinh", "cosh", "tanh", "sech", "cosech", "coth",
+            "asin", "acos", "atan", "asec", "acosec", "acot",
+            "asinh", "acosh", "atanh", "asech", "acosech", "acoth",
+        )
+
+        for function in functions:
+            source = f"{function}(x+i*y)"
+            with self.subTest(function=function, action="evaluate"):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertTrue(fields["unbound"].endswith("·i"), raw)
+                self.assertNotIn("i·", fields["unbound"])
+                self.assertNotIn("- -", fields["unbound"])
+
+            for wrt in ("x", "y"):
+                for action, field, suffix in (
+                    ("derivative", "derivative", "·i |"),
+                    ("integral", "integral", "·i + C |"),
+                ):
+                    with self.subTest(function=function, wrt=wrt, action=action):
+                        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                            self.expression_binary, source, 32, wrt, action
+                        )
+                        self.assertEqual(returncode, 0, raw)
+                        self.assertIn(field, fields, raw)
+                        self.assertIn(suffix, fields[field], raw)
+                        self.assertNotIn("no symbolic integral", fields[field])
+                        self.assertNotIn("i·", fields[field])
+                        self.assertNotIn("- -", fields[field])
+                        self.assertNotIn("x + iy", fields[field])
+                        self.assertNotIn("x + yi", fields[field])
+                        self.assertNotIn("xyi", fields[field])
+                        self.assertNotIn("ixy", fields[field])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_pure_imaginary_elementary_functions_and_calculus_use_cartesian_form(self) -> None:
         functions = (
             "exp", "sin", "cos", "tan", "sec", "cosec", "cot",
@@ -2375,7 +2419,10 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertNotIn("- -", fields["derivative"])
         self.assertNotIn("- -", fields["derivative_TeX"])
         self.assertNotIn("-  -", fields["derivative_function"])
-        self.assertIn("- 2·sinh(2x)·sin(2y)·i", fields["derivative"])
+        self.assertIn(
+            "- 2·sinh(2x)·sin(2y)/(cosh(2x) + cos(2y))²·i",
+            fields["derivative"],
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),

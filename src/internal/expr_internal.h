@@ -27,6 +27,18 @@ typedef enum expr_integration_bound_kind {
 expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
 
 /**
+ * @brief Split an expression into owning real and imaginary Cartesian coefficients for display.
+ *
+ * @param expr Expression to inspect.
+ * @param real_out Owning real coefficient on success.
+ * @param imaginary_out Owning imaginary coefficient on success.
+ * @param has_imaginary_out Whether the imaginary coefficient is structurally present.
+ * @return `true` when the expression can be split.
+ */
+bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
+                                      bool *has_imaginary_out);
+
+/**
  * @brief Expand supported unary functions of Cartesian arguments recursively for display.
  *
  * @param expr Expression whose supported unary nodes should be expanded.
@@ -60,12 +72,28 @@ expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *
 expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
 
 /**
+ * @brief Prepend an explicit zero real component to a purely imaginary display expression.
+ *
+ * @param expr Expression to inspect.
+ * @return Owning `0 + qi` expression, or `NULL` when no prefix is needed.
+ */
+expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
+
+/**
  * @brief Write a symbolic reciprocal square root in Cartesian surd form for display.
  *
  * @param expr Expression to rewrite.
  * @return Owning Cartesian reciprocal-root expression, or `NULL` when the rewrite does not apply.
  */
 expr_t *expr_beautify_symbolic_complex_square_root_reciprocal_for_display(const expr_t *expr);
+
+/**
+ * @brief Expand preserved binding expressions into their expression trees for display processing.
+ *
+ * @param expr Expression whose preserved nodes should be expanded.
+ * @return Owning expanded expression, or `NULL` on failure.
+ */
+expr_t *expr_expand_preserved_for_display(const expr_t *expr);
 
 typedef enum {
     EXPR_PATTERN_UNARY_EXP,
@@ -196,6 +224,15 @@ bool expr_match_affine_poly_deg4(const expr_t *expr, size_t nvars, expr_t *const
 bool expr_collect_poly_deg4(const expr_t *expr, const expr_t *var, number_t *coeffs_out);
 bool expr_match_unary_affine_kind(const expr_t *expr, expr_pattern_unary_affine_kind_t kind, size_t nvars,
                                   expr_t *const *vars, number_t *constant_out, number_t *coeffs_out);
+
+/**
+ * @brief Test whether an expression is headed by a selected unary function.
+ *
+ * @param expr Expression to inspect.
+ * @param kind Unary function kind to match.
+ * @return `true` when the expression has the requested unary head.
+ */
+bool expr_is_unary_pattern_kind(const expr_t *expr, expr_pattern_unary_affine_kind_t kind);
 bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
                                                          expr_pattern_unary_affine_kind_t unary_kind, size_t nvars,
                                                          expr_t *const *vars, number_t *poly_coeffs_out,

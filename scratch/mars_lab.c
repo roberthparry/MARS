@@ -79,6 +79,21 @@ static char *expr_TeX_body_dup(const expr_t *expr)
 static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
                                         const expr_t **imaginary_out, int *imaginary_sign_out);
 
+static expr_t *expr_expand_all_complex_unary_for_display(const expr_t *expr)
+{
+    expr_t *current = expr_clone(expr);
+
+    for (size_t pass = 0u; current && pass < 8u; ++pass) {
+        expr_t *next = expr_complex_unary_cartesian_for_display(current);
+
+        if (!next)
+            break;
+        expr_free(current);
+        current = next;
+    }
+    return current;
+}
+
 static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
 {
     const expr_t *left = NULL;
@@ -96,6 +111,42 @@ static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
     if (!expr_child_exprs(expr, &left, &right))
         return false;
     return expr_contains_imaginary_unit_for_display(left) || expr_contains_imaginary_unit_for_display(right);
+}
+
+static bool expr_contains_cartesian_component_symbol(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const char *name = expr_symbol_name(expr);
+
+    if (name && (strcmp(name, "x") == 0 || strcmp(name, "y") == 0))
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_cartesian_component_symbol(left) || expr_contains_cartesian_component_symbol(right);
+}
+
+static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
+{
+    static const expr_pattern_unary_affine_kind_t kinds[] = {
+        EXPR_PATTERN_UNARY_EXP,     EXPR_PATTERN_UNARY_LOG,     EXPR_PATTERN_UNARY_LOG10,
+        EXPR_PATTERN_UNARY_SIN,     EXPR_PATTERN_UNARY_COS,     EXPR_PATTERN_UNARY_TAN,
+        EXPR_PATTERN_UNARY_SEC,     EXPR_PATTERN_UNARY_COSEC,   EXPR_PATTERN_UNARY_COT,
+        EXPR_PATTERN_UNARY_SINH,    EXPR_PATTERN_UNARY_COSH,    EXPR_PATTERN_UNARY_TANH,
+        EXPR_PATTERN_UNARY_SECH,    EXPR_PATTERN_UNARY_COSECH,  EXPR_PATTERN_UNARY_COTH,
+        EXPR_PATTERN_UNARY_ASIN,    EXPR_PATTERN_UNARY_ACOS,    EXPR_PATTERN_UNARY_ATAN,
+        EXPR_PATTERN_UNARY_ASEC,    EXPR_PATTERN_UNARY_ACOSEC,  EXPR_PATTERN_UNARY_ACOT,
+        EXPR_PATTERN_UNARY_ASINH,   EXPR_PATTERN_UNARY_ACOSH,   EXPR_PATTERN_UNARY_ATANH,
+        EXPR_PATTERN_UNARY_ASECH,   EXPR_PATTERN_UNARY_ACOSECH, EXPR_PATTERN_UNARY_ACOTH,
+    };
+
+    if (!expr_contains_cartesian_component_symbol(expr) || !expr_contains_imaginary_unit_for_display(expr))
+        return false;
+    for (size_t index = 0u; index < sizeof(kinds) / sizeof(kinds[0]); ++index) {
+        if (expr_is_unary_pattern_kind(expr, kinds[index]))
+            return true;
+    }
+    return false;
 }
 
 static bool expr_is_cartesian_sum_with_unit_imaginary_for_display(const expr_t *expr)
@@ -116,13 +167,15 @@ static bool expr_is_cartesian_sum_with_unit_imaginary_for_display(const expr_t *
     return matched;
 }
 
-static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt)
+static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt, bool complex_cartesian)
 {
     expr_t *zero = NULL;
     expr_t *display = NULL;
     equation_t *polynomial = NULL;
     equation_t *expanded = NULL;
     expr_t *result;
+    expr_t *preserved_expanded = NULL;
+    expr_t *pre_beautified_cartesian = NULL;
     expr_t *beautified;
 
     if (!expr)
@@ -130,7 +183,9 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
     if (expr_contains_integral_operation(expr))
         return NULL;
 
-    if (wrt) {
+    if (wrt && complex_cartesian) {
+        display = expr_clone(expr);
+    } else if (wrt) {
         zero = expr_new_const(NUM_ZERO);
         polynomial = zero ? equ_new(expr, zero) : NULL;
         expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
@@ -150,7 +205,12 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
     equ_free(polynomial);
     expr_free(zero);
     result = display ? display : expr_simplify(expr);
-    beautified = result ? expr_beautify_presimplified(result) : NULL;
+    preserved_expanded = wrt && complex_cartesian && result ? expr_expand_preserved_for_display(result) : NULL;
+    pre_beautified_cartesian = preserved_expanded ? expr_expand_all_complex_unary_for_display(preserved_expanded) : NULL;
+    beautified = result ? expr_beautify_presimplified(pre_beautified_cartesian
+                                                          ? pre_beautified_cartesian
+                                                          : (preserved_expanded ? preserved_expanded : result))
+                        : NULL;
     if (beautified) {
         expr_t *reciprocal_cartesian =
             wrt ? expr_beautify_symbolic_complex_square_root_reciprocal_for_display(beautified) : NULL;
@@ -158,41 +218,44 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
         expr_t *rotated_cartesian =
             wrt ? expr_beautify_imaginary_cartesian_product_for_display(reciprocal_source) : NULL;
         const expr_t *beautified_source = rotated_cartesian ? rotated_cartesian : reciprocal_source;
-        expr_t *cartesian_unary = expr_complex_unary_cartesian_for_display(beautified_source);
+        expr_t *cartesian_unary = complex_cartesian
+                                      ? expr_expand_all_complex_unary_for_display(beautified_source)
+                                      : expr_complex_unary_cartesian_for_display(beautified_source);
         const expr_t *cartesian_source = cartesian_unary ? cartesian_unary : beautified_source;
         const expr_t *cartesian_scale = NULL;
         const expr_t *cartesian_real = NULL;
         const expr_t *cartesian_imaginary = NULL;
         int cartesian_imaginary_sign = 1;
+        bool scaled_cartesian =
+            expr_scaled_cartesian_parts(cartesian_source, &cartesian_scale, &cartesian_real, &cartesian_imaginary,
+                                        &cartesian_imaginary_sign);
         bool already_cartesian =
-            expr_scaled_cartesian_parts(beautified_source, &cartesian_scale, &cartesian_real, &cartesian_imaginary,
-                                        &cartesian_imaginary_sign) ||
-            expr_is_cartesian_sum_with_unit_imaginary_for_display(beautified_source);
+            (scaled_cartesian && !expr_contains_imaginary_unit_for_display(cartesian_scale)) ||
+            expr_is_cartesian_sum_with_unit_imaginary_for_display(cartesian_source);
+        bool force_cartesian = wrt && complex_cartesian;
         expr_t *cartesian_separated =
-            (!cartesian_unary && !already_cartesian) ? expr_separate_cartesian_for_display(cartesian_source) : NULL;
+            force_cartesian ? expr_separate_cartesian_for_display(cartesian_source) : NULL;
         expr_t *cartesian_expanded = NULL;
 
-        if (!cartesian_separated && !cartesian_unary && !already_cartesian &&
-            expr_contains_imaginary_unit_for_display(cartesian_source)) {
+        if (!cartesian_separated && force_cartesian) {
             cartesian_expanded = expr_display_expanded(cartesian_source);
             if (cartesian_expanded)
                 cartesian_separated = expr_separate_cartesian_for_display(cartesian_expanded);
         }
 
         expr_free(result);
-        if (cartesian_unary || already_cartesian) {
-            result = expr_clone(cartesian_source);
-            expr_free(cartesian_separated);
-            expr_free(cartesian_expanded);
-        } else if (cartesian_separated) {
+        if (cartesian_separated) {
             result = cartesian_separated;
+            expr_free(cartesian_expanded);
+        } else if (already_cartesian) {
+            result = expr_clone(cartesian_source);
             expr_free(cartesian_expanded);
         } else if (cartesian_expanded) {
             result = cartesian_expanded;
         } else {
             result = expr_clone(cartesian_source);
         }
-        if (wrt && result) {
+        if (wrt && complex_cartesian && result) {
             expr_t *final_rotated = expr_beautify_imaginary_cartesian_product_for_display(result);
 
             if (final_rotated) {
@@ -208,11 +271,33 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
                 result = imaginary_unit_last;
             }
         }
+        if (wrt && complex_cartesian && result) {
+            expr_t *final_separated = expr_separate_cartesian_for_display(result);
+
+            if (final_separated) {
+                expr_t *imaginary_unit_last = expr_move_imaginary_unit_last_for_display(final_separated);
+
+                expr_free(result);
+                result = imaginary_unit_last ? imaginary_unit_last : final_separated;
+                if (imaginary_unit_last)
+                    expr_free(final_separated);
+            }
+        }
         expr_free(cartesian_unary);
         expr_free(rotated_cartesian);
         expr_free(reciprocal_cartesian);
         expr_free(beautified);
     }
+    if (result) {
+        expr_t *explicit_real_component = expr_prepend_zero_real_component_for_display(result);
+
+        if (explicit_real_component) {
+            expr_free(result);
+            result = explicit_real_component;
+        }
+    }
+    expr_free(pre_beautified_cartesian);
+    expr_free(preserved_expanded);
     return result;
 }
 
@@ -1704,6 +1789,7 @@ int main(int argc, char **argv)
     bool evaluate_request = strcmp(action, "evaluate") == 0 || bindings_request || binding_edit_request;
     bool derivative_request = !integral_request && !evaluate_request;
     bool wrt_is_variable = false;
+    bool complex_cartesian = false;
     bool display_expr_owned = false;
     bool display_deriv_owned = false;
     int rc = 0;
@@ -1739,10 +1825,11 @@ int main(int argc, char **argv)
     if (bindings_request && argc > 5)
         preserve_matching_binding_values(bindings, argv[5]);
 
+    complex_cartesian = expr_is_complex_cartesian_elementary_request(expr);
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL);
+    display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
     display_expr_owned = display_expr != NULL;
     if (!display_expr)
         display_expr = expr;
@@ -1774,15 +1861,19 @@ int main(int argc, char **argv)
 
     if (wrt_is_variable && derivative_request) {
         expr_t *derivative_root_base = NULL;
+        const expr_t *derivative_source = display_expr;
         long derivative_root_order = 0L;
 
-        deriv = expr_create_deriv(display_expr, wrt);
+        if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
+            expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOTH))
+            derivative_source = expr;
+        deriv = expr_create_deriv(derivative_source, wrt);
         if (!deriv) {
             fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
             rc = 1;
             goto cleanup;
         }
-        display_deriv = display_polynomial_simplified(deriv, wrt);
+        display_deriv = display_polynomial_simplified(deriv, wrt, complex_cartesian);
         if (display_deriv) {
             display_deriv_owned = true;
         } else {
@@ -1838,10 +1929,9 @@ int main(int argc, char **argv)
                     integration_constant_name = expr_symbol_name(family_right);
                 (void)family_left;
 
-                display_integral = display_polynomial_simplified(integral, wrt);
-                if (!display_integral) {
+                display_integral = display_polynomial_simplified(integral, wrt, complex_cartesian);
+                if (!display_integral)
                     display_integral = integral;
-                }
                 if (integration_constant_name) {
                     expr_t *ordered_integral =
                         expr_move_named_addend_last_for_display(display_integral, integration_constant_name);
@@ -1855,6 +1945,9 @@ int main(int argc, char **argv)
                 integral_text = expr_text_dup(display_integral, style_EXPRESSION);
                 integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
                 integral_TeX_text = expr_TeX_body_dup(display_integral);
+                normalise_double_minus_owned(&integral_text);
+                normalise_double_minus_owned(&integral_func_text);
+                normalise_double_minus_owned(&integral_TeX_text);
                 printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
                 printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
                 printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");

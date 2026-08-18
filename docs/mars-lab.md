@@ -45,14 +45,20 @@ differentiate or integrate with respect to each variable. **Goal seek** finds a
 numeric value for a selected variable.
 
 Supported elementary functions with an explicit symbolic complex argument are
-presented in Cartesian `p + qi` form. This applies to inputs written with both
-parts—`exp(x + iy)` is displayed as
-`exp(x)·cos(y) + exp(x)·sin(y)·i`—and to pure-imaginary inputs, for which
-`sin(iy)` is displayed as `0 + sinh(y)·i`.
-The derivative and integral buttons use the same separated Cartesian algebra,
-so their Rendered TeX, Expression and Function cards do not fall back to the
-original unsplit function call. Indefinite integrals always place their
-constant of integration last in all three representations.
+presented in Cartesian `p + qi` form. The complete set comprises `exp`, `ln`,
+`log10`; the circular functions `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`;
+their hyperbolic counterparts; and all twelve inverse circular and inverse
+hyperbolic functions. This applies to inputs written with both parts—
+`exp(x + iy)` is displayed as `exp(x)·cos(y) + exp(x)·sin(y)·i`—and to
+pure-imaginary inputs, for which `sin(iy)` is displayed as
+`0 + sinh(y)·i`.
+
+The derivative and integral buttons use the same separated Cartesian algebra
+for differentiation or integration with respect to either component. Their
+Rendered TeX, Expression and Function cards do not fall back to the original
+unsplit function call. The imaginary unit is the final factor of the imaginary
+term, and indefinite integrals place their constant of integration last in all
+three representations.
 
 Explicit fractional powers retain their complete root family. Their
 derivatives likewise show every Cartesian branch; when bindings permit numeric

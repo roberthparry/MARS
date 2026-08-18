@@ -238,6 +238,15 @@ bool expr_match_unary_affine_kind(const expr_t *expr, expr_pattern_unary_affine_
     return expr_match_unary_affine_kind_num_local(expr, kind, nvars, vars, constant_out, coeffs_out);
 }
 
+/* Test the unary head without imposing conditions on its argument. */
+bool expr_is_unary_pattern_kind(const expr_t *expr, expr_pattern_unary_affine_kind_t kind)
+{
+    expr_op_kind_t op_kind;
+    const expr_t *argument = NULL;
+
+    return expr_affine_unary_kind_to_op(kind, &op_kind) && expr_match_unary_op(expr, op_kind, &argument);
+}
+
 static bool expr_match_affine_power_mul_deg2(const expr_t *expr, const expr_t **base_out)
 {
     const expr_t *left = NULL;

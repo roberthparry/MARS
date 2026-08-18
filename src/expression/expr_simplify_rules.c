@@ -1305,6 +1305,51 @@ static expr_t *expr_extract_i_unit_factor_owned(const expr_t *expr, int *sign_ou
     return combined;
 }
 
+static bool expr_contains_i_unit_factor(const expr_t *expr)
+{
+    int sign;
+
+    if (!expr)
+        return false;
+    if (expr_i_unit_sign(expr, &sign))
+        return true;
+    return expr_contains_i_unit_factor(expr->a) || expr_contains_i_unit_factor(expr->b);
+}
+
+static bool expr_cartesian_sum_parts_owned(const expr_t *expr, const expr_t **real_out, expr_t **imaginary_out,
+                                           int *imaginary_sign_out)
+{
+    const expr_t *left;
+    const expr_t *right;
+    expr_t *imaginary;
+    int sign;
+    bool subtract;
+
+    if (!expr || !real_out || !imaginary_out || !imaginary_sign_out ||
+        (!expr_is_op(expr, &ops_add) && !expr_is_op(expr, &ops_sub)))
+        return false;
+    left = expr->a;
+    right = expr->b;
+    subtract = expr_is_op(expr, &ops_sub);
+    imaginary = expr_extract_i_unit_factor_owned(right, &sign);
+    if (imaginary) {
+        *real_out = left;
+        *imaginary_out = imaginary;
+        *imaginary_sign_out = subtract ? -sign : sign;
+        return true;
+    }
+    if (!subtract) {
+        imaginary = expr_extract_i_unit_factor_owned(left, &sign);
+        if (imaginary) {
+            *real_out = right;
+            *imaginary_out = imaginary;
+            *imaginary_sign_out = sign;
+            return true;
+        }
+    }
+    return false;
+}
+
 expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b)
 {
     const expr_t *a_rest = NULL;
@@ -1421,39 +1466,540 @@ static expr_t *expr_cartesian_tangent_part(const expr_t *real, const expr_t *ima
     return expr_div_simplify_owned(numerator, denominator);
 }
 
+static expr_t *expr_twice_unary_product(expr_apply_unary_fn left_fn, const expr_t *left_arg,
+                                        expr_apply_unary_fn right_fn, const expr_t *right_arg)
+{
+    expr_t *product = expr_unary_product(left_fn, left_arg, right_fn, right_arg);
+
+    return product ? expr_mul_simplify_owned(expr_const_long(2L), product) : NULL;
+}
+
+static bool expr_cartesian_reciprocal_unary_parts(const expr_t *op, const expr_t *real, const expr_t *imaginary,
+                                                  expr_t **real_out, expr_t **imaginary_out,
+                                                  int *imaginary_sign_out)
+{
+    expr_t *double_real = NULL;
+    expr_t *double_imaginary = NULL;
+    expr_t *denominator_left = NULL;
+    expr_t *denominator_right = NULL;
+    expr_t *denominator = NULL;
+    expr_t *real_numerator = NULL;
+    expr_t *imaginary_numerator = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    bool secant = expr_is_op(op, &ops_sec);
+    bool cosecant = expr_is_op(op, &ops_cosec);
+    bool cotangent = expr_is_op(op, &ops_cot);
+    bool hyperbolic_secant = expr_is_op(op, &ops_sech);
+    bool hyperbolic_cosecant = expr_is_op(op, &ops_cosech);
+    bool hyperbolic_cotangent = expr_is_op(op, &ops_coth);
+    bool ok = false;
+
+    if ((!secant && !cosecant && !cotangent && !hyperbolic_secant && !hyperbolic_cosecant &&
+         !hyperbolic_cotangent) ||
+        !real || !imaginary || !real_out || !imaginary_out || !imaginary_sign_out)
+        goto cleanup;
+
+    double_real = expr_double_arg(real);
+    double_imaginary = expr_double_arg(imaginary);
+    if (!double_real || !double_imaginary)
+        goto cleanup;
+
+    if (secant) {
+        denominator_left = expr_cos(double_real);
+        denominator_right = expr_cosh(double_imaginary);
+        real_numerator = expr_twice_unary_product(expr_cos, real, expr_cosh, imaginary);
+        imaginary_numerator = expr_twice_unary_product(expr_sin, real, expr_sinh, imaginary);
+    } else if (cosecant || cotangent) {
+        denominator_left = expr_cosh(double_imaginary);
+        denominator_right = expr_cos(double_real);
+        real_numerator = cotangent ? expr_sin(double_real)
+                                   : expr_twice_unary_product(expr_sin, real, expr_cosh, imaginary);
+        imaginary_numerator = cotangent ? expr_sinh(double_imaginary)
+                                        : expr_twice_unary_product(expr_cos, real, expr_sinh, imaginary);
+        *imaginary_sign_out = -*imaginary_sign_out;
+    } else if (hyperbolic_secant) {
+        denominator_left = expr_cosh(double_real);
+        denominator_right = expr_cos(double_imaginary);
+        real_numerator = expr_twice_unary_product(expr_cosh, real, expr_cos, imaginary);
+        imaginary_numerator = expr_twice_unary_product(expr_sinh, real, expr_sin, imaginary);
+        *imaginary_sign_out = -*imaginary_sign_out;
+    } else {
+        denominator_left = expr_cosh(double_real);
+        denominator_right = expr_cos(double_imaginary);
+        real_numerator = hyperbolic_cotangent
+                             ? expr_sinh(double_real)
+                             : expr_twice_unary_product(expr_sinh, real, expr_cos, imaginary);
+        imaginary_numerator = hyperbolic_cotangent
+                                  ? expr_sin(double_imaginary)
+                                  : expr_twice_unary_product(expr_cosh, real, expr_sin, imaginary);
+        *imaginary_sign_out = -*imaginary_sign_out;
+    }
+    denominator = (cosecant || cotangent || hyperbolic_cosecant || hyperbolic_cotangent)
+                      ? expr_sub_simplify_owned(denominator_left, denominator_right)
+                      : expr_add_simplify_owned(denominator_left, denominator_right);
+    denominator_left = NULL;
+    denominator_right = NULL;
+    real_part = real_numerator && denominator
+                    ? expr_div_simplify_owned(real_numerator, expr_clone(denominator))
+                    : NULL;
+    if (real_numerator && denominator)
+        real_numerator = NULL;
+    imaginary_part = imaginary_numerator && denominator
+                         ? expr_div_simplify_owned(imaginary_numerator, expr_clone(denominator))
+                         : NULL;
+    if (imaginary_numerator && denominator)
+        imaginary_numerator = NULL;
+    if (!real_part || !imaginary_part)
+        goto cleanup;
+    *real_out = real_part;
+    *imaginary_out = imaginary_part;
+    real_part = NULL;
+    imaginary_part = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(imaginary_numerator);
+    expr_free(real_numerator);
+    expr_free(denominator);
+    expr_free(denominator_right);
+    expr_free(denominator_left);
+    expr_free(double_imaginary);
+    expr_free(double_real);
+    return ok;
+}
+
+static expr_t *expr_cartesian_shifted_radius(const expr_t *real, long real_shift, const expr_t *imaginary,
+                                             long imaginary_shift)
+{
+    expr_t *shifted_real = real_shift ? expr_add_long(real, real_shift) : expr_clone(real);
+    expr_t *shifted_imaginary = imaginary_shift ? expr_add_long(imaginary, imaginary_shift) : expr_clone(imaginary);
+    expr_t *real_squared = shifted_real ? expr_pow(shifted_real, &NUM_TWO) : NULL;
+    expr_t *imaginary_squared = shifted_imaginary ? expr_pow(shifted_imaginary, &NUM_TWO) : NULL;
+    expr_t *radius_squared = NULL;
+    expr_t *radius = NULL;
+
+    if (real_squared && imaginary_squared) {
+        radius_squared = expr_add_simplify_owned(real_squared, imaginary_squared);
+        real_squared = NULL;
+        imaginary_squared = NULL;
+    }
+    radius = radius_squared ? expr_sqrt(radius_squared) : NULL;
+    expr_free(radius_squared);
+    expr_free(imaginary_squared);
+    expr_free(real_squared);
+    expr_free(shifted_imaginary);
+    expr_free(shifted_real);
+    return radius;
+}
+
+static bool expr_cartesian_inverse_elliptic_parts(expr_op_kind_t kind, const expr_t *real, const expr_t *imaginary,
+                                                  const expr_t *imaginary_orientation_source, expr_t **real_out,
+                                                  expr_t **imaginary_out, int *imaginary_sign_out)
+{
+    expr_t *upper_radius = NULL;
+    expr_t *lower_radius = NULL;
+    expr_t *radius_difference = NULL;
+    expr_t *radius_sum = NULL;
+    expr_t *projection = NULL;
+    expr_t *height = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    expr_t *imaginary_absolute = NULL;
+    expr_t *imaginary_orientation = NULL;
+    expr_t *oriented_imaginary_part = NULL;
+    bool inverse_sine = kind == EXPR_KIND_ASIN;
+    bool inverse_cosine = kind == EXPR_KIND_ACOS;
+    bool inverse_hyperbolic_cosine = kind == EXPR_KIND_ACOSH;
+    bool ok = false;
+
+    if ((!inverse_sine && !inverse_cosine && !inverse_hyperbolic_cosine) || !real || !imaginary || !real_out ||
+        !imaginary_orientation_source || !imaginary_out || !imaginary_sign_out)
+        goto cleanup;
+    upper_radius = expr_cartesian_shifted_radius(real, 1L, imaginary, 0L);
+    lower_radius = expr_cartesian_shifted_radius(real, -1L, imaginary, 0L);
+    radius_difference = upper_radius && lower_radius ? expr_sub(upper_radius, lower_radius) : NULL;
+    radius_sum = upper_radius && lower_radius ? expr_add(upper_radius, lower_radius) : NULL;
+    projection = radius_difference ? expr_div_long(radius_difference, 2L) : NULL;
+    height = radius_sum ? expr_div_long(radius_sum, 2L) : NULL;
+    if (inverse_sine) {
+        real_part = projection ? expr_asin(projection) : NULL;
+        imaginary_part = height ? expr_acosh(height) : NULL;
+    } else if (inverse_cosine) {
+        real_part = projection ? expr_acos(projection) : NULL;
+        imaginary_part = height ? expr_acosh(height) : NULL;
+        *imaginary_sign_out = -*imaginary_sign_out;
+    } else {
+        real_part = height ? expr_acosh(height) : NULL;
+        imaginary_part = projection ? expr_acos(projection) : NULL;
+    }
+    imaginary_absolute = expr_abs(imaginary_orientation_source);
+    imaginary_orientation = imaginary_absolute ? expr_div(imaginary_orientation_source, imaginary_absolute) : NULL;
+    oriented_imaginary_part = imaginary_part && imaginary_orientation
+                                  ? expr_mul(imaginary_orientation, imaginary_part)
+                                  : NULL;
+    expr_free(imaginary_part);
+    imaginary_part = oriented_imaginary_part;
+    oriented_imaginary_part = NULL;
+    if (!real_part || !imaginary_part)
+        goto cleanup;
+    *real_out = real_part;
+    *imaginary_out = imaginary_part;
+    real_part = NULL;
+    imaginary_part = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(oriented_imaginary_part);
+    expr_free(imaginary_orientation);
+    expr_free(imaginary_absolute);
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(height);
+    expr_free(projection);
+    expr_free(radius_sum);
+    expr_free(radius_difference);
+    expr_free(lower_radius);
+    expr_free(upper_radius);
+    return ok;
+}
+
+static expr_t *expr_cartesian_square(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    if (expr->ops && expr->ops->kind == EXPR_KIND_NEG)
+        return expr_cartesian_square(expr->a);
+    if (expr->ops && expr->ops->kind == EXPR_KIND_MUL) {
+        expr_t *left = expr_cartesian_square(expr->a);
+        expr_t *right = expr_cartesian_square(expr->b);
+
+        if (left && right)
+            return expr_mul_simplify_owned(left, right);
+        expr_free(right);
+        expr_free(left);
+        return NULL;
+    }
+    if (expr->ops && expr->ops->kind == EXPR_KIND_DIV) {
+        expr_t *numerator = expr_cartesian_square(expr->a);
+        expr_t *denominator = expr_cartesian_square(expr->b);
+
+        if (numerator && denominator)
+            return expr_div_simplify_owned(numerator, denominator);
+        expr_free(denominator);
+        expr_free(numerator);
+        return NULL;
+    }
+    return expr_pow(expr, &NUM_TWO);
+}
+
+static bool expr_cartesian_inverse_hyperbolic_sine_parts(const expr_t *real, const expr_t *imaginary,
+                                                         const expr_t *real_orientation_source, expr_t **real_out,
+                                                         expr_t **imaginary_out)
+{
+    expr_t *upper_radius = NULL;
+    expr_t *lower_radius = NULL;
+    expr_t *radius_sum = NULL;
+    expr_t *radius_difference = NULL;
+    expr_t *height = NULL;
+    expr_t *projection = NULL;
+    expr_t *real_magnitude = NULL;
+    expr_t *real_absolute = NULL;
+    expr_t *real_orientation = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    bool ok = false;
+
+    if (!real || !imaginary || !real_orientation_source || !real_out || !imaginary_out)
+        goto cleanup;
+    upper_radius = expr_cartesian_shifted_radius(real, 0L, imaginary, 1L);
+    lower_radius = expr_cartesian_shifted_radius(real, 0L, imaginary, -1L);
+    radius_sum = upper_radius && lower_radius ? expr_add(upper_radius, lower_radius) : NULL;
+    radius_difference = upper_radius && lower_radius ? expr_sub(upper_radius, lower_radius) : NULL;
+    height = radius_sum ? expr_div_long(radius_sum, 2L) : NULL;
+    projection = radius_difference ? expr_div_long(radius_difference, 2L) : NULL;
+    real_magnitude = height ? expr_acosh(height) : NULL;
+    real_absolute = expr_abs(real_orientation_source);
+    real_orientation = real_absolute ? expr_div(real_orientation_source, real_absolute) : NULL;
+    real_part = real_magnitude && real_orientation ? expr_mul(real_orientation, real_magnitude) : NULL;
+    imaginary_part = projection ? expr_asin(projection) : NULL;
+    if (!real_part || !imaginary_part)
+        goto cleanup;
+    *real_out = real_part;
+    *imaginary_out = imaginary_part;
+    real_part = NULL;
+    imaginary_part = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(real_orientation);
+    expr_free(real_absolute);
+    expr_free(real_magnitude);
+    expr_free(projection);
+    expr_free(height);
+    expr_free(radius_difference);
+    expr_free(radius_sum);
+    expr_free(lower_radius);
+    expr_free(upper_radius);
+    return ok;
+}
+
+static bool expr_cartesian_inverse_hyperbolic_tangent_parts(const expr_t *real, const expr_t *imaginary,
+                                                            expr_t **real_out, expr_t **imaginary_out)
+{
+    expr_t *real_plus_one = NULL;
+    expr_t *real_minus_one = NULL;
+    expr_t *upper_real_square = NULL;
+    expr_t *lower_real_square = NULL;
+    expr_t *upper_imaginary_square = NULL;
+    expr_t *lower_imaginary_square = NULL;
+    expr_t *upper = NULL;
+    expr_t *lower = NULL;
+    expr_t *ratio = NULL;
+    expr_t *ratio_log = NULL;
+    expr_t *two_imaginary = NULL;
+    expr_t *real_square = NULL;
+    expr_t *imaginary_square = NULL;
+    expr_t *angle_denominator = NULL;
+    expr_t *angle = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    bool ok = false;
+
+    if (!real || !imaginary || !real_out || !imaginary_out)
+        goto cleanup;
+    real_plus_one = expr_add_long(real, 1L);
+    real_minus_one = expr_add_long(real, -1L);
+    upper_real_square = expr_cartesian_square(real_plus_one);
+    lower_real_square = expr_cartesian_square(real_minus_one);
+    upper_imaginary_square = expr_cartesian_square(imaginary);
+    lower_imaginary_square = expr_cartesian_square(imaginary);
+    upper = upper_real_square && upper_imaginary_square
+                ? expr_add_simplify_owned(upper_real_square, upper_imaginary_square)
+                : NULL;
+    if (upper_real_square && upper_imaginary_square) {
+        upper_real_square = NULL;
+        upper_imaginary_square = NULL;
+    }
+    lower = lower_real_square && lower_imaginary_square
+                ? expr_add_simplify_owned(lower_real_square, lower_imaginary_square)
+                : NULL;
+    if (lower_real_square && lower_imaginary_square) {
+        lower_real_square = NULL;
+        lower_imaginary_square = NULL;
+    }
+    ratio = upper && lower ? expr_div(upper, lower) : NULL;
+    ratio_log = ratio ? expr_log(ratio) : NULL;
+    real_part = ratio_log ? expr_mul_simplify_owned(expr_new_const(NUM_QUARTER), ratio_log) : NULL;
+    if (ratio_log)
+        ratio_log = NULL;
+
+    two_imaginary = expr_double_arg(imaginary);
+    real_square = expr_cartesian_square(real);
+    imaginary_square = expr_cartesian_square(imaginary);
+    if (real_square && imaginary_square) {
+        expr_t *real_difference = expr_sub_simplify_owned(expr_const_one(), real_square);
+
+        real_square = NULL;
+        if (real_difference) {
+            angle_denominator = expr_sub_simplify_owned(real_difference, imaginary_square);
+            imaginary_square = NULL;
+        }
+    }
+    angle = two_imaginary && angle_denominator ? expr_atan2(two_imaginary, angle_denominator) : NULL;
+    imaginary_part = angle ? expr_mul_simplify_owned(expr_new_const(NUM_HALF), angle) : NULL;
+    if (angle)
+        angle = NULL;
+    if (!real_part || !imaginary_part)
+        goto cleanup;
+    *real_out = real_part;
+    *imaginary_out = imaginary_part;
+    real_part = NULL;
+    imaginary_part = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(angle);
+    expr_free(angle_denominator);
+    expr_free(imaginary_square);
+    expr_free(real_square);
+    expr_free(two_imaginary);
+    expr_free(ratio_log);
+    expr_free(ratio);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(lower_imaginary_square);
+    expr_free(upper_imaginary_square);
+    expr_free(lower_real_square);
+    expr_free(upper_real_square);
+    expr_free(real_minus_one);
+    expr_free(real_plus_one);
+    return ok;
+}
+
+static bool expr_cartesian_reciprocal_argument(const expr_t *real, const expr_t *imaginary, expr_t **real_out,
+                                               expr_t **imaginary_out)
+{
+    expr_t *real_squared = expr_cartesian_square(real);
+    expr_t *imaginary_squared = expr_cartesian_square(imaginary);
+    expr_t *norm = NULL;
+    expr_t *reciprocal_real = NULL;
+    expr_t *reciprocal_imaginary = NULL;
+    bool ok = false;
+
+    if (real_squared && imaginary_squared) {
+        norm = expr_add_simplify_owned(real_squared, imaginary_squared);
+        real_squared = NULL;
+        imaginary_squared = NULL;
+    }
+    reciprocal_real = norm ? expr_div(real, norm) : NULL;
+    reciprocal_imaginary = norm ? expr_div(imaginary, norm) : NULL;
+    if (!reciprocal_real || !reciprocal_imaginary)
+        goto cleanup;
+    *real_out = reciprocal_real;
+    *imaginary_out = reciprocal_imaginary;
+    reciprocal_real = NULL;
+    reciprocal_imaginary = NULL;
+    ok = true;
+
+cleanup:
+    expr_free(reciprocal_imaginary);
+    expr_free(reciprocal_real);
+    expr_free(norm);
+    expr_free(imaginary_squared);
+    expr_free(real_squared);
+    return ok;
+}
+
 expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_node)
 {
     const expr_t *left;
     const expr_t *right;
     const expr_t *real;
     const expr_t *imaginary = NULL;
+    const expr_t *real_orientation_source = NULL;
+    const expr_t *imaginary_orientation_source = NULL;
     expr_t *owned_real = NULL;
     expr_t *owned_imaginary = NULL;
-    expr_t *real_part;
-    expr_t *imaginary_coefficient;
+    expr_t *owned_reciprocal_real = NULL;
+    expr_t *owned_reciprocal_imaginary = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_coefficient = NULL;
     expr_t *imaginary_unit;
     expr_t *imaginary_part;
     expr_t *out;
     expr_t *simplified;
     int imaginary_sign;
     bool subtract;
-    bool cosine = expr_is_op(op, &ops_cos);
+    bool reciprocal = expr_is_op(op, &ops_sec) || expr_is_op(op, &ops_cosec) || expr_is_op(op, &ops_cot) ||
+                      expr_is_op(op, &ops_sech) || expr_is_op(op, &ops_cosech) || expr_is_op(op, &ops_coth);
+    bool cosine = expr_is_op(op, &ops_cos) || expr_is_op(op, &ops_sec);
     bool exponential = expr_is_op(op, &ops_exp);
-    bool hyperbolic_cosine = expr_is_op(op, &ops_cosh);
-    bool hyperbolic_sine = expr_is_op(op, &ops_sinh);
-    bool hyperbolic_tangent = expr_is_op(op, &ops_tanh);
-    bool inverse_tangent = expr_is_op(op, &ops_atan);
+    bool hyperbolic_cosine = expr_is_op(op, &ops_cosh) || expr_is_op(op, &ops_sech);
+    bool hyperbolic_sine = expr_is_op(op, &ops_sinh) || expr_is_op(op, &ops_cosech);
+    bool hyperbolic_tangent = expr_is_op(op, &ops_tanh) || expr_is_op(op, &ops_coth);
+    bool inverse_sine = expr_is_op(op, &ops_asin) || expr_is_op(op, &ops_acosec);
+    bool inverse_cosine = expr_is_op(op, &ops_acos) || expr_is_op(op, &ops_asec);
+    bool inverse_tangent = expr_is_op(op, &ops_atan) || expr_is_op(op, &ops_acot);
+    bool inverse_cotangent = expr_is_op(op, &ops_acot);
+    bool inverse_hyperbolic_sine = expr_is_op(op, &ops_asinh) || expr_is_op(op, &ops_acosech);
+    bool inverse_hyperbolic_cosine = expr_is_op(op, &ops_acosh) || expr_is_op(op, &ops_asech);
+    bool inverse_hyperbolic_tangent = expr_is_op(op, &ops_atanh) || expr_is_op(op, &ops_acoth);
+    bool reciprocal_inverse = expr_is_op(op, &ops_asec) || expr_is_op(op, &ops_acosec) ||
+                              expr_is_op(op, &ops_asech) ||
+                              expr_is_op(op, &ops_acosech) || expr_is_op(op, &ops_acoth);
+    expr_op_kind_t inverse_kind = inverse_sine        ? EXPR_KIND_ASIN
+                                  : inverse_cosine    ? EXPR_KIND_ACOS
+                                  : inverse_tangent   ? EXPR_KIND_ATAN
+                                  : inverse_hyperbolic_sine
+                                      ? EXPR_KIND_ASINH
+                                  : inverse_hyperbolic_cosine ? EXPR_KIND_ACOSH
+                                                               : EXPR_KIND_ATANH;
     bool logarithm = expr_is_op(op, &ops_log);
     bool common_logarithm = expr_is_op(op, &ops_log10);
-    bool sine = expr_is_op(op, &ops_sin);
-    bool tangent = expr_is_op(op, &ops_tan);
+    bool sine = expr_is_op(op, &ops_sin) || expr_is_op(op, &ops_cosec);
+    bool tangent = expr_is_op(op, &ops_tan) || expr_is_op(op, &ops_cot);
+    bool scaled_cartesian = false;
+    bool parsed_has_imaginary = false;
+    bool legacy_direct_cartesian = false;
 
     if ((!sine && !cosine && !tangent && !hyperbolic_sine && !hyperbolic_cosine && !hyperbolic_tangent &&
-         !exponential && !logarithm && !common_logarithm && !inverse_tangent) ||
+         !exponential && !logarithm && !common_logarithm && !inverse_sine && !inverse_cosine && !inverse_tangent &&
+         !inverse_hyperbolic_sine && !inverse_hyperbolic_cosine && !inverse_hyperbolic_tangent) ||
         !arg_node)
         return NULL;
 
     if (expr_is_op(arg_node, &ops_add) || expr_is_op(arg_node, &ops_sub)) {
+        const expr_t *probe_real = NULL;
+        expr_t *probe_imaginary = NULL;
+        int probe_sign = 1;
+
+        legacy_direct_cartesian =
+            expr_cartesian_sum_parts_owned(arg_node, &probe_real, &probe_imaginary, &probe_sign);
+        expr_free(probe_imaginary);
+    }
+
+    if (!legacy_direct_cartesian &&
+        expr_cartesian_parts_for_display(arg_node, &owned_real, &owned_imaginary, &parsed_has_imaginary) &&
+        parsed_has_imaginary) {
+        real = owned_real;
+        imaginary = owned_imaginary;
+        imaginary_sign = 1;
+        scaled_cartesian = true;
+    } else {
+        expr_free(owned_imaginary);
+        expr_free(owned_real);
+        owned_imaginary = NULL;
+        owned_real = NULL;
+    }
+
+    if (!scaled_cartesian && expr_is_op(arg_node, &ops_mul)) {
+        const expr_t *cartesian_real = NULL;
+        const expr_t *scale = NULL;
+        expr_t *cartesian_imaginary = NULL;
+
+        if (expr_cartesian_sum_parts_owned(arg_node->a, &cartesian_real, &cartesian_imaginary, &imaginary_sign) &&
+            !expr_contains_i_unit_factor(arg_node->b)) {
+            scale = arg_node->b;
+        } else {
+            expr_free(cartesian_imaginary);
+            cartesian_imaginary = NULL;
+            if (expr_cartesian_sum_parts_owned(arg_node->b, &cartesian_real, &cartesian_imaginary, &imaginary_sign) &&
+                !expr_contains_i_unit_factor(arg_node->a))
+                scale = arg_node->a;
+        }
+        owned_real = scale ? expr_mul_simplify_owned(expr_clone(scale), expr_clone(cartesian_real)) : NULL;
+        owned_imaginary = scale ? expr_mul_simplify_owned(expr_clone(scale), cartesian_imaginary) : NULL;
+        if (scale)
+            cartesian_imaginary = NULL;
+        expr_free(cartesian_imaginary);
+        scaled_cartesian = owned_real && owned_imaginary;
+        if (scaled_cartesian)
+            real = owned_real;
+    } else if (!scaled_cartesian && expr_is_op(arg_node, &ops_div) && !expr_contains_i_unit_factor(arg_node->b)) {
+        const expr_t *cartesian_real = NULL;
+        expr_t *cartesian_imaginary = NULL;
+
+        if (expr_cartesian_sum_parts_owned(arg_node->a, &cartesian_real, &cartesian_imaginary, &imaginary_sign)) {
+            owned_real = expr_div_simplify_owned(expr_clone(cartesian_real), expr_clone(arg_node->b));
+            owned_imaginary = expr_div_simplify_owned(cartesian_imaginary, expr_clone(arg_node->b));
+            cartesian_imaginary = NULL;
+            scaled_cartesian = owned_real && owned_imaginary;
+            if (scaled_cartesian)
+                real = owned_real;
+        }
+        expr_free(cartesian_imaginary);
+    }
+
+    if (scaled_cartesian) {
+        imaginary = owned_imaginary;
+    } else if (expr_is_op(arg_node, &ops_add) || expr_is_op(arg_node, &ops_sub)) {
         left = arg_node->a;
         right = arg_node->b;
         subtract = expr_is_op(arg_node, &ops_sub);
@@ -1479,10 +2025,45 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
     }
 
     imaginary = owned_imaginary;
+    real_orientation_source = real;
+    imaginary_orientation_source = imaginary;
 
-    if (inverse_tangent) {
-        expr_t *real_squared = expr_pow(real, &NUM_TWO);
-        expr_t *imaginary_squared = expr_pow(imaginary, &NUM_TWO);
+    if (reciprocal_inverse) {
+        if (!expr_cartesian_reciprocal_argument(real, imaginary, &owned_reciprocal_real,
+                                                &owned_reciprocal_imaginary))
+            goto cleanup;
+        real = owned_reciprocal_real;
+        imaginary = owned_reciprocal_imaginary;
+        imaginary_sign = -imaginary_sign;
+    }
+
+    if (reciprocal) {
+        if (!expr_cartesian_reciprocal_unary_parts(op, real, imaginary, &real_part, &imaginary_coefficient,
+                                                   &imaginary_sign)) {
+            real_part = NULL;
+            imaginary_coefficient = NULL;
+        }
+    } else if (inverse_sine || inverse_cosine || inverse_hyperbolic_cosine) {
+        if (!expr_cartesian_inverse_elliptic_parts(inverse_kind, real, imaginary, imaginary_orientation_source,
+                                                   &real_part, &imaginary_coefficient, &imaginary_sign)) {
+            real_part = NULL;
+            imaginary_coefficient = NULL;
+        }
+    } else if (inverse_hyperbolic_sine) {
+        if (!expr_cartesian_inverse_hyperbolic_sine_parts(real, imaginary, real_orientation_source, &real_part,
+                                                          &imaginary_coefficient)) {
+            real_part = NULL;
+            imaginary_coefficient = NULL;
+        }
+    } else if (inverse_hyperbolic_tangent) {
+        if (!expr_cartesian_inverse_hyperbolic_tangent_parts(real, imaginary, &real_part,
+                                                             &imaginary_coefficient)) {
+            real_part = NULL;
+            imaginary_coefficient = NULL;
+        }
+    } else if (inverse_tangent) {
+        expr_t *real_squared = expr_cartesian_square(real);
+        expr_t *imaginary_squared = expr_cartesian_square(imaginary);
         expr_t *two_real = expr_mul_simplify_owned(expr_const_long(2L), expr_clone(real));
         expr_t *real_denominator = real_squared && imaginary_squared
                                            ? expr_sub_simplify_owned(
@@ -1492,10 +2073,10 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
         expr_t *real_angle = two_real && real_denominator ? expr_atan2(two_real, real_denominator) : NULL;
         expr_t *imaginary_plus_one = expr_add_simplify_owned(expr_clone(imaginary), expr_const_one());
         expr_t *imaginary_minus_one = expr_sub_simplify_owned(expr_clone(imaginary), expr_const_one());
-        expr_t *upper = imaginary_plus_one ? expr_pow(imaginary_plus_one, &NUM_TWO) : NULL;
-        expr_t *lower = imaginary_minus_one ? expr_pow(imaginary_minus_one, &NUM_TWO) : NULL;
-        expr_t *real_square_for_upper = expr_pow(real, &NUM_TWO);
-        expr_t *real_square_for_lower = expr_pow(real, &NUM_TWO);
+        expr_t *upper = expr_cartesian_square(imaginary_plus_one);
+        expr_t *lower = expr_cartesian_square(imaginary_minus_one);
+        expr_t *real_square_for_upper = expr_cartesian_square(real);
+        expr_t *real_square_for_lower = expr_cartesian_square(real);
         expr_t *ratio;
         expr_t *ratio_log;
 
@@ -1510,9 +2091,13 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
         expr_free(ratio);
         real_part = real_angle ? expr_mul_simplify_owned(expr_new_const(NUM_HALF), real_angle) : NULL;
         imaginary_coefficient = ratio_log ? expr_mul_simplify_owned(expr_new_const(NUM_QUARTER), ratio_log) : NULL;
+        if (inverse_cotangent && real_part) {
+            real_part = expr_sub_simplify_owned(expr_new_pi_ratio_long(1L, 2u), real_part);
+            imaginary_sign = -imaginary_sign;
+        }
     } else if (logarithm || common_logarithm) {
-        expr_t *real_squared = expr_pow(real, &NUM_TWO);
-        expr_t *imaginary_squared = expr_pow(imaginary, &NUM_TWO);
+        expr_t *real_squared = expr_cartesian_square(real);
+        expr_t *imaginary_squared = expr_cartesian_square(imaginary);
         expr_t *modulus_squared =
             real_squared && imaginary_squared ? expr_add_simplify_owned(real_squared, imaginary_squared) : NULL;
         expr_t *modulus_log = modulus_squared ? expr_log(modulus_squared) : NULL;
@@ -1563,19 +2148,32 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
     imaginary_unit = expr_new_named_const(NUM_I, "i");
     imaginary_part = imaginary_unit && imaginary_coefficient ? expr_mul(imaginary_unit, imaginary_coefficient) : NULL;
     out = real_part && imaginary_part
-              ? (imaginary_sign < 0 ? expr_sub(real_part, imaginary_part) : expr_add(real_part, imaginary_part))
+              ? expr_new_binary_internal(imaginary_sign < 0 ? &ops_sub : &ops_add, real_part, imaginary_part)
               : NULL;
+    if (out) {
+        real_part = NULL;
+        imaginary_part = NULL;
+    }
     simplified = out;
 
     expr_free(imaginary_part);
     expr_free(imaginary_unit);
     expr_free(imaginary_coefficient);
     expr_free(real_part);
+    expr_free(owned_reciprocal_imaginary);
+    expr_free(owned_reciprocal_real);
     expr_free(owned_imaginary);
     expr_free(owned_real);
     if (simplified)
         expr_free(arg_node);
     return simplified;
+
+cleanup:
+    expr_free(owned_reciprocal_imaginary);
+    expr_free(owned_reciprocal_real);
+    expr_free(owned_imaginary);
+    expr_free(owned_real);
+    return NULL;
 }
 
 static expr_t *expr_complex_unary_cartesian_for_display_recursive(const expr_t *expr, bool *changed)
@@ -1594,7 +2192,9 @@ static expr_t *expr_complex_unary_cartesian_for_display_recursive(const expr_t *
     left = expr_complex_unary_cartesian_for_display_recursive(expr->a, changed);
     if (!left)
         goto cleanup;
-    if (expr->ops->arity == EXPR_OP_BINARY) {
+    if (expr_is_pow_d_expr(expr)) {
+        rebuilt = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
         right = expr_complex_unary_cartesian_for_display_recursive(expr->b, changed);
         if (!right)
             goto cleanup;
