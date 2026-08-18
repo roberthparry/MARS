@@ -238,6 +238,8 @@ static expr_t *equ_parse_side(string_view_t side, const string_t *const *names, 
 equation_t *equ_from_text(const string_t *text)
 {
     equation_parse_parts_t parts;
+    string_t *expanded_lhs = NULL;
+    string_t *expanded_rhs = NULL;
     string_t *probe = NULL;
     expr_t *probe_expr = NULL;
     expr_bindings_t *bindings = NULL;
@@ -251,9 +253,16 @@ equation_t *equ_from_text(const string_t *text)
     if (!equ_parse_parts(text, &parts))
         return NULL;
 
+    expanded_lhs = equ_expand_arithmetic_series_side(parts.lhs);
+    expanded_rhs = equ_expand_arithmetic_series_side(parts.rhs);
+    if (!expanded_lhs || !expanded_rhs)
+        goto cleanup;
+    parts.lhs = string_view_all(expanded_lhs);
+    parts.rhs = string_view_all(expanded_rhs);
+
     probe = equ_make_binding_probe(&parts);
     if (!probe)
-        return NULL;
+        goto cleanup;
 
     probe_expr = expr_from_text(probe, &bindings);
     string_free(probe);
@@ -283,6 +292,8 @@ cleanup:
     free(names);
     expr_bindings_free(bindings);
     expr_free(probe_expr);
+    string_free(expanded_rhs);
+    string_free(expanded_lhs);
     return equation;
 }
 
