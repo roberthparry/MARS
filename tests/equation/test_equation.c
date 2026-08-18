@@ -333,6 +333,30 @@ static void test_equation_from_string_accepts_bare_equation(void)
     equ_free(equation);
 }
 
+static void test_equation_expands_arithmetic_sequence_ellipsis(void)
+{
+    const char *inputs[] = {
+        "x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430",
+        "x + 4*x + 7*x + … + 64*x = 1430",
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        equation_t *equation = equ_from_string(inputs[i]);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_long(solutions, 2L));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    ASSERT_NULL(equ_from_string("x + 2x + 4x + ... + 64x = 1430"));
+}
+
 static void test_equation_numeric_solves_all_variable_bindings(void)
 {
     equation_t *equation = equ_from_string("{ x^2 + y^2 - 5 = 0 | x = 1, y = 1 }");
@@ -1485,6 +1509,7 @@ static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
+    TEST_RUN_SUBTEST(test_equation_expands_arithmetic_sequence_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_rejects_unresolved_parameter_residual, NULL);
     TEST_RUN_SUBTEST(test_equation_to_text_round_trips_through_parser, NULL);

@@ -198,6 +198,22 @@ class EquationResultTests(unittest.TestCase):
             ],
         )
 
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
+        "release equation_lab helper is not built",
+    )
+    def test_equation_mode_solves_additive_arithmetic_sequence_ellipsis(self) -> None:
+        equation_binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        fields, raw, returncode = mars_lab.run_equation_lab_fields(
+            equation_binary,
+            "x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430",
+            64,
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "715x = 1430")
+        self.assertEqual(fields["solutions"], "x = 2")
+
 
 class MatrixResultTests(unittest.TestCase):
     def test_matrix_determinant_bar_is_not_treated_as_a_binding_separator(self) -> None:

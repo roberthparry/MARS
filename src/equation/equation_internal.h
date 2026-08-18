@@ -17,6 +17,8 @@
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
+string_t *equ_expand_arithmetic_series_side(string_view_t side);
+
 bool equ_match_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *linear_out,
                               number_t *quadratic_out);
 

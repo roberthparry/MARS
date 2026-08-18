@@ -160,6 +160,10 @@ void equ_print(const equation_t *equation);
  *   { lhs = rhs }
  *   { lhs = rhs | x = val, ...; [name] = val, ... }
  *
+ * A top-level additive arithmetic sequence may abbreviate its omitted terms
+ * with @c ... or @c … when three preceding like terms establish the common
+ * difference and one following like term supplies the endpoint.
+ *
  * The left and right sides share one symbol table, so a variable named on both
  * sides resolves to the same expr_t node. Parsed bindings are owned by the
  * returned equation and can be borrowed with equ_bindings() or
