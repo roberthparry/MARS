@@ -976,6 +976,9 @@ static int factor_power_log_order(const expr_t *left, const expr_t *right)
  * shallower expressions first so that, for example, cos(x) appears before exp(sin(x)). */
 static void sort_factors(expr_t **fac, int n)
 {
+    bool imaginary_unit_last =
+        n > 1 && expr_is_const(fac[n - 1]) && (num_eq(fac[n - 1]->c, NUM_I) || num_eq(fac[n - 1]->c, NUM_NEG_I));
+
     for (int s = 1; s < n; s++) {
         expr_t *key = fac[s];
         int kg = factor_group(key);
@@ -1007,6 +1010,18 @@ static void sort_factors(expr_t **fac, int n)
             t--;
         }
         fac[t + 1] = key;
+    }
+    if (imaginary_unit_last) {
+        for (int index = 0; index < n - 1; ++index) {
+            if (expr_is_const(fac[index]) && (num_eq(fac[index]->c, NUM_I) || num_eq(fac[index]->c, NUM_NEG_I))) {
+                expr_t *imaginary_unit = fac[index];
+
+                for (int next = index; next < n - 1; ++next)
+                    fac[next] = fac[next + 1];
+                fac[n - 1] = imaginary_unit;
+                break;
+            }
+        }
     }
 }
 

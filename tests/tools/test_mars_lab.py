@@ -2314,16 +2314,16 @@ class ExpressionResultTests(unittest.TestCase):
     )
     def test_elementary_functions_of_symbolic_complex_input_use_cartesian_form(self) -> None:
         expected_fragments = {
-            "exp": ("exp(x)·cos(y)", "i·exp(x)·sin(y)"),
-            "sin": ("sin(x)·cosh(y)", "i·cos(x)·sinh(y)"),
-            "cos": ("cos(x)·cosh(y)", "i·sin(x)·sinh(y)"),
-            "tan": ("sin(2x)", "i·sinh(2y)"),
-            "sinh": ("sinh(x)·cos(y)", "i·cosh(x)·sin(y)"),
-            "cosh": ("cosh(x)·cos(y)", "i·sinh(x)·sin(y)"),
-            "tanh": ("sinh(2x)", "i·sin(2y)"),
-            "atan": ("atan2(2x, 1 - x² - y²)", "¼i·ln("),
-            "ln": ("ln(x² + y²)", "i·atan2(y, x)"),
-            "log10": ("ln(x² + y²)", "i·atan2(y, x)"),
+            "exp": ("exp(x)·cos(y)", "exp(x)·sin(y)·i"),
+            "sin": ("sin(x)·cosh(y)", "cos(x)·sinh(y)·i"),
+            "cos": ("cos(x)·cosh(y)", "sin(x)·sinh(y)·i"),
+            "tan": ("sin(2x)", "sinh(2y)/(cos(2x) + cosh(2y))·i"),
+            "sinh": ("sinh(x)·cos(y)", "cosh(x)·sin(y)·i"),
+            "cosh": ("cosh(x)·cos(y)", "sinh(x)·sin(y)·i"),
+            "tanh": ("sinh(2x)", "sin(2y)/(cosh(2x) + cos(2y))·i"),
+            "atan": ("atan2(2x, 1 - x² - y²)", "¼·ln("),
+            "ln": ("ln(x² + y²)", "atan2(y, x)·i"),
+            "log10": ("ln(x² + y²)", "atan2(y, x)/ln(10)·i"),
         }
 
         for function, fragments in expected_fragments.items():
@@ -2336,6 +2336,8 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertNotIn(source.replace("*", "·"), fields["unbound"])
                 for fragment in fragments:
                     self.assertIn(fragment, fields["unbound"])
+                self.assertNotIn("i·", fields["unbound"])
+                self.assertTrue(fields["unbound"].endswith("·i"))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -2358,6 +2360,7 @@ class ExpressionResultTests(unittest.TestCase):
                     self.assertEqual(returncode, 0, raw)
                     self.assertIn(field, fields, raw)
                     self.assertNotIn(f"{function}(iy)", fields[field])
+                    self.assertNotIn("i·", fields[field])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -2372,7 +2375,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertNotIn("- -", fields["derivative"])
         self.assertNotIn("- -", fields["derivative_TeX"])
         self.assertNotIn("-  -", fields["derivative_function"])
-        self.assertIn("+ 2i·sinh(2x)·sin(2y)", fields["derivative"])
+        self.assertIn("- 2·sinh(2x)·sin(2y)·i", fields["derivative"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -2394,6 +2397,7 @@ class ExpressionResultTests(unittest.TestCase):
                     self.assertNotIn("/i", fields["integral"])
                     self.assertNotIn("/i", fields["integral_function"])
                     self.assertNotIn(r"}{i}", fields["integral_TeX"])
+                    self.assertIn("·i + C", fields["integral"])
 
     def test_evaluation_preserves_user_authored_expression_input(self) -> None:
         self.assertIn(
@@ -2659,8 +2663,8 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        self.assertEqual(payload["full_display_TeX"], r"\cos \theta + i\mkern-2mu \sin \theta")
-        self.assertEqual(payload["full_display_expression"], "{ cos(θ) + i·sin(θ) | θ = ? }")
+        self.assertEqual(payload["full_display_TeX"], r"\cos \theta + \sin \theta\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "{ cos(θ) + sin(θ)·i | θ = ? }")
         self.assertEqual([item["name"] for item in payload["binding_values"]], ["θ"])
 
     @unittest.skipUnless(
@@ -2687,9 +2691,9 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        self.assertEqual(payload["full_display_TeX"], r"0 + i\mkern-2mu \theta")
-        self.assertEqual(payload["full_display_expression"], "{ 0 + iθ | θ = π }")
-        self.assertIn("return 0 + i.θ.", payload["full_display_function"])
+        self.assertEqual(payload["full_display_TeX"], r"0 + \theta\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "{ 0 + θi | θ = π }")
+        self.assertIn("return 0 + θ.i.", payload["full_display_function"])
         self.assertIn("θ = @pi", payload["full_display_function"])
         self.assertIn("value", payload)
 
@@ -2721,7 +2725,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\frac{y}{\left|y\right|}", payload["full_display_TeX"])
         self.assertNotIn(r"\begin{aligned}", payload["full_display_TeX"])
         self.assertNotIn(r"\\", payload["full_display_TeX"])
-        self.assertIn(" + i", payload["full_display_expression"])
+        self.assertIn("·i |", payload["full_display_expression"])
         self.assertIn("abs(y)", payload["full_display_function"])
         self.assertNotIn("value", payload)
 
@@ -2767,10 +2771,10 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\sqrt{x^{2} + y^{2}}", fields["derivative_TeX"])
         self.assertIn(r"\left|y\right|", fields["derivative_TeX"])
         self.assertIn(r"}{y}", fields["derivative_TeX"])
-        self.assertIn(r"i\mkern-2mu", fields["derivative_TeX"])
+        self.assertIn(r"\mkern-2mu i", fields["derivative_TeX"])
         self.assertNotIn(r"\frac{1}{\sqrt{x + i\mkern-2mu y}}", fields["derivative_TeX"])
         self.assertIn("√(x² + y²)", fields["derivative"])
-        self.assertIn(" - i", fields["derivative"])
+        self.assertIn("·i", fields["derivative"])
         self.assertIn("(-1)^k", fields["derivative"])
         self.assertIn("expression roots(x, y, array const k)", fields["derivative_function"])
         self.assertIn("abs(y)", fields["derivative_function"])
@@ -2792,10 +2796,10 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(returncode, 0)
         self.assertIn("(-1)^k", fields["derivative"])
         self.assertIn("y/|y|·√(½·(√(x² + y²) - x))", fields["derivative"])
-        self.assertIn("+ i·√(½·(√(x² + y²) + x))", fields["derivative"])
+        self.assertIn("√(½·(√(x² + y²) + x))·i", fields["derivative"])
         self.assertIn(r"\begin{aligned}[t]", fields["derivative_TeX"])
         self.assertIn(r"\frac{y}{\left|y\right|}", fields["derivative_TeX"])
-        self.assertIn(r"i\mkern-2mu", fields["derivative_TeX"])
+        self.assertIn(r"\mkern-2mu i", fields["derivative_TeX"])
         self.assertIn(r"\\[0.65em]", fields["derivative_TeX"])
         self.assertIn("array const k)", fields["derivative_function"])
 
@@ -2866,16 +2870,16 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(
             payload["full_display_TeX"],
             r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{13} + 2\right)} + "
-            r"i\mkern-2mu \sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{13} - 2\right)}",
+            r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{13} - 2\right)}\mkern-2mu i",
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "√(½·(√(13) + 2)) + i·√(½·(√(13) - 2))",
+            "√(½·(√(13) + 2)) + √(½·(√(13) - 2))·i",
         )
         function = payload["full_display_function"]
         self.assertIn("const $[sqrt(13)] = sqrt(13).", function)
         self.assertIn(
-            "return sqrt(($[sqrt(13)] + 2)/2) + i.sqrt(($[sqrt(13)] - 2)/2).",
+            "return sqrt(($[sqrt(13)] + 2)/2) + sqrt(($[sqrt(13)] - 2)/2).i.",
             function,
         )
         self.assertIn(" + ", payload["value"])
@@ -2908,16 +2912,16 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(
             payload["full_display_TeX"],
             r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{2} + 1\right)} + "
-            r"i\mkern-2mu \sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{2} - 1\right)}",
+            r"\sqrt{\frac{1}{2}\mkern-2mu \left(\sqrt{2} - 1\right)}\mkern-2mu i",
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))",
+            "√(½·(√(2) + 1)) + √(½·(√(2) - 1))·i",
         )
         function = payload["full_display_function"]
         self.assertIn("const $[sqrt(2)] = sqrt(2).", function)
         self.assertIn(
-            "return sqrt(($[sqrt(2)] + 1)/2) + i.sqrt(($[sqrt(2)] - 1)/2).",
+            "return sqrt(($[sqrt(2)] + 1)/2) + sqrt(($[sqrt(2)] - 1)/2).i.",
             function,
         )
         self.assertTrue(payload["value"].endswith("i"))
@@ -2949,16 +2953,16 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(
             payload["full_display_TeX"],
             r"\frac{1}{2\mkern-2mu \sqrt[3]{2}}\mkern-2mu "
-            r"\left(\sqrt{3} + 1 + i\mkern-2mu \left(\sqrt{3} - 1\right)\right)",
+            r"\left(\sqrt{3} + 1 + \left(\sqrt{3} - 1\right)\mkern-2mu i\right)",
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "1/(2·cubrt(2))·(√(3) + 1 + i·(√(3) - 1))",
+            "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)",
         )
         function = payload["full_display_function"]
         self.assertIn("const $[sqrt(3)] = sqrt(3).", function)
         self.assertIn(
-            "return 1/(2.cubrt(2)).($[sqrt(3)] + 1 + i.($[sqrt(3)] - 1)).",
+            "return 1/(2.cubrt(2)).($[sqrt(3)] + 1 + ($[sqrt(3)] - 1).i).",
             function,
         )
         self.assertEqual(
@@ -3018,12 +3022,12 @@ class ExpressionResultTests(unittest.TestCase):
             payload["full_display_TeX"],
             r"\frac{1}{\sqrt{2}}\mkern-2mu "
             r"\left(\sqrt{\sqrt[4]{2} + \sqrt{\frac{\sqrt{2} + 1}{2}}} + "
-            r"i\mkern-2mu \sqrt{\sqrt[4]{2} - \sqrt{\frac{\sqrt{2} + 1}{2}}}\right)",
+            r"\sqrt{\sqrt[4]{2} - \sqrt{\frac{\sqrt{2} + 1}{2}}}\mkern-2mu i\right)",
         )
         self.assertEqual(
             payload["full_display_expression"],
             "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-            "i·√(root(2, 4) - √(1/2·(√(2) + 1))))",
+            "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)",
         )
         function = payload["full_display_function"]
         self.assertIn("const $[sqrt(2)] = sqrt(2).", function)
@@ -3031,7 +3035,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("const c1 = ($[sqrt(2)] + 1)/2.", function)
         self.assertIn("const c2 = sqrt(c1).", function)
         self.assertIn(
-            "return 1/$[sqrt(2)].(sqrt($[root(2,4)] + c2) + i.sqrt($[root(2,4)] - c2)).",
+            "return 1/$[sqrt(2)].(sqrt($[root(2,4)] + c2) + sqrt($[root(2,4)] - c2).i).",
             function,
         )
         self.assertEqual(
@@ -3086,7 +3090,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("    const c2 = sqrt(c1).", payload["full_display_function"])
         self.assertIn(
             "    return 1/$[sqrt(2)].exp(i.k.π/2)."
-            "(sqrt($[root(2,4)] + c2) + i.sqrt($[root(2,4)] - c2)).",
+            "(sqrt($[root(2,4)] + c2) + sqrt($[root(2,4)] - c2).i).",
             payload["full_display_function"],
         )
         self.assertTrue(all(len(line) <= 130 for line in payload["full_display_function"].splitlines()))
@@ -3122,7 +3126,7 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        principal_expression = "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))"
+        principal_expression = "√(½·(√(2) + 1)) + √(½·(√(2) - 1))·i"
         self.assertEqual(
             payload["full_display_expression"],
             f"{{ ({principal_expression})·(-1)^k | ; k = [0, 1] }}",
@@ -3618,9 +3622,9 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        self.assertEqual(payload["full_display_TeX"], r"x + i\mkern-2mu y")
-        self.assertEqual(payload["full_display_expression"], "{ x + iy | x = ?, y = ? }")
-        self.assertIn("return x + i.y.", payload["full_display_function"])
+        self.assertEqual(payload["full_display_TeX"], r"x + y\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "{ x + yi | x = ?, y = ? }")
+        self.assertIn("return x + y.i.", payload["full_display_function"])
 
         bound_expression = "{ " + expression + " | x = 3, y = 2 }"
         bound_fields, _, bound_returncode = mars_lab.run_mars_lab_fields(
@@ -3640,8 +3644,8 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        self.assertEqual(bound_payload["full_display_TeX"], r"x + i\mkern-2mu y")
-        self.assertEqual(bound_payload["full_display_expression"], "{ x + iy | x = 3, y = 2 }")
+        self.assertEqual(bound_payload["full_display_TeX"], r"x + y\mkern-2mu i")
+        self.assertEqual(bound_payload["full_display_expression"], "{ x + yi | x = 3, y = 2 }")
         self.assertEqual(bound_payload["value"], "3 + 2i")
 
     @unittest.skipUnless(
@@ -3668,9 +3672,9 @@ class ExpressionResultTests(unittest.TestCase):
             action="integral",
         )
 
-        self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + i\mkern-2mu y} + C")
-        self.assertEqual(payload["integral"], "∫dx = { 2·√(x + iy) + C | x = ?, y = ?; C = ? }")
-        self.assertIn("return 2.(x + i.y)^½ + C.", payload["full_display_integral_function"])
+        self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + y\mkern-2mu i} + C")
+        self.assertEqual(payload["integral"], "∫dx = { 2·√(x + yi) + C | x = ?, y = ?; C = ? }")
+        self.assertIn("return 2.(x + y.i)^½ + C.", payload["full_display_integral_function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4193,7 +4197,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(
             expression["unbound"],
             "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-            "i·√(root(2, 4) - √(1/2·(√(2) + 1))))",
+            "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)",
         )
         self.assertEqual(
             expression["value"],
@@ -4203,8 +4207,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
 
         # README examples: symbolic complex elementary functions use Cartesian output.
         for source, expected in (
-            ("exp(x+i*y)", "exp(x)·cos(y) + i·exp(x)·sin(y)"),
-            ("sin(i*y)", "0 + i·sinh(y)"),
+            ("exp(x+i*y)", "exp(x)·cos(y) + exp(x)·sin(y)·i"),
+            ("sin(i*y)", "0 + sinh(y)·i"),
         ):
             with self.subTest(readme_example=source):
                 expression, raw, returncode = mars_lab.run_mars_lab_fields(

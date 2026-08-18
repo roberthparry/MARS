@@ -52,6 +52,14 @@ expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr
 expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *name);
 
 /**
+ * @brief Place the imaginary unit last in Cartesian coefficients for display.
+ *
+ * @param expr Cartesian expression whose imaginary coefficients should be reordered.
+ * @return Owning reordered expression, or `NULL` when no reorder is required.
+ */
+expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
+
+/**
  * @brief Write a symbolic reciprocal square root in Cartesian surd form for display.
  *
  * @param expr Expression to rewrite.
