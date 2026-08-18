@@ -200,6 +200,14 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
                 result = final_rotated;
             }
         }
+        if (result) {
+            expr_t *imaginary_unit_last = expr_move_imaginary_unit_last_for_display(result);
+
+            if (imaginary_unit_last) {
+                expr_free(result);
+                result = imaginary_unit_last;
+            }
+        }
         expr_free(cartesian_unary);
         expr_free(rotated_cartesian);
         expr_free(reciprocal_cartesian);

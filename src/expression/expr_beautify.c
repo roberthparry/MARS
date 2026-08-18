@@ -147,6 +147,32 @@ cleanup:
     return coefficient;
 }
 
+static expr_t *expr_beautify_extract_imaginary_numeric_coefficient_for_display(const expr_t *expr, int *sign_out)
+{
+    number_t value = number_invalid();
+    number_t real = number_invalid();
+    number_t imaginary = number_invalid();
+    number_t magnitude = number_invalid();
+    expr_t *coefficient = NULL;
+
+    if (!expr || !sign_out || !expr_match_const_value(expr, &value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    if (!num_is_zero(real) || num_is_zero(imaginary))
+        goto cleanup;
+    magnitude = num_abs(imaginary);
+    coefficient = expr_new_const(magnitude);
+    *sign_out = num_sign(imaginary);
+
+cleanup:
+    num_destroy(&magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return coefficient;
+}
+
 static expr_t *expr_beautify_simplified_square_root(const expr_t *argument)
 {
     number_t value = number_invalid();
@@ -1104,12 +1130,14 @@ cleanup:
 static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
                                                    size_t *capacity);
 
-static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t *expr, int *sign_out)
+static expr_t *expr_beautify_extract_imaginary_product_coefficient_internal(const expr_t *expr, int *sign_out,
+                                                                            bool split_numeric_coefficient)
 {
     const expr_t *numerator;
     const expr_t *denominator;
     const expr_t **factors = NULL;
     expr_t *coefficient = NULL;
+    expr_t *imaginary_magnitude = NULL;
     size_t count = 0u;
     size_t capacity = 0u;
     size_t imaginary_index = SIZE_MAX;
@@ -1127,7 +1155,8 @@ static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t 
             goto cleanup;
         }
 
-        coefficient = expr_beautify_extract_imaginary_product_coefficient(numerator, sign_out);
+        coefficient =
+            expr_beautify_extract_imaginary_product_coefficient_internal(numerator, sign_out, split_numeric_coefficient);
         quotient = coefficient ? expr_div(coefficient, denominator) : NULL;
         expr_free(coefficient);
         coefficient = quotient;
@@ -1140,10 +1169,20 @@ static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t 
         if (imaginary_index == SIZE_MAX && expr_beautify_i_unit_sign(factors[index], &factor_sign)) {
             imaginary_index = index;
             sign = factor_sign;
+            continue;
+        }
+        if (split_numeric_coefficient && imaginary_index == SIZE_MAX) {
+            imaginary_magnitude =
+                expr_beautify_extract_imaginary_numeric_coefficient_for_display(factors[index], &factor_sign);
+            if (imaginary_magnitude) {
+                imaginary_index = index;
+                sign = factor_sign;
+            }
         }
     }
     if (imaginary_index == SIZE_MAX)
         goto cleanup;
+    coefficient = imaginary_magnitude ? expr_clone(imaginary_magnitude) : NULL;
     for (size_t index = 0u; index < count; ++index) {
         expr_t *factor;
 
@@ -1165,8 +1204,14 @@ static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t 
     *sign_out = sign;
 
 cleanup:
+    expr_free(imaginary_magnitude);
     free((void *)factors);
     return coefficient;
+}
+
+static expr_t *expr_beautify_extract_imaginary_product_coefficient(const expr_t *expr, int *sign_out)
+{
+    return expr_beautify_extract_imaginary_product_coefficient_internal(expr, sign_out, false);
 }
 
 static expr_t *expr_beautify_division_by_imaginary_unit_for_display(const expr_t *expr)
@@ -1429,6 +1474,112 @@ expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *
     expr_free(rest);
     expr_free(constant);
     return out;
+}
+
+static expr_t *expr_beautify_imaginary_unit_last_term(const expr_t *expr, bool *changed)
+{
+    expr_t *coefficient = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *out = NULL;
+    int sign = 1;
+
+    coefficient = expr_beautify_extract_imaginary_product_coefficient_internal(expr, &sign, true);
+    if (!coefficient || expr_beautify_is_one(coefficient)) {
+        expr_free(coefficient);
+        return expr_clone(expr);
+    }
+
+    imaginary_unit = expr_new_const(NUM_I);
+    out = imaginary_unit ? expr_new_binary_internal(&ops_mul, coefficient, imaginary_unit) : NULL;
+    if (out) {
+        coefficient = NULL;
+        imaginary_unit = NULL;
+        if (sign < 0) {
+            expr_t *negative = expr_new_unary_internal(&ops_neg, out);
+
+            if (negative)
+                out = negative;
+        }
+        *changed = true;
+    }
+    expr_free(imaginary_unit);
+    expr_free(coefficient);
+    return out;
+}
+
+static bool expr_beautify_contains_add_sub(const expr_t *expr)
+{
+    if (!expr || !expr->ops || expr->ops->arity == EXPR_OP_ATOM)
+        return false;
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub))
+        return true;
+    return expr_beautify_contains_add_sub(expr->a) || expr_beautify_contains_add_sub(expr->b);
+}
+
+static expr_t *expr_beautify_imaginary_unit_last_recursive(const expr_t *expr, bool *changed)
+{
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+    bool term_changed = false;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_neg)) {
+        left = expr_beautify_imaginary_unit_last_recursive(expr->a, changed);
+        out = left ? expr_new_unary_internal(&ops_neg, left) : NULL;
+        if (out)
+            left = NULL;
+        expr_free(left);
+        return out;
+    }
+    if (!expr_is_op(expr, &ops_add) && !expr_is_op(expr, &ops_sub)) {
+        out = expr_beautify_imaginary_unit_last_term(expr, &term_changed);
+        if (term_changed) {
+            *changed = true;
+            return out;
+        }
+        if (!expr_beautify_contains_add_sub(expr))
+            return out;
+        expr_free(out);
+        out = NULL;
+    }
+
+    left = expr_beautify_imaginary_unit_last_recursive(expr->a, changed);
+    if (!left)
+        goto cleanup;
+    if (expr_is_pow_d_expr(expr)) {
+        out = expr_new_pow_const_internal(left, expr->c);
+    } else if (expr->ops->arity == EXPR_OP_BINARY) {
+        right = expr_beautify_imaginary_unit_last_recursive(expr->b, changed);
+        if (!right)
+            goto cleanup;
+        out = expr_new_binary_internal(expr->ops, left, right);
+    } else {
+        out = expr_new_unary_internal(expr->ops, left);
+    }
+    if (out) {
+        left = NULL;
+        right = NULL;
+    }
+
+cleanup:
+    expr_free(right);
+    expr_free(left);
+    return out;
+}
+
+/* Place the imaginary unit last in Cartesian coefficients for presentation. */
+expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr)
+{
+    bool changed = false;
+    expr_t *rewrite = expr_beautify_imaginary_unit_last_recursive(expr, &changed);
+
+    if (!changed) {
+        expr_free(rewrite);
+        return NULL;
+    }
+    return rewrite;
 }
 
 static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
