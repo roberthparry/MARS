@@ -176,6 +176,7 @@
     },
     "test_diffequ_applies_affine_factorized_initial_conditions": true,
     "test_diffequ_applies_dependent_square_boundary": true,
+    "test_diffequ_applies_initial_condition_to_exact_differential_form": true,
     "test_diffequ_applies_quadratic_characteristic_boundary": true,
     "test_diffequ_applies_signed_dependent_square_boundary": true,
     "test_diffequ_constructs_from_equation": true,
