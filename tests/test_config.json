@@ -229,6 +229,7 @@
     "test_diffequ_solves_degree_six_characteristic_polynomial": true,
     "test_diffequ_solves_dependent_square_characteristic_pde": true,
     "test_diffequ_solves_derivative_quadratic_problem": true,
+    "test_diffequ_solves_divided_differential_form": true,
     "test_diffequ_solves_exact_differential_form": true,
     "test_diffequ_solves_exponential_characteristics": true,
     "test_diffequ_solves_exponential_reaction_forcing": true,

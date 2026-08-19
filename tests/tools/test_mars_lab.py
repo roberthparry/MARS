@@ -1868,6 +1868,45 @@ solutions y = final
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_solves_a_leading_divided_differential_form(
+        self,
+    ) -> None:
+        source = (
+            "dx/sqrt(x^2+y^2) + "
+            "(1/y - x/(y*sqrt(x^2+y^2)))dy = 0; y(2) = 1"
+        )
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                source,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "exact first-order")
+        self.assertEqual(
+            payload["solutions"],
+            "y = √((√(5) + 2)·(√(5) - 2x + 2))",
+        )
+        self.assertIn(r"\frac{1}{\sqrt{x^{2} + y^{2}}}\,dx", payload["problem_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_linearizes_the_modified_emden_equation(self) -> None:
         completed = subprocess.run(
             [
