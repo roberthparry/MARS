@@ -1903,6 +1903,30 @@ solutions y = final
         )
         self.assertIn(r"\frac{1}{\sqrt{x^{2} + y^{2}}}\,dx", payload["problem_TeX"])
 
+        family_completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                source.split(";", 1)[0],
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        family_payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(family_completed.stdout)
+        )
+
+        self.assertEqual(family_payload["status"], "solved")
+        self.assertEqual(family_payload["solver"], "exact first-order")
+        self.assertEqual(family_payload["solutions"], "y = ±C·√(1 - 2x/C)")
+        self.assertIn(r"\pm", family_payload["solutions_TeX"])
+
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",

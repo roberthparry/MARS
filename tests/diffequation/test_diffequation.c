@@ -350,13 +350,20 @@ static void test_diffequ_applies_initial_condition_to_exact_differential_form(vo
 static void test_diffequ_solves_divided_differential_form(void)
 {
     const char *source = "dx/sqrt(x^2+y^2) + (1/y - x/(y*sqrt(x^2+y^2)))dy = 0; y(2) = 1";
+    const char *family_source = "dx/sqrt(x^2+y^2) + (1/y - x/(y*sqrt(x^2+y^2)))dy = 0";
     diffequ_t *de = de_from_string(source);
+    diffequ_t *family_de = de_from_string(family_source);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    diffequ_solve_result_t *family_result = family_de ? de_solve(family_de) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    const equation_t *family_solution = family_result ? de_solve_result_at(family_result, 0u) : NULL;
     string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    string_t *family_solution_text = family_solution ? equ_to_text(family_solution, style_UNBOUND) : NULL;
 
     EXPECT_POINTER("parsed divided differential form", de, true);
+    EXPECT_POINTER("parsed unconditioned divided differential form", family_de, true);
     EXPECT_POINTER("divided differential-form result", result, true);
+    EXPECT_POINTER("unconditioned divided differential-form result", family_result, true);
     EXPECT_LONG("divided differential-form status", result ? (long)de_solve_result_status(result) : -1L,
                 (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("divided differential-form solver", result ? (long)de_solve_result_solver(result) : -1L,
@@ -364,9 +371,21 @@ static void test_diffequ_solves_divided_differential_form(void)
     EXPECT_LONG("divided differential-form solution count", result ? (long)de_solve_result_count(result) : -1L, 1L);
     EXPECT_TEXT("divided differential-form branch", solution_text ? string_c_str(solution_text) : NULL,
                 "y = √((√(5) + 2)·(√(5) - 2x + 2))");
+    EXPECT_LONG("unconditioned divided differential-form status",
+                family_result ? (long)de_solve_result_status(family_result) : -1L, (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG("unconditioned divided differential-form solver",
+                family_result ? (long)de_solve_result_solver(family_result) : -1L,
+                (long)DE_SOLVER_EXACT_FIRST_ORDER);
+    EXPECT_LONG("unconditioned divided differential-form solution count",
+                family_result ? (long)de_solve_result_count(family_result) : -1L, 1L);
+    EXPECT_TEXT("unconditioned divided differential-form family",
+                family_solution_text ? string_c_str(family_solution_text) : NULL, "y = ±C·√(1 - 2x/C)");
 
+    string_free(family_solution_text);
     string_free(solution_text);
+    de_solve_result_free(family_result);
     de_solve_result_free(result);
+    de_free(family_de);
     de_free(de);
 }
 

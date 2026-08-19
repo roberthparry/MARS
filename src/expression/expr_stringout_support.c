@@ -215,6 +215,8 @@ int expr_tostring_is_simple_name(const char *name)
 
     if (!name || !*name)
         return 0;
+    if (strcmp(name, "±") == 0)
+        return 1;
 
     text = string_new_with(name);
     cursor = text ? string_cursor_new(text) : NULL;

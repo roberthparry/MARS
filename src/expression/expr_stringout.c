@@ -2162,6 +2162,10 @@ void emit_TeX_name(sbuf_t *b, const char *name)
         sbuf_puts(b, "x");
         return;
     }
+    if (strcmp(name, "±") == 0) {
+        sbuf_puts(b, "\\pm");
+        return;
+    }
 
     if (expr_tostring_is_simple_name(name)) {
         tex = expr_tostring_texify(name);
