@@ -464,8 +464,9 @@ static char *de_normalize_differential_form(const char *source, bool *converted_
         for (size_t i = 0u; i < marker_count; ++i) {
             bool is_independent = strcmp(markers[i].name, variables[independent]) == 0;
             bool needs_multiply = de_previous_character_ends_factor(source, markers[i].start, equation_start);
+            size_t prefix_length = markers[i].start - copied;
 
-            if (string_append_chars(out, source + copied, markers[i].start - copied) != 0)
+            if (prefix_length > 0u && string_append_chars(out, source + copied, prefix_length) != 0)
                 goto cleanup;
             if (is_independent) {
                 if (!needs_multiply && string_append_char(out, '1') != 0)

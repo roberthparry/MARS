@@ -185,6 +185,156 @@ cleanup:
     return solved;
 }
 
+static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t *independent,
+                                               const expr_t *dependent, const expr_t *dependent_coefficient,
+                                               const expr_t *independent_coefficient, equation_t **solutions_out,
+                                               size_t *solution_count_out)
+{
+    const expr_t *condition_point = NULL;
+    const expr_t *condition_value = NULL;
+    expr_t *independent_square = NULL;
+    expr_t *dependent_square = NULL;
+    expr_t *radius_square = NULL;
+    expr_t *radius = NULL;
+    expr_t *expected_independent = NULL;
+    expr_t *dependent_radius = NULL;
+    expr_t *radial_ratio = NULL;
+    expr_t *expected_dependent = NULL;
+    expr_t *point_square = NULL;
+    expr_t *value_square = NULL;
+    expr_t *condition_radius_square = NULL;
+    expr_t *condition_radius = NULL;
+    expr_t *constant = NULL;
+    expr_t *constant_square = NULL;
+    expr_t *constant_times_independent = NULL;
+    expr_t *twice_constant_times_independent = NULL;
+    expr_t *radicand = NULL;
+    expr_t *root = NULL;
+    expr_t *candidates[2] = {NULL, NULL};
+    bool has_initial_condition = de_find_initial_condition(de, dependent, &condition_point, &condition_value);
+    number_t condition_number = has_initial_condition ? expr_eval(condition_value) : num_new();
+    int condition_sign = num_is_finite(condition_number) ? num_sign(condition_number) : 0;
+    de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
+
+    independent_square = expr_pow_long(independent, 2L);
+    dependent_square = expr_pow_long(dependent, 2L);
+    radius_square = independent_square && dependent_square
+                        ? expr_add_simplify_owned(independent_square, dependent_square)
+                        : NULL;
+    if (independent_square && dependent_square) {
+        independent_square = NULL;
+        dependent_square = NULL;
+    }
+    radius = radius_square ? expr_sqrt(radius_square) : NULL;
+    expected_independent = radius ? expr_div_simplify_owned(expr_const_one(), expr_clone(radius)) : NULL;
+    dependent_radius = radius ? expr_mul_simplify_owned(expr_clone(dependent), expr_clone(radius)) : NULL;
+    radial_ratio = dependent_radius
+                       ? expr_div_simplify_owned(expr_clone(independent), dependent_radius)
+                       : NULL;
+    if (dependent_radius)
+        dependent_radius = NULL;
+    expected_dependent = radial_ratio
+                             ? expr_sub_simplify_owned(
+                                   expr_div_simplify_owned(expr_const_one(), expr_clone(dependent)), radial_ratio)
+                             : NULL;
+    if (radial_ratio)
+        radial_ratio = NULL;
+    if (!expected_independent || !expected_dependent ||
+        !expr_struct_eq(independent_coefficient, expected_independent) ||
+        !expr_struct_eq(dependent_coefficient, expected_dependent))
+        goto cleanup;
+
+    attempt = DE_ATTEMPT_FAILED;
+    if (has_initial_condition) {
+        point_square = expr_pow_long(condition_point, 2L);
+        value_square = expr_pow_long(condition_value, 2L);
+        condition_radius_square = point_square && value_square
+                                      ? expr_add_simplify_owned(point_square, value_square)
+                                      : NULL;
+        if (point_square && value_square) {
+            point_square = NULL;
+            value_square = NULL;
+        }
+        condition_radius = condition_radius_square ? expr_sqrt(condition_radius_square) : NULL;
+        constant = condition_radius
+                       ? expr_add_simplify_owned(expr_clone(condition_point), condition_radius)
+                       : NULL;
+        if (condition_radius)
+            condition_radius = NULL;
+    } else {
+        constant = de_arbitrary_constant();
+    }
+    constant_square = constant ? expr_pow_long(constant, 2L) : NULL;
+    constant_times_independent = constant
+                                     ? expr_mul_simplify_owned(expr_clone(constant), expr_clone(independent))
+                                     : NULL;
+    twice_constant_times_independent = constant_times_independent
+                                           ? expr_mul_long(constant_times_independent, 2L)
+                                           : NULL;
+    radicand = constant_square && twice_constant_times_independent
+                   ? expr_sub_simplify_owned(constant_square, twice_constant_times_independent)
+                   : NULL;
+    if (constant_square && twice_constant_times_independent) {
+        constant_square = NULL;
+        twice_constant_times_independent = NULL;
+    }
+    root = radicand ? expr_sqrt(radicand) : NULL;
+    root = expr_simplify_owned(root);
+    if (!root)
+        goto cleanup;
+
+    candidates[0] = root;
+    root = NULL;
+    candidates[1] = expr_negate_owned(expr_clone(candidates[0]));
+    for (size_t i = 0u; i < 2u; ++i) {
+        size_t output_index = *solution_count_out;
+
+        if (!candidates[i])
+            continue;
+        if (has_initial_condition &&
+            !de_exact_solution_matches_condition(candidates[i], independent, condition_point, condition_value) &&
+            !((i == 0u && condition_sign > 0) || (i == 1u && condition_sign < 0)))
+            continue;
+        solutions_out[output_index] = equ_new(dependent, candidates[i]);
+        if (!solutions_out[output_index])
+            goto cleanup;
+        (*solution_count_out)++;
+    }
+    if (*solution_count_out > 0u)
+        attempt = DE_ATTEMPT_SOLVED;
+
+cleanup:
+    if (attempt != DE_ATTEMPT_SOLVED) {
+        for (size_t i = 0u; i < *solution_count_out; ++i) {
+            equ_free(solutions_out[i]);
+            solutions_out[i] = NULL;
+        }
+        *solution_count_out = 0u;
+    }
+    expr_free(candidates[1]);
+    expr_free(candidates[0]);
+    expr_free(root);
+    expr_free(radicand);
+    expr_free(twice_constant_times_independent);
+    expr_free(constant_times_independent);
+    expr_free(constant_square);
+    expr_free(constant);
+    expr_free(condition_radius);
+    expr_free(condition_radius_square);
+    expr_free(value_square);
+    expr_free(point_square);
+    expr_free(expected_dependent);
+    expr_free(radial_ratio);
+    expr_free(dependent_radius);
+    expr_free(expected_independent);
+    expr_free(radius);
+    expr_free(radius_square);
+    expr_free(dependent_square);
+    expr_free(independent_square);
+    num_destroy(&condition_number);
+    return attempt;
+}
+
 de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                           const expr_t *first_derivative, const expr_t *residual,
                                           equation_t **solutions_out, size_t *solution_count_out)
@@ -211,6 +361,7 @@ de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *ind
     const expr_t *condition_value = NULL;
     equation_solutions_t isolated = {0};
     bool has_initial_condition = false;
+    de_attempt_t radial_log_form = DE_ATTEMPT_NOT_MATCHED;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
     if (!de || !independent || !dependent || !first_derivative || !residual || !solutions_out || !solution_count_out)
@@ -224,6 +375,13 @@ de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *ind
 
     if (!de_linear_decompose(residual, first_derivative, &dependent_coefficient, &independent_coefficient))
         goto cleanup;
+
+    radial_log_form = de_attempt_radial_log_form(de, independent, dependent, dependent_coefficient,
+                                                 independent_coefficient, solutions_out, solution_count_out);
+    if (radial_log_form != DE_ATTEMPT_NOT_MATCHED) {
+        attempt = radial_log_form;
+        goto cleanup;
+    }
 
     dependent_coefficient_dx = expr_create_deriv(dependent_coefficient, independent);
     independent_coefficient_dy = expr_create_deriv(independent_coefficient, dependent);
