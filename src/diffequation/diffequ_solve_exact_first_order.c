@@ -205,6 +205,13 @@ static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t
     expr_t *condition_radius_square = NULL;
     expr_t *condition_radius = NULL;
     expr_t *constant = NULL;
+    expr_t *two_independent = NULL;
+    expr_t *scaled_independent = NULL;
+    expr_t *normalised_radicand = NULL;
+    expr_t *normalised_root = NULL;
+    expr_t *scaled_root = NULL;
+    expr_t *plus_minus = NULL;
+    expr_t *signed_family = NULL;
     expr_t *constant_square = NULL;
     expr_t *constant_times_independent = NULL;
     expr_t *twice_constant_times_independent = NULL;
@@ -264,6 +271,29 @@ static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t
     } else {
         constant = de_arbitrary_constant();
     }
+    if (!has_initial_condition) {
+        two_independent = expr_mul_long(independent, 2L);
+        scaled_independent = two_independent
+                                 ? expr_div_simplify_owned(two_independent, expr_clone(constant))
+                                 : NULL;
+        if (two_independent)
+            two_independent = NULL;
+        normalised_radicand = scaled_independent
+                                  ? expr_sub_simplify_owned(expr_const_one(), scaled_independent)
+                                  : NULL;
+        if (scaled_independent)
+            scaled_independent = NULL;
+        normalised_root = normalised_radicand ? expr_sqrt(normalised_radicand) : NULL;
+        scaled_root = constant && normalised_root ? expr_mul(constant, normalised_root) : NULL;
+        plus_minus = expr_new_named_const(NUM_NAN, "±");
+        signed_family = plus_minus && scaled_root ? expr_mul(plus_minus, scaled_root) : NULL;
+        solutions_out[0] = signed_family ? equ_new(dependent, signed_family) : NULL;
+        if (!solutions_out[0])
+            goto cleanup;
+        *solution_count_out = 1u;
+        attempt = DE_ATTEMPT_SOLVED;
+        goto cleanup;
+    }
     constant_square = constant ? expr_pow_long(constant, 2L) : NULL;
     constant_times_independent = constant
                                      ? expr_mul_simplify_owned(expr_clone(constant), expr_clone(independent))
@@ -318,6 +348,13 @@ cleanup:
     expr_free(twice_constant_times_independent);
     expr_free(constant_times_independent);
     expr_free(constant_square);
+    expr_free(signed_family);
+    expr_free(plus_minus);
+    expr_free(scaled_root);
+    expr_free(normalised_root);
+    expr_free(normalised_radicand);
+    expr_free(scaled_independent);
+    expr_free(two_independent);
     expr_free(constant);
     expr_free(condition_radius);
     expr_free(condition_radius_square);
