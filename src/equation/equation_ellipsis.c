@@ -171,6 +171,48 @@ static int equ_series_append_slice(string_t *output, const char *text, size_t st
     return status;
 }
 
+static bool equ_series_sum_coefficients(long long first, long long second, long long third, long long last,
+                                        long long *sum_out)
+{
+    const __int128 first_difference = (__int128)second - (__int128)first;
+    const __int128 second_difference = (__int128)third - 2 * (__int128)second + (__int128)first;
+    __int128 endpoint_index = -1;
+    __int128 count;
+    __int128 pair_count;
+    __int128 triple_count;
+    __int128 sum;
+
+    if (second_difference == 0) {
+        const __int128 endpoint_delta = (__int128)last - (__int128)first;
+
+        if (first_difference == 0 || endpoint_delta % first_difference != 0)
+            return false;
+        endpoint_index = endpoint_delta / first_difference;
+    } else {
+        for (__int128 index = 3; index < 1000000; ++index) {
+            const __int128 term = (__int128)first + index * first_difference +
+                                  index * (index - 1) / 2 * second_difference;
+
+            if (term == (__int128)last) {
+                endpoint_index = index;
+                break;
+            }
+        }
+    }
+    if (endpoint_index < 3 || endpoint_index >= 1000000)
+        return false;
+
+    count = endpoint_index + 1;
+    pair_count = count * (count - 1) / 2;
+    triple_count = count * (count - 1) * (count - 2) / 6;
+    sum = count * (__int128)first + pair_count * first_difference + triple_count * second_difference;
+    if (sum < LLONG_MIN || sum > LLONG_MAX)
+        return false;
+
+    *sum_out = (long long)sum;
+    return true;
+}
+
 static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out)
 {
     const char *text = string_c_str(side);
@@ -181,9 +223,7 @@ static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out
     long long second = 0;
     long long third = 0;
     long long last = 0;
-    long long step;
-    long long count;
-    __int128 sum;
+    long long sum;
     char *first_factor = NULL;
     char *second_factor = NULL;
     char *third_factor = NULL;
@@ -216,17 +256,7 @@ static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out
         strcmp(first_factor, last_factor) != 0)
         goto unsupported;
 
-    step = second - first;
-    if (step == 0 || third - second != step || (last - first) % step != 0)
-        goto unsupported;
-    count = (last - first) / step + 1;
-    if (count < 4 || count > 1000000)
-        goto unsupported;
-    sum = (__int128)count * ((__int128)first + (__int128)last);
-    if (sum % 2 != 0)
-        goto unsupported;
-    sum /= 2;
-    if (sum < LLONG_MIN || sum > LLONG_MAX)
+    if (!equ_series_sum_coefficients(first, second, third, last, &sum))
         goto unsupported;
 
     output = string_new();
@@ -234,7 +264,7 @@ static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out
         equ_series_append_slice(output, text, 0u, equ_series_trim(text, terms[ellipsis_index - 3u]).start) != 0)
         goto allocation_failure;
     if (!*first_factor) {
-        if (string_append_format(output, "%lld", (long long)sum) < 0)
+        if (string_append_format(output, "%lld", sum) < 0)
             goto allocation_failure;
     } else if (sum == 1) {
         if (string_append_cstr(output, first_factor) != 0)
@@ -242,7 +272,7 @@ static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out
     } else if (sum == -1) {
         if (string_append_char(output, '-') != 0 || string_append_cstr(output, first_factor) != 0)
             goto allocation_failure;
-    } else if (string_append_format(output, "%lld*(%s)", (long long)sum, first_factor) < 0) {
+    } else if (string_append_format(output, "%lld*(%s)", sum, first_factor) < 0) {
         goto allocation_failure;
     }
     if (equ_series_append_slice(output, text, equ_series_trim(text, terms[ellipsis_index + 1u]).end,
@@ -258,7 +288,8 @@ static string_t *equ_series_expand_once(const string_t *side, bool *expanded_out
     return output;
 
 unsupported:
-    fprintf(stderr, "equ_from_text: ellipsis must abbreviate an arithmetic sequence of like additive terms\n");
+    fprintf(stderr,
+            "equ_from_text: ellipsis must abbreviate an arithmetic or quadratic sequence of like additive terms\n");
     output = NULL;
     goto cleanup;
 
@@ -275,7 +306,7 @@ cleanup:
     return output;
 }
 
-string_t *equ_expand_arithmetic_series_side(string_view_t side)
+string_t *equ_expand_polynomial_series_side(string_view_t side)
 {
     string_t *current = string_from_view(&side);
 
@@ -296,6 +327,6 @@ string_t *equ_expand_arithmetic_series_side(string_view_t side)
     }
 
     string_free(current);
-    fprintf(stderr, "equ_from_text: too many arithmetic sequence ellipses\n");
+    fprintf(stderr, "equ_from_text: too many polynomial sequence ellipses\n");
     return NULL;
 }

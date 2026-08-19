@@ -253,8 +253,8 @@ equation_t *equ_from_text(const string_t *text)
     if (!equ_parse_parts(text, &parts))
         return NULL;
 
-    expanded_lhs = equ_expand_arithmetic_series_side(parts.lhs);
-    expanded_rhs = equ_expand_arithmetic_series_side(parts.rhs);
+    expanded_lhs = equ_expand_polynomial_series_side(parts.lhs);
+    expanded_rhs = equ_expand_polynomial_series_side(parts.rhs);
     if (!expanded_lhs || !expanded_rhs)
         goto cleanup;
     parts.lhs = string_view_all(expanded_lhs);

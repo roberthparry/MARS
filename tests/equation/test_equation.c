@@ -81,6 +81,25 @@ static bool test_equation_result_contains_long(const equation_solve_result_t *re
     return false;
 }
 
+static bool test_equation_result_contains_fraction(const equation_solve_result_t *result, long numerator,
+                                                   long denominator)
+{
+    number_t expected = num_create_from_frac(numerator, denominator);
+    bool found = false;
+
+    for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
+        number_t value = expr_eval(equ_rhs(RESULT_SOLUTION(result, i)));
+
+        found = num_eq(value, expected);
+        num_destroy(&value);
+        if (found)
+            break;
+    }
+
+    num_destroy(&expected);
+    return found;
+}
+
 static bool test_equation_result_has_solution_for(const equation_solve_result_t *result, const expr_t *wrt)
 {
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
@@ -333,15 +352,19 @@ static void test_equation_from_string_accepts_bare_equation(void)
     equ_free(equation);
 }
 
-static void test_equation_expands_arithmetic_sequence_ellipsis(void)
+static void test_equation_expands_polynomial_sequence_ellipsis(void)
 {
-    const char *inputs[] = {
+    const char *arithmetic_inputs[] = {
         "x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430",
         "x + 4*x + 7*x + … + 64*x = 1430",
     };
+    const char *quadratic_inputs[] = {
+        "x+4x+9x+...+100x = 20",
+        "x + 4*x + 9*x + 16*x + … + 100*x = 20",
+    };
 
-    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
-        equation_t *equation = equ_from_string(inputs[i]);
+    for (size_t i = 0u; i < sizeof(arithmetic_inputs) / sizeof(arithmetic_inputs[0]); ++i) {
+        equation_t *equation = equ_from_string(arithmetic_inputs[i]);
         equation_solutions_t *solutions;
 
         ASSERT_NOT_NULL(equation);
@@ -349,6 +372,20 @@ static void test_equation_expands_arithmetic_sequence_ellipsis(void)
         ASSERT_NOT_NULL(solutions);
         ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
         ASSERT_TRUE(test_equation_result_contains_long(solutions, 2L));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    for (size_t i = 0u; i < sizeof(quadratic_inputs) / sizeof(quadratic_inputs[0]); ++i) {
+        equation_t *equation = equ_from_string(quadratic_inputs[i]);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_fraction(solutions, 4L, 77L));
 
         equ_solutions_free(solutions);
         equ_free(equation);
@@ -1509,7 +1546,7 @@ static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
-    TEST_RUN_SUBTEST(test_equation_expands_arithmetic_sequence_ellipsis, NULL);
+    TEST_RUN_SUBTEST(test_equation_expands_polynomial_sequence_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_rejects_unresolved_parameter_residual, NULL);
     TEST_RUN_SUBTEST(test_equation_to_text_round_trips_through_parser, NULL);

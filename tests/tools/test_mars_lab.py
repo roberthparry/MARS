@@ -202,17 +202,20 @@ class EquationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
         "release equation_lab helper is not built",
     )
-    def test_equation_mode_solves_additive_arithmetic_sequence_ellipsis(self) -> None:
+    def test_equation_mode_solves_additive_polynomial_sequence_ellipsis(self) -> None:
         equation_binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
-        fields, raw, returncode = mars_lab.run_equation_lab_fields(
-            equation_binary,
-            "x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430",
-            64,
+        cases = (
+            ("x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430", "715x = 1430", "x = 2"),
+            ("x + 4x + 9x + 16x + ... + 100x = 20", "385x = 20", "x = ⁴⁄₇₇"),
         )
 
-        self.assertEqual(returncode, 0, raw)
-        self.assertEqual(fields["unbound"], "715x = 1430")
-        self.assertEqual(fields["solutions"], "x = 2")
+        for source, expected_equation, expected_solution in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_equation_lab_fields(equation_binary, source, 64)
+
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["unbound"], expected_equation)
+                self.assertEqual(fields["solutions"], expected_solution)
 
 
 class MatrixResultTests(unittest.TestCase):
