@@ -1835,6 +1835,39 @@ solutions y = final
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_helper_applies_an_initial_condition_to_an_exact_differential_form(
+        self,
+    ) -> None:
+        completed = subprocess.run(
+            [
+                str(
+                    ROOT
+                    / "build"
+                    / "release"
+                    / "scratch"
+                    / "diffequation_lab"
+                ),
+                "(x^2+y^2)dx + 2xy dy = 0; y(2) = 1",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = mars_lab.prepare_diffequation_fields(
+            mars_lab.parse_diffequation_lab_output(completed.stdout)
+        )
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "exact first-order")
+        self.assertEqual(payload["solutions"], "y = √(1/(3x)·(14 - x³))")
+        self.assertIn(r"14 - x^{3}", payload["solutions_TeX"])
+        self.assertNotIn(r"\ln", payload["solutions_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_helper_linearizes_the_modified_emden_equation(self) -> None:
         completed = subprocess.run(
             [

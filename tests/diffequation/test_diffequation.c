@@ -324,6 +324,29 @@ static void test_diffequ_solves_exact_differential_form(void)
     de_free(de);
 }
 
+static void test_diffequ_applies_initial_condition_to_exact_differential_form(void)
+{
+    diffequ_t *de = de_from_string("(x^2+y^2)dx + 2xy dy = 0; y(2) = 1");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    EXPECT_POINTER("parsed conditioned exact differential form", de, true);
+    EXPECT_POINTER("conditioned exact differential-form result", result, true);
+    EXPECT_LONG("conditioned exact differential-form status", result ? (long)de_solve_result_status(result) : -1L,
+                (long)DE_SOLVE_STATUS_SOLVED);
+    EXPECT_LONG("conditioned exact differential-form solver", result ? (long)de_solve_result_solver(result) : -1L,
+                (long)DE_SOLVER_EXACT_FIRST_ORDER);
+    EXPECT_LONG("conditioned exact differential-form solution count",
+                result ? (long)de_solve_result_count(result) : -1L, 1L);
+    EXPECT_TEXT("conditioned exact differential-form branch", solution_text ? string_c_str(solution_text) : NULL,
+                "y = √(1/(3x)·(14 - x³))");
+
+    string_free(solution_text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
 static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
 {
     const char *source = "y'' + 4y = 0";
@@ -2863,6 +2886,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_parses_greek_differential_forms);
     RUN_TEST_CASE(test_diffequ_solves_exact_differential_form);
+    RUN_TEST_CASE(test_diffequ_applies_initial_condition_to_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);

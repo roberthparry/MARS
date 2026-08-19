@@ -63,6 +63,128 @@ cleanup:
     return out;
 }
 
+static expr_t *de_exact_solution_constant(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
+                                          const expr_t *potential)
+{
+    const expr_t *point = NULL;
+    const expr_t *value = NULL;
+    expr_t *at_value = NULL;
+    expr_t *at_point = NULL;
+
+    if (de->condition_count == 0u)
+        return de_arbitrary_constant();
+    if (de->condition_count != 1u || !de_find_initial_condition(de, dependent, &point, &value))
+        return NULL;
+
+    at_value = expr_substitute(potential, dependent, value);
+    at_point = at_value ? expr_substitute(at_value, independent, point) : NULL;
+    expr_free(at_value);
+    return at_point ? expr_simplify_owned(at_point) : NULL;
+}
+
+static bool de_exact_solution_matches_condition(const expr_t *rhs, const expr_t *independent, const expr_t *point,
+                                                const expr_t *value)
+{
+    expr_t *at_point = expr_substitute(rhs, independent, point);
+    expr_t *difference = at_point ? expr_sub_simplify_owned(at_point, expr_clone(value)) : NULL;
+    bool matches = difference && expr_is_exact_zero(difference);
+
+    expr_free(difference);
+    return matches;
+}
+
+static bool de_exact_conditioned_square_solutions(const expr_t *potential, const expr_t *constant,
+                                                  const expr_t *independent, const expr_t *dependent,
+                                                  const expr_t *condition_point, const expr_t *condition_value,
+                                                  equation_t **solutions_out, size_t *solution_count_out)
+{
+    expr_t *polynomial_constant = NULL;
+    expr_t *polynomial_linear = NULL;
+    expr_t *polynomial_quadratic = NULL;
+    expr_t *numerator = NULL;
+    expr_t *scale_expression = NULL;
+    expr_t *scaled_denominator = NULL;
+    expr_t *radicand = NULL;
+    expr_t *root = NULL;
+    expr_t *candidates[2] = {NULL, NULL};
+    const expr_t *unscaled_numerator = NULL;
+    number_t numerator_scale = num_new();
+    number_t reciprocal_scale = num_new();
+    bool solved = false;
+
+    if (!equ_match_symbolic_quadratic_expr(potential, dependent, &polynomial_constant, &polynomial_linear,
+                                           &polynomial_quadratic) ||
+        !expr_is_exact_zero(polynomial_linear))
+        goto cleanup;
+
+    numerator = expr_sub_simplify_owned(expr_clone(constant), polynomial_constant);
+    polynomial_constant = NULL;
+    if (numerator && expr_match_scaled_expr(numerator, &numerator_scale, &unscaled_numerator) &&
+        num_sign(numerator_scale) != 0 && !num_eq(numerator_scale, NUM_ONE)) {
+        num_destroy(&reciprocal_scale);
+        reciprocal_scale = num_inv(numerator_scale);
+        scale_expression = expr_new_const(reciprocal_scale);
+        scaled_denominator = scale_expression
+                                 ? expr_mul_simplify_owned(scale_expression, polynomial_quadratic)
+                                 : NULL;
+        if (scale_expression) {
+            polynomial_quadratic = NULL;
+            scale_expression = NULL;
+        }
+        radicand = scaled_denominator
+                       ? expr_div_simplify_owned(expr_clone(unscaled_numerator), scaled_denominator)
+                       : NULL;
+        if (scaled_denominator)
+            scaled_denominator = NULL;
+    } else if (numerator) {
+        radicand = expr_div_simplify_owned(numerator, polynomial_quadratic);
+        numerator = NULL;
+        polynomial_quadratic = NULL;
+    }
+    root = radicand ? expr_sqrt(radicand) : NULL;
+    root = expr_simplify_owned(root);
+    if (!root)
+        goto cleanup;
+
+    candidates[0] = root;
+    root = NULL;
+    candidates[1] = expr_negate_owned(expr_clone(candidates[0]));
+    for (size_t i = 0u; i < 2u; ++i) {
+        size_t output_index = *solution_count_out;
+
+        if (!candidates[i] ||
+            !de_exact_solution_matches_condition(candidates[i], independent, condition_point, condition_value))
+            continue;
+        solutions_out[output_index] = equ_new(dependent, candidates[i]);
+        if (!solutions_out[output_index])
+            goto cleanup;
+        (*solution_count_out)++;
+    }
+    solved = *solution_count_out > 0u;
+
+cleanup:
+    if (!solved) {
+        for (size_t i = 0u; i < *solution_count_out; ++i) {
+            equ_free(solutions_out[i]);
+            solutions_out[i] = NULL;
+        }
+        *solution_count_out = 0u;
+    }
+    expr_free(candidates[1]);
+    expr_free(candidates[0]);
+    expr_free(root);
+    expr_free(radicand);
+    expr_free(scaled_denominator);
+    expr_free(scale_expression);
+    expr_free(numerator);
+    expr_free(polynomial_quadratic);
+    expr_free(polynomial_linear);
+    expr_free(polynomial_constant);
+    num_destroy(&reciprocal_scale);
+    num_destroy(&numerator_scale);
+    return solved;
+}
+
 de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                           const expr_t *first_derivative, const expr_t *residual,
                                           equation_t **solutions_out, size_t *solution_count_out)
@@ -85,11 +207,16 @@ de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *ind
     equation_t *implicit_solution = NULL;
     equation_t *isolation_solution = NULL;
     const equation_t *equation_to_isolate = NULL;
+    const expr_t *condition_point = NULL;
+    const expr_t *condition_value = NULL;
     equation_solutions_t isolated = {0};
+    bool has_initial_condition = false;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
-    if (!de || !independent || !dependent || !first_derivative || !residual || !solutions_out || !solution_count_out ||
-        de->condition_count != 0u)
+    if (!de || !independent || !dependent || !first_derivative || !residual || !solutions_out || !solution_count_out)
+        goto cleanup;
+    has_initial_condition = de_find_initial_condition(de, dependent, &condition_point, &condition_value);
+    if (de->condition_count != 0u && (!has_initial_condition || de->condition_count != 1u))
         goto cleanup;
     *solution_count_out = 0u;
     solutions_out[0] = NULL;
@@ -127,13 +254,21 @@ de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *ind
         potential = NULL;
         correction = NULL;
     }
-    constant = de_arbitrary_constant();
+    constant = de_exact_solution_constant(de, independent, dependent, complete_potential);
     implicit_solution = complete_potential && constant ? equ_new(complete_potential, constant) : NULL;
     if (!implicit_solution)
         goto cleanup;
 
+    if (has_initial_condition &&
+        de_exact_conditioned_square_solutions(complete_potential, constant, independent, dependent, condition_point,
+                                              condition_value, solutions_out, solution_count_out)) {
+        attempt = DE_ATTEMPT_SOLVED;
+        goto cleanup;
+    }
+
     equation_to_isolate = implicit_solution;
-    if (equ_match_symbolic_quadratic_expr(complete_potential, dependent, &polynomial_constant, &polynomial_linear,
+    if (!has_initial_condition &&
+        equ_match_symbolic_quadratic_expr(complete_potential, dependent, &polynomial_constant, &polynomial_linear,
                                           &polynomial_quadratic)) {
         /*
          * A quadratic formula introduces 4aC in its discriminant.  Since C
@@ -151,13 +286,21 @@ de_attempt_t de_attempt_exact_first_order(const diffequ_t *de, const expr_t *ind
         for (size_t i = 0u; i < equ_solutions_count(&isolated); ++i) {
             const equation_t *item = equ_solutions_at(&isolated, i);
             expr_t *normalized_rhs = item ? de_exact_normalize_isolated_rhs(equ_rhs(item)) : NULL;
+            size_t output_index = *solution_count_out;
 
-            solutions_out[i] = item && normalized_rhs ? equ_new(equ_lhs(item), normalized_rhs) : NULL;
+            if (has_initial_condition && normalized_rhs &&
+                !de_exact_solution_matches_condition(normalized_rhs, independent, condition_point, condition_value)) {
+                expr_free(normalized_rhs);
+                continue;
+            }
+            solutions_out[output_index] = item && normalized_rhs ? equ_new(equ_lhs(item), normalized_rhs) : NULL;
             expr_free(normalized_rhs);
-            if (!solutions_out[i])
+            if (!solutions_out[output_index])
                 goto cleanup;
             (*solution_count_out)++;
         }
+        if (*solution_count_out == 0u)
+            goto cleanup;
     } else {
         solutions_out[0] = implicit_solution;
         implicit_solution = NULL;
