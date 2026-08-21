@@ -223,9 +223,21 @@ qfloat_t qf_log(qfloat_t x)
     return y;
 }
 
+/* Provide the conventional ln shorthand for the natural logarithm. */
+qfloat_t qf_ln(qfloat_t x)
+{
+    return qf_log(x);
+}
+
 qfloat_t qf_log10(qfloat_t x)
 {
     return qf_div(qf_log(x), QF_LN10);
+}
+
+/* Provide the conventional lg shorthand for the common logarithm. */
+qfloat_t qf_lg(qfloat_t x)
+{
+    return qf_log10(x);
 }
 
 bool qf_isnan(qfloat_t x)
@@ -2802,7 +2814,7 @@ qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)
    Ei(x) asymptotic for large positive x:
    Ei(x) ~ e^x / x * Σ_{k=0..∞} k! / x^k
   ===============================================================*/
-static qfloat_t qf_ei_asymp_pos(qfloat_t x)
+static qfloat_t qf_Ei_asymp_pos(qfloat_t x)
 {
     qfloat_t one = QF_ONE;
     qfloat_t invx = qf_div(one, x);
@@ -2830,7 +2842,7 @@ static qfloat_t qf_ei_asymp_pos(qfloat_t x)
 /*===============================================================
    E1(x) asymptotic for large positive x
   ===============================================================*/
-static qfloat_t qf_e1_asymp_pos(qfloat_t x)
+static qfloat_t qf_E1_asymp_pos(qfloat_t x)
 {
     qfloat_t one = QF_ONE;
     qfloat_t invx = qf_div(one, x);
@@ -2859,7 +2871,7 @@ static qfloat_t qf_e1_asymp_pos(qfloat_t x)
    Ei(x) series for small/moderate |x|
    Ei(x) = γ + ln|x| + Σ_{k=1..∞} x^k / (k·k!)
   ===============================================================*/
-static qfloat_t qf_ei_series(qfloat_t x)
+static qfloat_t qf_Ei_series(qfloat_t x)
 {
     qfloat_t ax = qf_abs(x);
     qfloat_t zero = QF_ZERO;
@@ -2894,7 +2906,7 @@ static qfloat_t qf_ei_series(qfloat_t x)
 /*===============================================================
    Ei(x) asymptotic for large negative x
   ===============================================================*/
-static qfloat_t qf_ei_asymp_neg(qfloat_t x)
+static qfloat_t qf_Ei_asymp_neg(qfloat_t x)
 {
     qfloat_t t = qf_neg(x); /* t = -x > 0 */
 
@@ -2929,7 +2941,7 @@ static qfloat_t qf_ei_asymp_neg(qfloat_t x)
 /*===============================================================
    Ei(x) — PRIMARY ENTRY POINT (NO CF)
   ===============================================================*/
-qfloat_t qf_ei(qfloat_t x)
+qfloat_t qf_Ei(qfloat_t x)
 {
     qfloat_t zero = QF_ZERO;
     qfloat_t twelve = qf_from_double(12.0);
@@ -2938,19 +2950,19 @@ qfloat_t qf_ei(qfloat_t x)
 
     /* |x| ≤ 12: series */
     if (qf_le(ax, twelve))
-        return qf_ei_series(x);
+        return qf_Ei_series(x);
 
     if (qf_gt(x, zero))
-        return qf_ei_asymp_pos(x);
+        return qf_Ei_asymp_pos(x);
 
-    return qf_ei_asymp_neg(x);
+    return qf_Ei_asymp_neg(x);
 }
 
 /*===============================================================
    E1(x) — SECONDARY ENTRY POINT
    E1(x) = -Ei(-x) for moderate x
   ===============================================================*/
-qfloat_t qf_e1(qfloat_t x)
+qfloat_t qf_E1(qfloat_t x)
 {
     qfloat_t zero = QF_ZERO;
     qfloat_t twenty = qf_from_double(20.0);
@@ -2959,9 +2971,9 @@ qfloat_t qf_e1(qfloat_t x)
         return QF_NAN;
 
     if (qf_le(x, twenty))
-        return qf_neg(qf_ei(qf_neg(x)));
+        return qf_neg(qf_Ei(qf_neg(x)));
 
-    return qf_e1_asymp_pos(x);
+    return qf_E1_asymp_pos(x);
 }
 
 static int qf_to_integer_order(qfloat_t value, int *order)

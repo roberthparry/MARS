@@ -529,7 +529,7 @@ static expr_t *build_base_normal_cdf_term(const expr_t *u, expr_t *inverse_u, co
     return term ? mul_number_owned(term, poly_coeff) : NULL;
 }
 
-static expr_t *build_base_ei_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
+static expr_t *build_base_Ei_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
 {
     expr_t *exp_u = u ? expr_exp(u) : NULL;
     expr_t *term = build_base_with_correction(u, inverse_u, poly_coeff, exp_u, false);
@@ -538,7 +538,7 @@ static expr_t *build_base_ei_term(const expr_t *u, expr_t *inverse_u, const expr
     return term;
 }
 
-static expr_t *build_base_e1_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
+static expr_t *build_base_E1_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
 {
     expr_t *neg_u = u ? expr_neg(u) : NULL;
     expr_t *exp_neg_u = neg_u ? expr_exp(neg_u) : NULL;
@@ -678,7 +678,7 @@ static expr_t *build_linear_normal_cdf_term(const expr_t *u, expr_t *inverse_u, 
     return scale_owned_by_ratio(term, poly_coeff, 2);
 }
 
-static expr_t *build_linear_ei_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
+static expr_t *build_linear_Ei_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
 {
     expr_t *u_sq_inverse = (u_sq && inverse_u) ? expr_mul(u_sq, inverse_u) : NULL;
     expr_t *exp_u = u ? expr_exp(u) : NULL;
@@ -690,7 +690,7 @@ static expr_t *build_linear_ei_term(const expr_t *u, expr_t *inverse_u, const ex
     return scale_owned_by_ratio(term, poly_coeff, 2);
 }
 
-static expr_t *build_linear_e1_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
+static expr_t *build_linear_E1_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
 {
     expr_t *u_sq_inverse = (u_sq && inverse_u) ? expr_mul(u_sq, inverse_u) : NULL;
     expr_t *neg_u = u ? expr_neg(u) : NULL;
@@ -878,14 +878,14 @@ static const inverse_affine_rule_t inverse_affine_rules[INVERSE_AFFINE_RULE_COUN
                                                                  .build_linear_term = build_linear_normal_cdf_term,
                                                                  .build_quadratic_term = NULL},
     [EXPR_PATTERN_UNARY_EI - EXPR_PATTERN_UNARY_ASIN] = {.kind = EXPR_PATTERN_UNARY_EI,
-                                                         .antiderivative_fn = expr_ei,
-                                                         .build_base_term = build_base_ei_term,
-                                                         .build_linear_term = build_linear_ei_term,
+                                                         .antiderivative_fn = expr_Ei,
+                                                         .build_base_term = build_base_Ei_term,
+                                                         .build_linear_term = build_linear_Ei_term,
                                                          .build_quadratic_term = NULL},
     [EXPR_PATTERN_UNARY_E1 - EXPR_PATTERN_UNARY_ASIN] = {.kind = EXPR_PATTERN_UNARY_E1,
-                                                         .antiderivative_fn = expr_e1,
-                                                         .build_base_term = build_base_e1_term,
-                                                         .build_linear_term = build_linear_e1_term,
+                                                         .antiderivative_fn = expr_E1,
+                                                         .build_base_term = build_base_E1_term,
+                                                         .build_linear_term = build_linear_E1_term,
                                                          .build_quadratic_term = NULL}};
 
 static const inverse_affine_rule_t *find_inverse_affine_rule(expr_pattern_unary_affine_kind_t kind)

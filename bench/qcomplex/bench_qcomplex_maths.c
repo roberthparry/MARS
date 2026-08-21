@@ -75,8 +75,8 @@ static const bench_case_t bench_cases[] = {
                      bench_qc_gammainv_gamma_2_5_plus_0_3i),
     BENCH_UNARY_CASE("productlog_1_plus_1i", "qc_productlog(1+i)", "(1,1)", 300, qc_productlog),
     BENCH_UNARY_CASE("lambert_wm1_-0_2_-0_1i", "qc_lambert_wm1(-0.2-0.1i)", "(-0.2,-0.1)", 200, qc_lambert_wm1),
-    BENCH_UNARY_CASE("ei_1_plus_1i", "qc_ei(1+i)", "(1,1)", 300, qc_ei),
-    BENCH_UNARY_CASE("e1_1_plus_1i", "qc_e1(1+i)", "(1,1)", 300, qc_e1),
+    BENCH_UNARY_CASE("ei_1_plus_1i", "qc_Ei(1+i)", "(1,1)", 300, qc_Ei),
+    BENCH_UNARY_CASE("e1_1_plus_1i", "qc_E1(1+i)", "(1,1)", 300, qc_E1),
     BENCH_BINARY_CASE("beta_1_5_0_5__2_-0_3", "qc_beta(1.5+0.5i, 2-0.3i)", "(1.5,0.5)", "(2,-0.3)", 200, qc_beta),
     BENCH_BINARY_CASE("logbeta_1_5_0_5__2_-0_3", "qc_logbeta(1.5+0.5i, 2-0.3i)", "(1.5,0.5)", "(2,-0.3)", 200,
                       qc_logbeta)};

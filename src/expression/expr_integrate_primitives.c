@@ -1275,11 +1275,11 @@ expr_t *integrate_normal_logpdf_rule(const expr_t *expr, const expr_t *wrt)
     return div_number_owned_consuming(raw, &coeff);
 }
 
-expr_t *integrate_ei_rule(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_Ei_rule(const expr_t *expr, const expr_t *wrt)
 {
     number_t constant = num_new();
     number_t coeff = num_new();
-    expr_t *u_ei_u;
+    expr_t *u_Ei_u;
     expr_t *exp_u;
     expr_t *raw;
 
@@ -1289,21 +1289,21 @@ expr_t *integrate_ei_rule(const expr_t *expr, const expr_t *wrt)
         return NULL;
     }
 
-    u_ei_u = expr_mul(expr->a, expr);
+    u_Ei_u = expr_mul(expr->a, expr);
     exp_u = expr_exp(expr->a);
-    raw = (u_ei_u && exp_u) ? expr_sub(u_ei_u, exp_u) : NULL;
+    raw = (u_Ei_u && exp_u) ? expr_sub(u_Ei_u, exp_u) : NULL;
 
     expr_free(exp_u);
-    expr_free(u_ei_u);
+    expr_free(u_Ei_u);
     num_destroy(&constant);
     return div_number_owned_consuming(raw, &coeff);
 }
 
-expr_t *integrate_e1_rule(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_E1_rule(const expr_t *expr, const expr_t *wrt)
 {
     number_t constant = num_new();
     number_t coeff = num_new();
-    expr_t *u_e1_u;
+    expr_t *u_E1_u;
     expr_t *neg_u;
     expr_t *exp_neg_u;
     expr_t *raw;
@@ -1314,14 +1314,14 @@ expr_t *integrate_e1_rule(const expr_t *expr, const expr_t *wrt)
         return NULL;
     }
 
-    u_e1_u = expr_mul(expr->a, expr);
+    u_E1_u = expr_mul(expr->a, expr);
     neg_u = expr_neg(expr->a);
     exp_neg_u = neg_u ? expr_exp(neg_u) : NULL;
-    raw = (u_e1_u && exp_neg_u) ? expr_sub(u_e1_u, exp_neg_u) : NULL;
+    raw = (u_E1_u && exp_neg_u) ? expr_sub(u_E1_u, exp_neg_u) : NULL;
 
     expr_free(exp_neg_u);
     expr_free(neg_u);
-    expr_free(u_e1_u);
+    expr_free(u_E1_u);
     num_destroy(&constant);
     return div_number_owned_consuming(raw, &coeff);
 }

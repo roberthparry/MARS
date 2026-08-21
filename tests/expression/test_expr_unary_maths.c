@@ -207,10 +207,13 @@ void test_log(void)
 {
     expr_t *c = test_expr_new_var_d(1.5);
     expr_t *f = expr_log(c);
+    expr_t *ln_f = expr_ln(c);
 
     check_q_at(__FILE__, __LINE__, 1, "log(1.5)", expr_eval_qf(f), qf_log(qf_from_double(1.5)));
+    check_q_at(__FILE__, __LINE__, 1, "ln(1.5)", expr_eval_qf(ln_f), qf_ln(qf_from_double(1.5)));
     print_expr_of(f);
 
+    expr_free(ln_f);
     expr_free(f);
     expr_free(c);
 }
@@ -219,10 +222,13 @@ void test_log10(void)
 {
     expr_t *c = test_expr_new_var_d(1000.0);
     expr_t *f = expr_log10(c);
+    expr_t *lg_f = expr_lg(c);
 
     check_q_at(__FILE__, __LINE__, 1, "log10(1000)", expr_eval_qf(f), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "lg(1000)", expr_eval_qf(lg_f), qf_from_double(3.0));
     print_expr_of(f);
 
+    expr_free(lg_f);
     expr_free(f);
     expr_free(c);
 }
@@ -417,8 +423,8 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_normal_pdf, NULL);
     TEST_RUN_SUBTEST(test_normal_cdf, NULL);
     TEST_RUN_SUBTEST(test_normal_logpdf, NULL);
-    TEST_RUN_SUBTEST(test_ei, NULL);
-    TEST_RUN_SUBTEST(test_e1, NULL);
+    TEST_RUN_SUBTEST(test_Ei, NULL);
+    TEST_RUN_SUBTEST(test_E1, NULL);
     TEST_RUN_SUBTEST(test_beta, NULL);
     TEST_RUN_SUBTEST(test_logbeta, NULL);
     TEST_RUN_SUBTEST(test_gammainc, NULL);

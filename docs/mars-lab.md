@@ -49,12 +49,17 @@ numeric value for a selected variable.
 
 Supported elementary functions with an explicit symbolic complex argument are
 presented in Cartesian `p + qi` form. The complete set comprises `exp`, `ln`,
-`log10`; the circular functions `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`;
+`lg`; the circular functions `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`;
 their hyperbolic counterparts; and all twelve inverse circular and inverse
 hyperbolic functions. This applies to inputs written with both parts—
 `exp(x + iy)` is displayed as `exp(x)·cos(y) + exp(x)·sin(y)·i`—and to
 pure-imaginary inputs, for which `sin(iy)` is displayed as
 `0 + sinh(y)·i`.
+
+Logarithm input follows the calculator convention: `log(x)`, `log10(x)`, and
+`lg(x)` all mean the base-10 logarithm, while `ln(x)` means the natural
+logarithm. Result cards use `lg` and `ln` consistently, regardless of which
+accepted alias was entered.
 
 The derivative and integral buttons use the same separated Cartesian algebra
 for differentiation or integration with respect to either component. Their
@@ -200,8 +205,10 @@ Any unary scalar function supported by the native expression registry may be
 written around a square matrix. This includes exponential, logarithmic,
 trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density,
 Lambert W and exponential-integral families. The parser reports the canonical
-function name even when an alias such as `ln`, `log`, `Γ` or `productlog` was
-entered. Exact symbolic matrices are supported where MARSlib has an exact
+function name even when an alias such as `log`, `log10`, `Γ` or `productlog`
+was entered. In particular, `log` and `log10` report the canonical base-10 name
+`lg`, whereas natural logarithms report `ln`. Exact symbolic matrices are
+supported where MARSlib has an exact
 structured rule; otherwise, bind the entries to obtain a numeric matrix before
 applying a general numeric matrix function. Symbolic exponents on supported
 constant diagonalizable numeric square matrices are retained for any matrix
@@ -260,8 +267,8 @@ matrix. MARS Lab expands these projector expressions into a `2 x 2` matrix in
 the result cards while retaining the exact `√33` terms.
 
 MARSlib applies the spectral scalar rule before reconstructing the matrix. In
-compact notation, `d(A^x)/dx = A^x log(A)` and, when `log(A)` is invertible,
-`∫A^x dx = A^x inverse(log(A)) + C`. An eigenvalue-one projector is integrated
+compact notation, `d(A^x)/dx = A^x ln(A)` and, when `ln(A)` is invertible,
+`∫A^x dx = A^x inverse(ln(A)) + C`. An eigenvalue-one projector is integrated
 as a linear term rather than divided by zero. The same machinery supports
 ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.

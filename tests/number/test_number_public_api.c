@@ -29,8 +29,10 @@ void run_number_public_api_tests(void)
         number_t complex_quot = num_div(div_lhs, div_rhs);
         number_t wide_complex_product = num_mul(wide_complex_lhs, wide_complex_rhs);
         number_t logged = num_log(dec);
+        number_t ln_dec = num_ln(dec);
         number_t thousand = num_create_from_long(1000);
         number_t log10_thousand = num_log10(thousand);
+        number_t lg_thousand = num_lg(thousand);
         number_t rooted = num_sqrt(z);
         number_t cube_radicand = num_create_from_long(-8);
         number_t cube_root = num_cubrt(cube_radicand);
@@ -60,6 +62,8 @@ void run_number_public_api_tests(void)
         ASSERT_TRUE(num_is_exact(wide_complex_product));
         assert_number_string("num_clone(\"25/6\")", cloned, "²⁵⁄₆");
         assert_number_string("num_log10(1000)", log10_thousand, "3");
+        ASSERT_NUMBER_EQ(ln_dec, logged);
+        ASSERT_NUMBER_EQ(lg_thousand, log10_thousand);
         assert_number_string("num_floor(1.25)", floored, "1");
         assert_number_string("num_ceil(1.25)", ceiled, "2");
         assert_number_string_prefix("NUM_PI", constant, "3.141592653589793238462643383279");
@@ -99,8 +103,10 @@ void run_number_public_api_tests(void)
         num_destroy(&complex_quot);
         num_destroy(&wide_complex_product);
         num_destroy(&logged);
+        num_destroy(&ln_dec);
         num_destroy(&thousand);
         num_destroy(&log10_thousand);
+        num_destroy(&lg_thousand);
         num_destroy(&rooted);
         num_destroy(&cube_radicand);
         num_destroy(&cube_root);

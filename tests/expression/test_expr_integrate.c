@@ -774,9 +774,9 @@ static void test_integrate_affine_logs_inverse_and_specials(void)
     expr_t *erfc_arg = test_expr_add_d(x, 0.75);
     expr_t *erfc_term = expr_erfc(erfc_arg);
     expr_t *ei_arg = test_expr_add_d(x, 2.0);
-    expr_t *ei_term = expr_ei(ei_arg);
+    expr_t *ei_term = expr_Ei(ei_arg);
     expr_t *e1_arg = test_expr_add_d(x, 1.5);
-    expr_t *e1_term = expr_e1(e1_arg);
+    expr_t *e1_term = expr_E1(e1_arg);
 
     assert_antiderivative_matches("integral derivative of log(2*x + 3)", log_term, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
@@ -989,10 +989,10 @@ static void test_integrate_affine_poly_times_specials(void)
     expr_t *shifted_normal_cdf_product = expr_mul(x_plus_two, normal_cdf_x_plus_two);
     expr_t *x_normal_logpdf_x = expr_mul(x, normal_logpdf_x);
     expr_t *shifted_normal_logpdf_product = expr_mul(x_plus_two, normal_logpdf_x_plus_two);
-    expr_t *ei_x_plus_two = expr_ei(x_plus_two);
-    expr_t *e1_x_plus_two = expr_e1(x_plus_two);
-    expr_t *shifted_ei_product = expr_mul(x_plus_two, ei_x_plus_two);
-    expr_t *shifted_e1_product = expr_mul(x_plus_two, e1_x_plus_two);
+    expr_t *ei_x_plus_two = expr_Ei(x_plus_two);
+    expr_t *e1_x_plus_two = expr_E1(x_plus_two);
+    expr_t *shifted_Ei_product = expr_mul(x_plus_two, ei_x_plus_two);
+    expr_t *shifted_E1_product = expr_mul(x_plus_two, e1_x_plus_two);
     expr_t *exp_x_sin_x = expr_mul(exp_x, sin_x);
     expr_t *exp_x_cos_x = expr_mul(exp_x, cos_x);
     expr_t *exp_x_sinh_x = expr_mul(exp_x, sinh_x);
@@ -1087,9 +1087,9 @@ static void test_integrate_affine_poly_times_specials(void)
                                   sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of (x + 2)*normal_logpdf(x + 2)", shifted_normal_logpdf_product,
                                   x, points, sizeof(points) / sizeof(points[0]));
-    assert_antiderivative_matches("integral derivative of (x + 2)*Ei(x + 2)", shifted_ei_product, x, positive_points,
+    assert_antiderivative_matches("integral derivative of (x + 2)*Ei(x + 2)", shifted_Ei_product, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
-    assert_antiderivative_matches("integral derivative of (x + 2)*E1(x + 2)", shifted_e1_product, x, positive_points,
+    assert_antiderivative_matches("integral derivative of (x + 2)*E1(x + 2)", shifted_E1_product, x, positive_points,
                                   sizeof(positive_points) / sizeof(positive_points[0]));
     assert_antiderivative_matches("integral derivative of exp(x)*sin(x)", exp_x_sin_x, x, points,
                                   sizeof(points) / sizeof(points[0]));
@@ -1187,8 +1187,8 @@ static void test_integrate_affine_poly_times_specials(void)
     expr_free(sin_2x);
     expr_free(exp_2x);
     expr_free(two_x);
-    expr_free(shifted_e1_product);
-    expr_free(shifted_ei_product);
+    expr_free(shifted_E1_product);
+    expr_free(shifted_Ei_product);
     expr_free(e1_x_plus_two);
     expr_free(ei_x_plus_two);
     expr_free(shifted_erfc_product);

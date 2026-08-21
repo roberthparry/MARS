@@ -59,8 +59,8 @@ static const bench_md_row_t bench_md_rows[] = {{"exp", "num_exp(1.23456789)"},
                                                {"digamma", "num_digamma(2.345)"},
                                                {"trigamma", "num_trigamma(2.345)"},
                                                {"tetragamma", "num_tetragamma(2.345)"},
-                                               {"ei_5", "num_ei(5)"},
-                                               {"e1_5", "num_e1(5)"}};
+                                               {"ei_5", "num_Ei(5)"},
+                                               {"e1_5", "num_E1(5)"}};
 
 static int bench_markdown_enabled(void);
 static int bench_doc_iters(int base_iters);
@@ -780,8 +780,8 @@ static void run_const_case(const char *label, size_t precision, number_const_fn 
     run_binary_case("logbeta_" #PREC, "2.5", "3.5", PREC##u, num_logbeta, bench_scaled_iters(1));                      \
     run_ternary_case("beta_pdf_" #PREC, "0.5", "2.5", "3.5", PREC##u, num_beta_pdf, bench_scaled_iters(1));            \
     run_unary_case("normal_pdf_" #PREC, "0.5", PREC##u, num_normal_pdf, bench_scaled_iters(1));                        \
-    run_unary_case("ei_5_" #PREC, "5", PREC##u, num_ei, bench_scaled_iters(1));                                        \
-    run_unary_case("e1_5_" #PREC, "5", PREC##u, num_e1, bench_scaled_iters(1))
+    run_unary_case("ei_5_" #PREC, "5", PREC##u, num_Ei, bench_scaled_iters(1));                                        \
+    run_unary_case("e1_5_" #PREC, "5", PREC##u, num_E1, bench_scaled_iters(1))
 
 int main(void)
 {
@@ -900,8 +900,8 @@ int main(void)
         run_binary_case("gammainc_Q_256", "1", "1", 256u, num_gammainc_Q, bench_scaled_iters(2));
         run_binary_case("gammainc_lo_256", "1", "1", 256u, num_gammainc_lower, bench_scaled_iters(2));
         run_binary_case("gammainc_hi_256", "1", "1", 256u, num_gammainc_upper, bench_scaled_iters(2));
-        run_unary_case("ei_5_256", "5", 256u, num_ei, bench_scaled_iters(2));
-        run_unary_case("e1_5_256", "5", 256u, num_e1, bench_scaled_iters(2));
+        run_unary_case("ei_5_256", "5", 256u, num_Ei, bench_scaled_iters(2));
+        run_unary_case("e1_5_256", "5", 256u, num_E1, bench_scaled_iters(2));
     }
 
     if (bench_wants_section("selected512")) {
@@ -942,8 +942,8 @@ int main(void)
         run_binary_case("logbeta_512", "2.5", "3.5", 512u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_512", "0.5", "2.5", "3.5", 512u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_512", "0.5", 512u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_5_512", "5", 512u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_5_512", "5", 512u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_512", "5", 512u, num_Ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_512", "5", 512u, num_E1, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("selected768")) {
@@ -978,8 +978,8 @@ int main(void)
         run_unary_case("digamma_768", "2.345", 768u, num_digamma, bench_scaled_iters(1));
         run_unary_case("trigamma_768", "2.345", 768u, num_trigamma, bench_scaled_iters(1));
         run_unary_case("tetragamma_768", "2.345", 768u, num_tetragamma, bench_scaled_iters(1));
-        run_unary_case("ei_5_768", "5", 768u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_5_768", "5", 768u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_768", "5", 768u, num_Ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_768", "5", 768u, num_E1, bench_scaled_iters(1));
         run_unary_case("lambert_w0_768", "0.7", 768u, num_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_768", "-0.2", 768u, num_lambert_wm1, bench_scaled_iters(1));
     }
@@ -1022,8 +1022,8 @@ int main(void)
         run_binary_case("logbeta_1024", "2.5", "3.5", 1024u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_1024", "0.5", "2.5", "3.5", 1024u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_1024", "0.5", 1024u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_5_1024", "5", 1024u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_5_1024", "5", 1024u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_1024", "5", 1024u, num_Ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_1024", "5", 1024u, num_E1, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("selected2048")) {
@@ -1064,8 +1064,8 @@ int main(void)
         run_binary_case("logbeta_2048", "2.5", "3.5", 2048u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_2048", "0.5", "2.5", "3.5", 2048u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_2048", "0.5", 2048u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_5_2048", "5", 2048u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_5_2048", "5", 2048u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_2048", "5", 2048u, num_Ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_2048", "5", 2048u, num_E1, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("selected4096")) {
@@ -1106,8 +1106,8 @@ int main(void)
         run_binary_case("logbeta_4096", "2.5", "3.5", 4096u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_4096", "0.5", "2.5", "3.5", 4096u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_4096", "0.5", 4096u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_5_4096", "5", 4096u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_5_4096", "5", 4096u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_4096", "5", 4096u, num_Ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_4096", "5", 4096u, num_E1, bench_scaled_iters(1));
     }
 
     bench_print_markdown_table();

@@ -99,8 +99,8 @@ static matrix_t *mat_normal_logpdf_number_triangular_equal_diag(const matrix_t *
 static matrix_t *mat_lambert_w0_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_lambert_wm1_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_productlog_number_triangular_equal_diag(const matrix_t *A);
-static matrix_t *mat_ei_number_triangular_equal_diag(const matrix_t *A);
-static matrix_t *mat_e1_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_Ei_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_E1_number_triangular_equal_diag(const matrix_t *A);
 
 static matrix_t *mat_apply_unary(const matrix_t *A, void (*number_f)(void *out, const void *a),
                                  void (*expr_f)(void *out, const void *a), void (*native_f)(void *out, const void *a))
@@ -1547,14 +1547,14 @@ static matrix_t *mat_productlog_number_triangular_equal_diag(const matrix_t *A)
     return mat_number_unary_taylor_from_expr(A, expr_lambert_w0);
 }
 
-static matrix_t *mat_ei_number_triangular_equal_diag(const matrix_t *A)
+static matrix_t *mat_Ei_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_expr(A, expr_ei);
+    return mat_number_unary_taylor_from_expr(A, expr_Ei);
 }
 
-static matrix_t *mat_e1_number_triangular_equal_diag(const matrix_t *A)
+static matrix_t *mat_E1_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_expr(A, expr_e1);
+    return mat_number_unary_taylor_from_expr(A, expr_E1);
 }
 
 static matrix_t *mat_fun_expr_diagonalizable_2x2(const matrix_t *A, void (*scalar_f)(void *out, const void *in))
@@ -3732,6 +3732,12 @@ matrix_t *mat_log(const matrix_t *A)
     return R;
 }
 
+/* Provide the conventional ln shorthand for the principal matrix logarithm. */
+matrix_t *mat_ln(const matrix_t *A)
+{
+    return mat_log(A);
+}
+
 matrix_t *mat_log10(const matrix_t *A)
 {
     matrix_t *L = mat_log(A);
@@ -3748,6 +3754,12 @@ matrix_t *mat_log10(const matrix_t *A)
     mat_free(L);
 
     return R;
+}
+
+/* Provide the conventional lg shorthand for the principal matrix common logarithm. */
+matrix_t *mat_lg(const matrix_t *A)
+{
+    return mat_log10(A);
 }
 
 matrix_t *mat_sin(const matrix_t *A)
@@ -3785,6 +3797,80 @@ matrix_t *mat_tan(const matrix_t *A)
     return mat_apply_unary(A, number_elem.fun->tan, expr_elem.fun->tan,
                            A && A->elem && A->elem->fun ? A->elem->fun->tan : NULL);
 }
+
+#define DEFINE_MATRIX_UNARY_FUNCTION(name)                                                                               \
+    matrix_t *mat_##name(const matrix_t *A)                                                                              \
+    {                                                                                                                    \
+        return mat_apply_unary(A, number_elem.fun->name, expr_elem.fun->name,                                            \
+                               A && A->elem && A->elem->fun ? A->elem->fun->name : NULL);                                \
+    }
+
+/* Apply the scalar secant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(sec)
+/* Apply the scalar cosecant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(cosec)
+/* Apply the scalar cotangent through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(cot)
+/* Apply the scalar versed sine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(versin)
+/* Apply the scalar versed cosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(vercos)
+/* Apply the scalar coversed sine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(coversin)
+/* Apply the scalar coversed cosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(covercos)
+/* Apply the scalar haversine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(haversin)
+/* Apply the scalar havercosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(havercos)
+/* Apply the scalar hacoversine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(hacoversin)
+/* Apply the scalar hacovercosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(hacovercos)
+/* Apply the scalar hyperbolic secant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(sech)
+/* Apply the scalar hyperbolic cosecant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(cosech)
+/* Apply the scalar hyperbolic cotangent through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(coth)
+/* Apply the principal scalar cube root through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(cubrt)
+/* Apply the principal scalar arcsecant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(asec)
+/* Apply the principal scalar arccosecant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(acosec)
+/* Apply the principal scalar arccotangent through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(acot)
+/* Apply the principal inverse scalar versed sine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(arcversin)
+/* Apply the principal inverse scalar versed cosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(arcvercos)
+/* Apply the principal inverse scalar coversed sine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(arccoversin)
+/* Apply the principal inverse scalar coversed cosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(arccovercos)
+/* Apply the principal inverse scalar haversine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(archaversin)
+/* Apply the principal inverse scalar havercosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(archavercos)
+/* Apply the principal inverse scalar hacoversine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(archacoversin)
+/* Apply the principal inverse scalar hacovercosine through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(archacovercos)
+/* Apply the principal inverse scalar hyperbolic secant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(asech)
+/* Apply the principal inverse scalar hyperbolic cosecant through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(acosech)
+/* Apply the principal inverse scalar hyperbolic cotangent through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(acoth)
+/* Apply the analytically continued scalar Riemann zeta function through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(zeta)
+/* Apply the scalar Riemann zeta derivative through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(zetap)
+/* Apply the principal scalar dilogarithm through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(dilog)
+
+#undef DEFINE_MATRIX_UNARY_FUNCTION
 
 matrix_t *mat_sinh(const matrix_t *A)
 {
@@ -4104,11 +4190,11 @@ matrix_t *mat_productlog(const matrix_t *A)
                            A && A->elem && A->elem->fun ? A->elem->fun->productlog : NULL);
 }
 
-matrix_t *mat_ei(const matrix_t *A)
+matrix_t *mat_Ei(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&
         (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) && mat_number_diagonal_equal_local(A)) {
-        matrix_t *structured = mat_ei_number_triangular_equal_diag(A);
+        matrix_t *structured = mat_Ei_number_triangular_equal_diag(A);
         if (structured)
             return structured;
     }
@@ -4116,11 +4202,11 @@ matrix_t *mat_ei(const matrix_t *A)
                            A && A->elem && A->elem->fun ? A->elem->fun->ei : NULL);
 }
 
-matrix_t *mat_e1(const matrix_t *A)
+matrix_t *mat_E1(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&
         (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) && mat_number_diagonal_equal_local(A)) {
-        matrix_t *structured = mat_e1_number_triangular_equal_diag(A);
+        matrix_t *structured = mat_E1_number_triangular_equal_diag(A);
         if (structured)
             return structured;
     }

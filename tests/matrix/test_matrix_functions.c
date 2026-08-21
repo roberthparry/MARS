@@ -22,6 +22,78 @@ static void check_num_close_local(const char *label, number_t got, number_t expe
     num_destroy(&diff);
 }
 
+typedef matrix_t *(*matrix_unary_function_t)(const matrix_t *);
+typedef number_t (*number_unary_function_t)(const number_t);
+
+typedef struct {
+    const char *name;
+    matrix_unary_function_t matrix_function;
+    number_unary_function_t number_function;
+    double input;
+} matrix_number_function_case_t;
+
+static void test_number_function_matrix_parity(void)
+{
+    static const matrix_number_function_case_t cases[] = {
+        {"sec", mat_sec, num_sec, 0.7},
+        {"cosec", mat_cosec, num_cosec, 0.7},
+        {"cot", mat_cot, num_cot, 0.7},
+        {"versin", mat_versin, num_versin, 0.7},
+        {"vercos", mat_vercos, num_vercos, 0.7},
+        {"coversin", mat_coversin, num_coversin, 0.7},
+        {"covercos", mat_covercos, num_covercos, 0.7},
+        {"haversin", mat_haversin, num_haversin, 0.7},
+        {"havercos", mat_havercos, num_havercos, 0.7},
+        {"hacoversin", mat_hacoversin, num_hacoversin, 0.7},
+        {"hacovercos", mat_hacovercos, num_hacovercos, 0.7},
+        {"sech", mat_sech, num_sech, 0.7},
+        {"cosech", mat_cosech, num_cosech, 0.7},
+        {"coth", mat_coth, num_coth, 0.7},
+        {"cubrt", mat_cubrt, num_cubrt, 8.0},
+        {"asec", mat_asec, num_asec, 2.0},
+        {"acosec", mat_acosec, num_acosec, 2.0},
+        {"acot", mat_acot, num_acot, 2.0},
+        {"arcversin", mat_arcversin, num_arcversin, 0.25},
+        {"arcvercos", mat_arcvercos, num_arcvercos, 0.25},
+        {"arccoversin", mat_arccoversin, num_arccoversin, 0.25},
+        {"arccovercos", mat_arccovercos, num_arccovercos, 0.25},
+        {"archaversin", mat_archaversin, num_archaversin, 0.25},
+        {"archavercos", mat_archavercos, num_archavercos, 0.25},
+        {"archacoversin", mat_archacoversin, num_archacoversin, 0.25},
+        {"archacovercos", mat_archacovercos, num_archacovercos, 0.25},
+        {"asech", mat_asech, num_asech, 0.5},
+        {"acosech", mat_acosech, num_acosech, 2.0},
+        {"acoth", mat_acoth, num_acoth, 2.0},
+        {"zeta", mat_zeta, num_zeta, 2.5},
+        {"zetap", mat_zetap, num_zetap, 2.5},
+        {"dilog", mat_dilog, num_dilog, 0.25},
+    };
+
+    printf(C_CYAN "TEST: Number analytic functions are available as matrix functions\n" C_RESET);
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        number_t input = num_create_from_double(cases[i].input);
+        number_t expected = cases[i].number_function(input);
+        matrix_t *A = mat_create(1u, 1u, &input);
+        matrix_t *result = cases[i].matrix_function(A);
+        char label[128];
+
+        snprintf(label, sizeof(label), "mat_%s(1x1) is available", cases[i].name);
+        check_bool(label, result != NULL);
+        if (result) {
+            number_t got = mat_get_num(result, 0u, 0u);
+
+            snprintf(label, sizeof(label), "mat_%s(1x1) matches num_%s", cases[i].name, cases[i].name);
+            check_num_close_local(label, got, expected, 1e-12);
+            num_destroy(&got);
+        }
+
+        mat_free(result);
+        mat_free(A);
+        num_destroy(&expected);
+        num_destroy(&input);
+    }
+}
+
 static void test_eigen_d(void)
 {
     printf(C_CYAN "TEST: eigendecomposition (double)\n" C_RESET);
@@ -1335,10 +1407,16 @@ static void test_matrix_function_structure_preservation(void)
         double A_vals[4] = {2.0, 0.0, 0.0, 3.0};
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
         matrix_t *L = mat_log(A);
+        matrix_t *Ln = mat_ln(A);
+        matrix_t *Lg = mat_lg(A);
+        matrix_t *Log10 = mat_log10(A);
         matrix_t *E = NULL;
 
         check_bool("positive diagonal input allocated", A != NULL);
         check_bool("mat_log(positive diagonal) not NULL", L != NULL);
+        check_bool("mat_ln aliases mat_log", L && Ln && test_assert_matrix_d_close(Ln, L, 1e-12, __FILE__, __LINE__));
+        check_bool("mat_lg aliases mat_log10",
+                   Lg && Log10 && test_assert_matrix_d_close(Lg, Log10, 1e-12, __FILE__, __LINE__));
         if (L) {
             check_bool("mat_log(positive diagonal) preserves diagonal structure", mat_is_diagonal(L));
             E = mat_exp(L);
@@ -1347,6 +1425,9 @@ static void test_matrix_function_structure_preservation(void)
                 check_bool("mat_exp(mat_log(positive diagonal)) preserves diagonal structure", mat_is_diagonal(E));
                 if (!test_assert_matrix_d_close(E, A, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
+                    mat_free(Log10);
+                    mat_free(Lg);
+                    mat_free(Ln);
                     mat_free(L);
                     mat_free(A);
                     return;
@@ -1355,6 +1436,9 @@ static void test_matrix_function_structure_preservation(void)
         }
 
         mat_free(E);
+        mat_free(Log10);
+        mat_free(Lg);
+        mat_free(Ln);
         mat_free(L);
         mat_free(A);
     }
@@ -3238,7 +3322,7 @@ static void test_mat_special_unary_extensions(void)
                                        qf_lambert_wm1(b),
                                        qf_div(qf_lambert_wm1(b), qf_mul(b, qf_add(QF_ONE, qf_lambert_wm1(b)))), 1e-25);
 
-        check_unary_jordan_2x2_mp_real("mp-real ei(aI+N)=Ei(a)I+Ei'(a)N", mat_ei, ei_x, qf_ei(ei_x),
+        check_unary_jordan_2x2_mp_real("mp-real ei(aI+N)=Ei(a)I+Ei'(a)N", mat_Ei, ei_x, qf_Ei(ei_x),
                                        qf_div(qf_exp(ei_x), ei_x), 1e-25);
     }
 
@@ -3263,8 +3347,8 @@ static void test_mat_special_unary_extensions(void)
                                          wm1b, qc_make(qf_lambert_wm1(qf_from_double(-0.2)), QF_ZERO),
                                          qc_lambert_wm1(wm1b), 1e-24);
 
-        check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_ei, z1, z2, qc_ei(z1),
-                                         qc_ei(z2), 1e-24);
+        check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_Ei, z1, z2, qc_Ei(z1),
+                                         qc_Ei(z2), 1e-24);
     }
 }
 
@@ -3415,13 +3499,13 @@ static void test_mat_special_unary_square_extensions(void)
 
         {
             qfloat_t a = qf_from_double(0.5);
-            check_unary_jordan_2x2_d("ei(aI+N)=Ei(a)I+Ei'(a)N", mat_ei, 0.5, qf_to_double(qf_ei(a)),
+            check_unary_jordan_2x2_d("ei(aI+N)=Ei(a)I+Ei'(a)N", mat_Ei, 0.5, qf_to_double(qf_Ei(a)),
                                      qf_to_double(qf_div(qf_exp(a), a)), 1e-12);
         }
 
         {
             qfloat_t a = qf_from_double(1.0);
-            check_unary_jordan_2x2_d("e1(aI+N)=E1(a)I+E1'(a)N", mat_e1, 1.0, qf_to_double(qf_e1(a)),
+            check_unary_jordan_2x2_d("e1(aI+N)=E1(a)I+E1'(a)N", mat_E1, 1.0, qf_to_double(qf_E1(a)),
                                      qf_to_double(qf_div(qf_neg(qf_exp(qf_neg(a))), a)), 1e-12);
         }
     }
@@ -3446,8 +3530,8 @@ static void test_mat_special_unary_square_extensions(void)
         check_unary_diagonal_2x2_complex("complex lambert_wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))", mat_lambert_wm1, wm1a,
                                          wm1b, qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b), 1e-24);
 
-        check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_ei, z1, z2, qc_ei(z1),
-                                         qc_ei(z2), 1e-24);
+        check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_Ei, z1, z2, qc_Ei(z1),
+                                         qc_Ei(z2), 1e-24);
     }
 
     {
@@ -3491,7 +3575,7 @@ static void test_mat_special_unary_square_extensions(void)
 
         {
             qfloat_t a = qf_from_double(0.5);
-            check_unary_jordan_3x3_d("ei(aI+N+N^2)=Ei(a)I+Ei'(a)N+Ei''(a)N^2/2", mat_ei, 0.5, qf_to_double(qf_ei(a)),
+            check_unary_jordan_3x3_d("ei(aI+N+N^2)=Ei(a)I+Ei'(a)N+Ei''(a)N^2/2", mat_Ei, 0.5, qf_to_double(qf_Ei(a)),
                                      qf_to_double(qf_div(qf_exp(a), a)),
                                      qf_to_double(qf_div(qf_mul(qf_exp(a), qf_sub(a, one)), qf_mul(a, a))) / 2.0,
                                      1e-12);
@@ -3500,7 +3584,7 @@ static void test_mat_special_unary_square_extensions(void)
         {
             qfloat_t a = qf_from_double(1.0);
             check_unary_jordan_3x3_d(
-                "e1(aI+N+N^2)=E1(a)I+E1'(a)N+E1''(a)N^2/2", mat_e1, 1.0, qf_to_double(qf_e1(a)),
+                "e1(aI+N+N^2)=E1(a)I+E1'(a)N+E1''(a)N^2/2", mat_E1, 1.0, qf_to_double(qf_E1(a)),
                 qf_to_double(qf_div(qf_neg(qf_exp(qf_neg(a))), a)),
                 qf_to_double(qf_div(qf_mul(qf_exp(qf_neg(a)), qf_add(a, one)), qf_mul(a, a))) / 2.0, 1e-12);
         }
@@ -3532,8 +3616,8 @@ static void test_mat_special_unary_square_extensions(void)
                                          mat_lambert_wm1, wm1a, wm1b, wm1c, qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b),
                                          qc_lambert_wm1(wm1c), 1e-24);
 
-        check_unary_diagonal_3x3_complex("complex ei(diag(z1,z2,z3)) = diag(Ei(z1),Ei(z2),Ei(z3))", mat_ei, z1, z2, z3,
-                                         qc_ei(z1), qc_ei(z2), qc_ei(z3), 1e-24);
+        check_unary_diagonal_3x3_complex("complex ei(diag(z1,z2,z3)) = diag(Ei(z1),Ei(z2),Ei(z3))", mat_Ei, z1, z2, z3,
+                                         qc_Ei(z1), qc_Ei(z2), qc_Ei(z3), 1e-24);
     }
 }
 
@@ -5397,8 +5481,8 @@ static void test_number_matrix_functions(void)
                                         512u, "1e-90");
     check_number_upper_jordan_from_expr("lambert_wm1(number upper Jordan)[0,0]", mat_lambert_wm1, expr_lambert_wm1,
                                         "-0.2", 512u, "1e-30");
-    check_number_upper_jordan_from_expr("ei(number upper Jordan)[0,0]", mat_ei, expr_ei, "0.5", 512u, "1e-90");
-    check_number_upper_jordan_from_expr("e1(number upper Jordan)[0,0]", mat_e1, expr_e1, "1.0", 512u, "1e-90");
+    check_number_upper_jordan_from_expr("ei(number upper Jordan)[0,0]", mat_Ei, expr_Ei, "0.5", 512u, "1e-90");
+    check_number_upper_jordan_from_expr("e1(number upper Jordan)[0,0]", mat_E1, expr_E1, "1.0", 512u, "1e-90");
 
     mat_free(A_real);
     mat_free(A_complex);
@@ -6298,6 +6382,7 @@ static void test_expr_matrix_functions_extended(void)
 void run_matrix_function_tests(void)
 {
     TEST_RUN_CASE(test_mat_neg_convenience, NULL);
+    TEST_RUN_CASE(test_number_function_matrix_parity, NULL);
     TEST_RUN_CASE(test_eigen_d, NULL);
     TEST_RUN_CASE(test_eigen_mp_real, NULL);
     TEST_RUN_CASE(test_eigen_complex, NULL);

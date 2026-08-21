@@ -362,7 +362,9 @@ the inline fixed-precision fast paths.
 | --- | --- |
 | `num_exp(x)` | Returns the natural exponential `e^x`. |
 | `num_log(x)` | Returns the principal natural logarithm. |
+| `num_ln(x)` | Returns `num_log(x)`; this is the conventional natural-logarithm shorthand. |
 | `num_log10(x)` | Returns the principal base-10 logarithm. |
+| `num_lg(x)` | Returns `num_log10(x)`; this is the conventional common-logarithm shorthand. |
 | `num_sqrt(x)` | Returns the principal square root. |
 | `num_cubrt(x)` | Returns the principal cube root. |
 | `num_root(x, n)` | Returns the principal `n`th root, where `n` is an exact integer greater than one. |
@@ -449,8 +451,8 @@ when the selected principal root is not real.
 | `num_gammainc_upper(s, x)` | Evaluates the upper incomplete gamma function `Γ(s, x)`. |
 | `num_gammainc_P(s, x)` | Evaluates the regularised lower incomplete gamma function. |
 | `num_gammainc_Q(s, x)` | Evaluates the regularised upper incomplete gamma function. |
-| `num_e1(x)` | Evaluates the exponential integral `E₁(x)`. |
-| `num_ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
+| `num_E1(x)` | Evaluates the exponential integral `E₁(x)`. |
+| `num_Ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
 | `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
 | `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
@@ -733,7 +735,7 @@ Results (microseconds per call):
 | `num_digamma(2.345)` | `332.9 µs` | `827.4 µs` | `1.524 ms` | `1.699 ms` | `6.677 ms` | `45.697 ms` |
 | `num_trigamma(2.345)` | `1.629 ms` | `974.1 µs` | `1.301 ms` | `1.593 ms` | `2.894 ms` | `7.118 ms` |
 | `num_tetragamma(2.345)` | `803.1 µs` | `1.156 ms` | `1.445 ms` | `1.801 ms` | `3.171 ms` | `4.119 ms` |
-| `num_ei(5)` | `184.5 µs` | `304.5 µs` | `420.3 µs` | `542.4 µs` | `1.082 ms` | `1.282 ms` |
-| `num_e1(5)` | `386.5 µs` | `630.2 µs` | `880.3 µs` | `1.124 ms` | `1.081 ms` | `1.481 ms` |
+| `num_Ei(5)` | `184.5 µs` | `304.5 µs` | `420.3 µs` | `542.4 µs` | `1.082 ms` | `1.282 ms` |
+| `num_E1(5)` | `386.5 µs` | `630.2 µs` | `880.3 µs` | `1.124 ms` | `1.081 ms` | `1.481 ms` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](./benchmarks.md).

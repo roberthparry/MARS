@@ -1057,7 +1057,7 @@ static void test_mat_expression_registered_function_aliases(void)
                natural_log_operation && strcmp(natural_log_operation, "ln") == 0);
     check_bool("registered log spelling resolves as common matrix logarithm", common_log != NULL);
     check_bool("registered log spelling reports canonical operation",
-               common_log_operation && strcmp(common_log_operation, "log") == 0);
+               common_log_operation && strcmp(common_log_operation, "lg") == 0);
     check_bool("registered Greek gamma alias resolves through expression function hash", gamma != NULL);
     check_bool("registered Greek gamma alias reports canonical operation",
                gamma_operation && strcmp(gamma_operation, "gamma") == 0);

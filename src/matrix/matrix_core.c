@@ -1771,6 +1771,47 @@ void num_scalar_tan(void *out, const void *a)
 {
     num_replace_value(out, num_tan(*(const number_t *)a));
 }
+
+#define DEFINE_NUM_SCALAR_FUNCTION(name)                                                                                 \
+    void num_scalar_##name(void *out, const void *a)                                                                     \
+    {                                                                                                                    \
+        num_replace_value(out, num_##name(*(const number_t *)a));                                                        \
+    }
+
+DEFINE_NUM_SCALAR_FUNCTION(sec)
+DEFINE_NUM_SCALAR_FUNCTION(cosec)
+DEFINE_NUM_SCALAR_FUNCTION(cot)
+DEFINE_NUM_SCALAR_FUNCTION(versin)
+DEFINE_NUM_SCALAR_FUNCTION(vercos)
+DEFINE_NUM_SCALAR_FUNCTION(coversin)
+DEFINE_NUM_SCALAR_FUNCTION(covercos)
+DEFINE_NUM_SCALAR_FUNCTION(haversin)
+DEFINE_NUM_SCALAR_FUNCTION(havercos)
+DEFINE_NUM_SCALAR_FUNCTION(hacoversin)
+DEFINE_NUM_SCALAR_FUNCTION(hacovercos)
+DEFINE_NUM_SCALAR_FUNCTION(sech)
+DEFINE_NUM_SCALAR_FUNCTION(cosech)
+DEFINE_NUM_SCALAR_FUNCTION(coth)
+DEFINE_NUM_SCALAR_FUNCTION(cubrt)
+DEFINE_NUM_SCALAR_FUNCTION(asec)
+DEFINE_NUM_SCALAR_FUNCTION(acosec)
+DEFINE_NUM_SCALAR_FUNCTION(acot)
+DEFINE_NUM_SCALAR_FUNCTION(arcversin)
+DEFINE_NUM_SCALAR_FUNCTION(arcvercos)
+DEFINE_NUM_SCALAR_FUNCTION(arccoversin)
+DEFINE_NUM_SCALAR_FUNCTION(arccovercos)
+DEFINE_NUM_SCALAR_FUNCTION(archaversin)
+DEFINE_NUM_SCALAR_FUNCTION(archavercos)
+DEFINE_NUM_SCALAR_FUNCTION(archacoversin)
+DEFINE_NUM_SCALAR_FUNCTION(archacovercos)
+DEFINE_NUM_SCALAR_FUNCTION(asech)
+DEFINE_NUM_SCALAR_FUNCTION(acosech)
+DEFINE_NUM_SCALAR_FUNCTION(acoth)
+DEFINE_NUM_SCALAR_FUNCTION(zeta)
+DEFINE_NUM_SCALAR_FUNCTION(zetap)
+DEFINE_NUM_SCALAR_FUNCTION(dilog)
+
+#undef DEFINE_NUM_SCALAR_FUNCTION
 void num_scalar_sinh(void *out, const void *a)
 {
     num_replace_value(out, num_sinh(*(const number_t *)a));
@@ -1875,13 +1916,13 @@ void num_scalar_productlog(void *out, const void *a)
 {
     num_replace_value(out, num_productlog(*(const number_t *)a));
 }
-void num_scalar_ei(void *out, const void *a)
+void num_scalar_Ei(void *out, const void *a)
 {
-    num_replace_value(out, num_ei(*(const number_t *)a));
+    num_replace_value(out, num_Ei(*(const number_t *)a));
 }
-void num_scalar_e1(void *out, const void *a)
+void num_scalar_E1(void *out, const void *a)
 {
-    num_replace_value(out, num_e1(*(const number_t *)a));
+    num_replace_value(out, num_E1(*(const number_t *)a));
 }
 
 /* ---------- expr_t* ---------- */
@@ -2011,6 +2052,53 @@ void expr_scalar_tan(void *out, const void *a)
         expr_free(prev);
     *(expr_t **)out = res;
 }
+
+#define DEFINE_EXPR_SCALAR_FUNCTION(name)                                                                                \
+    void expr_scalar_##name(void *out, const void *a)                                                                    \
+    {                                                                                                                    \
+        expr_t *arg = *(expr_t *const *)a;                                                                               \
+        expr_t *prev = *(expr_t **)out;                                                                                  \
+        expr_t *res = expr_##name(arg);                                                                                  \
+                                                                                                                         \
+        if (prev)                                                                                                        \
+            expr_free(prev);                                                                                             \
+        *(expr_t **)out = res;                                                                                           \
+    }
+
+DEFINE_EXPR_SCALAR_FUNCTION(sec)
+DEFINE_EXPR_SCALAR_FUNCTION(cosec)
+DEFINE_EXPR_SCALAR_FUNCTION(cot)
+DEFINE_EXPR_SCALAR_FUNCTION(versin)
+DEFINE_EXPR_SCALAR_FUNCTION(vercos)
+DEFINE_EXPR_SCALAR_FUNCTION(coversin)
+DEFINE_EXPR_SCALAR_FUNCTION(covercos)
+DEFINE_EXPR_SCALAR_FUNCTION(haversin)
+DEFINE_EXPR_SCALAR_FUNCTION(havercos)
+DEFINE_EXPR_SCALAR_FUNCTION(hacoversin)
+DEFINE_EXPR_SCALAR_FUNCTION(hacovercos)
+DEFINE_EXPR_SCALAR_FUNCTION(sech)
+DEFINE_EXPR_SCALAR_FUNCTION(cosech)
+DEFINE_EXPR_SCALAR_FUNCTION(coth)
+DEFINE_EXPR_SCALAR_FUNCTION(cubrt)
+DEFINE_EXPR_SCALAR_FUNCTION(asec)
+DEFINE_EXPR_SCALAR_FUNCTION(acosec)
+DEFINE_EXPR_SCALAR_FUNCTION(acot)
+DEFINE_EXPR_SCALAR_FUNCTION(arcversin)
+DEFINE_EXPR_SCALAR_FUNCTION(arcvercos)
+DEFINE_EXPR_SCALAR_FUNCTION(arccoversin)
+DEFINE_EXPR_SCALAR_FUNCTION(arccovercos)
+DEFINE_EXPR_SCALAR_FUNCTION(archaversin)
+DEFINE_EXPR_SCALAR_FUNCTION(archavercos)
+DEFINE_EXPR_SCALAR_FUNCTION(archacoversin)
+DEFINE_EXPR_SCALAR_FUNCTION(archacovercos)
+DEFINE_EXPR_SCALAR_FUNCTION(asech)
+DEFINE_EXPR_SCALAR_FUNCTION(acosech)
+DEFINE_EXPR_SCALAR_FUNCTION(acoth)
+DEFINE_EXPR_SCALAR_FUNCTION(zeta)
+DEFINE_EXPR_SCALAR_FUNCTION(zetap)
+DEFINE_EXPR_SCALAR_FUNCTION(dilog)
+
+#undef DEFINE_EXPR_SCALAR_FUNCTION
 
 void expr_scalar_sinh(void *out, const void *a)
 {
@@ -2288,22 +2376,22 @@ void expr_scalar_productlog(void *out, const void *a)
     *(expr_t **)out = res;
 }
 
-void expr_scalar_ei(void *out, const void *a)
+void expr_scalar_Ei(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
-    expr_t *res = expr_ei(arg);
+    expr_t *res = expr_Ei(arg);
 
     if (prev)
         expr_free(prev);
     *(expr_t **)out = res;
 }
 
-void expr_scalar_e1(void *out, const void *a)
+void expr_scalar_E1(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
-    expr_t *res = expr_e1(arg);
+    expr_t *res = expr_E1(arg);
 
     if (prev)
         expr_free(prev);

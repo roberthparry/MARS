@@ -46,7 +46,7 @@ static void bench_digamma(mpfr_prec_t prec, int iters)
     mpfr_clear(value);
 }
 
-static void bench_ei_value(const char *label, unsigned long input, mpfr_prec_t prec, int iters)
+static void bench_Ei_value(const char *label, unsigned long input, mpfr_prec_t prec, int iters)
 {
     mpfr_t src;
     mpfr_t value;
@@ -166,18 +166,18 @@ int main(int argc, char **argv)
     }
 
     if (strcmp(argv[1], "ei") == 0) {
-        bench_ei_value("mpfr_eint(1)", 1u, 256u, 8);
-        bench_ei_value("mpfr_eint(1)", 1u, 512u, 4);
-        bench_ei_value("mpfr_eint(1)", 1u, 768u, 2);
-        bench_ei_value("mpfr_eint(1)", 1u, 1024u, 1);
+        bench_Ei_value("mpfr_eint(1)", 1u, 256u, 8);
+        bench_Ei_value("mpfr_eint(1)", 1u, 512u, 4);
+        bench_Ei_value("mpfr_eint(1)", 1u, 768u, 2);
+        bench_Ei_value("mpfr_eint(1)", 1u, 1024u, 1);
         return 0;
     }
 
     if (strcmp(argv[1], "ei5") == 0) {
-        bench_ei_value("mpfr_eint(5)", 5u, 256u, 8);
-        bench_ei_value("mpfr_eint(5)", 5u, 512u, 4);
-        bench_ei_value("mpfr_eint(5)", 5u, 768u, 2);
-        bench_ei_value("mpfr_eint(5)", 5u, 1024u, 1);
+        bench_Ei_value("mpfr_eint(5)", 5u, 256u, 8);
+        bench_Ei_value("mpfr_eint(5)", 5u, 512u, 4);
+        bench_Ei_value("mpfr_eint(5)", 5u, 768u, 2);
+        bench_Ei_value("mpfr_eint(5)", 5u, 1024u, 1);
         return 0;
     }
 

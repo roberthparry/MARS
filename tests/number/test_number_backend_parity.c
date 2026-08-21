@@ -302,8 +302,8 @@ static void test_number_real_special_parity(void)
     number_t upper_1_1 = num_gammainc_upper(one, one);
     number_t p_1_1 = num_gammainc_P(one, one);
     number_t q_1_1 = num_gammainc_Q(one, one);
-    number_t ei_one = num_ei(one);
-    number_t e1_one = num_e1(one);
+    number_t ei_one = num_Ei(one);
+    number_t e1_one = num_E1(one);
 
     assert_number_string("gamma(5)", gamma5, "24");
     assert_number_string_prefix("gamma(2.345)", gamma_2345, "1.199297829415319285526815335887956");

@@ -1084,8 +1084,8 @@ static void test_eval_num_function_values(void)
         {"normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf, NULL},
         {"normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf, NULL},
         {"normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf, NULL},
-        {"ei", "1.0", expr_ei, num_ei, NULL},
-        {"e1", "1.0", expr_e1, num_e1, NULL}};
+        {"ei", "1.0", expr_Ei, num_Ei, NULL},
+        {"e1", "1.0", expr_E1, num_E1, NULL}};
     static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
                                                       {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
                                                       {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
@@ -1134,8 +1134,8 @@ static void test_eval_num_function_derivatives(void)
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
-        UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)};
+        UCASE("ei", "1.0", expr_Ei, num_Ei),
+        UCASE("e1", "1.0", expr_E1, num_E1)};
     static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
                                                       {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
                                                       {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
@@ -1182,8 +1182,8 @@ static void test_high_precision_mpfr_function_values(void)
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
-        UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)};
+        UCASE("ei", "1.0", expr_Ei, num_Ei),
+        UCASE("e1", "1.0", expr_E1, num_E1)};
     static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
                                                       {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
                                                       {"hypot", "3.0", "4.0", expr_hypot, num_hypot},
@@ -1226,8 +1226,8 @@ static void test_high_precision_mpfr_function_derivatives(void)
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
-        UCASE("ei", "1.0", expr_ei, num_ei),
-        UCASE("e1", "1.0", expr_e1, num_e1)};
+        UCASE("ei", "1.0", expr_Ei, num_Ei),
+        UCASE("e1", "1.0", expr_E1, num_E1)};
     static const binary_eval_case_t binary_cases[] = {{"atan2", "2.0", "3.0", expr_atan2, num_atan2},
                                                       {"pow", "2.0", "3.0", expr_pow_xp, num_pow},
                                                       {"hypot", "3.0", "4.0", expr_hypot, num_hypot},

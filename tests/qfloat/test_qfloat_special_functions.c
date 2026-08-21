@@ -270,16 +270,16 @@ static qfloat_t qf_deriv_sym(qfloat_t (*f)(qfloat_t), qfloat_t x, double h_d)
 }
 
 /* Test Ei(x) via derivative: Ei'(x) = exp(x)/x */
-static void test_qf_ei_deriv(void)
+static void test_qf_Ei_deriv(void)
 {
-    printf(C_CYAN "TEST: qf_ei (derivative residual)\n" C_RESET);
+    printf(C_CYAN "TEST: qf_Ei (derivative residual)\n" C_RESET);
 
     double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
         qfloat_t x = qf_from_double(xs[i]);
-        qfloat_t dEi = qf_deriv_sym(qf_ei, x, 1e-8);
+        qfloat_t dEi = qf_deriv_sym(qf_Ei, x, 1e-8);
 
         qfloat_t ex = qf_exp(x);
         qfloat_t rhs = qf_div(ex, x); /* e^x / x */
@@ -295,16 +295,16 @@ static void test_qf_ei_deriv(void)
 }
 
 /* Test E1(x) via derivative: E1'(x) = -exp(-x)/x */
-static void test_qf_e1_deriv(void)
+static void test_qf_E1_deriv(void)
 {
-    printf(C_CYAN "TEST: qf_e1 (derivative residual)\n" C_RESET);
+    printf(C_CYAN "TEST: qf_E1 (derivative residual)\n" C_RESET);
 
     double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
         qfloat_t x = qf_from_double(xs[i]);
-        qfloat_t dE1 = qf_deriv_sym(qf_e1, x, 1e-8);
+        qfloat_t dE1 = qf_deriv_sym(qf_E1, x, 1e-8);
 
         qfloat_t nx = qf_neg(x);
         qfloat_t emx = qf_exp(nx);     /* e^{-x} */
@@ -322,9 +322,9 @@ static void test_qf_e1_deriv(void)
 }
 
 /* Test identity: E1(x) + Ei(-x) = 0 for x > 0 */
-static void test_qf_ei_e1_identity(void)
+static void test_qf_Ei_E1_identity(void)
 {
-    printf(C_CYAN "TEST: qf_ei / qf_e1 identity  E1(x) = -Ei(-x)\n" C_RESET);
+    printf(C_CYAN "TEST: qf_Ei / qf_E1 identity  E1(x) = -Ei(-x)\n" C_RESET);
 
     double xs[] = {0.1, 0.5, 1.0, 2.0, 5.0, 10.0};
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
@@ -333,8 +333,8 @@ static void test_qf_ei_e1_identity(void)
         qfloat_t x = qf_from_double(xs[i]);
         qfloat_t nx = qf_neg(x);
 
-        qfloat_t e1 = qf_e1(x);
-        qfloat_t ei = qf_ei(nx);
+        qfloat_t e1 = qf_E1(x);
+        qfloat_t ei = qf_Ei(nx);
 
         qfloat_t sum = qf_add(e1, ei); /* should be ~0 */
 
@@ -349,9 +349,9 @@ static void test_qf_ei_e1_identity(void)
     printf("\n");
 }
 
-static void test_ei_values(void)
+static void test_Ei_values(void)
 {
-    printf("TEST: qf_ei (full‑precision value tests)\n");
+    printf("TEST: qf_Ei (full‑precision value tests)\n");
 
     struct {
         const char *x_str;   /* x as full‑precision string */
@@ -390,7 +390,7 @@ static void test_ei_values(void)
 
         qfloat_t x = qf_from_string(cases[i].x_str);
         qfloat_t ref = qf_from_string(cases[i].ref_str);
-        qfloat_t got = qf_ei(x);
+        qfloat_t got = qf_Ei(x);
 
         qfloat_t diff = qf_sub(got, ref);
         qfloat_t ad = qf_abs(diff);
@@ -420,12 +420,12 @@ static void test_ei_values(void)
     printf("\n");
 }
 
-static void test_qf_ei_e1_all(void)
+static void test_qf_Ei_E1_all(void)
 {
-    TEST_RUN_SUBTEST(test_qf_ei_deriv, NULL);
-    TEST_RUN_SUBTEST(test_qf_e1_deriv, NULL);
-    TEST_RUN_SUBTEST(test_qf_ei_e1_identity, NULL);
-    TEST_RUN_SUBTEST(test_ei_values, NULL);
+    TEST_RUN_SUBTEST(test_qf_Ei_deriv, NULL);
+    TEST_RUN_SUBTEST(test_qf_E1_deriv, NULL);
+    TEST_RUN_SUBTEST(test_qf_Ei_E1_identity, NULL);
+    TEST_RUN_SUBTEST(test_Ei_values, NULL);
 }
 
 static void test_qf_add_double(void)
@@ -972,10 +972,10 @@ void test_vsprintf(void)
     TEST_RUN_SUBTEST(test_qf_vsprintf, NULL);
 }
 
-void test_gammainc_ei_e1(void)
+void test_gammainc_Ei_E1(void)
 {
     TEST_RUN_SUBTEST(test_qf_gammainc_all, NULL);
-    TEST_RUN_SUBTEST(test_qf_ei_e1_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_Ei_E1_all, NULL);
 }
 
 static void test_qf_bessel_half_order_identities(void)

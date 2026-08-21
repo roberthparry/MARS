@@ -608,7 +608,7 @@ NUMBER_MPFR_UNARY(number_mpfr_lgamma_mut, mpfr_lngamma)
 NUMBER_MPFR_UNARY(number_mpfr_digamma_mut, mpfr_digamma)
 NUMBER_MPFR_UNARY(number_mpfr_erf_mut, mpfr_erf)
 NUMBER_MPFR_UNARY(number_mpfr_erfc_mut, mpfr_erfc)
-NUMBER_MPFR_UNARY(number_mpfr_ei_mut, mpfr_eint)
+NUMBER_MPFR_UNARY(number_mpfr_Ei_mut, mpfr_eint)
 NUMBER_MPFR_UNARY(number_mpfr_dilog_mut, mpfr_li2)
 
 NUMBER_MPFR_BINARY(number_mpfr_atan2_mut, mpfr_atan2)
@@ -1211,7 +1211,7 @@ static number_t number_qfloat_qcomplex_binary(qfloat_t a, qfloat_t b, number_qco
     return fn ? num_create_from_qcomplex(fn(qc_make(a, QF_ZERO), qc_make(b, QF_ZERO))) : number_invalid();
 }
 
-static int number_mpfr_e1_mut(mpfr_t value)
+static int number_mpfr_E1_mut(mpfr_t value)
 {
     mpfr_neg(value, value, MPFR_RNDN);
     mpfr_eint(value, value, MPFR_RNDN);
@@ -3074,6 +3074,12 @@ number_t num_log(const number_t number)
     return number_log_backend(&number);
 }
 
+/* Provide the conventional ln shorthand for the principal natural logarithm. */
+number_t num_ln(const number_t number)
+{
+    return num_log(number);
+}
+
 number_t num_log10(const number_t number)
 {
     number_kind_t kind = number_kind_value(&number);
@@ -3102,6 +3108,12 @@ number_t num_log10(const number_t number)
         return out;
     }
     return number_apply_unary_math_with_double(number, log10, qf_log10, qc_log10, number_mpfr_log10_mut, mpc_log10);
+}
+
+/* Provide the conventional lg shorthand for the principal common logarithm. */
+number_t num_lg(const number_t number)
+{
+    return num_log10(number);
 }
 
 number_t num_sqrt(const number_t number)
@@ -5928,12 +5940,12 @@ number_t num_gammainc_Q(const number_t a, const number_t b)
     return number_apply_binary_math(a, b, qf_gammainc_Q, qc_gammainc_Q, number_mpfr_gammainc_q_mut, NULL);
 }
 
-number_t num_ei(const number_t number)
+number_t num_Ei(const number_t number)
 {
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_ei, qc_ei, number_mpfr_ei_mut, NULL);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_Ei, qc_Ei, number_mpfr_Ei_mut, NULL);
 }
 
-number_t num_e1(const number_t number)
+number_t num_E1(const number_t number)
 {
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_e1, qc_e1, number_mpfr_e1_mut, NULL);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_E1, qc_E1, number_mpfr_E1_mut, NULL);
 }

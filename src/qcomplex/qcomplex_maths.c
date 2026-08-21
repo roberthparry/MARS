@@ -859,10 +859,10 @@ qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x)
     return qc_sub(QC_ONE, qc_gammainc_P(s, x));
 }
 
-qcomplex_t qc_ei(qcomplex_t z)
+qcomplex_t qc_Ei(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))
-        return qc_make(qf_ei(qc_real(z)), QF_ZERO);
+        return qc_make(qf_Ei(qc_real(z)), QF_ZERO);
 
     /* Ei(z) = γ + log(z) + Σ_{k=1}^∞ z^k / (k × k!) */
     qfloat_t tol = qf_from_double(1e-30);
@@ -885,12 +885,12 @@ qcomplex_t qc_ei(qcomplex_t z)
     return sum;
 }
 
-qcomplex_t qc_e1(qcomplex_t z)
+qcomplex_t qc_E1(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))
-        return qc_make(qf_e1(qc_real(z)), QF_ZERO);
+        return qc_make(qf_E1(qc_real(z)), QF_ZERO);
 
-    return qc_neg(qc_ei(qc_neg(z)));
+    return qc_neg(qc_Ei(qc_neg(z)));
 }
 
 static int qc_to_integer_order(qcomplex_t value, int *order)

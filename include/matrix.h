@@ -1329,22 +1329,98 @@ matrix_t *mat_exp(const matrix_t *A);
 matrix_t *mat_sin(const matrix_t *A);
 matrix_t *mat_cos(const matrix_t *A);
 matrix_t *mat_tan(const matrix_t *A);
+/** @brief Return the matrix secant, the inverse of `cos(A)`. */
+matrix_t *mat_sec(const matrix_t *A);
+/** @brief Return the matrix cosecant, the inverse of `sin(A)`. */
+matrix_t *mat_cosec(const matrix_t *A);
+/** @brief Return the matrix cotangent. */
+matrix_t *mat_cot(const matrix_t *A);
+/** @brief Return the matrix versed sine. */
+matrix_t *mat_versin(const matrix_t *A);
+/** @brief Return the matrix versed cosine. */
+matrix_t *mat_vercos(const matrix_t *A);
+/** @brief Return the matrix coversed sine. */
+matrix_t *mat_coversin(const matrix_t *A);
+/** @brief Return the matrix coversed cosine. */
+matrix_t *mat_covercos(const matrix_t *A);
+/** @brief Return the matrix haversine. */
+matrix_t *mat_haversin(const matrix_t *A);
+/** @brief Return the matrix havercosine. */
+matrix_t *mat_havercos(const matrix_t *A);
+/** @brief Return the matrix hacoversine. */
+matrix_t *mat_hacoversin(const matrix_t *A);
+/** @brief Return the matrix hacovercosine. */
+matrix_t *mat_hacovercos(const matrix_t *A);
 
 matrix_t *mat_sinh(const matrix_t *A);
 matrix_t *mat_cosh(const matrix_t *A);
 matrix_t *mat_tanh(const matrix_t *A);
+/** @brief Return the matrix hyperbolic secant. */
+matrix_t *mat_sech(const matrix_t *A);
+/** @brief Return the matrix hyperbolic cosecant. */
+matrix_t *mat_cosech(const matrix_t *A);
+/** @brief Return the matrix hyperbolic cotangent. */
+matrix_t *mat_coth(const matrix_t *A);
 
 matrix_t *mat_sqrt(const matrix_t *A);
+/** @brief Return the principal matrix cube root. */
+matrix_t *mat_cubrt(const matrix_t *A);
 matrix_t *mat_log(const matrix_t *A);
+/**
+ * @brief Return the principal matrix natural logarithm of @p A.
+ *
+ * This is a shorthand for mat_log().
+ *
+ * @param A Input matrix.
+ * @return A newly allocated matrix equal to mat_log(A), or NULL on error.
+ */
+matrix_t *mat_ln(const matrix_t *A);
 matrix_t *mat_log10(const matrix_t *A);
+/**
+ * @brief Return the principal matrix common logarithm of @p A.
+ *
+ * This is a shorthand for mat_log10().
+ *
+ * @param A Input matrix.
+ * @return A newly allocated matrix equal to mat_log10(A), or NULL on error.
+ */
+matrix_t *mat_lg(const matrix_t *A);
 
 matrix_t *mat_asin(const matrix_t *A);
 matrix_t *mat_acos(const matrix_t *A);
 matrix_t *mat_atan(const matrix_t *A);
+/** @brief Return the principal matrix arcsecant. */
+matrix_t *mat_asec(const matrix_t *A);
+/** @brief Return the principal matrix arccosecant. */
+matrix_t *mat_acosec(const matrix_t *A);
+/** @brief Return the principal matrix arccotangent. */
+matrix_t *mat_acot(const matrix_t *A);
+/** @brief Return the principal inverse matrix versed sine. */
+matrix_t *mat_arcversin(const matrix_t *A);
+/** @brief Return the principal inverse matrix versed cosine. */
+matrix_t *mat_arcvercos(const matrix_t *A);
+/** @brief Return the principal inverse matrix coversed sine. */
+matrix_t *mat_arccoversin(const matrix_t *A);
+/** @brief Return the principal inverse matrix coversed cosine. */
+matrix_t *mat_arccovercos(const matrix_t *A);
+/** @brief Return the principal inverse matrix haversine. */
+matrix_t *mat_archaversin(const matrix_t *A);
+/** @brief Return the principal inverse matrix havercosine. */
+matrix_t *mat_archavercos(const matrix_t *A);
+/** @brief Return the principal inverse matrix hacoversine. */
+matrix_t *mat_archacoversin(const matrix_t *A);
+/** @brief Return the principal inverse matrix hacovercosine. */
+matrix_t *mat_archacovercos(const matrix_t *A);
 
 matrix_t *mat_asinh(const matrix_t *A);
 matrix_t *mat_acosh(const matrix_t *A);
 matrix_t *mat_atanh(const matrix_t *A);
+/** @brief Return the principal inverse matrix hyperbolic secant. */
+matrix_t *mat_asech(const matrix_t *A);
+/** @brief Return the principal inverse matrix hyperbolic cosecant. */
+matrix_t *mat_acosech(const matrix_t *A);
+/** @brief Return the principal inverse matrix hyperbolic cotangent. */
+matrix_t *mat_acoth(const matrix_t *A);
 
 matrix_t *mat_erf(const matrix_t *A);
 matrix_t *mat_erfc(const matrix_t *A);
@@ -1355,6 +1431,12 @@ matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
 matrix_t *mat_trigamma(const matrix_t *A);
 matrix_t *mat_tetragamma(const matrix_t *A);
+/** @brief Return the analytically continued Riemann zeta matrix function. */
+matrix_t *mat_zeta(const matrix_t *A);
+/** @brief Return the derivative of the Riemann zeta matrix function. */
+matrix_t *mat_zetap(const matrix_t *A);
+/** @brief Return the principal matrix dilogarithm. */
+matrix_t *mat_dilog(const matrix_t *A);
 matrix_t *mat_gammainv(const matrix_t *A);
 matrix_t *mat_normal_pdf(const matrix_t *A);
 matrix_t *mat_normal_cdf(const matrix_t *A);
@@ -1362,8 +1444,8 @@ matrix_t *mat_normal_logpdf(const matrix_t *A);
 matrix_t *mat_lambert_w0(const matrix_t *A);
 matrix_t *mat_lambert_wm1(const matrix_t *A);
 matrix_t *mat_productlog(const matrix_t *A);
-matrix_t *mat_ei(const matrix_t *A);
-matrix_t *mat_e1(const matrix_t *A);
+matrix_t *mat_Ei(const matrix_t *A);
+matrix_t *mat_E1(const matrix_t *A);
 
 /**
  * @brief Return a copy of a matrix with every symbolic entry simplified.

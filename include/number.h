@@ -796,7 +796,25 @@ number_t num_shr(const number_t number, long bits);
  */
 number_t num_exp(const number_t number);
 number_t num_log(const number_t number);
+/**
+ * @brief Return the principal natural logarithm of @p number.
+ *
+ * This is a shorthand for num_log().
+ *
+ * @param number Input value.
+ * @return The same owning value as num_log(number).
+ */
+number_t num_ln(const number_t number);
 number_t num_log10(const number_t number);
+/**
+ * @brief Return the principal common logarithm of @p number.
+ *
+ * This is a shorthand for num_log10().
+ *
+ * @param number Input value.
+ * @return The same owning value as num_log10(number).
+ */
+number_t num_lg(const number_t number);
 number_t num_sqrt(const number_t number);
 /**
  * @brief Return the single principal cube root of @p number.
@@ -954,8 +972,8 @@ number_t num_gammainc_lower(const number_t s, const number_t x);
 number_t num_gammainc_upper(const number_t s, const number_t x);
 number_t num_gammainc_P(const number_t s, const number_t x);
 number_t num_gammainc_Q(const number_t s, const number_t x);
-number_t num_ei(const number_t number);
-number_t num_e1(const number_t number);
+number_t num_Ei(const number_t number);
+number_t num_E1(const number_t number);
 /** @} */
 
 #endif

@@ -32,23 +32,52 @@ struct elem_fun_vtable {
     void (*sin)(void *out, const void *a);
     void (*cos)(void *out, const void *a);
     void (*tan)(void *out, const void *a);
+    void (*sec)(void *out, const void *a);
+    void (*cosec)(void *out, const void *a);
+    void (*cot)(void *out, const void *a);
+    void (*versin)(void *out, const void *a);
+    void (*vercos)(void *out, const void *a);
+    void (*coversin)(void *out, const void *a);
+    void (*covercos)(void *out, const void *a);
+    void (*haversin)(void *out, const void *a);
+    void (*havercos)(void *out, const void *a);
+    void (*hacoversin)(void *out, const void *a);
+    void (*hacovercos)(void *out, const void *a);
 
     void (*sinh)(void *out, const void *a);
     void (*cosh)(void *out, const void *a);
     void (*tanh)(void *out, const void *a);
+    void (*sech)(void *out, const void *a);
+    void (*cosech)(void *out, const void *a);
+    void (*coth)(void *out, const void *a);
 
     void (*sqrt)(void *out, const void *a);
+    void (*cubrt)(void *out, const void *a);
     void (*log)(void *out, const void *a);
 
     /* inverse trig */
     void (*asin)(void *out, const void *a);
     void (*acos)(void *out, const void *a);
     void (*atan)(void *out, const void *a);
+    void (*asec)(void *out, const void *a);
+    void (*acosec)(void *out, const void *a);
+    void (*acot)(void *out, const void *a);
+    void (*arcversin)(void *out, const void *a);
+    void (*arcvercos)(void *out, const void *a);
+    void (*arccoversin)(void *out, const void *a);
+    void (*arccovercos)(void *out, const void *a);
+    void (*archaversin)(void *out, const void *a);
+    void (*archavercos)(void *out, const void *a);
+    void (*archacoversin)(void *out, const void *a);
+    void (*archacovercos)(void *out, const void *a);
 
     /* inverse hyperbolic */
     void (*asinh)(void *out, const void *a);
     void (*acosh)(void *out, const void *a);
     void (*atanh)(void *out, const void *a);
+    void (*asech)(void *out, const void *a);
+    void (*acosech)(void *out, const void *a);
+    void (*acoth)(void *out, const void *a);
 
     /* special functions */
     void (*erf)(void *out, const void *a);
@@ -60,6 +89,9 @@ struct elem_fun_vtable {
     void (*digamma)(void *out, const void *a);
     void (*trigamma)(void *out, const void *a);
     void (*tetragamma)(void *out, const void *a);
+    void (*zeta)(void *out, const void *a);
+    void (*zetap)(void *out, const void *a);
+    void (*dilog)(void *out, const void *a);
     void (*gammainv)(void *out, const void *a);
     void (*normal_pdf)(void *out, const void *a);
     void (*normal_cdf)(void *out, const void *a);

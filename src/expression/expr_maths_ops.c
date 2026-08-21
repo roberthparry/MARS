@@ -787,8 +787,8 @@ const expr_ops_t ops_log10 = {.eval = eval_log10,
                               .reverse = expr_reverse_log10,
                               .kind = EXPR_KIND_LOG10,
                               .arity = EXPR_OP_UNARY,
-                              .name = "log",
-                              .TeX_name = "\\log",
+                              .name = "lg",
+                              .TeX_name = "\\lg",
                               .inverse_unary = expr_inverse_log10_internal,
                               .apply_unary = expr_log10,
                               .apply_binary = NULL,
@@ -1315,26 +1315,26 @@ const expr_ops_t ops_logpdf = {.eval = eval_normal_logpdf,
                                .integrate = expr_integrate_dispatch_primitive,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = NULL};
-const expr_ops_t ops_ei = {.eval = eval_ei,
-                           .deriv = deriv_ei,
-                           .reverse = expr_reverse_ei,
+const expr_ops_t ops_Ei = {.eval = eval_Ei,
+                           .deriv = deriv_Ei,
+                           .reverse = expr_reverse_Ei,
                            .kind = EXPR_KIND_EI,
                            .arity = EXPR_OP_UNARY,
                            .name = "Ei",
                            .TeX_name = "\\operatorname{Ei}",
-                           .apply_unary = expr_ei,
+                           .apply_unary = expr_Ei,
                            .apply_binary = NULL,
                            .integrate = expr_integrate_dispatch_primitive,
                            .simplify = expr_simplify_unary_operator,
                            .fold_const_unary = NULL};
-const expr_ops_t ops_e1 = {.eval = eval_e1,
-                           .deriv = deriv_e1,
-                           .reverse = expr_reverse_e1,
+const expr_ops_t ops_E1 = {.eval = eval_E1,
+                           .deriv = deriv_E1,
+                           .reverse = expr_reverse_E1,
                            .kind = EXPR_KIND_E1,
                            .arity = EXPR_OP_UNARY,
                            .name = "E1",
                            .TeX_name = "\\operatorname{E1}",
-                           .apply_unary = expr_e1,
+                           .apply_unary = expr_E1,
                            .apply_binary = NULL,
                            .integrate = expr_integrate_dispatch_primitive,
                            .simplify = expr_simplify_unary_operator,
@@ -1718,8 +1718,8 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
                                                                          [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
                                                                          [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
                                                                          [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
-                                                                         [EXPR_KIND_EI] = &ops_ei,
-                                                                         [EXPR_KIND_E1] = &ops_e1,
+                                                                         [EXPR_KIND_EI] = &ops_Ei,
+                                                                         [EXPR_KIND_E1] = &ops_E1,
                                                                          [EXPR_KIND_FACTORIAL] = &ops_factorial,
                                                                          [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
                                                                          [EXPR_KIND_PARTITION] = &ops_partition,
@@ -1762,9 +1762,22 @@ expr_t *expr_log(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_log, a);
 }
+
+/* Construct the natural-logarithm shorthand using the canonical log operation. */
+expr_t *expr_ln(const expr_t *a)
+{
+    return expr_log(a);
+}
+
 expr_t *expr_log10(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_log10, a);
+}
+
+/* Construct the common-logarithm shorthand using the canonical log10 operation. */
+expr_t *expr_lg(const expr_t *a)
+{
+    return expr_log10(a);
 }
 expr_t *expr_floor(const expr_t *a)
 {
@@ -2431,13 +2444,13 @@ expr_t *expr_logpdf(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_logpdf, a);
 }
-expr_t *expr_ei(const expr_t *a)
+expr_t *expr_Ei(const expr_t *a)
 {
-    return expr_math_wrap_unary(&ops_ei, a);
+    return expr_math_wrap_unary(&ops_Ei, a);
 }
-expr_t *expr_e1(const expr_t *a)
+expr_t *expr_E1(const expr_t *a)
 {
-    return expr_math_wrap_unary(&ops_e1, a);
+    return expr_math_wrap_unary(&ops_E1, a);
 }
 expr_t *expr_beta(const expr_t *a, const expr_t *b)
 {

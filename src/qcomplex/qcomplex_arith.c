@@ -74,10 +74,23 @@ qcomplex_t qc_log(qcomplex_t z)
     }
     return qc_make(qf_log(qc_abs(z)), qc_arg(z));
 }
+
+/* Provide the conventional ln shorthand for the principal natural logarithm. */
+qcomplex_t qc_ln(qcomplex_t z)
+{
+    return qc_log(z);
+}
+
 qcomplex_t qc_log10(qcomplex_t z)
 {
     qfloat_t inv_ln10 = qf_div(QF_ONE, QF_LN10);
     return qc_make(qf_mul(qf_log(qc_abs(z)), inv_ln10), qf_mul(qc_arg(z), inv_ln10));
+}
+
+/* Provide the conventional lg shorthand for the principal common logarithm. */
+qcomplex_t qc_lg(qcomplex_t z)
+{
+    return qc_log10(z);
 }
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b)
 {

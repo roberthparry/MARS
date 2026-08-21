@@ -252,6 +252,9 @@ static void test_qf_log(void)
         }
     }
 
+    TEST_ASSERT_QFLOAT_CLOSE(qf_ln(qf_from_double(2.0)), qf_log(qf_from_double(2.0)));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_lg(qf_from_double(1000.0)), qf_log10(qf_from_double(1000.0)));
+
     /* Round-trip: log(exp(x)) ≈ x */
     qfloat_t x = qf_from_double(5.0);
     qfloat_t ex = qf_exp(x);
