@@ -676,6 +676,27 @@ static void test_digamma(void)
         qfloat_t expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
         check_qc("ψ₃(-1/2) real bridge", qc_polygamma(3, qcr(-0.5)), qc_make(expect, QF_ZERO), 1e-22);
     }
+
+
+    {
+        qcomplex_t z = qcz(2.0, 3.0);
+        qcomplex_t expected = qc_make(qf_from_string("0.798021985146275720622294500724813"),
+                                      qf_from_string("-0.113744308052938500215913365857315"));
+
+        check_qc("ζ(2+3i)", qc_zeta(z), expected, 1e-29);
+        check_qc("ζ(3) real bridge", qc_zeta(qcr(3.0)),
+                 qcrs("1.2020569031595942853997381615114499907649862923405"), 1e-30);
+    }
+
+    {
+        qcomplex_t s = qcz(2.0, 0.5);
+        qcomplex_t a = qcz(1.25, 0.25);
+        qcomplex_t recurrence = qc_add(qc_pow(a, qc_neg(s)), qc_zetah(s, qc_add(a, QC_ONE)));
+
+        check_qc("ζ(s,a) = a^-s + ζ(s,a+1)", qc_zetah(s, a), recurrence, 1e-27);
+        check_qc("Hurwitz real bridge", qc_zetah(qcr(2.5), qcr(101.0)),
+                 qcrs("0.000661687499453171542062211501479711744239330816315948606222019329"), 1e-30);
+    }
 }
 
 static void test_polylog(void)

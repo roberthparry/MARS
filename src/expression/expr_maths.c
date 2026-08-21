@@ -501,6 +501,22 @@ number_t eval_polygamma(expr_t *dv)
         return NUM_NAN;
     return num_polygamma(order, expr_eval_num_internal(dv->b));
 }
+number_t eval_zeta(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_zeta);
+}
+number_t eval_zetap(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_zetap);
+}
+number_t eval_zetah(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_zetah);
+}
+number_t eval_zatahp(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_zatahp);
+}
 number_t eval_dilog(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_dilog);
@@ -1780,6 +1796,78 @@ expr_t *deriv_polygamma(expr_t *dv)
     out = expr_mul(factor, db);
     expr_free(factor);
     expr_free(db);
+    return out;
+}
+
+expr_t *deriv_zeta(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_zetap(dv->a));
+}
+
+expr_t *deriv_zetap(expr_t *dv)
+{
+    expr_t *wrts[1] = {dv->a};
+    expr_t *factor = expr_new_formal_derivative(dv, 1u, wrts);
+
+    return expr_chain_rule_with_factor(dv, factor);
+}
+
+expr_t *deriv_zetah(expr_t *dv)
+{
+    expr_t *ds = expr_get_dx_internal(dv->a);
+    expr_t *da = expr_get_dx_internal(dv->b);
+    expr_t *s_partial = expr_zatahp(dv->a, dv->b);
+    expr_t *s_term = expr_mul(ds, s_partial);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *s_plus_one = expr_add(dv->a, one);
+    expr_t *shift_zeta = expr_zetah(s_plus_one, dv->b);
+    expr_t *scaled_shift_zeta = expr_mul(dv->a, shift_zeta);
+    expr_t *a_partial = expr_neg(scaled_shift_zeta);
+    expr_t *a_term = expr_mul(da, a_partial);
+    expr_t *out = expr_add(s_term, a_term);
+
+    expr_free(a_term);
+    expr_free(a_partial);
+    expr_free(scaled_shift_zeta);
+    expr_free(shift_zeta);
+    expr_free(s_plus_one);
+    expr_free(one);
+    expr_free(s_term);
+    expr_free(s_partial);
+    expr_free(da);
+    expr_free(ds);
+    return out;
+}
+
+expr_t *deriv_zatahp(expr_t *dv)
+{
+    expr_t *ds = expr_get_dx_internal(dv->a);
+    expr_t *da = expr_get_dx_internal(dv->b);
+    expr_t *wrts[1] = {dv->a};
+    expr_t *s_partial = expr_new_formal_derivative(dv, 1u, wrts);
+    expr_t *s_term = expr_mul(ds, s_partial);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *s_plus_one = expr_add(dv->a, one);
+    expr_t *shift_zeta = expr_zetah(s_plus_one, dv->b);
+    expr_t *shift_zetap = expr_zatahp(s_plus_one, dv->b);
+    expr_t *scaled_shift_zetap = expr_mul(dv->a, shift_zetap);
+    expr_t *a_partial_sum = expr_add(shift_zeta, scaled_shift_zetap);
+    expr_t *a_partial = expr_neg(a_partial_sum);
+    expr_t *a_term = expr_mul(da, a_partial);
+    expr_t *out = expr_add(s_term, a_term);
+
+    expr_free(a_term);
+    expr_free(a_partial);
+    expr_free(a_partial_sum);
+    expr_free(scaled_shift_zetap);
+    expr_free(shift_zetap);
+    expr_free(shift_zeta);
+    expr_free(s_plus_one);
+    expr_free(one);
+    expr_free(s_term);
+    expr_free(s_partial);
+    expr_free(da);
+    expr_free(ds);
     return out;
 }
 

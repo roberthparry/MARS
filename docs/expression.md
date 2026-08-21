@@ -32,6 +32,8 @@ of these graphs.
 ## Capabilities
 
 - expression construction from constants, variables, and operators
+- native recognition of additive ellipsis series, with exact polynomial
+  interpolation, geometric and inverse-index-power models
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
 - Cartesian presentation of supported elementary functions with symbolic
@@ -115,6 +117,14 @@ one memorised input. Primitive dispatch preserves a symbolic affine complex
 argument long enough to integrate it before presentation expansion; in
 particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
 as native Cartesian expressions rather than unevaluated integral nodes.
+
+Riemann and Hurwitz zeta nodes participate in the same symbolic calculus.
+Differentiating `zeta(s)` produces `zetap(s)`. For Hurwitz zeta,
+`∂ζ(s,a)/∂s = zatahp(s,a)` and `∂ζ(s,a)/∂a = -s·ζ(s+1,a)`, with the chain
+rule applied when either argument is itself an expression. Integrating
+`zetap(s)` with respect to `s` returns `zeta(s)`, while integrating
+`zetah(s,a)` with respect to `a` returns `zetah(s-1,a)/(1-s)` wherever that
+identity is valid. Unsupported directions remain explicit integral nodes.
 
 For additive expressions, supported terms may still be integrated even when
 other terms are not. In that case the unsupported additive pieces are left as
@@ -759,6 +769,7 @@ All functions return owning handles.
 - `expr_t *expr_ceil(const expr_t *expr)` — ceiling
 - `expr_t *expr_pow(const expr_t *expr, const number_t *exponent)` — `expr ^ exponent` (borrowed scalar numeric exponent)
 - `expr_t *expr_pow_xp(const expr_t *base, const expr_t *exponent)` — `base ^ exponent`
+- `expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower, const expr_t *upper)` — construct an unevaluated finite sigma with inclusive bounds
 
 The string grammar accepts `conj(z)` and `conjugate(z)` for complex
 conjugation. Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
@@ -781,6 +792,10 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_digamma(const expr_t *expr)` — ψ(x) = d/dx ln Γ(x)
 - `expr_t *expr_trigamma(const expr_t *expr)` — ψ'(x)
 - `expr_t *expr_polygamma(unsigned int order, const expr_t *expr)` — ψ⁽ⁿ⁾(x)
+- `expr_t *expr_zeta(const expr_t *s)` — Riemann zeta ζ(s)
+- `expr_t *expr_zetap(const expr_t *s)` — derivative ζ′(s)
+- `expr_t *expr_zetah(const expr_t *s, const expr_t *a)` — Hurwitz zeta ζ(s, a)
+- `expr_t *expr_zatahp(const expr_t *s, const expr_t *a)` — partial derivative ∂ζ(s, a)/∂s
 - `expr_t *expr_gammainv(const expr_t *expr)` — principal Γ⁻¹(x)
 - `expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x)` — lower incomplete gamma γ(s, x)
 - `expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x)` — upper incomplete gamma Γ(s, x)
@@ -896,9 +911,51 @@ const c₀ = @gamma.
 output(expr(x, y, c₀)).
 ```
 
+### Additive Ellipsis Series
+
+The native parser recognises an ellipsis only when the surrounding additive
+terms establish a single exact model. Geometric and inverse-index-power forms
+use their corresponding identities. Otherwise, MARS constructs the unique
+Lagrange polynomial `P(k)` through the supplied coefficient terms, verifies
+that the written terminal term agrees with `P(N)`, and lowers the series to
+`Σ(k=1..N) P(k)`. The TeX derivation records that sigma form before the
+simplified sum and final value. If an endpoint is already named `n`, the dummy
+index changes to `k`, `j`, `m`, or `l` so that the two bindings cannot collide.
+
+For the inverse-power family `Σ(k=1..n) 1/k^p`, the generic finite expression
+is `ζ(p) - ζ(p, n + 1)` away from `p = 1`. At `p = 1`, both zeta terms have a
+pole and only their combined removable-singularity limit is finite; that limit
+is `digamma(n + 1) + gamma`. With `p` unset, the TeX derivation therefore
+displays separate `p = 1` and `p != 1` branches while the generic expression
+and function use `zeta(p) - zetah(p, n + 1)`. When the input supplies `p = 1`,
+native MARS marks that domain-required specialisation and all three algebraic
+cards use `digamma(n + 1) + gamma`; its sigma derivation likewise specialises
+the summand to `1/k` rather than retaining `1/k^p`. MARS also selects
+domain-safe alternatives when applicable: the Faulhaber polynomial at a
+non-positive integer `p`, and
+the familiar `pi^2/6 - trigamma(n + 1)` at `p = 2`. With `n = inf`, the
+inverse-square series simplifies exactly to `pi^2/6`, while another real
+exponent `p > 1` evaluates to `zeta(p)`; a non-convergent infinite series has
+no finite value. The endpoint may be supplied through a binding such as
+`n = inf`, or directly in the terminal term, as in
+`1 + 1/2^2 + 1/3^2 + ... + 1/inf^2`.
+The direct-power family `Σ(k=1..n) k^p` similarly becomes
+`ζ(-p) - ζ(-p, n + 1)`; non-negative integer exponents evaluate through the
+corresponding Faulhaber polynomial.
+Writing the inverse-power family with negative exponents, as in `1 + 2^-p +
+3^-p + ... + n^-p`, produces the same sigma form, closed form and calculus
+operations as `1 + 1/2^p + 1/3^p + ... + 1/n^p`.
+Symbolic geometric endpoints are also recognised directly: `1 + 3 + 9 + 27 +
+... + 3^(n - 1)` becomes `Σ(k=0..n-1) 3^k = (3^n - 1)/2`, and therefore
+evaluates to `29524` when `n = 10`.
+The Rendered TeX, Expression and Function cards all come from this same native
+simplified expression, while only the Value card substitutes supplied
+bindings.
+
 ### Parsing
 
 - `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from either bare shorthand or the wrapped format produced by `expr_to_text(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
+- `expr_t *expr_from_string_with_derivation_TeX(const char *s, expr_bindings_t **bnd_out, string_t **derivation_TeX_out)` — parse the same grammar and additionally return the owning native sigma derivation when the input contains a recognised finite ellipsis series; otherwise the derivation output is `NULL`
 - `expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)` — find a returned symbolic binding by name; lookup accepts the same normalisation rules as parsing, so aliases like `@pi`/`π`, `@phi`/`φ`, `@gamma`/`γ`, and `@tau`/`τ` all resolve to the same binding
 - `void expr_bindings_free(expr_bindings_t *bnd)` — destroy a bindings object returned by `expr_from_string(...)`
 
@@ -930,6 +987,9 @@ output(expr(x, y, c₀)).
   - `sin^2(x)` style ASCII exponents on function names
   - postfix factorial `x!`, which lowers to `gamma(x + 1)` when it remains
     symbolic and differentiable
+  - additive ellipsis series such as `a₁ + a₂ + a₃ + ... + aₙ`; the native
+    parser selects an exact geometric, inverse-index-power, or Lagrange-
+    interpolated polynomial term model from the supplied terms and endpoint
   - literal unevaluated integral forms `integral(x, f_expr, t)`,
     `∫^x f(t)dt`, `∫^x f(t)*dt`, and `∫^x f(t)·dt`; the spaced form
     `∫^x f(t) dt` is also accepted on input, but the canonical pretty-printed
@@ -949,6 +1009,10 @@ output(expr(x, y, c₀)).
     `archacovercos(x)` for the corresponding inverse functions
   - `gamma(x)` and `Γ(x)` for the gamma function
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
+  - `zeta(s)` and `ζ(s)` for Riemann zeta; `zetap(s)` for its derivative
+  - `zeta(s, a)`, `ζ(s, a)`, `zetah(s, a)`, and `zeta2(s, a)` for Hurwitz
+    zeta; `zetap(s, a)`, `zatahp(s, a)`, and `zeta2p(s, a)` for its partial
+    derivative with respect to `s`
   - `dilog(x)`, `Li2(x)`, and `polylog(n, x)` for Li₂(x) and Liₙ(x)
   - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)
   - `BesselJ(order, x)` or `bessel_j(order, x)` for J_order(x)

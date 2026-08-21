@@ -350,6 +350,36 @@ qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
 qcomplex_t qc_trigamma(qcomplex_t z);                      /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);                    /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */
+/**
+ * @brief Compute the analytically continued Riemann zeta function.
+ *
+ * @param z Complex argument; z = 1 is the simple pole.
+ * @return ζ(z) at double-double complex precision.
+ */
+qcomplex_t qc_zeta(qcomplex_t z);
+/**
+ * @brief Compute the analytically continued Hurwitz zeta function.
+ *
+ * @param s Complex exponent argument; s = 1 is the simple pole.
+ * @param a Complex shift argument on the principal branch.
+ * @return ζ(s, a) at double-double complex precision, or NaN where undefined.
+ */
+qcomplex_t qc_zetah(qcomplex_t s, qcomplex_t a);
+/**
+ * @brief Compute the first Hurwitz zeta derivative with respect to its exponent.
+ *
+ * @param s Complex exponent argument; s = 1 is the double pole of the derivative.
+ * @param a Complex shift argument on the principal branch.
+ * @return ∂ζ(s, a)/∂s at double-double complex precision, or NaN where undefined.
+ */
+qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
+/**
+ * @brief Compute the first derivative of the Riemann zeta function.
+ *
+ * @param z Complex argument; z = 1 is the double pole of the derivative.
+ * @return ζ′(z) at double-double complex precision.
+ */
+qcomplex_t qc_zetap(qcomplex_t z);
 qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
 qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z);         /**< polylogarithm Li_s(z), integer s */
 qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,

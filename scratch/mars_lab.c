@@ -126,6 +126,20 @@ static bool expr_contains_cartesian_component_symbol(const expr_t *expr)
     return expr_contains_cartesian_component_symbol(left) || expr_contains_cartesian_component_symbol(right);
 }
 
+static bool expr_contains_summation_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr)
+        return false;
+    if (expr_is_summation(expr))
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_summation_for_display(left) || expr_contains_summation_for_display(right);
+}
+
 static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
 {
     static const expr_pattern_unary_affine_kind_t kinds[] = {
@@ -1569,6 +1583,14 @@ static void print_expression_bindings(const char *label, const char *expression_
     expr_bindings_free(bindings);
 }
 
+static void print_expression_tree_bindings(const char *label, const expr_t *expr, int precision)
+{
+    expr_bindings_t *bindings = expr_bindings_from_expr_internal(expr);
+
+    print_bindings(label, bindings, precision);
+    expr_bindings_free(bindings);
+}
+
 static void preserve_matching_binding_values(expr_bindings_t *bindings, const char *source_expression)
 {
     expr_bindings_t *source_bindings = NULL;
@@ -1782,6 +1804,7 @@ int main(int argc, char **argv)
     char *integral_text = NULL;
     char *integral_func_text = NULL;
     char *integral_TeX_text = NULL;
+    string_t *derivation_TeX = NULL;
     char value_note[512];
     bool integral_request = strcmp(action, "integral") == 0;
     bool bindings_request = strcmp(action, "bindings") == 0;
@@ -1792,6 +1815,7 @@ int main(int argc, char **argv)
     bool complex_cartesian = false;
     bool display_expr_owned = false;
     bool display_deriv_owned = false;
+    bool domain_specialised = false;
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -1800,7 +1824,8 @@ int main(int argc, char **argv)
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
-    expr = expr_from_string(raw_input, &bindings);
+    expr = expr_from_string_with_derivation_TeX_internal(raw_input, &bindings, &derivation_TeX,
+                                                        &domain_specialised);
 
     if (!expr) {
         rc = 1;
@@ -1829,7 +1854,9 @@ int main(int argc, char **argv)
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    display_expr = display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
+    display_expr = derivation_TeX && string_length(derivation_TeX) > 0u
+                       ? expr_clone(expr)
+                       : display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
     display_expr_owned = display_expr != NULL;
     if (!display_expr)
         display_expr = expr;
@@ -1844,6 +1871,8 @@ int main(int argc, char **argv)
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
+    printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
+    printf("algebraic_specialisation  %s\n", domain_specialised ? "domain-required" : "none");
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
@@ -1929,7 +1958,9 @@ int main(int argc, char **argv)
                     integration_constant_name = expr_symbol_name(family_right);
                 (void)family_left;
 
-                display_integral = display_polynomial_simplified(integral, wrt, complex_cartesian);
+                display_integral = expr_contains_summation_for_display(integral)
+                                       ? expr_clone(integral)
+                                       : display_polynomial_simplified(integral, wrt, complex_cartesian);
                 if (!display_integral)
                     display_integral = integral;
                 if (integration_constant_name) {
@@ -1951,7 +1982,7 @@ int main(int argc, char **argv)
                 printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
                 printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
                 printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");
-                print_expression_bindings("integral_binding", integral_text, precision);
+                print_expression_tree_bindings("integral_binding", integral, precision);
                 print_owned_number("i value", expr_eval(integral), precision);
             }
         } else {
@@ -1970,6 +2001,7 @@ cleanup:
     free(deriv_text);
     free(deriv_values_text);
     free(TeX_text);
+    string_free(derivation_TeX);
     free(func_text);
     free(unbound_text);
     free(expr_text);

@@ -127,44 +127,7 @@ static void print_aligned_equation_fragment(const char *lhs, const char *rhs)
 
 static char *equation_display_TeX_dup(const equation_t *equation)
 {
-    char *lhs = NULL;
-    char *rhs = NULL;
-    char *out = NULL;
-    const char *rhs_body = NULL;
-    size_t rhs_body_len = 0u;
-    int needed;
-
-    if (!equation)
-        return NULL;
-
-    lhs = expr_TeX_body_dup(equ_lhs(equation));
-    rhs = expr_TeX_body_dup(equ_rhs(equation));
-    if (!lhs || !rhs)
-        goto cleanup;
-
-    if (TeX_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
-        needed =
-            snprintf(NULL, 0, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len, rhs_body);
-    } else {
-        needed = snprintf(NULL, 0, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
-    }
-    if (needed < 0)
-        goto cleanup;
-
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        goto cleanup;
-    if (TeX_wrapped_aligned_body(rhs, &rhs_body, &rhs_body_len)) {
-        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs, (int)rhs_body_len,
-                 rhs_body);
-    } else {
-        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
-    }
-
-cleanup:
-    free(rhs);
-    free(lhs);
-    return out;
+    return equ_to_TeX_body_wrapped(equation, 110u);
 }
 
 static equation_t *display_expanded_equation(const equation_t *equation)
@@ -471,16 +434,11 @@ static void print_solutions(const equation_solutions_t *solutions, expr_bindings
     }
 }
 
-static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
+static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                    const size_t *order, const char *first_separator)
 {
     size_t count = equ_solutions_count(solutions);
 
-    if (count == 0u) {
-        printf("solutions_TeX \n");
-        return;
-    }
-
-    printf("solutions_TeX \\begin{aligned}");
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
         const char *name = solution_binding_name(bindings, solution);
@@ -490,15 +448,43 @@ static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bind
         char *tex = equ_text_dup(shown, style_LATEX);
 
         if (name && rhs_TeX) {
-            printf("%s", i == 0u ? " " : " \\\\\n");
+            printf("%s", i == 0u ? first_separator : " \\\\\n");
             print_aligned_equation_fragment(name, rhs_TeX);
         } else
-            printf("%s%s", i == 0u ? " " : " \\\\\n", tex ? tex : "\\text{null}");
+            printf("%s%s", i == 0u ? first_separator : " \\\\\n", tex ? tex : "\\text{null}");
         equ_free(display);
         free(tex);
         free(rhs_TeX);
     }
+}
+
+static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
+{
+    if (equ_solutions_count(solutions) == 0u) {
+        printf("solutions_TeX \n");
+        return;
+    }
+
+    printf("solutions_TeX \\begin{aligned}");
+    print_solution_TeX_rows(solutions, bindings, order, " ");
     printf(" \\end{aligned}\n");
+}
+
+static void print_derivation_TeX(const char *equation_TeX, const equation_solutions_t *solutions,
+                                 expr_bindings_t *bindings, const size_t *order)
+{
+    const char *equation_body = NULL;
+    size_t equation_body_len = 0u;
+
+    if (!equation_TeX || !strstr(equation_TeX, "\\sum_") || equ_solutions_count(solutions) == 0u ||
+        !TeX_wrapped_aligned_body(equation_TeX, &equation_body, &equation_body_len)) {
+        printf("derivation_TeX \n");
+        return;
+    }
+
+    printf("derivation_TeX \\begin{aligned}[t]\n%.*s \\\\\n", (int)equation_body_len, equation_body);
+    print_solution_TeX_rows(solutions, bindings, order, "");
+    printf("\n\\end{aligned}\n");
 }
 
 static bool substitute_named_zero_if_present(expr_t **expr_io, const char *name)
@@ -657,6 +643,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     printf("status      %s\n", status ? status : "unsolved");
     print_solutions(solutions, bindings, solution_order);
     print_solutions_TeX(solutions, bindings, solution_order);
+    print_derivation_TeX(tex, solutions, bindings, solution_order);
     print_solution_numerics(solutions, bindings, solution_order, precision);
 
     free(solution_order);

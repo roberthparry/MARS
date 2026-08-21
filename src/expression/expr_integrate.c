@@ -736,6 +736,15 @@ static bool expr_integrate_needs_function_collection_local(const expr_t *expr)
     return expr_integrate_has_repeated_function_local(expr, seen, &count, MAX_FUNCTIONS);
 }
 
+static bool expr_integrate_contains_summation_local(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_summation(expr))
+        return true;
+    return expr_integrate_contains_summation_local(expr->a) || expr_integrate_contains_summation_local(expr->b);
+}
+
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *simplified;
@@ -765,6 +774,12 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
     expr_free(simplified);
 
 normalise_result:
+    if (raw && expr_contains_integral_operation(raw))
+        return raw;
+    if (raw && expr_integrate_contains_summation_local(raw)) {
+        expr_integrate_normalize_small_rationals_local(raw);
+        return raw;
+    }
     if (raw) {
         expr_t *expanded_raw = expr_expand_preserved_for_display(raw);
         expr_t *cartesian = expanded_raw ? expr_complex_unary_cartesian_for_display(expanded_raw) : NULL;
@@ -779,7 +794,6 @@ normalise_result:
     }
     if (expr_integrate_raw_poly_quotient_is_final_local(raw, wrt))
         return raw;
-
     result = simplify_owned(raw);
     if (!expr_integrate_needs_function_collection_local(result)) {
         expr_integrate_normalize_small_rationals_local(result);

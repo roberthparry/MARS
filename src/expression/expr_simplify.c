@@ -1428,6 +1428,14 @@ int expr_fold_zero_to_zero(const number_t *in, number_t *out)
     return 1;
 }
 
+int expr_fold_trigamma_const(const number_t *in, number_t *out)
+{
+    if (!in || !out || !num_is_inf(*in) || num_get_sign(*in) <= 0)
+        return 0;
+    *out = NUM_ZERO;
+    return 1;
+}
+
 int expr_fold_cos_const(const number_t *in, number_t *out)
 {
     if (!in || !out || !num_eq(*in, NUM_ZERO))

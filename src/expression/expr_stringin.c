@@ -188,6 +188,9 @@ static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p, char closing, const
 static expr_t *build_ascii_integral_expr(const expr_t *upper, const expr_t *display_integrand, const expr_t *dummy);
 static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower, const expr_t *upper,
                                                  const expr_t *display_integrand, const expr_t *dummy);
+static expr_t *build_ascii_sum_expr(size_t argument_count, expr_t *const *arguments);
+static expr_t *expr_zeta_from_args(size_t argument_count, expr_t *const *arguments);
+static expr_t *expr_zetap_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *build_sine_integral_expr(const expr_t *argument);
 static expr_t *build_cosine_integral_expr(const expr_t *argument);
 static expr_t *parse_signed_power_operand_mode(expr_parse_state_t *p, bool allow_ascii_rational_literal);
@@ -277,21 +280,26 @@ typedef struct {
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0, 5,
-    0, 1, 0, 0, 3, 2, 1, 0, 103, 0, 0, 1, 0, 4, 1, 1,
-    0, 0, 0, 0, 11, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0,
-    2, 0, 5, 12, 8, 0, 0, 0, 0, 0, 0, 3, 13, 0, 4, 0,
-    6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 2,
-    0, 0, 6, 0, 1, 0, 0, 8, 1, 6, 3, 5, 0, 1, 0, 0,
-    0, 1, 0, 0, 0, 4, 8, 4, 4, 17, 1, 0, 0, 0, 0, 0,
-    4, 0, 1, 0, 5, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 3, 2, 1, 0, 138, 0, 0, 1, 0, 4, 1, 1,
+    0, 0, 0, 0, 11, 0, 0, 58, 0, 1, 0, 0, 0, 0, 0, 0,
+    0, 0, 78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0,
+    2, 0, 5, 12, 8, 0, 0, 0, 0, 0, 0, 13, 13, 0, 4, 0,
+    6, 0, 1, 3, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 2,
+    0, 0, 6, 0, 1, 0, 0, 8, 1, 6, 3, 5, 0, 1, 0, 47,
+    0, 1, 0, 0, 0, 145, 8, 4, 4, 17, 1, 0, 0, 0, 0, 0,
+    4, 0, 1, 0, 5, 4, 2, 0, 0, 9, 0, 0, 0, 0, 0, 0,
     0, 3, 0, 0, 2, 0, 5, 0, 2, 0, 2, 0, 5, 0, 2, 3,
-    0, 0, 0, 2, 0, 0, 3,
+    0, 0, 0, 2, 0, 0, 35,
 };
 
 // clang-format off
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
+    [0]   = { .kw = "zeta",               .arity = UINT_MAX, .ops = &ops_zeta,           .ufn = expr_zeta,  .vfn = expr_zeta_from_args },
+    [1]   = { .kw = "zetap",              .arity = UINT_MAX, .ops = &ops_zetap,          .ufn = expr_zetap, .vfn = expr_zetap_from_args },
+    [2]   = { .kw = "W₀",                 .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [3]   = { .kw = "vercos",             .arity = 1u,       .ops = &ops_vercos,         .ufn = expr_vercos },
+    [4]   = { .kw = "erfc",               .arity = 1u,       .ops = &ops_erfc,           .ufn = expr_erfc },
+    [5]   = { .kw = "lambert_wm1",        .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [6]   = { .kw = "F_1",                .arity = 6u,                                   .sfn = expr_appell_f1 },
     [7]   = { .kw = "asinh",              .arity = 1u,       .ops = &ops_asinh,          .ufn = expr_asinh },
     [8]   = { .kw = "arcsec",             .arity = 1u,       .ops = &ops_asec,           .ufn = expr_asec },
@@ -305,14 +313,16 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [16]  = { .kw = "exp",                .arity = 1u,       .ops = &ops_exp,            .ufn = expr_exp },
     [17]  = { .kw = "gammainc_upper",     .arity = 2u,       .ops = &ops_gammainc_upper, .bfn = expr_gammainc_upper },
     [18]  = { .kw = "csc",                .arity = 1u,       .ops = &ops_cosec,          .ufn = expr_cosec },
-    [19]  = { .kw = "arccovercos",        .arity = 1u,       .ops = &ops_arccovercos,    .ufn = expr_arccovercos },
+    [19]  = { .kw = "zeta2p",             .arity = 2u,       .ops = &ops_zatahp,         .bfn = expr_zatahp },
     [20]  = { .kw = "Ei",                 .arity = 1u,       .ops = &ops_ei,             .ufn = expr_ei },
     [21]  = { .kw = "acosec",             .arity = 1u,       .ops = &ops_acosec,         .ufn = expr_acosec },
     [22]  = { .kw = "coth",               .arity = 1u,       .ops = &ops_coth,           .ufn = expr_coth },
     [23]  = { .kw = "SHR",                .arity = 2u,       .ops = &ops_shr,            .bfn = expr_shr },
+    [24]  = { .kw = "archavercos",        .arity = 1u,       .ops = &ops_archavercos,    .ufn = expr_archavercos },
+    [25]  = { .kw = "lambert_w0",         .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [26]  = { .kw = "hacoversin",         .arity = 1u,       .ops = &ops_hacoversin,     .ufn = expr_hacoversin },
     [27]  = { .kw = "tanh",               .arity = 1u,       .ops = &ops_tanh,           .ufn = expr_tanh },
-    [28]  = { .kw = "W₀",                 .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
+    [28]  = { .kw = "zeta2",              .arity = 2u,       .ops = &ops_zetah,          .bfn = expr_zetah },
     [29]  = { .kw = "E1",                 .arity = 1u,       .ops = &ops_e1,             .ufn = expr_e1 },
     [30]  = { .kw = "erf",                .arity = 1u,       .ops = &ops_erf,            .ufn = expr_erf },
     [31]  = { .kw = "F1",                 .arity = 6u,                                   .sfn = expr_appell_f1 },
@@ -332,7 +342,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [47]  = { .kw = "cubrt",              .arity = 1u,       .ops = &ops_cubrt,          .ufn = expr_cubrt },
     [48]  = { .kw = "hacovercos",         .arity = 1u,       .ops = &ops_hacovercos,     .ufn = expr_hacovercos },
     [49]  = { .kw = "digamma",            .arity = 1u,       .ops = &ops_digamma,        .ufn = expr_digamma },
-    [50]  = { .kw = "archavercos",        .arity = 1u,       .ops = &ops_archavercos,    .ufn = expr_archavercos },
+    [50]  = { .kw = "ζ",                  .arity = UINT_MAX, .ops = &ops_zeta,  .ufn = expr_zeta,  .vfn = expr_zeta_from_args },
     [51]  = { .kw = "W0",                 .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [52]  = { .kw = "arccot",             .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
     [53]  = { .kw = "versin",             .arity = 1u,       .ops = &ops_versin,         .ufn = expr_versin },
@@ -341,7 +351,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [58]  = { .kw = "productlog",         .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
     [59]  = { .kw = "arccoversin",        .arity = 1u,       .ops = &ops_arccoversin,    .ufn = expr_arccoversin },
     [60]  = { .kw = "acot",               .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
-    [61]  = { .kw = "acosech",            .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
     [62]  = { .kw = "cos",                .arity = 1u,       .ops = &ops_cos,            .ufn = expr_cos },
     [63]  = { .kw = "ln",                 .arity = 1u,       .ops = &ops_log,            .ufn = expr_log },
     [64]  = { .kw = "BesselJ",            .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
@@ -351,7 +360,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [68]  = { .kw = "polygamma",          .arity = 2u,       .ops = &ops_polygamma,      .bfn = expr_polygamma_xp },
     [69]  = { .kw = "factors",            .arity = 1u,       .ops = &ops_factors,        .ufn = expr_factors },
     [70]  = { .kw = "arcversin",          .arity = 1u,       .ops = &ops_arcversin,      .ufn = expr_arcversin },
-    [71]  = { .kw = "root",               .arity = 2u,       .ops = &ops_root,           .bfn = expr_root },
+    [71]  = { .kw = "acosech",            .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
     [72]  = { .kw = "pow",                .arity = 2u,       .ops = &ops_pow,            .bfn = expr_pow_xp },
     [73]  = { .kw = "XOR",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
     [74]  = { .kw = "sec",                .arity = 1u,       .ops = &ops_sec,            .ufn = expr_sec },
@@ -373,7 +382,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [90]  = { .kw = "F₁",                 .arity = 6u,                                   .sfn = expr_appell_f1 },
     [91]  = { .kw = "LauricellaF",        .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [92]  = { .kw = "binomial",           .arity = 2u,       .ops = NULL,                .bfn = expr_binomial },
-    [94]  = { .kw = "lambert_wm1",        .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [96]  = { .kw = "next_prime",         .arity = 1u,       .ops = &ops_next_prime,     .ufn = expr_next_prime },
     [97]  = { .kw = "acoth",              .arity = 1u,       .ops = &ops_acoth,          .ufn = expr_acoth },
     [98]  = { .kw = "arsech",             .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
@@ -383,6 +391,8 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [102] = { .kw = "normal_logpdf",      .arity = 1u,       .ops = &ops_normal_logpdf,  .ufn = expr_normal_logpdf },
     [103] = { .kw = "Wₙ",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [104] = { .kw = "covercos",           .arity = 1u,       .ops = &ops_covercos,       .ufn = expr_covercos },
+    [105] = { .kw = "sum",                .arity = UINT_MAX,                             .vfn = build_ascii_sum_expr },
+    [106] = { .kw = "root",               .arity = 2u,       .ops = &ops_root,           .bfn = expr_root },
     [108] = { .kw = "sech",               .arity = 1u,       .ops = &ops_sech,           .ufn = expr_sech },
     [109] = { .kw = "arcsch",             .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
     [110] = { .kw = "gamma",              .arity = 1u,       .ops = &ops_gamma,          .ufn = expr_gamma },
@@ -414,7 +424,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [136] = { .kw = "ψ⁽¹⁾",               .arity = 1u,       .ops = &ops_trigamma,       .ufn = expr_trigamma },
     [137] = { .kw = "normal_pdf",         .arity = 1u,       .ops = &ops_normal_pdf,     .ufn = expr_normal_pdf },
     [138] = { .kw = "BesselY",            .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
-    [139] = { .kw = "erfc",               .arity = 1u,       .ops = &ops_erfc,           .ufn = expr_erfc },
+    [139] = { .kw = "zatahp",             .arity = 2u,       .ops = &ops_zatahp,         .bfn = expr_zatahp },
     [140] = { .kw = "W_0",                .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [141] = { .kw = "archaversin",        .arity = 1u,       .ops = &ops_archaversin,    .ufn = expr_archaversin },
     [142] = { .kw = "W",                  .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
@@ -432,9 +442,10 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [154] = { .kw = "arcvercos",          .arity = 1u,       .ops = &ops_arcvercos,      .ufn = expr_arcvercos },
     [155] = { .kw = "is_prime",           .arity = 1u,       .ops = &ops_is_prime,       .ufn = expr_is_prime },
     [156] = { .kw = "appell_f1",          .arity = 6u,                                   .sfn = expr_appell_f1 },
-    [157] = { .kw = "lambert_w0",         .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
+    [157] = { .kw = "zetah",              .arity = 2u,       .ops = &ops_zetah,          .bfn = expr_zetah },
     [158] = { .kw = "logbeta_pdf",        .arity = 3u,                                   .tfn = expr_logbeta_pdf },
     [159] = { .kw = "conjugate",          .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
+    [160] = { .kw = "arccovercos",        .arity = 1u,       .ops = &ops_arccovercos,    .ufn = expr_arccovercos },
     [161] = { .kw = "asech",              .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
     [162] = { .kw = "OR",                 .arity = 2u,       .ops = &ops_bit_or,         .bfn = expr_bit_or },
     [163] = { .kw = "log",                .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
@@ -518,7 +529,7 @@ expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, cons
         return NULL;
 
     entry = lookup_func(string_view_from_chars(name, strlen(name)));
-    if (!entry || entry->arity != 1u || !entry->ufn)
+    if (!entry || (entry->arity != 1u && entry->arity != UINT_MAX) || !entry->ufn)
         return NULL;
 
     if (canonical_name_out)
@@ -1986,6 +1997,48 @@ static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower, const expr
                  : expr_integral_with_dummy_internal(display_integrand, upper, dummy);
 }
 
+static expr_t *build_ascii_sum_expr(size_t argument_count, expr_t *const *arguments)
+{
+    expr_t *index;
+    expr_t *term;
+    expr_t *sum;
+
+    if (argument_count != 4u || !arguments ||
+        (!expr_is_var(arguments[1]) && !expr_is_named_const(arguments[1])))
+        return NULL;
+    if (expr_is_var(arguments[1]))
+        return expr_new_finite_summation_range(arguments[0], arguments[1], arguments[2], arguments[3]);
+
+    index = expr_new_named_var(NUM_NAN, arguments[1]->name);
+    term = index ? expr_substitute(arguments[0], arguments[1], index) : NULL;
+    sum = term ? expr_new_finite_summation_range(term, index, arguments[2], arguments[3]) : NULL;
+    expr_free(term);
+    expr_free(index);
+    return sum;
+}
+
+static expr_t *expr_zeta_from_args(size_t argument_count, expr_t *const *arguments)
+{
+    if (!arguments)
+        return NULL;
+    if (argument_count == 1u)
+        return expr_zeta(arguments[0]);
+    if (argument_count == 2u)
+        return expr_zetah(arguments[0], arguments[1]);
+    return NULL;
+}
+
+static expr_t *expr_zetap_from_args(size_t argument_count, expr_t *const *arguments)
+{
+    if (!arguments)
+        return NULL;
+    if (argument_count == 1u)
+        return expr_zetap(arguments[0]);
+    if (argument_count == 2u)
+        return expr_zatahp(arguments[0], arguments[1]);
+    return NULL;
+}
+
 static expr_t *parse_integral_bound_var_slice(symtab_t *syms, string_view_t text)
 {
     string_cursor_t *cursor = string_cursor_new_view(text);
@@ -2519,7 +2572,13 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                     expr_free(arguments[i]);
                 free(arguments);
                 if (!result) {
-                    set_error(p, "invalid generalised hypergeometric parameters");
+                    const char *message = "invalid generalised hypergeometric parameters";
+
+                    if (fe->vfn == build_ascii_sum_expr)
+                        message = "invalid finite summation";
+                    else if (fe->vfn == expr_zeta_from_args || fe->vfn == expr_zetap_from_args)
+                        message = "zeta accepts one or two arguments";
+                    set_error(p, message);
                     return NULL;
                 }
                 if (!string_view_is_empty(symbolic_exp_text)) {
@@ -3215,6 +3274,25 @@ static int parse_bindings(string_view_t text, int is_var, symtab_t *syms, string
     return 0;
 }
 
+static bool expr_series_lookup_binding(void *context, const char *name, number_t *value_out)
+{
+    const symtab_t *symbols = context;
+    string_t *key;
+    expr_t *symbol;
+
+    if (!symbols || !name || !value_out)
+        return false;
+    key = string_new_with(name);
+    if (!key)
+        return false;
+    symbol = symtab_lookup_text(symbols, key);
+    string_free(key);
+    if (!symbol)
+        return false;
+    *value_out = expr_eval(symbol);
+    return true;
+}
+
 /* ------------------------------------------------------------------ */
 /* Pure-constant format: { name = val }                                 */
 /* ------------------------------------------------------------------ */
@@ -3566,7 +3644,8 @@ static size_t find_binding_semicolon(string_view_t text)
     return SIZE_MAX;
 }
 
-static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t **bindings_out)
+static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t **bindings_out,
+                                          string_t **series_TeX_out, bool *domain_specialised_out)
 {
     expr_bindings_t *bindings = NULL;
     string_view_t text;
@@ -3583,6 +3662,8 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
 
     if (bindings_out)
         *bindings_out = NULL;
+    if (domain_specialised_out)
+        *domain_specialised_out = false;
     if (string_view_is_empty(source))
         return NULL;
 
@@ -3670,10 +3751,17 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
     /* ---- No bindings: either { expr } or legacy { name = val } ---- */
     if (pipe_pos == SIZE_MAX) {
         string_view_t content = view_rtrim_ascii(string_view_slice(text, body_start, close_pos - body_start));
+        string_t *expanded_content = NULL;
         int content_has_top_level_equals;
         symtab_t syms;
 
         content_has_top_level_equals = has_top_level_equals(content);
+        expanded_content = expr_expand_series_text(content, series_TeX_out, NULL, NULL, domain_specialised_out);
+        if (!expanded_content) {
+            string_free(errmsg);
+            return NULL;
+        }
+        content = string_view_all(expanded_content);
 
         expr_t *result =
             parse_expression_view_with_metadata(content, NULL, "expr_from_string", 0, false, &has_symbolic_derivative,
@@ -3696,6 +3784,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
                 (*bindings_out)->has_symbolic_derivative = has_symbolic_derivative;
             if (bindings_out && *bindings_out)
                 (*bindings_out)->has_symbolic_integral = has_symbolic_integral;
+            string_free(expanded_content);
             string_free(errmsg);
             expr_bindings_free(symbolic_integral_bindings);
             return result;
@@ -3725,11 +3814,13 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
             if (result) {
                 if (bindings_out)
                     *bindings_out = bindings;
+                string_free(expanded_content);
                 string_free(errmsg);
                 expr_bindings_free(symbolic_integral_bindings);
                 return result;
             }
 
+            string_free(expanded_content);
             string_free(errmsg);
             expr_bindings_free(symbolic_integral_bindings);
             return NULL;
@@ -3743,6 +3834,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
         }
+        string_free(expanded_content);
         string_free(errmsg);
         return result;
     }
@@ -3750,6 +3842,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
     /* ---- Expression with bindings: { expr | vars; consts } ---- */
     string_view_t expr_view = view_rtrim_ascii(string_view_slice(text, body_start, pipe_pos - body_start));
     string_view_t bind_view = string_view_slice(text, pipe_pos + 1u, close_pos - pipe_pos - 1u);
+    string_t *expanded_expr = NULL;
     size_t semi_pos = find_binding_semicolon(bind_view);
 
     symtab_t syms;
@@ -3760,6 +3853,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
     if (parse_bindings(var_bindings, 1, &syms, errmsg) < 0) {
         symtab_free(&syms);
         fprintf(stderr, "%s\n", string_c_str(errmsg));
+        string_free(expanded_expr);
         string_free(errmsg);
         return NULL;
     }
@@ -3768,14 +3862,25 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
                            0, &syms, errmsg) < 0) {
             symtab_free(&syms);
             fprintf(stderr, "%s\n", string_c_str(errmsg));
+            string_free(expanded_expr);
             string_free(errmsg);
             return NULL;
         }
     }
 
+    expanded_expr = expr_expand_series_text(expr_view, series_TeX_out, expr_series_lookup_binding, &syms,
+                                            domain_specialised_out);
+    if (!expanded_expr) {
+        symtab_free(&syms);
+        string_free(errmsg);
+        return NULL;
+    }
+    expr_view = string_view_all(expanded_expr);
+
     if (collect_implicit_symbols(expr_view, &syms) < 0) {
         symtab_free(&syms);
         fprintf(stderr, "out of memory\n");
+        string_free(expanded_expr);
         string_free(errmsg);
         return NULL;
     }
@@ -3802,11 +3907,13 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
     if (result && bindings_out)
         *bindings_out = bindings;
     expr_bindings_free(symbolic_integral_bindings);
+    string_free(expanded_expr);
     string_free(errmsg);
     return result;
 }
 
-expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
+static expr_t *expr_from_text_internal(const string_t *text, expr_bindings_t **bnd_out, string_t **series_TeX_out,
+                                       bool *domain_specialised_out)
 {
     string_view_t source;
     string_cursor_t *cursor;
@@ -3814,6 +3921,10 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
     expr_t *result;
     unsigned char first = 0u;
 
+    if (series_TeX_out)
+        *series_TeX_out = NULL;
+    if (domain_specialised_out)
+        *domain_specialised_out = false;
     if (!text) {
         if (bnd_out)
             *bnd_out = NULL;
@@ -3827,7 +3938,7 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
     string_cursor_skip_spaces(cursor);
     if (string_cursor_peek_ascii(cursor, &first) && first == '{') {
         string_cursor_free(cursor);
-        return expr_from_string_view_impl(source, bnd_out);
+        return expr_from_string_view_impl(source, bnd_out, series_TeX_out, domain_specialised_out);
     }
     string_cursor_free(cursor);
 
@@ -3839,18 +3950,116 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
         return NULL;
     }
 
-    result = expr_from_string_view_impl(string_view_all(wrapped), bnd_out);
+    result = expr_from_string_view_impl(string_view_all(wrapped), bnd_out, series_TeX_out, domain_specialised_out);
     string_free(wrapped);
     return result;
 }
 
-expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
+expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
+{
+    return expr_from_text_internal(text, bnd_out, NULL, NULL);
+}
+
+static bool expr_series_zeta_difference_parts(const expr_t *result, const expr_t **parameter_out,
+                                              const expr_t **endpoint_out)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    bool subtract = false;
+
+    if (!result || !parameter_out || !endpoint_out ||
+        !expr_match_add_sub_expr(result, &left, &right, &subtract) || !subtract || !left || !right ||
+        !expr_is_op(left, &ops_zeta) || !expr_is_op(right, &ops_zetah) || !left->a || !right->a || !right->b ||
+        !expr_struct_eq(left->a, right->a)) {
+        return false;
+    }
+    *parameter_out = left->a;
+    *endpoint_out = right->b;
+    return true;
+}
+
+static char *expr_series_zeta_parameter_TeX(const expr_t *parameter)
+{
+    const expr_t *positive = NULL;
+    const char *name;
+
+    if (!parameter)
+        return NULL;
+    name = expr_symbol_name(parameter);
+    if (name)
+        return strdup(name);
+    positive = expr_is_neg(parameter) ? parameter->a : NULL;
+    if (positive && (name = expr_symbol_name(positive)) != NULL) {
+        const size_t name_length = strlen(name);
+        char *negative_name = malloc(name_length + 2u);
+
+        if (!negative_name)
+            return NULL;
+        negative_name[0] = '-';
+        memcpy(negative_name + 1u, name, name_length + 1u);
+        return negative_name;
+    }
+    return expr_to_TeX_body(parameter);
+}
+
+static string_t *expr_series_derivation_TeX(const string_t *series_TeX, const expr_t *result)
+{
+    const expr_t *zeta_parameter = NULL;
+    const expr_t *zeta_endpoint = NULL;
+    char *result_TeX = expr_to_TeX_body(result);
+    string_t *derivation = string_new();
+    const bool result_is_series = result_TeX && strcmp(string_c_str(series_TeX), result_TeX) == 0;
+
+    if (result_is_series) {
+        if (!derivation || string_append_format(derivation, "\\begin{aligned}[t]\n&%S\n\\end{aligned}", series_TeX) < 0) {
+            string_free(derivation);
+            derivation = NULL;
+        }
+    } else if (result_TeX && derivation &&
+               expr_series_zeta_difference_parts(result, &zeta_parameter, &zeta_endpoint)) {
+        expr_t *digamma = expr_digamma(zeta_endpoint);
+        expr_t *gamma = expr_from_string("gamma", NULL);
+        expr_t *harmonic = digamma && gamma ? expr_add(digamma, gamma) : NULL;
+        char *harmonic_TeX = harmonic ? expr_to_TeX_body(harmonic) : NULL;
+        char *parameter_TeX = expr_series_zeta_parameter_TeX(zeta_parameter);
+
+        if (!harmonic_TeX || !parameter_TeX ||
+            string_append_format(derivation,
+                                 "\\begin{aligned}[t]\n&%S \\\\\n"
+                                 "&= \\begin{cases}\n%s, & %s = 1, \\\\\n%s, & %s \\ne 1.\n\\end{cases}\n\\end{aligned}",
+                                 series_TeX, harmonic_TeX, parameter_TeX, result_TeX, parameter_TeX) < 0) {
+            string_free(derivation);
+            derivation = NULL;
+        }
+        free(parameter_TeX);
+        free(harmonic_TeX);
+        expr_free(harmonic);
+        expr_free(gamma);
+        expr_free(digamma);
+    } else if (!result_TeX || !derivation ||
+        string_append_format(derivation, "\\begin{aligned}[t]\n&%S \\\\\n&= %s\n\\end{aligned}", series_TeX, result_TeX) < 0) {
+        string_free(derivation);
+        derivation = NULL;
+    }
+    free(result_TeX);
+    return derivation;
+}
+
+/* Parse an expression while preserving its native series derivation and specialisation metadata. */
+expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindings_t **bnd_out,
+                                                      string_t **derivation_TeX_out,
+                                                      bool *domain_specialised_out)
 {
     string_t *text;
+    string_t *series_TeX = NULL;
     expr_t *result;
 
     if (bnd_out)
         *bnd_out = NULL;
+    if (derivation_TeX_out)
+        *derivation_TeX_out = NULL;
+    if (domain_specialised_out)
+        *domain_specialised_out = false;
     if (!s)
         return NULL;
 
@@ -3858,9 +4067,25 @@ expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
     if (!text)
         return NULL;
 
-    result = expr_from_text(text, bnd_out);
+    result = expr_from_text_internal(text, bnd_out, derivation_TeX_out ? &series_TeX : NULL,
+                                     domain_specialised_out);
     string_free(text);
+    if (result && series_TeX && derivation_TeX_out)
+        *derivation_TeX_out = expr_series_derivation_TeX(series_TeX, result);
+    string_free(series_TeX);
     return result;
+}
+
+/* Parse an expression while preserving any native finite-series derivation. */
+expr_t *expr_from_string_with_derivation_TeX(const char *s, expr_bindings_t **bnd_out,
+                                             string_t **derivation_TeX_out)
+{
+    return expr_from_string_with_derivation_TeX_internal(s, bnd_out, derivation_TeX_out, NULL);
+}
+
+expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
+{
+    return expr_from_string_with_derivation_TeX(s, bnd_out, NULL);
 }
 
 static expr_binding_entry_t *bnd_find_entry_text(expr_bindings_t *bnd, const string_t *name)

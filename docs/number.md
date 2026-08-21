@@ -321,109 +321,176 @@ Return conventions in this area:
 
 ## Arithmetic and Functions
 
-The generic layer exposes:
+The generic layer promotes compatible mixed backends before dispatch. Unless a
+status or predicate return is stated explicitly, each operation returns a new
+owning `number_t`.
 
-- core arithmetic:
-  - `num_add`
-  - `num_sub`
-  - `num_mul`
-  - `num_div`
-  - `num_inv`
-  - `num_neg`
-- real/complex helpers:
-  - `num_abs`
-  - `num_conj`
-  - `num_real_part`
-  - `num_imag_part`
-  - `num_arg`
-- elementary functions:
-  - `num_exp`
-  - `num_log`
-  - `num_log10`
-  - `num_sqrt`
-  - `num_cubrt`
-  - `num_root`
-  - `num_sin`, `num_cos`, `num_tan`
-  - `num_sec`, `num_cosec`, `num_cot`
-  - `num_versin`, `num_vercos`, `num_coversin`, `num_covercos`
-  - `num_haversin`, `num_havercos`, `num_hacoversin`, `num_hacovercos`
-  - `num_asin`, `num_acos`, `num_atan`
-  - `num_asec`, `num_acosec`, `num_acot`
-  - `num_arcversin`, `num_arcvercos`, `num_arccoversin`, `num_arccovercos`
-  - `num_archaversin`, `num_archavercos`, `num_archacoversin`, `num_archacovercos`
-  - `num_sinh`, `num_cosh`, `num_tanh`
-  - `num_sech`, `num_cosech`, `num_coth`
-  - `num_asinh`, `num_acosh`, `num_atanh`
-  - `num_asech`, `num_acosech`, `num_acoth`
-  - `num_atan2`
+### Core Arithmetic and Components
 
-`num_sqrt`, `num_cubrt`, and `num_root` return one principal value. `num_root(number, order)` requires an exact
-integer order greater than one and promotes a negative real radicand to a complex result when necessary.
-- special functions:
-  - `num_gamma`
-  - `num_lgamma`
-  - `num_digamma`
-  - `num_trigamma`
-  - `num_tetragamma`
-  - `num_polygamma`
-  - `num_gammainv`
-  - `num_erf`
-  - `num_erfc`
-  - `num_erfinv`
-  - `num_erfcinv`
-  - `num_lambert_w0`
-  - `num_lambert_wm1`
-  - `num_productlog`
-  - `num_beta`
-  - `num_logbeta`
-  - `num_binomial`
-  - `num_beta_pdf`
-  - `num_logbeta_pdf`
-  - `num_normal_pdf`
-  - `num_normal_cdf`
-  - `num_normal_logpdf`
-  - `num_gammainc_lower`
-  - `num_gammainc_upper`
-  - `num_gammainc_P`
-  - `num_gammainc_Q`
-  - `num_e1`
-  - `num_ei`
-  - `num_dilog`
-  - `num_polylog`
-  - `num_legendre_chi`
-  - `num_bessel_j`
-  - `num_bessel_y`
-  - `num_lommel_s`
-  - `num_appell_f1`
-  - `num_lauricella_f`
-  - `num_hypergeometric_pFq`
-- exact integer and number-theory helpers:
-  - `num_factorial`
-  - `num_fibonacci`
-  - `num_partition`
-  - `num_gcd`
-  - `num_lcm`
-  - `num_mod`
-  - `num_divmod`
-  - `num_gcdext`
-  - `num_powmod`
-  - `num_modinv`
-  - `num_is_prime`
-  - `num_prove_prime`
-  - `num_next_prime`
-  - `num_prev_prime`
-  - `num_factors`
-  - `num_bit_length`
-  - `num_test_bit`
-  - `num_set_bit`
-  - `num_clear_bit`
-  - `num_bit_not`
-  - `num_bit_and`
-  - `num_bit_or`
-  - `num_bit_xor`
-  - `num_shl`
-  - `num_shr`
-  - `num_isqrt`
+| Function | Meaning |
+| --- | --- |
+| `num_add(a, b)` | Returns the sum `a + b`. |
+| `num_sub(a, b)` | Returns the difference `a - b`. |
+| `num_mul(a, b)` | Returns the product `a b`. |
+| `num_div(a, b)` | Returns the quotient `a / b`. |
+| `num_inv(x)` | Returns the reciprocal `1 / x`. |
+| `num_neg(x)` | Returns the additive inverse `-x`. |
+| `num_add_long(x, n)` | Adds the machine integer `n` without requiring the caller to construct a `number_t`. |
+| `num_mul_long(x, n)` | Multiplies by the machine integer `n`. |
+| `num_pow(x, y)` | Returns the principal value of `x` raised to the `y` power. |
+| `num_pow_int(x, n)` | Raises `x` to an integer power; negative powers return the reciprocal of the corresponding positive power. |
+| `num_ldexp(x, n)` | Multiplies `x` by the exact binary scale `2^n`. |
+| `num_mul_pow10(x, n)` | Multiplies `x` by the decimal scale `10^n`. |
+| `num_sqr(x)` | Returns `x²`. |
+| `num_abs(x)` | Returns the real magnitude `\|x\|`. |
+| `num_conj(x)` | Returns the complex conjugate; real inputs are unchanged. |
+| `num_real_part(x)` | Extracts the real component. |
+| `num_imag_part(x)` | Extracts the imaginary component. |
+| `num_arg(x)` | Returns the principal complex argument in radians. |
+| `num_floor(x)` | Returns the greatest integer not exceeding a real input. |
+| `num_ceil(x)` | Returns the least integer not less than a real input. |
+| `num_hypot(x, y)` | Returns `sqrt(x² + y²)` with scaling that avoids needless overflow or underflow. |
+
+The `num_add_slow`, `num_sub_slow`, `num_mul_slow`, and `num_div_slow`
+variants perform the same four operations through the full generic dispatcher.
+They exist for internal parity tests and for code that deliberately bypasses
+the inline fixed-precision fast paths.
+
+### Elementary, Trigonometric, and Hyperbolic Functions
+
+| Function | Meaning |
+| --- | --- |
+| `num_exp(x)` | Returns the natural exponential `e^x`. |
+| `num_log(x)` | Returns the principal natural logarithm. |
+| `num_log10(x)` | Returns the principal base-10 logarithm. |
+| `num_sqrt(x)` | Returns the principal square root. |
+| `num_cubrt(x)` | Returns the principal cube root. |
+| `num_root(x, n)` | Returns the principal `n`th root, where `n` is an exact integer greater than one. |
+| `num_sin(x)` | Returns the sine. |
+| `num_cos(x)` | Returns the cosine. |
+| `num_tan(x)` | Returns the tangent, `sin(x) / cos(x)`. |
+| `num_sincos(x, &s, &c)` | Computes sine and cosine together; returns `0` on success and `-1` for invalid output pointers. |
+| `num_sec(x)` | Returns the secant, `1 / cos(x)`. |
+| `num_cosec(x)` | Returns the cosecant, `1 / sin(x)`. |
+| `num_cot(x)` | Returns the cotangent, `1 / tan(x)`. |
+| `num_versin(x)` | Returns the versed sine, `1 - cos(x)`. |
+| `num_vercos(x)` | Returns the versed cosine, `1 + cos(x)`. |
+| `num_coversin(x)` | Returns the coversed sine, `1 - sin(x)`. |
+| `num_covercos(x)` | Returns the coversed cosine, `1 + sin(x)`. |
+| `num_haversin(x)` | Returns the haversine, `(1 - cos(x)) / 2`. |
+| `num_havercos(x)` | Returns the havercosine, `(1 + cos(x)) / 2`. |
+| `num_hacoversin(x)` | Returns the hacoversine, `(1 - sin(x)) / 2`. |
+| `num_hacovercos(x)` | Returns the hacovercosine, `(1 + sin(x)) / 2`. |
+| `num_asin(x)` | Returns the principal inverse sine. |
+| `num_acos(x)` | Returns the principal inverse cosine. |
+| `num_atan(x)` | Returns the principal inverse tangent. |
+| `num_atan2(y, x)` | Returns the quadrant-aware angle of the real coordinate pair `(x, y)`. |
+| `num_asec(x)` | Returns the principal inverse secant. |
+| `num_acosec(x)` | Returns the principal inverse cosecant. |
+| `num_acot(x)` | Returns the principal inverse cotangent. |
+| `num_arcversin(x)` | Returns the principal inverse of `versin`. |
+| `num_arcvercos(x)` | Returns the principal inverse of `vercos`. |
+| `num_arccoversin(x)` | Returns the principal inverse of `coversin`. |
+| `num_arccovercos(x)` | Returns the principal inverse of `covercos`. |
+| `num_archaversin(x)` | Returns the principal inverse haversine. |
+| `num_archavercos(x)` | Returns the principal inverse havercosine. |
+| `num_archacoversin(x)` | Returns the principal inverse hacoversine. |
+| `num_archacovercos(x)` | Returns the principal inverse hacovercosine. |
+| `num_sinh(x)` | Returns the hyperbolic sine. |
+| `num_cosh(x)` | Returns the hyperbolic cosine. |
+| `num_sinhcosh(x, &s, &c)` | Computes hyperbolic sine and cosine together; returns `0` on success and `-1` for invalid output pointers. |
+| `num_tanh(x)` | Returns the hyperbolic tangent, `sinh(x) / cosh(x)`. |
+| `num_sech(x)` | Returns the hyperbolic secant, `1 / cosh(x)`. |
+| `num_cosech(x)` | Returns the hyperbolic cosecant, `1 / sinh(x)`. |
+| `num_coth(x)` | Returns the hyperbolic cotangent, `1 / tanh(x)`. |
+| `num_asinh(x)` | Returns the principal inverse hyperbolic sine. |
+| `num_acosh(x)` | Returns the principal inverse hyperbolic cosine. |
+| `num_atanh(x)` | Returns the principal inverse hyperbolic tangent. |
+| `num_asech(x)` | Returns the principal inverse hyperbolic secant. |
+| `num_acosech(x)` | Returns the principal inverse hyperbolic cosecant. |
+| `num_acoth(x)` | Returns the principal inverse hyperbolic cotangent. |
+
+`num_sqrt`, `num_cubrt`, and `num_root` return one principal value.
+`num_root(number, order)` promotes a negative real radicand to a complex result
+when the selected principal root is not real.
+
+### Special Functions
+
+| Function | Meaning |
+| --- | --- |
+| `num_gamma(x)` | Evaluates Euler's gamma function `Γ(x)`. |
+| `num_lgamma(x)` | Evaluates the principal logarithm of `Γ(x)`. |
+| `num_digamma(x)` | Evaluates `ψ(x)`, the logarithmic derivative of gamma. |
+| `num_trigamma(x)` | Evaluates `ψ⁽¹⁾(x)`, the derivative of digamma. |
+| `num_tetragamma(x)` | Evaluates `ψ⁽²⁾(x)`, the derivative of trigamma. |
+| `num_polygamma(m, x)` | Evaluates the order-`m` polygamma function `ψ⁽ᵐ⁾(x)`. |
+| `num_zeta(s)` | Evaluates the analytically continued Riemann zeta function `ζ(s)`. |
+| `num_zetap(s)` | Evaluates the derivative `ζ′(s)` with respect to `s`. |
+| `num_zetah(s, a)` | Evaluates the analytically continued Hurwitz zeta function `ζ(s, a)`. |
+| `num_zatahp(s, a)` | Evaluates the derivative of Hurwitz zeta with respect to its first argument. |
+| `num_gammainv(x)` | Evaluates the inverse gamma function used by MARS, returning the principal inverse branch. |
+| `num_erf(x)` | Evaluates the Gaussian error function. |
+| `num_erfc(x)` | Evaluates the complementary error function `1 - erf(x)`. |
+| `num_erfinv(x)` | Evaluates the principal inverse error function. |
+| `num_erfcinv(x)` | Evaluates the principal inverse complementary error function. |
+| `num_lambert_wn(k, x)` | Evaluates branch `k` of Lambert W, the inverse of `w e^w`. |
+| `num_lambert_w0(x)` | Evaluates the principal branch `W₀(x)`. |
+| `num_lambert_wm1(x)` | Evaluates the real lower branch `W₋₁(x)` where it exists, with principal complex continuation otherwise. |
+| `num_productlog(x)` | Evaluates the principal product logarithm, an alias of principal Lambert W. |
+| `num_beta(a, b)` | Evaluates Euler's beta function `B(a, b)`. |
+| `num_logbeta(a, b)` | Evaluates the principal logarithm of `B(a, b)`. |
+| `num_binomial(n, k)` | Evaluates the generalised binomial coefficient. |
+| `num_beta_pdf(x, a, b)` | Evaluates the beta-distribution probability density at `x`. |
+| `num_logbeta_pdf(x, a, b)` | Evaluates the natural logarithm of the beta density. |
+| `num_normal_pdf(x)` | Evaluates the standard normal probability density. |
+| `num_normal_cdf(x)` | Evaluates the standard normal cumulative distribution. |
+| `num_normal_logpdf(x)` | Evaluates the natural logarithm of the standard normal density. |
+| `num_gammainc_lower(s, x)` | Evaluates the lower incomplete gamma function `γ(s, x)`. |
+| `num_gammainc_upper(s, x)` | Evaluates the upper incomplete gamma function `Γ(s, x)`. |
+| `num_gammainc_P(s, x)` | Evaluates the regularised lower incomplete gamma function. |
+| `num_gammainc_Q(s, x)` | Evaluates the regularised upper incomplete gamma function. |
+| `num_e1(x)` | Evaluates the exponential integral `E₁(x)`. |
+| `num_ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
+| `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
+| `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |
+| `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
+| `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
+| `num_bessel_y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |
+| `num_lommel_s(μ, ν, x)` | Evaluates the Lommel function `sμ,ν(x)`. |
+| `num_appell_f1(a, b1, b2, c, x, y)` | Evaluates the two-variable Appell `F₁` hypergeometric function. |
+| `num_lauricella_f(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
+| `num_hypergeometric_pFq(upper, p, lower, q, x)` | Evaluates the generalised hypergeometric function with `p` upper and `q` lower parameters. |
+
+### Exact Integer and Number-Theory Functions
+
+| Function | Meaning |
+| --- | --- |
+| `num_factorial(n)` | Returns the exact factorial `n!`. |
+| `num_fibonacci(n)` | Returns the exact `n`th Fibonacci number. |
+| `num_partition(n)` | Returns the exact number of unrestricted integer partitions of `n`. |
+| `num_gcd(a, b)` | Returns the greatest common divisor. |
+| `num_lcm(a, b)` | Returns the least common multiple. |
+| `num_mod(a, m)` | Returns the canonical remainder modulo `m`. |
+| `num_divmod(a, b, &q, &r)` | Produces quotient `q` and remainder `r`; returns `0` on success. |
+| `num_gcdext(a, b, &g, &x, &y)` | Produces Bézout coefficients satisfying `ax + by = g = gcd(a, b)`; returns `0` on success. |
+| `num_powmod(a, e, m)` | Returns modular exponentiation `a^e mod m`. |
+| `num_modinv(a, m)` | Returns the multiplicative inverse of `a` modulo `m`, or an invalid value when none exists. |
+| `num_is_prime(n)` | Returns `true` when `n` passes the library's primality test. |
+| `num_prove_prime(n)` | Returns `PRIME`, `COMPOSITE`, or `UNKNOWN` according to the proof result. |
+| `num_next_prime(n)` | Returns the least prime strictly greater than `n`. |
+| `num_prev_prime(n)` | Returns the greatest prime strictly less than `n`. |
+| `num_factors(n)` | Returns the exact prime factorisation as an owned `number_factors_t`. |
+| `num_bit_length(n)` | Returns the number of significant bits in the absolute integer value. |
+| `num_test_bit(n, i)` | Tests whether bit `i` is set. |
+| `num_set_bit(n, i)` | Returns `n` with bit `i` set. |
+| `num_clear_bit(n, i)` | Returns `n` with bit `i` cleared. |
+| `num_bit_not(n)` | Returns the bitwise complement. |
+| `num_bit_and(a, b)` | Returns the bitwise AND. |
+| `num_bit_or(a, b)` | Returns the bitwise OR. |
+| `num_bit_xor(a, b)` | Returns the bitwise exclusive OR. |
+| `num_shl(n, bits)` | Shifts left; a negative count delegates to a right shift. |
+| `num_shr(n, bits)` | Shifts right; a negative count delegates to a left shift. |
+| `num_isqrt(n)` | Returns `floor(sqrt(n))` exactly for a non-negative integer. |
 
 Binary arithmetic mixes supported backends automatically by promoting to a
 common target representation before dispatch.
@@ -519,6 +586,13 @@ C(52, 5) = 2598960
 ```
 
 ### Multiprecision Special Functions
+
+The generic special-function layer includes `num_zeta(s)` and `num_zetap(s)`
+for the Riemann zeta function and its derivative, together with
+`num_zetah(s, a)` and `num_zatahp(s, a)` for the Hurwitz zeta function and its
+partial derivative with respect to `s`. The trailing `p` denotes a derivative.
+Dispatch preserves the active `number_t` backend, including qfloat, qcomplex,
+MPFR and MPC values.
 
 ```c
 num_set_default_prec_bits(256);

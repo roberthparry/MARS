@@ -5,7 +5,7 @@ This directory contains the longer module documentation for MARS.
 ## Getting Started
 
 - [MARS Lab](./mars-lab.md) — browser workspace with Cartesian complex
-  expression and calculus results
+  expression and calculus results, native series recognition and value cards
 - [Building](./building.md)
 - [Testing](./testing.md)
 - [Benchmarks](./benchmarks.md)
@@ -15,7 +15,7 @@ This directory contains the longer module documentation for MARS.
 - [`number_t`](./number.md) — generic numeric value cluster over exact,
   fixed-precision and multiprecision backends
 - [`qfloat_t`](./qfloat.md) — independent double-double arithmetic and real
-  special functions
+  special functions, including Riemann and Hurwitz zeta
 - [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
   and complex special functions
 - [`matrix_t`](./matrix.md) — generic high-precision matrix with numeric and
@@ -25,7 +25,7 @@ This directory contains the longer module documentation for MARS.
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
 - [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
   derivatives, numeric reverse-mode gradients, Cartesian complex presentation,
-  symbolic integration and helper APIs
+  algebraic-series recognition, symbolic integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries

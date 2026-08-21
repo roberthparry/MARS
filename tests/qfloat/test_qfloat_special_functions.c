@@ -750,6 +750,8 @@ void test_qf_trigamma(void)
     printf(C_CYAN "TEST: qf_trigamma\n" C_RESET);
     char buf[256], buf_exp[256];
 
+    TEST_ASSERT_QFLOAT_CLOSE(qf_trigamma(QF_INF), QF_ZERO);
+
     /* ψ₁(n) = π²/6 - sum_{k=1}^{n-1} 1/k²; ψ₁(1/2) = π²/2 */
     struct {
         const char *xs;
@@ -821,6 +823,7 @@ void test_qf_tetragamma(void)
             TEST_FAIL();
         }
     }
+    TEST_ASSERT_QFLOAT_CLOSE(qf_tetragamma(QF_INF), QF_ZERO);
     printf("\n");
 }
 
@@ -834,6 +837,7 @@ void test_qf_polygamma(void)
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(0, x), qf_digamma(x), 1e-28);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(1, x), qf_trigamma(x), 1e-28);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(2, x), qf_tetragamma(x), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE(qf_polygamma(3, QF_INF), QF_ZERO);
     }
 
     {
@@ -857,7 +861,30 @@ void test_qf_polygamma(void)
         TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_neg_half, expect, 1e-22);
     }
 
-    printf("%s  OK: qf_polygamma aliases and ψ⁽³⁾ identities%s\n\n", C_GREEN, C_RESET);
+    {
+        qfloat_t apery = qf_from_string("1.20205690315959428539973816151145");
+        qfloat_t zetap_zero = qf_from_string("-0.918938533204672741780329736405618");
+        qfloat_t minus_one_twelfth = qf_div(qf_from_double(-1.0), qf_from_double(12.0));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zeta(qf_from_double(3.0)), apery, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zeta(qf_from_double(-1.0)), minus_one_twelfth, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE(qf_zeta(qf_from_double(-2.0)), QF_ZERO);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetap(QF_ZERO), zetap_zero, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(qf_from_double(3.0), QF_ONE), apery, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zatahp(QF_ZERO, QF_ONE), zetap_zero, 1e-30);
+    }
+
+    {
+        qfloat_t s = qf_from_string("2.5");
+        qfloat_t a = qf_from_double(101.0);
+        qfloat_t expected = qf_from_string("0.000661687499453171542062211501479711744239330816315948606222019329");
+        qfloat_t recurrence = qf_add(qf_pow(a, qf_neg(s)), qf_zetah(s, qf_add(a, QF_ONE)));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), expected, 1e-31);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), recurrence, 1e-30);
+    }
+
+    printf("%s  OK: qf_polygamma aliases, ψ⁽³⁾ identities, and zeta functions%s\n\n", C_GREEN, C_RESET);
 }
 
 void test_qf_polylog(void)

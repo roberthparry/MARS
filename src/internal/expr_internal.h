@@ -6,6 +6,8 @@
 #error "internal/expr_internal.h is private to the MARS implementation; include expression.h instead."
 #endif
 
+#ifndef EXPR_INTERNAL_H
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -176,6 +178,8 @@ size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 
 bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
+/** Return whether an expression is a formal summation node. */
+bool expr_is_summation(const expr_t *expr);
 bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out);
@@ -246,5 +250,17 @@ char *expr_tostring_texify(const char *text);
 int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
+
+#endif /* EXPR_INTERNAL_H */
+
+typedef bool (*expr_series_binding_lookup_fn)(void *context, const char *name, number_t *value_out);
+
+string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_out,
+                                  expr_series_binding_lookup_fn lookup_binding, void *lookup_context,
+                                  bool *domain_specialised_out);
+
+expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindings_t **bnd_out,
+                                                      string_t **derivation_TeX_out,
+                                                      bool *domain_specialised_out);
 
 #endif /* EXPR_SHARED_INTERNAL_H */

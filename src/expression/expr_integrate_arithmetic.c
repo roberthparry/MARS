@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
@@ -85,6 +86,7 @@ enum { EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN = EXPR_KIND_SIN, EXPR_INTEGRATE_MUL_F
 enum { EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN = EXPR_KIND_ADD, EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX = EXPR_KIND_SQRT };
 
 static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt);
+static expr_t *integrate_inverse_power_zeta_difference(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_inverse_symbolic_square_sum(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor, const expr_t *antiderivative);
@@ -428,12 +430,18 @@ static expr_t *integrate_sum_terms_rule(const expr_t *expr, const expr_t *wrt, b
     out = subtract ? expr_sub(left, right) : expr_add(left, right);
     expr_free(right);
     expr_free(left);
+    if (expr_contains_integral_operation(out))
+        return out;
     return simplify_owned(out);
 }
 
 expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *sum;
+
+    sum = integrate_inverse_power_zeta_difference(expr, wrt);
+    if (sum)
+        return sum;
 
     sum = integrate_sum_terms_rule(expr, wrt, false);
     if (sum)
@@ -446,12 +454,110 @@ expr_t *integrate_sub_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *diff;
 
+    diff = integrate_inverse_power_zeta_difference(expr, wrt);
+    if (diff)
+        return diff;
+
     diff = integrate_sum_terms_rule(expr, wrt, true);
     if (diff)
         return diff;
 
     diff = integrate_exact_substitution_product(expr, wrt);
     return diff;
+}
+
+static bool integrate_expr_is_exact_one(const expr_t *expr)
+{
+    number_t value = num_new();
+    bool matched = expr_match_const_value(expr, &value) && num_eq(value, NUM_ONE);
+
+    num_destroy(&value);
+    return matched;
+}
+
+static const expr_t *integrate_match_increment_by_one(const expr_t *expr)
+{
+    if (!expr || !expr->ops || expr->ops->kind != EXPR_KIND_ADD || !expr->a || !expr->b)
+        return NULL;
+    if (integrate_expr_is_exact_one(expr->a))
+        return expr->b;
+    if (integrate_expr_is_exact_one(expr->b))
+        return expr->a;
+    return NULL;
+}
+
+static bool integrate_expr_has_named_symbol(const expr_t *expr, const char *name)
+{
+    const char *symbol_name;
+
+    if (!expr || !name)
+        return false;
+    symbol_name = expr_symbol_name(expr);
+    if (symbol_name && strcmp(symbol_name, name) == 0)
+        return true;
+    return integrate_expr_has_named_symbol(expr->a, name) || integrate_expr_has_named_symbol(expr->b, name);
+}
+
+static const char *integrate_series_index_name(const expr_t *expr)
+{
+    static const char *const candidates[] = {"k", "j", "m", "l"};
+
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i)
+        if (!integrate_expr_has_named_symbol(expr, candidates[i]))
+            return candidates[i];
+    return "q";
+}
+
+/* Recognise the finite inverse-power sum before integrating its two zeta terms separately. */
+static expr_t *integrate_inverse_power_zeta_difference(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *right;
+    const expr_t *upper;
+    expr_t *index = NULL;
+    expr_t *negative_exponent = NULL;
+    expr_t *power = NULL;
+    expr_t *logarithm = NULL;
+    expr_t *term = NULL;
+    expr_t *lower = NULL;
+    expr_t *summation = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !wrt || !expr->ops || !expr->a || !expr->b || !expr_is_op(expr->a, &ops_zeta))
+        return NULL;
+
+    right = expr->b;
+    if (expr->ops->kind == EXPR_KIND_ADD) {
+        if (!right->ops || right->ops->kind != EXPR_KIND_NEG || !right->a)
+            return NULL;
+        right = right->a;
+    } else if (expr->ops->kind != EXPR_KIND_SUB) {
+        return NULL;
+    }
+    if (!expr_is_op(right, &ops_zetah) || !expr->a->a || !right->a || !right->b ||
+        !expr_struct_eq(expr->a->a, wrt) || !expr_struct_eq(right->a, wrt))
+        return NULL;
+
+    upper = integrate_match_increment_by_one(right->b);
+    if (!upper || depends_on_wrt(upper, wrt))
+        return NULL;
+
+    index = expr_new_named_var(NUM_NAN, integrate_series_index_name(expr));
+    negative_exponent = expr_neg(wrt);
+    power = index && negative_exponent ? expr_pow_xp(index, negative_exponent) : NULL;
+    logarithm = index ? expr_log(index) : NULL;
+    term = power && logarithm ? expr_div(power, logarithm) : NULL;
+    lower = expr_new_const(NUM_TWO);
+    summation = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
+    out = summation ? expr_sub(wrt, summation) : NULL;
+
+    expr_free(summation);
+    expr_free(lower);
+    expr_free(term);
+    expr_free(logarithm);
+    expr_free(power);
+    expr_free(negative_exponent);
+    expr_free(index);
+    return out;
 }
 
 expr_t *integrate_neg_rule(const expr_t *expr, const expr_t *wrt)

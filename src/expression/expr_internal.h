@@ -87,6 +87,10 @@ typedef enum {
     EXPR_KIND_GAMMA,
     EXPR_KIND_DIGAMMA,
     EXPR_KIND_TRIGAMMA,
+    EXPR_KIND_ZETA,
+    EXPR_KIND_ZETAP,
+    EXPR_KIND_ZETAH,
+    EXPR_KIND_ZATAHP,
     EXPR_KIND_GAMMAINV,
     EXPR_KIND_LAMBERT_W,
     EXPR_KIND_LAMBERT_WN,
@@ -401,6 +405,10 @@ extern const expr_ops_t ops_erfcinv;
 extern const expr_ops_t ops_gamma;
 extern const expr_ops_t ops_digamma;
 extern const expr_ops_t ops_trigamma;
+extern const expr_ops_t ops_zeta;
+extern const expr_ops_t ops_zetap;
+extern const expr_ops_t ops_zetah;
+extern const expr_ops_t ops_zatahp;
 extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_legendre_chi;
@@ -741,6 +749,7 @@ int expr_fold_cubrt_const(const number_t *in, number_t *out);
 int expr_fold_floor_const(const number_t *in, number_t *out);
 int expr_fold_erf_const(const number_t *in, number_t *out);
 int expr_fold_erfc_const(const number_t *in, number_t *out);
+int expr_fold_trigamma_const(const number_t *in, number_t *out);
 
 /* Reverse-mode local adjoint hooks. */
 void expr_reverse_atom(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -811,6 +820,7 @@ void expr_reverse_gamma(const expr_t *dv, const number_t *out_bar, number_t *a_b
 void expr_reverse_lgamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_digamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_zeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_dilog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polylog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -844,6 +854,7 @@ void expr_reverse_not_differentiable(const expr_t *dv, const number_t *out_bar, 
 
 bool expr_is_exact_zero(const expr_t *dv);
 bool expr_is_named_const(const expr_t *dv);
+bool expr_is_summation(const expr_t *expr);
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
 expr_t *expr_clone(const expr_t *expr);
 expr_t *expr_const_zero(void);
@@ -999,5 +1010,8 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
 expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
 bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
                                       bool *has_imaginary_out);
+
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 #endif /* EXPR_INTERNAL_H */

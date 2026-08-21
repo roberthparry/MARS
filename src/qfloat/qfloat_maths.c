@@ -1696,6 +1696,9 @@ qfloat_t qf_trigamma(qfloat_t x)
 {
     qfloat_t one = QF_ONE;
 
+    if (qf_isposinf(x))
+        return QF_ZERO;
+
     /* Poles at non-positive integers */
     if (x.hi <= 0.0 && x.hi == floor(x.hi))
         return QF_NAN;
@@ -1755,6 +1758,9 @@ static qfloat_t qf_tetragamma_asymp(qfloat_t x)
 qfloat_t qf_tetragamma(qfloat_t x)
 {
     qfloat_t one = QF_ONE;
+
+    if (qf_isposinf(x))
+        return QF_ZERO;
 
     if (x.hi <= 0.0 && x.hi == floor(x.hi))
         return QF_NAN;
@@ -1829,6 +1835,8 @@ qfloat_t qf_polygamma(unsigned int order, qfloat_t x)
 
     if (order == 0u)
         return qf_digamma(x);
+    if (qf_isposinf(x))
+        return QF_ZERO;
     if (order == 1u)
         return qf_trigamma(x);
     if (order == 2u)
@@ -1849,6 +1857,299 @@ qfloat_t qf_polygamma(unsigned int order, qfloat_t x)
     }
 
     return qf_add(qf_polygamma_asymp(order, y), accum);
+}
+
+static void qf_zeta_euler_maclaurin(qfloat_t s, qfloat_t *value_out, qfloat_t *derivative_out)
+{
+    const unsigned int endpoint = 64u;
+    qfloat_t sum = QF_ZERO;
+    qfloat_t derivative = QF_ZERO;
+    qfloat_t log_endpoint = qf_log(qf_from_double((double)endpoint));
+    qfloat_t factorial = QF_ONE;
+
+    for (unsigned int n = 1u; n < endpoint; ++n) {
+        qfloat_t log_n = qf_log(qf_from_double((double)n));
+        qfloat_t term = qf_exp(qf_neg(qf_mul(s, log_n)));
+
+        sum = qf_add(sum, term);
+        derivative = qf_sub(derivative, qf_mul(log_n, term));
+    }
+
+    {
+        qfloat_t s_minus_one = qf_sub(s, QF_ONE);
+        qfloat_t endpoint_power = qf_exp(qf_mul(qf_sub(QF_ONE, s), log_endpoint));
+        qfloat_t tail = qf_div(endpoint_power, s_minus_one);
+        qfloat_t tail_derivative = qf_mul(
+            endpoint_power,
+            qf_sub(qf_neg(qf_div(log_endpoint, s_minus_one)), qf_div(QF_ONE, qf_mul(s_minus_one, s_minus_one))));
+        qfloat_t half_power = qf_mul(QF_HALF, qf_exp(qf_neg(qf_mul(s, log_endpoint))));
+
+        sum = qf_add(sum, tail);
+        derivative = qf_add(derivative, tail_derivative);
+        sum = qf_add(sum, half_power);
+        derivative = qf_sub(derivative, qf_mul(log_endpoint, half_power));
+    }
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
+        qfloat_t rising = QF_ONE;
+        qfloat_t rising_derivative = QF_ZERO;
+        qfloat_t bernoulli = qf_bernoulli_even_term(k);
+        qfloat_t power;
+        qfloat_t coefficient;
+
+        factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
+        factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
+        for (unsigned int j = 0u; j < rising_count; ++j) {
+            qfloat_t factor = qf_add(s, qf_from_double((double)j));
+
+            rising_derivative = qf_add(qf_mul(rising_derivative, factor), rising);
+            rising = qf_mul(rising, factor);
+        }
+        power = qf_exp(qf_mul(qf_neg(qf_add(s, qf_from_double((double)rising_count))), log_endpoint));
+        coefficient = qf_div(bernoulli, factorial);
+        sum = qf_add(sum, qf_mul(coefficient, qf_mul(rising, power)));
+        derivative = qf_add(
+            derivative,
+            qf_mul(coefficient, qf_mul(qf_sub(rising_derivative, qf_mul(rising, log_endpoint)), power)));
+    }
+
+    if (value_out)
+        *value_out = sum;
+    if (derivative_out)
+        *derivative_out = derivative;
+}
+
+static bool qf_zeta_is_negative_even_integer(qfloat_t s)
+{
+    qfloat_t half;
+
+    if (!qf_lt(s, QF_ZERO) || !qf_is_integer(s))
+        return false;
+    half = qf_mul(s, QF_HALF);
+    return qf_is_integer(half);
+}
+
+static void qf_zetah_euler_maclaurin(qfloat_t s, qfloat_t a, qfloat_t *value_out,
+                                     qfloat_t *derivative_out)
+{
+    const unsigned int term_count = 64u;
+    qfloat_t sum = QF_ZERO;
+    qfloat_t derivative = QF_ZERO;
+    qfloat_t endpoint = qf_add(a, qf_from_double((double)term_count));
+    qfloat_t log_endpoint = qf_log(endpoint);
+    qfloat_t factorial = QF_ONE;
+
+    for (unsigned int n = 0u; n < term_count; ++n) {
+        qfloat_t base = qf_add(a, qf_from_double((double)n));
+        qfloat_t log_base = qf_log(base);
+        qfloat_t term = qf_exp(qf_neg(qf_mul(s, log_base)));
+
+        sum = qf_add(sum, term);
+        derivative = qf_sub(derivative, qf_mul(log_base, term));
+    }
+
+    {
+        qfloat_t s_minus_one = qf_sub(s, QF_ONE);
+        qfloat_t endpoint_power = qf_exp(qf_mul(qf_sub(QF_ONE, s), log_endpoint));
+        qfloat_t half_power = qf_mul(QF_HALF, qf_exp(qf_neg(qf_mul(s, log_endpoint))));
+        qfloat_t tail_derivative = qf_mul(
+            endpoint_power,
+            qf_sub(qf_neg(qf_div(log_endpoint, s_minus_one)),
+                   qf_div(QF_ONE, qf_mul(s_minus_one, s_minus_one))));
+
+        sum = qf_add(sum, qf_div(endpoint_power, s_minus_one));
+        derivative = qf_add(derivative, tail_derivative);
+        sum = qf_add(sum, half_power);
+        derivative = qf_sub(derivative, qf_mul(log_endpoint, half_power));
+    }
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
+        qfloat_t rising = QF_ONE;
+        qfloat_t rising_derivative = QF_ZERO;
+        qfloat_t bernoulli = qf_bernoulli_even_term(k);
+        qfloat_t power;
+
+        factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
+        factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
+        for (unsigned int j = 0u; j < rising_count; ++j) {
+            qfloat_t factor = qf_add(s, qf_from_double((double)j));
+
+            rising_derivative = qf_add(qf_mul(rising_derivative, factor), rising);
+            rising = qf_mul(rising, factor);
+        }
+        power = qf_exp(qf_mul(qf_neg(qf_add(s, qf_from_double((double)rising_count))), log_endpoint));
+        sum = qf_add(sum, qf_mul(qf_div(bernoulli, factorial), qf_mul(rising, power)));
+        derivative = qf_add(
+            derivative,
+            qf_mul(qf_div(bernoulli, factorial),
+                   qf_mul(qf_sub(rising_derivative, qf_mul(rising, log_endpoint)), power)));
+    }
+    if (value_out)
+        *value_out = sum;
+    if (derivative_out)
+        *derivative_out = derivative;
+}
+
+/* Evaluate the Riemann zeta function across the real analytic continuation. */
+qfloat_t qf_zeta(qfloat_t s)
+{
+    qfloat_t value;
+
+    if (qf_isnan(s) || qf_isneginf(s))
+        return QF_NAN;
+    if (qf_isposinf(s))
+        return QF_ONE;
+    if (qf_eq(s, QF_ONE))
+        return QF_INF;
+    if (qf_eq(s, QF_ZERO))
+        return qf_neg(QF_HALF);
+    if (qf_zeta_is_negative_even_integer(s))
+        return QF_ZERO;
+    if (qf_lt(s, QF_ZERO)) {
+        qfloat_t one_minus_s = qf_sub(QF_ONE, s);
+        qfloat_t two_power = qf_exp(qf_mul(s, qf_log(QF_TWO)));
+        qfloat_t pi_power = qf_exp(qf_mul(qf_sub(s, QF_ONE), qf_log(QF_PI)));
+        qfloat_t sine = qf_sin(qf_mul(qf_mul(QF_HALF, QF_PI), s));
+
+        return qf_mul(qf_mul(qf_mul(qf_mul(two_power, pi_power), sine), qf_gamma(one_minus_s)),
+                      qf_zeta(one_minus_s));
+    }
+
+    qf_zeta_euler_maclaurin(s, &value, NULL);
+    return value;
+}
+
+/* Evaluate the Hurwitz zeta function on its real principal domain. */
+qfloat_t qf_zetah(qfloat_t s, qfloat_t a)
+{
+    qfloat_t value;
+
+    if (qf_isnan(s) || qf_isnan(a) || qf_le(a, QF_ZERO) || qf_isneginf(a))
+        return QF_NAN;
+    if (qf_eq(a, QF_ONE))
+        return qf_zeta(s);
+    if (qf_eq(s, QF_ONE))
+        return QF_INF;
+    if (qf_isposinf(a))
+        return qf_gt(s, QF_ONE) ? QF_ZERO : QF_NAN;
+    if (qf_isinf(s))
+        return qf_isposinf(s) && qf_ge(a, QF_ONE) ? (qf_eq(a, QF_ONE) ? QF_ONE : QF_ZERO) : QF_NAN;
+    qf_zetah_euler_maclaurin(s, a, &value, NULL);
+    return value;
+}
+
+/* Evaluate the first Hurwitz zeta derivative with respect to its exponent. */
+qfloat_t qf_zatahp(qfloat_t s, qfloat_t a)
+{
+    qfloat_t derivative;
+
+    if (qf_isnan(s) || qf_isnan(a) || qf_le(a, QF_ZERO) || qf_isneginf(a))
+        return QF_NAN;
+    if (qf_eq(a, QF_ONE))
+        return qf_zetap(s);
+    if (qf_eq(s, QF_ONE))
+        return qf_neg(QF_INF);
+    if (qf_isposinf(a))
+        return qf_gt(s, QF_ONE) ? QF_ZERO : QF_NAN;
+    if (qf_isinf(s))
+        return qf_isposinf(s) && qf_ge(a, QF_ONE) ? QF_ZERO : QF_NAN;
+    qf_zetah_euler_maclaurin(s, a, NULL, &derivative);
+    return derivative;
+}
+
+/* Evaluate the first derivative of the Riemann zeta function. */
+qfloat_t qf_zetap(qfloat_t s)
+{
+    qfloat_t derivative;
+
+    if (qf_isnan(s) || qf_isinf(s))
+        return qf_isposinf(s) ? QF_ZERO : QF_NAN;
+    if (qf_eq(s, QF_ONE))
+        return qf_neg(QF_INF);
+    if (qf_eq(s, QF_ZERO))
+        return qf_mul(qf_neg(QF_HALF), qf_log(qf_mul(QF_TWO, QF_PI)));
+    if (qf_zeta_is_negative_even_integer(s)) {
+        unsigned int n = (unsigned int)(-(long)qf_to_double(s) / 2L);
+        qfloat_t factorial = qf_factorial_uint(2u * n);
+        qfloat_t denominator = qf_mul(QF_TWO, qf_pow_int(qf_mul(QF_TWO, QF_PI), (int)(2u * n)));
+        qfloat_t result = qf_div(qf_mul(factorial, qf_zeta(qf_from_double((double)(2u * n + 1u)))), denominator);
+
+        return (n & 1u) != 0u ? qf_neg(result) : result;
+    }
+    if (qf_lt(s, QF_ZERO)) {
+        qfloat_t one_minus_s = qf_sub(QF_ONE, s);
+        qfloat_t reflected = qf_zeta(one_minus_s);
+        qfloat_t logarithmic_derivative = qf_add(qf_log(QF_TWO), qf_log(QF_PI));
+        qfloat_t cotangent = qf_cot(qf_mul(qf_mul(QF_HALF, QF_PI), s));
+
+        logarithmic_derivative = qf_add(logarithmic_derivative, qf_mul(qf_mul(QF_HALF, QF_PI), cotangent));
+        logarithmic_derivative = qf_sub(logarithmic_derivative, qf_digamma(one_minus_s));
+        logarithmic_derivative = qf_sub(logarithmic_derivative, qf_div(qf_zetap(one_minus_s), reflected));
+        return qf_mul(qf_zeta(s), logarithmic_derivative);
+    }
+
+    qf_zeta_euler_maclaurin(s, NULL, &derivative);
+    return derivative;
+}
+
+/* Evaluate ζ'(1) - ζ'(1, a) after cancelling the shared pole analytically. */
+qfloat_t qfi_zetap_difference_at_one(qfloat_t a)
+{
+    const unsigned int endpoint = 64u;
+    const qfloat_t left_endpoint = qf_from_double((double)endpoint);
+    qfloat_t right_endpoint;
+    qfloat_t left_log;
+    qfloat_t right_log;
+    qfloat_t difference = QF_ZERO;
+    qfloat_t harmonic = QF_ZERO;
+
+    if (qf_isnan(a) || qf_le(a, QF_ZERO) || qf_isinf(a))
+        return QF_NAN;
+
+    right_endpoint = qf_add(a, left_endpoint);
+    left_log = qf_log(left_endpoint);
+    right_log = qf_log(right_endpoint);
+
+    for (unsigned int n = 1u; n < endpoint; ++n) {
+        qfloat_t base = qf_from_double((double)n);
+
+        difference = qf_sub(difference, qf_div(qf_log(base), base));
+    }
+    for (unsigned int n = 0u; n < endpoint; ++n) {
+        qfloat_t base = qf_add(a, qf_from_double((double)n));
+
+        difference = qf_add(difference, qf_div(qf_log(base), base));
+    }
+
+    difference = qf_add(difference,
+                        qf_mul(QF_HALF, qf_sub(qf_mul(left_log, left_log), qf_mul(right_log, right_log))));
+    difference = qf_add(
+        difference,
+        qf_mul(QF_HALF,
+               qf_sub(qf_div(right_log, right_endpoint), qf_div(left_log, left_endpoint))));
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        const unsigned int order = (unsigned int)(2u * (k + 1u));
+        const unsigned int derivative_order = order - 1u;
+        qfloat_t coefficient = qf_div(qf_bernoulli_even_term(k), qf_from_double((double)order));
+        qfloat_t left_power;
+        qfloat_t right_power;
+        qfloat_t left_correction;
+        qfloat_t right_correction;
+
+        for (unsigned int j = k == 0u ? 1u : order - 2u; j <= derivative_order; ++j)
+            harmonic = qf_add(harmonic, qf_div(QF_ONE, qf_from_double((double)j)));
+
+        left_power = qf_exp(qf_mul_double(qf_neg(left_log), (double)order));
+        right_power = qf_exp(qf_mul_double(qf_neg(right_log), (double)order));
+        left_correction = qf_mul(qf_sub(harmonic, left_log), left_power);
+        right_correction = qf_mul(qf_sub(harmonic, right_log), right_power);
+        difference = qf_add(difference, qf_mul(coefficient, qf_sub(left_correction, right_correction)));
+    }
+
+    return difference;
 }
 
 /* gammainv */

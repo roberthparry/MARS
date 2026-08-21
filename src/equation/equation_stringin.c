@@ -5,6 +5,8 @@
 #include "equation.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #include "ustring.h"
 
 typedef struct {
@@ -240,6 +242,8 @@ equation_t *equ_from_text(const string_t *text)
     equation_parse_parts_t parts;
     string_t *expanded_lhs = NULL;
     string_t *expanded_rhs = NULL;
+    string_t *lhs_display_TeX = NULL;
+    string_t *rhs_display_TeX = NULL;
     string_t *probe = NULL;
     expr_t *probe_expr = NULL;
     expr_bindings_t *bindings = NULL;
@@ -253,8 +257,8 @@ equation_t *equ_from_text(const string_t *text)
     if (!equ_parse_parts(text, &parts))
         return NULL;
 
-    expanded_lhs = equ_expand_polynomial_series_side(parts.lhs);
-    expanded_rhs = equ_expand_polynomial_series_side(parts.rhs);
+    expanded_lhs = expr_expand_series_text(parts.lhs, &lhs_display_TeX, NULL, NULL, NULL);
+    expanded_rhs = expr_expand_series_text(parts.rhs, &rhs_display_TeX, NULL, NULL, NULL);
     if (!expanded_lhs || !expanded_rhs)
         goto cleanup;
     parts.lhs = string_view_all(expanded_lhs);
@@ -284,6 +288,11 @@ equation_t *equ_from_text(const string_t *text)
     if (!equation)
         goto cleanup;
     bindings = NULL;
+    if (equ_set_display_TeX(equation, lhs_display_TeX, rhs_display_TeX) != 0) {
+        equ_free(equation);
+        equation = NULL;
+        goto cleanup;
+    }
 
 cleanup:
     expr_free(rhs);
@@ -292,6 +301,8 @@ cleanup:
     free(names);
     expr_bindings_free(bindings);
     expr_free(probe_expr);
+    string_free(rhs_display_TeX);
+    string_free(lhs_display_TeX);
     string_free(expanded_rhs);
     string_free(expanded_lhs);
     return equation;

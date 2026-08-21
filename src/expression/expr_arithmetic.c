@@ -9,6 +9,8 @@
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
+#define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
+#include "internal/qfloat_internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* EVALUATION FUNCTIONS                                                      */
@@ -44,13 +46,53 @@ static number_t eval_argument_list(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+static bool eval_zetap_difference_at_one(const expr_t *riemann, const expr_t *hurwitz, number_t *result_out)
+{
+    number_t parameter;
+    number_t endpoint;
+
+    if (!riemann || !hurwitz || !result_out || !expr_is_op(riemann, &ops_zetap) ||
+        !expr_is_op(hurwitz, &ops_zatahp) || !riemann->a || !hurwitz->a || !hurwitz->b ||
+        !expr_struct_eq(riemann->a, hurwitz->a))
+        return false;
+
+    parameter = expr_eval_num_internal(riemann->a);
+    if (!num_is_real(parameter) || !num_eq(parameter, NUM_ONE)) {
+        num_destroy(&parameter);
+        return false;
+    }
+
+    endpoint = expr_eval_num_internal(hurwitz->b);
+    num_destroy(&parameter);
+    if (!num_is_real(endpoint) || !num_gt(endpoint, NUM_ZERO)) {
+        num_destroy(&endpoint);
+        return false;
+    }
+
+    *result_out = num_create_from_qfloat(qfi_zetap_difference_at_one(num_to_qfloat(endpoint)));
+    num_destroy(&endpoint);
+    return true;
+}
+
 static number_t eval_add(expr_t *dv)
 {
+    number_t result;
+
+    if (dv && dv->a && dv->b && expr_is_neg(dv->b) &&
+        eval_zetap_difference_at_one(dv->a, dv->b->a, &result))
+        return result;
+    if (dv && dv->a && dv->b && expr_is_neg(dv->a) &&
+        eval_zetap_difference_at_one(dv->b, dv->a->a, &result))
+        return result;
     return num_add(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
 }
 
 static number_t eval_sub(expr_t *dv)
 {
+    number_t result;
+
+    if (dv && eval_zetap_difference_at_one(dv->a, dv->b, &result))
+        return result;
     return num_sub(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
 }
 
@@ -297,6 +339,10 @@ static number_t eval_integral(expr_t *dv)
 
     result = num_new();
     antiderivative = expr_integrate(local_integrand, local_var);
+    if (antiderivative && expr_contains_integral_operation(antiderivative)) {
+        expr_free(antiderivative);
+        antiderivative = NULL;
+    }
     if (antiderivative) {
         number_t symbolic_value;
 

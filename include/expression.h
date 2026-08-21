@@ -547,6 +547,15 @@ expr_t *expr_ceil(const expr_t *expr);
 expr_t *expr_pow(const expr_t *expr, const number_t *exponent);
 expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
 
+/**
+ * @brief Build a formal finite summation with explicit inclusive bounds.
+ *
+ * The returned expression represents @c sum(term,index,lower,upper) without
+ * evaluating it. All inputs are borrowed; the caller owns the returned node.
+ */
+expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower,
+                                        const expr_t *upper);
+
 /* ------------------------------------------------------------------------- */
 /* Special functions (owning)                                                */
 /* ------------------------------------------------------------------------- */
@@ -592,6 +601,36 @@ expr_t *expr_lgamma(const expr_t *expr);
 expr_t *expr_digamma(const expr_t *expr);
 expr_t *expr_trigamma(const expr_t *expr);
 expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
+/**
+ * @brief Construct a Riemann zeta function expression.
+ *
+ * @param expr Argument expression; it is retained.
+ * @return A newly allocated ζ(expr) expression, or NULL on error.
+ */
+expr_t *expr_zeta(const expr_t *expr);
+/**
+ * @brief Construct a Hurwitz zeta function expression.
+ *
+ * @param s Exponent expression; it is retained.
+ * @param a Shift expression; it is retained.
+ * @return A newly allocated ζ(s, a) expression, or NULL on error.
+ */
+expr_t *expr_zetah(const expr_t *s, const expr_t *a);
+/**
+ * @brief Construct a first Hurwitz zeta derivative expression.
+ *
+ * @param s Exponent expression; it is retained.
+ * @param a Shift expression; it is retained.
+ * @return A newly allocated ∂ζ(s, a)/∂s expression, or NULL on error.
+ */
+expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
+/**
+ * @brief Construct a first Riemann zeta derivative expression.
+ *
+ * @param expr Argument expression; it is retained.
+ * @return A newly allocated ζ′(expr) expression, or NULL on error.
+ */
+expr_t *expr_zetap(const expr_t *expr);
 expr_t *expr_dilog(const expr_t *expr);
 expr_t *expr_polylog(unsigned int order, const expr_t *expr);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
@@ -861,6 +900,16 @@ void expr_print(const expr_t *expr);
  * once.
  */
 expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Parse an expression and return its native series derivation in TeX when applicable.
+ *
+ * This accepts the same grammar and ownership rules as expr_from_string(). When the source contains a recognised
+ * finite series ellipsis, @p derivation_TeX_out receives an owning aligned TeX rendering containing the inferred
+ * sigma formula followed by the simplified result. Otherwise it receives @c NULL. Release it with string_free().
+ */
+expr_t *expr_from_string_with_derivation_TeX(const char *s, expr_bindings_t **bnd_out,
+                                             string_t **derivation_TeX_out);
 
 /**
  * @brief Construct a expr_t from text stored in a string.

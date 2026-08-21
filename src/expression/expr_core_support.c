@@ -1268,6 +1268,21 @@ expr_t *expr_clone(const expr_t *expr)
         return out;
     }
 
+    if ((expr->ops->kind == EXPR_KIND_INTEGRAL || expr->ops->kind == EXPR_KIND_INTEGRAL_META ||
+         expr->ops->kind == EXPR_KIND_INTEGRAL_BOUNDS) &&
+        expr->a && expr->b) {
+        left = expr_clone(expr->a);
+        right = expr_clone(expr->b);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr_new_binary_internal(expr->ops, left, right);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
     if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
         left = expr_clone(expr->a);
         if (!left)
@@ -1278,7 +1293,7 @@ expr_t *expr_clone(const expr_t *expr)
         return out;
     }
 
-    if (expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary) {
+    if (expr->ops->arity == EXPR_OP_BINARY) {
         left = expr_clone(expr->a);
         right = expr_clone(expr->b);
         if (!left || !right) {
@@ -1286,7 +1301,15 @@ expr_t *expr_clone(const expr_t *expr)
             expr_free(right);
             return NULL;
         }
-        out = expr->ops->apply_binary(left, right);
+        if (expr->ops->apply_binary) {
+            out = expr->ops->apply_binary(left, right);
+        } else {
+            out = expr_new_binary_internal(expr->ops, left, right);
+            if (out) {
+                left = NULL;
+                right = NULL;
+            }
+        }
         expr_free(left);
         expr_free(right);
         expr_clone_copy_metadata(out, expr);

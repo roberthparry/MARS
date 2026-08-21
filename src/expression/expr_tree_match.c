@@ -26,6 +26,12 @@ bool expr_is_named_const(const expr_t *dv)
     return expr_is_op_kind(dv, EXPR_KIND_CONST) && dv->name && *dv->name;
 }
 
+/* Report whether an expression is a formal summation. */
+bool expr_is_summation(const expr_t *expr)
+{
+    return expr_is_op_kind(expr, EXPR_KIND_SUMMATION);
+}
+
 static bool expr_match_const_leaf(const expr_t *expr, number_t *value_out, const char **name_out)
 {
     if (!expr_is_op_kind(expr, EXPR_KIND_CONST))
@@ -454,6 +460,58 @@ static bool expr_collect_var_usage_impl(const expr_t *expr, size_t nvars, expr_t
                 return true;
             }
 
+            return expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out);
+        }
+        return true;
+    }
+
+    if (expr_is_op(expr, &ops_summation)) {
+        const expr_t *index = expr->b;
+        const expr_t *lower = NULL;
+        const expr_t *upper = NULL;
+
+        if (expr_is_op(expr->b, &ops_argument_list)) {
+            index = expr->b->a;
+            upper = expr->b->b;
+            if (expr_is_op(upper, &ops_argument_list)) {
+                lower = upper->a;
+                upper = upper->b;
+            }
+        }
+        if (lower && !expr_collect_var_usage_impl(lower, nvars, vars, used_out))
+            return false;
+        if (upper && !expr_collect_var_usage_impl(upper, nvars, vars, used_out))
+            return false;
+        if (expr->a) {
+            expr_t *const *filtered_vars = vars;
+            size_t filtered_nvars = nvars;
+
+            if (index && nvars > 0u) {
+                size_t out = 0u;
+                expr_t *stack_vars[16];
+                expr_t **filtered_storage = nvars <= 16u ? stack_vars : calloc(nvars, sizeof(*filtered_storage));
+
+                if (!filtered_storage)
+                    return false;
+                filtered_vars = filtered_storage;
+                for (size_t i = 0u; i < nvars; ++i) {
+                    const int same_index = vars[i] == index ||
+                                           (expr_is_var(vars[i]) && expr_is_var(index) && vars[i]->var_id != 0u &&
+                                            vars[i]->var_id == index->var_id);
+
+                    if (!same_index)
+                        filtered_storage[out++] = vars[i];
+                }
+                filtered_nvars = out;
+                if (!expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out)) {
+                    if (filtered_storage != stack_vars)
+                        free(filtered_storage);
+                    return false;
+                }
+                if (filtered_storage != stack_vars)
+                    free(filtered_storage);
+                return true;
+            }
             return expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out);
         }
         return true;

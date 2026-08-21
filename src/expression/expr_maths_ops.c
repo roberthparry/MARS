@@ -38,6 +38,87 @@ static number_t eval_formal_series_component(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
+{
+    number_t value;
+    string_t *text;
+    char *end = NULL;
+    long parsed;
+
+    if (!bound || !out)
+        return false;
+    value = expr_eval(bound);
+    if (!num_is_real(value) || !num_is_finite(value) || !num_is_integer(value)) {
+        num_destroy(&value);
+        return false;
+    }
+    text = num_to_string(value);
+    num_destroy(&value);
+    if (!text)
+        return false;
+    parsed = strtol(string_c_str(text), &end, 10);
+    if (!end || *end != '\0') {
+        string_free(text);
+        return false;
+    }
+    string_free(text);
+    *out = parsed;
+    return true;
+}
+
+static number_t eval_finite_summation(expr_t *dv)
+{
+    const long maximum_terms = 1000000L;
+    expr_t *index;
+    const expr_t *lower = NULL;
+    const expr_t *upper = NULL;
+    number_t sum;
+    long lower_value;
+    long upper_value;
+
+    if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
+        return num_clone(NUM_NAN);
+    index = dv->b->a;
+    upper = dv->b->b;
+    if (expr_is_op(upper, &ops_argument_list)) {
+        lower = upper->a;
+        upper = upper->b;
+    }
+    lower_value = 0L;
+    if (!expr_is_var(index) || !upper || (lower && !expr_summation_bound_to_long(lower, &lower_value)) ||
+        !expr_summation_bound_to_long(upper, &upper_value))
+        return num_clone(NUM_NAN);
+    if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms)
+        return num_clone(NUM_NAN);
+
+    sum = num_clone(NUM_ZERO);
+    for (long value = lower_value; value <= upper_value; ++value) {
+        number_t index_value = num_create_from_long(value);
+        expr_t *index_expression = expr_new_const(index_value);
+        expr_t *term_expression = index_expression ? expr_substitute(dv->a, index, index_expression) : NULL;
+        number_t term;
+        number_t updated;
+
+        num_destroy(&index_value);
+        term = term_expression ? expr_eval(term_expression) : num_clone(NUM_NAN);
+        expr_free(term_expression);
+        expr_free(index_expression);
+        if (!num_is_finite(term)) {
+            num_destroy(&term);
+            num_destroy(&sum);
+            sum = num_clone(NUM_NAN);
+            break;
+        }
+        updated = num_add(sum, term);
+        num_destroy(&term);
+        num_destroy(&sum);
+        sum = updated;
+        if (value == LONG_MAX)
+            break;
+    }
+    return sum;
+}
+
 static expr_t *deriv_indexed_symbol(expr_t *dv)
 {
     expr_t *index_derivative = expr_get_dx_internal(dv->b);
@@ -69,6 +150,49 @@ static expr_t *integrate_summation(const expr_t *expr, const expr_t *wrt)
     out = integrated_term ? expr_new_summation(integrated_term, expr->b) : NULL;
     expr_free(integrated_term);
     return out;
+}
+
+static expr_t *integrate_zeta_formal(const expr_t *expr, const expr_t *wrt)
+{
+    return expr_integral(expr, wrt);
+}
+
+static expr_t *integrate_zetap(const expr_t *expr, const expr_t *wrt)
+{
+    if (!expr || !wrt || !expr->a || expr->a != wrt)
+        return NULL;
+    return expr_zeta(wrt);
+}
+
+static expr_t *integrate_zetah(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *one;
+    expr_t *s_minus_one;
+    expr_t *one_minus_s;
+    expr_t *shifted;
+    expr_t *out;
+
+    if (!expr || !wrt || !expr->a || !expr->b)
+        return NULL;
+    if (expr->b != wrt && !expr_struct_eq(expr->b, wrt))
+        return expr_integral(expr, wrt);
+    one = expr_new_const(NUM_ONE);
+    s_minus_one = expr_sub(expr->a, one);
+    one_minus_s = expr_sub(one, expr->a);
+    shifted = expr_zetah(s_minus_one, expr->b);
+    out = expr_div(shifted, one_minus_s);
+    expr_free(shifted);
+    expr_free(one_minus_s);
+    expr_free(s_minus_one);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *integrate_zatahp(const expr_t *expr, const expr_t *wrt)
+{
+    if (!expr || !wrt || !expr->a || !expr->b || (expr->a != wrt && !expr_struct_eq(expr->a, wrt)))
+        return expr_integral(expr, wrt);
+    return expr_zetah(expr->a, expr->b);
 }
 
 static expr_t *expr_inverse_log10_internal(const expr_t *a)
@@ -862,7 +986,7 @@ const expr_ops_t ops_trigamma = {.eval = eval_trigamma,
                                  .apply_unary = expr_trigamma,
                                  .apply_binary = NULL,
                                  .simplify = expr_simplify_unary_operator,
-                                 .fold_const_unary = NULL};
+                                 .fold_const_unary = expr_fold_trigamma_const};
 const expr_ops_t ops_polygamma = {.eval = eval_polygamma,
                                   .deriv = deriv_polygamma,
                                   .reverse = expr_reverse_polygamma,
@@ -874,6 +998,51 @@ const expr_ops_t ops_polygamma = {.eval = eval_polygamma,
                                   .apply_binary = expr_polygamma_xp,
                                   .simplify = expr_simplify_binary_operator,
                                   .fold_const_unary = NULL};
+const expr_ops_t ops_zeta = {.eval = eval_zeta,
+                             .deriv = deriv_zeta,
+                             .reverse = expr_reverse_zeta,
+                             .kind = EXPR_KIND_ZETA,
+                             .arity = EXPR_OP_UNARY,
+                             .name = "zeta",
+                             .TeX_name = "\\zeta",
+                             .apply_unary = expr_zeta,
+                             .apply_binary = NULL,
+                             .integrate = integrate_zeta_formal,
+                             .simplify = expr_simplify_unary_operator,
+                             .fold_const_unary = NULL};
+const expr_ops_t ops_zetap = {.eval = eval_zetap,
+                              .deriv = deriv_zetap,
+                              .kind = EXPR_KIND_ZETAP,
+                              .arity = EXPR_OP_UNARY,
+                              .name = "zetap",
+                              .TeX_name = "\\zeta'",
+                              .apply_unary = expr_zetap,
+                              .apply_binary = NULL,
+                              .integrate = integrate_zetap,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_zetah = {.eval = eval_zetah,
+                              .deriv = deriv_zetah,
+                              .kind = EXPR_KIND_ZETAH,
+                              .arity = EXPR_OP_BINARY,
+                              .name = "zetah",
+                              .TeX_name = "\\zeta",
+                              .apply_unary = NULL,
+                              .apply_binary = expr_zetah,
+                              .integrate = integrate_zetah,
+                              .simplify = expr_simplify_binary_operator,
+                              .fold_const_unary = NULL};
+const expr_ops_t ops_zatahp = {.eval = eval_zatahp,
+                               .deriv = deriv_zatahp,
+                               .kind = EXPR_KIND_ZATAHP,
+                               .arity = EXPR_OP_BINARY,
+                               .name = "zatahp",
+                               .TeX_name = "\\zeta'",
+                               .apply_unary = NULL,
+                               .apply_binary = expr_zatahp,
+                               .integrate = integrate_zatahp,
+                               .simplify = expr_simplify_binary_operator,
+                               .fold_const_unary = NULL};
 const expr_ops_t ops_dilog = {.eval = eval_dilog,
                               .deriv = deriv_dilog,
                               .reverse = expr_reverse_dilog,
@@ -1192,7 +1361,7 @@ const expr_ops_t ops_indexed_symbol = {.eval = eval_formal_series_component,
                                        .apply_binary = NULL,
                                        .simplify = expr_simplify_binary_operator,
                                        .fold_const_unary = NULL};
-const expr_ops_t ops_summation = {.eval = eval_formal_series_component,
+const expr_ops_t ops_summation = {.eval = eval_finite_summation,
                                   .deriv = deriv_summation,
                                   .reverse = expr_reverse_not_differentiable,
                                   .kind = EXPR_KIND_SUMMATION,
@@ -1536,6 +1705,10 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
                                                                          [EXPR_KIND_GAMMA] = &ops_gamma,
                                                                          [EXPR_KIND_DIGAMMA] = &ops_digamma,
                                                                          [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
+                                                                         [EXPR_KIND_ZETA] = &ops_zeta,
+                                                                         [EXPR_KIND_ZETAP] = &ops_zetap,
+                                                                         [EXPR_KIND_ZETAH] = &ops_zetah,
+                                                                         [EXPR_KIND_ZATAHP] = &ops_zatahp,
                                                                          [EXPR_KIND_DILOG] = &ops_dilog,
                                                                          [EXPR_KIND_GAMMAINV] = &ops_gammainv,
                                                                          [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
@@ -1809,6 +1982,26 @@ expr_t *expr_digamma(const expr_t *a)
 expr_t *expr_trigamma(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_trigamma, a);
+}
+/* Construct a Riemann zeta function expression. */
+expr_t *expr_zeta(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_zeta, a);
+}
+/* Construct a first Riemann zeta derivative expression. */
+expr_t *expr_zetap(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_zetap, a);
+}
+/* Construct a Hurwitz zeta function expression. */
+expr_t *expr_zetah(const expr_t *s, const expr_t *a)
+{
+    return expr_math_wrap_binary(&ops_zetah, s, a);
+}
+/* Construct a first Hurwitz zeta derivative expression. */
+expr_t *expr_zatahp(const expr_t *s, const expr_t *a)
+{
+    return expr_math_wrap_binary(&ops_zatahp, s, a);
 }
 expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg)
 {
@@ -2273,6 +2466,19 @@ expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const
     expr_t *out = bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
 
     expr_free(bounds);
+    return out;
+}
+
+/* Build a formal finite summation with explicit inclusive bounds. */
+expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower,
+                                        const expr_t *upper)
+{
+    expr_t *range = expr_math_wrap_binary(&ops_argument_list, lower, upper);
+    expr_t *bounds = range ? expr_math_wrap_binary(&ops_argument_list, index, range) : NULL;
+    expr_t *out = bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
+
+    expr_free(bounds);
+    expr_free(range);
     return out;
 }
 expr_t *expr_gammainc_lower(const expr_t *a, const expr_t *b)

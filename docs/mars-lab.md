@@ -32,7 +32,10 @@ development instance cannot silently reuse a stale binary.
 Use `make mars-lab-stop` to stop a Lab process belonging to the current user,
 or `make mars-lab-restart` after changing the native helper or client.
 
-The selected mode and recent workspace state are retained between sessions.
+Each mode retains its most recent editor text, binding values and controls
+between sessions. Input events save an in-progress edit as well as a submitted
+calculation, so moving between modes or restarting the Lab does not restore an
+older expression or equation.
 The precision buttons change the working precision used by the mathematical
 helpers. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
@@ -66,28 +69,52 @@ evaluation, the result card is titled **Values** and contains one value per
 branch. Named `sqrt`, `cubrt` and `root` calls remain principal and
 single-valued.
 
-The captured input is `root(1+i, 4)`. This named root asks for the principal
-fourth root, which MARS simplifies to the exact Cartesian surd
+Additive ellipses are interpreted by the native expression parser. It first
+tries exact geometric and inverse-index-power models, then uses a Lagrange
+polynomial fitted to the supplied coefficient terms and verified against the
+terminal term. The Rendered TeX derivation shows the inferred sigma before the
+simplified formula and value. The browser neither extrapolates nor rewrites the
+series.
+
+The captured editor input is `1+1/2^p+1/3^p+...+1/n^p`; its binding boxes
+supply `p = 2.5` and `n = 100`. MARS recognises
 
 $$
-\frac{1}{\sqrt{2}}\left(
-\sqrt{\sqrt[4]{2}+\sqrt{\frac{\sqrt{2}+1}{2}}}
-+i\sqrt{\sqrt[4]{2}-\sqrt{\frac{\sqrt{2}+1}{2}}}
-\right).
+\sum_{k=1}^{n}\frac{1}{k^p}
+=\zeta(p)-\zeta(p,n+1),
 $$
 
-The four result cards deliberately show different representations:
+and the supplied bindings produce approximately
+`1.3408255697514640082147074818471`. At `p = 1`, MARS uses the harmonic
+formula `digamma(n + 1) + gamma` consistently in the Rendered TeX, Expression
+and Function cards, with the sigma summand shown as `1/k`; non-positive integer
+exponents use the corresponding Faulhaber polynomial. With `n = inf`, `p = 2`
+simplifies exactly to `pi^2/6`,
+while another real `p > 1` evaluates to `zeta(p)`,
+while a divergent infinite series has no finite Value card. A literal infinite
+terminal term such as `1/inf^2` is also accepted.
+
+Riemann zeta accepts `zeta(s)` or `ζ(s)`. Hurwitz zeta accepts the two-argument
+forms `zeta(s,a)` and `ζ(s,a)`, as well as `zetah(s,a)` and `zeta2(s,a)`.
+Their first-argument derivatives use the trailing-`p` names `zetap`,
+`zatahp`, and `zeta2p`.
+
+The result cards deliberately show different representations of one native
+simplified expression:
 
 - **Rendered TeX** shows the simplified mathematical result without bindings.
 - **Expression** shows the parseable MARS expression, including variable and
-  constant bindings when the input has them.
+  constant bindings when the input has them. Riemann and Hurwitz zeta use the
+  shared mathematical symbol `ζ`, distinguished by their one- and two-argument
+  forms.
 - **Function** shows an evaluable MARS function. Reused expression-DAG nodes
   are named once as intermediate constants or variables before the return
   expression.
-- **Value** appears when a numerical value can be produced. It remains
-  numerical even when the other cards have an exact surd result.
+- **Value** appears whenever supplied bindings allow a numerical result. It is
+  the only card that substitutes those bindings; it also appears when
+  simplification proves a binding-independent value despite an unset binding.
 
-[![MARS Lab expression mode displaying the exact principal fourth root of 1 plus i as Cartesian surds](images/mars-lab/expression.png?v=20260818-1)](images/mars-lab/expression.png?v=20260818-1)
+[![MARS Lab expression mode displaying an inverse-power series as a sigma, Hurwitz-zeta formula and numerical value](images/mars-lab/expression.png?v=20260820-2)](images/mars-lab/expression.png?v=20260820-2)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -261,8 +288,12 @@ to `2 x 2` matrices.
 Result cards have distinct purposes:
 
 - **Rendered TeX** shows the exact symbolic result. Long decimal mantissas are
-  abbreviated with an ellipsis by default; **Show more digits** reveals them.
-  Scientific notation is rendered as multiplication by a power of ten.
+  abbreviated with an ellipsis by default. Large integers use 23 significant
+  digits followed by an ellipsis and an `e` exponent in the Expression and
+  Function cards, for example `1.3322938598456934859438...e+45`.
+  **Show more digits** reveals the complete exact integer in those cards.
+  Rendered TeX instead uses a multiplication sign and a power of ten. The
+  Value card is never abbreviated and wraps its complete numerical value.
 - **Result** contains the copyable inline result.
 - **Layout** contains the plain-text matrix layout.
 - **Value** appears when supplied bindings allow a numeric or partially
@@ -317,15 +348,18 @@ weather calculations. Enter a selected date, a date range and an observer
 location. A Julian day number may be used in place of the selected civil date.
 The GMT offset includes daylight saving when applicable.
 
-The captured request uses 8 August 2026 in England. Its output includes the
-weekday, sunrise and sunset, moonrise and moonset, moon phase, clock changes,
+The captured request uses 20 August 2026 in Shrewsbury, with a date range
+ending on 1 January 2027. Its output includes the weekday, sunrise and sunset,
+moonrise and moonset, moon phase, clock changes, the asynchronously added
 weather summary, the selected date range and the year's calendar observances.
 
-[![MARS Lab datetime mode showing calendar, solar, lunar and weather results](images/mars-lab/datetime.png)](images/mars-lab/datetime.png)
+[![MARS Lab datetime mode showing calendar and astronomical results followed by asynchronously loaded weather](images/mars-lab/datetime.png?v=20260820-1)](images/mars-lab/datetime.png?v=20260820-1)
 
 Weather is shown only when a WeatherAPI key was configured during desktop
 installation and the service can be reached. The calendar and astronomical
-results do not depend on that optional service.
+results do not depend on that optional service. They are displayed as soon as
+the native datetime helper completes; weather is fetched asynchronously and
+updates its own card afterwards, without delaying or replacing those results.
 
 ## Almanac mode
 
