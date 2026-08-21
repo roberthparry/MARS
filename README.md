@@ -1,7 +1,7 @@
 # MARS
 
 ![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
-[![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
+[![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)](LICENSE)
 ![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
 MARS is a Linux-focused C99/GNU C library for high-precision numerics,
@@ -397,9 +397,18 @@ make install-mars-lab
 That setup asks for a password to protect the private jurisdiction database, stores
 the resulting configuration in `~/.mars/config/jurisdiction-db.env`, and builds the
 encrypted jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
-If you choose to enable weather lookups, the optional WeatherAPI key is stored in
+MARS supplies no shared WeatherAPI account or key. If you choose to enable
+weather lookups, create your own WeatherAPI account; its key is stored in
 `~/.mars/config/weather.env`. Reinstalling MARS Lab recreates `~/.mars`, while
-preserving `weather.env`.
+preserving `weather.env`. A lookup sends that key, the selected date and the
+observer latitude and longitude from the local server to WeatherAPI.com over
+HTTPS; the key is not sent to the browser. MARS does not cache or persist the
+weather response, although the date and coordinates remain in private local Lab
+state so that its inputs can be restored. Weather information is general and
+probabilistic and must not be the sole basis for safety-critical decisions;
+consult official meteorological services and authorities. See the
+[MARS privacy notice](docs/privacy.md), [WeatherAPI privacy policy](https://www.weatherapi.com/privacy.aspx)
+and [WeatherAPI terms](https://www.weatherapi.com/terms.aspx).
 
 ## Run Tests
 
@@ -463,4 +472,13 @@ libraries.
 
 ## Licence
 
-MIT Licence. See [MIT Licence](https://en.wikipedia.org/wiki/MIT_License).
+MARS is distributed under the [MIT Licence](LICENSE). Required attribution and
+licence information for the system libraries, tools and generated data used by
+MARS is in [Third-party notices](THIRD_PARTY_NOTICES.md). A machine-readable
+SPDX 2.3 dependency inventory is also provided in
+[`DEPENDENCIES.spdx`](DEPENDENCIES.spdx). The
+[licensing and dependency continuity policy](docs/licensing.md) records the
+response to an upstream acquisition, licence change or loss of maintenance.
+The [almanac data provenance](docs/almanac-data-provenance.md) identifies the
+astronomical sources, transformations, checksums and AstroNav workbook
+ownership.

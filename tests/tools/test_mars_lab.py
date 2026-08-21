@@ -4829,6 +4829,17 @@ class ExpressionResultTests(unittest.TestCase):
 
 
 class DatetimeWeatherTests(unittest.TestCase):
+    def test_weather_provider_is_not_contacted_without_own_account_key(self) -> None:
+        with (
+            mock.patch.object(mars_lab, "weather_relative_day_span", return_value=0),
+            mock.patch.object(mars_lab, "weather_date_is_supported", return_value=True),
+            mock.patch.object(mars_lab, "weather_api_key", return_value=""),
+            mock.patch.object(mars_lab.urllib.request, "urlopen") as urlopen,
+        ):
+            self.assertIsNone(mars_lab.fetch_daily_weather_for_datetime("2026-08-21", 52.7077, -2.7541))
+
+        urlopen.assert_not_called()
+
     def test_weather_payload_is_ready_for_thin_client_rendering(self) -> None:
         payload = mars_lab.prepare_datetime_weather_fields({
             "weather_min_c": "12°C",
@@ -4852,6 +4863,11 @@ class DatetimeWeatherTests(unittest.TestCase):
                 {"label": "Wind", "value": "18 km/h"},
                 {"label": "Chance of rain", "value": "34%"},
                 {"label": "Source", "value": "WeatherAPI.com"},
+                {"label": "Account", "value": mars_lab.WEATHER_ACCOUNT_NOTICE},
+                {"label": "Data disclosure", "value": mars_lab.WEATHER_DATA_DISCLOSURE},
+                {"label": "Privacy", "value": mars_lab.WEATHER_API_PRIVACY_URL},
+                {"label": "Safety notice", "value": mars_lab.WEATHER_SAFETY_NOTICE},
+                {"label": "Terms", "value": mars_lab.WEATHER_API_TERMS_URL},
             ],
         )
 
@@ -4871,6 +4887,10 @@ class DatetimeWeatherTests(unittest.TestCase):
     def test_datetime_weather_is_requested_asynchronously_and_rejects_stale_results(self) -> None:
         html = mars_lab.INDEX_HTML
 
+        self.assertIn("Optional weather privacy:", html)
+        self.assertIn("MARS supplies no shared WeatherAPI account or key.", html)
+        self.assertIn(mars_lab.WEATHER_API_PRIVACY_URL, html)
+        self.assertIn(mars_lab.WEATHER_API_TERMS_URL, html)
         self.assertIn("fetch('/datetime-weather'", html)
         self.assertIn("void refreshDatetimeWeather(evaluationId, {", html)
         self.assertIn("evaluationId !== datetimeEvaluationSequence", html)

@@ -140,8 +140,20 @@ def main() -> int:
     if interactive:
         print("Optional weather setup")
         print("MARS Lab can show minimum and maximum temperature, and chance of rain, in datetime mode.")
-        print("To enable this, create a free WeatherAPI account and copy your key from:")
+        print("MARS does not provide a shared weather account or key. Weather remains disabled unless you enable it.")
+        print("To enable it, create your own WeatherAPI account and copy that account's key from:")
         print("  https://www.weatherapi.com/signup.aspx")
+        print(
+            "The local server sends the configured key, selected date, latitude and longitude to WeatherAPI.com over HTTPS."
+        )
+        print("The key is not sent to the browser. MARS does not cache or persist the weather response.")
+        print("The date and location remain in private local Lab state so that its inputs can be restored.")
+        print("Weather-specific logs do not record the date or location.")
+        print("Weather information is general and probabilistic;")
+        print("do not rely on it alone for safety-critical decisions. Terms:")
+        print("  https://www.weatherapi.com/terms.aspx")
+        print("Privacy:")
+        print("  https://www.weatherapi.com/privacy.aspx")
         print("You can ignore this now and configure it later by creating:")
         print(f"  {display_config_path()}")
         if not prompt_yes_no("Would you like to configure a weather API key now?", default=False):

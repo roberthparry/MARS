@@ -1,0 +1,300 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: MARS-dependency-inventory
+DocumentNamespace: https://github.com/roberthparry/MARS/spdx/dependencies-2026-08-21
+Creator: Organization: MARS contributors
+Created: 2026-08-21T00:00:00Z
+CreatorComment: This inventory describes source-tree dependencies. System package versions are selected by the builder or distributor.
+
+PackageName: MARS
+SPDXID: SPDXRef-Package-MARS
+PackageDownloadLocation: git+https://github.com/roberthparry/MARS.git
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2026 Robert H. Parry and MARS contributors
+
+PackageName: GNU-MP
+SPDXID: SPDXRef-Package-GMP
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://gmplib.org/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: LGPL-3.0-or-later OR GPL-2.0-or-later
+PackageCopyrightText: NOASSERTION
+
+PackageName: GNU-MPFR
+SPDXID: SPDXRef-Package-MPFR
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://www.mpfr.org/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: LGPL-3.0-or-later
+PackageCopyrightText: NOASSERTION
+
+PackageName: GNU-MPC
+SPDXID: SPDXRef-Package-MPC
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://www.multiprecision.org/mpc/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: LGPL-3.0-or-later
+PackageCopyrightText: NOASSERTION
+
+PackageName: GNU-libunistring
+SPDXID: SPDXRef-Package-libunistring
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://www.gnu.org/software/libunistring/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: LGPL-3.0-or-later OR GPL-2.0-or-later
+PackageCopyrightText: NOASSERTION
+PackageComment: Optional at build time; enabled by default.
+
+PackageName: SQLCipher-Community-Edition
+SPDXID: SPDXRef-Package-SQLCipher
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/sqlcipher/sqlcipher
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: Copyright (c) 2025, ZETETIC LLC
+
+PackageName: SQLite
+SPDXID: SPDXRef-Package-SQLite
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://sqlite.org/src/
+FilesAnalyzed: false
+PackageLicenseConcluded: LicenseRef-SQLite-Public-Domain
+PackageLicenseDeclared: LicenseRef-SQLite-Public-Domain
+PackageCopyrightText: The author disclaims copyright to the SQLite source code.
+
+PackageName: OpenSSL
+SPDXID: SPDXRef-Package-OpenSSL
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/openssl/openssl
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: Apache-2.0
+PackageCopyrightText: NOASSERTION
+PackageComment: Cryptographic provider used by the supported Debian and Ubuntu SQLCipher packages. Another system SQLCipher build can select a different provider, in which case the distributor must regenerate this inventory.
+
+PackageName: zlib
+SPDXID: SPDXRef-Package-zlib
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/madler/zlib
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: Zlib
+PackageCopyrightText: NOASSERTION
+PackageComment: Transitive system dependency of the OpenSSL build verified for MARS.
+
+PackageName: Zstandard
+SPDXID: SPDXRef-Package-zstd
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/facebook/zstd
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause OR GPL-2.0-only
+PackageCopyrightText: NOASSERTION
+PackageComment: Transitive system dependency of the OpenSSL build verified for MARS.
+
+PackageName: GNU-C-Library
+SPDXID: SPDXRef-Package-glibc
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://sourceware.org/git/glibc.git
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: LGPL-2.1-or-later
+PackageCopyrightText: NOASSERTION
+PackageComment: Supplies the C library, libm and pthread implementation on the normal supported GNU/Linux target; individual components can carry additional terms.
+
+PackageName: CPython
+SPDXID: SPDXRef-Package-CPython
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/python/cpython
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: PSF-2.0
+PackageCopyrightText: NOASSERTION
+PackageComment: Separately installed runtime for MARS Lab and configuration tools; only the standard library is imported.
+
+PackageName: TeX-Live
+SPDXID: SPDXRef-Package-TeXLive
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://tug.org/texlive/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Separately installed MARS Lab rendering tool; TeX Live contains packages under multiple licences.
+
+PackageName: dvisvgm
+SPDXID: SPDXRef-Package-dvisvgm
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/mgieseki/dvisvgm
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: GPL-3.0-or-later
+PackageCopyrightText: NOASSERTION
+PackageComment: Separately installed MARS Lab rendering tool.
+
+PackageName: Tailscale
+SPDXID: SPDXRef-Package-Tailscale
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/tailscale/tailscale
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: NOASSERTION
+PackageComment: Optional, separately installed private-network access tool for MARS Lab.
+
+PackageName: python-holidays
+SPDXID: SPDXRef-Package-python-holidays
+PackageVersion: 0.99
+PackageDownloadLocation: https://github.com/vacanza/holidays
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time source for bundled holiday instances; not a runtime dependency.
+
+PackageName: Workalendar
+SPDXID: SPDXRef-Package-Workalendar
+PackageVersion: 17.0.0
+PackageDownloadLocation: https://github.com/workalendar/workalendar
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time source for bundled historical holiday instances; not a runtime dependency.
+
+PackageName: IANA-Time-Zone-Database
+SPDXID: SPDXRef-Package-TZDB
+PackageVersion: 2025b
+PackageDownloadLocation: https://data.iana.org/time-zones/releases/tzdb-2025b.tar.lz
+FilesAnalyzed: false
+PackageLicenseConcluded: LicenseRef-IANA-TZDB-Public-Domain
+PackageLicenseDeclared: LicenseRef-IANA-TZDB-Public-Domain
+PackageCopyrightText: NONE
+PackageComment: Generation-time source for the bundled ISO 3166 country seed.
+
+PackageName: WeatherAPI.com
+SPDXID: SPDXRef-Package-WeatherAPI
+PackageVersion: API service accessed 2026-08-21
+PackageDownloadLocation: https://www.weatherapi.com/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Optional hosted weather service, not redistributed by MARS. MARS supplies no shared account or key; the installer must use their own WeatherAPI account to enable it. Use is governed by https://www.weatherapi.com/terms.aspx and https://www.weatherapi.com/privacy.aspx. The local Lab server sends the configured API key, selected date, latitude and longitude to the service over HTTPS, does not expose the key to the browser, and does not cache or persist weather responses. The selected date and coordinates remain in private local Lab state so that inputs can be restored.
+
+PackageName: JPL-DE440-SPICE-Kernel
+SPDXID: SPDXRef-Package-DE440
+PackageVersion: de440.bsp published 2020-12-21
+PackageDownloadLocation: https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp
+FilesAnalyzed: false
+PackageChecksum: MD5: c9d581bfd84209dbeee8b1583939b148
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time source for bundled Chebyshev ephemeris coefficients. MARS does not redistribute this kernel. NASA/JPL/Caltech NAIF use rules apply: https://naif.jpl.nasa.gov/naif/rules.html.
+
+PackageName: JPL-DE440s-SPICE-Kernel
+SPDXID: SPDXRef-Package-DE440s
+PackageVersion: de440s.bsp published 2020-12-21
+PackageDownloadLocation: https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp
+FilesAnalyzed: false
+PackageChecksum: MD5: 3917ee56769db332790c751e2168843d
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time source for Moon data in the original MARS AstroNav workbook. MARS does not redistribute this kernel. NASA/JPL/Caltech NAIF use rules apply.
+
+PackageName: NAIF-Auxiliary-SPICE-Kernels
+SPDXID: SPDXRef-Package-NAIF-Auxiliary-Kernels
+PackageVersion: naif0012.tls (2016-07-14) and pck00011.tpc (2022-12-27)
+PackageDownloadLocation: https://naif.jpl.nasa.gov/pub/naif/generic_kernels/
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Unmodified generation-time leap-seconds and planetary-constants inputs. MARS does not redistribute these kernels. NASA/JPL/Caltech NAIF use rules apply.
+
+PackageName: NumPy
+SPDXID: SPDXRef-Package-NumPy
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/numpy/numpy
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time numerical fitting tool; not a MARS runtime dependency. The exact historical package version was not retained.
+
+PackageName: SpiceyPy
+SPDXID: SPDXRef-Package-SpiceyPy
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/AndrewAnnex/SpiceyPy
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time Python interface to SPICE; not a MARS runtime dependency. The exact historical package version was not retained.
+
+PackageName: PyERFA
+SPDXID: SPDXRef-Package-PyERFA
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/liberfa/pyerfa
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-time Python wrapper and distribution of ERFA; not a MARS runtime dependency. The exact historical package version was not retained.
+
+PackageName: ERFA
+SPDXID: SPDXRef-Package-ERFA
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/liberfa/erfa
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: NOASSERTION
+PackageComment: Essential Routines for Fundamental Astronomy used through PyERFA to generate frame rotations and test oracles.
+
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-GMP
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPFR
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPC
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-SQLCipher
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-glibc
+Relationship: SPDXRef-Package-libunistring OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-SQLCipher DEPENDS_ON SPDXRef-Package-SQLite
+Relationship: SPDXRef-Package-SQLCipher DEPENDS_ON SPDXRef-Package-OpenSSL
+Relationship: SPDXRef-Package-OpenSSL DEPENDS_ON SPDXRef-Package-zlib
+Relationship: SPDXRef-Package-OpenSSL DEPENDS_ON SPDXRef-Package-zstd
+Relationship: SPDXRef-Package-CPython RUNTIME_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-TeXLive RUNTIME_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-dvisvgm RUNTIME_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-Tailscale OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-python-holidays
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-Workalendar
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-TZDB
+Relationship: SPDXRef-Package-WeatherAPI OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-DE440
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-DE440s
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-NAIF-Auxiliary-Kernels
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-NumPy
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-SpiceyPy
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-PyERFA
+Relationship: SPDXRef-Package-PyERFA CONTAINS SPDXRef-Package-ERFA
+
+LicenseID: LicenseRef-SQLite-Public-Domain
+ExtractedText: SQLite source code has been dedicated to the public domain. See https://sqlite.org/copyright.html.
+LicenseName: SQLite public-domain dedication
+LicenseCrossReference: https://sqlite.org/copyright.html
+
+LicenseID: LicenseRef-IANA-TZDB-Public-Domain
+ExtractedText: The IANA Time Zone Database code and data are in the public domain. See https://www.iana.org/time-zones.
+LicenseName: IANA Time Zone Database public-domain dedication
+LicenseCrossReference: https://www.iana.org/time-zones

@@ -362,11 +362,26 @@ weather summary, the selected date range and the year's calendar observances.
 
 [![MARS Lab datetime mode showing calendar and astronomical results followed by asynchronously loaded weather](images/mars-lab/datetime.png?v=20260820-1)](images/mars-lab/datetime.png?v=20260820-1)
 
-Weather is shown only when a WeatherAPI key was configured during desktop
-installation and the service can be reached. The calendar and astronomical
-results do not depend on that optional service. They are displayed as soon as
-the native datetime helper completes; weather is fetched asynchronously and
-updates its own card afterwards, without delaying or replacing those results.
+MARS supplies no shared WeatherAPI account or key. Weather is shown only when
+the person installing MARS Lab creates their own WeatherAPI account, configures
+that account's key during desktop installation, and the service can be reached.
+The calendar and astronomical results do not depend on that optional service.
+They are displayed as soon as the native datetime helper completes; weather is
+fetched asynchronously and updates its own card afterwards, without delaying
+or replacing those results.
+
+Each lookup sends the configured key, selected date, latitude and longitude
+from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
+the browser. MARS does not cache or persist the returned weather response,
+although the date and coordinates remain in private local Lab state so that its
+inputs can be restored. The weather card identifies WeatherAPI.com as its
+source and displays the required end-user warning. Forecasts and conditions are
+probabilistic and may be inaccurate for an exact place or time. Do not use them
+as the sole basis for personal safety, aviation, marine navigation, emergency
+planning or any other safety-critical decision; consult official
+meteorological services and authorities. See the [MARS privacy notice](privacy.md),
+[WeatherAPI privacy policy](https://www.weatherapi.com/privacy.aspx) and
+[WeatherAPI terms](https://www.weatherapi.com/terms.aspx).
 
 ## Almanac mode
 

@@ -107,10 +107,14 @@ By default, installation uses:
 PREFIX=/usr/local
 LIBDIR=$(PREFIX)/lib
 INCLUDEDIR=$(PREFIX)/include
+DOCDIR=$(PREFIX)/share/doc/mars
 ```
 
 That places libraries in `/usr/local/lib` and public headers in
-`/usr/local/include/mars`. Override paths as needed:
+`/usr/local/include/mars`. The MARS licence, third-party notices, SPDX
+dependency inventory, licensing policy, privacy notice and almanac data
+provenance are installed in `/usr/local/share/doc/mars`, so they remain with
+packaged installations. Override paths as needed:
 
 ```sh
 make install PREFIX=/opt/mars
@@ -146,10 +150,19 @@ before starting the browser client.
 That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in
 `~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at
-`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. If you choose to enable
-weather lookups, the optional WeatherAPI key is stored in
+`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. MARS supplies no shared
+WeatherAPI account or key. If the installer creates their own WeatherAPI
+account and chooses to enable weather lookups, that account's key is stored in
 `~/.mars/config/weather.env`. Reinstalling MARS Lab recreates `~/.mars` while
-preserving `weather.env`.
+preserving `weather.env`. Each lookup sends the configured key, selected date,
+latitude and longitude from the local MARS Lab server to WeatherAPI.com over
+HTTPS; the key is not sent to the browser. MARS does not cache or persist the
+weather response, although the date and coordinates remain in private local
+Lab state so that its inputs can be restored. The displayed weather is general,
+probabilistic information and must not be the sole basis for safety-critical
+decisions. See the [MARS privacy notice](privacy.md),
+[WeatherAPI privacy policy](https://www.weatherapi.com/privacy.aspx) and
+[WeatherAPI terms](https://www.weatherapi.com/terms.aspx).
 
 Remove installed MARS files:
 

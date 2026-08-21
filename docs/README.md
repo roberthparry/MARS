@@ -9,6 +9,9 @@ This directory contains the longer module documentation for MARS.
 - [Building](./building.md)
 - [Testing](./testing.md)
 - [Benchmarks](./benchmarks.md)
+- [Licensing and dependency continuity](./licensing.md)
+- [Privacy](./privacy.md)
+- [Almanac data provenance](./almanac-data-provenance.md)
 
 ## Modules
 
@@ -60,6 +63,11 @@ multiprecision backends:
 
 `sqlite_t` uses [SQLCipher](https://www.zetetic.net/sqlcipher/) for encrypted
 SQLite-compatible storage.
+
+The repository's [third-party notices](../THIRD_PARTY_NOTICES.md) record the
+required SQLCipher notice and the licences and provenance of other external
+components. The accompanying [`DEPENDENCIES.spdx`](../DEPENDENCIES.spdx) file
+is the machine-readable dependency inventory.
 
 ## Notes
 
