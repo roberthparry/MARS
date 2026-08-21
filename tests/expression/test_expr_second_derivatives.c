@@ -865,10 +865,10 @@ void test_second_deriv_normal_logpdf(void)
     expr_free(x);
 }
 
-void test_second_deriv_ei(void)
+void test_second_deriv_Ei(void)
 {
     expr_t *x = test_expr_new_var_d(1.0);
-    expr_t *f = expr_ei(x);
+    expr_t *f = expr_Ei(x);
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
@@ -884,10 +884,10 @@ void test_second_deriv_ei(void)
     expr_free(x);
 }
 
-void test_second_deriv_e1(void)
+void test_second_deriv_E1(void)
 {
     expr_t *x = test_expr_new_var_d(1.0);
-    expr_t *f = expr_e1(x);
+    expr_t *f = expr_E1(x);
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
@@ -1103,8 +1103,8 @@ void test_second_derivatives(void)
     TEST_RUN_SUBTEST(test_second_deriv_normal_pdf, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_normal_cdf, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_normal_logpdf, NULL);
-    TEST_RUN_SUBTEST(test_second_deriv_ei, NULL);
-    TEST_RUN_SUBTEST(test_second_deriv_e1, NULL);
+    TEST_RUN_SUBTEST(test_second_deriv_Ei, NULL);
+    TEST_RUN_SUBTEST(test_second_deriv_E1, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_erfinv, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_erfcinv, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_lambert_w0, NULL);

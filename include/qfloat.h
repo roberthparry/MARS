@@ -771,12 +771,28 @@ qfloat_t qf_exp(qfloat_t x);
 qfloat_t qf_log(qfloat_t x);
 
 /**
+ * @brief Natural-logarithm shorthand.
+ *
+ * @param x Input value (must be > 0).
+ * @return The same value as qf_log(x).
+ */
+qfloat_t qf_ln(qfloat_t x);
+
+/**
  * @brief Common logarithm.
  *
  * @param x Input value (must be > 0).
  * @return log10(x) (double-double precision).
  */
 qfloat_t qf_log10(qfloat_t x);
+
+/**
+ * @brief Common-logarithm shorthand.
+ *
+ * @param x Input value (must be > 0).
+ * @return The same value as qf_log10(x).
+ */
+qfloat_t qf_lg(qfloat_t x);
 
 /**
  * @brief Test whether a qfloat_t is a NaN value.
@@ -1458,11 +1474,11 @@ qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x);
  *
  * Principal value on the real axis, with the usual branch cut on (-∞, 0].
  */
-qfloat_t qf_ei(qfloat_t x);
+qfloat_t qf_Ei(qfloat_t x);
 
 /**
  * @brief Exponential integral E1(x) = ∫_{x}^{∞} (e^{-t} / t) dt,  x > 0
  */
-qfloat_t qf_e1(qfloat_t x);
+qfloat_t qf_E1(qfloat_t x);
 
 #endif /* QFLOAT_H */

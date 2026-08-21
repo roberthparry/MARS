@@ -342,6 +342,8 @@ static void test_log(void)
     check_qc("log(e) = 1", qc_log(qcrs("2.71828182845904523536028747135266249775724709369996")), qcr(1.0), 1e-30);
 
     check_qc("log10(100) = 2", qc_log10(qcr(100.0)), qcr(2.0), 1e-30);
+    check_qc("ln(z) aliases log(z)", qc_ln(qcz(0.75, 1.25)), qc_log(qcz(0.75, 1.25)), 1e-30);
+    check_qc("lg(z) aliases log10(z)", qc_lg(qcz(0.75, 1.25)), qc_log10(qcz(0.75, 1.25)), 1e-30);
 
     {
         qcomplex_t z = qcz(0.7, 1.2);
@@ -964,14 +966,14 @@ static void test_gammainc(void)
    Exponential integrals
    ==================================================================== */
 
-static void test_ei_e1(void)
+static void test_Ei_E1(void)
 {
     printf(C_CYAN "TEST: ei/e1\n" C_RESET);
 
-    check_qc_rel("Ei(1) = 1.89511...", qc_ei(qcr(1.0)), qcrs("1.89511781635593675546652093433163253689966848312547"),
+    check_qc_rel("Ei(1) = 1.89511...", qc_Ei(qcr(1.0)), qcrs("1.89511781635593675546652093433163253689966848312547"),
                  1e-26);
 
-    check_qc_rel("E1(1) = 0.21938...", qc_e1(qcr(1.0)), qcrs("0.21938393439552027367716377546049389941229571528030"),
+    check_qc_rel("E1(1) = 0.21938...", qc_E1(qcr(1.0)), qcrs("0.21938393439552027367716377546049389941229571528030"),
                  1e-26);
 
     double zs[] = {0.5, 1.0, 2.0};
@@ -979,14 +981,14 @@ static void test_ei_e1(void)
         qcomplex_t z = qcr(zs[i]);
         char label[64];
         snprintf(label, sizeof(label), "E1(%.1f) = -Ei(-%.1f)", zs[i], zs[i]);
-        check_qc_rel(label, qc_e1(z), qc_neg(qc_ei(qc_neg(z))), 1e-27);
+        check_qc_rel(label, qc_E1(z), qc_neg(qc_Ei(qc_neg(z))), 1e-27);
     }
 
-    check_bool("Ei monotone on positive real axis", qf_gt(qc_abs(qc_ei(qcr(2.0))), qc_abs(qc_ei(qcr(1.0)))));
+    check_bool("Ei monotone on positive real axis", qf_gt(qc_abs(qc_Ei(qcr(2.0))), qc_abs(qc_Ei(qcr(1.0)))));
 
     {
         qcomplex_t zc = qcz(1.0, 0.5);
-        qcomplex_t e1c = qc_e1(zc);
+        qcomplex_t e1c = qc_E1(zc);
         check_bool("E1(1+0.5i) is finite", !qc_isnan(e1c) && !qc_isinf(e1c));
     }
 }
@@ -1261,7 +1263,7 @@ static void test_special_group(void)
     TEST_RUN_SUBTEST(test_lambert_wm1, NULL);
     TEST_RUN_SUBTEST(test_lambert_wn, NULL);
     TEST_RUN_SUBTEST(test_gammainc, NULL);
-    TEST_RUN_SUBTEST(test_ei_e1, NULL);
+    TEST_RUN_SUBTEST(test_Ei_E1, NULL);
     TEST_RUN_SUBTEST(test_difficult_cases, NULL);
 }
 

@@ -1338,10 +1338,10 @@ void test_multi_3d_exp_square_product(void)
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(term_exp, test_num_mul_double(num_exp(test_num_from_double(-1.0)), 2.0));
     TEST_NUMBER_AUTO_VALUE(term_erf, num_mul(test_num_mul_double(num_sqrt(NUM_PI), 2.0), num_erf(NUM_ONE)));
-    TEST_NUMBER_AUTO_VALUE(term_e1, num_e1(NUM_ONE));
+    TEST_NUMBER_AUTO_VALUE(term_E1, num_E1(NUM_ONE));
     TEST_NUMBER_AUTO_VALUE(expected, num_sub(num_sub(num_sub(num_add(term_exp, term_erf), test_num_from_double(2.0)),
                                                      NUM_EULER_MASCHERONI),
-                                             term_e1));
+                                             term_E1));
 
     {
         int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
@@ -1362,7 +1362,7 @@ void test_multi_3d_exp_square_product(void)
     }
 
     num_destroy(&expected);
-    num_destroy(&term_e1);
+    num_destroy(&term_E1);
     num_destroy(&term_erf);
     num_destroy(&term_exp);
     expr_free(expr);

@@ -502,7 +502,25 @@ expr_t *expr_acosech(const expr_t *expr);
 expr_t *expr_acoth(const expr_t *expr);
 expr_t *expr_exp(const expr_t *expr);
 expr_t *expr_log(const expr_t *expr);
+/**
+ * @brief Construct a natural-logarithm expression.
+ *
+ * This is a shorthand for expr_log() and constructs the same symbolic operation.
+ *
+ * @param expr Operand expression; it is retained.
+ * @return A newly allocated natural-logarithm expression, or NULL on error.
+ */
+expr_t *expr_ln(const expr_t *expr);
 expr_t *expr_log10(const expr_t *expr);
+/**
+ * @brief Construct a common-logarithm expression.
+ *
+ * This is a shorthand for expr_log10() and constructs the same symbolic operation.
+ *
+ * @param expr Operand expression; it is retained.
+ * @return A newly allocated common-logarithm expression, or NULL on error.
+ */
+expr_t *expr_lg(const expr_t *expr);
 /**
  * @brief Construct the single-valued principal square root of an expression.
  *
@@ -578,7 +596,7 @@ expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index,
  * Beta/binomial:     expr_beta (B), expr_logbeta (log B), expr_beta_pdf,
  *                    expr_logbeta_pdf, expr_binomial
  * Normal dist.:      expr_normal_pdf, expr_normal_cdf, expr_normal_logpdf
- * Exponential int.:  expr_ei (Ei), expr_e1 (E₁)
+ * Exponential int.:  expr_Ei (Ei), expr_E1 (E₁)
  *
  * Exact/discrete helpers such as expr_partition and expr_gcd are value functions:
  * they evaluate normally, but they are not differentiable.
@@ -681,8 +699,8 @@ expr_t *expr_normal_logpdf(const expr_t *expr);
 expr_t *expr_pdf(const expr_t *expr);
 expr_t *expr_cdf(const expr_t *expr);
 expr_t *expr_logpdf(const expr_t *expr);
-expr_t *expr_ei(const expr_t *expr);
-expr_t *expr_e1(const expr_t *expr);
+expr_t *expr_Ei(const expr_t *expr);
+expr_t *expr_E1(const expr_t *expr);
 
 /**
  * @brief Return true when every operation in @p expr is differentiable.

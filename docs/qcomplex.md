@@ -24,7 +24,7 @@ currently remains a transparent by-value struct.
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, negate, conjugate
 - magnitude and argument
-- elementary functions: exp, log, pow, sqrt
+- elementary functions: exp, natural logarithm, common logarithm, pow, sqrt
 - trigonometric, versine/haversine, and hyperbolic functions (and their inverses)
 - special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
@@ -113,8 +113,10 @@ All declarations are in `include/qcomplex.h`.
 |---|---|
 | `qc_exp(z)` | `e^z` |
 | `qc_log(z)` | principal logarithm `ln(z)` |
-| `qc_log10(z)` | principal common logarithm `log10(z)` |
-| `qc_pow(a, b)` | `a^b = exp(b * log(a))` (principal branch) |
+| `qc_ln(z)` | shorthand for `qc_log(z)` |
+| `qc_log10(z)` | principal common logarithm `lg(z)` |
+| `qc_lg(z)` | shorthand for `qc_log10(z)` |
+| `qc_pow(a, b)` | `a^b = exp(b * ln(a))` (principal branch) |
 | `qc_sqrt(z)` | principal square root |
 | `qc_cubrt(z)` | single principal cube root, equivalent to `qc_root(z, 3)` |
 | `qc_root(z, n)` | single principal `n`-th root for an integer order greater than one |
@@ -206,8 +208,8 @@ All declarations are in `include/qcomplex.h`.
 | `qc_gammainc_upper(s, x)` | upper incomplete gamma Γ(s,x) |
 | `qc_gammainc_P(s, x)` | regularised lower incomplete gamma P(s,x) = γ(s,x)/Γ(s) |
 | `qc_gammainc_Q(s, x)` | regularised upper incomplete gamma Q(s,x) = Γ(s,x)/Γ(s) |
-| `qc_ei(z)` | exponential integral Ei(z) |
-| `qc_e1(z)` | exponential integral E₁(z); satisfies E₁(z) = −Ei(−z) for real z > 0 |
+| `qc_Ei(z)` | exponential integral Ei(z) |
+| `qc_E1(z)` | exponential integral E₁(z); satisfies E₁(z) = −Ei(−z) for real z > 0 |
 | `qc_dilog(z)` | principal dilogarithm Li₂(z) |
 | `qc_polylog(s, z)` | polylogarithm Li_s(z) for integer real orders currently supported by the implementation |
 | `qc_legendre_chi(s, z)` | Legendre chi χ_s(z) for integer real orders currently supported by the implementation |
@@ -315,8 +317,8 @@ Results:
 | `qc_gammainv(qc_gamma(2.5+0.3i))` | `218.0 µs` |
 | `qc_productlog(1+i)` | `29.1 µs` |
 | `qc_lambert_wm1(-0.2-0.1i)` | `29.5 µs` |
-| `qc_ei(1+i)` | `46.7 µs` |
-| `qc_e1(1+i)` | `47.9 µs` |
+| `qc_Ei(1+i)` | `46.7 µs` |
+| `qc_E1(1+i)` | `47.9 µs` |
 | `qc_beta(1.5+0.5i, 2-0.3i)` | `41.5 µs` |
 | `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.4 µs` |
 

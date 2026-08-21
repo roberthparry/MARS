@@ -18,7 +18,8 @@ maintained after every operation.
 
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, power
-- elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, the versine/haversine family, and inverses
+- elementary functions: exp, natural logarithm, common logarithm, sqrt, sin, cos, tan, atan2, hypot, the
+  versine/haversine family, and inverses
 - special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
   Lauricella F_D, Appell F₁, Bessel J/Y, Lommel s, Riemann and Hurwitz zeta,
@@ -72,7 +73,7 @@ the result renormalised into a stable `(hi, lo)` pair.
 
 ### Function Implementation
 
-Functions such as `exp`, `log`, `sin`, `cos`, `sqrt`, `pow`, and `atan2` are
+Functions such as `exp`, `ln`, `lg`, `sin`, `cos`, `sqrt`, `pow`, and `atan2` are
 built from argument reduction, polynomial or rational approximation,
 Newton-style refinement, and renormalisation back into `(hi, lo)` form.
 Special functions build on the same arithmetic core.
@@ -200,7 +201,7 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_floor(qfloat_t x)` — floor of `x`
 - `qfloat_t qf_ldexp(qfloat_t x, int k)` — `x * 2^k`
 - `qfloat_t qf_pow_int(qfloat_t x, int n)` — `x^n` by exponentiation-by-squaring; negative exponents supported
-- `qfloat_t qf_pow(qfloat_t x, qfloat_t y)` — `x^y` via `exp(y * log(x))`; returns NaN on domain error
+- `qfloat_t qf_pow(qfloat_t x, qfloat_t y)` — `x^y` via `exp(y * ln(x))`; returns NaN on domain error
 - `qfloat_t qf_pow10(int n)` — `10^n` exactly
 
 ### Elementary Functions
@@ -212,7 +213,9 @@ All declarations are in `include/qfloat.h`.
   returns NaN for a negative radicand or an invalid order
 - `qfloat_t qf_exp(qfloat_t x)` — natural exponential
 - `qfloat_t qf_log(qfloat_t x)` — natural logarithm (`x > 0`)
+- `qfloat_t qf_ln(qfloat_t x)` — shorthand for `qf_log(x)`
 - `qfloat_t qf_log10(qfloat_t x)` — common logarithm (`x > 0`)
+- `qfloat_t qf_lg(qfloat_t x)` — shorthand for `qf_log10(x)`
 - `qfloat_t qf_hypot(qfloat_t x, qfloat_t y)` — `sqrt(x^2 + y^2)` without overflow
 - `qfloat_t qf_sin(qfloat_t x)` — sine (radians)
 - `qfloat_t qf_cos(qfloat_t x)` — cosine (radians)
@@ -326,8 +329,8 @@ The qfloat layer has no dependency on MPFR.
 
 **Exponential integrals**
 
-- `qfloat_t qf_ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
-- `qfloat_t qf_e1(qfloat_t x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
+- `qfloat_t qf_Ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
+- `qfloat_t qf_E1(qfloat_t x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
 
 **Polylogarithms**
 
@@ -422,8 +425,8 @@ Results:
 | `qf_gammainv(119292.4619946090070787515047110059)` | `143.7 µs` |
 | `qf_lambert_w0(1)` | `14.9 µs` |
 | `qf_lambert_wm1(-0.1)` | `81.8 µs` |
-| `qf_ei(1)` | `4.7 µs` |
-| `qf_e1(1)` | `4.7 µs` |
+| `qf_Ei(1)` | `4.7 µs` |
+| `qf_E1(1)` | `4.7 µs` |
 | `qf_beta(2.3, 4.5)` | `5.2 µs` |
 | `qf_logbeta(2.3, 4.5)` | `26.6 µs` |
 

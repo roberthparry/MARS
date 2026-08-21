@@ -184,7 +184,7 @@ int tests_main()
     TEST_RUN_IN_GROUP(test_gamma_erf_erfc_erfinv_erfcinv_digamma, tests, NULL);
     TEST_RUN_IN_GROUP(test_lambert_w, tests, NULL);
     TEST_RUN_IN_GROUP(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, tests, NULL);
-    TEST_RUN_IN_GROUP(test_gammainc_ei_e1, tests, NULL);
+    TEST_RUN_IN_GROUP(test_gammainc_Ei_E1, tests, NULL);
     TEST_RUN_IN_GROUP(test_bessel_functions, tests, NULL);
     TEST_RUN_IN_GROUP(test_difficult_qfloat_cases, tests, NULL);
 

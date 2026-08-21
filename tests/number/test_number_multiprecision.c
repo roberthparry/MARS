@@ -315,7 +315,7 @@ void run_number_multiprecision_tests(void)
 
         exact_int = num_create_from_string("1");
         exact_rat = num_create_from_string("3/2");
-        ei_int = num_ei(exact_int);
+        ei_int = num_Ei(exact_int);
         log_rat = num_log(exact_rat);
         two = num_create_from_string("2");
         half = num_create_from_string("1/2");

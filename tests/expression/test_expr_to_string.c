@@ -784,18 +784,39 @@ static void test_to_string_log10_TeX(void)
 {
     expr_t *x = test_expr_new_named_var_d(100.0, "x0");
     expr_t *f = expr_log10(x);
-    char *got = expr_to_string(f, style_LATEX);
+    char *got_TeX = expr_to_string(f, style_LATEX);
+    char *got_expression = expr_to_string(f, style_EXPRESSION);
+    char *got_function = expr_to_string(f, style_FUNCTION);
 
-    const char *expect = "\\left\\{ \\log(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
+    const char *expect_TeX = "\\left\\{ \\lg(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
+    const char *expect_expression = "{ lg(x₀) | x₀ = 100 }";
+    const char *expect_function = "expression expr(x₀) {\n"
+                                  "    return lg(x₀).\n"
+                                  "}\n"
+                                  "\n"
+                                  "x₀ = 100.\n"
+                                  "output(expr(x₀)).";
 
-    TeX_preview_emit_case(__FILE__, "log10 (TEX)", got);
+    TeX_preview_emit_case(__FILE__, "log10 (TEX)", got_TeX);
 
-    if (str_eq(got, expect))
-        to_string_pass("log10 (TEX)", got, expect);
+    if (str_eq(got_TeX, expect_TeX))
+        to_string_pass("log10 canonical lg name (TEX)", got_TeX, expect_TeX);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "log10 (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (TEX)", got_TeX, expect_TeX);
 
-    free(got);
+    if (str_eq(got_expression, expect_expression))
+        to_string_pass("log10 canonical lg name (EXPR)", got_expression, expect_expression);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (EXPR)", got_expression, expect_expression);
+
+    if (str_eq(got_function, expect_function))
+        to_string_pass("log10 canonical lg name (FUNC)", got_function, expect_function);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (FUNC)", got_function, expect_function);
+
+    free(got_function);
+    free(got_expression);
+    free(got_TeX);
     expr_free(f);
     expr_free(x);
 }
@@ -2029,12 +2050,12 @@ void test_to_string_special_functions(void)
     }
     {
         expr_t *x = test_expr_new_named_var_d(1.0, "x");
-        check_roundtrip("to_string: ei(x)", expr_ei(x), __LINE__);
+        check_roundtrip("to_string: ei(x)", expr_Ei(x), __LINE__);
         expr_free(x);
     }
     {
         expr_t *x = test_expr_new_named_var_d(1.0, "x");
-        check_roundtrip("to_string: e1(x)", expr_e1(x), __LINE__);
+        check_roundtrip("to_string: e1(x)", expr_E1(x), __LINE__);
         expr_free(x);
     }
     /* Binary functions */

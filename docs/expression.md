@@ -104,9 +104,9 @@ fall back to the numerical `integrator_t` path without guessing.
 
 The current rule set is intentionally conservative. It covers constants,
 sums/differences, constant multiples, powers of the integration variable,
-`1/x`, `log(x)`, affine elementary and inverse-family primitives, selected
+`1/x`, `ln(x)`, affine elementary and inverse-family primitives, selected
 u-substitutions, integration-by-parts families such as `x * sin(x)`,
-`x * exp(x)`, `x * log(x)`, and `x * atan(x)`, plus a focused partial-fraction
+`x * exp(x)`, `x * ln(x)`, and `x * atan(x)`, plus a focused partial-fraction
 layer for rational functions whose denominator factors into supported affine
 linear terms. Affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh`
 terms such as `sin(3*x - 1)` are part of that fast path. The special-function
@@ -612,10 +612,11 @@ style is applied afterwards.
 When an elementary function has a supported symbolic Cartesian identity, the
 native display pass separates an explicit `x + iy` argument into real and
 imaginary parts. For example, `exp(x + iy)` becomes
-`exp(x)·cos(y) + exp(x)·sin(y)·i`. The pass covers `exp`, `ln`, `log10`, all six
+`exp(x)·cos(y) + exp(x)·sin(y)·i`. The pass covers `exp`, `ln`, `lg`, all six
 circular functions, all six hyperbolic functions, and all twelve inverse
 circular and inverse hyperbolic functions. It applies equally to pure-imaginary
-arguments.
+arguments. The accepted common-logarithm aliases `log` and `log10` use the same
+base-10 operation and are rendered canonically as `lg`.
 
 Differentiation and integration with respect to either Cartesian component
 preserve the separated `p + qi` structure. The imaginary unit remains the
@@ -743,7 +744,11 @@ All functions return owning handles.
 - `expr_t *expr_acoth(const expr_t *expr)` — inverse hyperbolic cotangent
 - `expr_t *expr_exp(const expr_t *expr)` — natural exponential
 - `expr_t *expr_log(const expr_t *expr)` — natural logarithm
+- `expr_t *expr_ln(const expr_t *expr)` — shorthand for `expr_log(expr)`; it constructs the same natural-logarithm
+  operation
 - `expr_t *expr_log10(const expr_t *expr)` — common logarithm
+- `expr_t *expr_lg(const expr_t *expr)` — shorthand for `expr_log10(expr)`; it constructs the same common-logarithm
+  operation
 - `expr_t *expr_sqrt(const expr_t *expr)` — the single-valued principal square root. For complex `z`, MARS defines
   it as `exp(Log(z)/2)`, with the principal argument in `(-pi, pi]`. Thus the real part is non-negative and a value
   on the negative real axis has a positive imaginary square root.
@@ -812,8 +817,8 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_normal_pdf(const expr_t *expr)` — standard normal PDF φ(x)
 - `expr_t *expr_normal_cdf(const expr_t *expr)` — standard normal CDF Φ(x)
 - `expr_t *expr_normal_logpdf(const expr_t *expr)` — ln φ(x)
-- `expr_t *expr_ei(const expr_t *expr)` — Ei(x), exponential integral
-- `expr_t *expr_e1(const expr_t *expr)` — E₁(x), exponential integral
+- `expr_t *expr_Ei(const expr_t *expr)` — Ei(x), exponential integral
+- `expr_t *expr_E1(const expr_t *expr)` — E₁(x), exponential integral
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
 - `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
@@ -1000,7 +1005,8 @@ bindings.
   - `sqrt(x)` or `√(x)` for a single principal square root; `cubrt(x)` and `root(x, n)` for single principal cube
     and integer-order roots
   - `conj(x)` and `conjugate(x)` for complex conjugation, with postfix `x^*` as the equivalent shorthand
-  - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
+  - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm. Result renderings
+    use the unambiguous canonical names `ln(x)` and `lg(x)`.
   - `versin(x)`, `vercos(x)`, `coversin(x)`, `covercos(x)`,
     `haversin(x)`, `havercos(x)`, `hacoversin(x)`, and `hacovercos(x)`
     for the versine/haversine family

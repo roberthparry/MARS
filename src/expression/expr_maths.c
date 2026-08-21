@@ -888,13 +888,13 @@ number_t eval_normal_logpdf(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_normal_logpdf);
 }
-number_t eval_ei(expr_t *dv)
+number_t eval_Ei(expr_t *dv)
 {
-    return expr_eval_unary_num(dv, num_ei);
+    return expr_eval_unary_num(dv, num_Ei);
 }
-number_t eval_e1(expr_t *dv)
+number_t eval_E1(expr_t *dv)
 {
-    return expr_eval_unary_num(dv, num_e1);
+    return expr_eval_unary_num(dv, num_E1);
 }
 
 number_t eval_hypot(expr_t *dv)
@@ -2374,7 +2374,7 @@ expr_t *deriv_logpdf(expr_t *dv)
     return deriv_normal_logpdf(dv);
 }
 
-expr_t *deriv_ei(expr_t *dv)
+expr_t *deriv_Ei(expr_t *dv)
 {
     expr_t *da = expr_get_dx_internal(dv->a);
     expr_t *ea = expr_exp(dv->a);
@@ -2386,7 +2386,7 @@ expr_t *deriv_ei(expr_t *dv)
     return out;
 }
 
-expr_t *deriv_e1(expr_t *dv)
+expr_t *deriv_E1(expr_t *dv)
 {
     expr_t *da = expr_get_dx_internal(dv->a);
     expr_t *neg_a = expr_neg(dv->a);

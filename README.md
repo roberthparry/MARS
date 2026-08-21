@@ -126,7 +126,7 @@ Recent sample benchmarks on this tree show:
   `3.797 µs`
 - `qfloat_t` `gammainv(119292.4619946090070787515047110059)` at about
   `82.548 µs`
-- `qcomplex_t` `exp(1+i)` at about `2.513 µs` and `log(1+i)` at about
+- `qcomplex_t` `qc_exp(1+i)` at about `2.513 µs` and `qc_log(1+i)` at about
   `3.503 µs`
 - `qcomplex_t` `gammainv(qc_gamma(2.5+0.3i))` at about `145.943 µs`
 

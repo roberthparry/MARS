@@ -369,7 +369,7 @@ static int intg_eval_unit_box_exp_square_product(const expr_t *expr, size_t ndim
             number_t two_sqrt_pi = num_mul_long(sqrt_pi, 2L);
             number_t two_sqrt_pi_sqrt_a = num_mul(two_sqrt_pi, sqrt_a);
             number_t erf_term = num_mul(two_sqrt_pi_sqrt_a, erf_sqrt_a);
-            number_t e1_term = num_e1(a);
+            number_t e1_term = num_E1(a);
             number_t log_term = num_log(a);
             number_t sum = num_add(two_exp, erf_term);
             number_t next;

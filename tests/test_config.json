@@ -382,6 +382,8 @@
       "enabled": true,
       "test_first_derivatives": {
         "enabled": true,
+        "test_deriv_E1": true,
+        "test_deriv_Ei": true,
         "test_deriv_abs": true,
         "test_deriv_acos": true,
         "test_deriv_acosh": true,
@@ -401,8 +403,6 @@
         "test_deriv_cosh": true,
         "test_deriv_digamma": true,
         "test_deriv_div_d": true,
-        "test_deriv_e1": true,
-        "test_deriv_ei": true,
         "test_deriv_erf": true,
         "test_deriv_erfc": true,
         "test_deriv_erfcinv": true,
@@ -719,6 +719,8 @@
       "enabled": true,
       "test_second_derivatives": {
         "enabled": true,
+        "test_second_deriv_E1": true,
+        "test_second_deriv_Ei": true,
         "test_second_deriv_abs": true,
         "test_second_deriv_acos": true,
         "test_second_deriv_acosh": true,
@@ -735,8 +737,6 @@
         "test_second_deriv_cosh": true,
         "test_second_deriv_digamma": true,
         "test_second_deriv_div_d": true,
-        "test_second_deriv_e1": true,
-        "test_second_deriv_ei": true,
         "test_second_deriv_erf": true,
         "test_second_deriv_erfc": true,
         "test_second_deriv_erfcinv": true,
@@ -912,6 +912,8 @@
       "enabled": true,
       "test_maths_functions": {
         "enabled": true,
+        "test_E1": true,
+        "test_Ei": true,
         "test_abs": true,
         "test_acos": true,
         "test_acosh": true,
@@ -929,8 +931,6 @@
         "test_cosh": true,
         "test_digamma": true,
         "test_dilog_polylog": true,
-        "test_e1": true,
-        "test_ei": true,
         "test_erf": true,
         "test_erfc": true,
         "test_erfcinv": true,
@@ -1304,6 +1304,7 @@
     "test_mat_trig_null_safety": true,
     "test_mat_typeof": true,
     "test_matrix_function_structure_preservation": true,
+    "test_number_function_matrix_parity": true,
     "test_number_matrix_functions": true
   },
   "tests/matrix/test_matrix_output.c": {
@@ -1385,10 +1386,10 @@
       "test_from_string": true,
       "test_special_group": {
         "enabled": true,
+        "test_Ei_E1": true,
         "test_beta": true,
         "test_difficult_cases": true,
         "test_digamma": true,
-        "test_ei_e1": true,
         "test_erf": true,
         "test_erfinv": true,
         "test_gamma": true,
@@ -1426,7 +1427,7 @@
       "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": true,
       "test_difficult_qfloat_cases": true,
       "test_gamma_erf_erfc_erfinv_erfcinv_digamma": true,
-      "test_gammainc_ei_e1": true,
+      "test_gammainc_Ei_E1": true,
       "test_hyperbolic": true,
       "test_hypotenus": true,
       "test_lambert_w": true,
@@ -1616,14 +1617,14 @@
         "test_qf_bessel_integer_order_values": true,
         "test_qf_bessel_order_recurrence": true
       },
-      "test_gammainc_ei_e1": {
+      "test_gammainc_Ei_E1": {
         "enabled": true,
-        "test_qf_ei_e1_all": {
+        "test_qf_Ei_E1_all": {
           "enabled": true,
-          "test_ei_values": true,
-          "test_qf_e1_deriv": true,
-          "test_qf_ei_deriv": true,
-          "test_qf_ei_e1_identity": true
+          "test_Ei_values": true,
+          "test_qf_E1_deriv": true,
+          "test_qf_Ei_E1_identity": true,
+          "test_qf_Ei_deriv": true
         },
         "test_qf_gammainc_all": {
           "enabled": true,

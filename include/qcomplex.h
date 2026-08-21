@@ -274,7 +274,25 @@ void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
  */
 qcomplex_t qc_exp(qcomplex_t z);               /**< exp(z) */
 qcomplex_t qc_log(qcomplex_t z);               /**< log(z) */
+/**
+ * @brief Return the principal natural logarithm of @p z.
+ *
+ * This is a shorthand for qc_log().
+ *
+ * @param z Input value.
+ * @return The same value as qc_log(z).
+ */
+qcomplex_t qc_ln(qcomplex_t z);
 qcomplex_t qc_log10(qcomplex_t z);             /**< log10(z) */
+/**
+ * @brief Return the principal common logarithm of @p z.
+ *
+ * This is a shorthand for qc_log10().
+ *
+ * @param z Input value.
+ * @return The same value as qc_log10(z).
+ */
+qcomplex_t qc_lg(qcomplex_t z);
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b); /**< a^b */
 qcomplex_t qc_sqrt(qcomplex_t z);              /**< sqrt(z) */
 /** @brief Return the single principal cube root of @p z. */
@@ -405,8 +423,8 @@ qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x); /**< lower incomplete 
 qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x); /**< upper incomplete gamma */
 qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x);     /**< regularised lower gamma */
 qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x);     /**< regularised upper gamma */
-qcomplex_t qc_ei(qcomplex_t z);                           /**< exponential integral Ei */
-qcomplex_t qc_e1(qcomplex_t z);                           /**< exponential integral E1 */
+qcomplex_t qc_Ei(qcomplex_t z);                           /**< exponential integral Ei */
+qcomplex_t qc_E1(qcomplex_t z);                           /**< exponential integral E1 */
 /** @} */
 
 /**

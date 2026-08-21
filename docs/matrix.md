@@ -41,8 +41,11 @@ the API. Internally each matrix carries:
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
 - condition number computation
-- matrix functions: named APIs for exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh,
-  acosh, atanh, erf, and erfc; complete matrix-expression input resolves every applicable unary expression function
+- matrix functions: named APIs for every applicable single-variable analytic or
+  meromorphic Number function, including the complete trigonometric and
+  hyperbolic families, principal inverse functions, zeta, dilogarithm, gamma,
+  error, normal-distribution, Lambert W, and exponential-integral functions;
+  complete matrix-expression input uses the same function vocabulary
 - power functions: integer power, principal numeric power, exact symbolic
   spectral powers for eligible `1×1` and `2×2` matrices, and retained symbolic
   exponents for supported diagonalizable numeric square matrices of any order
@@ -472,7 +475,7 @@ When an operation has an obviously structured result, the library tries to keep
 that structure instead of immediately falling back to a fully materialised dense
 matrix. In particular, factorisation outputs and compatible diagonal or
 triangular matrix-function results preserve their natural layout. This also
-applies to compatible `exp(log(A))` round-trips, so diagonal or triangular
+applies to compatible `exp(ln(A))` round-trips, so diagonal or triangular
 inputs are not flattened merely because an internal cache is involved.
 
 ### Bulk Element Access
@@ -952,7 +955,7 @@ Computes the Schur factorisation
 
 where `Q` is unitary and `T` is upper triangular. This is the standard stable
 representation used for non-Hermitian eigenvalue problems and for matrix
-functions such as `exp(A)`, `log(A)`, and `sqrt(A)`.
+functions such as `exp(A)`, `ln(A)`, and `sqrt(A)`.
 
 The result is stored in the `mat_schur_factor_t` struct containing `Q` and `T`.
 These factors are returned as numeric `matrix_t` values (`MAT_TYPE_NUMBER`)
@@ -963,8 +966,12 @@ entries. Returns 0 on success, negative on error. Use
 ### Matrix Functions
 
 All matrix functions accept a square matrix and return a newly allocated result,
-or NULL on error (NULL input, non-square input, unsupported element type, or
-internal allocation failure).
+or NULL on error (NULL input, non-square input, unsupported element type,
+unsupported spectral domain, or internal allocation failure). MARS exposes the
+single-variable analytic and meromorphic functions from the Number API as
+matrix functions. Discrete operations, predicates, ordering operations and
+multivariate scalar operations without a canonical definition for
+non-commuting matrices are deliberately excluded.
 
 Every matrix function uses the same algorithm: Schur decomposition followed by
 the Parlett recurrence on the triangular Schur factor.
@@ -1015,20 +1022,51 @@ For `MAT_TYPE_EXPR`, the story is different:
 |---|---|
 | `mat_exp(A)` | Matrix exponential `eˢ` |
 | `mat_log(A)` | Matrix (principal) logarithm |
-| `mat_log10(A)` | Matrix common logarithm, computed as `mat_log(A) / log(10)` |
+| `mat_ln(A)` | Shorthand for `mat_log(A)` |
+| `mat_log10(A)` | Matrix common logarithm, computed as `mat_log(A) / ln(10)` |
+| `mat_lg(A)` | Shorthand for `mat_log10(A)` |
 | `mat_sqrt(A)` | Matrix (principal) square root |
+| `mat_cubrt(A)` | Matrix principal cube root |
 | `mat_sin(A)` | Matrix sine |
 | `mat_cos(A)` | Matrix cosine |
 | `mat_tan(A)` | Matrix tangent |
+| `mat_sec(A)` | Matrix secant |
+| `mat_cosec(A)` | Matrix cosecant |
+| `mat_cot(A)` | Matrix cotangent |
+| `mat_versin(A)` | Matrix versed sine |
+| `mat_vercos(A)` | Matrix versed cosine |
+| `mat_coversin(A)` | Matrix coversed sine |
+| `mat_covercos(A)` | Matrix coversed cosine |
+| `mat_haversin(A)` | Matrix haversine |
+| `mat_havercos(A)` | Matrix havercosine |
+| `mat_hacoversin(A)` | Matrix hacoversine |
+| `mat_hacovercos(A)` | Matrix hacovercosine |
 | `mat_sinh(A)` | Matrix hyperbolic sine |
 | `mat_cosh(A)` | Matrix hyperbolic cosine |
 | `mat_tanh(A)` | Matrix hyperbolic tangent |
+| `mat_sech(A)` | Matrix hyperbolic secant |
+| `mat_cosech(A)` | Matrix hyperbolic cosecant |
+| `mat_coth(A)` | Matrix hyperbolic cotangent |
 | `mat_asin(A)` | Matrix arc sine |
 | `mat_acos(A)` | Matrix arc cosine |
 | `mat_atan(A)` | Matrix arc tangent |
+| `mat_asec(A)` | Principal matrix arcsecant |
+| `mat_acosec(A)` | Principal matrix arccosecant |
+| `mat_acot(A)` | Principal matrix arccotangent |
+| `mat_arcversin(A)` | Principal inverse matrix versed sine |
+| `mat_arcvercos(A)` | Principal inverse matrix versed cosine |
+| `mat_arccoversin(A)` | Principal inverse matrix coversed sine |
+| `mat_arccovercos(A)` | Principal inverse matrix coversed cosine |
+| `mat_archaversin(A)` | Principal inverse matrix haversine |
+| `mat_archavercos(A)` | Principal inverse matrix havercosine |
+| `mat_archacoversin(A)` | Principal inverse matrix hacoversine |
+| `mat_archacovercos(A)` | Principal inverse matrix hacovercosine |
 | `mat_asinh(A)` | Matrix inverse hyperbolic sine |
 | `mat_acosh(A)` | Matrix inverse hyperbolic cosine |
 | `mat_atanh(A)` | Matrix inverse hyperbolic tangent |
+| `mat_asech(A)` | Principal inverse matrix hyperbolic secant |
+| `mat_acosech(A)` | Principal inverse matrix hyperbolic cosecant |
+| `mat_acoth(A)` | Principal inverse matrix hyperbolic cotangent |
 | `mat_erf(A)` | Matrix error function |
 | `mat_erfc(A)` | Matrix complementary error function |
 | `mat_erfinv(A)` | Matrix inverse error function |
@@ -1038,6 +1076,9 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_digamma(A)` | Matrix digamma function (psi) |
 | `mat_trigamma(A)` | Matrix trigamma function |
 | `mat_tetragamma(A)` | Matrix tetragamma function |
+| `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |
+| `mat_zetap(A)` | Derivative of the Riemann zeta matrix function |
+| `mat_dilog(A)` | Principal matrix dilogarithm |
 | `mat_gammainv(A)` | Matrix inverse gamma function |
 | `mat_normal_pdf(A)` | Matrix normal probability density function |
 | `mat_normal_cdf(A)` | Matrix normal cumulative distribution function |
@@ -1045,8 +1086,8 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_lambert_w0(A)` | Matrix Lambert W function (principal branch) |
 | `mat_lambert_wm1(A)` | Matrix Lambert W function (-1 branch) |
 | `mat_productlog(A)` | Matrix product logarithm (Lambert W) |
-| `mat_ei(A)` | Matrix exponential integral Ei |
-| `mat_e1(A)` | Matrix exponential integral E1 |
+| `mat_Ei(A)` | Matrix exponential integral Ei |
+| `mat_E1(A)` | Matrix exponential integral E1 |
 
 ### Power Functions
 
@@ -1069,7 +1110,7 @@ matrix_t *mat_pow(const matrix_t *A, const number_t *s);
 For exact `1×1` and `2×2` inputs raised to one half, MARS retains an exact
 symbolic principal square root. Other diagonalizable matrices apply the scalar
 principal power to their eigenvalues. Defective inputs fall back to
-`exp(s log(A))` and therefore require a well-defined principal logarithm.
+`exp(s ln(A))` and therefore require a well-defined principal logarithm.
 
 #### Symbolic power and constant-matrix calculus
 
@@ -1087,11 +1128,11 @@ For a constant square matrix `A`, these helpers transform each scalar spectral
 power before reconstructing the matrix. In particular,
 
 ```text
-d(A^x)/dx = A^x log(A)
-∫ A^x dx = A^x inverse(log(A)) + C
+d(A^x)/dx = A^x ln(A)
+∫ A^x dx = A^x inverse(ln(A)) + C
 ```
 
-The second compact form assumes that `log(A)` is invertible. The spectral
+The second compact form assumes that `ln(A)` is invertible. The spectral
 implementation also handles an eigenvalue equal to one correctly by integrating
 its projector as a linear term. Exact projectors are retained where available;
 otherwise supported diagonalizable numeric square matrices use a numeric
@@ -1191,9 +1232,12 @@ operation that was recognised.
 
 Function names and aliases are resolved by the expression module's perfect
 hash registry. Matrix parsing therefore has no separate linear name scan and
-no duplicate list of accepted spellings: `ln(...)`, `log(...)`, `gamma(...)`,
-`Γ(...)`, and every other registered spelling have the same identity in both
-expression and matrix input. Expression constructs the scalar function on each
+no duplicate list of accepted spellings: `ln(...)`, `log(...)`, `lg(...)`,
+`log10(...)`, `gamma(...)`, `Γ(...)`, and every other registered spelling are
+resolved consistently in expression and matrix input. `log(...)`, `log10(...)`,
+and `lg(...)` select the common logarithm and report the canonical operation
+name `lg`; `ln(...)` selects and reports the natural logarithm. Expression
+constructs the scalar function on each
 numeric or symbolic diagonal value and evaluates it when the value is numeric;
 Matrix is responsible for the matrix decomposition and reconstruction. Symbolic diagonal values retain
 the same variable and constant nodes as the original matrix, and

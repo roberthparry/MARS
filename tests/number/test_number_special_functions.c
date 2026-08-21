@@ -100,7 +100,7 @@ void run_number_special_function_tests(void)
         number_t binom = num_binomial(fifty_two, five);
         number_t normal_pdf0 = num_normal_pdf(zero);
         number_t normal_cdf0 = num_normal_cdf(zero);
-        number_t e1_1 = num_e1(one);
+        number_t e1_1 = num_E1(one);
         number_t pi_over_three = num_div(NUM_PI, three);
         number_t pi_over_six = num_div(NUM_PI, six);
         number_t one_half = num_div(one, two);
@@ -156,7 +156,7 @@ void run_number_special_function_tests(void)
         assert_number_string("num_binomial(52, 5)", binom, "2598960");
         assert_number_string_prefix("num_normal_pdf(0)", normal_pdf0, "0.398942280401432677939946059934");
         assert_number_string("num_normal_cdf(0)", normal_cdf0, "0.5");
-        assert_number_string_prefix("num_e1(1)", e1_1, "0.219383934395520273677163775460");
+        assert_number_string_prefix("num_E1(1)", e1_1, "0.219383934395520273677163775460");
         assert_number_close_text("num_dilog(1/2) = pi^2/12 - log(2)^2/2", dilog_half,
                                  "0.58224052646501250590265632015968", "1e-30");
         assert_number_close_text("num_polylog(2, 1/2) = num_dilog(1/2)", polylog2_half,

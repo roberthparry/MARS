@@ -133,12 +133,12 @@ make bench_number_scope
 
 This benchmark exercises the generic `number_t` API, including:
 
-- elementary functions such as `exp`, `log`, `sqrt`, `sin`, `cos`, `atan`,
+- elementary functions such as `exp`, `ln`, `lg`, `sqrt`, `sin`, `cos`, `atan`,
   `sinh`, `tanh`, and `pow`
 - paired output functions such as `sincos` and `sinhcosh`
 - special functions such as `gamma`, `lgamma`, `digamma`, `trigamma`,
   `tetragamma`, `erf`, `erfc`, `gammainv`, `lambert_w0`, `lambert_wm1`,
-  `beta`, `logbeta`, `binomial`, `normal_pdf`, `normal_cdf`, `ei`, and `e1`
+  `beta`, `logbeta`, `binomial`, `normal_pdf`, `normal_cdf`, `Ei`, and `E1`
 - named constants such as `pi`, `e`, and Euler-Mascheroni
 
 Because `number_t` accepts exact integer and rational inputs as well as
@@ -181,7 +181,7 @@ This benchmark currently covers a broader `qfloat` maths slice:
 - `qf_gamma`, `qf_lgamma`, `qf_digamma`, `qf_trigamma`, and `qf_tetragamma`
 - `qf_gammainv`
 - `qf_lambert_w0` and `qf_lambert_wm1`
-- `qf_ei` and `qf_e1`
+- `qf_Ei` and `qf_E1`
 - `qf_beta` and `qf_logbeta`
 
 Current sample timings with `MARS_BENCH_SCALE=5` on the benchmark machine:
@@ -218,7 +218,7 @@ This benchmark covers a representative complex-valued slice:
   `qc_trigamma`, and `qc_tetragamma`
 - real and genuinely complex `qc_gammainv` cases
 - `qc_productlog` and `qc_lambert_wm1`
-- `qc_ei`, `qc_e1`, `qc_beta`, and `qc_logbeta`
+- `qc_Ei`, `qc_E1`, `qc_beta`, and `qc_logbeta`
 
 Current sample timings on the benchmark machine:
 

@@ -19,7 +19,7 @@ void run_number_formatting_tests(void)
         number_t beta = num_beta(two, two);
         number_t angle = num_atan2(one, one);
         number_t gamma5 = num_gamma(five);
-        number_t ei1 = num_ei(one);
+        number_t ei1 = num_Ei(one);
         number_t cdouble_unit = num_create_from_cdouble(1.0 + 1.0 * I);
         number_t cdouble_neg_unit = num_create_from_cdouble(1.0 - 1.0 * I);
         number_t cdouble_pure_unit = num_create_from_cdouble(0.0 + 1.0 * I);
@@ -60,7 +60,7 @@ void run_number_formatting_tests(void)
         assert_number_string_prefix("num_beta(2, 2)", beta, "0.166666666666666666666666666666");
         assert_number_string_prefix("num_atan2(1, 1)", angle, "0.785398163397448309615660845819");
         assert_number_string("num_gamma(5)", gamma5, "24");
-        assert_number_string_prefix("num_ei(1)", ei1, "1.895117816355936755466520934331");
+        assert_number_string_prefix("num_Ei(1)", ei1, "1.895117816355936755466520934331");
         assert_number_string("num_create_from_cdouble(1 + i)", cdouble_unit, "1 + i");
         assert_number_string("num_create_from_cdouble(1 - i)", cdouble_neg_unit, "1 - i");
         assert_number_string("num_create_from_cdouble(i)", cdouble_pure_unit, "i");

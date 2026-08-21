@@ -280,17 +280,17 @@ void test_normal_logpdf(void)
     check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0.5) = log(normal_pdf(0.5))", lhs, rhs);
 }
 
-void test_ei(void)
+void test_Ei(void)
 {
-    /* Verify Ei against qf_ei at x=1 and x=2 */
+    /* Verify Ei against qf_Ei at x=1 and x=2 */
     qfloat_t X1 = qf_from_double(1.0);
     qfloat_t X2 = qf_from_double(2.0);
     expr_t *c1 = test_expr_new_var_d(1.0);
-    expr_t *f1 = expr_ei(c1);
+    expr_t *f1 = expr_Ei(c1);
     expr_t *c2 = test_expr_new_var_d(2.0);
-    expr_t *f2 = expr_ei(c2);
-    check_q_at(__FILE__, __LINE__, 1, "ei(1) via qfloat_t", expr_eval_qf(f1), qf_ei(X1));
-    check_q_at(__FILE__, __LINE__, 1, "ei(2) via qfloat_t", expr_eval_qf(f2), qf_ei(X2));
+    expr_t *f2 = expr_Ei(c2);
+    check_q_at(__FILE__, __LINE__, 1, "ei(1) via qfloat_t", expr_eval_qf(f1), qf_Ei(X1));
+    check_q_at(__FILE__, __LINE__, 1, "ei(2) via qfloat_t", expr_eval_qf(f2), qf_Ei(X2));
     print_expr_of(f1);
     print_expr_of(f2);
     expr_free(f1);
@@ -304,28 +304,28 @@ void test_ei(void)
                qf_div(qf_exp(qf_from_double(1.0)), qf_from_double(1.0)));
 }
 
-void test_e1(void)
+void test_E1(void)
 {
     /* E₁(x) at x=1 */
     expr_t *c = test_expr_new_var_d(1.0);
-    expr_t *f = expr_e1(c);
-    check_q_at(__FILE__, __LINE__, 1, "e1(1) via qfloat_t", expr_eval_qf(f), qf_e1(qf_from_double(1.0)));
+    expr_t *f = expr_E1(c);
+    check_q_at(__FILE__, __LINE__, 1, "e1(1) via qfloat_t", expr_eval_qf(f), qf_E1(qf_from_double(1.0)));
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
 
     /* E₁(x) at x=0.5 */
     c = test_expr_new_var_d(0.5);
-    f = expr_e1(c);
-    check_q_at(__FILE__, __LINE__, 1, "e1(0.5) via qfloat_t", expr_eval_qf(f), qf_e1(qf_from_double(0.5)));
+    f = expr_E1(c);
+    check_q_at(__FILE__, __LINE__, 1, "e1(0.5) via qfloat_t", expr_eval_qf(f), qf_E1(qf_from_double(0.5)));
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
 
     /* E₁'(1) = -exp(-1)/1 = -1/e */
-    qfloat_t deriv_e1_at_1 = qf_neg(qf_div(qf_exp(qf_neg(qf_from_double(1.0))), qf_from_double(1.0)));
+    qfloat_t deriv_E1_at_1 = qf_neg(qf_div(qf_exp(qf_neg(qf_from_double(1.0))), qf_from_double(1.0)));
     qfloat_t expect = qf_neg(qf_exp(qf_neg(qf_from_double(1.0))));
-    check_q_at(__FILE__, __LINE__, 1, "e1'(1) = -exp(-1)/1 = -1/e", deriv_e1_at_1, expect);
+    check_q_at(__FILE__, __LINE__, 1, "e1'(1) = -exp(-1)/1 = -1/e", deriv_E1_at_1, expect);
 }
 
 void test_beta(void)
