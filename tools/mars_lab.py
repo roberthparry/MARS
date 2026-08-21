@@ -598,6 +598,7 @@ MARS_LAB_CONFIG_FILE = "mars-lab.env"
 MARS_LAB_OBJECT_STORE_PATH_ENV = "MARS_LAB_OBJECT_STORE_PATH"
 MARS_LAB_OBJECT_STORE_KEY_ENV = "MARS_LAB_OBJECT_STORE_KEY"
 STATE_FILE = mars_lab_path_from_env("MARS_LAB_STATE_FILE", mars_lab_data_dir() / "mars_lab_state.json")
+STATE_DATA_LOCK = threading.Lock()
 CACHE_FILE = mars_lab_path_from_env("MARS_LAB_CACHE_FILE", mars_lab_data_dir() / "mars_lab_object_store.sqlite3")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
@@ -647,6 +648,7 @@ MAX_VALUE_PRECISION_DIGITS = math.ceil(MAX_VALUE_PRECISION_BITS * math.log10(2))
 INTEGRATOR_ERROR_DISPLAY_DIGITS = 4
 COMPACT_BINDING_VALUE_LIMIT = 20
 COMPACT_BINDING_VALUE_KEEP = 16
+COMPACT_INTEGER_DIGITS_KEEP = 23
 QR_VERSION = 5
 QR_SIZE = 17 + 4 * QR_VERSION
 QR_DATA_CODEWORDS = 108
@@ -2945,17 +2947,26 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     #value {
-      overflow: auto;
-      white-space: pre;
-      overflow-wrap: normal;
-      word-break: normal;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     #functionStyle:not(.equation-function) {
-      overflow-x: auto;
-      white-space: pre;
-      overflow-wrap: normal;
-      word-break: normal;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    #parsed {
+      overflow-x: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     #functionStyle.equation-function {
@@ -3910,6 +3921,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="card result-card" id="valueCard">
           <div class="card-title value-title">
             <span id="valueTitle">Value</span>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="valueMore">Show more digits</button>
+            </span>
             <span class="card-actions value-card-actions">
               <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
               <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
@@ -3991,7 +4005,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Direct <code>Dxx(A)</code> and <code>Dxy(A)</code> notation supports ordered higher and mixed differentiation. Matrix integration uses the same <code>@S(...)dx</code> notation as scalar expressions.</li>
             <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
             <li><code>Rendered TeX</code>, <code>Result</code>, and <code>Layout</code> preserve the symbolic answer. <code>Value</code> separately shows the numeric or partially evaluated matrix obtained from supplied bindings.</li>
-            <li>Long numbers in rendered TeX use an ellipsis by default. Choose <code>Show more digits</code> for the full mantissa; scientific notation is displayed as multiplication by a power of ten.</li>
+            <li>Long numbers use an abbreviated mantissa and power of ten by default. Choose <code>Show more digits</code> for the complete value.</li>
             <li><code>Use as input</code> copies the reusable result expression back into the Matrix editor.</li>
           </ul>
         </div>
@@ -4368,6 +4382,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     });
     let datetimeLocalRefreshSequence = 0;
     let datetimeEvaluationSequence = 0;
+    let datetimeWeatherAbortController = null;
     let almanacEvaluationSequence = 0;
     let almanacLocationRefreshSequence = 0;
     const statusEl = document.getElementById('status');
@@ -4389,6 +4404,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const valueCard = document.getElementById('valueCard');
     const value = document.getElementById('value');
     const valueTitle = document.getElementById('valueTitle');
+    const valueMore = document.getElementById('valueMore');
     const copyButtons = Array.from(document.querySelectorAll('.copy-result'));
     const moreDigitButtons = Array.from(document.querySelectorAll('.more-digits'));
     const resultCards = Array.from(document.querySelectorAll('.result-card'));
@@ -4470,6 +4486,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
     const COMPACT_BINDING_VALUE_LIMIT = 20;
     const COMPACT_BINDING_VALUE_KEEP = 16;
+    const COMPACT_INTEGER_DIGITS_KEEP = 23;
     const DEFAULT_EXPRESSION_TEXT = __DEFAULT_EXPRESSION__;
     const DEFAULT_EQUATION_TEXT = __DEFAULT_EQUATION__;
     const DEFAULT_DIFFEQUATION_TEXT = __DEFAULT_DIFFEQUATION__;
@@ -4507,7 +4524,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const HOLIDAY_JURISDICTION_SET = new Set(__HOLIDAY_JURISDICTION_CODES__);
     const JURISDICTION_TOWN_OPTIONS = __JURISDICTION_TOWN_OPTIONS__;
     const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
+    const EXPRESSION_TIMESTAMP_STORAGE_KEY = 'mars.exprLab.lastExpressionUpdatedAt';
+    const EQUATION_TIMESTAMP_STORAGE_KEY = 'mars.exprLab.lastEquationUpdatedAt';
     let currentLabMode = 'expression';
+    let expressionStateSaveTimer = null;
+    let equationStateSaveTimer = null;
+    let lastExpressionUpdatedAt = 0;
     const modeEditorText = {
       expression: DEFAULT_EXPRESSION_TEXT,
       equation: DEFAULT_EQUATION_TEXT,
@@ -4635,6 +4657,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         ? mode
         : 'expression';
       const changed = nextMode !== currentLabMode;
+      if (changed && datetimeWeatherAbortController) {
+        datetimeWeatherAbortController.abort();
+        datetimeWeatherAbortController = null;
+      }
       currentLabMode = nextMode;
       workingPrecisionBits = modePrecisionBits[currentLabMode] || workingPrecisionBits;
       syncModeTabs();
@@ -4646,9 +4672,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     function captureCurrentModeEditor() {
       commitVisibleBindingInputs();
       const mode = currentMode();
-      if (mode === 'expression')
+      if (mode === 'expression') {
         modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
-      else if (mode === 'equation') {
+        saveLastExpression(modeEditorText.expression);
+      } else if (mode === 'equation') {
         modeEditorText.equation = currentExpressionText() || expr.value.trim() || modeEditorText.equation;
         saveLastEquationState();
       }
@@ -4802,6 +4829,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         renderedMore: snapshotButtonState(renderedMore),
         parsedMore: snapshotButtonState(parsedMore),
         functionMore: snapshotButtonState(functionMore),
+        valueMore: snapshotButtonState(valueMore),
         resultInputText: resultUseInput.dataset.inputText || '',
         lastTex,
         lastDerivativeExpression,
@@ -4825,6 +4853,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       restoreButtonState(renderedMore, state.renderedMore);
       restoreButtonState(parsedMore, state.parsedMore);
       restoreButtonState(functionMore, state.functionMore);
+      restoreButtonState(valueMore, state.valueMore);
       setResultInputText(state.resultInputText || '');
       lastTex = state.lastTex || '';
       lastDerivativeExpression = state.lastDerivativeExpression || '';
@@ -5860,15 +5889,33 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return {display: text, shortened: false};
       if (text.length <= COMPACT_BINDING_VALUE_LIMIT)
         return {display: text, shortened: false};
-      return {display: compactLongNumericTokens(text), shortened: true};
+      const display = compactLongNumericTokens(text);
+      return {display, shortened: display !== text};
     }
 
     function compactLongNumericTokens(text) {
-      return String(text || '').replace(
-        /(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)/g,
+      const source = String(text || '').replace(
+        /(^|[^A-Za-z0-9_.])([+-]?\d(?:\.\d+)?\.\.\.)[x×]10\^(?:\{([+-]?\d+)\}|([+-]?\d+))/g,
+        (match, prefix, mantissa, bracedExponent, plainExponent) => {
+          const exponent = String(bracedExponent || plainExponent || '');
+          return `${prefix}${mantissa}e${exponent.startsWith('-') || exponent.startsWith('+') ? exponent : `+${exponent}`}`;
+        }
+      );
+      return source.replace(
+        /(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?(?:\.\.\.[Ee][+-]?\d+)?)/g,
         (match, prefix, numberText) => {
           if (numberText.includes('...') || numberText.length <= COMPACT_BINDING_VALUE_LIMIT)
             return match;
+          if (/^[+-]?\d+$/.test(numberText)) {
+            const sign = numberText.startsWith('-') || numberText.startsWith('+') ? numberText[0] : '';
+            const digits = sign ? numberText.slice(1) : numberText;
+            const significantDigits = digits.replace(/^0+/, '') || '0';
+            if (significantDigits.length <= COMPACT_INTEGER_DIGITS_KEEP)
+              return match;
+            const shown = significantDigits.slice(0, COMPACT_INTEGER_DIGITS_KEEP);
+            const mantissa = `${shown[0]}.${shown.slice(1)}`;
+            return `${prefix}${sign}${mantissa}...e+${significantDigits.length - 1}`;
+          }
           return `${prefix}${numberText.slice(0, COMPACT_BINDING_VALUE_KEEP)}...`;
         }
       );
@@ -6166,7 +6213,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
-    async function applyMarsBindingExpression(updated) {
+    async function applyMarsBindingExpression(updated, editorBodyText = null) {
       setBusy(true);
       setStatus('Updating bindings...');
       try {
@@ -6174,15 +6221,26 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (!response.ok || !data.ok)
           throw new Error(data.error || 'MARS could not update the bindings');
 
-        setExpressionEditor(
-          data.expression || updated,
-          bindingsWithAuthoredValues(
-            Array.isArray(data.binding_values) ? data.binding_values : [],
-            data.expression || updated
-          ),
-          null,
-          data.evaluation_ready
+        const bindings = bindingsWithAuthoredValues(
+          Array.isArray(data.binding_values) ? data.binding_values : [],
+          updated
         );
+        if (editorBodyText !== null && editorBodyText !== undefined) {
+          const editorBody = expressionBodyForEditor(editorBodyText);
+          setExpressionEditor(
+            expressionWithBindings(editorBody, bindings) || editorBody,
+            bindings,
+            editorBody,
+            data.evaluation_ready
+          );
+        } else {
+          setExpressionEditor(
+            data.expression || updated,
+            bindings,
+            null,
+            data.evaluation_ready
+          );
+        }
         updateHistoryButtons();
         saveCurrentModeEditorState();
         setStatus('Ready');
@@ -6196,14 +6254,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data) {
+      const inlineBindings = bindingParts(editedBody);
+      const editorBody = expressionBodyForEditor(editedBody);
+      const authoredBindingSource = inlineBindings ? editedBody : sourceExpression;
       const bindings = bindingsWithAuthoredValues(
         data && data.binding_values,
-        sourceExpression
+        authoredBindingSource
       );
       fullExpressionText = expressionForEditor(
-        expressionWithBindings(editedBody, bindings) || editedBody
+        expressionWithBindings(editorBody, bindings) || editorBody
       ).trim();
-      displayedExpressionText = editedBody;
+      displayedExpressionText = editorBody;
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
       expr.dataset.bindingRefreshValid = 'true';
@@ -6211,11 +6272,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         String(data && data.evaluation_ready || 'no').trim().toLowerCase() === 'yes'
           ? 'true'
           : 'false';
+      expr.value = displayedExpressionText;
       renderVariableValues(bindings);
       currentVariables = variableNamesFromBindings(bindings);
       currentDifferentiable =
         String(data && data.differentiable || 'yes').trim().toLowerCase() !== 'no';
       renderDerivativeButtons(currentVariables);
+      saveLastExpression(fullExpressionText, {debounce: true});
     }
 
     async function refreshEditedExpressionBindings(editedBody, sourceExpression, sequence) {
@@ -6381,7 +6444,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return true;
     }
 
-    function toggleBindingKind(binding) {
+    async function toggleBindingKind(binding) {
       const current = currentExpressionText();
       const name = String(binding && binding.name || '').trim();
       const currentKind = String(binding && binding.kind || 'variable').trim() || 'variable';
@@ -6392,6 +6455,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const updated = replaceBindingKindInExpression(current, name, nextKind);
       if (updated === current)
         return;
+
+      if (currentMode() === 'expression') {
+        await applyMarsBindingExpression(updated, expr.value.trim());
+        return;
+      }
 
       applyUpdatedBindingExpression(updated);
       refreshVariableValuesFromEditor();
@@ -6411,8 +6479,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       const rhs = match[1].replace(/\s+/g, '');
       const number = '(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[Ee][+-]?\\d+)?';
+      const fraction = '(?:\\d+/\\d+|[⁰¹²³⁴⁵⁶⁷⁸⁹]+⁄[₀₁₂₃₄₅₆₇₈₉]+|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])';
+      const scalar = `(?:${number}|${fraction})`;
       const numeric = new RegExp(
-        `^(?:[+-]?${number}|[+-]?(?:${number})?i|[+-]?${number}[+-](?:${number})?i)$`
+        `^(?:[+-]?${scalar}|[+-]?(?:${scalar})?i|[+-]?${scalar}[+-](?:${scalar})?i)$`
       );
       return numeric.test(rhs);
     }
@@ -6540,7 +6610,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         toggle.title = kind === 'constant'
           ? `Treat ${binding.name} as a variable`
           : `Treat ${binding.name} as a constant`;
-        toggle.addEventListener('click', () => toggleBindingKind(binding));
+        toggle.addEventListener('click', () => {
+          void toggleBindingKind(binding);
+        });
 
         actions.append(toggle, copy);
         box.append(name, text, actions);
@@ -6637,7 +6709,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const defaultEditorBody = expressionBodyForEditor(fullText);
       let editorBody = editorBodyText === null || editorBodyText === undefined
         ? defaultEditorBody
-        : expressionForEditor(editorBodyText).trim();
+        : expressionBodyForEditor(editorBodyText);
       const fullEditorText = expressionForEditor(fullText).trim();
       fullExpressionText = fullEditorText;
       displayedExpressionText = editorBody;
@@ -7121,7 +7193,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function applySavedState(data) {
       const saved = String(data.expression || '').trim();
-      if (saved && !saved.includes('...')) {
+      if (saved) {
+        lastExpressionUpdatedAt = Number(data.expression_updated_at || 0);
         modeEditorText.expression = saved;
         setExpressionEditor(saved);
       }
@@ -7131,7 +7204,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         modeEditorText.matrix = savedMatrix;
 
       const savedEquation = String(data.equation || '').trim();
-      if (savedEquation && !savedEquation.includes('...'))
+      if (savedEquation)
         modeEditorText.equation = expressionWithSortedConstants(savedEquation);
 
       const savedDiffequation = String(data.diffequation || '').trim();
@@ -7236,16 +7309,58 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const response = await fetch('/state');
         const data = await response.json();
         applySavedState(data || {});
-        if (String(data.expression || '').trim())
-          return;
+        try {
+          const serverExpression = String(data.expression || '').trim();
+          const serverExpressionUpdatedAt = Number(data.expression_updated_at || 0);
+          const localExpression = String(localStorage.getItem('mars.exprLab.lastExpression') || '').trim();
+          const localExpressionUpdatedAt = Number(localStorage.getItem(EXPRESSION_TIMESTAMP_STORAGE_KEY) || 0);
+          if (localExpression && (
+            localExpressionUpdatedAt > serverExpressionUpdatedAt ||
+            !serverExpression ||
+            serverExpression === DEFAULT_EXPRESSION_TEXT
+          )) {
+            lastExpressionUpdatedAt = localExpressionUpdatedAt || Date.now();
+            modeEditorText.expression = localExpression;
+            if (currentMode() === 'expression')
+              setExpressionEditor(localExpression);
+            saveLabState({
+              expression: localExpression,
+              expression_updated_at: localExpressionUpdatedAt || Date.now()
+            });
+          }
+
+          const serverEquation = String(data.equation || '').trim();
+          const serverEquationUpdatedAt = Number(data.equation_updated_at || 0);
+          const localEquation = String(localStorage.getItem('mars.exprLab.lastEquation') || '').trim();
+          const localEquationUpdatedAt = Number(localStorage.getItem(EQUATION_TIMESTAMP_STORAGE_KEY) || 0);
+          if (localEquation && (
+            localEquationUpdatedAt > serverEquationUpdatedAt ||
+            !serverEquation ||
+            serverEquation === DEFAULT_EQUATION_TEXT
+          )) {
+            modeEditorText.equation = expressionWithSortedConstants(localEquation);
+            if (currentMode() === 'equation')
+              restoreModeEditor('equation');
+            saveLabState({
+              equation: modeEditorText.equation,
+              equation_updated_at: localEquationUpdatedAt || Date.now()
+            });
+          }
+        } catch (_) {
+          // The server copy remains authoritative when localStorage is unavailable.
+        }
+        return;
       } catch (_) {
         // Fall back to localStorage below.
       }
 
       try {
         const saved = localStorage.getItem('mars.exprLab.lastExpression');
-        if (saved && !saved.includes('...'))
+        if (saved) {
+          lastExpressionUpdatedAt = Number(localStorage.getItem(EXPRESSION_TIMESTAMP_STORAGE_KEY) || Date.now());
+          modeEditorText.expression = saved;
           setExpressionEditor(saved);
+        }
         const matrixText = localStorage.getItem('mars.exprLab.lastMatrix');
         if (matrixText && !matrixText.includes('...'))
           modeEditorText.matrix = matrixText;
@@ -7256,7 +7371,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (matrixOperand && matrixOperandText !== null)
           matrixOperand.value = matrixOperandText;
         const equationText = localStorage.getItem('mars.exprLab.lastEquation');
-        if (equationText && !equationText.includes('...'))
+        if (equationText)
           modeEditorText.equation = expressionWithSortedConstants(equationText);
         const diffequationText = localStorage.getItem('mars.exprLab.lastDiffequation');
         if (diffequationText && !diffequationText.includes('...'))
@@ -7342,12 +7457,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
-    function saveLabState(patch) {
+    function saveLabState(patch, options = {}) {
       const payload = {...patch};
       fetch('/state', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        keepalive: !!options.keepalive
       }).catch(() => {
         // Persistence is helpful, not essential.
       });
@@ -7367,16 +7483,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       saveLabState({lab_mode: labMode});
     }
 
-    function saveLastExpression(text) {
+    function saveLastExpression(text, options = {}) {
       text = String(text || '').trim();
-      if (text.includes('...') && fullExpressionText)
-        text = fullExpressionText;
-      if (text.includes('...'))
-        return;
+      const updatedAt = Date.now();
+      lastExpressionUpdatedAt = updatedAt;
+      if (text)
+        modeEditorText.expression = text;
 
       try {
         if (text)
           localStorage.setItem('mars.exprLab.lastExpression', text);
+        localStorage.setItem(EXPRESSION_TIMESTAMP_STORAGE_KEY, String(updatedAt));
       } catch (_) {
         // The lab still works fine without persistence.
       }
@@ -7384,10 +7501,21 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (!text)
         return;
 
-      saveLabState({
+      const patch = {
         expression: text,
+        expression_updated_at: updatedAt,
         precision_bits: modePrecisionBits
-      });
+      };
+      clearTimeout(expressionStateSaveTimer);
+      expressionStateSaveTimer = null;
+      if (options.debounce) {
+        expressionStateSaveTimer = setTimeout(() => {
+          expressionStateSaveTimer = null;
+          saveLabState(patch);
+        }, 250);
+      } else {
+        saveLabState(patch, {keepalive: !!options.keepalive});
+      }
     }
 
     function saveLastMatrixState() {
@@ -7414,22 +7542,35 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       });
     }
 
-    function saveLastEquationState() {
+    function saveLastEquationState(options = {}) {
       const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
+      const updatedAt = Date.now();
       if (text)
         modeEditorText.equation = text;
 
       try {
         if (text)
           localStorage.setItem('mars.exprLab.lastEquation', text);
+        localStorage.setItem(EQUATION_TIMESTAMP_STORAGE_KEY, String(updatedAt));
       } catch (_) {
         // The lab still works fine without persistence.
       }
 
-      saveLabState({
+      const patch = {
         equation: text,
+        equation_updated_at: updatedAt,
         precision_bits: modePrecisionBits
-      });
+      };
+      clearTimeout(equationStateSaveTimer);
+      equationStateSaveTimer = null;
+      if (options.debounce) {
+        equationStateSaveTimer = setTimeout(() => {
+          equationStateSaveTimer = null;
+          saveLabState(patch);
+        }, 250);
+      } else {
+        saveLabState(patch, {keepalive: !!options.keepalive});
+      }
     }
 
     function saveLastDiffequationState() {
@@ -7849,7 +7990,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           binding_value: bindingValue,
           wrt,
           precision,
-          action
+          action,
+          expression_updated_at: lastExpressionUpdatedAt,
+          persist_expression: currentMode() === 'expression'
         })
       });
       const data = await response.json();
@@ -8303,6 +8446,27 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         data = raw ? JSON.parse(raw) : {};
       } catch (_) {
         throw new Error(raw || `Datetime request failed with HTTP ${response.status}`);
+      }
+      return {response, data};
+    }
+
+    async function fetchDatetimeWeather(state, signal) {
+      const response = await fetch('/datetime-weather', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          date: state.date,
+          latitude: state.latitude,
+          longitude: state.longitude,
+        }),
+        signal,
+      });
+      const raw = await response.text();
+      let data;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        throw new Error(raw || `Weather request failed with HTTP ${response.status}`);
       }
       return {response, data};
     }
@@ -8896,7 +9060,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (target === 'rendered') return rendered.classList.contains('error') ? rendered.textContent : lastTex;
       if (target === 'expression') return parsedExpressionText();
       if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
-      if (target === 'value') return value.textContent;
+      if (target === 'value') return value.dataset.fullText || value.textContent;
       if (target === 'mobile') {
         const url = mobileUrl ? mobileUrl.textContent.trim() : '';
         return /^https?:\/\//.test(url) ? url : '';
@@ -9562,6 +9726,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       );
     }
 
+    function setValueText(fullText) {
+      const full = String(fullText || '');
+      setExpandableText(value, valueMore, full, full);
+    }
+
     function renderDatetimeSections(element, button, sections, fallbackText = '') {
       const text = String(fallbackText || '').trim();
       const items = Array.isArray(sections) ? sections : [];
@@ -9897,6 +10066,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       functionStyle.textContent = '';
       resetMoreDigitsButton(parsedMore, false);
       resetMoreDigitsButton(functionMore, false);
+      resetMoreDigitsButton(valueMore, false);
       delete parsed.dataset.fullText;
       delete parsed.dataset.displayText;
       delete functionStyle.dataset.fullText;
@@ -9908,7 +10078,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       delete rendered.dataset.responsiveFallback;
       delete rendered.dataset.responsiveVariant;
       setResultInputText('');
-      value.textContent = '';
+      setValueText('');
       if (currentMode() === 'expression')
         setValueCardVisible(false);
       lastTex = '';
@@ -9928,6 +10098,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const text = options.reuseLastInput && lastEvaluationInputText
         ? lastEvaluationInputText
         : editorText;
+      saveLastExpression(editorText || text);
       const nextState = historyStateForMode(currentMode(), text);
       const previousState = !options.skipHistoryUpdate
         ? previousModeStateForHistory(nextState)
@@ -9978,9 +10149,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.display_function || data.function || '',
           data.full_display_function || data.function || ''
         );
-        value.textContent = data.value_note
+        setValueText(data.value_note
           ? `${data.value || ''}\n${data.value_note}`
-          : (data.value || '');
+          : (data.value || ''));
         valueTitle.textContent = data.root_value ? 'Values' : 'Value';
         setValueCardVisible(!!data.value);
         lastEvaluationInputText = text;
@@ -10063,7 +10234,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (data.value_pretty)
           setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
         else
-          value.textContent = data.value || '';
+          setValueText(data.value || '');
         setValueCardVisible(!!data.value);
         if (Array.isArray(data.binding_values) && data.binding_values.length) {
           const matrixBindings = bindingsWithAuthoredValues(data.binding_values, text);
@@ -10150,7 +10321,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           const numericSolutionLines = Array.isArray(data.numeric_solutions)
             ? data.numeric_solutions.map((line) => String(line).trim()).filter(Boolean)
             : [];
-          functionStyle.classList.add('equation-function');
           setExpandableText(
             functionStyle,
             functionMore,
@@ -10167,7 +10337,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           });
           if (!valueLines.length && data.status)
             valueLines.push(data.status);
-          value.textContent = valueLines.join('\n');
+          setValueText(valueLines.join('\n'));
         }
         if (Array.isArray(data.binding_values))
           renderVariableValues(data.binding_values);
@@ -10273,7 +10443,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             // Keep the plain-text solver derivation as the rendering fallback.
           }
         }
-        value.textContent = data.solutions || data.diagnostic || data.status || '';
+        setValueText(data.solutions || data.diagnostic || data.status || '');
         setValueCardVisible(true);
         clearVariableValues();
         modeEditorText.diffequation = text;
@@ -10377,7 +10547,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             valueLines.push(`error ≈ ${data.error}`);
           if (!valueLines.length && data.status)
             valueLines.push(data.status);
-          value.textContent = valueLines.join('\n');
+          setValueText(valueLines.join('\n'));
         }
         applyIntegratorBindingState(data, text);
         applyIntegratorResultBound(data);
@@ -10397,6 +10567,38 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setBusy(false);
         if (!options.skipHistoryUpdate)
           updateHistoryButtons();
+      }
+    }
+
+    async function refreshDatetimeWeather(evaluationId, state, overviewData) {
+      if (datetimeWeatherAbortController)
+        datetimeWeatherAbortController.abort();
+      const controller = new AbortController();
+      datetimeWeatherAbortController = controller;
+      setStatus('Loading weather...');
+
+      try {
+        const {response, data} = await fetchDatetimeWeather(state, controller.signal);
+        if (evaluationId !== datetimeEvaluationSequence || currentMode() !== 'datetime' || controller.signal.aborted)
+          return;
+        if (!response.ok || !data.ok)
+          throw new Error(data.error || 'Weather request failed');
+
+        const baseSections = (Array.isArray(overviewData.overview_sections) ? overviewData.overview_sections : [])
+          .filter((section) => String(section && section.title || '') !== 'Weather');
+        const weatherSections = Array.isArray(data.overview_sections) ? data.overview_sections : [];
+        const overviewText = [overviewData.overview || '', data.overview || '']
+          .filter(Boolean)
+          .join('\n');
+        renderDatetimeSections(rendered, null, [...baseSections, ...weatherSections], overviewText);
+        setStatus('Ready');
+      } catch (err) {
+        if (evaluationId !== datetimeEvaluationSequence || currentMode() !== 'datetime' || controller.signal.aborted)
+          return;
+        setStatus('Weather unavailable');
+      } finally {
+        if (datetimeWeatherAbortController === controller)
+          datetimeWeatherAbortController = null;
       }
     }
 
@@ -10460,6 +10662,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         saveLastDatetimeState();
         commitModeState();
         setStatus('Ready');
+        void refreshDatetimeWeather(evaluationId, {
+          ...state,
+          date: String(data.fields && data.fields.date || state.date),
+          latitude: String(data.fields && data.fields.latitude || state.latitude),
+          longitude: String(data.fields && data.fields.longitude || state.longitude),
+        }, data);
       } catch (err) {
         if (evaluationId !== datetimeEvaluationSequence || currentMode() !== 'datetime')
           return;
@@ -10511,7 +10719,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, '', '');
         setExpandableText(functionStyle, functionMore, '', '');
-        value.textContent = '';
+        setValueText('');
         if (data.fields) {
           if (almanacZone && data.fields.zone)
             almanacZone.value = String(data.fields.zone || '').trim();
@@ -10626,7 +10834,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         data.display_function || data.function || '',
         data.full_display_function || data.function || ''
       );
-      value.textContent = data.value || '';
+      setValueText(data.value || '');
       lastEvaluationInputText = solvedExpression;
       lastDerivativeExpression = '';
       {
@@ -10760,7 +10968,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (data.value_pretty)
           setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
         else
-          value.textContent = data.value || '';
+          setValueText(data.value || '');
         setValueCardVisible(!!data.value);
         currentVariables = variables;
         currentDifferentiable = differentiable;
@@ -10822,7 +11030,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setExpandableText(parsed, parsedMore, resultExpression, resultExpression);
         setResultInputText(resultExpression);
         setMatrixPrettyResult(resultExpression, '');
-        value.textContent = resultValue || '';
+        setValueText(resultValue || '');
         valueTitle.textContent = data.derivative_values ? 'Values' : 'Value';
         setValueCardVisible(!!resultValue);
         lastTex = resultTex || '';
@@ -10898,7 +11106,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           derivativeFunction,
           fullDerivativeFunction
         );
-        value.textContent = data.derivative_value || '';
+        setValueText(data.derivative_value || '');
         valueTitle.textContent = data.derivative_values ? 'Values' : 'Value';
         setValueCardVisible(!!data.derivative_value);
         lastDerivativeExpression = derivativeExpression;
@@ -10985,7 +11193,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           integralFunction,
           fullIntegralFunction
         );
-        value.textContent = data.integral_value || '';
+        setValueText(data.integral_value || '');
         setValueCardVisible(!!data.integral_value);
         lastDerivativeExpression = '';
         {
@@ -11082,6 +11290,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           expr.dataset.displayExpression = displayedExpressionText;
         }
         refreshVariableValuesFromEditor();
+        saveLastEquationState({debounce: true});
         updateHistoryButtons();
         return;
       }
@@ -11108,6 +11317,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         updateHistoryButtons();
         return;
       }
+      saveLastExpression(expr.value.trim(), {debounce: true});
       if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText)) {
         clearTimeout(expressionBindingRefreshTimer);
         expressionBindingRefreshSequence++;
@@ -11480,6 +11690,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       toggleTextDigits(functionStyle, functionMore);
     });
 
+    valueMore.addEventListener('click', () => {
+      toggleTextDigits(value, valueMore);
+    });
+
     resultUseInput.addEventListener('click', () => {
       void sendResultExpressionToInput();
     });
@@ -11543,6 +11757,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }, {passive: false});
     });
 
+    window.addEventListener('pagehide', () => {
+      if (currentMode() === 'expression')
+        saveLastExpression(currentExpressionText() || expr.value.trim(), {keepalive: true});
+      else if (currentMode() === 'equation')
+        saveLastEquationState({keepalive: true});
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        if (currentMode() === 'expression')
+          saveLastExpression(currentExpressionText() || expr.value.trim(), {keepalive: true});
+        else if (currentMode() === 'equation')
+          saveLastEquationState({keepalive: true});
+      }
+    });
+
     window.addEventListener('resize', () => {
       resultCards.forEach((card) => applyResultZoom(card));
     });
@@ -11593,7 +11823,9 @@ WEB_MANIFEST = {
 def default_state() -> dict[str, object]:
     return {
         "expression": DEFAULT_EXPRESSION,
+        "expression_updated_at": 0,
         "equation": DEFAULT_EQUATION,
+        "equation_updated_at": 0,
         "diffequation": DEFAULT_DIFFEQUATION,
         "equation_variable": DEFAULT_EQUATION_VARIABLE,
         "matrix": DEFAULT_MATRIX,
@@ -11637,14 +11869,24 @@ def default_state() -> dict[str, object]:
 
 def write_state_data(state: dict[str, object]) -> None:
     ensure_private_directory(STATE_FILE.parent)
-    STATE_FILE.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    temporary_file = STATE_FILE.with_name(
+        f".{STATE_FILE.name}.{os.getpid()}.{threading.get_ident()}.tmp"
     )
     try:
-        STATE_FILE.chmod(0o600)
-    except OSError:
-        pass
+        temporary_file.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            temporary_file.chmod(0o600)
+        except OSError:
+            pass
+        os.replace(temporary_file, STATE_FILE)
+    finally:
+        try:
+            temporary_file.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def recover_generated_matrix_calculus_input(matrix: str) -> str:
@@ -11695,10 +11937,11 @@ def load_state_data() -> dict[str, object]:
     )
     state.update(data)
     expression = str(state.get("expression", "")).strip()
-    if "..." in expression:
-        state["expression"] = DEFAULT_EXPRESSION
-    else:
-        state["expression"] = expression_with_sorted_constants(expression)
+    state["expression"] = expression or DEFAULT_EXPRESSION
+    try:
+        state["expression_updated_at"] = max(0, int(state.get("expression_updated_at", 0)))
+    except (TypeError, ValueError):
+        state["expression_updated_at"] = 0
 
     matrix = str(state.get("matrix", "")).strip()
     if "..." in matrix:
@@ -11711,10 +11954,11 @@ def load_state_data() -> dict[str, object]:
         state["lab_mode"] = "expression"
 
     equation = str(state.get("equation", "")).strip()
-    if "..." in equation:
-        state["equation"] = DEFAULT_EQUATION
-    else:
-        state["equation"] = expression_with_sorted_constants(equation)
+    state["equation"] = expression_with_sorted_constants(equation) if equation else DEFAULT_EQUATION
+    try:
+        state["equation_updated_at"] = max(0, int(state.get("equation_updated_at", 0)))
+    except (TypeError, ValueError):
+        state["equation_updated_at"] = 0
 
     equation_variable = str(state.get("equation_variable", "")).strip()
     if not equation_variable:
@@ -11805,38 +12049,60 @@ def load_state_expression() -> str:
     data = load_state_data()
 
     expression = str(data.get("expression", "")).strip()
-    if "..." in expression:
-        return DEFAULT_EXPRESSION
     return expression or DEFAULT_EXPRESSION
 
 
 def save_state_data(updates: dict[str, object]) -> None:
-    state = load_state_data()
-    normalized = dict(updates)
-    if "expression" in normalized:
-        normalized["expression"] = expression_with_sorted_constants(
-            str(normalized.get("expression") or "").strip()
-        )
-    if "equation" in normalized:
-        normalized["equation"] = expression_with_sorted_constants(
-            str(normalized.get("equation") or "").strip()
-        )
-    if "diffequation" in normalized:
-        normalized["diffequation"] = str(
-            normalized.get("diffequation") or ""
-        ).strip()
-    if "integrator_expression" in normalized:
-        normalized["integrator_expression"] = expression_with_sorted_constants(
-            str(normalized.get("integrator_expression") or "").strip()
-        )
-    state.update(normalized)
-    write_state_data(state)
+    with STATE_DATA_LOCK:
+        state = load_state_data()
+        normalized = dict(updates)
+        if "expression" in normalized:
+            normalized["expression"] = str(normalized.get("expression") or "").strip()
+            if "expression_updated_at" not in normalized:
+                normalized["expression_updated_at"] = int(time.time() * 1000)
+        if "expression_updated_at" in normalized:
+            try:
+                normalized["expression_updated_at"] = max(0, int(normalized["expression_updated_at"]))
+            except (TypeError, ValueError):
+                normalized.pop("expression_updated_at")
+        if "expression" in normalized and int(normalized.get("expression_updated_at", 0)) < int(
+            state.get("expression_updated_at", 0)
+        ):
+            normalized.pop("expression", None)
+            normalized.pop("expression_updated_at", None)
+        if "equation" in normalized:
+            normalized["equation"] = expression_with_sorted_constants(
+                str(normalized.get("equation") or "").strip()
+            )
+            if "equation_updated_at" not in normalized:
+                normalized["equation_updated_at"] = int(time.time() * 1000)
+        if "equation_updated_at" in normalized:
+            try:
+                normalized["equation_updated_at"] = max(0, int(normalized["equation_updated_at"]))
+            except (TypeError, ValueError):
+                normalized.pop("equation_updated_at")
+        if "equation" in normalized and int(normalized.get("equation_updated_at", 0)) < int(
+            state.get("equation_updated_at", 0)
+        ):
+            normalized.pop("equation", None)
+            normalized.pop("equation_updated_at", None)
+        if "diffequation" in normalized:
+            normalized["diffequation"] = str(
+                normalized.get("diffequation") or ""
+            ).strip()
+        if "integrator_expression" in normalized:
+            normalized["integrator_expression"] = expression_with_sorted_constants(
+                str(normalized.get("integrator_expression") or "").strip()
+            )
+        state.update(normalized)
+        write_state_data(state)
 
 
-def save_state_expression(expression: str) -> None:
-    if "..." in expression:
-        return
-    save_state_data({"expression": expression})
+def save_state_expression(expression: str, updated_at: int | None = None) -> None:
+    save_state_data({
+        "expression": expression,
+        "expression_updated_at": int(updated_at if updated_at is not None else time.time() * 1000),
+    })
 
 
 def expression_for_editor(expression: str) -> str:
@@ -12805,10 +13071,39 @@ def compact_long_numeric_tokens(text: str) -> str:
     if not text:
         return text
 
+    text = re.sub(
+        r"(?<![A-Za-z0-9_.])([+-]?\d(?:\.\d+)?\.\.\.)[x×]10\^(?:\{([+-]?\d+)\}|([+-]?\d+))",
+        lambda match: (
+            match.group(1)
+            + "e"
+            + (
+                (match.group(2) or match.group(3))
+                if (match.group(2) or match.group(3)).startswith(("+", "-"))
+                else "+" + (match.group(2) or match.group(3))
+            )
+        ),
+        text,
+    )
+
     def compact_match(match: re.Match[str]) -> str:
         number_text = match.group(2)
         if len(number_text) <= COMPACT_BINDING_VALUE_LIMIT or "..." in number_text:
             return match.group(0)
+        if re.fullmatch(r"[+-]?\d+", number_text):
+            sign = number_text[0] if number_text.startswith(("+", "-")) else ""
+            digits = number_text[1:] if sign else number_text
+            significant_digits = digits.lstrip("0") or "0"
+            if len(significant_digits) <= COMPACT_INTEGER_DIGITS_KEEP:
+                return match.group(0)
+            shown = significant_digits[:COMPACT_INTEGER_DIGITS_KEEP]
+            mantissa = shown[0] + "." + shown[1:]
+            return (
+                match.group(1)
+                + sign
+                + mantissa
+                + "...e+"
+                + str(len(significant_digits) - 1)
+            )
         scientific = re.match(r"^(.*?)([Ee][+-]?\d+)$", number_text)
         if scientific:
             mantissa = scientific.group(1)
@@ -12822,9 +13117,19 @@ def compact_long_numeric_tokens(text: str) -> str:
         return match.group(1) + number_text[:COMPACT_BINDING_VALUE_KEEP] + "..."
 
     return re.sub(
-        r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)",
+        r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?(?:\.\.\.[Ee][+-]?\d+)?)",
         compact_match,
         text,
+    )
+
+
+def compact_display_TeX(text: str) -> str:
+    compact = compact_long_numeric_tokens(text)
+
+    return re.sub(
+        r"(?<![A-Za-z0-9_.])([+-]?\d(?:\.\d+)?\.\.\.)[Ee]\+?(\d+)",
+        lambda match: rf"{match.group(1)}\times 10^{{{match.group(2)}}}",
+        compact,
     )
 
 
@@ -12890,6 +13195,12 @@ def matrix_display_TeX(tex: str, precision: int) -> str:
 
 
 def matrix_scientific_notation_TeX(tex: str) -> str:
+    tex = re.sub(
+        r"(?<![A-Za-z0-9_.])([+-]?\d(?:\.\d+)?\.\.\.)x10\^(\d+)",
+        lambda match: rf"{match.group(1)}\times 10^{{{match.group(2)}}}",
+        str(tex or ""),
+    )
+
     def replace_scientific(match: re.Match[str]) -> str:
         exponent = int(match.group(2))
         return rf"{match.group(1)}\times 10^{{{exponent}}}"
@@ -12897,7 +13208,7 @@ def matrix_scientific_notation_TeX(tex: str) -> str:
     return re.sub(
         r"(?<![A-Za-z0-9_.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\.\.\.)?)[Ee]([+-]?\d+)",
         replace_scientific,
-        str(tex or ""),
+        tex,
     )
 
 
@@ -12977,6 +13288,7 @@ def precision_limit_result_fields(fields: dict[str, str], precision: int) -> Non
         "expression",
         "unbound",
         "tex",
+        "derivation_TeX",
         "function",
         "derivative_function",
         "integral_function",
@@ -13111,6 +13423,8 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
+        "derivation_TeX": r"^derivation_TeX\s*(.*)$",
+        "algebraic_specialisation": r"^algebraic_specialisation\s+(.*)$",
         "root_expression": r"^root_expression\s{2,}(.*)$",
         "root_TeX": r"^root_tex\s+(.*)$",
         "root_function": r"^root_function\s{2,}(.*)$",
@@ -13141,6 +13455,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         {
             "function",
             "tex",
+            "derivation_TeX",
             "root_function",
             "derivative_function",
             "derivative_TeX",
@@ -13217,10 +13532,11 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "value": r"^value\s+(.*)$",
             "status": r"^status\s+(.*)$",
             "solutions_TeX": r"^solutions_TeX\s*(.*)$",
+            "derivation_TeX": r"^derivation_TeX\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
             "numeric": r"^numeric\s+(.*)$",
         },
-        {"function", "tex", "solutions_TeX", "solutions", "numeric"},
+        {"function", "tex", "solutions_TeX", "derivation_TeX", "solutions", "numeric"},
     )
 
 
@@ -13422,7 +13738,6 @@ WEATHER_HISTORY_START = py_datetime.date(2010, 1, 1)
 WEATHER_FORECAST_WINDOW_DAYS = 14
 WEATHER_FUTURE_WINDOW_DAYS = 300
 WEATHER_REQUEST_TIMEOUT_SECONDS = 4.0
-WEATHER_TOTAL_BUDGET_SECONDS = 0.8
 WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1"
 WEATHER_API_KEY_ENV = "MARS_WEATHER_API_KEY"
 LEGACY_WEATHER_API_KEY_ENV = "WEATHERAPI_KEY"
@@ -13560,26 +13875,6 @@ def fetch_daily_weather_for_datetime(date_text: str,
         "weather_summary": f"Min {min_text}, max {max_text}",
         "weather_source": "WeatherAPI.com",
     }
-
-
-def fetch_daily_weather_with_budget(date_text: str,
-                                    latitude: float,
-                                    longitude: float) -> dict[str, str] | None:
-    result: dict[str, str] | None = None
-    finished = threading.Event()
-
-    def worker() -> None:
-        nonlocal result
-        try:
-            result = fetch_daily_weather_for_datetime(date_text, latitude, longitude)
-        finally:
-            finished.set()
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
-    if not finished.wait(WEATHER_TOTAL_BUDGET_SECONDS):
-        return None
-    return result
 
 
 def _trim_decimal_tail(text: str) -> str:
@@ -13997,7 +14292,7 @@ def restore_compact_binding_values(expression: str, source_expression: str) -> s
             name = part[:eq].strip()
             value = part[eq + 1:].strip()
             cached = source_values.get(name)
-            if cached and value.endswith("...") and cached.startswith(value[:-3]):
+            if cached and "..." in value and _compact_long_text_value(cached) == value:
                 changed = True
                 value = cached
             out.append(f"{name} = {value}")
@@ -14675,6 +14970,8 @@ def mars_binding_values(records: object) -> list[dict[str, str]]:
 
 def expression_with_unset_bindings(expression: str) -> str:
     body, variable_text, constant_text = parse_expression_body(expression)
+    if "..." in body or "…" in body:
+        return body
     variables = [name for name, _ in parse_binding_assignments(variable_text) if name]
     constants = [name for name, _ in parse_binding_assignments(constant_text) if name]
 
@@ -14832,22 +15129,29 @@ def merge_algebraic_expression_fields(
     algebraic_fields: dict[str, str],
     source_expression: str,
     precision: int,
-) -> list[dict[str, str]]:
+) -> tuple[list[dict[str, str]], dict[str, str]]:
+    native_algebra_required = fields.get("algebraic_specialisation") == "domain-required"
+    selected_fields = fields if native_algebra_required else algebraic_fields
     bound_expression = fields.get("expression", "")
     bindings = expression_card_binding_values(
         source_expression,
-        algebraic_fields.get("expression", ""),
+        selected_fields.get("expression", ""),
         bound_expression,
         fields.get("bindings"),
         precision,
     )
-    algebraic_body = str(algebraic_fields.get("unbound") or algebraic_fields.get("expression") or "").strip()
+    algebraic_body = str(selected_fields.get("unbound") or selected_fields.get("expression") or "").strip()
     bound_function = fields.get("function", "")
+    algebraic_function = selected_fields.get("function", "")
+    algebraic_tex = selected_fields.get("tex", fields.get("tex", ""))
+    algebraic_derivation_TeX = selected_fields.get("derivation_TeX", fields.get("derivation_TeX", ""))
 
     fields["unbound"] = algebraic_body
     fields["expression"] = expression_for_result_card(algebraic_body, bindings)
-    fields["function"] = function_for_result_card(algebraic_fields.get("function", ""), bindings, bound_function)
-    fields["tex"] = algebraic_fields.get("tex", fields.get("tex", ""))
+    fields["function"] = function_for_result_card(algebraic_function, bindings, bound_function)
+    fields["tex"] = algebraic_tex
+    fields["derivation_TeX"] = algebraic_derivation_TeX
+    result_sources: dict[str, str] = {}
 
     for prefix in ("derivative", "integral"):
         algebraic_result = str(algebraic_fields.get(prefix) or "").strip()
@@ -14856,13 +15160,14 @@ def merge_algebraic_expression_fields(
         marker = "="
         result_body = algebraic_result.split(marker, 1)[1].strip() if marker in algebraic_result else algebraic_result
         result_bindings = expression_card_binding_values(
-            result_body,
+            source_expression,
             result_body,
             str(fields.get(prefix) or result_body),
             fields.get(f"{prefix}_bindings"),
             precision,
         )
         result_source = expression_for_result_card(parse_expression_body(result_body)[0], result_bindings)
+        result_sources[prefix] = result_source
         label = algebraic_result.split(marker, 1)[0].rstrip() if marker in algebraic_result else ""
         fields[prefix] = f"{label} = {result_source}" if label else result_source
         fields[f"{prefix}_function"] = function_for_result_card(
@@ -14872,7 +15177,7 @@ def merge_algebraic_expression_fields(
         )
         fields[f"{prefix}_TeX"] = algebraic_fields.get(f"{prefix}_TeX", fields.get(f"{prefix}_TeX", ""))
 
-    return bindings
+    return bindings, result_sources
 
 
 def goal_seek_expression(
@@ -14931,6 +15236,7 @@ def prepare_evaluation_fields(
     action: str = "",
 ) -> dict[str, object]:
     card_binding_values: list[dict[str, str]] | None = None
+    algebraic_result_sources: dict[str, str] = {}
 
     if action != "binding-edit":
         algebraic_action = action if action in {"derivative", "integral"} else "evaluate"
@@ -14947,12 +15253,26 @@ def prepare_evaluation_fields(
             algebraic_fields = {}
             algebraic_returncode = 1
         if algebraic_returncode == 0:
-            card_binding_values = merge_algebraic_expression_fields(
+            card_binding_values, algebraic_result_sources = merge_algebraic_expression_fields(
                 fields,
                 algebraic_fields,
                 expression,
                 precision,
             )
+            for prefix, result_source in algebraic_result_sources.items():
+                try:
+                    result_fields, _, result_returncode = run_mars_lab_fields(
+                        binary,
+                        result_source,
+                        precision,
+                        wrt,
+                        "evaluate",
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    continue
+                result_value = numeric_value_for_display(str(result_fields.get("value") or ""))
+                if result_returncode == 0 and result_value != "?":
+                    fields[f"{prefix}_value"] = result_fields["value"]
             if (
                 not card_binding_values
                 and fields.get("unbound")
@@ -14995,7 +15315,9 @@ def prepare_evaluation_fields(
 
     display_expression_source = fields.get("root_expression", "") or fields.get("expression", "") or fields.get("unbound", "")
     fields["full_display_expression"] = expression_for_display(display_expression_source)
-    fields["full_display_TeX"] = TeX_for_display(fields.get("root_TeX", "") or fields.get("tex", ""))
+    fields["full_display_TeX"] = TeX_for_display(
+        fields.get("derivation_TeX", "") or fields.get("root_TeX", "") or fields.get("tex", "")
+    )
     fields["full_display_function"] = function_with_source_comment(
         function_for_display(fields.get("root_function", "") or fields.get("function", "")),
         expression,
@@ -15005,7 +15327,7 @@ def prepare_evaluation_fields(
     if fields.get("derivative_values"):
         fields["derivative_value"] = array_values_for_display(fields["derivative_values"])
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
-    fields["display_TeX"] = compact_display_text(str(fields["full_display_TeX"]))
+    fields["display_TeX"] = compact_display_TeX(str(fields["full_display_TeX"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
     fields["full_display_derivative_function"] = function_for_display(
         fields.get("derivative_function", "")
@@ -15041,9 +15363,13 @@ def prepare_evaluation_fields(
             integral_wrapped_svg, _ = render_TeX_to_svg(integral_wrapped_TeX)
             if integral_wrapped_svg:
                 fields["integral_wrapped_svg"] = integral_wrapped_svg
+    authored_binding_values = expression_variable_binding_values(expression, precision)
     symbolic_binding_values = expression_variable_binding_values(str(fields.get("expression") or expression), precision)
-    fields["binding_values"] = card_binding_values if card_binding_values is not None else (
-        symbolic_binding_values if symbolic_binding_values else mars_binding_values(fields.get("bindings"))
+    native_binding_values = mars_binding_values(fields.get("bindings"))
+    fields["binding_values"] = (
+        authored_binding_values
+        or native_binding_values
+        or (card_binding_values if card_binding_values is not None else symbolic_binding_values)
     )
     fields["derivative_binding_values"] = mars_binding_values(
         fields.get("derivative_bindings")
@@ -15362,7 +15688,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
     source_equation_text = str(fields.get("input") or "").strip()
     solved_equation_text = str(fields.get("equation") or "").strip()
-    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_TeX"):
+    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_TeX", "derivation_TeX"):
         value = str(fields.get(key) or "")
         if not value:
             continue
@@ -15389,8 +15715,13 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         source_equation_text,
         solved_equation_text,
     )
-    render_TeX = solutions_TeX or equation_TeX
-    display_TeX = compact_display_text(render_TeX)
+    derivation_TeX = replace_source_constant_spellings_in_TeX(
+        str(fields.get("derivation_TeX") or "").strip(),
+        source_equation_text,
+        solved_equation_text,
+    )
+    render_TeX = derivation_TeX or solutions_TeX or equation_TeX
+    display_TeX = compact_display_TeX(render_TeX)
     solution_lines = [line.strip() for line in solutions_text.splitlines() if line.strip()]
     numeric_solution_lines = equation_lab_numeric_solution_lines(fields, precision)
     if not numeric_solution_lines:
@@ -15414,6 +15745,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "tex": "" if render_TeX == "(null)" else render_TeX,
         "equation_TeX": "" if equation_TeX == "(null)" else equation_TeX,
         "solutions_TeX": "" if solutions_TeX == "(null)" else solutions_TeX,
+        "derivation_TeX": "" if derivation_TeX == "(null)" else derivation_TeX,
         "residual": str(fields.get("residual") or "").strip(),
         "value": numeric_value_for_display(fields.get("value")),
         "status": str(fields.get("status") or "").strip(),
@@ -15488,6 +15820,44 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
     return payload
 
 
+def prepare_datetime_weather_fields(fields: dict[str, str], unavailable_reason: str = "") -> dict[str, object]:
+    weather_min_c = str(fields.get("weather_min_c") or "").strip()
+    weather_max_c = str(fields.get("weather_max_c") or "").strip()
+    weather_humidity = str(fields.get("weather_humidity") or "").strip()
+    weather_wind = str(fields.get("weather_wind") or "").strip()
+    weather_rain_chance = str(fields.get("weather_rain_chance") or "").strip()
+    weather_summary = str(fields.get("weather_summary") or "").strip()
+    weather_source = str(fields.get("weather_source") or "").strip()
+    available = bool(weather_min_c and weather_max_c)
+    rows = []
+
+    if available:
+        rows = [
+            {"label": "Minimum", "value": weather_min_c},
+            {"label": "Maximum", "value": weather_max_c},
+            *([{"label": "Humidity", "value": weather_humidity}] if weather_humidity else []),
+            *([{"label": "Wind", "value": weather_wind}] if weather_wind else []),
+            *([{"label": "Chance of rain", "value": weather_rain_chance}] if weather_rain_chance else []),
+            *([{"label": "Source", "value": weather_source}] if weather_source else []),
+        ]
+    elif unavailable_reason:
+        rows = [{"label": "Status", "value": unavailable_reason}]
+
+    overview_lines = [
+        f"Temperature: {weather_summary}" if weather_summary else "",
+        f"Humidity: {weather_humidity}" if weather_humidity else "",
+        f"Wind: {weather_wind}" if weather_wind else "",
+    ]
+    return {
+        "ok": True,
+        "mode": "datetime-weather",
+        "available": available,
+        "overview": "\n".join(line for line in overview_lines if line),
+        "overview_sections": [{"title": "Weather", "open": True, "rows": rows}] if rows else [],
+        "fields": fields,
+    }
+
+
 def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     date = str(fields.get("date") or "").strip()
     weekday = str(fields.get("weekday") or "").strip()
@@ -15508,13 +15878,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
     dst_back_to_offset = str(fields.get("dst_back_to_offset") or "").strip()
     dst_status = str(fields.get("dst_status") or "").strip()
     gmt_offset = str(fields.get("gmt_offset") or "").strip()
-    weather_min_c = str(fields.get("weather_min_c") or "").strip()
-    weather_max_c = str(fields.get("weather_max_c") or "").strip()
-    weather_humidity = str(fields.get("weather_humidity") or "").strip()
-    weather_wind = str(fields.get("weather_wind") or "").strip()
-    weather_rain_chance = str(fields.get("weather_rain_chance") or "").strip()
-    weather_summary = str(fields.get("weather_summary") or "").strip()
-    weather_source = str(fields.get("weather_source") or "").strip()
+    weather = prepare_datetime_weather_fields(fields)
     offset_text = "local machine GMT offset" if gmt_offset == "local" else f"GMT offset {gmt_offset}"
 
     def format_offset_text(text: str) -> str:
@@ -15588,9 +15952,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
         f"Sunset: {sunset}" if sunset and sunset != "unavailable" else f"Sunset: {sunset_status or 'unavailable'}",
         f"Moonrise: {moonrise}" if moonrise and moonrise != "unavailable" else f"Moonrise: {moonrise_status or 'unavailable'}",
         f"Moonset: {moonset}" if moonset and moonset != "unavailable" else f"Moonset: {moonset_status or 'unavailable'}",
-        f"Temperature: {weather_summary}" if weather_summary else "",
-        f"Humidity: {weather_humidity}" if weather_humidity else "",
-        f"Wind: {weather_wind}" if weather_wind else "",
+        *str(weather.get("overview") or "").splitlines(),
         f"Clocks forward: {dst_forward_text}" if dst_forward_text else "",
         f"Clocks back: {dst_back_text}" if dst_back_text else "",
         dst_summary,
@@ -15640,28 +16002,7 @@ def prepare_datetime_fields(fields: dict[str, str]) -> dict[str, object]:
                 ] if dst_summary else []),
             ],
         },
-        *([
-            {
-                "title": "Weather",
-                "open": True,
-                "rows": [
-                    {"label": "Minimum", "value": weather_min_c},
-                    {"label": "Maximum", "value": weather_max_c},
-                    *([
-                        {"label": "Humidity", "value": weather_humidity},
-                    ] if weather_humidity else []),
-                    *([
-                        {"label": "Wind", "value": weather_wind},
-                    ] if weather_wind else []),
-                    *([
-                        {"label": "Chance of rain", "value": weather_rain_chance},
-                    ] if weather_rain_chance else []),
-                    *([
-                        {"label": "Source", "value": weather_source},
-                    ] if weather_source else []),
-                ],
-            },
-        ] if weather_min_c and weather_max_c else []),
+        *weather["overview_sections"],
     ]
     range_lines = [
         f"Start date: {str(fields.get('start') or '').strip()}",
@@ -17149,8 +17490,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 updates: dict[str, object] = {}
 
                 expression = str(payload.get("expression", "")).strip()
-                if expression and "..." not in expression:
+                if expression:
                     updates["expression"] = expression
+                    if "expression_updated_at" in payload:
+                        try:
+                            updates["expression_updated_at"] = max(0, int(payload["expression_updated_at"]))
+                        except (TypeError, ValueError):
+                            updates["expression_updated_at"] = 0
 
                 matrix = str(payload.get("matrix", "")).strip()
                 if matrix and "..." not in matrix:
@@ -17161,8 +17507,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     updates["lab_mode"] = lab_mode
 
                 equation = str(payload.get("equation", "")).strip()
-                if equation and "..." not in equation:
+                if equation:
                     updates["equation"] = equation
+                    if "equation_updated_at" in payload:
+                        try:
+                            updates["equation_updated_at"] = max(0, int(payload["equation_updated_at"]))
+                        except (TypeError, ValueError):
+                            updates["equation_updated_at"] = 0
 
                 diffequation = str(payload.get("diffequation", "")).strip()
                 if diffequation and "..." not in diffequation:
@@ -17279,6 +17630,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": "Equation input is empty"})
                 return
 
+            save_state_data({
+                "equation": equation_text,
+                "equation_updated_at": int(time.time() * 1000),
+            })
             try:
                 precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
                 ensure_scratch_binary(self.equation_binary, "scratch/equation_lab")
@@ -17295,9 +17650,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": raw or "Equation solving failed"})
                 return
 
-            save_state_data({
-                "equation": equation_text,
-            })
             self.send_json(200, prepare_equation_fields(fields, precision))
             return
 
@@ -17517,6 +17869,47 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, response_payload)
             return
 
+        if path == "/datetime-weather":
+            weather_start = time.perf_counter()
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                date_text = str(payload.get("date", DEFAULT_DATETIME_DATE)).strip()
+                latitude = float(str(payload.get("latitude", DEFAULT_DATETIME_LATITUDE)).strip())
+                longitude = float(str(payload.get("longitude", DEFAULT_DATETIME_LONGITUDE)).strip())
+                py_datetime.date.fromisoformat(date_text)
+                if latitude < -90.0 or latitude > 90.0:
+                    raise ValueError("Latitude must be between -90 and 90")
+                if longitude < -180.0 or longitude > 180.0:
+                    raise ValueError("Longitude must be between -180 and 180")
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            unavailable_reason = ""
+            weather_fields = None
+            if not weather_date_is_supported(date_text):
+                unavailable_reason = "The selected date is outside the weather provider's supported range."
+            elif not weather_api_key():
+                unavailable_reason = "A weather API key is not configured."
+            else:
+                weather_fields = fetch_daily_weather_for_datetime(date_text, latitude, longitude)
+                if not weather_fields:
+                    unavailable_reason = "The weather provider did not return data."
+
+            response_payload = prepare_datetime_weather_fields(weather_fields or {}, unavailable_reason)
+            self.log_message(
+                "datetime weather date=%s latitude=%.6f longitude=%.6f available=%s total=%.1fms",
+                date_text,
+                latitude,
+                longitude,
+                "yes" if response_payload["available"] else "no",
+                (time.perf_counter() - weather_start) * 1000.0,
+            )
+            self.send_json(200, response_payload)
+            return
+
         if path == "/datetime-eval":
             request_start = time.perf_counter()
             try:
@@ -17624,8 +18017,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(422, {"ok": False, "error": raw or "Datetime calculation failed"})
                     return
 
-                effective_weather_latitude = latitude
-                effective_weather_longitude = longitude
                 if not cached_datetime:
                     holiday_ms = 0.0
                     try:
@@ -17683,25 +18074,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     )
                     DATETIME_FIELDS_CACHE[response_cache_key] = dict(fields)
 
-                try:
-                    jurisdiction_latitude = float(str(fields.get("jurisdiction_latitude") or "").strip())
-                    jurisdiction_longitude = float(str(fields.get("jurisdiction_longitude") or "").strip())
-                    effective_weather_latitude = jurisdiction_latitude
-                    effective_weather_longitude = jurisdiction_longitude
-                except (TypeError, ValueError):
-                    pass
-
                 selected_date_text = str(fields.get("date") or date_text).strip()
                 selected_jdn_text = str(fields.get("julian_day_number") or jdn_text).strip()
-                weather_start = time.perf_counter()
-                weather_fields = fetch_daily_weather_with_budget(
-                    selected_date_text,
-                    effective_weather_latitude,
-                    effective_weather_longitude,
-                )
-                weather_ms = (time.perf_counter() - weather_start) * 1000.0
-                if weather_fields:
-                    fields.update(weather_fields)
                 save_state_data({
                     "datetime_date": selected_date_text,
                     "datetime_jdn": selected_jdn_text,
@@ -17716,11 +18090,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "datetime_gmt_offset": gmt_offset_text,
                 })
                 self.log_message(
-                    "datetime eval cache=%s cache=%.1fms compute=%.1fms weather=%.1fms total=%.1fms",
+                    "datetime eval cache=%s cache=%.1fms compute=%.1fms total=%.1fms",
                     cache_source,
                     cache_ms,
                     compute_ms,
-                    weather_ms,
                     (time.perf_counter() - request_start) * 1000.0,
                 )
                 self.send_json(200, prepare_datetime_fields(fields))
@@ -18190,7 +18563,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields["full_display_TeX"] = TeX_for_display(fields.get("tex", ""))
             fields["full_display_function"] = function_for_display(fields.get("function", ""))
             fields["display_expression"] = compact_display_text(fields["full_display_expression"])
-            fields["display_TeX"] = compact_display_text(fields["full_display_TeX"])
+            fields["display_TeX"] = compact_display_TeX(fields["full_display_TeX"])
             fields["display_function"] = compact_function_text(fields["full_display_function"])
             fields["binding_values"] = mars_binding_values(fields.get("bindings"))
             svg, render_error = render_TeX_to_svg(fields.get("display_TeX", ""))
@@ -18229,10 +18602,17 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 "derivative",
                 "integral",
             }
+            persist_expression_value = payload.get("persist_expression")
+            persist_expression = (
+                not operation_request
+                if persist_expression_value is None
+                else persist_expression_value is True
+            )
             derivative_request = bool(requested_wrt) and action in {"", "derivative"}
             integral_request = action == "integral"
             wrt = requested_wrt or "x"
             precision = int(payload.get("precision", 96))
+            expression_updated_at = max(0, int(payload.get("expression_updated_at", 0)))
         except Exception as exc:
             self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
             return
@@ -18241,7 +18621,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": "Expression is empty"})
             return
         precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+        authored_expression = expression_for_editor(expression)
         expression = restore_compact_binding_values(expression, load_state_expression())
+        if persist_expression:
+            save_state_expression(authored_expression, expression_updated_at or None)
 
         try:
             command = [str(self.binary), expression]
@@ -18335,7 +18718,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields,
             expression,
             precision,
-            save_expression=not operation_request,
+            save_expression=persist_expression and not operation_request,
             wrt=wrt,
             action=action or ("integral" if integral_request else ("derivative" if derivative_request else "")),
         )

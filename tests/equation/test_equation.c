@@ -81,10 +81,9 @@ static bool test_equation_result_contains_long(const equation_solve_result_t *re
     return false;
 }
 
-static bool test_equation_result_contains_fraction(const equation_solve_result_t *result, long numerator,
-                                                   long denominator)
+static bool test_equation_result_contains_number_text(const equation_solve_result_t *result, const char *expected_text)
 {
-    number_t expected = num_create_from_frac(numerator, denominator);
+    number_t expected = num_create_from_string(expected_text);
     bool found = false;
 
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
@@ -352,16 +351,64 @@ static void test_equation_from_string_accepts_bare_equation(void)
     equ_free(equation);
 }
 
-static void test_equation_expands_polynomial_sequence_ellipsis(void)
+static void test_equation_expands_algebraic_sequence_ellipsis(void)
 {
+    const char *linear_input = "x + 2x + 3x + ... + 10x = 100";
     const char *arithmetic_inputs[] = {
+        "x + 3x + ... + 9x = 25",
         "x+4x+7x+10x+13x+16x+19x+22x+...+64x = 1430",
         "x + 4*x + 7*x + … + 64*x = 1430",
+    };
+    const long arithmetic_solutions[] = {
+        1L,
+        2L,
+        2L,
     };
     const char *quadratic_inputs[] = {
         "x+4x+9x+...+100x = 20",
         "x + 4*x + 9*x + 16*x + … + 100*x = 20",
     };
+    const char *cubic_inputs[] = {
+        "x + 8x + 27x + ... + 1000x = 2000",
+        "x + 8x + 27x + 64x + ... + 1000x = 2000",
+    };
+    const char *quartic_input = "x + 16x + 81x + 256x + ... + 10000x = 2000";
+    const char *sparse_polynomial_inputs[] = {
+        "x + 17x + 83x + 259x + ... + 10009x = 10000",
+        "6x + 15x + 36x + ... + 1023x = 3165",
+        "7x + 41x + 259x + 1051x + 3167x + ... + 100177x = 221500",
+    };
+    const char *lagrange_input = "x + 21x + 92x + 275x + ... + 10109x = 10000";
+    const char *harmonic_input = "x + x/2 + x/3 + x/4 + ... + x/10 = 1";
+    const char *geometric_input = "x + 2x + 4x + ... + 64x = 127";
+    const char *large_input = "100000000000000000000x+100000000000000000003x+100000000000000000008x+"
+                              "...+100000000000000000099x = 1";
+
+    {
+        equation_t *equation = equ_from_string(linear_input);
+        equation_solutions_t *solutions;
+        string_t *TeX;
+        string_t *expanded_text;
+
+        ASSERT_NOT_NULL(equation);
+        expanded_text = equ_to_text(equation, style_UNBOUND);
+        TeX = equ_to_text(equation, style_LATEX);
+        ASSERT_NOT_NULL(expanded_text);
+        ASSERT_NOT_NULL(TeX);
+        ASSERT_TRUE(strcmp(string_c_str(expanded_text), "55x = 100") == 0);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "\\sum_{n=1}^{10}") != NULL);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "n\\mkern-2mu x") != NULL);
+
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "20/11"));
+
+        equ_solutions_free(solutions);
+        string_free(TeX);
+        string_free(expanded_text);
+        equ_free(equation);
+    }
 
     for (size_t i = 0u; i < sizeof(arithmetic_inputs) / sizeof(arithmetic_inputs[0]); ++i) {
         equation_t *equation = equ_from_string(arithmetic_inputs[i]);
@@ -371,7 +418,106 @@ static void test_equation_expands_polynomial_sequence_ellipsis(void)
         solutions = equ_derive_solutions(equation);
         ASSERT_NOT_NULL(solutions);
         ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
-        ASSERT_TRUE(test_equation_result_contains_long(solutions, 2L));
+        ASSERT_TRUE(test_equation_result_contains_long(solutions, arithmetic_solutions[i]));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    for (size_t i = 0u; i < sizeof(cubic_inputs) / sizeof(cubic_inputs[0]); ++i) {
+        equation_t *equation = equ_from_string(cubic_inputs[i]);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "80/121"));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    {
+        equation_t *equation = equ_from_string(quartic_input);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "2000/25333"));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    for (size_t i = 0u; i < sizeof(sparse_polynomial_inputs) / sizeof(sparse_polynomial_inputs[0]); ++i) {
+        equation_t *equation = equ_from_string(sparse_polynomial_inputs[i]);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        if (i == 0u)
+            ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "5000/12689"));
+        else
+            ASSERT_TRUE(test_equation_result_contains_long(solutions, 1L));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    {
+        equation_t *equation = equ_from_string(lagrange_input);
+        equation_solutions_t *solutions;
+        string_t *TeX;
+
+        ASSERT_NOT_NULL(equation);
+        TeX = equ_to_text(equation, style_LATEX);
+        ASSERT_NOT_NULL(TeX);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "\\sum_{n=1}^{10}") != NULL);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "n^{4}") != NULL);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "625/1611"));
+
+        equ_solutions_free(solutions);
+        string_free(TeX);
+        equ_free(equation);
+    }
+
+    {
+        equation_t *equation = equ_from_string(harmonic_input);
+        equation_solutions_t *solutions;
+        string_t *TeX;
+
+        ASSERT_NOT_NULL(equation);
+        TeX = equ_to_text(equation, style_LATEX);
+        ASSERT_NOT_NULL(TeX);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "\\sum_{n=1}^{10}") != NULL);
+        ASSERT_TRUE(strstr(string_c_str(TeX), "\\frac{x}{n}") != NULL);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "2520/7381"));
+
+        equ_solutions_free(solutions);
+        string_free(TeX);
+        equ_free(equation);
+    }
+
+    {
+        equation_t *equation = equ_from_string(geometric_input);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_long(solutions, 1L));
 
         equ_solutions_free(solutions);
         equ_free(equation);
@@ -385,13 +531,28 @@ static void test_equation_expands_polynomial_sequence_ellipsis(void)
         solutions = equ_derive_solutions(equation);
         ASSERT_NOT_NULL(solutions);
         ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
-        ASSERT_TRUE(test_equation_result_contains_fraction(solutions, 4L, 77L));
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "4/77"));
 
         equ_solutions_free(solutions);
         equ_free(equation);
     }
 
-    ASSERT_NULL(equ_from_string("x + 2x + 4x + ... + 64x = 1430"));
+    {
+        equation_t *equation = equ_from_string(large_input);
+        equation_solutions_t *solutions;
+
+        ASSERT_NOT_NULL(equation);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+        ASSERT_TRUE(test_equation_result_contains_number_text(solutions, "1/1000000000000000000375"));
+
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+
+    ASSERT_NULL(equ_from_string("x + 16x + 81x + 256x + ... + 10001x = 2000"));
+    ASSERT_NULL(equ_from_string("x + 2x + 4x + ... + 67x = 1430"));
 }
 
 static void test_equation_numeric_solves_all_variable_bindings(void)
@@ -705,11 +866,12 @@ static void test_equation_solves_symbolic_quadratic_formula(void)
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 1u), x));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{b^{2} - 4 a c}"));
-    ASSERT_TRUE(
-        test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
-    ASSERT_TRUE(
-        test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-\\sqrt{b^{2} - 4 a c} - b}{2 a}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX, "\\sqrt{b^{2} - 4\\mkern-2mu a\\mkern-2mu c}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX, "\\frac{\\sqrt{b^{2} - 4\\mkern-2mu a\\mkern-2mu c} - b}{2\\mkern-2mu a}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX, "\\frac{-\\sqrt{b^{2} - 4\\mkern-2mu a\\mkern-2mu c} - b}{2\\mkern-2mu a}"));
 
     equ_solve_result_free(result);
     equ_free(equation);
@@ -792,7 +954,8 @@ static void test_equation_solves_self_power_with_lambert_w(void)
     ASSERT_TRUE(RESULT_IS_SOLVED(result));
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
-    ASSERT_TRUE(test_equation_result_has_rhs_string(result, "(ln(-3) + 2iπn)/Wₙ(k, ln(-3) + 2iπn)"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "Wₙ(k, ln(-3) + 2iπn)"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "ln(-3) + 2iπn"));
 
     equ_solve_result_free(result);
     equ_free(equation);
@@ -957,10 +1120,12 @@ static void test_equation_solves_symbolic_cubic_cardano(void)
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 1u), x));
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 2u), x));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "^{\\frac{1}{3}}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt[3]{"));
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "3 a c - b^{2}"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "27 a d - 9 b c"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX, "3\\mkern-2mu a\\mkern-2mu c - b^{2}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX, "27\\mkern-2mu a\\mkern-2mu d - 9\\mkern-2mu b\\mkern-2mu c"));
 
     equ_solve_result_free(result);
     equ_free(equation);
@@ -1546,7 +1711,7 @@ static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
-    TEST_RUN_SUBTEST(test_equation_expands_polynomial_sequence_ellipsis, NULL);
+    TEST_RUN_SUBTEST(test_equation_expands_algebraic_sequence_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_rejects_unresolved_parameter_residual, NULL);
     TEST_RUN_SUBTEST(test_equation_to_text_round_trips_through_parser, NULL);

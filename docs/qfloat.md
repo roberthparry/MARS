@@ -21,7 +21,8 @@ maintained after every operation.
 - elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, the versine/haversine family, and inverses
 - special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
-  Lauricella F_D, Appell F₁, Bessel J/Y, Lommel s and the normal distribution
+  Lauricella F_D, Appell F₁, Bessel J/Y, Lommel s, Riemann and Hurwitz zeta,
+  and the normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
 
@@ -270,6 +271,17 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)` — upper incomplete Γ(s, x)
 - `qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)` — regularised P(s, x) = γ(s,x)/Γ(s)
 - `qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)` — regularised Q(s, x) = Γ(s,x)/Γ(s)
+
+**Zeta family**
+
+- `qfloat_t qf_zeta(qfloat_t s)` — Riemann zeta ζ(s), analytically continued away from its pole at `s = 1`
+- `qfloat_t qf_zetap(qfloat_t s)` — derivative ζ′(s) with respect to `s`
+- `qfloat_t qf_zetah(qfloat_t s, qfloat_t a)` — Hurwitz zeta ζ(s, a)
+- `qfloat_t qf_zatahp(qfloat_t s, qfloat_t a)` — partial derivative ∂ζ(s, a)/∂s
+
+The trailing `p` consistently denotes differentiation with respect to the
+first argument. The real Hurwitz implementation requires a positive shift
+`a`; its meromorphic continuation in `s` retains the pole at `s = 1`.
 
 **Error functions**
 

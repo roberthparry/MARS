@@ -357,6 +357,220 @@ qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z)
     return qc_add(qc_polygamma_asymp(order, zz), accum);
 }
 
+static void qc_zeta_euler_maclaurin(qcomplex_t s, qcomplex_t *value_out, qcomplex_t *derivative_out)
+{
+    const unsigned int endpoint = 64u;
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t derivative = QC_ZERO;
+    qfloat_t log_endpoint = qf_log(qf_from_double((double)endpoint));
+    qfloat_t factorial = QF_ONE;
+
+    for (unsigned int n = 1u; n < endpoint; ++n) {
+        qfloat_t log_n = qf_log(qf_from_double((double)n));
+        qcomplex_t term = qc_exp(qc_mul(qc_neg(s), qc_make(log_n, QF_ZERO)));
+
+        sum = qc_add(sum, term);
+        derivative = qc_sub(derivative, qc_mul(qc_make(log_n, QF_ZERO), term));
+    }
+
+    {
+        qcomplex_t s_minus_one = qc_sub(s, QC_ONE);
+        qcomplex_t endpoint_power = qc_exp(qc_mul(qc_sub(QC_ONE, s), qc_make(log_endpoint, QF_ZERO)));
+        qcomplex_t tail = qc_div(endpoint_power, s_minus_one);
+        qcomplex_t tail_derivative = qc_mul(
+            endpoint_power,
+            qc_sub(qc_neg(qc_div(qc_make(log_endpoint, QF_ZERO), s_minus_one)),
+                   qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
+        qcomplex_t half_power = qc_mul(QC_HALF, qc_exp(qc_mul(qc_neg(s), qc_make(log_endpoint, QF_ZERO))));
+
+        sum = qc_add(sum, tail);
+        derivative = qc_add(derivative, tail_derivative);
+        sum = qc_add(sum, half_power);
+        derivative = qc_sub(derivative, qc_mul(qc_make(log_endpoint, QF_ZERO), half_power));
+    }
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
+        qcomplex_t rising = QC_ONE;
+        qcomplex_t rising_derivative = QC_ZERO;
+        qfloat_t bernoulli = qc_bernoulli_even_term(k);
+        qcomplex_t power;
+        qfloat_t coefficient;
+
+        factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
+        factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
+        for (unsigned int j = 0u; j < rising_count; ++j) {
+            qcomplex_t factor = qc_add(s, qc_make(qf_from_double((double)j), QF_ZERO));
+
+            rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
+            rising = qc_mul(rising, factor);
+        }
+        power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
+                              qc_make(log_endpoint, QF_ZERO)));
+        coefficient = qf_div(bernoulli, factorial);
+        sum = qc_add(sum, qc_mul(qc_make(coefficient, QF_ZERO), qc_mul(rising, power)));
+        derivative = qc_add(
+            derivative,
+            qc_mul(qc_make(coefficient, QF_ZERO),
+                   qc_mul(qc_sub(rising_derivative, qc_mul(rising, qc_make(log_endpoint, QF_ZERO))), power)));
+    }
+
+    if (value_out)
+        *value_out = sum;
+    if (derivative_out)
+        *derivative_out = derivative;
+}
+
+static void qc_zetah_euler_maclaurin(qcomplex_t s, qcomplex_t a, qcomplex_t *value_out,
+                                     qcomplex_t *derivative_out)
+{
+    const unsigned int term_count = 64u;
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t derivative = QC_ZERO;
+    qcomplex_t endpoint = qc_add(a, qc_make(qf_from_double((double)term_count), QF_ZERO));
+    qcomplex_t log_endpoint = qc_log(endpoint);
+    qfloat_t factorial = QF_ONE;
+
+    for (unsigned int n = 0u; n < term_count; ++n) {
+        qcomplex_t base = qc_add(a, qc_make(qf_from_double((double)n), QF_ZERO));
+        qcomplex_t log_base = qc_log(base);
+        qcomplex_t term = qc_exp(qc_mul(qc_neg(s), log_base));
+
+        sum = qc_add(sum, term);
+        derivative = qc_sub(derivative, qc_mul(log_base, term));
+    }
+
+    {
+        qcomplex_t s_minus_one = qc_sub(s, QC_ONE);
+        qcomplex_t endpoint_power = qc_exp(qc_mul(qc_sub(QC_ONE, s), log_endpoint));
+        qcomplex_t tail = qc_div(endpoint_power, s_minus_one);
+        qcomplex_t tail_derivative = qc_mul(
+            endpoint_power,
+            qc_sub(qc_neg(qc_div(log_endpoint, s_minus_one)), qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
+        qcomplex_t half_power = qc_mul(QC_HALF, qc_exp(qc_mul(qc_neg(s), log_endpoint)));
+
+        sum = qc_add(sum, tail);
+        derivative = qc_add(derivative, tail_derivative);
+        sum = qc_add(sum, half_power);
+        derivative = qc_sub(derivative, qc_mul(log_endpoint, half_power));
+    }
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
+        qcomplex_t rising = QC_ONE;
+        qcomplex_t rising_derivative = QC_ZERO;
+        qfloat_t bernoulli = qc_bernoulli_even_term(k);
+        qcomplex_t power;
+        qfloat_t coefficient;
+
+        factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
+        factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
+        for (unsigned int j = 0u; j < rising_count; ++j) {
+            qcomplex_t factor = qc_add(s, qc_make(qf_from_double((double)j), QF_ZERO));
+
+            rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
+            rising = qc_mul(rising, factor);
+        }
+        power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
+                              log_endpoint));
+        coefficient = qf_div(bernoulli, factorial);
+        sum = qc_add(sum, qc_mul(qc_make(coefficient, QF_ZERO), qc_mul(rising, power)));
+        derivative = qc_add(
+            derivative,
+            qc_mul(qc_make(coefficient, QF_ZERO),
+                   qc_mul(qc_sub(rising_derivative, qc_mul(rising, log_endpoint)), power)));
+    }
+
+    if (value_out)
+        *value_out = sum;
+    if (derivative_out)
+        *derivative_out = derivative;
+}
+
+/* Evaluate the Riemann zeta function across the complex analytic continuation. */
+qcomplex_t qc_zeta(qcomplex_t s)
+{
+    qcomplex_t value;
+
+    if (qf_eq(qc_imag(s), QF_ZERO))
+        return qc_make(qf_zeta(qc_real(s)), QF_ZERO);
+    if (qc_isnan(s) || qc_isinf(s))
+        return QC_NAN;
+    if (qf_lt(qc_real(s), QF_ZERO)) {
+        qcomplex_t one_minus_s = qc_sub(QC_ONE, s);
+        qcomplex_t two_power = qc_exp(qc_mul(s, qc_make(qf_log(QF_TWO), QF_ZERO)));
+        qcomplex_t pi_power = qc_exp(qc_mul(qc_sub(s, QC_ONE), qc_make(qf_log(QF_PI), QF_ZERO)));
+        qcomplex_t sine = qc_sin(qc_mul(qc_make(qf_mul(QF_HALF, QF_PI), QF_ZERO), s));
+
+        return qc_mul(qc_mul(qc_mul(qc_mul(two_power, pi_power), sine), qc_gamma(one_minus_s)), qc_zeta(one_minus_s));
+    }
+
+    qc_zeta_euler_maclaurin(s, &value, NULL);
+    return value;
+}
+
+/* Evaluate the Hurwitz zeta function on its principal branch. */
+qcomplex_t qc_zetah(qcomplex_t s, qcomplex_t a)
+{
+    qcomplex_t value;
+
+    if (qf_eq(qc_imag(s), QF_ZERO) && qf_eq(qc_imag(a), QF_ZERO) && qf_gt(qc_real(a), QF_ZERO))
+        return qc_make(qf_zetah(qc_real(s), qc_real(a)), QF_ZERO);
+    if (qc_isnan(s) || qc_isnan(a) || qc_isinf(s) || qc_isinf(a))
+        return QC_NAN;
+    if (qf_eq(qc_real(s), QF_ONE) && qf_eq(qc_imag(s), QF_ZERO))
+        return QC_INF;
+    if (qf_eq(qc_imag(a), QF_ZERO) && qf_le(qc_real(a), QF_ZERO) &&
+        qf_eq(qc_real(a), qf_floor(qc_real(a))))
+        return QC_NAN;
+    qc_zetah_euler_maclaurin(s, a, &value, NULL);
+    return value;
+}
+
+/* Evaluate the first Hurwitz zeta derivative with respect to its exponent. */
+qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a)
+{
+    qcomplex_t derivative;
+
+    if (qf_eq(qc_imag(s), QF_ZERO) && qf_eq(qc_imag(a), QF_ZERO) && qf_gt(qc_real(a), QF_ZERO))
+        return qc_make(qf_zatahp(qc_real(s), qc_real(a)), QF_ZERO);
+    if (qc_isnan(s) || qc_isnan(a) || qc_isinf(s) || qc_isinf(a))
+        return QC_NAN;
+    if (qf_eq(qc_real(s), QF_ONE) && qf_eq(qc_imag(s), QF_ZERO))
+        return qc_neg(QC_INF);
+    if (qf_eq(qc_imag(a), QF_ZERO) && qf_le(qc_real(a), QF_ZERO) &&
+        qf_eq(qc_real(a), qf_floor(qc_real(a))))
+        return QC_NAN;
+    qc_zetah_euler_maclaurin(s, a, NULL, &derivative);
+    return derivative;
+}
+
+/* Evaluate the first derivative of the Riemann zeta function. */
+qcomplex_t qc_zetap(qcomplex_t s)
+{
+    qcomplex_t derivative;
+
+    if (qf_eq(qc_imag(s), QF_ZERO))
+        return qc_make(qf_zetap(qc_real(s)), QF_ZERO);
+    if (qc_isnan(s) || qc_isinf(s))
+        return QC_NAN;
+    if (qf_lt(qc_real(s), QF_ZERO)) {
+        qcomplex_t one_minus_s = qc_sub(QC_ONE, s);
+        qcomplex_t reflected = qc_zeta(one_minus_s);
+        qcomplex_t logarithmic_derivative = qc_make(qf_add(qf_log(QF_TWO), qf_log(QF_PI)), QF_ZERO);
+        qcomplex_t cotangent = qc_cot(qc_mul(qc_make(qf_mul(QF_HALF, QF_PI), QF_ZERO), s));
+
+        logarithmic_derivative = qc_add(
+            logarithmic_derivative, qc_mul(qc_make(qf_mul(QF_HALF, QF_PI), QF_ZERO), cotangent));
+        logarithmic_derivative = qc_sub(logarithmic_derivative, qc_digamma(one_minus_s));
+        logarithmic_derivative = qc_sub(logarithmic_derivative, qc_div(qc_zetap(one_minus_s), reflected));
+        return qc_mul(qc_zeta(s), logarithmic_derivative);
+    }
+
+    qc_zeta_euler_maclaurin(s, NULL, &derivative);
+    return derivative;
+}
+
 qcomplex_t qc_gammainv(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))

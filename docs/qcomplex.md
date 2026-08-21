@@ -28,7 +28,8 @@ currently remains a transparent by-value struct.
 - trigonometric, versine/haversine, and hyperbolic functions (and their inverses)
 - special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
-  Lauricella F_D, Appell F₁ and the normal distribution
+  Lauricella F_D, Appell F₁, Riemann and Hurwitz zeta, and the normal
+  distribution
 - polar form conversion
 - parsing from string
 - printf-style formatting and printing
@@ -186,6 +187,10 @@ All declarations are in `include/qcomplex.h`.
 | `qc_trigamma(z)` | ψ₁(z) = ψ′(z) |
 | `qc_tetragamma(z)` | ψ₂(z) = −ψ^(2)(z) (positive, = +2Σ 1/(z+k)³) |
 | `qc_polygamma(n, z)` | ψ⁽ⁿ⁾(z) |
+| `qc_zeta(s)` | Riemann zeta ζ(s), analytically continued away from `s = 1` |
+| `qc_zetap(s)` | derivative ζ′(s) with respect to `s` |
+| `qc_zetah(s, a)` | Hurwitz zeta ζ(s, a) |
+| `qc_zatahp(s, a)` | partial derivative ∂ζ(s, a)/∂s |
 | `qc_gammainv(z)` | inverse of the gamma function (principal branch, Re z ≥ 1.46) |
 | `qc_beta(a, b)` | B(a,b) = Γ(a)Γ(b)/Γ(a+b) |
 | `qc_logbeta(a, b)` | ln B(a,b) |

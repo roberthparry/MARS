@@ -163,8 +163,11 @@ static bool binding_is_noneditable_builtin(const expr_t *node)
 
     name = string_new_with(node->name);
     is_builtin = name && expr_get_default_constant_num_text(name, &value);
-    if (is_builtin)
+    if (is_builtin) {
+        is_builtin = node->binding_expr && node->binding_expr->kind == EXPR_BINDING_EXPR_CONST &&
+                     num_eq(node->c, value);
         num_destroy(&value);
+    }
     string_free(name);
     return is_builtin;
 }
@@ -413,6 +416,22 @@ static int expr_integral_binds_name(const expr_t *expr, const char *name)
     return expr_integral_binds_name(expr->a, name) || expr_integral_binds_name(expr->b, name);
 }
 
+static int expr_summation_binds_name(const expr_t *expr, const char *name)
+{
+    const expr_t *index;
+
+    if (!expr || !name)
+        return 0;
+    if (expr_is_op(expr, &ops_summation)) {
+        index = expr->b;
+        if (expr_is_op(index, &ops_argument_list))
+            index = index->a;
+        if (index && index->name && strcmp(index->name, name) == 0)
+            return 1;
+    }
+    return expr_summation_binds_name(expr->a, name) || expr_summation_binds_name(expr->b, name);
+}
+
 static int expr_contains_integral(const expr_t *expr)
 {
     if (!expr)
@@ -437,6 +456,8 @@ static int symtab_binding_is_needed_for_expr(const expr_t *expr, const expr_t *n
         if (expr_contains_node(expr, node))
             return 1;
         if (node->name && expr_integral_binds_name(expr, node->name))
+            return 0;
+        if (node->name && expr_summation_binds_name(expr, node->name))
             return 0;
         if (node->name && strcmp(node->name, "d") == 0 && expr_contains_integral(expr))
             return 0;

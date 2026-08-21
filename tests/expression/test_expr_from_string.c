@@ -10,7 +10,37 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
 
 static void test_from_string_function_hash(void)
 {
+    expr_t *unset_zetap;
+    number_t unset_value;
+
     ASSERT_TRUE(expr_stringin_function_hash_is_valid());
+    check_parse_num("zeta is registered in the perfect hash", "zeta(3)",
+                    "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
+    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ zetap(x) | x = NAN }", __LINE__);
+    check_parse_expr("zetap bindings use the binding perfect hash", "{ zetap(x) | x = 3 }",
+                     "{ zetap(x) | x = 3 }", __LINE__);
+    check_parse_expr("the zeta symbol is a perfect-hash alias", "ζ(x)", "{ ζ(x) | x = NAN }", __LINE__);
+    check_parse_num("the zeta symbol evaluates through its alias", "ζ(3)",
+                    "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
+    check_parse_num("two-argument zeta selects Hurwitz zeta", "zeta(2.5, 101)",
+                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
+    check_parse_num("two-argument zeta symbol selects Hurwitz zeta", "ζ(2.5, 101)",
+                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
+    check_parse_num("zetah is registered in the perfect hash", "zetah(2.5, 101)",
+                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
+    check_parse_num("zeta2 is a perfect-hash alias", "zeta2(2.5, 101)",
+                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
+    check_parse_num("zatahp is registered in the perfect hash", "zatahp(2.5, 101)",
+                    "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
+    check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
+                    "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
+    check_parse_val("finite sum is registered in the perfect hash", "sum(k,k,1,10)", 55.0, __LINE__);
+    unset_zetap = expr_from_string("zetap(NAN)", NULL);
+    ASSERT_NOT_NULL(unset_zetap);
+    unset_value = expr_eval(unset_zetap);
+    TEST_ASSERT_TRUE(num_is_nan(unset_value), "zetap preserves an unset value");
+    num_destroy(&unset_value);
+    expr_free(unset_zetap);
 }
 
 static void test_from_string_conjugation(void)
@@ -105,6 +135,266 @@ static void test_from_string_arithmetic(void)
                     "{ c\xe2\x82\x80x\xe2\x82\x80 + c\xe2\x82\x81x\xe2\x82\x81 | x\xe2\x82\x80 = 2, x\xe2\x82\x81 = 3; "
                     "c\xe2\x82\x80 = 2, c\xe2\x82\x81 = 3 }",
                     13.0, __LINE__);
+}
+
+static void test_from_string_series_ellipsis(void)
+{
+    const char *source = "1 + 1/2^2 + 1/3^2 + 1/4^2 + ... + 1/2000^2";
+    string_t *derivation_TeX = NULL;
+    expr_t *expression = expr_from_string_with_derivation_TeX(source, NULL, &derivation_TeX);
+    number_t expected = num_clone(NUM_ZERO);
+    number_t actual;
+    char *expression_text;
+    char *function_text;
+    expr_bindings_t *bindings = NULL;
+
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "π²/6 - ψ⁽¹⁾(2001)");
+    ASSERT_NOT_NULL(strstr(function_text, "return π^2/6 - trigamma(2001)."));
+    free(function_text);
+    free(expression_text);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{2000}\\frac{1}{n^{2}}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{\\pi^{2}}{6} - \\psi^{(1)}(2001)"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "&="));
+    for (long index = 1L; index <= 2000L; ++index) {
+        number_t index_value = num_create_from_long(index);
+        number_t denominator = num_pow_int(index_value, 2);
+        number_t term = num_div(NUM_ONE, denominator);
+        number_t updated = num_add(expected, term);
+
+        num_destroy(&expected);
+        expected = updated;
+        num_destroy(&term);
+        num_destroy(&denominator);
+        num_destroy(&index_value);
+    }
+
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(actual));
+    ASSERT_EQ_DOUBLE(num_to_double(actual), num_to_double(expected), 1e-15);
+
+    num_destroy(&actual);
+    num_destroy(&expected);
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("a + ar + ar^2 + ar^3 + ... + ar^n", &bindings,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text,
+                       "{ a/(r - 1)·(r^(n + 1) - 1) | r = NAN; a = NAN, n = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return a.(r^(n + 1) - 1)/(r - 1)."));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}a\\mkern-2mu r^{k}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
+                           "\\frac{a}{r - 1}\\mkern-2mu \\left(r^{n + 1} - 1\\right)"));
+    free(function_text);
+    free(expression_text);
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX(
+        "1 + 1/2^2 + 1/3^2 + ... + 1/100000000^2", NULL, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "π²/6 - ψ⁽¹⁾(100000001)");
+    ASSERT_NOT_NULL(strstr(function_text, "return π^2/6 - trigamma(100000001)."));
+    free(function_text);
+    free(expression_text);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{100000000}\\frac{1}{n^{2}}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{\\pi^{2}}{6} - \\psi^{(1)}(100000001)"));
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(actual));
+    ASSERT_EQ_DOUBLE(num_to_double(actual), 1.6449340568482264, 1e-15);
+
+    num_destroy(&actual);
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 1/2 + 1/3 + ... + 1/N", NULL, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + γ."));
+    free(function_text);
+    free(expression_text);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{N}\\frac{1}{n}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(N + 1) + \\gamma"));
+
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 1/2^3 + 1/3^3 + ... + 1/N^3", NULL, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(N + 1)/2 | N = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return zeta(3) + polygamma(2, N + 1)/2."));
+    free(function_text);
+    free(expression_text);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{N}\\frac{1}{n^{3}}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
+                           "\\zeta(3) + \\frac{\\psi^{(2)}(N + 1)}{2}"));
+
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 1/2^3 + 1/3^3 + ... + 1/n^3", NULL,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(n + 1)/2 | ; n = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return zeta(3) + polygamma(2, n + 1)/2."));
+    free(function_text);
+    free(expression_text);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}\\frac{1}{k^{3}}"));
+    ASSERT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{n}"));
+
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX(
+        "(n + k) + (n + k)/2^3 + (n + k)/3^3 + ... + (n + k)/N^3", NULL, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{j=1}^{N}\\frac{k + n}{j^{3}}"));
+
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 1/2^p + 1/3^p + ... + 1/n^p", &bindings,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(derivation_TeX);
+    TEST_ASSERT_TRUE(expr_bindings_count(bindings) == 2u, "a finite sum omits its bound dummy index");
+    ASSERT_NOT_NULL(expr_bindings_get(bindings, "p"));
+    ASSERT_NOT_NULL(expr_bindings_get(bindings, "n"));
+    ASSERT_NULL(expr_bindings_get(bindings, "k"));
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(p) - ζ(p, n + 1) | p = NAN; n = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return zeta(p) - zetah(p, n + 1)."));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}\\frac{1}{k^{p}}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\begin{cases}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(n + 1) + \\gamma, & p = 1"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\zeta(p) - \\zeta(p, n + 1)"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "& p \\ne 1"));
+    ASSERT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{n}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "&="));
+    free(function_text);
+    free(expression_text);
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 2^p + 3^p + 4^p + ... + n^p", &bindings,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(-p) - ζ(-p, n + 1) | p = NAN; n = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "zeta(v1) - zetah(v1, n + 1)"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}k^{p}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\zeta(-p) - \\zeta(-p, n + 1)"));
+    free(function_text);
+    free(expression_text);
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    /* README example: a symbolic geometric endpoint shows its sigma form and exact closed form. */
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 + 3 + 9 + 27 + ... + 3^(n - 1)", &bindings,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    function_text = expr_to_string(expression, style_FUNCTION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(function_text);
+    TEST_ASSERT_STR_EQ(expression_text, "{ 1/2·(3^n - 1) | ; n = NAN }");
+    ASSERT_NOT_NULL(strstr(function_text, "return (3^n - 1)/2."));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n - 1}3^{k}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{3^{n} - 1}{2}"));
+    free(function_text);
+    free(expression_text);
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    check_parse_val("symbolic inverse-power sum evaluates after bindings are supplied",
+                    "{ 1 + 1/2^p + 1/3^p + ... + 1/n^p | p = 2; n = 10 }", 1.5497677311665408,
+                    __LINE__);
+    check_parse_val("a negative symbolic exponent uses the same inverse-power sum",
+                    "{ 1 + 2^-p + 3^-p + 4^-p + ... + n^-p | p = 2; n = 10 }", 1.5497677311665408,
+                    __LINE__);
+    check_parse_val("symbolic harmonic sum formula includes p = 1",
+                    "{ 1 + 1/2^p + 1/3^p + ... + 1/n^p | p = 1; n = 10 }", 2.928968253968254,
+                    __LINE__);
+    check_parse_val("symbolic inverse-power sum reaches zeta at an infinite endpoint",
+                    "{ 1 + 1/2^p + 1/3^p + ... + 1/n^p | p = 3; n = inf }", 1.2020569031595942,
+                    __LINE__);
+    check_parse_val("symbolic inverse-power sum supports a non-integer exponent",
+                    "{ 1 + 1/2^p + 1/3^p + ... + 1/n^p | p = 2.5; n = 100 }", 1.340825569751464,
+                    __LINE__);
+    check_parse_val("symbolic inverse-power sum uses a polynomial formula outside the polygamma order domain",
+                    "{ 1 + 1/2^p + 1/3^p + ... + 1/n^p | p = -1; n = 100 }", 5050.0,
+                    __LINE__);
+    check_parse_val("symbolic direct-power sum evaluates through its Faulhaber specialisation",
+                    "{ 1 + 2^p + 3^p + 4^p + ... + n^p | p = 2; n = 100 }", 338350.0, __LINE__);
+    check_parse_val("symbolic direct-power sum reaches the harmonic specialisation",
+                    "{ 1 + 2^p + 3^p + 4^p + ... + n^p | p = -1; n = 100 }", 5.1873775176396203,
+                    __LINE__);
+    check_parse_val("symbolic geometric sum evaluates after its endpoint is supplied",
+                    "{ 1 + 3 + 9 + 27 + ... + 3^(n - 1) | n = 10 }", 29524.0, __LINE__);
+    check_parse_val("symbolic geometric first term and ratio evaluate after bindings are supplied",
+                    "{ a + ar + ar^2 + ar^3 + ... + ar^n | r = 2, n = 4; a = 3 }", 93.0, __LINE__);
 }
 
 /* ---- Elementary functions ---- */
@@ -247,6 +537,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽⁰⁾(1) = -gamma_E", "{ ψ⁽⁰⁾(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽¹⁾(1) = pi²/6", "{ ψ⁽¹⁾(x) | x = 1 }", M_PI * M_PI / 6.0, __LINE__);
+    check_parse_simplified_expr("trigamma at positive infinity is zero", "trigamma(inf)", "0", __LINE__);
     check_parse_val("polygamma(3, 2) = pi^4/15 - 6", "{ polygamma(3, x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0,
                     __LINE__);
     check_parse_val("ψ⁽³⁾(2) = pi^4/15 - 6", "{ ψ⁽³⁾(x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
@@ -2727,6 +3018,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
+    TEST_RUN_SUBTEST(test_from_string_series_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
     TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);

@@ -113,6 +113,15 @@ const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t
 string_t *equ_to_text(const equation_t *equation, style_t style);
 
 /**
+ * @brief Render an equation as an owning aligned TeX body.
+ *
+ * Native display metadata, including formal finite sums preserved while the
+ * solver expands their values, is honoured. The caller must release the
+ * returned C string with free().
+ */
+char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit);
+
+/**
  * @brief Format equation-aware text into a new string_t from a va_list.
  *
  * Supports ordinary string formatting plus equation conversions:

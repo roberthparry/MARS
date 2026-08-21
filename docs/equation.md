@@ -65,6 +65,16 @@ The binding section is significant:
 
 That means the equation text itself can express both intent and seed values.
 
+Additive ellipses use the same native series recogniser as `expr_t`; the
+equation client does not expand them. MARS first tries exact geometric and
+inverse-index-power models. For a general algebraic sequence it constructs the
+Lagrange polynomial `P(k)` determined by the supplied coefficient terms,
+checks the written final coefficient against `P(N)`, and replaces the sequence
+with the exact sigma `Σ(k=1..N) P(k)` before solving. The derivation therefore
+shows the inferred sigma step before its simplified finite sum. A series is
+rejected when the visible terms and endpoint do not determine and verify one
+model, rather than silently extrapolating an inconsistent pattern.
+
 ## Solving Model
 
 There is one public solve entry point:
@@ -241,6 +251,9 @@ about 64 significant decimal digits before the equation is parsed and solved.
   the compact `output(equ(...).solve()).` form
 - `equ_to_text(..., style_UNBOUND)` shows the plain equation body
 - `equ_to_text(..., style_LATEX)` emits TeX-ready display text
+- `equ_to_TeX_body_wrapped(...)` emits an owning aligned TeX body and honours
+  native derivation metadata such as a finite sigma step retained while the
+  solver uses its expanded value
 - `equ_display_expanded(...)` builds a display equation whose polynomial sides
   are collected and written in descending powers of the selected variable
 - `equ_residual(...)` builds the simplified residual `lhs - rhs`

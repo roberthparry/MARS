@@ -1211,6 +1211,43 @@ qfloat_t qf_tetragamma(qfloat_t x);
 qfloat_t qf_polygamma(unsigned int order, qfloat_t x);
 
 /**
+ * @brief Compute the Riemann zeta function by analytic continuation.
+ *
+ * @param x Argument of the zeta function. The value 1 is its simple pole.
+ * @return ζ(x) at double-double precision, infinity at the pole, or NaN when undefined.
+ */
+qfloat_t qf_zeta(qfloat_t x);
+
+/**
+ * @brief Compute the Hurwitz zeta function by analytic continuation.
+ *
+ * The real backend accepts a strictly positive second argument. Use qcomplex
+ * when the second argument lies outside that real principal domain.
+ *
+ * @param s Exponent argument. The value 1 is the function's simple pole.
+ * @param a Strictly positive shift argument.
+ * @return ζ(s, a) at double-double precision, infinity at the pole, or NaN when undefined.
+ */
+qfloat_t qf_zetah(qfloat_t s, qfloat_t a);
+
+/**
+ * @brief Compute the first derivative of the Hurwitz zeta function with respect to its exponent.
+ *
+ * @param s Exponent argument. The value 1 is a double pole of the derivative.
+ * @param a Strictly positive shift argument.
+ * @return ∂ζ(s, a)/∂s at double-double precision, or NaN when undefined.
+ */
+qfloat_t qf_zatahp(qfloat_t s, qfloat_t a);
+
+/**
+ * @brief Compute the first derivative of the Riemann zeta function.
+ *
+ * @param x Argument of the zeta derivative. The value 1 is a double pole.
+ * @return ζ′(x) at double-double precision, negative infinity at the pole, or NaN when undefined.
+ */
+qfloat_t qf_zetap(qfloat_t x);
+
+/**
  * @brief Compute the principal dilogarithm Li₂(x).
  *
  * Real-valued for x <= 1 on the principal branch. Arguments beyond the real

@@ -1938,15 +1938,16 @@ static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE]
     0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0, 1, 0, 0,
     0, 7, 2, 0, 2, 0, 0, 0, 0, 0, 2, 1, 0, 5, 2, 0,
     0, 0, 0, 0, 13, 0, 0, 0, 1, 0, 0, 0, 2, 1, 0, 1,
-    0, 1, 0, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0,
-    0, 0, 1, 15, 0, 0, 4, 0, 0, 0, 0, 0, 0, 10, 2, 2,
+    0, 4, 0, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 15, 0, 0, 4, 0, 0, 0, 0, 0, 0, 10, 2, 137,
     0, 0, 0, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1, 0, 0, 1,
     2, 0, 0, 13, 2, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0,
     0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 22, 0, 2, 1,
     0, 1, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0,
-    0, 0, 0, 0, 0, 0, 0};
+    162, 0, 0, 0, 0, 0, 0};
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
+    [1] = {.kw = "zetap", .is_binary = false, .ops = &ops_zetap},
     [2] = {.kw = "sin", .is_binary = false, .ops = &ops_sin},
     [3] = {.kw = "versin", .is_binary = false, .ops = &ops_versin},
     [8] = {.kw = "atan2", .is_binary = true, .ops = &ops_atan2},
@@ -1961,12 +1962,13 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [19] = {.kw = "abs", .is_binary = false, .ops = &ops_abs},
     [20] = {.kw = "lg", .is_binary = false, .ops = &ops_log10},
     [21] = {.kw = "cosech", .is_binary = false, .ops = &ops_cosech},
+    [22] = {.kw = "factors", .is_binary = false, .ops = &ops_factors},
     [23] = {.kw = "cos", .is_binary = false, .ops = &ops_cos},
+    [24] = {.kw = "cosec", .is_binary = false, .ops = &ops_cosec},
     [25] = {.kw = "asec", .is_binary = false, .ops = &ops_asec},
     [26] = {.kw = "archavercos", .is_binary = false, .ops = &ops_archavercos},
     [27] = {.kw = "W0", .is_binary = false, .ops = &ops_lambert_w0},
     [28] = {.kw = "Li2", .is_binary = false, .ops = &ops_dilog},
-    [29] = {.kw = "cosec", .is_binary = false, .ops = &ops_cosec},
     [30] = {.kw = "erfcinv", .is_binary = false, .ops = &ops_erfcinv},
     [31] = {.kw = "W₀", .is_binary = false, .ops = &ops_lambert_w0},
     [32] = {.kw = "pdf", .is_binary = false, .ops = &ops_pdf},
@@ -1979,6 +1981,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [40] = {.kw = "next_prime", .is_binary = false, .ops = &ops_next_prime},
     [41] = {.kw = "normal_pdf", .is_binary = false, .ops = &ops_normal_pdf},
     [42] = {.kw = "asin", .is_binary = false, .ops = &ops_asin},
+    [43] = {.kw = "zeta", .is_binary = false, .ops = &ops_zeta},
     [44] = {.kw = "OR", .is_binary = true, .ops = &ops_bit_or},
     [45] = {.kw = "lcm", .is_binary = true, .ops = &ops_lcm},
     [46] = {.kw = "cot", .is_binary = false, .ops = &ops_cot},
@@ -1989,7 +1992,6 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [51] = {.kw = "arcsch", .is_binary = false, .ops = &ops_acosech},
     [52] = {.kw = "tan", .is_binary = false, .ops = &ops_tan},
     [53] = {.kw = "acoth", .is_binary = false, .ops = &ops_acoth},
-    [54] = {.kw = "factors", .is_binary = false, .ops = &ops_factors},
     [55] = {.kw = "Ei", .is_binary = false, .ops = &ops_ei},
     [56] = {.kw = "haversin", .is_binary = false, .ops = &ops_haversin},
     [57] = {.kw = "bessel_j", .is_binary = true, .ops = &ops_bessel_j},
@@ -2029,10 +2031,10 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [100] = {.kw = "arcsec", .is_binary = false, .ops = &ops_asec},
     [102] = {.kw = "csc", .is_binary = false, .ops = &ops_cosec},
     [103] = {.kw = "beta", .is_binary = true, .ops = &ops_beta},
+    [104] = {.kw = "gammainc_P", .is_binary = true, .ops = &ops_gammainc_P},
     [105] = {.kw = "gcd", .is_binary = true, .ops = &ops_gcd},
     [107] = {.kw = "hacovercos", .is_binary = false, .ops = &ops_hacovercos},
     [108] = {.kw = "W_-1", .is_binary = false, .ops = &ops_lambert_wm1},
-    [109] = {.kw = "gammainc_P", .is_binary = true, .ops = &ops_gammainc_P},
     [110] = {.kw = "atan", .is_binary = false, .ops = &ops_atan},
     [112] = {.kw = "polylog", .is_binary = true, .ops = &ops_polylog},
     [113] = {.kw = "W_0", .is_binary = false, .ops = &ops_lambert_w0},
@@ -2040,12 +2042,14 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [115] = {.kw = "exp", .is_binary = false, .ops = &ops_exp},
     [116] = {.kw = "prev_prime", .is_binary = false, .ops = &ops_prev_prime},
     [117] = {.kw = "vercos", .is_binary = false, .ops = &ops_vercos},
+    [120] = {.kw = "ζ", .is_binary = false, .ops = &ops_zeta},
     [121] = {.kw = "arccot", .is_binary = false, .ops = &ops_acot},
     [122] = {.kw = "coversin", .is_binary = false, .ops = &ops_coversin},
     [123] = {.kw = "archacovercos", .is_binary = false, .ops = &ops_archacovercos},
     [125] = {.kw = "acosh", .is_binary = false, .ops = &ops_acosh},
     [126] = {.kw = "sec", .is_binary = false, .ops = &ops_sec},
     [127] = {.kw = "log10", .is_binary = false, .ops = &ops_log10},
+    [128] = {.kw = "Wₙ", .is_binary = true, .ops = &ops_lambert_wn},
     [130] = {.kw = "trigamma", .is_binary = false, .ops = &ops_trigamma},
     [131] = {.kw = "erfinv", .is_binary = false, .ops = &ops_erfinv},
     [132] = {.kw = "SHR", .is_binary = true, .ops = &ops_shr},
@@ -2076,11 +2080,10 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [157] = {.kw = "conj", .is_binary = false, .ops = &ops_conj},
     [158] = {.kw = "asech", .is_binary = false, .ops = &ops_asech},
     [159] = {.kw = "partition", .is_binary = false, .ops = &ops_partition},
-    [160] = {.kw = "Wₙ", .is_binary = true, .ops = &ops_lambert_wn},
     [161] = {.kw = "root", .is_binary = true, .ops = &ops_root},
     [162] = {.kw = "productlog", .is_binary = false, .ops = &ops_lambert_w},
-    [163] = {.kw = "normal_cdf", .is_binary = false, .ops = &ops_normal_cdf},
     [164] = {.kw = "acosech", .is_binary = false, .ops = &ops_acosech},
+    [166] = {.kw = "normal_cdf", .is_binary = false, .ops = &ops_normal_cdf},
 };
 
 static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
@@ -3852,6 +3855,8 @@ static void emit_binding_expr_unary_call(const expr_ops_t *ops, const expr_bindi
         sbuf_puts(b, "ψ⁽⁰⁾");
     else if (ops == &ops_trigamma)
         sbuf_puts(b, "ψ⁽¹⁾");
+    else if (ops == &ops_zeta)
+        sbuf_puts(b, "ζ");
     else
         sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
     sbuf_putc(b, '(');
@@ -4096,7 +4101,23 @@ static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t 
         return;
     }
 
-    sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    if (ops == &ops_polygamma) {
+        long order;
+
+        if (binding_number_text_to_long(expr->u.binary_op.left, &order) && order >= 0L) {
+            sbuf_puts(b, "ψ⁽");
+            emit_binding_superscript_int(b, order);
+            sbuf_puts(b, "⁾(");
+            emit_binding_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+            sbuf_putc(b, ')');
+            return;
+        }
+    }
+
+    if (ops == &ops_zetah)
+        sbuf_puts(b, "ζ");
+    else
+        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
     sbuf_putc(b, '(');
     emit_binding_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
     sbuf_puts(b, ", ");
@@ -4316,6 +4337,15 @@ static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *
         sbuf_puts(b, "]{");
         emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
         sbuf_putc(b, '}');
+        return;
+    }
+
+    if (ops == &ops_polygamma) {
+        sbuf_puts(b, "\\psi^{");
+        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
+        sbuf_puts(b, "}(");
+        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+        sbuf_putc(b, ')');
         return;
     }
 

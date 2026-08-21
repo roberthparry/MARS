@@ -630,6 +630,14 @@ void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *
     expr_reverse_unary(expr_reverse_num_clone(factor), a_bar, b_bar);
 }
 
+void expr_reverse_zeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t derivative = num_zetap(expr_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, derivative);
+
+    expr_reverse_unary(expr_reverse_num_clone(factor), a_bar, b_bar);
+}
+
 void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t order_value = expr_eval_num_internal(dv->a);

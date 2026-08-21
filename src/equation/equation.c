@@ -14,6 +14,8 @@ struct equation_t {
     expr_t *lhs;
     expr_t *rhs;
     expr_bindings_t *bindings;
+    string_t *lhs_display_TeX;
+    string_t *rhs_display_TeX;
 };
 
 static void equ_solutions_reset(equation_solutions_t *solutions)
@@ -71,10 +73,39 @@ void equ_free(equation_t *equation)
 {
     if (!equation)
         return;
+    string_free(equation->rhs_display_TeX);
+    string_free(equation->lhs_display_TeX);
     expr_bindings_free(equation->bindings);
     expr_free(equation->lhs);
     expr_free(equation->rhs);
     free(equation);
+}
+
+int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs)
+{
+    string_t *lhs_copy = lhs ? string_clone(lhs) : NULL;
+    string_t *rhs_copy = rhs ? string_clone(rhs) : NULL;
+
+    if (!equation || (lhs && !lhs_copy) || (rhs && !rhs_copy)) {
+        string_free(rhs_copy);
+        string_free(lhs_copy);
+        return -1;
+    }
+    string_free(equation->lhs_display_TeX);
+    string_free(equation->rhs_display_TeX);
+    equation->lhs_display_TeX = lhs_copy;
+    equation->rhs_display_TeX = rhs_copy;
+    return 0;
+}
+
+const string_t *equ_lhs_display_TeX(const equation_t *equation)
+{
+    return equation ? equation->lhs_display_TeX : NULL;
+}
+
+const string_t *equ_rhs_display_TeX(const equation_t *equation)
+{
+    return equation ? equation->rhs_display_TeX : NULL;
 }
 
 const expr_t *equ_lhs(const equation_t *equation)

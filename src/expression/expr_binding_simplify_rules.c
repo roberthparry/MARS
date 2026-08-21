@@ -661,6 +661,22 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_
     return binding_expr_fold_to_number_owned(expr, magnitude);
 }
 
+expr_binding_expr_t *binding_expr_try_simplify_trigamma_positive_infinity(expr_binding_expr_t *expr)
+{
+    number_t value;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP || expr->u.unary_op.ops != &ops_trigamma ||
+        !expr_binding_expr_number_value(expr->u.unary_op.child, &value))
+        return expr;
+    if (!num_is_real(value) || !num_is_inf(value) || num_get_sign(value) <= 0) {
+        num_destroy(&value);
+        return expr;
+    }
+
+    num_destroy(&value);
+    return binding_expr_fold_to_number_owned(expr, num_clone(NUM_ZERO));
+}
+
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
 {
     char *text;

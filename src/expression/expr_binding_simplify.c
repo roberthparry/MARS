@@ -87,6 +87,7 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {{binding_e
                                                                       {binding_expr_try_simplify_lambert_exp},
                                                                       {binding_expr_try_simplify_lambert_inverse},
                                                                       {binding_expr_try_simplify_complex_floor_ceil},
+                                                                      {binding_expr_try_simplify_trigamma_positive_infinity},
                                                                       {binding_expr_try_simplify_sqrt_numeric_square},
                                                                       {binding_expr_try_simplify_log_e},
                                                                       {binding_expr_try_simplify_log10_power},

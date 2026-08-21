@@ -266,6 +266,7 @@ void run_number_multiprecision_tests(void)
         number_t one_pow_zero;
         number_t one_pow_one;
         number_t one_pow_neg_one;
+        number_t one_pow_neg_two;
         number_t one_pow_two;
         number_t pow_half;
         number_t pow_quarter;
@@ -324,6 +325,7 @@ void run_number_multiprecision_tests(void)
         one_pow_zero = num_pow(two, zero);
         one_pow_one = num_pow(two, one);
         one_pow_neg_one = num_pow(two, neg_one);
+        one_pow_neg_two = num_pow_int(two, -2);
         one_pow_two = num_pow(two, NUM_TWO);
         pow_half = num_pow(two, half);
         pow_quarter = num_pow(two, NUM_QUARTER);
@@ -375,6 +377,7 @@ void run_number_multiprecision_tests(void)
         assert_number_string("num_pow(2, 0)", one_pow_zero, "1");
         ASSERT_NUMBER_EQ(one_pow_one, two);
         assert_number_string("num_pow(2, -1)", one_pow_neg_one, "½");
+        assert_number_string("num_pow_int(2, -2)", one_pow_neg_two, "¼");
         assert_number_string("num_pow(2, 2)", one_pow_two, "4");
         ASSERT_NUMBER_EQ(pow_half, sqrt_two);
         ASSERT_NUMBER_EQ(pow_quarter, sqrt_sqrt_two);
@@ -409,6 +412,7 @@ void run_number_multiprecision_tests(void)
         num_destroy(&one_pow_zero);
         num_destroy(&one_pow_one);
         num_destroy(&one_pow_neg_one);
+        num_destroy(&one_pow_neg_two);
         num_destroy(&one_pow_two);
         num_destroy(&pow_half);
         num_destroy(&pow_quarter);

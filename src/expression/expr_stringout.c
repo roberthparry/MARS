@@ -2379,6 +2379,8 @@ static const char *expr_unary_name(const expr_t *f)
         return "ψ⁽⁰⁾";
     if (expr_is_op(f, &ops_trigamma))
         return "ψ⁽¹⁾";
+    if (expr_is_op(f, &ops_zeta))
+        return "ζ";
     return f->ops->name ? f->ops->name : "?";
 }
 
@@ -2574,11 +2576,15 @@ static void emit_TeX_polygamma(const expr_t *f, sbuf_t *b)
     long order;
     char buf[32];
 
-    if (!expr_polygamma_order(f, &order))
+    if (!f || !expr_is_op(f, &ops_polygamma) || !f->a || !f->b)
         return;
     sbuf_puts(b, "\\psi^{(");
-    snprintf(buf, sizeof(buf), "%ld", order);
-    sbuf_puts(b, buf);
+    if (expr_polygamma_order(f, &order)) {
+        snprintf(buf, sizeof(buf), "%ld", order);
+        sbuf_puts(b, buf);
+    } else {
+        emit_TeX_expr(f->a, b, PREC_LOWEST);
+    }
     sbuf_puts(b, ")}(");
     emit_TeX_expr(f->b, b, 0);
     sbuf_putc(b, ')');
@@ -3452,15 +3458,25 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_summation)) {
             const expr_t *index = f->b;
+            const expr_t *lower = NULL;
             const expr_t *upper = NULL;
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
+                if (expr_is_op(upper, &ops_argument_list)) {
+                    lower = upper->a;
+                    upper = upper->b;
+                }
             }
             sbuf_puts(b, "\\sum_{");
             emit_TeX_expr(index, b, 0);
-            sbuf_puts(b, "=0}^{");
+            sbuf_putc(b, '=');
+            if (lower)
+                emit_TeX_expr(lower, b, 0);
+            else
+                sbuf_putc(b, '0');
+            sbuf_puts(b, "}^{");
             if (upper)
                 emit_TeX_expr(upper, b, 0);
             else
@@ -3469,8 +3485,17 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_expr(f->a, b, PREC_MUL);
             return;
         }
-        if (expr_has_polygamma_order(f)) {
+        if (expr_is_op(f, &ops_polygamma)) {
             emit_TeX_polygamma(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_zetah) || expr_is_op(f, &ops_zatahp)) {
+            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_putc(b, '(');
+            emit_TeX_expr(f->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_TeX_expr(f->b, b, 0);
+            sbuf_putc(b, ')');
             return;
         }
         if (expr_has_polylog_order(f)) {
@@ -3984,15 +4009,25 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_summation)) {
             const expr_t *index = f->b;
+            const expr_t *lower = NULL;
             const expr_t *upper = NULL;
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
+                if (expr_is_op(upper, &ops_argument_list)) {
+                    lower = upper->a;
+                    upper = upper->b;
+                }
             }
             sbuf_puts(b, "Σ_(");
             emit_expr(index, b, 0);
-            sbuf_puts(b, "=0)^");
+            sbuf_putc(b, '=');
+            if (lower)
+                emit_expr(lower, b, 0);
+            else
+                sbuf_putc(b, '0');
+            sbuf_puts(b, ")^");
             if (upper)
                 emit_expr(upper, b, 0);
             else
@@ -4033,7 +4068,10 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_hypergeometric_pFq(f, b);
             return;
         }
-        sbuf_puts(b, f->ops->name);
+        if (expr_is_op(f, &ops_zetah))
+            sbuf_puts(b, "ζ");
+        else
+            sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
@@ -4335,17 +4373,27 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_summation)) {
             const expr_t *index = f->b;
+            const expr_t *lower = NULL;
             const expr_t *upper = NULL;
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
+                if (expr_is_op(upper, &ops_argument_list)) {
+                    lower = upper->a;
+                    upper = upper->b;
+                }
             }
             sbuf_puts(b, "sum(");
             emit_func(f->a, b, 0);
             sbuf_puts(b, ", ");
             emit_func(index, b, 0);
-            sbuf_puts(b, ", 0, ");
+            sbuf_puts(b, ", ");
+            if (lower)
+                emit_func(lower, b, 0);
+            else
+                sbuf_putc(b, '0');
+            sbuf_puts(b, ", ");
             if (upper)
                 emit_func(upper, b, 0);
             else

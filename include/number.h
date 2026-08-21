@@ -891,6 +891,36 @@ number_t num_digamma(const number_t number);
 number_t num_trigamma(const number_t number);
 number_t num_tetragamma(const number_t number);
 number_t num_polygamma(unsigned int order, const number_t number);
+/**
+ * @brief Evaluate the analytically continued Riemann zeta function.
+ *
+ * @param number Real or complex argument; 1 is the simple pole.
+ * @return An owning number containing ζ(number).
+ */
+number_t num_zeta(const number_t number);
+/**
+ * @brief Evaluate the analytically continued Hurwitz zeta function.
+ *
+ * @param s Real or complex exponent argument; 1 is the simple pole.
+ * @param a Real or complex shift argument on the principal branch.
+ * @return An owning number containing ζ(s, a).
+ */
+number_t num_zetah(const number_t s, const number_t a);
+/**
+ * @brief Evaluate the first Hurwitz zeta derivative with respect to its exponent.
+ *
+ * @param s Real or complex exponent argument; 1 is the double pole of the derivative.
+ * @param a Real or complex shift argument on the principal branch.
+ * @return An owning number containing ∂ζ(s, a)/∂s.
+ */
+number_t num_zatahp(const number_t s, const number_t a);
+/**
+ * @brief Evaluate the first derivative of the Riemann zeta function.
+ *
+ * @param number Real or complex argument; 1 is the double pole of the derivative.
+ * @return An owning number containing ζ′(number).
+ */
+number_t num_zetap(const number_t number);
 number_t num_dilog(const number_t number);
 number_t num_polylog(const number_t order, const number_t number);
 number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,

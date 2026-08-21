@@ -17,7 +17,9 @@
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
-string_t *equ_expand_polynomial_series_side(string_view_t side);
+int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
+const string_t *equ_lhs_display_TeX(const equation_t *equation);
+const string_t *equ_rhs_display_TeX(const equation_t *equation);
 
 bool equ_match_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *linear_out,
                               number_t *quadratic_out);

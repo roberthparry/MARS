@@ -62,9 +62,12 @@ void run_number_special_function_tests(void)
         number_t lgamma5 = num_lgamma(five);
         number_t digamma1 = num_digamma(one);
         number_t trigamma1 = num_trigamma(one);
+        number_t trigamma_inf = num_trigamma(NUM_INF);
+        number_t tetragamma_inf = num_tetragamma(NUM_INF);
         number_t polygamma0_1 = num_polygamma(0u, one);
         number_t polygamma1_1 = num_polygamma(1u, one);
         number_t polygamma3_2 = num_polygamma(3u, two);
+        number_t polygamma3_inf = num_polygamma(3u, NUM_INF);
         number_t neg_half = num_create_from_string("-1/2");
         number_t polygamma3_neg_half = num_polygamma(3u, neg_half);
         number_t fifteen = num_create_from_long(15);
@@ -127,11 +130,14 @@ void run_number_special_function_tests(void)
         assert_number_string_prefix("num_lgamma(5)", lgamma5, "3.178053830347945619646941601297");
         assert_number_string_prefix("num_digamma(1)", digamma1, "-0.577215664901532860606512090082");
         assert_number_string_prefix("num_trigamma(1)", trigamma1, "1.644934066848226436472415166646");
+        assert_number_string("num_trigamma(inf)", trigamma_inf, "0");
+        assert_number_string("num_tetragamma(inf)", tetragamma_inf, "0");
         assert_number_close_text("num_polygamma(0, 1) = num_digamma(1)", polygamma0_1,
                                  "-0.577215664901532860606512090082", "1e-30");
         assert_number_close_text("num_polygamma(1, 1) = num_trigamma(1)", polygamma1_1,
                                  "1.644934066848226436472415166646", "1e-30");
         assert_number_close_number("num_polygamma(3, 2) = pi^4/15 - 6", polygamma3_2, polygamma3_2_expect, "1e-25");
+        assert_number_string("num_polygamma(3, inf)", polygamma3_inf, "0");
         assert_number_close_number("num_polygamma(3, -1/2) = pi^4 + 96", polygamma3_neg_half,
                                    polygamma3_neg_half_expect, "1e-25");
         assert_number_string_prefix("num_erf(1)", erf1, "0.842700792949714869341220635082");
@@ -176,7 +182,10 @@ void run_number_special_function_tests(void)
         ASSERT_TRUE(num_is_real(lgamma5));
         ASSERT_TRUE(num_is_real(digamma1));
         ASSERT_TRUE(num_is_real(trigamma1));
+        ASSERT_TRUE(num_is_real(trigamma_inf));
+        ASSERT_TRUE(num_is_real(tetragamma_inf));
         ASSERT_TRUE(num_is_real(polygamma3_2));
+        ASSERT_TRUE(num_is_real(polygamma3_inf));
         ASSERT_TRUE(num_is_real(polygamma3_neg_half));
         ASSERT_TRUE(num_is_real(beta22));
         ASSERT_TRUE(num_is_real(logbeta22));
@@ -191,9 +200,12 @@ void run_number_special_function_tests(void)
         num_destroy(&lgamma5);
         num_destroy(&digamma1);
         num_destroy(&trigamma1);
+        num_destroy(&trigamma_inf);
+        num_destroy(&tetragamma_inf);
         num_destroy(&polygamma0_1);
         num_destroy(&polygamma1_1);
         num_destroy(&polygamma3_2);
+        num_destroy(&polygamma3_inf);
         num_destroy(&neg_half);
         num_destroy(&polygamma3_neg_half);
         num_destroy(&fifteen);
@@ -545,5 +557,44 @@ void run_number_special_function_tests(void)
         num_destroy(&expected_hypergeometric);
         num_destroy(&hypergeometric);
         num_destroy(&z);
+    }
+
+
+    {
+        number_t three = num_create_from_long(3);
+        number_t zero = num_create_from_long(0);
+        number_t complex_argument = num_create_from_string("2 + 3i");
+        number_t zeta_three = num_zeta(three);
+        number_t zeta_complex = num_zeta(complex_argument);
+        number_t derivative_zero = num_zetap(zero);
+        number_t derivative_nan = num_zetap(NUM_NAN);
+        number_t two_and_half = num_create_from_string("2.5");
+        number_t one_hundred_and_one = num_create_from_long(101);
+        number_t hurwitz = num_zetah(two_and_half, one_hundred_and_one);
+        number_t hurwitz_derivative = num_zatahp(two_and_half, one_hundred_and_one);
+
+        assert_number_string_prefix("num_zeta(3)", zeta_three, "1.2020569031595942853997381615114499");
+        assert_number_close_text("num_zeta(2 + 3i)", zeta_complex,
+                                 "0.798021985146275720622294500724813 - 0.113744308052938500215913365857315i",
+                                 "1e-30");
+        assert_number_string_prefix("num_zetap(0)", derivative_zero,
+                                    "-0.9189385332046727417803297364056176");
+        TEST_ASSERT_TRUE(num_is_nan(derivative_nan), "num_zetap(NaN) remains NaN");
+        assert_number_string_prefix("num_zetah(2.5, 101)", hurwitz,
+                                    "0.000661687499453171542062211501479711744239330816315948606222019");
+        assert_number_string_prefix("num_zatahp(2.5, 101)", hurwitz_derivative,
+                                    "-0.00349161965653033810674455840434715303797124292360183374983833");
+
+        num_destroy(&hurwitz_derivative);
+        num_destroy(&hurwitz);
+        num_destroy(&one_hundred_and_one);
+        num_destroy(&two_and_half);
+        num_destroy(&derivative_nan);
+        num_destroy(&derivative_zero);
+        num_destroy(&zeta_complex);
+        num_destroy(&zeta_three);
+        num_destroy(&complex_argument);
+        num_destroy(&zero);
+        num_destroy(&three);
     }
 }

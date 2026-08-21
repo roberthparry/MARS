@@ -583,6 +583,10 @@ equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt)
     }
 
     expanded = equ_new(lhs, rhs);
+    if (expanded && equ_set_display_TeX(expanded, equ_lhs_display_TeX(equation), equ_rhs_display_TeX(equation)) != 0) {
+        equ_free(expanded);
+        expanded = NULL;
+    }
     expr_free(rhs);
     expr_free(lhs);
     return expanded;

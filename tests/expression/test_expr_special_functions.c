@@ -761,6 +761,132 @@ void test_deriv_trigamma(void)
 
     expr_free(f);
     expr_free(x);
+
+    x = test_expr_new_var_d(3.0);
+    f = expr_zeta(x);
+    df = expr_get_deriv(f, x);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{zeta(x)} | x=3", expr_eval_qf(df), qf_zetap(qf_from_double(3.0)));
+    print_expr_of(df);
+
+    expr_t *zetap = expr_zetap(x);
+    expr_t *anti = expr_integrate(zetap, x);
+    ASSERT_NOT_NULL(anti);
+    check_q_at(__FILE__, __LINE__, 1, "integral of zetap(x) = zeta(x)", expr_eval_qf(anti),
+               qf_zeta(qf_from_double(3.0)));
+    expr_free(anti);
+    expr_free(zetap);
+    expr_free(f);
+    expr_free(x);
+
+    {
+        expr_t *s = test_expr_new_var_d(2.5);
+        expr_t *a = test_expr_new_const_d(101.0);
+        expr_t *hurwitz = expr_zetah(s, a);
+        const expr_t *hurwitz_derivative = expr_get_deriv(hurwitz, s);
+        expr_t *hurwitz_zetap = expr_zatahp(s, a);
+        expr_t *hurwitz_antiderivative = expr_integrate(hurwitz_zetap, s);
+
+        ASSERT_NOT_NULL(hurwitz_derivative);
+        ASSERT_NOT_NULL(hurwitz_antiderivative);
+        check_q_at(__FILE__, __LINE__, 1, "d/ds{zetah(s,a)} = zatahp(s,a)", expr_eval_qf(hurwitz_derivative),
+                   qf_zatahp(qf_from_double(2.5), qf_from_double(101.0)));
+        check_q_at(__FILE__, __LINE__, 1, "integral of zatahp(s,a) = zetah(s,a)",
+                   expr_eval_qf(hurwitz_antiderivative), qf_zetah(qf_from_double(2.5), qf_from_double(101.0)));
+
+        expr_free(hurwitz_antiderivative);
+        expr_free(hurwitz_zetap);
+        expr_free(hurwitz);
+        expr_free(a);
+        expr_free(s);
+    }
+
+    {
+        expr_t *s = test_expr_new_var_d(1.0);
+        expr_t *a = test_expr_new_const_d(1001.0);
+        expr_t *riemann = expr_zeta(s);
+        expr_t *hurwitz = expr_zetah(s, a);
+        expr_t *finite_sum = expr_sub(riemann, hurwitz);
+        const expr_t *finite_sum_derivative = expr_get_deriv(finite_sum, s);
+        expr_t *simplified_derivative = finite_sum_derivative ? expr_simplify(finite_sum_derivative) : NULL;
+        qfloat_t expected = QF_ZERO;
+
+        for (unsigned int k = 1u; k <= 1000u; ++k) {
+            qfloat_t base = qf_from_double((double)k);
+
+            expected = qf_sub(expected, qf_div(qf_log(base), base));
+        }
+
+        ASSERT_NOT_NULL(finite_sum_derivative);
+        ASSERT_NOT_NULL(simplified_derivative);
+        check_q_at(__FILE__, __LINE__, 1, "AD of zeta(s) - zetah(s,a) cancels the shared pole at s=1",
+                   expr_eval_qf(simplified_derivative), expected);
+
+        expr_free(simplified_derivative);
+        expr_free(finite_sum);
+        expr_free(hurwitz);
+        expr_free(riemann);
+        expr_free(a);
+        expr_free(s);
+    }
+
+    {
+        expr_t *s = test_expr_new_var_d(2.0);
+        expr_t *n = expr_new_named_const(NUM_TEN, "n");
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *upper = n && one ? expr_add(n, one) : NULL;
+        expr_t *riemann = s ? expr_zeta(s) : NULL;
+        expr_t *hurwitz = s && upper ? expr_zetah(s, upper) : NULL;
+        expr_t *finite_sum = riemann && hurwitz ? expr_sub(riemann, hurwitz) : NULL;
+        expr_t *antiderivative = finite_sum ? expr_integrate(finite_sum, s) : NULL;
+        expr_t *antiderivative_clone = antiderivative ? expr_clone(antiderivative) : NULL;
+        expr_t *derivative = antiderivative ? expr_create_deriv(antiderivative, s) : NULL;
+        char *antiderivative_text = antiderivative ? expr_to_string(antiderivative, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(antiderivative);
+        ASSERT_NOT_NULL(antiderivative_clone);
+        ASSERT_NOT_NULL(derivative);
+        ASSERT_NOT_NULL(antiderivative_text);
+        ASSERT_TRUE(strstr(antiderivative_text, "Σ_(k=2)^n") != NULL);
+        ASSERT_TRUE(strstr(antiderivative_text, "ln(k)") != NULL);
+        check_q_at(__FILE__, __LINE__, 1, "derivative of finite inverse-power sum antiderivative",
+                   expr_eval_qf(derivative), expr_eval_qf(finite_sum));
+
+        free(antiderivative_text);
+        expr_free(derivative);
+        expr_free(antiderivative_clone);
+        expr_free(antiderivative);
+        expr_free(finite_sum);
+        expr_free(hurwitz);
+        expr_free(riemann);
+        expr_free(upper);
+        expr_free(one);
+        expr_free(n);
+        expr_free(s);
+    }
+
+    {
+        expr_t *s = test_expr_new_const_d(2.5);
+        expr_t *a = test_expr_new_var_d(3.0);
+        expr_t *hurwitz = expr_zetah(s, a);
+        const expr_t *hurwitz_derivative = expr_get_deriv(hurwitz, a);
+        expr_t *hurwitz_antiderivative = expr_integrate(hurwitz, a);
+        qfloat_t expected_derivative =
+            qf_neg(qf_mul(qf_from_double(2.5), qf_zetah(qf_from_double(3.5), qf_from_double(3.0))));
+        qfloat_t expected_antiderivative =
+            qf_div(qf_zetah(qf_from_double(1.5), qf_from_double(3.0)), qf_from_double(-1.5));
+
+        ASSERT_NOT_NULL(hurwitz_derivative);
+        ASSERT_NOT_NULL(hurwitz_antiderivative);
+        check_q_at(__FILE__, __LINE__, 1, "d/da{zetah(s,a)} = -s zetah(s+1,a)",
+                   expr_eval_qf(hurwitz_derivative), expected_derivative);
+        check_q_at(__FILE__, __LINE__, 1, "integral over a of zetah(s,a)", expr_eval_qf(hurwitz_antiderivative),
+                   expected_antiderivative);
+
+        expr_free(hurwitz_antiderivative);
+        expr_free(hurwitz);
+        expr_free(a);
+        expr_free(s);
+    }
 }
 
 void test_second_deriv_digamma(void)
