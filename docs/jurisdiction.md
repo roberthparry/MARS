@@ -56,9 +56,18 @@ make uninstall-jurisdiction-db
 
 If you want the desktop app as well, use `make install-mars-lab`.
 
-When weather lookups are configured for MARS Lab, the optional WeatherAPI key
-is stored separately in `~/.mars/config/weather.env` and is preserved when the
-jurisdiction database is rebuilt.
+MARS supplies no shared WeatherAPI account or key. When the installer chooses
+to create their own WeatherAPI account and configure weather lookups, that
+account's key is stored separately in `~/.mars/config/weather.env` and is
+preserved when the jurisdiction database is rebuilt. A lookup sends the key,
+selected date and observer coordinates from the local MARS Lab server to
+WeatherAPI.com over HTTPS; the key is not sent to the browser. MARS does not
+cache or persist the returned weather response, although the date and
+coordinates remain in private local Lab state so that its inputs can be
+restored. Weather information is general and probabilistic; consult official
+meteorological services and authorities for safety-critical decisions. See the
+[MARS privacy notice](privacy.md), [WeatherAPI privacy policy](https://www.weatherapi.com/privacy.aspx)
+and [WeatherAPI terms](https://www.weatherapi.com/terms.aspx).
 
 ## Range Queries
 

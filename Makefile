@@ -26,6 +26,12 @@ SQLCIPHER ?= sqlcipher
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR ?= $(PREFIX)/include
+DATADIR ?= $(PREFIX)/share
+DOCDIR ?= $(DATADIR)/doc/mars
+
+LEGAL_ROOT_DOCUMENTS := LICENSE THIRD_PARTY_NOTICES.md DEPENDENCIES.spdx
+LEGAL_GUIDE_DOCUMENTS := docs/licensing.md docs/privacy.md docs/almanac-data-provenance.md
+LEGAL_DOCUMENTS := $(LEGAL_ROOT_DOCUMENTS) $(LEGAL_GUIDE_DOCUMENTS)
 
 MARS_LAB_INSTALL_PREFIX ?= $(HOME)/.local
 MARS_LAB_BINDIR ?= $(MARS_LAB_INSTALL_PREFIX)/bin
@@ -227,12 +233,15 @@ check-lab-deps: check-jurisdiction-db-deps
 # ------------------------------------------------------------
 # Installation
 # ------------------------------------------------------------
-install: check-deps $(STATIC_LIB) $(SHARED_LIB)
+install: check-deps $(STATIC_LIB) $(SHARED_LIB) $(LEGAL_DOCUMENTS)
 	$(INSTALL) -d "$(DESTDIR)$(LIBDIR)"
 	$(INSTALL) -d "$(DESTDIR)$(INCLUDEDIR)/mars"
+	$(INSTALL) -d "$(DESTDIR)$(DOCDIR)/docs"
 	$(INSTALL) -m 644 $(STATIC_LIB) "$(DESTDIR)$(LIBDIR)/libmars.a"
 	$(INSTALL) -m 755 $(SHARED_LIB) "$(DESTDIR)$(LIBDIR)/libmars.so"
 	$(INSTALL) -m 644 $(HEADERS) "$(DESTDIR)$(INCLUDEDIR)/mars"
+	$(INSTALL) -m 644 $(LEGAL_ROOT_DOCUMENTS) "$(DESTDIR)$(DOCDIR)"
+	$(INSTALL) -m 644 $(LEGAL_GUIDE_DOCUMENTS) "$(DESTDIR)$(DOCDIR)/docs"
 
 uninstall:
 	rm -f "$(DESTDIR)$(LIBDIR)/libmars.a"
@@ -240,7 +249,15 @@ uninstall:
 	@for h in $(notdir $(HEADERS)); do \
 	    rm -f "$(DESTDIR)$(INCLUDEDIR)/mars/$$h"; \
 	done
+	@for document in $(notdir $(LEGAL_ROOT_DOCUMENTS)); do \
+	    rm -f "$(DESTDIR)$(DOCDIR)/$$document"; \
+	done
+	@for document in $(notdir $(LEGAL_GUIDE_DOCUMENTS)); do \
+	    rm -f "$(DESTDIR)$(DOCDIR)/docs/$$document"; \
+	done
 	-rmdir "$(DESTDIR)$(INCLUDEDIR)/mars"
+	-rmdir "$(DESTDIR)$(DOCDIR)/docs"
+	-rmdir "$(DESTDIR)$(DOCDIR)"
 
 # ------------------------------------------------------------
 # Dependency tracking

@@ -1,6 +1,19 @@
 <a id="solution-of-differential-equations"></a>
 # Solution of differential equations
 
+<a id="preface"></a>
+## Preface
+
+These notes were transcribed by the author from blackboard lectures delivered by Professor P. G. L. Leach in 1986,
+during the author's honours year studying Applied Mathematics at the University of the Witwatersrand. They are the
+author's contemporaneous record of those lectures, subsequently organised, typeset, and edited into their present
+form.
+
+The mathematical exposition, derivations, and examples recorded here originate in Professor Leach's lectures unless
+another source is expressly acknowledged. The transcription, subsequent organisation, and editorial presentation
+are the author's own. These notes are not an official publication of the University of the Witwatersrand and have
+not been endorsed by either the University or Professor Leach.
+
 <a id="contents"></a>
 ## Contents
 

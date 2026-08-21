@@ -13,6 +13,10 @@ Event-search algorithms in this module draw on Seidelmann, P. Kenneth (ed.),
 *Explanatory Supplement to the Astronomical Almanac*, University Science
 Books, 1992. Subsequent references in this document use *ESAA*.
 
+The packaged coefficient sources, transformations, checksums and AstroNav
+workbook ownership are recorded in the
+[almanac data provenance](./almanac-data-provenance.md).
+
 ## Capabilities
 
 - open the configured encrypted ephemeris database

@@ -3762,6 +3762,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
         </div>
         <p class="mode-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
+        <p class="mode-hint"><strong>Optional weather privacy:</strong> MARS supplies no shared WeatherAPI account or key. Weather remains disabled unless the person installing MARS Lab configures a key from their own WeatherAPI account. When enabled, evaluating this panel sends the selected date and observer coordinates from the local server to WeatherAPI.com over HTTPS; the account key is never sent to the browser. See the <a href="https://www.weatherapi.com/privacy.aspx" target="_blank" rel="noreferrer">provider privacy policy</a> and <a href="https://www.weatherapi.com/terms.aspx" target="_blank" rel="noreferrer">terms</a>.</p>
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
@@ -4062,7 +4063,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
             <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
-            <li>Weather, humidity, wind, and rain chance appear only when a weather API key is configured and the selected date is supported by the provider.</li>
+            <li>MARS supplies no shared weather account or key. Weather, humidity, wind, and rain chance appear only when the installer configures a key from their own WeatherAPI account and the selected date is supported by the provider.</li>
+            <li>When enabled, the local server sends that key, the selected date, and the observer coordinates to WeatherAPI.com over HTTPS. The key is not sent to the browser, and MARS does not retain the returned weather response.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="almanac">
@@ -13742,6 +13744,23 @@ WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1"
 WEATHER_API_KEY_ENV = "MARS_WEATHER_API_KEY"
 LEGACY_WEATHER_API_KEY_ENV = "WEATHERAPI_KEY"
 WEATHER_CONFIG_FILE = "weather.env"
+WEATHER_API_TERMS_URL = "https://www.weatherapi.com/terms.aspx"
+WEATHER_API_PRIVACY_URL = "https://www.weatherapi.com/privacy.aspx"
+WEATHER_ACCOUNT_NOTICE = (
+    "Weather is disabled unless the person installing MARS Lab creates their own WeatherAPI account and configures "
+    "that account's API key. MARS does not provide or share a WeatherAPI account or key."
+)
+WEATHER_DATA_DISCLOSURE = (
+    "The browser sends the selected date and observer latitude and longitude to this MARS Lab server. When weather "
+    "is enabled, the server sends those values and the locally configured API key to WeatherAPI.com over HTTPS. "
+    "The key is not sent to the browser. MARS does not cache or persist the returned weather response. The selected "
+    "date and observer coordinates remain in the private local MARS Lab state so that its input fields can be restored."
+)
+WEATHER_SAFETY_NOTICE = (
+    "Weather information is for general information only. Conditions and forecasts are probabilistic and may be "
+    "inaccurate for the exact location or time. Do not use them as the sole basis for safety, aviation, marine, "
+    "emergency, or other safety-critical decisions; consult official meteorological services and authorities."
+)
 
 
 def weather_api_key() -> str:
@@ -15839,6 +15858,11 @@ def prepare_datetime_weather_fields(fields: dict[str, str], unavailable_reason: 
             *([{"label": "Wind", "value": weather_wind}] if weather_wind else []),
             *([{"label": "Chance of rain", "value": weather_rain_chance}] if weather_rain_chance else []),
             *([{"label": "Source", "value": weather_source}] if weather_source else []),
+            {"label": "Account", "value": WEATHER_ACCOUNT_NOTICE},
+            {"label": "Data disclosure", "value": WEATHER_DATA_DISCLOSURE},
+            {"label": "Privacy", "value": WEATHER_API_PRIVACY_URL},
+            {"label": "Safety notice", "value": WEATHER_SAFETY_NOTICE},
+            {"label": "Terms", "value": WEATHER_API_TERMS_URL},
         ]
     elif unavailable_reason:
         rows = [{"label": "Status", "value": unavailable_reason}]
@@ -17892,7 +17916,9 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             if not weather_date_is_supported(date_text):
                 unavailable_reason = "The selected date is outside the weather provider's supported range."
             elif not weather_api_key():
-                unavailable_reason = "A weather API key is not configured."
+                unavailable_reason = (
+                    "Weather is disabled. Configure an API key from your own WeatherAPI account to enable it."
+                )
             else:
                 weather_fields = fetch_daily_weather_for_datetime(date_text, latitude, longitude)
                 if not weather_fields:
@@ -17900,10 +17926,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
             response_payload = prepare_datetime_weather_fields(weather_fields or {}, unavailable_reason)
             self.log_message(
-                "datetime weather date=%s latitude=%.6f longitude=%.6f available=%s total=%.1fms",
-                date_text,
-                latitude,
-                longitude,
+                "datetime weather available=%s total=%.1fms",
                 "yes" if response_payload["available"] else "no",
                 (time.perf_counter() - weather_start) * 1000.0,
             )
