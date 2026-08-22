@@ -22,6 +22,7 @@ typedef enum {
     EXPR_SERIES_MODEL_POLYNOMIAL,
     EXPR_SERIES_MODEL_GEOMETRIC,
     EXPR_SERIES_MODEL_INVERSE_INDEX_POWER,
+    EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL,
 } expr_series_model_kind_t;
 
 typedef struct {
@@ -34,15 +35,18 @@ typedef struct {
     expr_t *symbolic_geometric_ratio;
     number_t inverse_index_first;
     int inverse_index_exponent;
+    long alternating_reciprocal_step;
     expr_t *inverse_index_numerator;
     expr_t *symbolic_exponent;
     bool symbolic_direct_power;
     size_t endpoint;
+    number_t exact_endpoint;
     expr_t *symbolic_endpoint;
     expr_series_model_kind_t kind;
 } expr_series_result_t;
 
 static void expr_series_destroy_numbers(number_t *values, size_t count);
+static bool expr_series_number_to_long(number_t value, long *value_out);
 
 static void expr_series_result_init(expr_series_result_t *result)
 {
@@ -51,6 +55,7 @@ static void expr_series_result_init(expr_series_result_t *result)
         .geometric_first = NUM_NAN,
         .geometric_ratio = NUM_NAN,
         .inverse_index_first = NUM_NAN,
+        .exact_endpoint = NUM_NAN,
     };
 }
 
@@ -66,6 +71,7 @@ static void expr_series_result_clear(expr_series_result_t *result)
     num_destroy(&result->inverse_index_first);
     expr_free(result->inverse_index_numerator);
     expr_free(result->symbolic_exponent);
+    num_destroy(&result->exact_endpoint);
     expr_free(result->symbolic_endpoint);
     expr_series_destroy_numbers(result->polynomial, result->polynomial_count);
     expr_series_result_init(result);
@@ -141,11 +147,27 @@ static bool expr_series_is_ellipsis(const char *text, expr_series_span_t span)
     return match;
 }
 
-static bool expr_series_exponent_plus(const char *text, size_t length, size_t pos)
+static bool expr_series_exponent_sign(const char *text, size_t length, size_t pos)
 {
     return pos > 1u && pos + 1u < length && (text[pos - 1u] == 'e' || text[pos - 1u] == 'E') &&
            (isdigit((unsigned char)text[pos - 2u]) || text[pos - 2u] == '.') &&
            isdigit((unsigned char)text[pos + 1u]);
+}
+
+static bool expr_series_sign_is_unary(const char *text, size_t start, size_t pos)
+{
+    size_t first = start;
+    size_t previous = pos;
+
+    while (first < pos && isspace((unsigned char)text[first]))
+        ++first;
+    if (first == pos)
+        return true;
+    while (previous > start && isspace((unsigned char)text[previous - 1u]))
+        --previous;
+    if (previous == start)
+        return true;
+    return strchr("+-*/^(,[{|=;", text[previous - 1u]) != NULL;
 }
 
 static bool expr_series_split_terms(const char *text, expr_series_span_t **terms_out, size_t *count_out)
@@ -185,10 +207,11 @@ static bool expr_series_split_terms(const char *text, expr_series_span_t **terms
                     --brace_depth;
                 break;
             case '+':
+            case '-':
                 if (paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 &&
-                    !expr_series_exponent_plus(text, length, i)) {
+                    !expr_series_exponent_sign(text, length, i) && !expr_series_sign_is_unary(text, start, i)) {
                     terms[count++] = (expr_series_span_t){start, i};
-                    start = i + 1u;
+                    start = text[i] == '-' ? i : i + 1u;
                 }
                 break;
             default:
@@ -494,6 +517,164 @@ static bool expr_series_simplified_equal(const expr_t *left, const expr_t *right
     expr_free(right_simplified);
     expr_free(left_simplified);
     return equal;
+}
+
+static bool expr_series_match_positive_long_scale(const expr_t *expression, const expr_t *base, long *scale_out)
+{
+    number_t scale = num_new();
+    const expr_t *scaled_base = NULL;
+    bool matched = false;
+
+    if (expr_series_simplified_equal(expression, base)) {
+        *scale_out = 1L;
+        return true;
+    }
+    if (expr_match_scaled_expr(expression, &scale, &scaled_base) && scaled_base &&
+        expr_series_simplified_equal(scaled_base, base) && expr_series_number_to_long(scale, scale_out) &&
+        *scale_out > 0L)
+        matched = true;
+    num_destroy(&scale);
+    return matched;
+}
+
+static bool expr_series_parse_symbolic_alternating_reciprocal_endpoint(const char *text, expr_series_span_t span,
+                                                                       number_t *first_out, long *step_out,
+                                                                       expr_t **endpoint_out)
+{
+    char *term_text = NULL;
+    expr_t *expression = NULL;
+    const expr_t *numerator = NULL;
+    const expr_t *denominator = NULL;
+    const expr_t *alternating_power = NULL;
+    const expr_t *minus_one = NULL;
+    const expr_t *endpoint = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *linear = NULL;
+    const expr_t *offset = NULL;
+    number_t first = num_new();
+    number_t base_value = num_new();
+    number_t offset_value = num_new();
+    number_t endpoint_value = num_new();
+    bool subtract = false;
+    long step = 0L;
+    bool matched = false;
+
+    *first_out = NUM_NAN;
+    *step_out = 0L;
+    *endpoint_out = NULL;
+    span = expr_series_trim(text, span);
+    term_text = expr_series_copy_span(text, span);
+    expression = term_text ? expr_from_string(term_text, NULL) : NULL;
+    free(term_text);
+    if (!expression || !expr_match_div_expr(expression, &numerator, &denominator) || !numerator || !denominator)
+        goto cleanup;
+
+    if (expr_match_scaled_expr(numerator, &first, &alternating_power) && alternating_power) {
+        /* The leading coefficient was separated from (-1)^n. */
+    } else {
+        num_destroy(&first);
+        first = num_clone(NUM_ONE);
+        alternating_power = numerator;
+    }
+    if (!num_is_exact(first) || !num_is_finite(first) || num_is_zero(first) ||
+        !expr_match_pow_expr(alternating_power, &minus_one, &endpoint) || !minus_one || !endpoint ||
+        !expr_match_const_value(minus_one, &base_value) || !num_eq(base_value, NUM_NEG_ONE))
+        goto cleanup;
+    num_destroy(&endpoint_value);
+    endpoint_value = expr_eval(endpoint);
+    if ((!expr_is_variable(endpoint) && !expr_is_named_const(endpoint)) || !num_is_nan(endpoint_value))
+        goto cleanup;
+
+    if (!expr_match_add_sub_expr(denominator, &left, &right, &subtract) || subtract || !left || !right)
+        goto cleanup;
+    if (expr_match_const_value(right, &offset_value) && num_is_one(offset_value)) {
+        linear = left;
+        offset = right;
+    } else {
+        num_destroy(&offset_value);
+        offset_value = num_new();
+        if (!expr_match_const_value(left, &offset_value) || !num_is_one(offset_value))
+            goto cleanup;
+        linear = right;
+        offset = left;
+    }
+    if (!offset || !expr_series_match_positive_long_scale(linear, endpoint, &step))
+        goto cleanup;
+
+    *first_out = first;
+    *step_out = step;
+    *endpoint_out = expr_clone(endpoint);
+    first = NUM_NAN;
+    matched = *endpoint_out != NULL;
+
+cleanup:
+    if (!matched) {
+        num_destroy(first_out);
+        *first_out = NUM_NAN;
+        *step_out = 0L;
+        expr_free(*endpoint_out);
+        *endpoint_out = NULL;
+    }
+    num_destroy(&endpoint_value);
+    num_destroy(&offset_value);
+    num_destroy(&base_value);
+    num_destroy(&first);
+    expr_free(expression);
+    return matched;
+}
+
+static bool expr_series_parse_numeric_fraction(const char *text, expr_series_span_t span, number_t *numerator_out,
+                                               number_t *denominator_out)
+{
+    char *term_text = NULL;
+    char *slash = NULL;
+    char *numerator_text = NULL;
+    char *denominator_text = NULL;
+    char *end = NULL;
+    number_t numerator = NUM_NAN;
+    number_t denominator = NUM_NAN;
+    bool matched = false;
+
+    *numerator_out = NUM_NAN;
+    *denominator_out = NUM_NAN;
+    span = expr_series_trim(text, span);
+    term_text = expr_series_copy_span(text, span);
+    slash = term_text ? strchr(term_text, '/') : NULL;
+    if (!slash || strchr(slash + 1, '/'))
+        goto cleanup;
+    *slash = '\0';
+    numerator_text = term_text;
+    denominator_text = slash + 1;
+    while (isspace((unsigned char)*numerator_text))
+        ++numerator_text;
+    while (isspace((unsigned char)*denominator_text))
+        ++denominator_text;
+    end = numerator_text + strlen(numerator_text);
+    while (end > numerator_text && isspace((unsigned char)end[-1]))
+        *--end = '\0';
+    end = denominator_text + strlen(denominator_text);
+    while (end > denominator_text && isspace((unsigned char)end[-1]))
+        *--end = '\0';
+    if (!*numerator_text || !*denominator_text)
+        goto cleanup;
+    numerator = num_create_from_string(numerator_text);
+    denominator = num_create_from_string(denominator_text);
+    if (!num_is_exact(numerator) || !num_is_integer(numerator) || !num_is_exact(denominator) ||
+        !num_is_integer(denominator) || !num_gt(denominator, NUM_ZERO))
+        goto cleanup;
+
+    *numerator_out = numerator;
+    *denominator_out = denominator;
+    numerator = NUM_NAN;
+    denominator = NUM_NAN;
+    matched = true;
+
+cleanup:
+    num_destroy(&denominator);
+    num_destroy(&numerator);
+    free(term_text);
+    return matched;
 }
 
 static expr_t *expr_series_parse_term_expression(const char *text, expr_series_span_t span)
@@ -1227,6 +1408,297 @@ cleanup:
     return found;
 }
 
+static number_t expr_series_alternating_arithmetic_reciprocal_term(number_t first, long step, size_t index)
+{
+    number_t denominator = num_create_from_long(1L + step * (long)index);
+    number_t term = num_div(first, denominator);
+
+    num_destroy(&denominator);
+    if ((index & 1u) != 0u) {
+        number_t negative = num_neg(term);
+
+        num_destroy(&term);
+        term = negative;
+    }
+    return term;
+}
+
+static bool expr_series_alternating_arithmetic_reciprocal_prefix(const number_t *coefficients,
+                                                                 size_t coefficient_count, long *step_out)
+{
+    number_t first_magnitude = NUM_NAN;
+    number_t second_magnitude = NUM_NAN;
+    number_t denominator = NUM_NAN;
+    long second_denominator = 0L;
+    long step = 0L;
+    bool matched = false;
+
+    *step_out = 0L;
+    if (coefficient_count < 3u || num_is_zero(coefficients[0]) ||
+        num_sign(coefficients[1]) == num_sign(coefficients[0]))
+        return false;
+    first_magnitude = num_abs(coefficients[0]);
+    second_magnitude = num_abs(coefficients[1]);
+    denominator = num_div(first_magnitude, second_magnitude);
+    if (!num_is_exact(denominator) || !num_is_integer(denominator) ||
+        !expr_series_number_to_long(denominator, &second_denominator) || second_denominator <= 1L)
+        goto cleanup;
+    step = second_denominator - 1L;
+    if (step > (LONG_MAX - 1L) / (long)(coefficient_count - 1u))
+        goto cleanup;
+
+    for (size_t index = 0u; index < coefficient_count; ++index) {
+        number_t expected = expr_series_alternating_arithmetic_reciprocal_term(coefficients[0], step, index);
+        bool matches = num_is_finite(expected) && num_eq(expected, coefficients[index]);
+
+        num_destroy(&expected);
+        if (!matches)
+            goto cleanup;
+    }
+    *step_out = step;
+    matched = true;
+
+cleanup:
+    num_destroy(&denominator);
+    num_destroy(&second_magnitude);
+    num_destroy(&first_magnitude);
+    return matched;
+}
+
+static bool expr_series_alternating_arithmetic_reciprocal_endpoint(number_t first, number_t last, long step,
+                                                                   size_t minimum, number_t *endpoint_out)
+{
+    number_t first_magnitude = num_abs(first);
+    number_t last_magnitude = num_abs(last);
+    number_t denominator = num_div(first_magnitude, last_magnitude);
+    number_t denominator_minus_one = NUM_NAN;
+    number_t step_value = num_create_from_long(step);
+    number_t endpoint = NUM_NAN;
+    number_t division_remainder = NUM_NAN;
+    number_t minimum_value = num_create_from_long((long)minimum);
+    number_t remainder = NUM_NAN;
+    number_t scaled_endpoint = NUM_NAN;
+    number_t expected_denominator = NUM_NAN;
+    number_t expected = NUM_NAN;
+    bool matched = false;
+
+    *endpoint_out = NUM_NAN;
+    if (num_is_zero(last) || !num_is_exact(denominator) || !num_is_integer(denominator) ||
+        !num_gt(denominator, NUM_ZERO))
+        goto cleanup;
+    denominator_minus_one = num_sub(denominator, NUM_ONE);
+    if (num_divmod(denominator_minus_one, step_value, &endpoint, &division_remainder) != 0 ||
+        !num_is_zero(division_remainder) || !num_is_exact(endpoint) || !num_is_integer(endpoint) ||
+        !num_ge(endpoint, minimum_value))
+        goto cleanup;
+    scaled_endpoint = num_mul(endpoint, step_value);
+    expected_denominator = num_add(scaled_endpoint, NUM_ONE);
+    expected = num_div(first, expected_denominator);
+    remainder = num_mod(endpoint, NUM_TWO);
+    if (num_is_one(remainder)) {
+        number_t negative = num_neg(expected);
+
+        num_destroy(&expected);
+        expected = negative;
+    }
+    if (!num_is_finite(expected) || !num_eq(expected, last))
+        goto cleanup;
+    *endpoint_out = endpoint;
+    endpoint = NUM_NAN;
+    matched = true;
+
+cleanup:
+    num_destroy(&expected_denominator);
+    num_destroy(&scaled_endpoint);
+    num_destroy(&remainder);
+    num_destroy(&minimum_value);
+    num_destroy(&division_remainder);
+    num_destroy(&endpoint);
+    num_destroy(&step_value);
+    num_destroy(&denominator_minus_one);
+    num_destroy(&expected);
+    num_destroy(&denominator);
+    num_destroy(&last_magnitude);
+    num_destroy(&first_magnitude);
+    return matched;
+}
+
+static bool expr_series_alternating_arithmetic_reciprocal_fraction_endpoint(
+    number_t first, number_t numerator, number_t denominator, long step, size_t minimum, number_t *endpoint_out)
+{
+    number_t first_magnitude = num_abs(first);
+    number_t numerator_magnitude = num_abs(numerator);
+    number_t denominator_minus_one = NUM_NAN;
+    number_t step_value = num_create_from_long(step);
+    number_t endpoint = NUM_NAN;
+    number_t division_remainder = NUM_NAN;
+    number_t minimum_value = num_create_from_long((long)minimum);
+    number_t remainder = NUM_NAN;
+    bool signs_match;
+    bool matched = false;
+
+    *endpoint_out = NUM_NAN;
+    if (!num_is_exact(numerator) || !num_is_integer(numerator) || !num_is_exact(denominator) ||
+        !num_is_integer(denominator) || !num_gt(denominator, NUM_ZERO) ||
+        !num_eq(first_magnitude, numerator_magnitude))
+        goto cleanup;
+    denominator_minus_one = num_sub(denominator, NUM_ONE);
+    if (num_divmod(denominator_minus_one, step_value, &endpoint, &division_remainder) != 0 ||
+        !num_is_zero(division_remainder) || !num_is_exact(endpoint) || !num_is_integer(endpoint) ||
+        !num_ge(endpoint, minimum_value))
+        goto cleanup;
+    remainder = num_mod(endpoint, NUM_TWO);
+    signs_match = num_sign(first) == num_sign(numerator);
+    if ((num_is_zero(remainder) && !signs_match) || (num_is_one(remainder) && signs_match))
+        goto cleanup;
+
+    *endpoint_out = endpoint;
+    endpoint = NUM_NAN;
+    matched = true;
+
+cleanup:
+    num_destroy(&remainder);
+    num_destroy(&minimum_value);
+    num_destroy(&division_remainder);
+    num_destroy(&endpoint);
+    num_destroy(&step_value);
+    num_destroy(&denominator_minus_one);
+    num_destroy(&numerator_magnitude);
+    num_destroy(&first_magnitude);
+    return matched;
+}
+
+static number_t expr_series_alternating_arithmetic_reciprocal_sum_approx(number_t first, long step,
+                                                                         number_t endpoint)
+{
+    number_t step_value = num_create_from_long(step);
+    number_t reciprocal_step = num_div(NUM_ONE, step_value);
+    number_t first_digamma_arg_numerator = num_add(reciprocal_step, NUM_ONE);
+    number_t first_digamma_arg = num_div(first_digamma_arg_numerator, NUM_TWO);
+    number_t second_digamma_arg = num_div(reciprocal_step, NUM_TWO);
+    number_t first_digamma = num_digamma(first_digamma_arg);
+    number_t second_digamma = num_digamma(second_digamma_arg);
+    number_t infinite_difference = num_sub(first_digamma, second_digamma);
+    number_t endpoint_plus_reciprocal = num_add(endpoint, reciprocal_step);
+    number_t tail_first_numerator = num_add(endpoint_plus_reciprocal, NUM_TWO);
+    number_t tail_second_numerator = num_add(endpoint_plus_reciprocal, NUM_ONE);
+    number_t tail_first_arg = num_div(tail_first_numerator, NUM_TWO);
+    number_t tail_second_arg = num_div(tail_second_numerator, NUM_TWO);
+    number_t tail_first = num_digamma(tail_first_arg);
+    number_t tail_second = num_digamma(tail_second_arg);
+    number_t tail_difference = num_sub(tail_first, tail_second);
+    number_t endpoint_remainder = num_mod(endpoint, NUM_TWO);
+    number_t signed_tail = num_is_one(endpoint_remainder) ? num_neg(tail_difference) : num_clone(tail_difference);
+    number_t bracket = num_add(infinite_difference, signed_tail);
+    number_t twice_step = num_mul(NUM_TWO, step_value);
+    number_t scale = num_div(first, twice_step);
+    number_t sum = num_mul(scale, bracket);
+
+    num_destroy(&scale);
+    num_destroy(&twice_step);
+    num_destroy(&bracket);
+    num_destroy(&signed_tail);
+    num_destroy(&endpoint_remainder);
+    num_destroy(&tail_difference);
+    num_destroy(&tail_second);
+    num_destroy(&tail_first);
+    num_destroy(&tail_second_arg);
+    num_destroy(&tail_first_arg);
+    num_destroy(&tail_second_numerator);
+    num_destroy(&tail_first_numerator);
+    num_destroy(&endpoint_plus_reciprocal);
+    num_destroy(&infinite_difference);
+    num_destroy(&second_digamma);
+    num_destroy(&first_digamma);
+    num_destroy(&second_digamma_arg);
+    num_destroy(&first_digamma_arg);
+    num_destroy(&first_digamma_arg_numerator);
+    num_destroy(&reciprocal_step);
+    num_destroy(&step_value);
+    return sum;
+}
+
+static bool expr_series_sum_alternating_arithmetic_reciprocal(const number_t *coefficients,
+                                                              size_t coefficient_count, number_t last,
+                                                              number_t *sum_out, bool *recognised_out,
+                                                              size_t *endpoint_out, number_t *exact_endpoint_out,
+                                                              long *step_out)
+{
+    number_t sum = NUM_NAN;
+    number_t exact_endpoint = NUM_NAN;
+    number_t exact_sum_limit = NUM_NAN;
+    long step = 0L;
+    size_t endpoint = 0u;
+    long endpoint_long = 0L;
+    bool found = false;
+
+    *sum_out = NUM_NAN;
+    *recognised_out = false;
+    *endpoint_out = 0u;
+    *exact_endpoint_out = NUM_NAN;
+    *step_out = 0L;
+    if (!expr_series_alternating_arithmetic_reciprocal_prefix(coefficients, coefficient_count, &step))
+        return false;
+    *recognised_out = true;
+    if (!expr_series_alternating_arithmetic_reciprocal_endpoint(coefficients[0], last, step, coefficient_count,
+                                                                &exact_endpoint))
+        return false;
+    exact_sum_limit = num_create_from_long(1000000L);
+    if (!num_is_finite(exact_sum_limit))
+        goto cleanup;
+    if (num_gt(exact_endpoint, exact_sum_limit)) {
+        sum = expr_series_alternating_arithmetic_reciprocal_sum_approx(coefficients[0], step, exact_endpoint);
+        if (!num_is_finite(sum))
+            goto cleanup;
+        *sum_out = sum;
+        *exact_endpoint_out = exact_endpoint;
+        *step_out = step;
+        sum = NUM_NAN;
+        exact_endpoint = NUM_NAN;
+        num_destroy(&exact_sum_limit);
+        return true;
+    }
+    if (!expr_series_number_to_long(exact_endpoint, &endpoint_long) || endpoint_long < 0L)
+        goto cleanup;
+    endpoint = (size_t)endpoint_long;
+    if (!expr_series_initial_sum(coefficients, coefficient_count, &sum))
+        goto cleanup;
+
+    for (size_t index = coefficient_count; index <= endpoint; ++index) {
+        number_t term;
+        number_t next_sum;
+
+        if (step > (LONG_MAX - 1L) / (long)index)
+            break;
+        term = expr_series_alternating_arithmetic_reciprocal_term(coefficients[0], step, index);
+        next_sum = num_add(sum, term);
+        num_destroy(&sum);
+        sum = next_sum;
+        if (!num_is_finite(term) || !num_is_finite(sum)) {
+            num_destroy(&term);
+            goto cleanup;
+        }
+        if (index == endpoint && num_eq(term, last)) {
+            *sum_out = sum;
+            *endpoint_out = index;
+            *exact_endpoint_out = exact_endpoint;
+            *step_out = step;
+            sum = NUM_NAN;
+            exact_endpoint = NUM_NAN;
+            found = true;
+            num_destroy(&term);
+            break;
+        }
+        num_destroy(&term);
+    }
+
+cleanup:
+    num_destroy(&exact_sum_limit);
+    num_destroy(&exact_endpoint);
+    num_destroy(&sum);
+    return found;
+}
+
 static number_t *expr_series_difference_tails(const number_t *coefficients, size_t coefficient_count,
                                              size_t *degree_out)
 {
@@ -1584,13 +2056,26 @@ static bool expr_series_set_index_power_model(expr_series_result_t *result, cons
 static bool expr_series_sum_coefficients(const number_t *coefficients, size_t coefficient_count, number_t last,
                                         expr_series_result_t *result)
 {
+    bool alternating_arithmetic_reciprocal = false;
     bool geometric = false;
     bool index_power = false;
     bool inverse_index_power = false;
     size_t endpoint = 0u;
     int exponent = 0;
+    long alternating_reciprocal_step = 0L;
     number_t ratio = NUM_NAN;
 
+    if (expr_series_sum_alternating_arithmetic_reciprocal(
+            coefficients, coefficient_count, last, &result->sum, &alternating_arithmetic_reciprocal,
+            &endpoint, &result->exact_endpoint, &alternating_reciprocal_step)) {
+        result->inverse_index_first = num_clone(coefficients[0]);
+        result->alternating_reciprocal_step = alternating_reciprocal_step;
+        result->endpoint = endpoint;
+        result->kind = EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL;
+        return true;
+    }
+    if (alternating_arithmetic_reciprocal)
+        return false;
     if (expr_series_sum_inverse_index_power(coefficients, coefficient_count, last, &result->sum,
                                            &inverse_index_power, &endpoint, &exponent)) {
         result->inverse_index_first = num_clone(coefficients[0]);
@@ -1739,6 +2224,30 @@ static expr_t *expr_series_inverse_index_power_expr(const expr_series_result_t *
     return term;
 }
 
+static expr_t *expr_series_alternating_arithmetic_reciprocal_expr(const expr_series_result_t *result,
+                                                                  const expr_t *index)
+{
+    number_t step_value = num_create_from_long(result->alternating_reciprocal_step);
+    expr_t *minus_one = expr_new_const(NUM_NEG_ONE);
+    expr_t *alternating_sign = minus_one ? expr_pow_xp(minus_one, index) : NULL;
+    expr_t *step = expr_new_const(step_value);
+    expr_t *scaled_index = step ? expr_mul(step, index) : NULL;
+    expr_t *denominator = scaled_index ? expr_add(scaled_index, EXPR_ONE) : NULL;
+    expr_t *first = expr_new_const(result->inverse_index_first);
+    expr_t *numerator = first && alternating_sign ? expr_mul(first, alternating_sign) : NULL;
+    expr_t *term = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+
+    expr_free(numerator);
+    expr_free(first);
+    expr_free(denominator);
+    expr_free(scaled_index);
+    expr_free(step);
+    expr_free(alternating_sign);
+    expr_free(minus_one);
+    num_destroy(&step_value);
+    return term;
+}
+
 static expr_t *expr_series_parse_span_expr(const char *text, expr_series_span_t span)
 {
     char *term_text;
@@ -1802,7 +2311,9 @@ static string_t *expr_series_display_TeX(const char *text, const expr_series_spa
     expr_t *factor_expr = NULL;
     expr_t *term = NULL;
     const bool zero_based_geometric = result->kind == EXPR_SERIES_MODEL_GEOMETRIC && result->symbolic_endpoint;
-    expr_t *lower = expr_new_const(zero_based_geometric ? NUM_ZERO : NUM_ONE);
+    const bool zero_based = zero_based_geometric ||
+                            result->kind == EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL;
+    expr_t *lower = expr_new_const(zero_based ? NUM_ZERO : NUM_ONE);
     number_t endpoint_value = NUM_NAN;
     expr_t *upper = NULL;
     expr_t *summation = NULL;
@@ -1817,6 +2328,8 @@ static string_t *expr_series_display_TeX(const char *text, const expr_series_spa
         upper = zero_based_geometric ? expr_sub_simplify_owned(expr_clone(result->symbolic_endpoint),
                                                                expr_clone(EXPR_ONE))
                                      : expr_clone(result->symbolic_endpoint);
+    } else if (num_is_exact(result->exact_endpoint)) {
+        upper = expr_new_const(result->exact_endpoint);
     } else {
         endpoint_value = num_create_from_long((long)result->endpoint);
         upper = expr_new_const(endpoint_value);
@@ -1834,6 +2347,8 @@ static string_t *expr_series_display_TeX(const char *text, const expr_series_spa
                                      : expr_series_geometric_expr(result, index);
     else if (result->kind == EXPR_SERIES_MODEL_INVERSE_INDEX_POWER)
         model = expr_series_inverse_index_power_expr(result, index, factor_expr);
+    else if (result->kind == EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL)
+        model = expr_series_alternating_arithmetic_reciprocal_expr(result, index);
     else
         model = expr_series_polynomial_expr(result, index);
     if (!model)
@@ -2181,6 +2696,32 @@ static int expr_series_append_symbolic_power_formula(string_t *output, const exp
     return status;
 }
 
+static int expr_series_append_symbolic_alternating_reciprocal_formula(string_t *output, const char *source_text,
+                                                                      const expr_series_result_t *result)
+{
+    const char *index_name = expr_series_display_index_name(source_text);
+    string_t *first_text = num_to_string(result->inverse_index_first);
+    char *endpoint_text = expr_to_string(result->symbolic_endpoint, style_UNBOUND);
+    int status = -1;
+
+    if (!first_text || !endpoint_text)
+        goto cleanup;
+    if (num_is_one(result->inverse_index_first)) {
+        if (string_append_format(output, "sum((-1)^(%s)/(%ld*(%s)+1),%s,0,%s)", index_name,
+                                 result->alternating_reciprocal_step, index_name, index_name, endpoint_text) >= 0)
+            status = 0;
+    } else if (string_append_format(output, "sum((%S)*(-1)^(%s)/(%ld*(%s)+1),%s,0,%s)", first_text,
+                                    index_name, result->alternating_reciprocal_step, index_name, index_name,
+                                    endpoint_text) >= 0) {
+        status = 0;
+    }
+
+cleanup:
+    free(endpoint_text);
+    string_free(first_text);
+    return status;
+}
+
 static string_t *expr_series_expand_once(const string_t *side, bool *expanded_out, string_t **display_TeX_out,
                                          expr_series_binding_lookup_fn lookup_binding, void *lookup_context,
                                          bool *domain_specialised_out)
@@ -2198,8 +2739,14 @@ static string_t *expr_series_expand_once(const string_t *side, bool *expanded_ou
     char *terminal_factor = NULL;
     expr_t *symbolic_numerator = NULL;
     number_t symbolic_geometric_ratio = NUM_NAN;
+    number_t symbolic_alternating_first = NUM_NAN;
+    number_t numeric_terminal_numerator = NUM_NAN;
+    number_t numeric_terminal_denominator = NUM_NAN;
     int symbolic_exponent = 0;
+    long symbolic_alternating_step = 0L;
     bool symbolic_endpoint = false;
+    bool symbolic_alternating = false;
+    bool numeric_fraction_endpoint = false;
     bool symbolic_geometric = false;
     bool symbolic_geometric_expression = false;
     bool endpoint_positive_infinity = false;
@@ -2234,13 +2781,24 @@ static string_t *expr_series_expand_once(const string_t *side, bool *expanded_ou
     }
     symbolic_endpoint = symbolic_geometric;
     if (!symbolic_geometric) {
+        symbolic_alternating = expr_series_parse_symbolic_alternating_reciprocal_endpoint(
+            text, terms[ellipsis_index + 1u], &symbolic_alternating_first, &symbolic_alternating_step,
+            &result.symbolic_endpoint);
+        symbolic_endpoint = symbolic_alternating;
+    }
+    if (!symbolic_geometric && !symbolic_alternating) {
         symbolic_endpoint = expr_series_parse_symbolic_power_endpoint(
             text, terms[ellipsis_index + 1u], &symbolic_numerator, &result.symbolic_endpoint,
             &result.symbolic_exponent, &symbolic_exponent, &result.symbolic_direct_power);
     }
-    if (!symbolic_endpoint &&
-        !expr_series_parse_term(text, terms[ellipsis_index + 1u], &last, &terminal_factor))
-        goto unsupported;
+    if (!symbolic_endpoint) {
+        numeric_fraction_endpoint = expr_series_parse_numeric_fraction(
+            text, terms[ellipsis_index + 1u], &numeric_terminal_numerator, &numeric_terminal_denominator);
+        if (expr_series_parse_term(text, terms[ellipsis_index + 1u], &last, &terminal_factor))
+            numeric_fraction_endpoint = false;
+        else if (!numeric_fraction_endpoint)
+            goto unsupported;
+    }
     if (symbolic_endpoint && result.symbolic_exponent) {
         if (!expr_series_symbolic_power_prefix_matches(text, terms, ellipsis_index, symbolic_numerator,
                                                        result.symbolic_exponent, result.symbolic_direct_power,
@@ -2297,6 +2855,15 @@ static string_t *expr_series_expand_once(const string_t *side, bool *expanded_ou
         result.geometric_first = num_clone(coefficients[0]);
         result.geometric_ratio = num_clone(symbolic_geometric_ratio);
         result.kind = EXPR_SERIES_MODEL_GEOMETRIC;
+    } else if (symbolic_alternating) {
+        long inferred_step = 0L;
+
+        if (!expr_series_alternating_arithmetic_reciprocal_prefix(coefficients, coefficient_count, &inferred_step) ||
+            inferred_step != symbolic_alternating_step || !num_eq(coefficients[0], symbolic_alternating_first))
+            goto unsupported;
+        result.inverse_index_first = num_clone(coefficients[0]);
+        result.alternating_reciprocal_step = inferred_step;
+        result.kind = EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL;
     } else if (symbolic_endpoint) {
         int inferred_exponent = 0;
 
@@ -2307,6 +2874,42 @@ static string_t *expr_series_expand_once(const string_t *side, bool *expanded_ou
         result.inverse_index_first = num_clone(coefficients[0]);
         result.inverse_index_exponent = inferred_exponent;
         result.kind = EXPR_SERIES_MODEL_INVERSE_INDEX_POWER;
+    } else if (numeric_fraction_endpoint) {
+        number_t exact_endpoint = NUM_NAN;
+        number_t exact_sum_limit = num_create_from_long(1000000L);
+        long inferred_step = 0L;
+        bool prefix_matches =
+            expr_series_alternating_arithmetic_reciprocal_prefix(coefficients, coefficient_count, &inferred_step);
+        bool endpoint_matches =
+            prefix_matches && expr_series_alternating_arithmetic_reciprocal_fraction_endpoint(
+                                  coefficients[0], numeric_terminal_numerator, numeric_terminal_denominator,
+                                  inferred_step, coefficient_count, &exact_endpoint);
+
+        if (*last_factor || !prefix_matches || !endpoint_matches) {
+            num_destroy(&exact_sum_limit);
+            num_destroy(&exact_endpoint);
+            goto unsupported;
+        }
+        if (!num_gt(exact_endpoint, exact_sum_limit)) {
+            last = num_div(numeric_terminal_numerator, numeric_terminal_denominator);
+            num_destroy(&exact_endpoint);
+            num_destroy(&exact_sum_limit);
+            if (!num_is_exact(last) || !expr_series_sum_coefficients(coefficients, coefficient_count, last, &result))
+                goto unsupported;
+        } else {
+            result.sum = expr_series_alternating_arithmetic_reciprocal_sum_approx(coefficients[0], inferred_step,
+                                                                                  exact_endpoint);
+            if (!num_is_finite(result.sum)) {
+                num_destroy(&exact_sum_limit);
+                num_destroy(&exact_endpoint);
+                goto unsupported;
+            }
+            result.inverse_index_first = num_clone(coefficients[0]);
+            result.alternating_reciprocal_step = inferred_step;
+            result.exact_endpoint = exact_endpoint;
+            result.kind = EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL;
+            num_destroy(&exact_sum_limit);
+        }
     } else {
         if (strcmp(last_factor, terminal_factor) != 0 ||
             !expr_series_sum_coefficients(coefficients, coefficient_count, last, &result))
@@ -2342,6 +2945,10 @@ model_ready:
         goto allocation_failure;
     if (result.kind == EXPR_SERIES_MODEL_GEOMETRIC && result.symbolic_endpoint) {
         if (expr_series_append_symbolic_geometric_formula(output, &result) != 0)
+            goto allocation_failure;
+    } else if (result.kind == EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL &&
+               result.symbolic_endpoint) {
+        if (expr_series_append_symbolic_alternating_reciprocal_formula(output, text, &result) != 0)
             goto allocation_failure;
     } else if (result.kind == EXPR_SERIES_MODEL_INVERSE_INDEX_POWER && result.symbolic_exponent) {
         if (expr_series_append_symbolic_power_formula(output, &result, lookup_binding, lookup_context,
@@ -2384,8 +2991,9 @@ model_ready:
     goto cleanup;
 
 unsupported:
-    fprintf(stderr, "expr_from_string: ellipsis must abbreviate an exact polynomial, index-power, inverse-index-power, "
-                    "or geometric sequence of like additive terms\n");
+    fprintf(stderr,
+            "expr_from_string: ellipsis must abbreviate an exact polynomial, index-power, inverse-index-power, "
+            "alternating reciprocal, or geometric sequence of like additive terms\n");
     output = NULL;
     goto cleanup;
 
@@ -2398,6 +3006,9 @@ allocation_failure:
 cleanup:
     expr_series_result_clear(&result);
     expr_free(symbolic_numerator);
+    num_destroy(&numeric_terminal_denominator);
+    num_destroy(&numeric_terminal_numerator);
+    num_destroy(&symbolic_alternating_first);
     num_destroy(&symbolic_geometric_ratio);
     num_destroy(&last);
     expr_series_destroy_numbers(coefficients, coefficient_count);

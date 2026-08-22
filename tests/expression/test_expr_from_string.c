@@ -184,6 +184,94 @@ static void test_from_string_series_ellipsis(void)
     string_free(derivation_TeX);
 
     derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX("1 - 1/3 + 1/5 - 1/7 + ... + 1/21", NULL,
+                                                       &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expected = num_create_from_string("11757173/14549535");
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_exact(actual));
+    ASSERT_TRUE(num_eq(actual, expected));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=0}^{10}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "(-1)^{n}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "2n + 1"));
+    num_destroy(&actual);
+    num_destroy(&expected);
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX(
+        "4 - 4/3 + 4/5 - 4/7 + ... + 4(-1)^n/(2n+1)", &bindings, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(derivation_TeX);
+    expression_text = expr_to_string(expression, style_EXPRESSION);
+    ASSERT_NOT_NULL(expression_text);
+    ASSERT_NOT_NULL(strstr(expression_text, "Σ_(k=0)^n 4·(-1)^k/(2k + 1)"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "4\\mkern-2mu \\left(-1\\right)^{k}"));
+    free(expression_text);
+    expr_bindings_free(bindings);
+    bindings = NULL;
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX(
+        "4 - 4/3 + 4/5 - 4/7 + ... + 4/10000001", NULL, &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(actual));
+    ASSERT_EQ_DOUBLE(num_to_double(actual), 3.14159285358975323846864338288, 1e-15);
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=0}^{5000000}"));
+    num_destroy(&actual);
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    {
+        string_t *source = string_new_with("4 - 4/3 + 4/5 - 4/7 + ... + 4/1");
+        string_t *upper = string_new_with("\\sum_{n=0}^{5");
+
+        ASSERT_NOT_NULL(source);
+        ASSERT_NOT_NULL(upper);
+        for (size_t digit = 0u; digit < 300u; ++digit) {
+            ASSERT_EQ_INT(string_append_char(source, '0'), 0);
+            ASSERT_EQ_INT(string_append_char(upper, '0'), 0);
+        }
+        ASSERT_EQ_INT(string_append_char(source, '1'), 0);
+        ASSERT_EQ_INT(string_append_char(upper, '}'), 0);
+
+        derivation_TeX = NULL;
+        expression = expr_from_string_with_derivation_TeX(string_c_str(source), NULL, &derivation_TeX);
+        ASSERT_NOT_NULL(expression);
+        ASSERT_NOT_NULL(derivation_TeX);
+        actual = expr_eval(expression);
+        ASSERT_TRUE(num_is_finite(actual));
+        ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), string_c_str(upper)));
+        num_destroy(&actual);
+        expr_free(expression);
+        string_free(derivation_TeX);
+        string_free(upper);
+        string_free(source);
+    }
+
+    derivation_TeX = NULL;
+    expression = expr_from_string_with_derivation_TeX(
+        "4 - 4/3 + 4/5 - 4/7 + ... + 4/100000000000000000000000000000000000001", NULL,
+        &derivation_TeX);
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(derivation_TeX);
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(actual));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
+                           "\\sum_{n=0}^{50000000000000000000000000000000000000}"));
+    num_destroy(&actual);
+    expr_free(expression);
+    string_free(derivation_TeX);
+
+    derivation_TeX = NULL;
     expression = expr_from_string_with_derivation_TeX("a + ar + ar^2 + ar^3 + ... + ar^n", &bindings,
                                                        &derivation_TeX);
     ASSERT_NOT_NULL(expression);
@@ -797,6 +885,9 @@ static void test_from_string_bracketed_names(void)
                     __LINE__);
     /* Bracketed name as named const in pure-const format */
     check_parse_val("[my const] pure const = 99", "{ [my const] = 99 }", 99.0, __LINE__);
+    check_parse_val("$[name] input alias", "{ $[sqrt(2)] + 1 | $[sqrt(2)] = 2 }", 3.0, __LINE__);
+    check_parse_val("$[long name] input alias", "{ $[long descriptive variable] | $[long descriptive variable] = 7 }",
+                    7.0, __LINE__);
 }
 
 static void test_from_string_name_normalisation(void)
@@ -2276,21 +2367,28 @@ static void test_binding_edit_preserves_symbolic_value(void)
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *edited_bindings = NULL;
     expr_bindings_t *fraction_bindings = NULL;
+    expr_bindings_t *tenth_bindings = NULL;
     expr_t *expr = expr_from_string("{ x^2 | x = NAN }", &bindings);
     expr_t *edited = expr_edit_binding(expr, bindings, "x", "pi", &edited_bindings);
     expr_t *fraction = expr_edit_binding(expr, bindings, "x", "½", &fraction_bindings);
+    expr_t *tenth = expr_edit_binding(expr, bindings, "x", "⅒", &tenth_bindings);
     char *expr_text = edited ? expr_to_string(edited, style_EXPRESSION) : NULL;
     char *func_text = edited ? expr_to_string(edited, style_FUNCTION) : NULL;
     char *fraction_func_text = fraction ? expr_to_string(fraction, style_FUNCTION) : NULL;
+    char *tenth_func_text = tenth ? expr_to_string(tenth, style_FUNCTION) : NULL;
     bool expression_preserved = expr_text && strstr(expr_text, "x = π");
     bool function_preserved = func_text && strstr(func_text, "x = @pi;\noutput(expr(x));");
-    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = ½;\noutput(expr(x));");
+    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = 1/2;\noutput(expr(x));");
+    bool tenth_preserved = tenth_func_text && strstr(tenth_func_text, "x = 1/10;\noutput(expr(x));");
 
+    free(tenth_func_text);
     free(fraction_func_text);
     free(func_text);
     free(expr_text);
     expr_bindings_free(fraction_bindings);
     expr_free(fraction);
+    expr_bindings_free(tenth_bindings);
+    expr_free(tenth);
     expr_bindings_free(edited_bindings);
     expr_free(edited);
     expr_bindings_free(bindings);
@@ -2298,7 +2396,8 @@ static void test_binding_edit_preserves_symbolic_value(void)
 
     TEST_ASSERT_TRUE(expression_preserved, "binding edit preserves pi in expression output");
     TEST_ASSERT_TRUE(function_preserved, "binding edit preserves pi in function output");
-    TEST_ASSERT_TRUE(fraction_preserved, "function output preserves a Unicode fraction binding");
+    TEST_ASSERT_TRUE(fraction_preserved, "function output uses a typeable ASCII fraction binding");
+    TEST_ASSERT_TRUE(tenth_preserved, "function output safely expands a vulgar fraction to ASCII");
 }
 
 static void test_binding_edit_preserves_array_value(void)

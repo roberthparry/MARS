@@ -253,6 +253,20 @@ char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit
 
 #endif /* EXPR_INTERNAL_H */
 
+typedef struct expr_function_temporaries expr_function_temporaries_t;
+
+/* Build a shared function-temporary plan for several expression roots. */
+expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *roots, size_t count);
+
+/* Render the declarations selected by a shared function-temporary plan. */
+string_t *expr_function_temporaries_declarations_text(const expr_function_temporaries_t *plan);
+
+/* Render one root using the names selected by a shared function-temporary plan. */
+string_t *expr_function_temporaries_expression_text(const expr_function_temporaries_t *plan, const expr_t *expr);
+
+/* Release a shared function-temporary plan. */
+void expr_function_temporaries_free(expr_function_temporaries_t *plan);
+
 typedef bool (*expr_series_binding_lookup_fn)(void *context, const char *name, number_t *value_out);
 
 string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_out,

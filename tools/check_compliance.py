@@ -192,6 +192,11 @@ def main() -> int:
         action="store_true",
         help="accept compliance files present in the working tree before their first commit",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="suppress the success message while retaining all failure diagnostics",
+    )
     arguments = parser.parse_args()
 
     errors: list[str] = []
@@ -212,7 +217,8 @@ def main() -> int:
             print(f"  {error}", file=sys.stderr)
         return 1
 
-    print("compliance records, installed notices, SPDX references and provenance checksums are consistent")
+    if not arguments.quiet:
+        print("compliance records, installed notices, SPDX references and provenance checksums are consistent")
     return 0
 
 

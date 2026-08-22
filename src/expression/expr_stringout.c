@@ -4088,22 +4088,101 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 /* FUNCTION MODE (calculator-style)                                          */
 /* ------------------------------------------------------------------------- */
 
-static void emit_func_fragment(sbuf_t *b, const char *text)
+static int function_fraction_digit(const char *text, const char *const digits[10], size_t *width)
+{
+    for (int digit = 0; digit < 10; ++digit) {
+        size_t digit_width = strlen(digits[digit]);
+
+        if (strncmp(text, digits[digit], digit_width) == 0) {
+            if (width)
+                *width = digit_width;
+            return digit;
+        }
+    }
+    return -1;
+}
+
+static size_t function_ascii_stacked_fraction(char *out, const char *text)
+{
+    const char *cursor = text;
+    char *output = out;
+    size_t digit_width = 0u;
+    int digit;
+
+    while ((digit = function_fraction_digit(cursor, sup_digits, &digit_width)) >= 0) {
+        *output++ = (char)('0' + digit);
+        cursor += digit_width;
+    }
+    if (output == out || strncmp(cursor, "⁄", strlen("⁄")) != 0)
+        return 0u;
+
+    *output++ = '/';
+    cursor += strlen("⁄");
+    char *denominator = output;
+    while ((digit = function_fraction_digit(cursor, sub_digits, &digit_width)) >= 0) {
+        *output++ = (char)('0' + digit);
+        cursor += digit_width;
+    }
+    if (output == denominator)
+        return 0u;
+
+    *output = '\0';
+    return (size_t)(cursor - text);
+}
+
+static size_t function_ascii_vulgar_fraction(char *out, const char *text)
+{
+    static const struct {
+        const char *unicode;
+        const char *ascii;
+    } fractions[] = {
+        {"¼", "1/4"}, {"½", "1/2"}, {"¾", "3/4"}, {"⅐", "1/7"}, {"⅑", "1/9"}, {"⅒", "1/10"},
+        {"⅓", "1/3"}, {"⅔", "2/3"}, {"⅕", "1/5"}, {"⅖", "2/5"}, {"⅗", "3/5"}, {"⅘", "4/5"},
+        {"⅙", "1/6"}, {"⅚", "5/6"}, {"⅛", "1/8"}, {"⅜", "3/8"}, {"⅝", "5/8"}, {"⅞", "7/8"},
+    };
+
+    for (size_t i = 0u; i < sizeof(fractions) / sizeof(fractions[0]); ++i) {
+        size_t width = strlen(fractions[i].unicode);
+
+        if (strncmp(text, fractions[i].unicode, width) == 0) {
+            strcpy(out, fractions[i].ascii);
+            return width;
+        }
+    }
+    return 0u;
+}
+
+void emit_func_fragment(sbuf_t *b, const char *text)
 {
     char *normalised;
+    size_t input_length;
     size_t input_index = 0u;
     size_t output_index = 0u;
 
     if (!text)
         return;
 
-    normalised = malloc(strlen(text) + 1u);
+    input_length = strlen(text);
+    if (input_length > ((size_t)-1 - 1u) / 2u) {
+        sbuf_puts(b, text);
+        return;
+    }
+    normalised = malloc(input_length * 2u + 1u);
     if (!normalised) {
         sbuf_puts(b, text);
         return;
     }
 
     while (text[input_index] != '\0') {
+        size_t fraction_width = function_ascii_stacked_fraction(normalised + output_index, text + input_index);
+
+        if (fraction_width == 0u)
+            fraction_width = function_ascii_vulgar_fraction(normalised + output_index, text + input_index);
+        if (fraction_width != 0u) {
+            output_index += strlen(normalised + output_index);
+            input_index += fraction_width;
+            continue;
+        }
         if (text[input_index] == ' ') {
             size_t operator_index = input_index;
 

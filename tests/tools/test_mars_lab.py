@@ -1,5 +1,6 @@
 import datetime as py_datetime
 import math
+import re
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,54 @@ class JurisdictionDefaultTests(unittest.TestCase):
 
 
 class MobileAccessTests(unittest.TestCase):
+    def test_local_holidays_use_available_panel_height_before_page_scrolling(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn(".datetime-local-body {\n      max-height: none;\n      overflow: visible;", html)
+        self.assertNotIn(".datetime-local-body {\n      max-height: 20rem;\n      overflow: auto;", html)
+
+    def test_primary_actions_follow_the_editor_in_viewport_fitted_modes(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertNotIn("#workspacePanel.viewport-fitted #expr {\n      flex: 1 1 auto;", html)
+        self.assertNotIn("#workspacePanel > .controls:not(.derivative-controls) {\n      margin-top: auto;", html)
+
+    def test_textarea_resize_grip_appears_only_when_space_runs_out_in_any_mode(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("textarea.editor-space-limited {\n      resize: vertical;", html)
+        self.assertIn("const labTextareas = Array.from(document.querySelectorAll('textarea'));", html)
+        self.assertIn("function textareaCanUseConditionalResize(textarea)", html)
+        self.assertNotIn("function editorCanUseConditionalResize()", html)
+        self.assertIn("const spaceLimited = textarea.scrollHeight > textarea.clientHeight + 1;", html)
+        self.assertIn("textarea.classList.toggle('editor-space-limited', spaceLimited);", html)
+        self.assertIn("textarea.classList.add('editor-manual-size');", html)
+        self.assertIn("setWorkspacePanelHeight(workspacePanelBaseHeight + fittedTextareaExtraHeight());", html)
+        self.assertIn("labTextareas.forEach((textarea) => expressionEditorResizeObserver.observe(textarea));", html)
+        self.assertIn("const maximumTotalExtraHeight = Math.max(96, Math.min(320, window.innerHeight * 0.35));", html)
+        self.assertIn("const maximumExtraHeight = maximumTotalExtraHeight / Math.max(1, visibleTextareas.length);", html)
+        self.assertIn("const manuallyResized = Math.abs(currentHeight - automaticHeight) > 2;", html)
+        self.assertIn("textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;", html)
+        self.assertIn("#workspacePanel.viewport-fitted.manually-expanded,", html)
+
+    def test_every_scrollable_lab_element_uses_the_MARS_scrollbar_theme(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("*::-webkit-scrollbar {", html)
+        self.assertIn("*::-webkit-scrollbar-track {", html)
+        self.assertIn("*::-webkit-scrollbar-thumb {", html)
+        self.assertIn("*::-webkit-scrollbar-corner {", html)
+        self.assertIn("scrollbar-color: rgba(227, 180, 87, 0.72) rgba(8, 29, 22, 0.62);", html)
+
+    def test_all_buttons_use_the_delegated_MARS_tooltip(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn(".mars-button-tooltip {", html)
+        self.assertIn("function buttonTooltipText(button)", html)
+        self.assertIn("document.addEventListener('pointerover'", html)
+        self.assertIn("document.addEventListener('focusin'", html)
+        self.assertIn("return target && typeof target.closest === 'function' ? target.closest('button') : null;", html)
+
     def test_value_card_wraps_long_unbroken_numbers(self) -> None:
         self.assertIn(
             "#value {\n"
@@ -87,7 +136,8 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn("source.startsWith('$[', index)", html)
         self.assertIn("appendFunctionToken(fragment, source.slice(index, next), 'function-token-variable');", html)
         self.assertIn("source[index] === '[' || source[index] === ']'", html)
-        self.assertIn("'array', 'const', 'equation', 'expression', 'i', 'return'", html)
+        self.assertIn("'array', 'const', 'equation', 'expression', 'i', 'matrix', 'return'", html)
+        self.assertIn("(?:equation|expression|matrix)", html)
         self.assertIn("const numberMatch = source.slice(index).match", html)
 
     def test_function_syntax_colouring_uses_the_semantic_palette(self) -> None:
@@ -387,6 +437,27 @@ class EquationResultTests(unittest.TestCase):
 
 
 class MatrixResultTests(unittest.TestCase):
+    def test_rendered_tex_svg_ids_are_isolated_between_cards(self) -> None:
+        first = (
+            "<svg><defs><path id='g2-50' d='first'/></defs>"
+            "<use xlink:href='#g2-50'/></svg>"
+        )
+        second = (
+            "<svg><defs><path id='g2-50' d='second'/></defs>"
+            "<use xlink:href='#g2-50'/></svg>"
+        )
+
+        isolated_first = mars_lab._namespace_svg_ids(first)
+        isolated_second = mars_lab._namespace_svg_ids(second)
+        first_id = re.search(r"id='([^']+)'", isolated_first)
+        second_id = re.search(r"id='([^']+)'", isolated_second)
+
+        self.assertIsNotNone(first_id)
+        self.assertIsNotNone(second_id)
+        self.assertNotEqual(first_id.group(1), second_id.group(1))
+        self.assertIn(f"xlink:href='#{first_id.group(1)}'", isolated_first)
+        self.assertIn(f"xlink:href='#{second_id.group(1)}'", isolated_second)
+
     def test_matrix_determinant_bar_is_not_treated_as_a_binding_separator(self) -> None:
         html = mars_lab.INDEX_HTML
 
@@ -403,11 +474,9 @@ class MatrixResultTests(unittest.TestCase):
         fields = {
             "input": "|(1 2; 3 4) - (lambda 0; 0 lambda)|",
             "operation": "det",
-            "result": "{ (1 - λ)·(4 - λ) - 6 | λ = NAN }",
-            "tex": (
-                r"\left\{ \left(1 - \lambda\right) \cdot \left(4 - \lambda\right) - 6 "
-                r"\;\middle|\; \lambda = NAN \right\}"
-            ),
+            "result": "(1 - λ)·(4 - λ) - 6",
+            "expression": "{ (1 - λ)·(4 - λ) - 6 | λ = ? }",
+            "tex": r"\left(1 - \lambda\right) \cdot \left(4 - \lambda\right) - 6",
             "bindings": "variable\tλ\tNAN",
         }
 
@@ -426,9 +495,10 @@ class MatrixResultTests(unittest.TestCase):
         fields = {
             "input": "trace(a 0; 0 d)",
             "operation": "trace",
-            "result": "{ a+d |; a=NAN, d=NAN }",
-            "pretty": "{ a+d |; a=NAN, d=NAN }",
-            "tex": r"\left\{ a+d \;\middle|\; ; a=NAN, d=NAN \right\}",
+            "result": "a+d",
+            "expression": "{ a+d | ; a = ?, d = ? }",
+            "pretty": "a+d",
+            "tex": "a+d",
             "bindings": "constant\ta\tNAN\nconstant\td\tNAN",
         }
 
@@ -443,16 +513,17 @@ class MatrixResultTests(unittest.TestCase):
         fields = {
             "input": "{ |(1 2; 3 4) - (lambda 0; 0 lambda)| | lambda = 4 }",
             "operation": "det",
-            "result": "{ (1 - λ)·(4 - λ) - 6 | λ = 4 }",
+            "result": "(1 - λ)·(4 - λ) - 6",
+            "expression": "{ (1 - λ)·(4 - λ) - 6 | λ = 4 }",
             "value": "-6",
             "bindings": "variable\tλ\t4",
         }
 
         payload = mars_lab.prepare_matrix_fields(fields, 32)
 
-        self.assertEqual(payload["result"], "{ (1 - λ)·(4 - λ) - 6 | λ = 4 }")
+        self.assertEqual(payload["result"], "(1 - λ)·(4 - λ) - 6")
         self.assertEqual(payload["value"], "-6")
-        self.assertIn("value.textContent = data.value || '';", mars_lab.INDEX_HTML)
+        self.assertIn("setValueText(data.value || '');", mars_lab.INDEX_HTML)
         self.assertIn("setValueCardVisible(!!data.value);", mars_lab.INDEX_HTML)
 
     def test_resolved_matrix_result_includes_an_evaluated_value_matrix(self) -> None:
@@ -463,6 +534,7 @@ class MatrixResultTests(unittest.TestCase):
             "rows": "2",
             "cols": "2",
             "result": "(1 - λ, 2; 3, 4 - λ)",
+            "expression_pretty": "{ (\n\t1 - λ,\t2;\n\t3,\t4 - λ\n) | λ = 3 }",
             "pretty": "(\n  1 - λ     2\n      3 4 - λ\n)",
             "value": "(-2, 2; 3, 1)",
             "value_pretty": "(\n  -2 2\n   3 1\n)",
@@ -475,8 +547,92 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(payload["result"], "(1 - λ, 2; 3, 4 - λ)")
         self.assertEqual(payload["value"], "(-2, 2; 3, 1)")
         self.assertEqual(payload["value_pretty"], "(\n  -2 2\n   3 1\n)")
-        self.assertIn("setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);", mars_lab.INDEX_HTML)
-        self.assertIn("valueTitle.textContent = data.value ? 'Value' : 'Summary';", mars_lab.INDEX_HTML)
+        self.assertEqual(payload["expression_pretty"], fields["expression_pretty"])
+        self.assertEqual(payload["value_TeX"], fields["value_tex"])
+        self.assertIn("<svg", payload["value_svg"])
+        self.assertIn("setMatrixValueResult(data);", mars_lab.INDEX_HTML)
+        self.assertIn("valueTitle.textContent = 'Value';", mars_lab.INDEX_HTML)
+
+    def test_matrix_value_card_renders_the_native_numeric_tex(self) -> None:
+        self.assertIn(
+            "#value.matrix-tex-value {\n"
+            "      overflow: auto;\n"
+            "      white-space: normal;",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn("const svg = String(data.value_svg || '');", mars_lab.INDEX_HTML)
+        self.assertIn("frame.innerHTML = svg;", mars_lab.INDEX_HTML)
+
+    def test_matrix_result_uses_distinct_native_expression_and_function_cards(self) -> None:
+        fields = {
+            "input": "{ (x c; d x^2) | x = 2; c = 3, d = 4 }",
+            "operation": "eval",
+            "kind": "expr",
+            "rows": "2",
+            "cols": "2",
+            "result": "(x, c; d, x²)",
+            "expression": "{ (x, c; d, x²) | x = 2; c = 3, d = 4 }",
+            "expression_pretty": "{ (\n\tx,\tc;\n\td,\tx²\n) | x = 2; c = 3, d = 4 }",
+            "function": (
+                "matrix mat(x, const c, const d) {\n"
+                "    return (x, c; d, x^2).\n"
+                "}\n\n"
+                "x = 2.\nconst c = 3.\nconst d = 4.\noutput(mat(x, c, d))."
+            ),
+            "tex": r"\begin{bmatrix}x & c \\ d & x^{2}\end{bmatrix}",
+            "bindings": "variable\tx\t2\nconstant\tc\t3\nconstant\td\t4",
+        }
+
+        payload = mars_lab.prepare_matrix_fields(fields, 32)
+
+        self.assertEqual(payload["expression"], fields["expression"])
+        self.assertEqual(payload["function"], fields["function"])
+        self.assertIn("setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');", mars_lab.INDEX_HTML)
+        self.assertIn("function setMatrixExpressionResult(data)", mars_lab.INDEX_HTML)
+        self.assertIn("data.expression_pretty || data.expression || data.result", mars_lab.INDEX_HTML)
+        self.assertIn("setExpandableText(parsed, parsedMore, displayExpression, fullExpression);", mars_lab.INDEX_HTML)
+        self.assertIn("data.display_expression || data.expression", mars_lab.INDEX_HTML)
+        self.assertIn("data.display_function || data.function", mars_lab.INDEX_HTML)
+        matrix_evaluation = mars_lab.INDEX_HTML.split(
+            "async function evaluateMatrix(options = {}) {", 1
+        )[1].split("\n    async function evaluateEquation", 1)[0]
+        self.assertNotIn("setMatrixPrettyResult(data.display_result", matrix_evaluation)
+
+    def test_matrix_expression_card_uses_readable_native_plain_text(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("#parsed.matrix-expression-text {", html)
+        self.assertIn("white-space: pre-wrap;", html)
+        self.assertIn("tab-size: 4;", html)
+        self.assertNotIn("function renderMatrixExpressionResult", html)
+
+    def test_expanded_matrix_result_card_uses_the_complete_workspace_width(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn('<main id="labWorkspace">', html)
+        self.assertIn('<section id="resultWorkspacePanel">', html)
+        self.assertIn(
+            "body.matrix-mode #labWorkspace.result-card-expanded > #workspacePanel {\n"
+            "      display: none;\n"
+            "    }",
+            html,
+        )
+        self.assertIn(
+            "body.matrix-mode #labWorkspace.result-card-expanded > #resultWorkspacePanel {\n"
+            "      grid-column: 1 / -1;\n"
+            "    }",
+            html,
+        )
+        self.assertIn("labWorkspace.classList.add('result-card-expanded');", html)
+        self.assertIn("labWorkspace.classList.remove('result-card-expanded');", html)
+        self.assertIn("document.body.classList.toggle('matrix-mode', matrixMode);", html)
+
+    def test_matrix_function_card_uses_the_shared_function_syntax_highlighter(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("(?:equation|expression|matrix)", html)
+        self.assertIn("'matrix'", html)
+        self.assertIn("element === functionStyle && looksLikeMarsFunction(text)", html)
 
     def test_matrix_scalar_calculus_uses_the_expression_backend(self) -> None:
         html = mars_lab.INDEX_HTML
@@ -547,18 +703,22 @@ class MatrixResultTests(unittest.TestCase):
             (ROOT / "tools" / "mars_lab.py").read_text(encoding="utf-8"),
         )
 
-    def test_matrix_integral_payload_displays_antiderivative_plus_constant_matrix(self) -> None:
+    def test_matrix_integral_payload_transports_native_antiderivative_and_constant_matrix(self) -> None:
         fields = {
             "input": "{ @S (x, 2x; 3x, 4x) dx | x = ? }",
             "operation": "eval",
             "kind": "expr",
             "rows": "2",
             "cols": "2",
-            "result": "(½x² + C₁₁, x² + C₁₂; 3/2x² + C₂₁, 2x² + C₂₂)",
+            "result": "(½x², x²; 3/2x², 2x²) + (C₁₁, C₁₂; C₂₁, C₂₂)",
+            "expression": (
+                "{ (½x², x²; 3/2x², 2x²) + (C₁₁, C₁₂; C₂₁, C₂₂) | "
+                "x = ?; C₁₁ = ?, C₁₂ = ?, C₂₁ = ?, C₂₂ = ? }"
+            ),
             "pretty": "unused",
             "tex": (
-                r"\begin{bmatrix}\frac{1}{2}x^{2} + C_{11} & x^{2} + C_{12} \\ "
-                r"\frac{3}{2}x^{2} + C_{21} & 2x^{2} + C_{22}\end{bmatrix}"
+                r"\begin{bmatrix}\frac{1}{2}x^{2} & x^{2} \\ \frac{3}{2}x^{2} & 2x^{2}\end{bmatrix} + "
+                r"\begin{bmatrix}C_{11} & C_{12} \\ C_{21} & C_{22}\end{bmatrix}"
             ),
             "bindings": (
                 "variable\tx\tNAN\nconstant\tC₁₁\tNAN\nconstant\tC₁₂\tNAN\n"
@@ -570,10 +730,8 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(payload["result"], "(½x², x²; 3/2x², 2x²) + (C₁₁, C₁₂; C₂₁, C₂₂)")
         self.assertIn(r"\end{bmatrix} + \begin{bmatrix}C_{11} & C_{12}", payload["tex"])
-        self.assertIn("const matrixTerms = terms.length && terms.every((term) => term) ? terms : null;", mars_lab.INDEX_HTML)
-        self.assertIn("operator.className = 'matrix-sum-operator';", mars_lab.INDEX_HTML)
-        self.assertIn("termDisplay.className = 'matrix-term-display';", mars_lab.INDEX_HTML)
-        self.assertIn("product.className = 'matrix-product-operator';", mars_lab.INDEX_HTML)
+        source = (ROOT / "tools" / "mars_lab.py").read_text(encoding="utf-8")
+        self.assertNotIn("matrix_integral_sum_display(", source)
 
     def test_matrix_payload_uses_native_matrix_bindings(self) -> None:
         fields = {
@@ -737,6 +895,11 @@ class MatrixResultTests(unittest.TestCase):
     def test_help_documents_complete_native_matrix_expression_syntax(self) -> None:
         help_html = mars_lab.INDEX_HTML
 
+        self.assertIn("Using Matrix Mode", help_html)
+        self.assertIn("choose the required matrix operation", help_html)
+        self.assertIn("<code>Right-hand side matrix</code>", help_html)
+        self.assertIn("This changes how MARS treats the symbol without replacing the expression you typed", help_html)
+        self.assertIn("same four-card arrangement as Expression mode", help_html)
         self.assertIn("Matrix Notation And Aliases", help_html)
         self.assertIn("Matrix Operation Selector", help_html)
         self.assertIn("<code>Solve A X = B</code>", help_html)
@@ -790,6 +953,13 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["result"], "(1 - λ, 2; 3, 4 - λ)")
+        self.assertEqual(fields["expression"], "{ (1 - λ, 2; 3, 4 - λ) | λ = 3 }")
+        self.assertEqual(
+            fields["expression_pretty"],
+            "{ (\n\t1 - λ,\t2;\n\t3,\t4 - λ\n) | λ = 3 }",
+        )
+        self.assertIn("matrix mat(λ)", fields["function"])
+        self.assertIn("λ = 3.", fields["function"])
         self.assertEqual(fields["value"], "(-2, 2; 3, 1)")
         self.assertIn("-2 2", fields["value_pretty"])
 
@@ -797,7 +967,32 @@ class MatrixResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
         "release matrix_lab helper is not built",
     )
-    def test_native_helper_preserves_exact_surds_for_a_bound_rational_matrix_power(self) -> None:
+    def test_native_helper_emits_all_result_cards_for_spectral_operations(self) -> None:
+        matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+        eigenvalues, eigenvalue_raw, eigenvalue_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "(1 2; 3 4)", "eigenvalues", 32
+        )
+        decomposition, decomposition_raw, decomposition_returncode = mars_lab.run_matrix_lab_fields(
+            matrix_binary, "(1 2; 3 4)", "eigendecompose", 32
+        )
+
+        self.assertEqual(eigenvalue_returncode, 0, eigenvalue_raw)
+        self.assertTrue(eigenvalues["result"].startswith("("))
+        self.assertEqual(eigenvalues["expression"], eigenvalues["result"])
+        self.assertIn("matrix mat()", eigenvalues["function"])
+        self.assertIn("λ1 =", eigenvalues["value"])
+        self.assertEqual(decomposition_returncode, 0, decomposition_raw)
+        self.assertIn("eigenvalues\n(", decomposition["expression"])
+        self.assertIn("eigenvectors\n(", decomposition["expression"])
+        self.assertIn("matrix eigenvalues()", decomposition["function"])
+        self.assertIn("matrix eigenvectors()", decomposition["function"])
+        self.assertIn("eigenvectors", decomposition["value"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_native_helper_numerically_evaluates_a_bound_rational_matrix_power(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         fields, raw, returncode = mars_lab.run_matrix_lab_fields(
             matrix_binary,
@@ -808,15 +1003,18 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["operation"], "power")
-        self.assertIn("√(33)", fields["value"])
-        self.assertIn("^³⁄₂", fields["value"])
-        self.assertNotIn("2.974570", fields["value"])
-        self.assertIn(r"\sqrt{33}", fields["value_tex"])
-
-        displayed_value_TeX = mars_lab.matrix_display_TeX(fields["value_tex"], 32)
-        self.assertIn(r"\frac{2}{\sqrt{66}}", displayed_value_TeX)
-        self.assertIn(r"\sqrt{27\mkern-2mu \sqrt{33} + 155}", displayed_value_TeX)
-        self.assertNotIn(r"\sqrt{2}\mkern-2mu \sqrt{33}", displayed_value_TeX)
+        self.assertEqual(fields["expression"].count("x ="), 1)
+        self.assertIn("x = ³⁄₂", fields["expression"])
+        declaration_lines = fields["function"].split("    return ", 1)[0].splitlines()[1:]
+        constant_lines = [index for index, line in enumerate(declaration_lines) if line.startswith("    const ")]
+        variable_lines = [index for index, line in enumerate(declaration_lines) if line.startswith("    v")]
+        self.assertTrue(constant_lines)
+        self.assertTrue(variable_lines)
+        self.assertLess(max(constant_lines), min(variable_lines))
+        self.assertTrue(fields["value"].startswith("(2.97457074818556029658"))
+        self.assertNotIn("√", fields["value"])
+        self.assertNotIn("^", fields["value"])
+        self.assertNotIn(r"\sqrt", fields["value_tex"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -843,7 +1041,8 @@ class MatrixResultTests(unittest.TestCase):
             self.assertEqual(bound_fields[field], unbound_fields[field], field)
         self.assertNotIn("√(128)", bound_fields["result"])
         self.assertNotIn(r"\sqrt{128}", bound_fields["tex"])
-        self.assertIn("^-⁵⁄₂", bound_fields["value"])
+        self.assertTrue(bound_fields["value"].startswith("(0.00357099560662556126"))
+        self.assertNotIn("^", bound_fields["value"])
         self.assertNotEqual(bound_fields["value"], bound_fields["result"])
 
     @unittest.skipUnless(
@@ -884,10 +1083,10 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["tex"].count(r"\frac{1}{\sqrt{66}}"), 1)
-        self.assertIn(r"2\mkern-2mu \left(5\mkern-2mu i\mkern-2mu \sqrt{2} + 27\right)", fields["tex"])
-        self.assertIn(r"2\mkern-2mu \left(11\mkern-2mu i\mkern-2mu \sqrt{2} + 59\right)", fields["tex"])
-        self.assertIn("5i·√(2)", fields["result"])
-        self.assertIn("11i·√(2)", fields["result"])
+        self.assertIn(r"2\mkern-2mu \left(5\mkern-2mu \sqrt{2}\mkern-2mu i + 27\right)", fields["tex"])
+        self.assertIn(r"2\mkern-2mu \left(11\mkern-2mu \sqrt{2}\mkern-2mu i + 59\right)", fields["tex"])
+        self.assertIn("5·√(2)·i", fields["result"])
+        self.assertIn("11·√(2)·i", fields["result"])
         self.assertNotIn("10√2", fields["result"])
         self.assertNotIn("22√2", fields["result"])
 
@@ -908,11 +1107,11 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn(r"\frac{1}{\sqrt{66}}", fields["tex"])
         self.assertEqual(fields["tex"].count(r"\frac{1}{\sqrt{66}}"), 1)
         self.assertEqual(fields["result"].count("1/√(66)"), 1)
-        self.assertIn(r"i\mkern-2mu \sqrt{2}", fields["tex"])
-        self.assertIn(r"i\mkern-2mu \sqrt{\sqrt{33} - 5}", fields["tex"])
+        self.assertIn(r"\sqrt{2}\mkern-2mu i", fields["tex"])
+        self.assertIn(r"\sqrt{\sqrt{33} - 5}\mkern-2mu i", fields["tex"])
         self.assertIn(
-            r"\left(1 + i\mkern-2mu \sqrt{2}\right)\mkern-2mu "
-            r"\left(\sqrt{\sqrt{33} + 5} - i\mkern-2mu \sqrt{\sqrt{33} - 5}\right)",
+            r"\left(1 + \sqrt{2}\mkern-2mu i\right)\mkern-2mu "
+            r"\left(\sqrt{\sqrt{33} + 5} - \sqrt{\sqrt{33} - 5}\mkern-2mu i\right)",
             fields["tex"],
         )
         self.assertNotIn(r"\sqrt{2i\mkern-2mu \sqrt{2} + 5}", fields["tex"])
@@ -920,7 +1119,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertNotIn(r"\left(5 - \sqrt{33}\right)^{\frac{1}{2}}", fields["tex"])
         self.assertIn("√(√(33) + 5)", fields["result"])
         self.assertIn("√(√(33) - 5)", fields["result"])
-        self.assertIn("(1 + i·√(2))·(√(√(33) + 5) - i·√(√(33) - 5))", fields["result"])
+        self.assertIn("(1 + √(2)·i)·(√(√(33) + 5) - √(√(33) - 5)·i)", fields["result"])
         self.assertNotIn("i2", fields["result"])
         self.assertNotIn("√(-2)", fields["result"])
 
@@ -986,7 +1185,8 @@ class MatrixResultTests(unittest.TestCase):
         )
 
         self.assertEqual(returncode, 0, raw)
-        self.assertIn("√(33)", fields["value"])
+        self.assertTrue(fields["value"].startswith("(5.5441400453188723946"))
+        self.assertNotIn("√", fields["value"])
         self.assertNotIn("NAN", fields["value"].upper())
 
     @unittest.skipUnless(
@@ -1035,7 +1235,7 @@ class MatrixResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
         "release matrix_lab helper is not built",
     )
-    def test_bound_matrix_integral_emits_a_partial_value_matrix(self) -> None:
+    def test_bound_matrix_integral_omits_value_until_constants_are_supplied(self) -> None:
         matrix_binary = ROOT / "build" / "release" / "scratch" / "matrix_lab"
         fields, raw, returncode = mars_lab.run_matrix_lab_fields(
             matrix_binary,
@@ -1046,11 +1246,8 @@ class MatrixResultTests(unittest.TestCase):
         payload = mars_lab.prepare_matrix_fields(fields, 32)
 
         self.assertEqual(returncode, 0, raw)
-        self.assertEqual(
-            payload["value"],
-            "(-1.5, 6; 9, 7.5) + (C₁₁, C₁₂; C₂₁, C₂₂)",
-        )
-        self.assertIn("valueTitle.textContent = data.value ? 'Value' : 'Summary';", mars_lab.INDEX_HTML)
+        self.assertNotIn("value", payload)
+        self.assertIn("valueTitle.textContent = 'Value';", mars_lab.INDEX_HTML)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -1302,6 +1499,8 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn("2/√(33)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
         self.assertIn("√(³⁄₁₁)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
         self.assertNotIn("(½·(5 + √(33)))^x", power["result"])
+        self.assertIn("const c1 = sqrt(3/11).", power["function"])
+        self.assertNotIn("³⁄₁₁", power["function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -3680,9 +3879,9 @@ class ExpressionResultTests(unittest.TestCase):
             "√(½·(√(13) + 2)) + √(½·(√(13) - 2))·i",
         )
         function = payload["full_display_function"]
-        self.assertIn("const $[sqrt(13)] = sqrt(13).", function)
+        self.assertIn("const c1 = sqrt(13).", function)
         self.assertIn(
-            "return sqrt(($[sqrt(13)] + 2)/2) + sqrt(($[sqrt(13)] - 2)/2).i.",
+            "return sqrt((c1 + 2)/2) + sqrt((c1 - 2)/2).i.",
             function,
         )
         self.assertIn(" + ", payload["value"])
@@ -3722,9 +3921,9 @@ class ExpressionResultTests(unittest.TestCase):
             "√(½·(√(2) + 1)) + √(½·(√(2) - 1))·i",
         )
         function = payload["full_display_function"]
-        self.assertIn("const $[sqrt(2)] = sqrt(2).", function)
+        self.assertIn("const c1 = sqrt(2).", function)
         self.assertIn(
-            "return sqrt(($[sqrt(2)] + 1)/2) + sqrt(($[sqrt(2)] - 1)/2).i.",
+            "return sqrt((c1 + 1)/2) + sqrt((c1 - 1)/2).i.",
             function,
         )
         self.assertTrue(payload["value"].endswith("i"))
@@ -3763,9 +3962,9 @@ class ExpressionResultTests(unittest.TestCase):
             "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)",
         )
         function = payload["full_display_function"]
-        self.assertIn("const $[sqrt(3)] = sqrt(3).", function)
+        self.assertIn("const c1 = sqrt(3).", function)
         self.assertIn(
-            "return 1/(2.cubrt(2)).($[sqrt(3)] + 1 + ($[sqrt(3)] - 1).i).",
+            "return 1/(2.cubrt(2)).(c1 + 1 + (c1 - 1).i).",
             function,
         )
         self.assertEqual(
@@ -3833,12 +4032,12 @@ class ExpressionResultTests(unittest.TestCase):
             "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)",
         )
         function = payload["full_display_function"]
-        self.assertIn("const $[sqrt(2)] = sqrt(2).", function)
-        self.assertIn("const $[root(2,4)] = root(2, 4).", function)
-        self.assertIn("const c1 = ($[sqrt(2)] + 1)/2.", function)
-        self.assertIn("const c2 = sqrt(c1).", function)
+        self.assertIn("const c1 = sqrt(2).", function)
+        self.assertIn("const c2 = root(2, 4).", function)
+        self.assertIn("const c3 = (c1 + 1)/2.", function)
+        self.assertIn("const c4 = sqrt(c3).", function)
         self.assertIn(
-            "return 1/$[sqrt(2)].(sqrt($[root(2,4)] + c2) + sqrt($[root(2,4)] - c2).i).",
+            "return 1/c1.(sqrt(c2 + c4) + sqrt(c2 - c4).i).",
             function,
         )
         self.assertEqual(
@@ -3887,13 +4086,13 @@ class ExpressionResultTests(unittest.TestCase):
             r"\end{aligned}",
         )
         self.assertNotIn("e^{", payload["full_display_TeX"])
-        self.assertIn("    const $[sqrt(2)] = sqrt(2).", payload["full_display_function"])
-        self.assertIn("    const $[root(2,4)] = root(2, 4).", payload["full_display_function"])
-        self.assertIn("    const c1 = ($[sqrt(2)] + 1)/2.", payload["full_display_function"])
-        self.assertIn("    const c2 = sqrt(c1).", payload["full_display_function"])
+        self.assertIn("    const c1 = sqrt(2).", payload["full_display_function"])
+        self.assertIn("    const c2 = root(2, 4).", payload["full_display_function"])
+        self.assertIn("    const c3 = (c1 + 1)/2.", payload["full_display_function"])
+        self.assertIn("    const c4 = sqrt(c3).", payload["full_display_function"])
         self.assertIn(
-            "    return 1/$[sqrt(2)].exp(i.k.π/2)."
-            "(sqrt($[root(2,4)] + c2) + sqrt($[root(2,4)] - c2).i).",
+            "    return 1/c1.exp(i.k.π/2)."
+            "(sqrt(c2 + c4) + sqrt(c2 - c4).i).",
             payload["full_display_function"],
         )
         self.assertTrue(all(len(line) <= 130 for line in payload["full_display_function"].splitlines()))

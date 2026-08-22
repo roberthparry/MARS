@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime as py_datetime
 import errno
+import hashlib
 import ipaddress
 from decimal import Decimal, InvalidOperation, localcontext
 import html
@@ -644,7 +645,11 @@ INDEX_HTML = r"""<!doctype html>
       --shadow: rgba(0, 0, 0, 0.28);
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(227, 180, 87, 0.72) rgba(8, 29, 22, 0.62);
+    }
 
     body {
       position: relative;
@@ -818,6 +823,14 @@ INDEX_HTML = r"""<!doctype html>
       padding: 0.75rem clamp(1rem, 3vw, 2rem) 2rem;
     }
 
+    body.matrix-mode #labWorkspace.result-card-expanded > #workspacePanel {
+      display: none;
+    }
+
+    body.matrix-mode #labWorkspace.result-card-expanded > #resultWorkspacePanel {
+      grid-column: 1 / -1;
+    }
+
     .lab-topbar {
       grid-column: 1 / -1;
       display: flex;
@@ -898,6 +911,43 @@ INDEX_HTML = r"""<!doctype html>
       overflow: hidden;
     }
 
+    #workspacePanel {
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    #workspacePanel.viewport-fitted,
+    #resultWorkspacePanel.viewport-fitted {
+      position: sticky;
+      top: 0.75rem;
+      align-self: start;
+      height: var(--workspace-panel-height);
+    }
+
+    #workspacePanel.viewport-fitted.manually-expanded,
+    #resultWorkspacePanel.viewport-fitted.manually-expanded {
+      position: relative;
+      top: auto;
+    }
+
+    #workspacePanel.viewport-fitted textarea.editor-manual-size {
+      flex: 0 0 auto;
+    }
+
+    #resultWorkspacePanel.viewport-fitted {
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    #resultWorkspacePanel.viewport-fitted > .output-grid,
+    #resultWorkspacePanel.viewport-fitted > .help-pane {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
     .panel-head {
       display: flex;
       align-items: center;
@@ -920,13 +970,24 @@ INDEX_HTML = r"""<!doctype html>
     textarea {
       width: 100%;
       min-height: 11rem;
-      resize: vertical;
+      resize: none;
       border: 0;
       outline: 0;
       padding: 1rem;
       color: var(--code);
       background: transparent;
       font: 1.05rem/1.5 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    textarea.editor-space-limited {
+      resize: vertical;
+    }
+
+    textarea.editor-space-limited::-webkit-resizer {
+      border-radius: 0.2rem 0 0 0;
+      background:
+        linear-gradient(135deg, transparent 0 38%, rgba(227, 180, 87, 0.92) 40% 52%, transparent 54% 63%,
+          rgba(113, 198, 180, 0.86) 65% 77%, transparent 79%);
     }
 
     body.datetime-mode #expr,
@@ -1746,12 +1807,11 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .datetime-local-body {
-      max-height: 20rem;
-      overflow: auto;
+      max-height: none;
+      overflow: visible;
       color: var(--code);
       white-space: normal;
       font: 0.82rem/1.45 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
-      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
     }
 
     .datetime-section-grid {
@@ -1997,7 +2057,6 @@ INDEX_HTML = r"""<!doctype html>
       box-shadow:
         0 1.2rem 2.4rem rgba(0, 0, 0, 0.32),
         inset 0 0 0 1px rgba(255, 255, 255, 0.03);
-      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
     }
 
     .select-menu.hidden {
@@ -2030,7 +2089,6 @@ INDEX_HTML = r"""<!doctype html>
       max-height: min(15.5rem, 38vh);
       overflow-y: auto;
       padding-right: 0.08rem;
-      scrollbar-color: rgba(207, 160, 82, 0.74) rgba(7, 25, 19, 0.62);
     }
 
     .select-option {
@@ -2413,6 +2471,38 @@ INDEX_HTML = r"""<!doctype html>
       opacity: 0.55;
     }
 
+    .mars-button-tooltip {
+      position: fixed;
+      z-index: 1000;
+      max-width: min(22rem, calc(100vw - 1rem));
+      padding: 0.48rem 0.68rem;
+      border: 1px solid rgba(227, 180, 87, 0.72);
+      border-radius: 10px;
+      color: #f5edcf;
+      background:
+        linear-gradient(135deg, rgba(8, 29, 22, 0.98), rgba(24, 57, 42, 0.98));
+      box-shadow:
+        0 0.7rem 1.8rem rgba(0, 0, 0, 0.38),
+        inset 0 0 0 1px rgba(113, 198, 180, 0.12);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-0.18rem);
+      transition:
+        opacity 100ms ease,
+        transform 100ms ease,
+        visibility 100ms ease;
+      font: 0.76rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.015em;
+      text-align: left;
+    }
+
+    .mars-button-tooltip.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
     .output-grid {
       display: grid;
       gap: 1rem;
@@ -2563,32 +2653,19 @@ INDEX_HTML = r"""<!doctype html>
       min-height: 2.75rem;
     }
 
-    .card pre,
-    .card .rendered,
-    .matrix-pretty {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(227, 180, 87, 0.72) rgba(8, 29, 22, 0.62);
-    }
-
-    .card pre::-webkit-scrollbar,
-    .card .rendered::-webkit-scrollbar,
-    .matrix-pretty::-webkit-scrollbar {
+    *::-webkit-scrollbar {
       width: 0.72rem;
       height: 0.72rem;
     }
 
-    .card pre::-webkit-scrollbar-track,
-    .card .rendered::-webkit-scrollbar-track,
-    .matrix-pretty::-webkit-scrollbar-track {
+    *::-webkit-scrollbar-track {
       border-radius: 999px;
       background:
         linear-gradient(180deg, rgba(8, 29, 22, 0.76), rgba(18, 53, 39, 0.58));
       box-shadow: inset 0 0 0 1px rgba(233, 244, 239, 0.12);
     }
 
-    .card pre::-webkit-scrollbar-thumb,
-    .card .rendered::-webkit-scrollbar-thumb,
-    .matrix-pretty::-webkit-scrollbar-thumb {
+    *::-webkit-scrollbar-thumb {
       border: 2px solid rgba(8, 29, 22, 0.82);
       border-radius: 999px;
       background:
@@ -2596,11 +2673,13 @@ INDEX_HTML = r"""<!doctype html>
       box-shadow: inset 0 0 0 1px rgba(255, 250, 220, 0.18);
     }
 
-    .card pre::-webkit-scrollbar-thumb:hover,
-    .card .rendered::-webkit-scrollbar-thumb:hover,
-    .matrix-pretty::-webkit-scrollbar-thumb:hover {
+    *::-webkit-scrollbar-thumb:hover {
       background:
         linear-gradient(135deg, rgba(247, 205, 112, 0.98), rgba(139, 222, 195, 0.92));
+    }
+
+    *::-webkit-scrollbar-corner {
+      background: rgba(8, 29, 22, 0.76);
     }
 
     pre {
@@ -2653,6 +2732,58 @@ INDEX_HTML = r"""<!doctype html>
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }
+
+    #value.matrix-pretty {
+      overflow-x: hidden;
+      overflow-y: auto;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    #value.matrix-pretty .matrix-sum-display,
+    #value.matrix-pretty .matrix-term-display,
+    #value.matrix-pretty .matrix-display,
+    #value.matrix-pretty .matrix-grid {
+      min-width: 0;
+      width: 100%;
+    }
+
+    #value.matrix-pretty .matrix-display {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    #value.matrix-pretty .matrix-cell {
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    #value.matrix-tex-value {
+      overflow: auto;
+      white-space: normal;
+    }
+
+    #value.matrix-tex-value .rendered-zoom-frame {
+      display: inline-block;
+      min-width: max-content;
+    }
+
+    #value.matrix-tex-value svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      overflow: visible;
+      transform-origin: left top;
+      filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%);
+    }
+
+    #parsed.matrix-expression-text {
+      white-space: pre-wrap;
+      tab-size: 4;
+      overflow-wrap: anywhere;
     }
 
     #functionStyle:not(.equation-function) {
@@ -3308,7 +3439,7 @@ INDEX_HTML = r"""<!doctype html>
       </details>
     </div>
   </header>
-  <main>
+  <main id="labWorkspace">
     <div class="lab-topbar">
       <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
         <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
@@ -3562,7 +3693,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       <div class="variable-values hidden" id="variableValues"></div>
     </section>
 
-    <section>
+    <section id="resultWorkspacePanel">
       <div class="panel-head">
         <h2 id="rightPaneTitle">Result</h2>
         <button class="card-action result-use-input hidden" id="resultUseInput" type="button">Use as input</button>
@@ -3658,6 +3789,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </ul>
         </div>
         <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Using Matrix Mode</div>
+          <p>Enter the complete matrix expression in the main editor, choose the required matrix operation, then press <code>Evaluate</code>. A straightforward calculation can be completed as follows:</p>
+          <ol>
+            <li>Enter a matrix such as <code>(1 2; 3 4)</code>. Spaces or commas separate columns; semicolons separate rows.</li>
+            <li>Leave <code>Matrix operation</code> set to <code>Evaluate expression</code> when the operation is already written in the editor, for example <code>sin(1 2; 3 4)</code> or <code>(1 2; 3 4)^2</code>. Otherwise choose a structural operation such as <code>Inverse</code>, <code>Determinant</code>, or <code>Eigenvalues</code>.</li>
+            <li>For <code>Multiply by another matrix</code> or <code>Solve A X = B</code>, enter the second matrix in the <code>Right-hand side matrix</code> box that appears.</li>
+            <li>Press <code>Evaluate</code>. If the matrix contains symbols, their binding boxes appear below the controls. Enter values only when a numerical result is wanted, or leave them blank for a symbolic result.</li>
+            <li>Use each binding's <code>Variable</code>/<code>Constant</code> button to change its role. This changes how MARS treats the symbol without replacing the expression you typed.</li>
+            <li>Use the derivative and integral buttons that appear for variable bindings to apply entrywise matrix calculus.</li>
+          </ol>
+          <p>The result side uses the same four-card arrangement as Expression mode: <code>Rendered TeX</code> shows the symbolic result, <code>Expression</code> includes its bindings, <code>Function</code> gives reusable MARS code with shared calculations assigned once to intermediate variables, and <code>Value</code> appears when all required values are available. <code>Use as input</code> returns a reusable result to the Matrix editor.</p>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
           <div class="help-kicker">Matrix Functions</div>
           <p>Write the complete matrix expression in the editor, then press <code>Evaluate</code>. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
           <ul>
@@ -3702,8 +3846,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>The variable derivative and integral buttons apply entrywise and remain available while the corresponding variable is present.</li>
             <li>Direct <code>Dxx(A)</code> and <code>Dxy(A)</code> notation supports ordered higher and mixed differentiation. Matrix integration uses the same <code>@S(...)dx</code> notation as scalar expressions.</li>
             <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
-            <li><code>Rendered TeX</code>, <code>Result</code>, and <code>Layout</code> preserve the symbolic answer. <code>Value</code> separately shows the numeric or partially evaluated matrix obtained from supplied bindings.</li>
-            <li>Long numbers use an abbreviated mantissa and power of ten by default. Choose <code>Show more digits</code> for the complete value.</li>
+            <li><code>Rendered TeX</code>, <code>Expression</code>, and <code>Function</code> preserve the symbolic answer. <code>Value</code> separately shows the numerical matrix once every required binding is supplied; it remains hidden while any entry is unresolved.</li>
+            <li>The Value card never abbreviates its numerical output. Long entries wrap within their matrix columns so the complete result remains visible.</li>
             <li><code>Use as input</code> copies the reusable result expression back into the Matrix editor.</li>
           </ul>
         </div>
@@ -3969,6 +4113,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
   <script>
     const expr = document.getElementById('expr');
+    const labTextareas = Array.from(document.querySelectorAll('textarea'));
     const subtitle = document.getElementById('subtitle');
     const leftPaneTitle = document.getElementById('leftPaneTitle');
     const modeTabs = Array.from(document.querySelectorAll('.mode-tab'));
@@ -4038,6 +4183,148 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
     const controlToken = __CONTROL_TOKEN__;
+    const buttonTooltip = document.createElement('div');
+    const BUTTON_TOOLTIP_TEXT = Object.freeze({
+      back: 'Return to the previous input in this mode',
+      clear: 'Clear the current input and its results',
+      forward: 'Move to the next input in this mode',
+      goalSeek: 'Find a variable value that reaches the requested target',
+      help: 'Show or hide help for the current mode',
+      inputCopy: 'Copy the current input',
+      integratorAddBound: 'Add another integration variable and its bounds',
+      lessPrecision: 'Calculate and display fewer significant digits',
+      marsDatePickerClose: 'Close the date picker',
+      marsDatePickerToday: 'Use the current date',
+      morePrecision: 'Calculate and display more significant digits',
+      resultUseInput: 'Put this result into the current mode as a new input',
+      run: 'Evaluate the current input'
+    });
+    let activeTooltipButton = null;
+    let activeTooltipDescribedBy = null;
+
+    buttonTooltip.className = 'mars-button-tooltip';
+    buttonTooltip.id = 'marsButtonTooltip';
+    buttonTooltip.setAttribute('role', 'tooltip');
+    document.body.appendChild(buttonTooltip);
+
+    function buttonCardName(button) {
+      const card = button.closest('.result-card');
+      const title = card ? card.querySelector('.card-title > span:first-child') : null;
+      return String(title && title.textContent || 'result').trim().toLowerCase();
+    }
+
+    function buttonTooltipText(button) {
+      const title = String(button.getAttribute('title') || '').trim();
+      if (button.hasAttribute('title')) {
+        if (title)
+          button.dataset.marsTooltipTitle = title;
+        else
+          delete button.dataset.marsTooltipTitle;
+      }
+      if (title)
+        return title;
+      const savedTitle = String(button.dataset.marsTooltipTitle || '').trim();
+      if (savedTitle)
+        return savedTitle;
+      if (BUTTON_TOOLTIP_TEXT[button.id])
+        return BUTTON_TOOLTIP_TEXT[button.id];
+      if (button.classList.contains('mode-tab'))
+        return `Switch to ${String(button.textContent || '').trim()} mode`;
+      if (button.matches('[data-expand-card]'))
+        return `${button.textContent.trim()} the ${buttonCardName(button)} card`;
+      if (button.classList.contains('more-digits'))
+        return `Show the full value in the ${buttonCardName(button)} card`;
+      if (button.dataset.copyTarget === 'mobile')
+        return 'Copy the private mobile-access URL';
+      if (button.classList.contains('copy-result'))
+        return `Copy the ${buttonCardName(button)}`;
+      if (button.classList.contains('variable-copy'))
+        return 'Copy this binding value';
+      if (button.classList.contains('select-button'))
+        return `Choose ${String(button.textContent || 'an option').trim()}`;
+
+      const ariaLabel = String(button.getAttribute('aria-label') || '').trim();
+      if (ariaLabel)
+        return ariaLabel;
+      const text = String(button.textContent || '').replace(/\s+/g, ' ').trim();
+      return text || 'Activate this control';
+    }
+
+    function positionButtonTooltip(button) {
+      const buttonRect = button.getBoundingClientRect();
+      const tooltipRect = buttonTooltip.getBoundingClientRect();
+      const gap = 8;
+      const viewportMargin = 8;
+      const centredLeft = buttonRect.left + (buttonRect.width - tooltipRect.width) / 2;
+      const left = Math.max(
+        viewportMargin,
+        Math.min(window.innerWidth - tooltipRect.width - viewportMargin, centredLeft)
+      );
+      const below = buttonRect.bottom + gap;
+      const top = below + tooltipRect.height <= window.innerHeight - viewportMargin
+        ? below
+        : Math.max(viewportMargin, buttonRect.top - tooltipRect.height - gap);
+      buttonTooltip.style.left = `${left}px`;
+      buttonTooltip.style.top = `${top}px`;
+    }
+
+    function showButtonTooltip(button) {
+      if (!button || button.closest('.hidden'))
+        return;
+      if (activeTooltipButton && activeTooltipButton !== button)
+        hideButtonTooltip();
+
+      const text = buttonTooltipText(button);
+      if (!text)
+        return;
+      if (button.hasAttribute('title'))
+        button.removeAttribute('title');
+      activeTooltipButton = button;
+      activeTooltipDescribedBy = button.getAttribute('aria-describedby');
+      const descriptions = new Set(String(activeTooltipDescribedBy || '').split(/\s+/).filter(Boolean));
+      descriptions.add(buttonTooltip.id);
+      button.setAttribute('aria-describedby', Array.from(descriptions).join(' '));
+      buttonTooltip.textContent = text;
+      positionButtonTooltip(button);
+      buttonTooltip.classList.add('visible');
+    }
+
+    function hideButtonTooltip() {
+      if (activeTooltipButton) {
+        if (activeTooltipDescribedBy)
+          activeTooltipButton.setAttribute('aria-describedby', activeTooltipDescribedBy);
+        else
+          activeTooltipButton.removeAttribute('aria-describedby');
+      }
+      activeTooltipButton = null;
+      activeTooltipDescribedBy = null;
+      buttonTooltip.classList.remove('visible');
+    }
+
+    function eventButton(target) {
+      return target && typeof target.closest === 'function' ? target.closest('button') : null;
+    }
+
+    document.addEventListener('pointerover', (event) => {
+      const button = eventButton(event.target);
+      if (button && (!event.relatedTarget || !button.contains(event.relatedTarget)))
+        showButtonTooltip(button);
+    });
+    document.addEventListener('pointerout', (event) => {
+      const button = eventButton(event.target);
+      if (button && (!event.relatedTarget || !button.contains(event.relatedTarget)))
+        hideButtonTooltip();
+    });
+    document.addEventListener('focusin', (event) => showButtonTooltip(eventButton(event.target)));
+    document.addEventListener('focusout', hideButtonTooltip);
+    document.addEventListener('click', hideButtonTooltip);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape')
+        hideButtonTooltip();
+    });
+    window.addEventListener('scroll', hideButtonTooltip, {passive: true});
+    window.addEventListener('resize', hideButtonTooltip);
+
     function formatTownCoordinate(value, width) {
       const number = Number(value);
       if (!Number.isFinite(number))
@@ -4087,6 +4374,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     let almanacLocationRefreshSequence = 0;
     const statusEl = document.getElementById('status');
     const inputCopy = document.getElementById('inputCopy');
+    const labWorkspace = document.getElementById('labWorkspace');
+    const workspacePanel = document.getElementById('workspacePanel');
+    const resultWorkspacePanel = document.getElementById('resultWorkspacePanel');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
     const resultUseInput = document.getElementById('resultUseInput');
     const resultPane = document.getElementById('resultPane');
@@ -4111,7 +4401,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const expandCardButtons = Array.from(document.querySelectorAll('[data-expand-card]'));
     const zoomButtons = Array.from(document.querySelectorAll('[data-zoom-step], [data-zoom-reset]'));
     const MARS_FUNCTION_KEYWORDS = new Set([
-      'array', 'const', 'equation', 'expression', 'i', 'return'
+      'array', 'const', 'equation', 'expression', 'i', 'matrix', 'return'
     ]);
     const MARS_FUNCTION_CONSTANTS = new Set(['NAN', 'e', 'pi', 'π']);
     const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
@@ -4361,6 +4651,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         datetimeWeatherAbortController.abort();
         datetimeWeatherAbortController = null;
       }
+      if (changed)
+        resetEditorManualSize();
       currentLabMode = nextMode;
       workingPrecisionBits = modePrecisionBits[currentLabMode] || workingPrecisionBits;
       syncModeTabs();
@@ -4568,6 +4860,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const needsOperand = currentMode() === 'matrix' && (matrixOperation.value === 'solve' || matrixOperation.value === 'multiply');
       matrixOperand.classList.toggle('hidden', !needsOperand);
       matrixOperandLabel.classList.toggle('hidden', !needsOperand);
+      scheduleEditorResizeGrip();
     }
 
     function syncModeUI() {
@@ -4583,6 +4876,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       document.body.classList.toggle('datetime-mode', datetimeMode);
       document.body.classList.toggle('almanac-mode', almanacMode);
       document.body.classList.toggle('diffequation-mode', diffequationMode);
+      document.body.classList.toggle('matrix-mode', matrixMode);
       matrixControls.classList.toggle('hidden', !matrixMode);
       equationControls.classList.toggle('hidden', !equationMode);
       diffequationControls.classList.toggle('hidden', !diffequationMode);
@@ -4615,8 +4909,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         setValueCardVisible(true);
       } else if (matrixMode) {
         leftPaneTitle.textContent = 'Matrix';
-        subtitle.textContent = 'Enter a complete matrix expression on the left, press Evaluate, and inspect both the formatted result and the raw matrix output.';
-        setResultTitles('Rendered TeX', 'Result', 'Layout', 'Summary');
+        subtitle.textContent = 'Enter a complete matrix expression on the left, press Evaluate, and inspect its TeX, expression, function, and numerical value.';
+        setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
         setAuxResultCardsVisible(true);
         setValueCardVisible(false);
       } else if (integratorMode) {
@@ -4641,6 +4935,130 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       syncMatrixControls();
       syncHelpCards();
       updateHistoryButtons();
+      scheduleWorkspacePanelFit();
+    }
+
+    let workspacePanelFitFrame = 0;
+    let editorResizeFrame = 0;
+    let workspacePanelBaseHeight = 0;
+
+    function setWorkspacePanelHeight(height) {
+      const fittedHeight = `${Math.max(320, Math.ceil(height))}px`;
+      const manuallyExpanded = workspacePanelBaseHeight > 0 && height > workspacePanelBaseHeight + 1;
+      workspacePanel.style.setProperty('--workspace-panel-height', fittedHeight);
+      resultWorkspacePanel.style.setProperty('--workspace-panel-height', fittedHeight);
+      workspacePanel.classList.toggle('manually-expanded', manuallyExpanded);
+      resultWorkspacePanel.classList.toggle('manually-expanded', manuallyExpanded);
+    }
+
+    function textareaCanUseConditionalResize(textarea) {
+      return textarea.isConnected &&
+        textarea.clientHeight > 0 &&
+        textarea.getClientRects().length > 0;
+    }
+
+    function resetEditorManualSize() {
+      labTextareas.forEach((textarea) => {
+        textarea.classList.remove('editor-manual-size', 'editor-space-limited');
+        textarea.style.removeProperty('height');
+        textarea.style.removeProperty('max-height');
+        delete textarea.dataset.automaticHeight;
+      });
+      workspacePanel.classList.remove('manually-expanded');
+      resultWorkspacePanel.classList.remove('manually-expanded');
+    }
+
+    function fittedTextareaExtraHeight() {
+      return labTextareas.reduce((total, textarea) => {
+        if (!textarea.classList.contains('editor-manual-size'))
+          return total;
+        const automaticHeight = Number(textarea.dataset.automaticHeight || 0);
+        return total + Math.max(0, textarea.getBoundingClientRect().height - automaticHeight);
+      }, 0);
+    }
+
+    function syncEditorResizeGrip() {
+      editorResizeFrame = 0;
+      const fittedWorkspace = workspacePanel.classList.contains('viewport-fitted');
+      const visibleTextareas = labTextareas.filter(textareaCanUseConditionalResize);
+      const maximumTotalExtraHeight = Math.max(96, Math.min(320, window.innerHeight * 0.35));
+      const maximumExtraHeight = maximumTotalExtraHeight / Math.max(1, visibleTextareas.length);
+
+      labTextareas.forEach((textarea) => {
+        if (!textareaCanUseConditionalResize(textarea)) {
+          textarea.classList.remove('editor-manual-size', 'editor-space-limited');
+          textarea.style.removeProperty('height');
+          textarea.style.removeProperty('max-height');
+          delete textarea.dataset.automaticHeight;
+          return;
+        }
+
+        const spaceLimited = textarea.scrollHeight > textarea.clientHeight + 1;
+        if (spaceLimited && !textarea.classList.contains('editor-manual-size')) {
+          const automaticHeight = textarea.getBoundingClientRect().height;
+          textarea.dataset.automaticHeight = String(automaticHeight);
+          textarea.style.height = `${automaticHeight}px`;
+          textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;
+          textarea.classList.add('editor-manual-size');
+        }
+
+        if (textarea.classList.contains('editor-manual-size')) {
+          const automaticHeight = Number(textarea.dataset.automaticHeight || 0);
+          const currentHeight = textarea.getBoundingClientRect().height;
+          const manuallyResized = Math.abs(currentHeight - automaticHeight) > 2;
+          textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;
+          if (!spaceLimited && !manuallyResized) {
+            textarea.classList.remove('editor-manual-size', 'editor-space-limited');
+            textarea.style.removeProperty('height');
+            textarea.style.removeProperty('max-height');
+            delete textarea.dataset.automaticHeight;
+          } else {
+            textarea.classList.add('editor-space-limited');
+          }
+        } else {
+          textarea.classList.toggle('editor-space-limited', spaceLimited);
+        }
+      });
+
+      if (fittedWorkspace) {
+        setWorkspacePanelHeight(workspacePanelBaseHeight + fittedTextareaExtraHeight());
+      }
+    }
+
+    function scheduleEditorResizeGrip() {
+      if (editorResizeFrame)
+        cancelAnimationFrame(editorResizeFrame);
+      editorResizeFrame = requestAnimationFrame(syncEditorResizeGrip);
+    }
+
+    function fitWorkspacePanelToViewport() {
+      workspacePanelFitFrame = 0;
+      const mode = currentMode();
+      const shouldFit = (mode === 'expression' || mode === 'matrix') && window.innerWidth > 900;
+      workspacePanel.classList.toggle('viewport-fitted', shouldFit);
+      resultWorkspacePanel.classList.toggle('viewport-fitted', shouldFit);
+      if (!shouldFit) {
+        workspacePanel.style.removeProperty('--workspace-panel-height');
+        resultWorkspacePanel.style.removeProperty('--workspace-panel-height');
+        workspacePanel.classList.remove('manually-expanded');
+        resultWorkspacePanel.classList.remove('manually-expanded');
+        workspacePanelBaseHeight = 0;
+        scheduleEditorResizeGrip();
+        return;
+      }
+
+      const top = Math.max(12, workspacePanel.getBoundingClientRect().top);
+      const availableHeight = Math.max(320, window.innerHeight - top - 12);
+      workspacePanelBaseHeight = availableHeight;
+      const extraHeight = fittedTextareaExtraHeight();
+      setWorkspacePanelHeight(availableHeight + extraHeight);
+      scheduleEditorResizeGrip();
+    }
+
+    function scheduleWorkspacePanelFit() {
+      if (workspacePanelFitFrame)
+        cancelAnimationFrame(workspacePanelFitFrame);
+      workspacePanelFitFrame = requestAnimationFrame(fitWorkspacePanelToViewport);
     }
 
     function syncHelpCards() {
@@ -6425,6 +6843,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         delete expr.dataset.evaluationReady;
       }
       expr.value = displayedExpressionText;
+      scheduleEditorResizeGrip();
       const bindings = visibleBindingsForCurrentMode(
         hasEvaluatedBindings
           ? editorBindings
@@ -8974,6 +9393,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function collapseResultCards() {
+      labWorkspace.classList.remove('result-card-expanded');
       resultPane.classList.remove('card-expanded');
       document.querySelectorAll('.result-card.expanded-card')
         .forEach((card) => card.classList.remove('expanded-card'));
@@ -8993,6 +9413,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (isExpanded)
         return;
 
+      labWorkspace.classList.add('result-card-expanded');
       resultPane.classList.add('card-expanded');
       card.classList.add('expanded-card');
       button.textContent = 'Collapse';
@@ -9213,7 +9634,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function looksLikeMarsFunction(source) {
-      return /(?:^|\n)\s*(?:array\s+)?(?:equation|expression)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(/u
+      return /(?:^|\n)\s*(?:array\s+)?(?:equation|expression|matrix)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(/u
         .test(String(source || ''));
     }
 
@@ -9235,7 +9656,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const identifierStart = character => /[\p{L}_]/u.test(character);
       const identifierPart = character => /[\p{L}\p{M}\p{N}_]/u.test(character);
       const functionDeclaration = source.match(
-        /(?:^|\n)\s*(?:array\s+)?(?:equation|expression)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(([^)]*)\)/u
+        /(?:^|\n)\s*(?:array\s+)?(?:equation|expression|matrix)\s+[\p{L}_$][\p{L}\p{M}\p{N}_$]*\s*\(([^)]*)\)/u
       );
       const functionArrayVariables = new Set();
       const functionOpeningBrackets = new Set();
@@ -9590,7 +10011,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         const grid = document.createElement('span');
         grid.className = 'matrix-grid';
-        grid.style.gridTemplateColumns = `repeat(${term.rows[0].length}, max-content)`;
+        grid.style.gridTemplateColumns = element === value || element === parsed
+          ? `repeat(${term.rows[0].length}, minmax(0, 1fr))`
+          : `repeat(${term.rows[0].length}, max-content)`;
         term.rows.forEach((row) => {
           row.forEach((cellText) => {
             const cell = document.createElement('span');
@@ -9609,6 +10032,39 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         sum.appendChild(termDisplay);
       });
       element.appendChild(sum);
+    }
+
+    function setMatrixExpressionResult(data) {
+      const fullExpression = data.expression_pretty || data.expression || data.result || '';
+      const displayExpression = data.display_expression_pretty || fullExpression;
+
+      parsed.classList.remove('matrix-pretty', 'matrix-expression-pretty');
+      parsed.classList.add('matrix-expression-text');
+      setExpandableText(parsed, parsedMore, displayExpression, fullExpression);
+    }
+
+    function setMatrixValueResult(data) {
+      const fullText = String(data.value || '');
+      const svg = String(data.value_svg || '');
+
+      value.classList.remove('matrix-pretty');
+      value.classList.toggle('matrix-tex-value', !!svg);
+      value.dataset.displayText = fullText;
+      value.dataset.fullText = fullText;
+      resetMoreDigitsButton(valueMore, false);
+      if (!svg) {
+        setValueText(fullText);
+        return;
+      }
+
+      value.replaceChildren();
+      const frame = document.createElement('span');
+      frame.className = 'rendered-zoom-frame';
+      frame.innerHTML = svg;
+      value.appendChild(frame);
+      const card = value.closest('.result-card');
+      if (card)
+        requestAnimationFrame(() => applyResultZoom(card));
     }
 
     function setRenderedResult(data) {
@@ -9759,9 +10215,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function clearResultDetails(options = {}) {
       parsed.classList.remove('matrix-pretty');
+      parsed.classList.remove('matrix-expression-pretty');
+      parsed.classList.remove('matrix-expression-text');
       functionStyle.classList.remove('matrix-pretty');
       functionStyle.classList.remove('equation-function');
       value.classList.remove('matrix-pretty');
+      value.classList.remove('matrix-tex-value');
       parsed.textContent = '';
       functionStyle.textContent = '';
       resetMoreDigitsButton(parsedMore, false);
@@ -9769,6 +10228,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       resetMoreDigitsButton(valueMore, false);
       delete parsed.dataset.fullText;
       delete parsed.dataset.displayText;
+      delete parsed.dataset.matrixExpression;
+      delete parsed.dataset.matrixDisplayResult;
+      delete parsed.dataset.matrixFullResult;
+      delete parsed.dataset.matrixPretty;
+      delete parsed.dataset.matrixBindings;
       delete functionStyle.dataset.fullText;
       delete functionStyle.dataset.displayText;
       delete rendered.dataset.compactTex;
@@ -9921,20 +10385,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           renderedMore,
           !!data.full_TeX && !!data.tex && data.full_TeX !== data.tex
         );
-        setExpandableText(parsed, parsedMore, data.display_result || data.result || '', data.result || '');
+        setMatrixExpressionResult(data);
         lastMatrixScalarExpression = data.scalar ? (data.result || '') : '';
         setResultInputText(data.result || '', data.binding_values || []);
-        setMatrixPrettyResult(data.display_result || data.result || '', data.pretty || '');
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          data.display_function || data.function || '',
+          data.full_display_function || data.function || ''
+        );
         if (data.operation && matrixOperation) {
           matrixOperation.value = validMatrixOperation(data.operation);
           syncRoundedSelect(matrixOperation);
           syncMatrixControls();
         }
-        valueTitle.textContent = data.value ? 'Value' : 'Summary';
-        if (data.value_pretty)
-          setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
-        else
-          setValueText(data.value || '');
+        valueTitle.textContent = 'Value';
+        setMatrixValueResult(data);
         setValueCardVisible(!!data.value);
         if (Array.isArray(data.binding_values) && data.binding_values.length) {
           const matrixBindings = bindingsWithAuthoredValues(data.binding_values, text);
@@ -10661,14 +11127,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           renderedMore,
           !!data.full_TeX && !!data.tex && data.full_TeX !== data.tex
         );
-        setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
+        setMatrixExpressionResult(data);
         setResultInputText(data.result || '', data.binding_values || []);
-        setMatrixPrettyResult(data.result || '', data.pretty || '');
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          data.display_function || data.function || '',
+          data.full_display_function || data.function || ''
+        );
         valueTitle.textContent = data.value ? 'Value' : 'Summary';
-        if (data.value_pretty)
-          setMatrixPrettyResult(data.value || '', data.value_pretty, value, null);
-        else
-          setValueText(data.value || '');
+        setMatrixValueResult(data);
         setValueCardVisible(!!data.value);
         currentVariables = variables;
         currentDifferentiable = differentiable;
@@ -11475,7 +11943,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     window.addEventListener('resize', () => {
       resultCards.forEach((card) => applyResultZoom(card));
+      scheduleWorkspacePanelFit();
     });
+    window.addEventListener('scroll', scheduleWorkspacePanelFit, {passive: true});
+
+    labTextareas.forEach((textarea) => textarea.addEventListener('input', scheduleEditorResizeGrip));
+    if (typeof ResizeObserver === 'function') {
+      const expressionEditorResizeObserver = new ResizeObserver(scheduleEditorResizeGrip);
+      labTextareas.forEach((textarea) => expressionEditorResizeObserver.observe(textarea));
+    }
 
     expandCardButtons.forEach((button) => {
       button.setAttribute('aria-expanded', 'false');
@@ -13161,6 +13637,9 @@ def parse_matrix_lab_output(output: str) -> dict[str, str]:
             "rows": r"^rows\s+(.*)$",
             "cols": r"^cols\s+(.*)$",
             "result": r"^result\s+(.*)$",
+            "expression": r"^expression\s{2,}(.*)$",
+            "expression_pretty": r"^expression_pretty\s{2,}(.*)$",
+            "function": r"^function\s+(.*)$",
             "value": r"^value\s+(.*)$",
             "value_pretty": r"^value_pretty\s+(.*)$",
             "value_tex": r"^value_tex\s+(.*)$",
@@ -13169,7 +13648,7 @@ def parse_matrix_lab_output(output: str) -> dict[str, str]:
             "bindings": r"^binding\s{2,}(.*)$",
             "error": r"^error\s+(.*)$",
         },
-        {"pretty", "tex", "value_pretty", "value_tex"},
+        {"expression_pretty", "function", "pretty", "tex", "value_pretty", "value_tex"},
     )
 
 
@@ -13603,6 +14082,29 @@ def format_number_text_for_precision(
     return _trim_decimal_tail(format(rounded, "g").replace("e", "E"))
 
 
+def _namespace_svg_ids(svg: str) -> str:
+    matches = re.findall(r"\bid=(['\"])([^'\"]+)\1", svg)
+    ids = {svg_id for _, svg_id in matches}
+
+    if not ids:
+        return svg
+
+    namespace = "mars-" + hashlib.sha256(svg.encode("utf-8")).hexdigest()[:16] + "-"
+    replacements = {svg_id: namespace + svg_id for svg_id in ids}
+
+    def replace_id(match: re.Match[str]) -> str:
+        quote = match.group(1)
+        svg_id = match.group(2)
+        return f"id={quote}{replacements[svg_id]}{quote}"
+
+    svg = re.sub(r"\bid=(['\"])([^'\"]+)\1", replace_id, svg)
+    reference_pattern = re.compile(
+        r"#(" + "|".join(re.escape(svg_id) for svg_id in sorted(ids, key=len, reverse=True)) + r")"
+        r"(?![A-Za-z0-9_.:-])"
+    )
+    return reference_pattern.sub(lambda match: "#" + replacements[match.group(1)], svg)
+
+
 def render_TeX_to_svg(tex: str) -> tuple[str | None, str | None]:
     if not tex:
         return None, None
@@ -13657,7 +14159,8 @@ def render_TeX_to_svg(tex: str) -> tuple[str | None, str | None]:
             return None, dvisvgm.stdout + dvisvgm.stderr
 
         try:
-            return svg_file.read_text(encoding="utf-8"), None
+            svg = svg_file.read_text(encoding="utf-8")
+            return _namespace_svg_ids(svg), None
         except OSError as exc:
             return None, str(exc)
 
@@ -15070,174 +15573,53 @@ def prepare_evaluation_fields(
     return fields
 
 
-def matrix_integral_sum_display(
-    result: str,
-    tex: str,
-    input_text: str,
-    rows_text: str,
-    cols_text: str,
-) -> tuple[str, str, str] | None:
-    input_body, _, _ = parse_expression_body(str(input_text or "").strip())
-    if not input_body.lstrip().startswith("@S"):
-        return None
-
-    try:
-        rows = int(rows_text)
-        cols = int(cols_text)
-    except (TypeError, ValueError):
-        return None
-    body = str(result or "").strip()
-    if rows <= 0 or cols <= 0 or len(body) < 2 or body[0] != "(" or body[-1] != ")":
-        return None
-
-    source_rows = split_top_level_text(body[1:-1], ";")
-    if len(source_rows) != rows:
-        return None
-
-    anti_rows: list[list[str]] = []
-    constant_rows: list[list[str]] = []
-    subscript_digits = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
-    transformed_tex = str(tex or "")
-    for row_index, source_row in enumerate(source_rows, start=1):
-        source_cells = split_top_level_text(source_row, ",")
-        if len(source_cells) != cols:
-            return None
-
-        anti_cells: list[str] = []
-        constant_cells: list[str] = []
-        for col_index, source_cell in enumerate(source_cells, start=1):
-            ascii_index = f"{row_index}{col_index}"
-            constant = "C" + ascii_index.translate(subscript_digits)
-            match = re.match(rf"^(.*)\s+\+\s+{re.escape(constant)}$", source_cell.strip())
-            constant_first = re.match(
-                rf"^{re.escape(constant)}\s*([+-])\s*(.+)$",
-                source_cell.strip(),
-            )
-            if match:
-                anti_cell = match.group(1).strip()
-            elif constant_first:
-                remainder = constant_first.group(2).strip()
-                anti_cell = remainder if constant_first.group(1) == "+" else f"-{remainder}"
-            elif source_cell.strip() == constant:
-                anti_cell = "0"
-            else:
-                return None
-            anti_cells.append(anti_cell)
-            constant_cells.append(constant)
-
-            tex_suffix = re.compile(rf"\s*\+\s*C_\{{{ascii_index}\}}")
-            transformed_tex, substitutions = tex_suffix.subn("", transformed_tex, count=1)
-            if substitutions != 1:
-                tex_prefix = re.compile(rf"C_\{{{ascii_index}\}}\s*([+-])\s*")
-
-                def remove_tex_prefix(prefix_match: re.Match[str]) -> str:
-                    return "" if prefix_match.group(1) == "+" else "-"
-
-                transformed_tex, substitutions = tex_prefix.subn(remove_tex_prefix, transformed_tex, count=1)
-                if substitutions != 1:
-                    return None
-
-        anti_rows.append(anti_cells)
-        constant_rows.append(constant_cells)
-
-    inline_anti = "; ".join(", ".join(cells) for cells in anti_rows)
-    inline_constants = "; ".join(", ".join(cells) for cells in constant_rows)
-    inline = f"({inline_anti}) + ({inline_constants})"
-
-    pretty_anti = "\n".join("  " + "  ".join(cells) for cells in anti_rows)
-    pretty_constants = "\n".join("  " + "  ".join(cells) for cells in constant_rows)
-    pretty = f"(\n{pretty_anti}\n) + (\n{pretty_constants}\n)"
-
-    constant_tex_rows = [" & ".join(f"C_{{{row}{col}}}" for col in range(1, cols + 1))
-                         for row in range(1, rows + 1)]
-    constant_tex = r"\begin{bmatrix}" + r" \\ ".join(constant_tex_rows) + r"\end{bmatrix}"
-    return inline, pretty, transformed_tex + " + " + constant_tex
-
-
-def matrix_scalar_display_without_unset_bindings(
-    result_text: str,
-    pretty_text: str,
-    tex: str,
-    binding_values: list[dict[str, str]],
-) -> tuple[str, str, str]:
-    if not binding_values:
-        return result_text, pretty_text, tex
-
-    if any(str(binding.get("value") or "").upper() != "NAN" for binding in binding_values):
-        return result_text, pretty_text, tex
-
-    expected = sorted(
-        (str(binding.get("name") or "").strip(), str(binding.get("kind") or "variable"))
-        for binding in binding_values
-    )
-
-    def unwrapped_text(text: str) -> str:
-        source = str(text or "").strip()
-        if not source.startswith("{") or not source.endswith("}"):
-            return source
-        body, variables, constants = parse_expression_body(source)
-        assignments = [(name, value, "variable") for name, value in parse_binding_assignments(variables)]
-        assignments.extend((name, value, "constant") for name, value in parse_binding_assignments(constants))
-        actual = sorted((name, kind) for name, value, kind in assignments if value.upper() == "NAN")
-        if len(actual) != len(assignments) or actual != expected:
-            return source
-        return body
-
-    tex_match = re.fullmatch(
-        r"\s*\\left\\\{\s*(.*?)\s*\\;\\middle\|\\;.*?\\right\\\}\s*",
-        str(tex or ""),
-        re.DOTALL,
-    )
-    unwrapped_tex = tex_match.group(1).strip() if tex_match else tex
-    return unwrapped_text(result_text), unwrapped_text(pretty_text), unwrapped_tex
-
-
 def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
     result_text = str(fields.get("result") or fields.get("value") or "").strip()
     pretty_text = str(fields.get("pretty") or "").strip()
     tex = str(fields.get("tex") or "").strip()
-    integral_sum = matrix_integral_sum_display(
-        result_text,
-        tex,
-        str(fields.get("input") or ""),
-        str(fields.get("rows") or ""),
-        str(fields.get("cols") or ""),
-    )
-    if integral_sum:
-        result_text, pretty_text, tex = integral_sum
     operation = str(fields.get("operation") or "eval").strip()
     kind = str(fields.get("kind") or "").strip()
     rows = str(fields.get("rows") or "").strip()
     cols = str(fields.get("cols") or "").strip()
     input_text = str(fields.get("input") or "").strip()
+    native_binding_values = mars_binding_values(fields.get("bindings"))
     evaluated_value = str(fields.get("value") or "").strip() if fields.get("result") else ""
     evaluated_pretty = str(fields.get("value_pretty") or "").strip()
     evaluated_TeX = str(fields.get("value_tex") or "").strip()
-    evaluated_integral_sum = matrix_integral_sum_display(
-        evaluated_value,
-        evaluated_TeX,
-        input_text,
-        rows,
-        cols,
-    )
-    if evaluated_integral_sum:
-        evaluated_value, evaluated_pretty, evaluated_TeX = evaluated_integral_sum
     if evaluated_value:
         evaluated_value = numeric_value_for_display(
             format_number_text_for_precision(evaluated_value, precision, zero_subprecision=True)
         )
     if evaluated_pretty:
         evaluated_pretty = precision_numeric_tokens(evaluated_pretty, precision, zero_subprecision=True)
-    binding_values = mars_binding_values(fields.get("bindings"))
-    if not rows and not cols:
-        result_text, pretty_text, tex = matrix_scalar_display_without_unset_bindings(
-            result_text,
-            pretty_text,
-            tex,
-            binding_values,
+    expression_text = str(fields.get("expression") or result_text).strip()
+    expression_pretty_text = str(fields.get("expression_pretty") or expression_text).strip()
+    function_text = str(fields.get("function") or "").strip()
+    authored_binding_values = expression_variable_binding_values(input_text, precision)
+    authored_by_key = {
+        (str(binding.get("kind") or "variable"), str(binding.get("name") or "")): binding
+        for binding in authored_binding_values
+    }
+    card_binding_values = [
+        authored_by_key.get(
+            (str(binding.get("kind") or "variable"), str(binding.get("name") or "")),
+            binding,
         )
+        for binding in native_binding_values
+    ]
+    binding_values = [
+        {**binding, "value": "NAN" if str(binding.get("value") or "?") == "?" else binding.get("value")}
+        for binding in card_binding_values
+    ]
     display_result_text = precision_numeric_tokens(result_text, precision, zero_subprecision=True)
     display_pretty_text = precision_numeric_tokens(pretty_text, precision, zero_subprecision=True)
+    full_display_expression = expression_for_display(expression_text)
+    display_expression = compact_display_text(full_display_expression)
+    display_expression_pretty = precision_numeric_tokens(
+        expression_pretty_text, precision, zero_subprecision=True
+    )
+    full_display_function = function_for_display(function_text)
+    display_function = compact_function_text(full_display_function)
     display_TeX = matrix_display_TeX(tex, precision)
 
     svg = None
@@ -15260,6 +15642,14 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
         "scalar": not rows and not cols,
         "result": result_text,
         "display_result": display_result_text,
+        "expression": expression_text,
+        "display_expression": display_expression,
+        "full_display_expression": full_display_expression,
+        "expression_pretty": expression_pretty_text,
+        "display_expression_pretty": display_expression_pretty,
+        "function": function_text,
+        "display_function": display_function,
+        "full_display_function": full_display_function,
         "pretty": display_pretty_text,
         "tex": "" if display_TeX == "(null)" else display_TeX,
         "full_TeX": "" if tex == "(null)" else matrix_scientific_notation_TeX(tex),
@@ -15271,7 +15661,10 @@ def prepare_matrix_fields(fields: dict[str, str], precision: int) -> dict[str, o
     if evaluated_pretty:
         payload["value_pretty"] = evaluated_pretty
     if evaluated_TeX:
-        payload["value_TeX"] = matrix_display_TeX(evaluated_TeX, precision)
+        payload["value_TeX"] = evaluated_TeX
+        value_svg, _ = render_TeX_to_svg(evaluated_TeX)
+        if value_svg:
+            payload["value_svg"] = value_svg
     if svg:
         payload["svg"] = svg
     elif render_error:

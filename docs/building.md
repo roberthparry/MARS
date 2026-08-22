@@ -48,12 +48,13 @@ make check-deps
 If a required dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`.
 
-MARS Lab uses server-side TeX rendering, and the desktop installer now uses the
+MARS Lab requires Python 3.10 or later and uses only the Python standard
+library. It uses server-side TeX rendering, and the desktop installer uses the
 `sqlcipher` CLI to bootstrap the jurisdiction database, so the desktop Lab also
 needs `latex`, `dvisvgm`, and `sqlcipher`:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm sqlcipher
+sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
 make check-lab-deps
 ```
 

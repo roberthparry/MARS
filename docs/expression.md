@@ -877,16 +877,20 @@ statements may share a line when whitespace separates them. Unknown scalars use
 unspecified array and are serialised canonically as `[?]`. Symbolic assignment
 values use input aliases such as `@pi`.
 
+Function style writes exact fractions in typeable ASCII `numerator/denominator`
+form. For example, a mathematical card may display `³⁄₁₁`, while the corresponding
+generated function writes `3/11`.
+
 Before emitting the return statement, Function style traverses the expression
 DAG and gives shared non-trivial nodes intermediate names in dependency order.
-Short, recognisable constant operations use a compact semantic name such as
-`$[sqrt(2)]` or `$[root(2,4)]`; spaces are never retained inside `$[...]`.
-The complete `$[...]` name is rendered in the same subdued off-white italics
-as other variable and constant names; its punctuation is part of the name, not
-separately coloured syntax.
-Other constant intermediates use `c1`, `c2`, and so on, while intermediates
-that depend on variables use `v1`, `v2`, and so on. This keeps repeated work
-visible and makes the generated function suitable for later differentiation.
+Constant intermediates use `c1`, `c2`, and so on, while intermediates that
+depend on variables use `v1`, `v2`, and so on. Constant intermediates are
+grouped before variable-dependent intermediates wherever their dependencies
+allow it. This keeps repeated work visible and makes the generated function
+suitable for later differentiation. Descriptive identifiers such as
+`$[sqrt(2)]` remain valid input aliases for bracketed names and are
+canonicalised to `[sqrt(2)]`, but Function-style output does not generate the
+`$[...]` form.
 MARS Lab applies presentation-only syntax colouring to this text: function
 names are bold turquoise and their matching call brackets are non-bold gold.
 Grouping brackets retain the ordinary text colour, and copied Function text is

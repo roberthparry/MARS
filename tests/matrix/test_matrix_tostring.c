@@ -9,6 +9,16 @@ static matrix_TeX_preview_entry_t *g_matrix_TeX_preview_entries = NULL;
 static size_t g_matrix_TeX_preview_count = 0u;
 static size_t g_matrix_TeX_preview_cap = 0u;
 
+static size_t matrix_tostring_count_substring(const char *text, const char *needle)
+{
+    size_t count = 0u;
+    size_t needle_length = strlen(needle);
+
+    for (const char *match = text; match && (match = strstr(match, needle)) != NULL; match += needle_length)
+        count++;
+    return count;
+}
+
 static char *matrix_TeX_preview_strdup(const char *s)
 {
     size_t n;
@@ -272,6 +282,58 @@ static void test_mat_to_string_numeric_TeX(void)
     mat_free(A);
     for (size_t i = 0; i < 4; ++i)
         num_destroy(&vals[i]);
+
+    {
+        const char *real_digits = "0.123456789012345678901234567890123456789012345678901234567890123456789";
+        const char *imag_digits = "0.987654321098765432109876543210987654321098765432109876543210987654321";
+        number_t long_vals[4] = {
+            num_create_from_string(
+                "0.123456789012345678901234567890123456789012345678901234567890123456789 + "
+                "0.987654321098765432109876543210987654321098765432109876543210987654321i"),
+            num_create_from_string("2"), num_create_from_string("3"), num_create_from_string("4")};
+        matrix_t *long_matrix = mat_create(2, 2, long_vals);
+        char *long_tex = mat_to_string(long_matrix, MAT_STRING_LATEX);
+
+        check_bool("mat_to_string long numeric tex uses real and imaginary matrices",
+                   long_tex && strstr(long_tex, "\\begin{aligned}") != NULL &&
+                       matrix_tostring_count_substring(long_tex, "\\begin{pmatrix}") == 2u);
+        check_bool("mat_to_string long numeric tex preserves real matrix columns",
+                   long_tex && strstr(long_tex, " & 2 \\\\[10pt] 3 & 4\\end{pmatrix}") != NULL);
+        check_bool("mat_to_string long numeric tex puts i before the imaginary matrix",
+                   long_tex && strstr(long_tex, "{}+ i\\mkern-2mu \\begin{pmatrix}") != NULL);
+        check_bool("mat_to_string long numeric tex preserves imaginary matrix shape",
+                   long_tex && strstr(long_tex, " & 0 \\\\[10pt] 0 & 0\\end{pmatrix}") != NULL);
+        check_bool("mat_to_string long numeric tex preserves the real component",
+                   long_tex && strstr(long_tex, real_digits) != NULL);
+        check_bool("mat_to_string long numeric tex preserves the imaginary component",
+                   long_tex && strstr(long_tex, imag_digits) != NULL);
+
+        free(long_tex);
+        mat_free(long_matrix);
+        for (size_t i = 0u; i < 4u; ++i)
+            num_destroy(&long_vals[i]);
+    }
+
+    {
+        number_t wide_vals[2] = {
+            num_create_from_string("0.1234567890123456789012345 + 0.9876543210987654321098765i"),
+            num_create_from_string("0.2345678901234567890123456 - 0.8765432109876543210987654i")};
+        matrix_t *wide_matrix = mat_create(1, 2, wide_vals);
+        char *wide_tex = mat_to_string(wide_matrix, MAT_STRING_LATEX);
+
+        check_bool("mat_to_string wide numeric row uses real and imaginary matrices",
+                   wide_tex && strstr(wide_tex, "\\begin{aligned}") != NULL &&
+                       matrix_tostring_count_substring(wide_tex, "\\begin{pmatrix}") == 2u);
+        check_bool("mat_to_string wide numeric row puts i before the imaginary matrix",
+                   wide_tex && strstr(wide_tex, "{}+ i\\mkern-2mu \\begin{pmatrix}") != NULL);
+        check_bool("mat_to_string wide numeric row preserves the negative imaginary component",
+                   wide_tex && strstr(wide_tex, "-0.8765432109876543210987654") != NULL);
+
+        free(wide_tex);
+        mat_free(wide_matrix);
+        for (size_t i = 0u; i < 2u; ++i)
+            num_destroy(&wide_vals[i]);
+    }
 }
 
 static void test_mat_to_string_number_precision(void)
@@ -570,6 +632,119 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
     mat_free(A);
 }
 
+static void test_mat_to_string_result_card_styles(void)
+{
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string_expr("(x, c; d, x^2)", &bindings);
+    mat_bindings_t *long_bindings = NULL;
+    matrix_t *long_A = mat_from_string_expr(
+        "(a+a^2+a^3+a^4+a^5+a^6+a^7+a^8+a^9+a^10+a^11+a^12+a^13+a^14+a^15+a^16, "
+        "b+b^2+b^3+b^4+b^5+b^6+b^7+b^8+b^9+b^10+b^11+b^12+b^13+b^14+b^15+b^16; "
+        "c+c^2+c^3+c^4+c^5+c^6+c^7+c^8+c^9+c^10+c^11+c^12+c^13+c^14+c^15+c^16, "
+        "d+d^2+d^3+d^4+d^5+d^6+d^7+d^8+d^9+d^10+d^11+d^12+d^13+d^14+d^15+d^16)",
+        &long_bindings);
+    mat_bindings_t *fraction_bindings = NULL;
+    matrix_t *fraction_A = mat_from_string_expr("{ (x, 0; 0, 1) | x = 5/2 }", &fraction_bindings);
+    char *expression = mat_to_string(A, MAT_STRING_EXPRESSION);
+    char *expression_layout = mat_to_string(A, MAT_STRING_EXPRESSION_LAYOUT);
+    char *long_expression_layout = mat_to_string(long_A, MAT_STRING_EXPRESSION_LAYOUT);
+    char *function = mat_to_string(A, MAT_STRING_FUNCTION);
+    char *fraction_function = mat_to_string(fraction_A, MAT_STRING_FUNCTION);
+    mat_bindings_t *layout_bindings = NULL;
+    mat_bindings_t *long_layout_bindings = NULL;
+    matrix_t *layout_roundtrip = NULL;
+    matrix_t *long_layout_roundtrip = NULL;
+
+    check_bool("mat_to_string expression card source non-null", A != NULL);
+    check_bool("mat_to_string expression card exact",
+               expression && strcmp(expression, "{ (x, c; d, x²) | x = ?; c = ?, d = ? }") == 0);
+    check_bool("mat_to_string laid-out expression card exact",
+               expression_layout &&
+                   strcmp(expression_layout, "{ (\n\tx,\tc;\n\td,\tx^2\n) | x = ?; c = ?, d = ? }") == 0);
+    layout_roundtrip = expression_layout ? mat_from_string_expr(expression_layout, &layout_bindings) : NULL;
+    check_bool("mat_to_string laid-out expression card reparses", layout_roundtrip != NULL);
+    check_bool("mat_to_string long laid-out expression card stacks cells",
+               long_expression_layout && strstr(long_expression_layout, ",\n\t") != NULL &&
+                   strstr(long_expression_layout, ";\n\t") != NULL && strstr(long_expression_layout, ";\n\n\t") == NULL);
+    long_layout_roundtrip =
+        long_expression_layout ? mat_from_string_expr(long_expression_layout, &long_layout_bindings) : NULL;
+    check_bool("mat_to_string long laid-out expression card reparses", long_layout_roundtrip != NULL);
+    check_bool("mat_to_string function card declaration",
+               function && strstr(function, "matrix mat(x, const c, const d) {") != NULL);
+    check_bool("mat_to_string function card body", function && strstr(function, "return (x, c; d, x^2).") != NULL);
+    check_bool("mat_to_string function card variable initialiser", function && strstr(function, "x = ?.") != NULL);
+    check_bool("mat_to_string function card constant initialiser",
+               function && strstr(function, "const c = ?.\nconst d = ?.") != NULL);
+    check_bool("mat_to_string function card output", function && strstr(function, "output(mat(x, c, d)).") != NULL);
+    check_bool("mat_to_string function card uses plain fraction syntax for binding initialisers",
+               fraction_function && strstr(fraction_function, "x = 5/2.") != NULL &&
+                   strstr(fraction_function, "x = ⁵⁄₂.") == NULL);
+
+    free(fraction_function);
+    free(function);
+    free(long_expression_layout);
+    free(expression_layout);
+    free(expression);
+    mat_bindings_free(long_layout_bindings);
+    mat_free(long_layout_roundtrip);
+    mat_bindings_free(layout_bindings);
+    mat_free(layout_roundtrip);
+    mat_bindings_free(long_bindings);
+    mat_free(long_A);
+    mat_bindings_free(fraction_bindings);
+    mat_free(fraction_A);
+    mat_bindings_free(bindings);
+    mat_free(A);
+}
+
+static void test_mat_to_string_numeric_function_card(void)
+{
+    matrix_t *A = mat_from_string("(1, 2; 3, 4)");
+    char *function = mat_to_string(A, MAT_STRING_FUNCTION);
+
+    check_bool("mat_to_string numeric function card source non-null", A != NULL);
+    check_bool("mat_to_string numeric function card exact",
+               function && strcmp(function, "matrix mat() {\n    return (1, 2; 3, 4).\n}\n\noutput(mat()).") == 0);
+
+    free(function);
+    mat_free(A);
+}
+
+static void test_mat_to_string_function_card_reuses_shared_calculations(void)
+{
+    mat_bindings_t *bindings = NULL;
+    mat_bindings_t *repeated_bindings = NULL;
+    matrix_t *A = mat_from_string_expr("(sin(x)+cos(x), sin(x)-cos(x); 2*sin(x), 2*cos(x))", &bindings);
+    matrix_t *repeated = mat_from_string_expr("(sin(x), sin(x); cos(x), cos(x))", &repeated_bindings);
+    char *function = mat_to_string(A, MAT_STRING_FUNCTION);
+    char *repeated_function = mat_to_string(repeated, MAT_STRING_FUNCTION);
+
+    check_bool("mat_to_string optimised function card source non-null", A != NULL);
+    check_bool("mat_to_string optimised function card declares sin once",
+               function && matrix_tostring_count_substring(function, "sin(x)") == 1u);
+    check_bool("mat_to_string optimised function card declares cos once",
+               function && matrix_tostring_count_substring(function, "cos(x)") == 1u);
+    check_bool("mat_to_string optimised function card reuses first temporary",
+               function && strstr(function, "v1 = sin(x).") != NULL &&
+                   matrix_tostring_count_substring(function, "v1") == 4u);
+    check_bool("mat_to_string optimised function card reuses second temporary",
+               function && strstr(function, "v2 = cos(x).") != NULL &&
+                   matrix_tostring_count_substring(function, "v2") == 4u);
+    check_bool("mat_to_string optimised function card body",
+               function && strstr(function, "return (v1 + v2, v1 - v2; 2.v1, 2.v2).") != NULL);
+    check_bool("mat_to_string optimised function card lifts identical complete entries",
+               repeated_function && strstr(repeated_function, "v1 = sin(x).") != NULL &&
+                   strstr(repeated_function, "v2 = cos(x).") != NULL &&
+                   strstr(repeated_function, "return (v1, v1; v2, v2).") != NULL);
+
+    free(repeated_function);
+    free(function);
+    mat_bindings_free(repeated_bindings);
+    mat_bindings_free(bindings);
+    mat_free(repeated);
+    mat_free(A);
+}
+
 void run_matrix_tostring_tests(void)
 {
     TEST_RUN_CASE(test_mat_to_string_numeric, NULL);
@@ -583,5 +758,8 @@ void run_matrix_tostring_tests(void)
     TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_TeX_elides_wrapper, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_roundtrip, NULL);
     TEST_RUN_CASE(test_mat_to_string_symbolic_derivative_roundtrip, NULL);
+    TEST_RUN_CASE(test_mat_to_string_result_card_styles, NULL);
+    TEST_RUN_CASE(test_mat_to_string_numeric_function_card, NULL);
+    TEST_RUN_CASE(test_mat_to_string_function_card_reuses_shared_calculations, NULL);
     matrix_TeX_preview_cleanup();
 }

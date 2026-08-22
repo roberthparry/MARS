@@ -98,12 +98,13 @@ sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-
 Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
-MARS Lab also renders TeX through `latex` and `dvisvgm`. The desktop Lab now
-uses the `sqlcipher` CLI to bootstrap the jurisdiction database during
-installation. Install the runtime tools and check them with:
+MARS Lab requires Python 3.10 or later, using only its standard library, and
+renders TeX through `latex` and `dvisvgm`. The desktop Lab uses the `sqlcipher`
+CLI to bootstrap the jurisdiction database during installation. Install the
+runtime tools and check them with:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm sqlcipher
+sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
 make check-lab-deps
 ```
 
