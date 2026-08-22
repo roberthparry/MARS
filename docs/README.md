@@ -10,6 +10,7 @@ This directory contains the longer module documentation for MARS.
 - [Testing](./testing.md)
 - [Benchmarks](./benchmarks.md)
 - [Licensing and dependency continuity](./licensing.md)
+- [Compliance status](./compliance-status.md)
 - [Privacy](./privacy.md)
 - [Almanac data provenance](./almanac-data-provenance.md)
 - [Visual asset provenance](./visual-asset-provenance.md)

@@ -493,3 +493,6 @@ response to an upstream acquisition, licence change or loss of maintenance.
 The [almanac data provenance](docs/almanac-data-provenance.md) identifies the
 astronomical sources, transformations, checksums and AstroNav workbook
 ownership.
+The [compliance status](docs/compliance-status.md) separates automated
+repository safeguards from matters that still require a manual legal or release
+decision.

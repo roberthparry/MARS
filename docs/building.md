@@ -112,9 +112,10 @@ DOCDIR=$(PREFIX)/share/doc/mars
 
 That places libraries in `/usr/local/lib` and public headers in
 `/usr/local/include/mars`. The MARS licence, third-party notices, SPDX
-dependency inventory, licensing policy, privacy notice and almanac data
-provenance are installed in `/usr/local/share/doc/mars`, so they remain with
-packaged installations. Override paths as needed:
+dependency inventory, licensing policy, privacy notice, almanac and visual
+provenance records, and compliance status are installed in
+`/usr/local/share/doc/mars`, so they remain with packaged installations.
+Override paths as needed:
 
 ```sh
 make install PREFIX=/opt/mars

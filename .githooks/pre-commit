@@ -3,4 +3,5 @@
 set -eu
 
 repository_root=$(git rev-parse --show-toplevel)
-exec "$repository_root/tools/check_public_distribution.py"
+"$repository_root/tools/check_public_distribution.py"
+exec "$repository_root/tools/check_compliance.py"
