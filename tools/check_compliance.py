@@ -171,7 +171,8 @@ def check_weather_integration(errors: list[str]) -> None:
     mars_lab = read_text("tools/mars_lab.py")
     required_markers = {
         "MARS_WEATHER_API_KEY": "user-supplied API-key setting",
-        "WEATHER_SAFETY_NOTICE": "end-user weather safety notice",
+        "Weather is informational and must not be the sole basis for safety-critical decisions.":
+            "end-user weather safety notice",
         "https://www.weatherapi.com/": "WeatherAPI attribution link",
         "https://www.weatherapi.com/privacy.aspx": "WeatherAPI privacy link",
         "https://www.weatherapi.com/terms.aspx": "WeatherAPI terms link",
