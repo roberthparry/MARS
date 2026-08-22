@@ -152,7 +152,7 @@ check-public-distribution:
 	@tools/check_public_distribution.py
 
 check-compliance: check-public-distribution
-	@tools/check_compliance.py
+	@tools/check_compliance.py --quiet
 
 # qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
 # to the number backend and must not leak across this module boundary.
@@ -233,6 +233,19 @@ check-lab-deps: check-jurisdiction-db-deps
 	        missing=1; \
 	    fi; \
 	}; \
+	check_python() { \
+	    if ! command -v python3 >/dev/null 2>&1; then \
+	        echo "Missing Python 3.10 or later for MARS Lab."; \
+	        echo "  Debian/Ubuntu: sudo apt install python3"; \
+	        packages="$$packages python3"; \
+	        missing=1; \
+	    elif ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then \
+	        echo "MARS Lab requires Python 3.10 or later."; \
+	        echo "  Found: $$(python3 --version 2>&1)"; \
+	        missing=1; \
+	    fi; \
+	}; \
+	check_python; \
 	check_tool "LaTeX" "latex" "texlive-latex-base"; \
 	check_tool "dvisvgm" "dvisvgm" "dvisvgm"; \
 	if [ "$$missing" -ne 0 ]; then \

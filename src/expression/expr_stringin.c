@@ -39,7 +39,8 @@
  *               integration variable t
  *
  * Bracketed names ([my var], [2pi], …) are supported for identifiers that
- * do not fit the single-letter-plus-subscript rule.
+ * do not fit the single-letter-plus-subscript rule. The input-only $[name]
+ * alias is accepted and canonicalised to [name].
  *
  * Returns an owning expr_t* on success, NULL on parse error (details written
  * to stderr).  The caller must call expr_free() on the returned pointer exactly

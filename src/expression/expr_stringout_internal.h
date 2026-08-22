@@ -58,6 +58,7 @@ char *binding_rhs_c_string_local(const expr_t *dv);
 /* Expression emitters. */
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+void emit_func_fragment(sbuf_t *b, const char *text);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_with_temporaries(const expr_t *f, sbuf_t *b, int parent_prec, const expr_t *const *nodes,

@@ -1315,9 +1315,12 @@
     "test_mat_text_formatters": true
   },
   "tests/matrix/test_matrix_tostring.c": {
+    "test_mat_to_string_function_card_reuses_shared_calculations": true,
     "test_mat_to_string_number_precision": true,
     "test_mat_to_string_numeric": true,
     "test_mat_to_string_numeric_TeX": true,
+    "test_mat_to_string_numeric_function_card": true,
+    "test_mat_to_string_result_card_styles": true,
     "test_mat_to_string_symbolic": true,
     "test_mat_to_string_symbolic_TeX": true,
     "test_mat_to_string_symbolic_TeX_exact": true,

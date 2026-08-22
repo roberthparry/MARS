@@ -185,7 +185,7 @@ static char *concat3(const char *a, const char *b, const char *c)
 
 static char *matrix_scalar_lhs_TeX(const matrix_t *matrix, const char *operation)
 {
-    char *matrix_TeX = mat_to_string(matrix, MAT_STRING_LATEX);
+    char *matrix_TeX = mat_body_to_string(matrix, MAT_STRING_LATEX);
     char *lhs;
 
     if (!matrix_TeX)
@@ -205,6 +205,22 @@ static char *matrix_scalar_lhs_TeX(const matrix_t *matrix, const char *operation
 
     free(matrix_TeX);
     return lhs;
+}
+
+static char *expr_card_text_dup(const expr_t *expression)
+{
+    string_t *text = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
+    char *out;
+
+    if (!text)
+        return NULL;
+    if (string_replace(text, "NAN", "?") < 0) {
+        string_free(text);
+        return NULL;
+    }
+    out = strdup(string_c_str(text));
+    string_free(text);
+    return out;
 }
 
 static void print_expr_values(const char *label, expr_t **values, size_t count)
@@ -241,22 +257,82 @@ static void print_number_eigenvalues_TeX(number_t *values, size_t count)
     printf("\\end{aligned}\n");
 }
 
-static void print_matrix_fields(const matrix_t *matrix)
+static void print_matrix_card_fields(const matrix_t *matrix)
 {
     char *inline_text = mat_body_to_string(matrix, MAT_STRING_INLINE_PRETTY);
+    char *expression_text = mat_to_string(matrix, MAT_STRING_EXPRESSION);
+    char *expression_pretty_text = mat_to_string(matrix, MAT_STRING_EXPRESSION_LAYOUT);
+    char *function_text = mat_to_string(matrix, MAT_STRING_FUNCTION);
     char *pretty_text = mat_body_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
-    char *TeX_text = mat_body_to_string(matrix, MAT_STRING_LATEX);
 
     printf("kind        %s\n", matrix_type_name(matrix));
     printf("rows        %zu\n", mat_get_row_count(matrix));
     printf("cols        %zu\n", mat_get_col_count(matrix));
     printf("result      %s\n", inline_text ? inline_text : "(null)");
+    printf("expression  %s\n", expression_text ? expression_text : "(null)");
+    printf("expression_pretty  %s\n", expression_pretty_text ? expression_pretty_text : "(null)");
+    printf("function    %s\n", function_text ? function_text : "(null)");
     printf("pretty      %s\n", pretty_text ? pretty_text : "(null)");
-    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
 
-    free(TeX_text);
     free(pretty_text);
+    free(function_text);
+    free(expression_pretty_text);
+    free(expression_text);
     free(inline_text);
+}
+
+static void print_matrix_fields(const matrix_t *matrix)
+{
+    char *TeX_text;
+
+    print_matrix_card_fields(matrix);
+    TeX_text = mat_body_to_string(matrix, MAT_STRING_LATEX);
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
+    free(TeX_text);
+}
+
+static matrix_t *expr_column_matrix(expr_t **values, size_t count)
+{
+    matrix_t *matrix = mat_new_expr(count, 1u);
+
+    if (!matrix)
+        return NULL;
+    for (size_t row = 0u; row < count; ++row)
+        mat_set(matrix, row, 0u, &values[row]);
+    return matrix;
+}
+
+static matrix_t *number_column_matrix(number_t *values, size_t count)
+{
+    matrix_t *matrix = mat_new(count, 1u);
+
+    if (!matrix)
+        return NULL;
+    for (size_t row = 0u; row < count; ++row)
+        mat_set(matrix, row, 0u, &values[row]);
+    return matrix;
+}
+
+static char *matrix_function_named(const matrix_t *matrix, const char *name)
+{
+    string_t *text = mat_to_text(matrix, MAT_STRING_FUNCTION);
+    char declaration[96];
+    char output[96];
+    char *result;
+
+    if (!text || !name)
+        goto fail;
+    snprintf(declaration, sizeof(declaration), "matrix %s(", name);
+    snprintf(output, sizeof(output), "output(%s(", name);
+    if (string_replace(text, "matrix mat(", declaration) < 0 || string_replace(text, "output(mat(", output) < 0)
+        goto fail;
+    result = strdup(string_c_str(text));
+    string_free(text);
+    return result;
+
+fail:
+    string_free(text);
+    return NULL;
 }
 
 static void print_matrix_value_fields(const matrix_t *matrix)
@@ -376,67 +452,58 @@ static bool matrix_bindings_have_resolved_values(mat_bindings_t *bindings)
     return false;
 }
 
-static matrix_t *matrix_partially_evaluate(const matrix_t *matrix, mat_bindings_t *bindings)
+static void matrix_bindings_copy_values(mat_bindings_t *destination, mat_bindings_t *source)
 {
-    matrix_t *evaluated;
-    size_t rows;
-    size_t cols;
+    if (!destination || !source)
+        return;
 
-    if (!matrix || mat_typeof(matrix) != MAT_TYPE_EXPR)
-        return NULL;
-    rows = mat_get_row_count(matrix);
-    cols = mat_get_col_count(matrix);
-    evaluated = mat_new_expr(rows, cols);
-    if (!evaluated)
-        return NULL;
+    for (size_t index = 0u; index < mat_bindings_count(destination); ++index) {
+        const char *name = mat_bindings_name_at(destination, index);
+        expr_t *target = mat_bindings_expr_at(destination, index);
+        expr_t *origin = name ? mat_bindings_get(source, name) : NULL;
+        number_t value;
 
-    for (size_t row = 0u; row < rows; ++row) {
-        for (size_t col = 0u; col < cols; ++col) {
-            expr_t *entry = NULL;
+        if (!target || !origin)
+            continue;
+        value = expr_get_val(origin);
+        expr_set_val(target, value);
+        num_destroy(&value);
+    }
+}
 
-            mat_get(matrix, row, col, &entry);
-            if (!entry)
-                goto fail;
-            expr_retain(entry);
-            for (size_t binding_index = 0u; binding_index < mat_bindings_count(bindings); ++binding_index) {
-                expr_t *binding = mat_bindings_expr_at(bindings, binding_index);
-                number_t value;
+static void expression_bindings_copy_values(expr_t *expression, mat_bindings_t *source)
+{
+    matrix_t *holder;
+    mat_bindings_t *destination;
 
-                if (!binding)
-                    continue;
-                value = expr_get_val(binding);
-                if (!num_is_nan(value)) {
-                    expr_t *replacement = expr_new_const(num_clone(value));
-                    expr_t *substituted = replacement ? expr_substitute(entry, binding, replacement) : NULL;
+    if (!expression || !source)
+        return;
+    holder = mat_new_expr(1u, 1u);
+    if (!holder)
+        return;
+    mat_set(holder, 0u, 0u, &expression);
+    destination = mat_bindings_from_matrix(holder);
+    matrix_bindings_copy_values(destination, source);
+    mat_bindings_free(destination);
+    mat_free(holder);
+}
 
-                    expr_free(replacement);
-                    if (!substituted) {
-                        num_destroy(&value);
-                        expr_free(entry);
-                        goto fail;
-                    }
-                    expr_free(entry);
-                    entry = substituted;
-                }
-                num_destroy(&value);
-            }
-            {
-                expr_t *simplified = expr_display_simplified(entry);
+static bool matrix_has_numeric_values(const matrix_t *matrix)
+{
+    if (!matrix || mat_typeof(matrix) != MAT_TYPE_NUMBER)
+        return false;
 
-                if (simplified) {
-                    expr_free(entry);
-                    entry = simplified;
-                }
-            }
-            mat_set(evaluated, row, col, &entry);
-            expr_free(entry);
+    for (size_t row = 0u; row < mat_get_row_count(matrix); ++row) {
+        for (size_t col = 0u; col < mat_get_col_count(matrix); ++col) {
+            number_t value = mat_get_num(matrix, row, col);
+            bool numeric = !num_is_nan(value);
+
+            num_destroy(&value);
+            if (!numeric)
+                return false;
         }
     }
-    return evaluated;
-
-fail:
-    mat_free(evaluated);
-    return NULL;
+    return true;
 }
 
 static char *expr_to_unbound_TeX(expr_t *expr)
@@ -554,9 +621,13 @@ static void print_number_eigenvector_column_TeX(const matrix_t *eigenvectors, si
 
 static void print_eigendecomposition_expr_fields(expr_t **eigenvalues, size_t count, const matrix_t *eigenvectors)
 {
+    matrix_t *eigenvalue_matrix = expr_column_matrix(eigenvalues, count);
     char *inline_text = mat_to_string(eigenvectors, MAT_STRING_INLINE_PRETTY);
     char *pretty_text = mat_to_string(eigenvectors, MAT_STRING_LAYOUT_PRETTY);
-    char *TeX_text = mat_to_string(eigenvectors, MAT_STRING_LATEX);
+    char *eigenvalue_expression = eigenvalue_matrix ? mat_to_string(eigenvalue_matrix, MAT_STRING_EXPRESSION) : NULL;
+    char *eigenvector_expression = mat_to_string(eigenvectors, MAT_STRING_EXPRESSION);
+    char *eigenvalue_function = eigenvalue_matrix ? matrix_function_named(eigenvalue_matrix, "eigenvalues") : NULL;
+    char *eigenvector_function = matrix_function_named(eigenvectors, "eigenvectors");
 
     printf("kind        %s\n", matrix_type_name(eigenvectors));
     printf("rows        %zu\n", mat_get_row_count(eigenvectors));
@@ -574,6 +645,13 @@ static void print_eigendecomposition_expr_fields(expr_t **eigenvalues, size_t co
         print_expr_eigenvector_column("", eigenvectors, i);
     }
     printf("result      V = %s\n", inline_text ? inline_text : "(null)");
+
+    printf("expression  eigenvalues\n");
+    printf("expression  %s\n", eigenvalue_expression ? eigenvalue_expression : "(null)");
+    printf("expression  eigenvectors\n");
+    printf("expression  %s\n", eigenvector_expression ? eigenvector_expression : "(null)");
+    printf("function    %s\n\n%s\n", eigenvalue_function ? eigenvalue_function : "(null)",
+           eigenvector_function ? eigenvector_function : "(null)");
 
     printf("pretty      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
@@ -605,16 +683,33 @@ static void print_eigendecomposition_expr_fields(expr_t **eigenvalues, size_t co
     }
     printf("\\end{aligned}\n");
 
-    free(TeX_text);
+    if (eigenvalue_matrix) {
+        mat_bindings_t *value_bindings = mat_bindings_from_matrix(eigenvalue_matrix);
+        mat_bindings_t *vector_bindings = mat_bindings_from_matrix(eigenvectors);
+
+        print_matrix_bindings(value_bindings);
+        print_additional_matrix_bindings(vector_bindings, value_bindings);
+        mat_bindings_free(vector_bindings);
+        mat_bindings_free(value_bindings);
+    }
+    free(eigenvector_function);
+    free(eigenvalue_function);
+    free(eigenvector_expression);
+    free(eigenvalue_expression);
     free(pretty_text);
     free(inline_text);
+    mat_free(eigenvalue_matrix);
 }
 
 static void print_eigendecomposition_number_fields(number_t *eigenvalues, size_t count, const matrix_t *eigenvectors)
 {
+    matrix_t *eigenvalue_matrix = number_column_matrix(eigenvalues, count);
     char *inline_text = mat_to_string(eigenvectors, MAT_STRING_INLINE_PRETTY);
     char *pretty_text = mat_to_string(eigenvectors, MAT_STRING_LAYOUT_PRETTY);
-    char *TeX_text = mat_to_string(eigenvectors, MAT_STRING_LATEX);
+    char *eigenvalue_expression = eigenvalue_matrix ? mat_to_string(eigenvalue_matrix, MAT_STRING_EXPRESSION) : NULL;
+    char *eigenvector_expression = mat_to_string(eigenvectors, MAT_STRING_EXPRESSION);
+    char *eigenvalue_function = eigenvalue_matrix ? matrix_function_named(eigenvalue_matrix, "eigenvalues") : NULL;
+    char *eigenvector_function = matrix_function_named(eigenvectors, "eigenvectors");
 
     printf("kind        %s\n", matrix_type_name(eigenvectors));
     printf("rows        %zu\n", mat_get_row_count(eigenvectors));
@@ -632,6 +727,21 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues, size_t
         print_number_eigenvector_column("", eigenvectors, i);
     }
     printf("result      V = %s\n", inline_text ? inline_text : "(null)");
+
+    printf("expression  eigenvalues\n");
+    printf("expression  %s\n", eigenvalue_expression ? eigenvalue_expression : "(null)");
+    printf("expression  eigenvectors\n");
+    printf("expression  %s\n", eigenvector_expression ? eigenvector_expression : "(null)");
+    printf("function    %s\n\n%s\n", eigenvalue_function ? eigenvalue_function : "(null)",
+           eigenvector_function ? eigenvector_function : "(null)");
+
+    printf("value       eigenvalues\n");
+    print_number_values("value", eigenvalues, count);
+    printf("value       eigenvectors\n");
+    for (size_t i = 0; i < count; ++i) {
+        printf("value       v%zu = ", i + 1u);
+        print_number_eigenvector_column("", eigenvectors, i);
+    }
 
     printf("pretty      eigenvalues\n");
     for (size_t i = 0; i < count; ++i) {
@@ -663,36 +773,59 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues, size_t
     }
     printf("\\end{aligned}\n");
 
-    free(TeX_text);
+    free(eigenvector_function);
+    free(eigenvalue_function);
+    free(eigenvector_expression);
+    free(eigenvalue_expression);
     free(pretty_text);
     free(inline_text);
+    mat_free(eigenvalue_matrix);
 }
 
-static void print_expr_scalar_field(const matrix_t *matrix, const char *operation, const char *label, expr_t *expr)
+static void print_expr_scalar_field(const matrix_t *matrix, const char *operation, expr_t *expr)
 {
-    char *text = expr ? expr_text_dup(expr, style_EXPRESSION) : NULL;
-    char *tex = expr ? expr_text_dup(expr, style_LATEX) : NULL;
+    char *result_text = expr ? expr_text_dup(expr, style_UNBOUND) : NULL;
+    char *expression_text = expr_card_text_dup(expr);
+    char *function_text = expr ? expr_text_dup(expr, style_FUNCTION) : NULL;
+    char *tex = expr ? expr_to_TeX_body(expr) : NULL;
     char *lhs_TeX = matrix ? matrix_scalar_lhs_TeX(matrix, operation) : NULL;
+    number_t value = expr ? expr_get_val(expr) : num_new();
 
-    printf("%-12s %s\n", label, text ? text : "(null)");
+    printf("result      %s\n", result_text ? result_text : "(null)");
+    printf("expression  %s\n", expression_text ? expression_text : "(null)");
+    printf("function    %s\n", function_text ? function_text : "(null)");
+    if (!num_is_nan(value)) {
+        char *value_text = number_text_dup(value);
+
+        printf("value       %s\n", value_text ? value_text : "(null)");
+        free(value_text);
+    }
     if (lhs_TeX && tex)
         printf("tex         %s = %s\n", lhs_TeX, tex);
     else
         printf("tex         %s\n", tex ? tex : "(null)");
 
+    num_destroy(&value);
     free(lhs_TeX);
     free(tex);
-    free(text);
+    free(function_text);
+    free(expression_text);
+    free(result_text);
     expr_free(expr);
 }
 
-static void print_number_scalar_field(const matrix_t *matrix, const char *operation, const char *label, number_t value)
+static void print_number_scalar_field(const matrix_t *matrix, const char *operation, number_t value)
 {
     char *text = number_text_dup(value);
     char *tex = number_TeX_dup(value);
     char *lhs_TeX = matrix_scalar_lhs_TeX(matrix, operation);
+    expr_t *expression = expr_new_const(value);
+    char *function_text = expression ? expr_text_dup(expression, style_FUNCTION) : NULL;
 
-    printf("%-12s %s\n", label, text ? text : "(null)");
+    printf("result      %s\n", text ? text : "(null)");
+    printf("expression  %s\n", text ? text : "(null)");
+    printf("function    %s\n", function_text ? function_text : "(null)");
+    printf("value       %s\n", text ? text : "(null)");
     if (lhs_TeX && tex)
         printf("tex         %s = %s\n", lhs_TeX, tex);
     else if (tex)
@@ -700,7 +833,9 @@ static void print_number_scalar_field(const matrix_t *matrix, const char *operat
 
     free(lhs_TeX);
     free(tex);
+    free(function_text);
     free(text);
+    expr_free(expression);
     num_destroy(&value);
 }
 
@@ -712,14 +847,14 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
 
             if (mat_trace_expr(matrix, &trace) != 0 || !trace)
                 return 1;
-            print_expr_scalar_field(matrix, operation, "value", trace);
+            print_expr_scalar_field(matrix, operation, trace);
             return 0;
         } else {
             number_t trace = num_new();
 
             if (mat_trace(matrix, &trace) != 0)
                 return 1;
-            print_number_scalar_field(matrix, operation, "value", trace);
+            print_number_scalar_field(matrix, operation, trace);
             return 0;
         }
     }
@@ -730,14 +865,14 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
 
             if (mat_det_expr(matrix, &det) != 0 || !det)
                 return 1;
-            print_expr_scalar_field(matrix, operation, "value", det);
+            print_expr_scalar_field(matrix, operation, det);
             return 0;
         } else {
             number_t det = num_new();
 
             if (mat_det(matrix, &det) != 0)
                 return 1;
-            print_number_scalar_field(matrix, operation, "value", det);
+            print_number_scalar_field(matrix, operation, det);
             return 0;
         }
     }
@@ -746,6 +881,9 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
         int rank = mat_rank(matrix);
         char *lhs_TeX = matrix_scalar_lhs_TeX(matrix, operation);
 
+        printf("result      %d\n", rank);
+        printf("expression  %d\n", rank);
+        printf("function    expression expr() {\n    return %d.\n}\n\noutput(expr()).\n", rank);
         printf("value       %d\n", rank);
         if (lhs_TeX)
             printf("tex         %s = %d\n", lhs_TeX, rank);
@@ -764,6 +902,7 @@ static int run_eigenvalue_operation(const matrix_t *matrix)
 
     if (mat_typeof(matrix) == MAT_TYPE_EXPR) {
         expr_t **eigenvalues = calloc(n, sizeof(*eigenvalues));
+        matrix_t *eigenvalue_matrix;
         int rc;
 
         if (!eigenvalues)
@@ -773,14 +912,30 @@ static int run_eigenvalue_operation(const matrix_t *matrix)
             free(eigenvalues);
             return 1;
         }
+        eigenvalue_matrix = expr_column_matrix(eigenvalues, n);
+        if (!eigenvalue_matrix) {
+            for (size_t i = 0; i < n; ++i)
+                expr_free(eigenvalues[i]);
+            free(eigenvalues);
+            return 1;
+        }
+        print_matrix_card_fields(eigenvalue_matrix);
         print_expr_values("value", eigenvalues, n);
         print_expr_eigenvalues_TeX(eigenvalues, n);
+        {
+            mat_bindings_t *eigenvalue_bindings = mat_bindings_from_matrix(eigenvalue_matrix);
+
+            print_matrix_bindings(eigenvalue_bindings);
+            mat_bindings_free(eigenvalue_bindings);
+        }
+        mat_free(eigenvalue_matrix);
         for (size_t i = 0; i < n; ++i)
             expr_free(eigenvalues[i]);
         free(eigenvalues);
         return 0;
     } else {
         number_t *eigenvalues = calloc(n, sizeof(*eigenvalues));
+        matrix_t *eigenvalue_matrix;
         int rc;
 
         if (!eigenvalues)
@@ -794,8 +949,17 @@ static int run_eigenvalue_operation(const matrix_t *matrix)
             free(eigenvalues);
             return 1;
         }
+        eigenvalue_matrix = number_column_matrix(eigenvalues, n);
+        if (!eigenvalue_matrix) {
+            for (size_t i = 0; i < n; ++i)
+                num_destroy(&eigenvalues[i]);
+            free(eigenvalues);
+            return 1;
+        }
+        print_matrix_card_fields(eigenvalue_matrix);
         print_number_values("value", eigenvalues, n);
         print_number_eigenvalues_TeX(eigenvalues, n);
+        mat_free(eigenvalue_matrix);
         for (size_t i = 0; i < n; ++i)
             num_destroy(&eigenvalues[i]);
         free(eigenvalues);
@@ -907,22 +1071,12 @@ int main(int argc, char **argv)
     }
 
     if (scalar_result) {
-        number_t evaluated_value = num_clone(NUM_NAN);
-
         operation = parsed_operation ? parsed_operation : operation;
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
-        if (matrix_bindings_are_resolved(bindings))
-            evaluated_value = expr_eval(bound_scalar_result ? bound_scalar_result : scalar_result);
-        print_expr_scalar_field(NULL, operation, "result", scalar_result);
+        expression_bindings_copy_values(scalar_result, bindings);
+        print_expr_scalar_field(NULL, operation, scalar_result);
         scalar_result = NULL;
-        if (!num_is_nan(evaluated_value)) {
-            char *value_text = number_text_dup(evaluated_value);
-
-            printf("value       %s\n", value_text ? value_text : "(null)");
-            free(value_text);
-        }
-        num_destroy(&evaluated_value);
         print_matrix_bindings(bindings);
         rc = 0;
         goto cleanup;
@@ -982,6 +1136,12 @@ int main(int argc, char **argv)
         }
         result = strcmp(operation, "solve") == 0 ? mat_solve(matrix, other) : mat_mul(matrix, other);
     } else if (strcmp(operation, "trace") == 0 || strcmp(operation, "det") == 0 || strcmp(operation, "rank") == 0) {
+        if (mat_typeof(matrix) == MAT_TYPE_EXPR) {
+            mat_bindings_t *scalar_bindings = mat_bindings_from_matrix(matrix);
+
+            matrix_bindings_copy_values(scalar_bindings, bindings);
+            mat_bindings_free(scalar_bindings);
+        }
         rc = run_scalar_operation(matrix, operation);
         goto cleanup;
     } else if (strcmp(operation, "eigenvalues") == 0) {
@@ -1011,13 +1171,21 @@ result_ready:
     }
 
     result_bindings = mat_bindings_from_matrix(result);
+    matrix_bindings_copy_values(result_bindings, bindings);
     print_matrix_fields(result);
-    if (bound_matrix_is_result) {
-        matrix_t *value_matrix = mat_typeof(bound_matrix) == MAT_TYPE_EXPR
-                                     ? matrix_partially_evaluate(bound_matrix, bindings)
-                                     : NULL;
+    if (matrix_bindings_are_resolved(result_bindings)) {
+        const matrix_t *value_source = bound_matrix_is_result ? bound_matrix : result;
+        matrix_t *value_matrix = mat_evaluate(value_source);
 
-        print_matrix_value_fields(value_matrix ? value_matrix : bound_matrix);
+        if (matrix_has_numeric_values(value_matrix)) {
+            matrix_t *real_value = matrix_real_copy_if_possible(value_matrix);
+
+            if (real_value) {
+                mat_free(value_matrix);
+                value_matrix = real_value;
+            }
+            print_matrix_value_fields(value_matrix);
+        }
         mat_free(value_matrix);
     }
     if (bound_matrix_is_result) {

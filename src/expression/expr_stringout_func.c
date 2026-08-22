@@ -43,12 +43,12 @@ static void emit_assignment_value(sbuf_t *b, char *value)
             }
         }
         if (!match) {
-            sbuf_puts(b, cursor);
+            emit_func_fragment(b, cursor);
             break;
         }
 
         *match = '\0';
-        sbuf_puts(b, cursor);
+        emit_func_fragment(b, cursor);
         *match = aliases[alias_index].symbol[0];
         sbuf_puts(b, aliases[alias_index].alias);
         cursor = match + strlen(aliases[alias_index].symbol);
@@ -132,6 +132,13 @@ typedef struct {
     size_t count;
     size_t capacity;
 } function_dag_table_t;
+
+struct expr_function_temporaries {
+    function_temporary_table_t temporaries;
+    autoname_table_t autonames;
+    varlist_t variables;
+    varlist_t constants;
+};
 
 static void function_temporary_table_init(function_temporary_table_t *table)
 {
@@ -263,63 +270,10 @@ static bool function_temporary_table_name_is_available(const function_temporary_
     return true;
 }
 
-static bool function_temporary_has_simple_constant_label(const expr_t *node)
-{
-    if (!node || !function_node_is_constant(node))
-        return false;
-    if (node->ops->arity == EXPR_OP_UNARY)
-        return node->a && (expr_is_const(node->a) || expr_is_var(node->a));
-    if (expr_is_op(node, &ops_root))
-        return node->a && node->b && (expr_is_const(node->a) || expr_is_var(node->a)) &&
-               (expr_is_const(node->b) || expr_is_var(node->b));
-    return false;
-}
-
-static char *function_temporary_semantic_name_dup(const expr_t *node)
-{
-    sbuf_t rendered;
-    const char *rendered_text;
-    char *name;
-    size_t length;
-    size_t compact_length = 0u;
-    size_t output_index = 2u;
-
-    if (!function_temporary_has_simple_constant_label(node))
-        return NULL;
-
-    sbuf_init(&rendered);
-    emit_func(node, &rendered, PREC_LOWEST);
-    length = sbuf_len(&rendered);
-    rendered_text = sbuf_c_str(&rendered);
-    for (size_t index = 0u; index < length; ++index) {
-        if (rendered_text[index] != ' ')
-            ++compact_length;
-    }
-    if (compact_length == 0u || compact_length > 20u) {
-        sbuf_free(&rendered);
-        return NULL;
-    }
-
-    name = malloc(compact_length + strlen("$[]") + 1u);
-    if (name) {
-        name[0] = '$';
-        name[1] = '[';
-        for (size_t index = 0u; index < length; ++index) {
-            if (rendered_text[index] != ' ')
-                name[output_index++] = rendered_text[index];
-        }
-        name[output_index++] = ']';
-        name[output_index] = '\0';
-    }
-    sbuf_free(&rendered);
-    return name;
-}
-
 static bool function_temporary_table_append(function_temporary_table_t *table, const expr_t *node,
                                             const varlist_t *variables, const varlist_t *constants)
 {
     char candidate[48];
-    char *semantic_name;
     bool is_constant = function_node_is_constant(node);
     size_t ordinal = 1u;
 
@@ -343,25 +297,45 @@ static bool function_temporary_table_append(function_temporary_table_t *table, c
         table->capacity = capacity;
     }
 
-    semantic_name = function_temporary_semantic_name_dup(node);
-    if (semantic_name && !function_temporary_table_name_is_available(table, semantic_name, variables, constants)) {
-        free(semantic_name);
-        semantic_name = NULL;
-    }
-    if (!semantic_name) {
-        do {
-            snprintf(candidate, sizeof(candidate), "%c%zu", is_constant ? 'c' : 'v', ordinal++);
-        } while (!function_temporary_table_name_is_available(table, candidate, variables, constants));
-        semantic_name = expr_tostring_xstrdup(candidate);
-    }
+    do {
+        snprintf(candidate, sizeof(candidate), "%c%zu", is_constant ? 'c' : 'v', ordinal++);
+    } while (!function_temporary_table_name_is_available(table, candidate, variables, constants));
 
-    table->names[table->count] = semantic_name;
+    table->names[table->count] = expr_tostring_xstrdup(candidate);
     if (!table->names[table->count])
         return false;
     table->nodes[table->count] = node;
     table->constants[table->count] = is_constant;
     table->count++;
     return true;
+}
+
+static void function_temporary_table_group_constants(function_temporary_table_t *table)
+{
+    size_t constant_count = 0u;
+
+    if (!table)
+        return;
+
+    for (size_t index = 0u; index < table->count; ++index) {
+        const expr_t *node;
+        char *name;
+
+        if (!table->constants[index])
+            continue;
+
+        node = table->nodes[index];
+        name = table->names[index];
+        for (size_t move = index; move > constant_count; --move) {
+            table->nodes[move] = table->nodes[move - 1u];
+            table->names[move] = table->names[move - 1u];
+            table->constants[move] = table->constants[move - 1u];
+        }
+        table->nodes[constant_count] = node;
+        table->names[constant_count] = name;
+        table->constants[constant_count] = true;
+        constant_count++;
+    }
 }
 
 static bool function_collect_shared_temporaries(const expr_t *node, const expr_t *root,
@@ -454,7 +428,10 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
         return;
     }
 
+    function_temporary_table_group_constants(&temporaries);
     for (size_t index = 0u; index < temporaries.count; ++index) {
+        if (index > 0u && temporaries.constants[index - 1u] && !temporaries.constants[index])
+            sbuf_putc(b, '\n');
         sbuf_puts(b, "    ");
         if (temporaries.constants[index])
             sbuf_puts(b, "const ");
@@ -472,6 +449,167 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
     sbuf_puts(b, ".\n");
     function_dag_table_free(&dag);
     function_temporary_table_free(&temporaries);
+}
+
+/* Build one temporary plan shared by several function expression roots. */
+expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *roots, size_t count)
+{
+    expr_function_temporaries_t *plan = calloc(1u, sizeof(*plan));
+    function_dag_table_t dag;
+    bool ok = plan != NULL;
+
+    if (!plan)
+        return NULL;
+
+    function_temporary_table_init(&plan->temporaries);
+    autoname_init(&plan->autonames);
+    varlist_init(&plan->variables);
+    varlist_init(&plan->constants);
+    function_dag_table_init(&dag);
+
+    for (size_t index = 0u; ok && index < count; ++index) {
+        if (!roots[index])
+            continue;
+        assign_unnamed_vars_dfs((expr_t *)roots[index], &plan->autonames);
+        find_vars_dfs(roots[index], &plan->variables);
+        find_explicit_named_consts_dfs(roots[index], &plan->constants);
+        find_named_consts_dfs(roots[index], &plan->constants);
+        ok = function_dag_table_register(&dag, roots[index]) != (size_t)-1;
+    }
+
+    for (size_t index = 0u; ok && index < count; ++index) {
+        if (roots[index])
+            ok = function_collect_shared_temporaries(roots[index], roots[index], &dag, &plan->temporaries,
+                                                     &plan->variables, &plan->constants);
+    }
+
+    for (size_t index = 0u; ok && index < count; ++index) {
+        size_t occurrences = 0u;
+
+        if (!roots[index] || expr_is_const(roots[index]) || expr_is_var(roots[index]) ||
+            function_temporary_table_contains(&plan->temporaries, roots[index]))
+            continue;
+        for (size_t candidate = 0u; candidate < count; ++candidate) {
+            if (roots[candidate] &&
+                (roots[candidate] == roots[index] || expr_struct_eq(roots[candidate], roots[index])))
+                occurrences++;
+        }
+        if (occurrences > 1u)
+            ok = function_temporary_table_append(&plan->temporaries, roots[index], &plan->variables,
+                                                 &plan->constants);
+    }
+
+    for (size_t index = 0u; ok && index < count; ++index) {
+        sbuf_t direct;
+
+        if (!roots[index])
+            continue;
+        sbuf_init(&direct);
+        emit_func_with_temporaries(roots[index], &direct, PREC_LOWEST, plan->temporaries.nodes,
+                                   (const char *const *)plan->temporaries.names, plan->temporaries.count,
+                                   roots[index]);
+        if (sbuf_len(&direct) + strlen("    return .") > 130u)
+            ok = function_append_hierarchical_temporary(roots[index]->a, &plan->temporaries, &plan->variables,
+                                                        &plan->constants) &&
+                 function_append_hierarchical_temporary(roots[index]->b, &plan->temporaries, &plan->variables,
+                                                        &plan->constants);
+        sbuf_free(&direct);
+    }
+
+    function_dag_table_free(&dag);
+    if (!ok) {
+        expr_function_temporaries_free(plan);
+        return NULL;
+    }
+    function_temporary_table_group_constants(&plan->temporaries);
+    return plan;
+}
+
+/* Render declarations from a shared function-temporary plan. */
+string_t *expr_function_temporaries_declarations_text(const expr_function_temporaries_t *plan)
+{
+    sbuf_t buffer;
+    string_t *text;
+
+    if (!plan)
+        return NULL;
+    sbuf_init(&buffer);
+    for (size_t index = 0u; index < plan->temporaries.count; ++index) {
+        if (index > 0u && plan->temporaries.constants[index - 1u] && !plan->temporaries.constants[index])
+            sbuf_putc(&buffer, '\n');
+        sbuf_puts(&buffer, "    ");
+        if (plan->temporaries.constants[index])
+            sbuf_puts(&buffer, "const ");
+        sbuf_puts(&buffer, plan->temporaries.names[index]);
+        sbuf_puts(&buffer, " = ");
+        emit_func_with_temporaries(plan->temporaries.nodes[index], &buffer, PREC_LOWEST, plan->temporaries.nodes,
+                                   (const char *const *)plan->temporaries.names, plan->temporaries.count,
+                                   plan->temporaries.nodes[index]);
+        sbuf_puts(&buffer, ".\n");
+    }
+    if (plan->temporaries.count > 0u)
+        sbuf_putc(&buffer, '\n');
+    text = sbuf_to_string(&buffer);
+    sbuf_free(&buffer);
+    return text;
+}
+
+/* Render one expression using a shared function-temporary plan. */
+string_t *expr_function_temporaries_expression_text(const expr_function_temporaries_t *plan, const expr_t *expr)
+{
+    sbuf_t buffer;
+    string_t *text;
+
+    if (!plan || !expr)
+        return NULL;
+    sbuf_init(&buffer);
+    emit_func_with_temporaries(expr, &buffer, PREC_LOWEST, plan->temporaries.nodes,
+                               (const char *const *)plan->temporaries.names, plan->temporaries.count, NULL);
+    text = sbuf_to_string(&buffer);
+    sbuf_free(&buffer);
+    return text;
+}
+
+/* Release a shared function-temporary plan. */
+void expr_function_temporaries_free(expr_function_temporaries_t *plan)
+{
+    if (!plan)
+        return;
+    function_temporary_table_free(&plan->temporaries);
+    free(plan->variables.vars);
+    free(plan->constants.vars);
+    autoname_restore(&plan->autonames);
+    free(plan);
+}
+
+/* Serialise one expression body using the notation accepted in a MARS function. */
+string_t *expr_to_function_body_text(const expr_t *expr)
+{
+    sbuf_t buffer;
+    autoname_table_t names;
+    string_t *text;
+
+    if (!expr)
+        return string_new_with("NULL");
+
+    sbuf_init(&buffer);
+    autoname_init(&names);
+    assign_unnamed_vars_dfs((expr_t *)expr, &names);
+    emit_func(expr, &buffer, PREC_LOWEST);
+    text = sbuf_to_string(&buffer);
+    autoname_restore(&names);
+    sbuf_free(&buffer);
+    return text;
+}
+
+/* Serialise one expression body to an owned C string in MARS function notation. */
+char *expr_to_function_body(const expr_t *expr)
+{
+    string_t *text = expr_to_function_body_text(expr);
+    char *out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
+
+    string_free(text);
+    return out;
 }
 
 string_t *expr_to_text_function(const expr_t *f)
@@ -492,7 +630,7 @@ string_t *expr_to_text_function(const expr_t *f)
         if (rhs) {
             sbuf_puts(&b, "expression expr() {\n");
             sbuf_puts(&b, "    return ");
-            sbuf_puts(&b, rhs);
+            emit_func_fragment(&b, rhs);
             sbuf_puts(&b, ".\n");
             sbuf_puts(&b, "}\n\n");
             sbuf_puts(&b, "output(expr()).");

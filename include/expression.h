@@ -789,6 +789,25 @@ string_t *expr_to_text(const expr_t *expr, style_t style);
 char *expr_to_string(const expr_t *expr, style_t style);
 
 /**
+ * @brief Serialise an expression body using MARS function notation.
+ *
+ * Unlike @c expr_to_text(..., style_FUNCTION), this returns only the expression
+ * used after a function's @c return keyword. It is intended for native
+ * containers, such as matrices, that provide their own function wrapper.
+ * The caller owns the returned string and must release it with
+ * @c string_free().
+ */
+string_t *expr_to_function_body_text(const expr_t *expr);
+
+/**
+ * @brief Serialise an expression body to a C string using MARS function notation.
+ *
+ * This is the plain C-string counterpart to expr_to_function_body_text(). The
+ * caller owns the returned buffer and must release it with free().
+ */
+char *expr_to_function_body(const expr_t *expr);
+
+/**
  * @brief Return the TeX expression body without binding wrappers.
  *
  * The returned C string is allocated with malloc() and must be released with
@@ -882,7 +901,8 @@ void expr_print(const expr_t *expr);
  *               sub-expression ((x+1)^2 ≡ (x+1)²)
  *
  * Bracketed names (@p [my var], @p [2pi], …) are supported for identifiers
- * that do not fit the single-letter-plus-subscript rule.
+ * that do not fit the single-letter-plus-subscript rule. The input-only
+ * @p $[name] alias is accepted and canonicalised to @p [name].
  *
  * If there is no binding section and the expression still contains symbolic
  * names, bare inference uses these defaults:

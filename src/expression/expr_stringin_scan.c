@@ -351,6 +351,26 @@ static string_t *read_bracketed_name(string_cursor_t *cursor)
     return name;
 }
 
+static string_t *read_dollar_bracketed_name(string_cursor_t *cursor)
+{
+    string_cursor_t *scan;
+    string_t *name;
+
+    scan = string_cursor_clone(cursor);
+    if (!scan)
+        return NULL;
+    if (!expr_parse_cursor_consume_char(scan, '$')) {
+        string_cursor_free(scan);
+        return NULL;
+    }
+
+    name = read_bracketed_name(scan);
+    if (name)
+        string_cursor_seek(cursor, string_cursor_position(scan));
+    string_cursor_free(scan);
+    return name;
+}
+
 static size_t cursor_alias_name_len(const string_cursor_t *cursor, string_pos_t alias_pos)
 {
     return expr_match_leading_greek_alias_len(cursor, alias_pos);
@@ -541,8 +561,12 @@ string_t *expr_parse_read_name(string_cursor_t *cursor, bool allow_plain_letters
     if (!cursor)
         return NULL;
 
-    if (string_cursor_peek_ascii(cursor, &b) && b == '[')
-        return read_bracketed_name(cursor);
+    if (string_cursor_peek_ascii(cursor, &b)) {
+        if (b == '[')
+            return read_bracketed_name(cursor);
+        if (b == '$')
+            return read_dollar_bracketed_name(cursor);
+    }
 
     for (size_t i = 0u; i < sizeof(special_names) / sizeof(special_names[0]); ++i) {
         if (string_cursor_match_at(cursor, string_cursor_position(cursor), special_names[i].text) &&

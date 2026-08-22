@@ -38,7 +38,13 @@ typedef enum {
     MAT_STRING_INLINE_PRETTY,
     MAT_STRING_LAYOUT_SCIENTIFIC,
     MAT_STRING_LAYOUT_PRETTY,
-    MAT_STRING_LATEX
+    MAT_STRING_LATEX,
+    /** Native matrix expression with variable and constant bindings. */
+    MAT_STRING_EXPRESSION,
+    /** Native matrix expression with compact rows, or individually stacked entries when a row is long. */
+    MAT_STRING_EXPRESSION_LAYOUT,
+    /** Native MARS matrix-function representation with binding declarations. */
+    MAT_STRING_FUNCTION
 } mat_string_style_t;
 
 /**

@@ -8,10 +8,12 @@ is sent to the local MARS helper programs, which use MARSlib.
 
 ## Installing and starting the Lab
 
-Build MARS and install the TeX rendering tools before starting the Lab:
+MARS Lab requires Python 3.10 or later and uses only its standard library; no
+packages from `pip` are needed. Build MARS and install Python, SQLCipher and the
+TeX rendering tools before starting the Lab:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm sqlcipher
+sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
 make mars-lab
 ```
 
@@ -123,10 +125,11 @@ simplified expression:
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
-without surrounding spaces. Constants use `const`; arrays use `array`; and a
-short repeated constant may receive a descriptive name such as `$[sqrt(3)]`.
-The complete descriptive name, including `$[` and `]`, uses the subdued
-off-white italic styling of variable and constant names.
+without surrounding spaces. Constants use `const`; arrays use `array`; and
+generated intermediate values use compact names such as `c1` and `v1`.
+Descriptive `$[...]` identifiers remain accepted as input aliases for
+bracketed names and use the subdued off-white italic styling of variable and
+constant names, but result cards do not generate the `$[...]` form.
 The syntax colouring distinguishes keywords, functions, variables, numbers and
 comments. Function-call brackets use the same gold hue as operators without
 bold weight, while grouping brackets retain the ordinary text colour. The
@@ -301,12 +304,24 @@ Result cards have distinct purposes:
   **Show more digits** reveals the complete exact integer in those cards.
   Rendered TeX instead uses a multiplication sign and a power of ten. The
   Value card is never abbreviated and wraps its complete numerical value.
-- **Result** contains the copyable inline result.
-- **Layout** contains the plain-text matrix layout.
-- **Value** appears when supplied bindings allow a numeric or partially
-  evaluated result. For example, setting `lambda` to `3` evaluates
+- **Expression** shows the same native simplified matrix expression as a
+  bracketed grid. Variable and constant bindings are placed on a separate row
+  beneath the matrix, and unset bindings are shown as `?`. Copy still returns
+  the complete native expression in reusable curly-brace notation.
+- **Function** shows the same result as a native MARS matrix function, followed
+  by the declarations and initialisations for its bindings. Repeated
+  calculations shared by several entries are assigned once to intermediate
+  variables and reused throughout the returned matrix.
+- **Value** appears only when every matrix entry can be evaluated numerically.
+  It remains hidden while a binding or integration constant is unresolved, and
+  its complete numerical entries wrap within their columns rather than being
+  abbreviated. For example, setting `lambda` to `3` evaluates
   `(1 2; 3 4) - lambdaI` to `(-2 2; 3 1)` without replacing the symbolic
-  result above it.
+  algebra in the other cards.
+
+MARSlib creates all four representations from the same simplified matrix. The
+browser transports, displays and compacts the native fields; it does not parse,
+simplify or reinterpret the matrix mathematics.
 
 Symbolic matrix calculus constructs expression DAGs. It does not depend on the
 numeric automatic-differentiation mode: the scalar expression evaluator has a
