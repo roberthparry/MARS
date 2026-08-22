@@ -148,6 +148,48 @@ The resulting MARS SQL data files retain source names, source URLs and source
 document identifiers so that provenance is not lost when the encrypted
 jurisdiction database is created.
 
+### Unicode CLDR week data
+
+Territory weekend conventions use the Unicode Common Locale Data Repository
+(CLDR) week-data model and are cross-checked against the calendar sources named
+above. Unicode CLDR data files are distributed under the Unicode Licence v3.
+The required notice follows.
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY DOWNLOADING,
+INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR SOFTWARE, YOU
+UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE TERMS AND CONDITIONS
+OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT DOWNLOAD, INSTALL, COPY,
+DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+data files and any associated documentation (the "Data Files") or software and
+any associated documentation (the "Software") to deal in the Data Files or
+Software without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, and/or sell copies of the Data Files
+or Software, and to permit persons to whom the Data Files or Software are
+furnished to do so, provided that either (a) this copyright and permission
+notice appear with all copies of the Data Files or Software, or (b) this
+copyright and permission notice appear in associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD
+PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
+NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL
+DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR
+SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall not be
+used in advertising or otherwise to promote the sale, use or other dealings in
+these Data Files or Software without prior written authorization of the
+copyright holder.
+
+Upstream licence information: <https://www.unicode.org/license.txt>
+
 ## Astronomical data and generation tools
 
 The packaged almanac coefficients were derived from JPL Development Ephemeris
@@ -175,6 +217,11 @@ Parry and is original MARS material, not a third-party spreadsheet. He first
 assembled it in Microsoft Excel before 2000, subsequently converted it to an
 OpenOffice document, later maintained it as a LibreOffice document, and more
 recently extended it to improve its accuracy for the 2000–2040 period.
+
+The MARS Lab icons, icon concepts and documentation screenshots are original
+MARS material rather than third-party assets. Their scope and authorship are
+recorded in
+[`docs/visual-asset-provenance.md`](docs/visual-asset-provenance.md).
 
 ## WeatherAPI.com
 

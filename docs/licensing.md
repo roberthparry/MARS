@@ -40,6 +40,13 @@ Every MARS release should apply the following controls:
    a release-review event rather than accepting it silently during an upgrade.
 6. Keep persistence behind the MARS `sqlite_t` API so that storage migration is
    localised if the preferred encrypted database implementation ever changes.
+7. Run `make check-public-distribution` before release. The check rejects any
+   tracked path reserved for the private ESAA reference copy. The repository's
+   tracked pre-commit hook applies the same check when enabled with
+   `git config core.hooksPath .githooks`.
+8. Keep the [visual asset provenance record](./visual-asset-provenance.md) with
+   every distribution containing MARS Lab artwork or screenshots, and record
+   any future third-party visual material before it is added.
 
 ## Dependency risk register
 
@@ -55,6 +62,7 @@ Every MARS release should apply the following controls:
 | TeX Live and dvisvgm | MARS Lab TeX rendering | Per-package licences; dvisvgm is GPL 3 or later | Low to medium | Invoke separately installed programs. A packaged appliance must inventory the actual TeX packages included. |
 | python-holidays and Workalendar | Generation sources for bundled holiday data | MIT | Low | Retain versioned provenance in the SQL source and notices; they are not runtime dependencies. |
 | IANA Time Zone Database | Country and time-zone seed data | Public domain | Very low | Retain the release identifier and source URL in generated data provenance. |
+| Unicode CLDR | Calendar identifiers and territory weekend conventions | Unicode Licence v3 | Very low | Retain the version, source URL and Unicode copyright and permission notice with distributions of derived jurisdiction data. |
 | Tailscale | Optional private access to MARS Lab | BSD 3-Clause client | Low to medium | Keep it optional; normal local and LAN operation must not depend on it. |
 | WeatherAPI.com | Optional hosted weather data | Revocable service terms rather than an open-source licence | Medium | Supply no shared account or key; require an installer who enables weather to use their own account; keep the integration optional and server-side; publish the privacy notice; credit the provider; disclose transmitted and locally retained fields; display the mandatory end-user warning; retain no weather responses; protect the API key; and review the terms before each release. Calendar and astronomical output must remain independent of the service. |
 | JPL DE440 and NAIF auxiliary kernels | Generation sources for bundled almanac coefficients and workbook Moon data | NASA/JPL/Caltech NAIF use and redistribution rules | Low to medium | Do not bundle the kernels or SPICE Toolkit; retain official source URLs, kernel versions, published checksums, transformation details and output hashes in the almanac provenance record. Acknowledge NASA, JPL, Caltech and NAIF without implying endorsement. |

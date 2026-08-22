@@ -30,7 +30,7 @@ DATADIR ?= $(PREFIX)/share
 DOCDIR ?= $(DATADIR)/doc/mars
 
 LEGAL_ROOT_DOCUMENTS := LICENSE THIRD_PARTY_NOTICES.md DEPENDENCIES.spdx
-LEGAL_GUIDE_DOCUMENTS := docs/licensing.md docs/privacy.md docs/almanac-data-provenance.md
+LEGAL_GUIDE_DOCUMENTS := docs/licensing.md docs/privacy.md docs/almanac-data-provenance.md docs/visual-asset-provenance.md
 LEGAL_DOCUMENTS := $(LEGAL_ROOT_DOCUMENTS) $(LEGAL_GUIDE_DOCUMENTS)
 
 MARS_LAB_INSTALL_PREFIX ?= $(HOME)/.local
@@ -131,15 +131,20 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-public-distribution check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
-all: check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
+all: check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
 debug:
 	$(MAKE) DEBUG=1 all
 
 release:
 	$(MAKE) DEBUG=0 all
+
+# Private reference material may remain on the developer's machine, but it
+# must never enter the public repository index.
+check-public-distribution:
+	@tools/check_public_distribution.py
 
 # qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
 # to the number backend and must not leak across this module boundary.
@@ -337,7 +342,7 @@ VALGRIND := valgrind \
     --show-leak-kinds=all \
     --track-origins=yes
 
-test: $(TEST_BINS)
+test: check-public-distribution $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
 	    printf "  %-40s" "$$t ..."; \
 	    if $$t > /dev/null 2>&1; then \
