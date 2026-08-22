@@ -78,32 +78,6 @@ def detect_system_timezone_name() -> str:
     return ""
 
 
-def infer_defaults_from_timezone() -> tuple[str, str, str]:
-    timezone_name = detect_system_timezone_name()
-    candidates = [
-        ("Australia/", ("-33.8688", "151.2093", "AU")),
-        ("Pacific/Auckland", ("-36.8485", "174.7633", "NZ")),
-        ("Africa/Johannesburg", ("-26.2041", "28.0473", "ZA")),
-        ("Europe/Amsterdam", ("52.3676", "4.9041", "NL")),
-        ("Europe/Copenhagen", ("55.6761", "12.5683", "DK")),
-        ("Europe/Dublin", ("53.3498", "-6.2603", "IE")),
-        ("Europe/Lisbon", ("38.7223", "-9.1393", "PT")),
-        ("Europe/Rome", ("41.9028", "12.4964", "IT")),
-        ("Europe/Athens", ("37.9838", "23.7275", "GR")),
-        ("Europe/Berlin", ("52.52", "13.405", "DE")),
-        ("Europe/Paris", ("48.8566", "2.3522", "FR")),
-        ("Europe/London", ("51.5074", "-0.1278", "GB-ENG")),
-        ("America/Toronto", ("43.6532", "-79.3832", "CA")),
-        ("America/Vancouver", ("49.2827", "-123.1207", "CA")),
-        ("America/Halifax", ("44.6488", "-63.5752", "CA")),
-        ("America/", ("40.7128", "-74.006", "US")),
-    ]
-    for prefix, defaults in candidates:
-        if timezone_name.startswith(prefix):
-            return defaults
-    return ("51.5074", "-0.1278", "GB-ENG")
-
-
 def locale_country_to_holiday_jurisdiction(country_code: str) -> str:
     country_code = str(country_code or "").strip().upper()
     if not country_code:
@@ -113,7 +87,6 @@ def locale_country_to_holiday_jurisdiction(country_code: str) -> str:
     return country_code
 
 
-DEFAULT_TIMEZONE_LATITUDE, DEFAULT_TIMEZONE_LONGITUDE, DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE = infer_defaults_from_timezone()
 DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE = locale_country_to_holiday_jurisdiction(
     detect_system_locale_country_code()
 )
@@ -495,11 +468,48 @@ HOLIDAY_JURISDICTION_LABELS = dict(HOLIDAY_JURISDICTION_OPTIONS)
 VALID_HOLIDAY_JURISDICTIONS = {code for code, _ in HOLIDAY_JURISDICTION_OPTIONS}
 JURISDICTION_LOCATION_DEFAULTS = load_jurisdiction_location_defaults()
 JURISDICTION_TOWN_OPTIONS = load_jurisdiction_town_options(JURISDICTION_LOCATION_DEFAULTS)
+
+
+def jurisdiction_for_timezone(
+    timezone_name: str,
+    defaults: dict[str, tuple[str, str, str, str]],
+    towns: dict[str, list[dict[str, object]]],
+) -> str:
+    timezone_name = str(timezone_name or "").strip()
+    if not timezone_name:
+        return ""
+    for jurisdiction, (_latitude, _longitude, candidate_timezone, _locality_name) in defaults.items():
+        candidate_jurisdiction = locale_country_to_holiday_jurisdiction(jurisdiction)
+        if candidate_timezone == timezone_name and candidate_jurisdiction in VALID_HOLIDAY_JURISDICTIONS:
+            return candidate_jurisdiction
+    for jurisdiction, rows in towns.items():
+        candidate_jurisdiction = locale_country_to_holiday_jurisdiction(jurisdiction)
+        if candidate_jurisdiction not in VALID_HOLIDAY_JURISDICTIONS:
+            continue
+        if any(str(row.get("timezone") or "").strip() == timezone_name for row in rows):
+            return candidate_jurisdiction
+    return ""
+
+
+DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE = jurisdiction_for_timezone(
+    detect_system_timezone_name(),
+    JURISDICTION_LOCATION_DEFAULTS,
+    JURISDICTION_TOWN_OPTIONS,
+)
 DEFAULT_HOLIDAY_JURISDICTION = (
     DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE
     if DEFAULT_HOLIDAY_JURISDICTION_FROM_LOCALE in VALID_HOLIDAY_JURISDICTIONS
-    else DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE
+    else (
+        DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE
+        if DEFAULT_HOLIDAY_JURISDICTION_FROM_TIMEZONE in VALID_HOLIDAY_JURISDICTIONS
+        else ("GB-ENG" if "GB-ENG" in VALID_HOLIDAY_JURISDICTIONS else HOLIDAY_JURISDICTION_OPTIONS[0][0])
+    )
 )
+_default_location = JURISDICTION_LOCATION_DEFAULTS.get(DEFAULT_HOLIDAY_JURISDICTION)
+if _default_location is None:
+    _default_location = JURISDICTION_LOCATION_DEFAULTS.get(DEFAULT_HOLIDAY_JURISDICTION.split("-", 1)[0])
+DEFAULT_TIMEZONE_LATITUDE = _default_location[0] if _default_location else ""
+DEFAULT_TIMEZONE_LONGITUDE = _default_location[1] if _default_location else ""
 HOLIDAY_JURISDICTION_OPTIONS_HTML = "\n".join(
     (
         f'          <option value="{html.escape(code)}" selected>{html.escape(name)}</option>'
@@ -508,63 +518,6 @@ HOLIDAY_JURISDICTION_OPTIONS_HTML = "\n".join(
     )
     for code, name in HOLIDAY_JURISDICTION_OPTIONS
 )
-ALMANAC_BODY_OPTIONS = (
-    ("MOON", "Moon"),
-    ("SUN", "Sun"),
-    ("VENUS", "Venus"),
-    ("MARS", "Mars"),
-    ("JUPITER", "Jupiter"),
-    ("SATURN", "Saturn"),
-    ("SIRIUS", "Sirius"),
-    ("POLARIS", "Polaris"),
-)
-
-
-HOLIDAY_JURISDICTION_BOXES = [
-    ("AU", -44.5, -10.0, 112.0, 154.5),
-    ("NZ", -48.5, -33.0, 165.0, 179.9),
-    ("ZA", -35.5, -21.0, 16.0, 33.5),
-    ("GL", 59.0, 84.0, -75.0, -10.0),
-    ("IS", 63.0, 67.5, -25.0, -13.0),
-    ("NL", 50.0, 54.2, 3.0, 8.0),
-    ("DK", 54.0, 58.0, 7.5, 15.5),
-    ("IE", 51.0, 55.8, -11.0, -5.0),
-    ("PT", 36.5, 42.5, -10.0, -6.0),
-    ("ES", 35.5, 43.9, -9.5, 4.5),
-    ("GR", 34.0, 42.5, 19.0, 29.5),
-    ("IT", 35.0, 47.5, 6.0, 19.0),
-    ("FR", 41.0, 51.5, -5.5, 10.5),
-    ("DE", 47.0, 55.5, 5.0, 16.5),
-    ("GB-ENG", 49.5, 56.2, -7.8, 2.2),
-    ("CA", 41.0, 84.5, -141.5, -52.0),
-    ("US", 18.0, 72.0, -171.0, -66.0),
-]
-
-
-def holiday_jurisdiction_for_coordinates(latitude: float, longitude: float) -> str:
-    for jurisdiction, min_lat, max_lat, min_lon, max_lon in HOLIDAY_JURISDICTION_BOXES:
-        if min_lat <= latitude <= max_lat and min_lon <= longitude <= max_lon:
-            return jurisdiction
-    return ""
-
-
-def infer_holiday_jurisdiction(latitude: float, longitude: float) -> str:
-    jurisdiction = holiday_jurisdiction_for_coordinates(latitude, longitude)
-    if jurisdiction:
-        return jurisdiction
-    return DEFAULT_HOLIDAY_JURISDICTION
-
-
-def geographic_water_label(latitude: float, longitude: float) -> str:
-    if 0.0 <= latitude <= 70.0 and -85.0 <= longitude <= 25.0:
-        return "North Atlantic Ocean"
-    if -60.0 <= latitude <= 20.0 and -70.0 <= longitude <= 20.0:
-        return "South Atlantic Ocean"
-    if latitude >= 60.0 and -180.0 <= longitude <= 180.0:
-        return "Arctic Ocean"
-    return "Open ocean"
-
-
 def normalize_holiday_jurisdiction(value: str) -> str:
     jurisdiction = str(value or "").strip()
     if jurisdiction in VALID_HOLIDAY_JURISDICTIONS:
@@ -582,7 +535,6 @@ LAB_SUBTITLE = os.environ.get(
     "MARS_LAB_SUBTITLE",
     "Switch between expression, equation, differential-equation, matrix, integrator, datetime, and almanac experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
 ).strip() or "Switch between expression, equation, differential-equation, matrix, integrator, datetime, and almanac experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
-LAB_THEME = os.environ.get("MARS_LAB_THEME", "mars").strip().lower() or "mars"
 DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
 DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
 DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
@@ -662,259 +614,6 @@ CONTROL_COOKIE = os.environ.get("MARS_LAB_CONTROL_COOKIE", "mars_lab_control")
 LAB_THEME_COLOR = "#071913"
 LAB_MANIFEST_BACKGROUND = "#f6f0e5"
 LAB_MANIFEST_THEME = "#0b4f8a"
-LAB_BODY_CLASS = ""
-LAB_THEME_OVERRIDES = ""
-
-if LAB_THEME == "to-be-announced":
-    LAB_THEME_COLOR = "#f7a8d9"
-    LAB_MANIFEST_BACKGROUND = "#fff5fb"
-    LAB_MANIFEST_THEME = "#f7a8d9"
-    LAB_BODY_CLASS = "theme-to-be-announced"
-    LAB_THEME_OVERRIDES = r"""
-    body.theme-to-be-announced {
-      color: #31143d;
-      font-family: "Georgia", "Iowan Old Style", "Palatino Linotype", serif;
-      background:
-        radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.92), transparent 12rem),
-        radial-gradient(circle at 84% 14%, rgba(255, 214, 244, 0.78), transparent 15rem),
-        radial-gradient(circle at 76% 78%, rgba(190, 240, 255, 0.54), transparent 20rem),
-        linear-gradient(160deg, #fff7fd 0%, #ffe6f5 26%, #f6e6ff 52%, #dbf6ff 74%, #fff4cf 100%);
-    }
-
-    body.theme-to-be-announced::before {
-      opacity: 1;
-      background:
-        radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.96) 0 3.5rem, transparent 6rem),
-        radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.88) 0 3rem, transparent 5.2rem),
-        radial-gradient(circle at 26% 68%, rgba(255, 255, 255, 0.86) 0 2.4rem, transparent 4.2rem),
-        radial-gradient(circle at 72% 62%, rgba(255, 255, 255, 0.82) 0 2.8rem, transparent 4.6rem),
-        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.7) 0 2.2rem, transparent 4rem),
-        radial-gradient(circle at 10% 82%, rgba(255, 222, 245, 0.52) 0 9rem, transparent 14rem),
-        radial-gradient(circle at 88% 72%, rgba(195, 241, 255, 0.48) 0 10rem, transparent 16rem),
-        repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.28) 0 2px, transparent 2px 16px);
-      mask: none;
-    }
-
-    body.theme-to-be-announced::after {
-      height: 14rem;
-      opacity: 0.94;
-      background:
-        radial-gradient(circle at 20% 82%, rgba(255, 186, 227, 0.56) 0 6rem, transparent 8rem),
-        radial-gradient(circle at 80% 74%, rgba(187, 237, 255, 0.58) 0 6.4rem, transparent 8.8rem),
-        linear-gradient(0deg, rgba(255, 224, 244, 0.82), rgba(255, 255, 255, 0.12) 54%, transparent 90%);
-    }
-
-    body.theme-to-be-announced .celtic-backdrop {
-      overflow: visible;
-    }
-
-    body.theme-to-be-announced .aurora {
-      top: 0.4rem;
-      height: 16rem;
-      opacity: 0.94;
-      background:
-        radial-gradient(circle at 22% 52%, rgba(255, 255, 255, 0.84) 0 1.5rem, transparent 1.7rem),
-        radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.7) 0 1rem, transparent 1.2rem),
-        radial-gradient(circle at 66% 38%, rgba(255, 255, 255, 0.76) 0 1.15rem, transparent 1.35rem),
-        linear-gradient(104deg, transparent 0 8%, rgba(255, 175, 223, 0.78) 12%, rgba(255, 226, 248, 0.36) 24%, transparent 40%),
-        linear-gradient(116deg, transparent 0 22%, rgba(203, 184, 255, 0.64) 28%, rgba(188, 244, 255, 0.32) 42%, transparent 58%),
-        linear-gradient(128deg, transparent 0 36%, rgba(255, 236, 174, 0.58) 42%, rgba(255, 212, 234, 0.24) 54%, transparent 70%);
-      filter: blur(0.2px);
-      transform: skewY(-4deg);
-    }
-
-    body.theme-to-be-announced .standing-stones {
-      bottom: 1.4rem;
-      height: 13rem;
-      opacity: 0.92;
-    }
-
-    body.theme-to-be-announced .stone {
-      width: clamp(3.6rem, 5vw, 4.8rem);
-      height: clamp(7.2rem, 14vw, 11rem);
-      border-radius: 58% 42% 48% 52% / 14% 14% 8% 8%;
-      background:
-        linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(255, 211, 240, 0.88) 34%, rgba(204, 242, 255, 0.88) 70%, rgba(255, 246, 196, 0.86));
-      border: 1px solid rgba(255, 255, 255, 0.84);
-      box-shadow:
-        0 0.8rem 1.6rem rgba(182, 120, 188, 0.18),
-        inset 0.55rem 0.35rem 1rem rgba(255, 255, 255, 0.72);
-    }
-
-    body.theme-to-be-announced .stone:nth-child(2),
-    body.theme-to-be-announced .stone:nth-child(5) {
-      height: 12.2rem;
-    }
-
-    body.theme-to-be-announced .stone:nth-child(1)::before,
-    body.theme-to-be-announced .stone:nth-child(2)::before,
-    body.theme-to-be-announced .stone:nth-child(3)::before,
-    body.theme-to-be-announced .stone:nth-child(4)::before,
-    body.theme-to-be-announced .stone:nth-child(5)::before,
-    body.theme-to-be-announced .stone:nth-child(6)::before {
-      content: "";
-      position: absolute;
-      inset: 18% 22%;
-      border-radius: 999px 999px 28% 28%;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.94), rgba(255,184,221,0.86) 52%, rgba(173, 234, 255, 0.78));
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.7),
-        0 0 1.1rem rgba(255, 170, 221, 0.34);
-      clip-path: polygon(46% 0%, 62% 17%, 88% 18%, 69% 36%, 76% 62%, 50% 48%, 24% 62%, 31% 36%, 12% 18%, 38% 17%);
-      opacity: 0.96;
-    }
-
-    body.theme-to-be-announced .chariot-wheel {
-      right: 5vw;
-      bottom: 2rem;
-      width: 8rem;
-      height: 8rem;
-      opacity: 0.9;
-      border: none;
-      background:
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0 0.72rem, transparent 0.9rem),
-        radial-gradient(circle at 50% 50%, transparent 0 2rem, rgba(255, 188, 227, 0.8) 2.06rem 2.26rem, transparent 2.34rem),
-        radial-gradient(circle at 50% 50%, transparent 0 3.42rem, rgba(181, 234, 255, 0.86) 3.5rem 3.72rem, transparent 3.84rem),
-        conic-gradient(from 0deg,
-          rgba(255, 188, 227, 0.86) 0deg 18deg,
-          transparent 18deg 42deg,
-          rgba(188, 244, 255, 0.84) 42deg 60deg,
-          transparent 60deg 84deg,
-          rgba(255, 235, 170, 0.88) 84deg 102deg,
-          transparent 102deg 126deg,
-          rgba(212, 190, 255, 0.84) 126deg 144deg,
-          transparent 144deg 168deg,
-          rgba(255, 188, 227, 0.86) 168deg 186deg,
-          transparent 186deg 210deg,
-          rgba(188, 244, 255, 0.84) 210deg 228deg,
-          transparent 228deg 252deg,
-          rgba(255, 235, 170, 0.88) 252deg 270deg,
-          transparent 270deg 294deg,
-          rgba(212, 190, 255, 0.84) 294deg 312deg,
-          transparent 312deg 336deg,
-          rgba(255, 188, 227, 0.86) 336deg 360deg);
-      box-shadow:
-        0 0 1.4rem rgba(240, 148, 210, 0.32),
-        inset 0 0 1rem rgba(255,255,255,0.6);
-    }
-
-    body.theme-to-be-announced h1 {
-      color: #8a2b74;
-      text-shadow:
-        0 0 1.2rem rgba(255, 198, 231, 0.92),
-        0 0 2rem rgba(199, 236, 255, 0.52);
-    }
-
-    body.theme-to-be-announced .subtitle,
-    body.theme-to-be-announced .status,
-    body.theme-to-be-announced .precision-label,
-    body.theme-to-be-announced label,
-    body.theme-to-be-announced .help-card,
-    body.theme-to-be-announced .mobile-panel {
-      color: #5d2b67;
-    }
-
-    body.theme-to-be-announced .status {
-      background: rgba(255,255,255,0.64);
-      border-color: rgba(247, 168, 217, 0.56);
-      box-shadow: 0 0.5rem 1.2rem rgba(191, 132, 188, 0.16);
-    }
-
-    body.theme-to-be-announced .lab-topbar,
-    body.theme-to-be-announced #workspacePanel,
-    body.theme-to-be-announced #resultPanel,
-    body.theme-to-be-announced .help-card,
-    body.theme-to-be-announced .mobile-panel,
-    body.theme-to-be-announced .mode-panel,
-    body.theme-to-be-announced .value-card,
-    body.theme-to-be-announced .rendered,
-    body.theme-to-be-announced .raw-block,
-    body.theme-to-be-announced textarea,
-    body.theme-to-be-announced select {
-      background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,247,253,0.66));
-      border-color: rgba(230, 167, 216, 0.44);
-      box-shadow: 0 0.9rem 2rem rgba(179, 129, 179, 0.12);
-      color: #421c4f;
-    }
-
-    body.theme-to-be-announced textarea,
-    body.theme-to-be-announced select,
-    body.theme-to-be-announced .raw-block,
-    body.theme-to-be-announced code {
-      color: #51245e;
-    }
-
-    body.theme-to-be-announced .mode-panel select {
-      color-scheme: light;
-    }
-
-    body.theme-to-be-announced .mode-panel select option {
-      color: #51245e;
-      background: #fff7fd;
-    }
-
-    body.theme-to-be-announced .mode-panel select option:checked {
-      color: #421c4f;
-      background: #ffd6f4;
-    }
-
-    body.theme-to-be-announced .select-shell .select-button,
-    body.theme-to-be-announced .select-shell .select-menu {
-      color: #51245e;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,247,253,0.78));
-      border-color: rgba(230, 167, 216, 0.48);
-      box-shadow: 0 0.9rem 2rem rgba(179, 129, 179, 0.12);
-    }
-
-    body.theme-to-be-announced .select-shell .select-option {
-      color: #51245e;
-    }
-
-    body.theme-to-be-announced .select-shell .select-option:hover,
-    body.theme-to-be-announced .select-shell .select-option:focus-visible {
-      background: rgba(247, 168, 217, 0.22);
-    }
-
-    body.theme-to-be-announced .select-shell .select-option.selected {
-      color: #421c4f;
-      background: #ffd6f4;
-    }
-
-    body.theme-to-be-announced .mode-tab,
-    body.theme-to-be-announced .card-action,
-    body.theme-to-be-announced button {
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,226,246,0.92));
-      border-color: rgba(234, 154, 214, 0.62);
-      color: #7d2d7b;
-      box-shadow: 0 0.4rem 1rem rgba(198, 144, 194, 0.16);
-    }
-
-    body.theme-to-be-announced .mode-tab.active,
-    body.theme-to-be-announced .card-action:hover,
-    body.theme-to-be-announced button:hover {
-      background:
-        linear-gradient(180deg, rgba(255, 238, 248, 0.98), rgba(213, 244, 255, 0.96));
-      color: #5b2081;
-      transform: translateY(-1px);
-    }
-
-    body.theme-to-be-announced .mode-tab.active {
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.84),
-        0 0.7rem 1.5rem rgba(171, 214, 255, 0.26);
-    }
-
-    body.theme-to-be-announced .rendered {
-      background:
-        radial-gradient(circle at top right, rgba(255,255,255,0.8), transparent 8rem),
-        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,245,252,0.82));
-    }
-    """
-
-
 INDEX_HTML = r"""<!doctype html>
 <html lang="en">
 <head>
@@ -3571,10 +3270,9 @@ INDEX_HTML = r"""<!doctype html>
         padding: 0.8rem;
       }
     }
-__THEME_OVERRIDES__
   </style>
 </head>
-<body class="__BODY_CLASS__">
+<body>
   <div class="celtic-backdrop" aria-hidden="true">
     <div class="aurora"></div>
     <div class="standing-stones">
@@ -3762,7 +3460,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
         </div>
         <p class="mode-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
-        <p class="mode-hint"><strong>Optional weather privacy:</strong> MARS supplies no shared WeatherAPI account or key. Weather remains disabled unless the person installing MARS Lab configures a key from their own WeatherAPI account. When enabled, evaluating this panel sends the selected date and observer coordinates from the local server to WeatherAPI.com over HTTPS; the account key is never sent to the browser. See the <a href="https://www.weatherapi.com/privacy.aspx" target="_blank" rel="noreferrer">provider privacy policy</a> and <a href="https://www.weatherapi.com/terms.aspx" target="_blank" rel="noreferrer">terms</a>.</p>
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
@@ -4065,6 +3762,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
             <li>MARS supplies no shared weather account or key. Weather, humidity, wind, and rain chance appear only when the installer configures a key from their own WeatherAPI account and the selected date is supported by the provider.</li>
             <li>When enabled, the local server sends that key, the selected date, and the observer coordinates to WeatherAPI.com over HTTPS. The key is not sent to the browser, and MARS does not retain the returned weather response.</li>
+            <li>Weather is informational and must not be the sole basis for safety-critical decisions. See the provider's <a href="https://www.weatherapi.com/privacy.aspx" target="_blank" rel="noreferrer">privacy policy</a> and <a href="https://www.weatherapi.com/terms.aspx" target="_blank" rel="noreferrer">terms</a>.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="almanac">
@@ -11799,10 +11497,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 ).replace(
     "__THEME_COLOR__", LAB_THEME_COLOR
 ).replace(
-    "__THEME_OVERRIDES__", LAB_THEME_OVERRIDES
-).replace(
-    "__BODY_CLASS__", LAB_BODY_CLASS
-).replace(
     "__LAB_SUBTITLE__", LAB_SUBTITLE
 )
 
@@ -12651,17 +12345,6 @@ def local_mdns_host() -> str:
     if not short_name or _is_loopback_or_wildcard_host(short_name):
         return ""
     return f"{short_name.lower()}.local"
-
-
-def host_port_reachable(host: str, port: int, timeout: float = 0.35) -> bool:
-    host = host.strip().strip("[]")
-    if not host or port <= 0:
-        return False
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
 
 
 def _host_is_ipv6(host: str) -> bool:
@@ -13744,25 +13427,6 @@ WEATHER_API_BASE_URL = "https://api.weatherapi.com/v1"
 WEATHER_API_KEY_ENV = "MARS_WEATHER_API_KEY"
 LEGACY_WEATHER_API_KEY_ENV = "WEATHERAPI_KEY"
 WEATHER_CONFIG_FILE = "weather.env"
-WEATHER_API_TERMS_URL = "https://www.weatherapi.com/terms.aspx"
-WEATHER_API_PRIVACY_URL = "https://www.weatherapi.com/privacy.aspx"
-WEATHER_ACCOUNT_NOTICE = (
-    "Weather is disabled unless the person installing MARS Lab creates their own WeatherAPI account and configures "
-    "that account's API key. MARS does not provide or share a WeatherAPI account or key."
-)
-WEATHER_DATA_DISCLOSURE = (
-    "The browser sends the selected date and observer latitude and longitude to this MARS Lab server. When weather "
-    "is enabled, the server sends those values and the locally configured API key to WeatherAPI.com over HTTPS. "
-    "The key is not sent to the browser. MARS does not cache or persist the returned weather response. The selected "
-    "date and observer coordinates remain in the private local MARS Lab state so that its input fields can be restored."
-)
-WEATHER_SAFETY_NOTICE = (
-    "Weather information is for general information only. Conditions and forecasts are probabilistic and may be "
-    "inaccurate for the exact location or time. Do not use them as the sole basis for safety, aviation, marine, "
-    "emergency, or other safety-critical decisions; consult official meteorological services and authorities."
-)
-
-
 def weather_api_key() -> str:
     for env_name in (WEATHER_API_KEY_ENV, LEGACY_WEATHER_API_KEY_ENV):
         value = os.environ.get(env_name, "").strip()
@@ -15858,11 +15522,6 @@ def prepare_datetime_weather_fields(fields: dict[str, str], unavailable_reason: 
             *([{"label": "Wind", "value": weather_wind}] if weather_wind else []),
             *([{"label": "Chance of rain", "value": weather_rain_chance}] if weather_rain_chance else []),
             *([{"label": "Source", "value": weather_source}] if weather_source else []),
-            {"label": "Account", "value": WEATHER_ACCOUNT_NOTICE},
-            {"label": "Data disclosure", "value": WEATHER_DATA_DISCLOSURE},
-            {"label": "Privacy", "value": WEATHER_API_PRIVACY_URL},
-            {"label": "Safety notice", "value": WEATHER_SAFETY_NOTICE},
-            {"label": "Terms", "value": WEATHER_API_TERMS_URL},
         ]
     elif unavailable_reason:
         rows = [{"label": "Status", "value": unavailable_reason}]
@@ -16583,7 +16242,6 @@ def almanac_zone_label(zone_hours: float) -> str:
 
 
 ALMANAC_EVENT_OFFSET_CACHE: dict[tuple[str, str], float] = {}
-ALMANAC_JURISDICTION_LOCATION_CACHE: dict[tuple[str, str], tuple[str, str, str]] = {}
 JURISDICTION_OFFSET_TEXT_CACHE: dict[tuple[str, str], str] = {}
 DATETIME_FIELDS_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str, str], dict[str, str]] = {}
 ALMANAC_RESPONSE_CACHE: dict[tuple[str, str, str, str, str, str, str, str, str], dict[str, object]] = {}
@@ -16716,56 +16374,6 @@ def jurisdiction_default_location_for_date(jurisdiction: str, date_text: str) ->
     return (offset_text, latitude, longitude)
 
 
-def almanac_jurisdiction_location_for_date(jurisdiction: str,
-                                           date_text: str,
-                                           zone_text: str,
-                                           latitude_text: str,
-                                           longitude_text: str) -> tuple[str, str, str]:
-    key = (normalize_holiday_jurisdiction(jurisdiction), date_text)
-    if key in ALMANAC_JURISDICTION_LOCATION_CACHE:
-        return ALMANAC_JURISDICTION_LOCATION_CACHE[key]
-
-    result = (
-        str(zone_text or "").strip(),
-        str(latitude_text or "").strip(),
-        str(longitude_text or "").strip(),
-    )
-
-    resident_result = jurisdiction_default_location_for_date(key[0], date_text)
-    if resident_result is not None:
-        ALMANAC_JURISDICTION_LOCATION_CACHE[key] = resident_result
-        return resident_result
-
-    resolved = False
-    try:
-        ensure_scratch_binary(DEFAULT_HOLIDAY_BIN, "scratch/holiday_lab")
-        fields, _, returncode = run_holiday_lab_fields_cached(
-            DEFAULT_HOLIDAY_BIN,
-            {
-                "date": date_text,
-                "start": date_text,
-                "end": date_text,
-                "jurisdiction": key[0],
-            },
-        )
-        if returncode == 0 and str(fields.get("jurisdiction_status") or "").strip() == "ok":
-            candidate_zone = str(fields.get("jurisdiction_gmt_offset") or "").strip()
-            candidate_latitude = str(fields.get("jurisdiction_latitude") or "").strip()
-            candidate_longitude = str(fields.get("jurisdiction_longitude") or "").strip()
-            zone = float(candidate_zone)
-            latitude = float(candidate_latitude)
-            longitude = float(candidate_longitude)
-            if -14.0 <= zone <= 14.0 and -90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0:
-                result = (candidate_zone, candidate_latitude, candidate_longitude)
-                resolved = True
-    except Exception:
-        pass
-
-    if resolved:
-        ALMANAC_JURISDICTION_LOCATION_CACHE[key] = result
-    return result
-
-
 def almanac_jurisdiction_offset_for_date(jurisdiction: str, date_text: str, fallback: float) -> float:
     key = (normalize_holiday_jurisdiction(jurisdiction), date_text)
     if key in ALMANAC_EVENT_OFFSET_CACHE:
@@ -16834,58 +16442,35 @@ def format_almanac_totality_location(payload: str,
                                      fallback_zone_hours: float,
                                      observer_jurisdiction: str) -> str:
     payload_text = str(payload or "")
-    if payload_text.startswith("town\t") or payload_text.startswith("near_town\t"):
-        parts = payload_text.split("\t")
-        if len(parts) < 8:
-            return ""
-        kind, town_name, jurisdiction, timezone_name, latitude, longitude, totality_jd, distance_km = parts[:8]
-        try:
-            totality_latitude = float(latitude)
-            totality_longitude = float(longitude)
-            totality_jd_value = float(totality_jd)
-            distance_value = float(distance_km)
-        except ValueError:
-            return ""
-        jurisdiction = normalize_holiday_jurisdiction(jurisdiction)
-        jurisdiction_label = HOLIDAY_JURISDICTION_LABELS.get(jurisdiction, jurisdiction)
-        location_label = f"{town_name}, {jurisdiction_label}" if jurisdiction_label else town_name
-        if kind == "near_town":
-            location_label = f"Nearest town: {location_label}"
-        time_text = almanac_local_event_time_from_jd_for_timezone(
-            totality_jd_value,
-            timezone_name,
-            fallback_zone_hours,
-            jurisdiction or observer_jurisdiction,
-        )
-        return (
-            f"{location_label}; "
-            f"{totality_latitude:.4f}, {totality_longitude:.4f}; "
-            f"{time_text}; "
-            f"{distance_value:,.0f} km from observer"
-        )
-
-    parts = [part.strip() for part in str(payload or "").split(",")]
-    if len(parts) != 4:
+    if not (payload_text.startswith("town\t") or payload_text.startswith("near_town\t")):
         return ""
+    parts = payload_text.split("\t")
+    if len(parts) < 8:
+        return ""
+    kind, town_name, jurisdiction, timezone_name, latitude, longitude, totality_jd, distance_km = parts[:8]
     try:
-        totality_latitude = float(parts[0])
-        totality_longitude = float(parts[1])
-        totality_jd = float(parts[2])
-        distance_km = float(parts[3])
+        totality_latitude = float(latitude)
+        totality_longitude = float(longitude)
+        totality_jd_value = float(totality_jd)
+        distance_value = float(distance_km)
     except ValueError:
         return ""
-    totality_jurisdiction = holiday_jurisdiction_for_coordinates(totality_latitude, totality_longitude)
-    location_label = (
-        HOLIDAY_JURISDICTION_LABELS.get(totality_jurisdiction, totality_jurisdiction)
-        if totality_jurisdiction else geographic_water_label(totality_latitude, totality_longitude)
+    jurisdiction = normalize_holiday_jurisdiction(jurisdiction)
+    jurisdiction_label = HOLIDAY_JURISDICTION_LABELS.get(jurisdiction, jurisdiction)
+    location_label = f"{town_name}, {jurisdiction_label}" if jurisdiction_label else town_name
+    if kind == "near_town":
+        location_label = f"Nearest town: {location_label}"
+    time_text = almanac_local_event_time_from_jd_for_timezone(
+        totality_jd_value,
+        timezone_name,
+        fallback_zone_hours,
+        jurisdiction or observer_jurisdiction,
     )
-    totality_time_jurisdiction = totality_jurisdiction or normalize_holiday_jurisdiction(observer_jurisdiction)
-    time_text, _ = almanac_local_event_time_from_jd(totality_jd, totality_time_jurisdiction, fallback_zone_hours)
     return (
         f"{location_label}; "
         f"{totality_latitude:.4f}, {totality_longitude:.4f}; "
         f"{time_text}; "
-        f"{distance_km:,.0f} km from observer"
+        f"{distance_value:,.0f} km from observer"
     )
 
 

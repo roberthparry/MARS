@@ -14,6 +14,40 @@ sys.path.insert(0, str(ROOT / "tools"))
 import mars_lab
 
 
+class JurisdictionDefaultTests(unittest.TestCase):
+    def test_timezone_defaults_come_from_packaged_jurisdiction_data(self) -> None:
+        self.assertEqual(
+            mars_lab.jurisdiction_for_timezone(
+                "Australia/Sydney",
+                mars_lab.JURISDICTION_LOCATION_DEFAULTS,
+                mars_lab.JURISDICTION_TOWN_OPTIONS,
+            ),
+            "AU",
+        )
+        self.assertEqual(
+            mars_lab.jurisdiction_for_timezone(
+                "America/Los_Angeles",
+                mars_lab.JURISDICTION_LOCATION_DEFAULTS,
+                mars_lab.JURISDICTION_TOWN_OPTIONS,
+            ),
+            "US",
+        )
+        self.assertEqual(
+            mars_lab.jurisdiction_for_timezone(
+                "Invalid/Timezone",
+                mars_lab.JURISDICTION_LOCATION_DEFAULTS,
+                mars_lab.JURISDICTION_TOWN_OPTIONS,
+            ),
+            "",
+        )
+
+    def test_initial_coordinates_match_the_selected_jurisdiction_default(self) -> None:
+        location = mars_lab.JURISDICTION_LOCATION_DEFAULTS[mars_lab.DEFAULT_HOLIDAY_JURISDICTION]
+
+        self.assertEqual(mars_lab.DEFAULT_TIMEZONE_LATITUDE, location[0])
+        self.assertEqual(mars_lab.DEFAULT_TIMEZONE_LONGITUDE, location[1])
+
+
 class MobileAccessTests(unittest.TestCase):
     def test_value_card_wraps_long_unbroken_numbers(self) -> None:
         self.assertIn(
@@ -4863,11 +4897,6 @@ class DatetimeWeatherTests(unittest.TestCase):
                 {"label": "Wind", "value": "18 km/h"},
                 {"label": "Chance of rain", "value": "34%"},
                 {"label": "Source", "value": "WeatherAPI.com"},
-                {"label": "Account", "value": mars_lab.WEATHER_ACCOUNT_NOTICE},
-                {"label": "Data disclosure", "value": mars_lab.WEATHER_DATA_DISCLOSURE},
-                {"label": "Privacy", "value": mars_lab.WEATHER_API_PRIVACY_URL},
-                {"label": "Safety notice", "value": mars_lab.WEATHER_SAFETY_NOTICE},
-                {"label": "Terms", "value": mars_lab.WEATHER_API_TERMS_URL},
             ],
         )
 
@@ -4887,10 +4916,6 @@ class DatetimeWeatherTests(unittest.TestCase):
     def test_datetime_weather_is_requested_asynchronously_and_rejects_stale_results(self) -> None:
         html = mars_lab.INDEX_HTML
 
-        self.assertIn("Optional weather privacy:", html)
-        self.assertIn("MARS supplies no shared WeatherAPI account or key.", html)
-        self.assertIn(mars_lab.WEATHER_API_PRIVACY_URL, html)
-        self.assertIn(mars_lab.WEATHER_API_TERMS_URL, html)
         self.assertIn("fetch('/datetime-weather'", html)
         self.assertIn("void refreshDatetimeWeather(evaluationId, {", html)
         self.assertIn("evaluationId !== datetimeEvaluationSequence", html)
@@ -4898,6 +4923,18 @@ class DatetimeWeatherTests(unittest.TestCase):
 
 
 class AlmanacLocationTests(unittest.TestCase):
+    def test_totality_location_accepts_the_current_named_town_payload_only(self) -> None:
+        payload = "town\tMálaga\tES\tEurope/Madrid\t36.7202\t-4.4203\t2461620.5\t123.4\t22"
+
+        self.assertIn(
+            "Málaga, Spain; 36.7202, -4.4203;",
+            mars_lab.format_almanac_totality_location(payload, 0.0, "GB-ENG"),
+        )
+        self.assertEqual(
+            mars_lab.format_almanac_totality_location("36.7202,-4.4203,2461620.5,123.4", 0.0, "GB-ENG"),
+            "",
+        )
+
     def test_eclipse_kind_and_magnitude_columns_do_not_overlap(self) -> None:
         self.assertIn('.almanac-event-table .event-kind {\n      width: 5.6rem;', mars_lab.INDEX_HTML)
         self.assertIn('class="event-kind" data-label="Kind"', mars_lab.INDEX_HTML)
