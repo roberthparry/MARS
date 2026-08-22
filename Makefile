@@ -30,8 +30,10 @@ DATADIR ?= $(PREFIX)/share
 DOCDIR ?= $(DATADIR)/doc/mars
 
 LEGAL_ROOT_DOCUMENTS := LICENSE THIRD_PARTY_NOTICES.md DEPENDENCIES.spdx
-LEGAL_GUIDE_DOCUMENTS := docs/licensing.md docs/privacy.md docs/almanac-data-provenance.md docs/visual-asset-provenance.md
+LEGAL_GUIDE_DOCUMENTS := docs/licensing.md docs/privacy.md docs/almanac-data-provenance.md docs/visual-asset-provenance.md docs/compliance-status.md
 LEGAL_DOCUMENTS := $(LEGAL_ROOT_DOCUMENTS) $(LEGAL_GUIDE_DOCUMENTS)
+RELEASE_LIBRARY := build/release/libmars.so
+RELEASE_EVIDENCE ?= build/compliance/release-evidence.json
 
 MARS_LAB_INSTALL_PREFIX ?= $(HOME)/.local
 MARS_LAB_BINDIR ?= $(MARS_LAB_INSTALL_PREFIX)/bin
@@ -131,20 +133,26 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps check-public-distribution check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 all: check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
 debug:
 	$(MAKE) DEBUG=1 all
 
-release:
+release: check-compliance
 	$(MAKE) DEBUG=0 all
+
+release-evidence: release
+	@tools/write_release_evidence.py --library "$(RELEASE_LIBRARY)" --output "$(RELEASE_EVIDENCE)"
 
 # Private reference material may remain on the developer's machine, but it
 # must never enter the public repository index.
 check-public-distribution:
 	@tools/check_public_distribution.py
+
+check-compliance: check-public-distribution
+	@tools/check_compliance.py
 
 # qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
 # to the number backend and must not leak across this module boundary.
@@ -238,7 +246,7 @@ check-lab-deps: check-jurisdiction-db-deps
 # ------------------------------------------------------------
 # Installation
 # ------------------------------------------------------------
-install: check-deps $(STATIC_LIB) $(SHARED_LIB) $(LEGAL_DOCUMENTS)
+install: check-deps check-compliance $(STATIC_LIB) $(SHARED_LIB) $(LEGAL_DOCUMENTS)
 	$(INSTALL) -d "$(DESTDIR)$(LIBDIR)"
 	$(INSTALL) -d "$(DESTDIR)$(INCLUDEDIR)/mars"
 	$(INSTALL) -d "$(DESTDIR)$(DOCDIR)/docs"
@@ -558,6 +566,7 @@ help:
 	@echo "Targets:"
 	@echo "  make debug                  Build debug binaries and tests"
 	@echo "  make release                Build release binaries and tests"
+	@echo "  make release-evidence       Build a release and record its binary dependency evidence"
 	@echo "  make test                   Run all tests (release)"
 	@echo "  make memtest                Run all tests under valgrind (release)"
 	@echo "  make test_<name>            Build and run a single test (e.g. make test_expression) (release)"
@@ -585,6 +594,7 @@ help:
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
 	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo "  make check-deps             Check required external development libraries"
+	@echo "  make check-compliance       Verify public-path, notice, SPDX and provenance safeguards"
 	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"

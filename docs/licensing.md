@@ -40,9 +40,12 @@ Every MARS release should apply the following controls:
    a release-review event rather than accepting it silently during an upgrade.
 6. Keep persistence behind the MARS `sqlite_t` API so that storage migration is
    localised if the preferred encrypted database implementation ever changes.
-7. Run `make check-public-distribution` before release. The check rejects any
-   tracked path reserved for the private ESAA reference copy. The repository's
-   tracked pre-commit hook applies the same check when enabled with
+7. Run `make check-compliance` before release. It includes the public-
+   distribution guard, checks required legal records and installed documents,
+   verifies SPDX references and confirms recorded almanac checksums. The
+   public-distribution guard rejects any tracked path reserved for the private
+   ESAA reference copy. The repository's tracked pre-commit hook applies these
+   checks when enabled with
    `git config core.hooksPath .githooks`.
 8. Keep the [visual asset provenance record](./visual-asset-provenance.md) with
    every distribution containing MARS Lab artwork or screenshots, and record
@@ -97,3 +100,13 @@ version list and the dynamic dependency closure of `libmars.so` and every
 shipped executable. On GNU/Linux, tools such as `readelf` or `ldd` can help
 discover that closure, but their output must be reviewed because dynamically
 loaded providers and data packages may not appear there.
+
+`make release-evidence` builds the release library from a clean worktree and
+writes `build/compliance/release-evidence.json`. The record contains the source
+commit, artefact and dependency hashes, available tool versions, package
+versions and installed package-copyright hashes. Retain that JSON file with
+the release artefacts and review entries that have no package ownership or
+licence record.
+
+The current automated controls and matters that still require a human decision
+are recorded in the [compliance status](./compliance-status.md).
