@@ -454,6 +454,17 @@ Public consumers should include headers from `include/`. Shared implementation
 headers under `src/internal/` support communication between MARS subsystems and
 tests, and are not intended as stable external API.
 
+## Author
+
+MARS was created and is maintained solely by Robert H Parry (Rob). His early
+interests in mathematics, celestial navigation and programmable calculators
+developed into a career spanning applied mathematics, scientific computing,
+software engineering, reporting and data analysis.
+
+MARS brings together Rob's long-standing interests in mathematics, navigation,
+astronomy and computer programming. See [About the author](docs/about-the-author.md)
+for further background.
+
 ## Acknowledgements
 
 MARS's multiprecision numeric layer builds directly on the GNU multiprecision
