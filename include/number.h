@@ -941,6 +941,14 @@ number_t num_zatahp(const number_t s, const number_t a);
 number_t num_zetap(const number_t number);
 number_t num_dilog(const number_t number);
 number_t num_polylog(const number_t order, const number_t number);
+/**
+ * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
+ *
+ * @param degree Non-negative integer degree.
+ * @param argument Real or complex argument.
+ * @return An owning number containing the finite logarithmic sum, or NaN for an invalid degree.
+ */
+number_t num_harmonic_poly(const number_t degree, const number_t argument);
 number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y);
 number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,

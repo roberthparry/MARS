@@ -745,6 +745,15 @@ static bool expr_integrate_contains_summation_local(const expr_t *expr)
     return expr_integrate_contains_summation_local(expr->a) || expr_integrate_contains_summation_local(expr->b);
 }
 
+static bool expr_integrate_contains_harmonic_poly_local(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_op(expr, &ops_harmonic_poly))
+        return true;
+    return expr_integrate_contains_harmonic_poly_local(expr->a) || expr_integrate_contains_harmonic_poly_local(expr->b);
+}
+
 expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *simplified;
@@ -777,6 +786,10 @@ normalise_result:
     if (raw && expr_contains_integral_operation(raw))
         return raw;
     if (raw && expr_integrate_contains_summation_local(raw)) {
+        expr_integrate_normalize_small_rationals_local(raw);
+        return raw;
+    }
+    if (raw && expr_integrate_contains_harmonic_poly_local(raw)) {
         expr_integrate_normalize_small_rationals_local(raw);
         return raw;
     }

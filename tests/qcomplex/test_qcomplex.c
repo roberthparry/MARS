@@ -703,7 +703,7 @@ static void test_digamma(void)
 
 static void test_polylog(void)
 {
-    printf(C_CYAN "TEST: dilog/polylog\n" C_RESET);
+    printf(C_CYAN "TEST: dilog/polylog/harmonic polynomial\n" C_RESET);
 
     {
         qfloat_t log2 = qf_log(qf_from_double(2.0));
@@ -721,6 +721,8 @@ static void test_polylog(void)
         check_qc("polylog(1, z) = -log(1-z)", qc_polylog(QC_ONE, z), qc_neg(qc_log(one_minus_z)), 1e-27);
         check_qc("polylog(0, z) = z/(1-z)", qc_polylog(QC_ZERO, z), qc_div(z, one_minus_z), 1e-27);
     }
+
+    check_qc("H_2(i) = -1/2 + i", qc_harmonic_poly(2ul, QC_I), qcz(-0.5, 1.0), 1e-30);
 
     {
         qcomplex_t got = qc_appell_f1(QC_ONE, QC_ONE, QC_ONE, qcr(2.0), qc_make(qf_from_string("0.1"), QF_ZERO),

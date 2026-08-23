@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -24,6 +25,14 @@ typedef enum {
     EXPR_SERIES_MODEL_INVERSE_INDEX_POWER,
     EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL,
 } expr_series_model_kind_t;
+
+typedef enum {
+    EXPR_SERIES_TRIGONOMETRIC_NONE,
+    EXPR_SERIES_TRIGONOMETRIC_SIN,
+    EXPR_SERIES_TRIGONOMETRIC_COS,
+    EXPR_SERIES_TRIGONOMETRIC_SINH,
+    EXPR_SERIES_TRIGONOMETRIC_COSH,
+} expr_series_trigonometric_kind_t;
 
 typedef struct {
     number_t sum;
@@ -136,15 +145,221 @@ static char *expr_series_replace_literal_infinity(const char *text, bool *replac
 static bool expr_series_is_ellipsis(const char *text, expr_series_span_t span)
 {
     char *term;
+    const char *cursor;
+    size_t dot_count = 0u;
     bool match;
 
     span = expr_series_trim(text, span);
     term = expr_series_copy_span(text, span);
     if (!term)
         return false;
-    match = strcmp(term, "...") == 0 || strcmp(term, "…") == 0;
+    cursor = term;
+    if (*cursor == '+' || *cursor == '-')
+        ++cursor;
+    while (isspace((unsigned char)*cursor))
+        ++cursor;
+    if (strcmp(cursor, "…") == 0) {
+        free(term);
+        return true;
+    }
+    while (*cursor == '.') {
+        ++dot_count;
+        ++cursor;
+    }
+    while (isspace((unsigned char)*cursor))
+        ++cursor;
+    match = dot_count >= 3u && *cursor == '\0';
     free(term);
     return match;
+}
+
+static const char *expr_series_skip_spaces(const char *cursor)
+{
+    while (cursor && isspace((unsigned char)*cursor))
+        ++cursor;
+    return cursor;
+}
+
+static bool expr_series_parse_unit_reciprocal_factor(const char **cursor_inout, int *reciprocal_sign_out,
+                                                     char **denominator_out)
+{
+    const char *cursor = expr_series_skip_spaces(*cursor_inout);
+    const char *start;
+    int reciprocal_sign;
+
+    *reciprocal_sign_out = 0;
+    *denominator_out = NULL;
+    if (*cursor++ != '(')
+        return false;
+    cursor = expr_series_skip_spaces(cursor);
+    if (*cursor++ != '1')
+        return false;
+    cursor = expr_series_skip_spaces(cursor);
+    if (*cursor == '+')
+        reciprocal_sign = 1;
+    else if (*cursor == '-')
+        reciprocal_sign = -1;
+    else
+        return false;
+    ++cursor;
+    cursor = expr_series_skip_spaces(cursor);
+    if (*cursor++ != '1')
+        return false;
+    cursor = expr_series_skip_spaces(cursor);
+    if (*cursor++ != '/')
+        return false;
+    cursor = expr_series_skip_spaces(cursor);
+    start = cursor;
+    while (isalnum((unsigned char)*cursor) || *cursor == '_' || (unsigned char)*cursor >= 0x80u)
+        ++cursor;
+    if (cursor == start)
+        return false;
+    *denominator_out = strndup(start, (size_t)(cursor - start));
+    if (!*denominator_out)
+        return false;
+    cursor = expr_series_skip_spaces(cursor);
+    if (*cursor++ != ')') {
+        free(*denominator_out);
+        *denominator_out = NULL;
+        return false;
+    }
+    *reciprocal_sign_out = reciprocal_sign;
+    *cursor_inout = cursor;
+    return true;
+}
+
+static string_t *expr_series_expand_telescoping_product(const string_t *source, bool *expanded_out,
+                                                        string_t **display_TeX_out)
+{
+    const char *cursor = string_c_str(source);
+    const char *ellipsis;
+    char *denominators[4] = {NULL, NULL, NULL, NULL};
+    string_t *expanded = NULL;
+    string_t *TeX = NULL;
+    bool matched = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    for (size_t i = 0u; i < 3u; ++i) {
+        int reciprocal_sign = 0;
+
+        if (!expr_series_parse_unit_reciprocal_factor(&cursor, &reciprocal_sign, &denominators[i]) ||
+            reciprocal_sign != 1)
+            goto cleanup;
+    }
+    if (strcmp(denominators[0], "2") != 0 || strcmp(denominators[1], "3") != 0 ||
+        strcmp(denominators[2], "4") != 0)
+        goto cleanup;
+    cursor = expr_series_skip_spaces(cursor);
+    ellipsis = cursor;
+    while (*cursor == '.')
+        ++cursor;
+    if ((size_t)(cursor - ellipsis) < 3u)
+        goto cleanup;
+    {
+        int reciprocal_sign = 0;
+
+        if (!expr_series_parse_unit_reciprocal_factor(&cursor, &reciprocal_sign, &denominators[3]) ||
+            reciprocal_sign != 1 || *expr_series_skip_spaces(cursor) != '\0')
+            goto cleanup;
+    }
+
+    expanded = string_new();
+    TeX = string_new();
+    if (!expanded || !TeX || string_append_format(expanded, "((%s)+1)/2", denominators[3]) < 0 ||
+        string_append_format(TeX,
+                             "\\prod_{k=2}^{%s}\\left(1+\\frac{1}{k}\\right)="
+                             "\\frac{%s+1}{2}",
+                             denominators[3], denominators[3]) < 0)
+        goto cleanup;
+    matched = true;
+
+cleanup:
+    for (size_t i = 0u; i < 4u; ++i)
+        free(denominators[i]);
+    if (!matched) {
+        string_free(expanded);
+        string_free(TeX);
+        return string_clone(source);
+    }
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    return expanded;
+}
+
+static bool expr_series_parse_ellipsis_at_end(const char *cursor)
+{
+    const char *ellipsis = expr_series_skip_spaces(cursor);
+    size_t dot_count = 0u;
+
+    if (strncmp(ellipsis, "\xE2\x80\xA6", 3u) == 0)
+        return *expr_series_skip_spaces(ellipsis + 3u) == '\0';
+    while (*ellipsis == '.') {
+        ++dot_count;
+        ++ellipsis;
+    }
+    return dot_count >= 3u && *expr_series_skip_spaces(ellipsis) == '\0';
+}
+
+static string_t *expr_series_expand_infinite_prime_product(const string_t *source, bool *expanded_out,
+                                                           string_t **display_TeX_out)
+{
+    const char *cursor = string_c_str(source);
+    number_t expected_prime = num_create_from_long(2L);
+    size_t factor_count = 0u;
+    string_t *expanded = NULL;
+    string_t *TeX = NULL;
+    int product_sign = 0;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    while (!expr_series_parse_ellipsis_at_end(cursor)) {
+        char *denominator = NULL;
+        number_t actual_prime;
+        number_t next_prime;
+        int reciprocal_sign = 0;
+
+        if (!expr_series_parse_unit_reciprocal_factor(&cursor, &reciprocal_sign, &denominator))
+            goto cleanup;
+        if (product_sign == 0)
+            product_sign = reciprocal_sign;
+        else if (reciprocal_sign != product_sign) {
+            free(denominator);
+            goto cleanup;
+        }
+        actual_prime = num_create_from_string(denominator);
+        free(denominator);
+        if (!num_is_exact(actual_prime) || !num_is_integer(actual_prime) || !num_eq(actual_prime, expected_prime)) {
+            num_destroy(&actual_prime);
+            goto cleanup;
+        }
+        num_destroy(&actual_prime);
+        ++factor_count;
+        next_prime = num_next_prime(expected_prime);
+        num_destroy(&expected_prime);
+        expected_prime = next_prime;
+    }
+    if (factor_count < 4u)
+        goto cleanup;
+
+    expanded = string_new();
+    TeX = string_new();
+    if (!expanded || !TeX ||
+        string_append_cstr(expanded, product_sign > 0 ? "inf" : "0") != 0 ||
+        string_append_cstr(TeX, product_sign > 0
+                                    ? "\\prod_{p\\in\\mathbb{P}}\\left(1+\\frac{1}{p}\\right)=+\\infty"
+                                    : "\\prod_{p\\in\\mathbb{P}}\\left(1-\\frac{1}{p}\\right)=0") != 0)
+        goto cleanup;
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    num_destroy(&expected_prime);
+    return expanded;
+
+cleanup:
+    num_destroy(&expected_prime);
+    string_free(expanded);
+    string_free(TeX);
+    return string_clone(source);
 }
 
 static bool expr_series_exponent_sign(const char *text, size_t length, size_t pos)
@@ -691,6 +906,213 @@ static expr_t *expr_series_parse_term_expression(const char *text, expr_series_s
     return term;
 }
 
+static expr_series_trigonometric_kind_t expr_series_match_trigonometric_term(const expr_t *term,
+                                                                             const expr_t **argument_out)
+{
+    *argument_out = NULL;
+    if (!term)
+        return EXPR_SERIES_TRIGONOMETRIC_NONE;
+    if (expr_match_sin_expr(term, argument_out))
+        return EXPR_SERIES_TRIGONOMETRIC_SIN;
+    if (expr_match_cos_expr(term, argument_out))
+        return EXPR_SERIES_TRIGONOMETRIC_COS;
+    if (expr_is_unary_pattern_kind(term, EXPR_PATTERN_UNARY_SINH) && expr_match_unary_expr(term, argument_out))
+        return EXPR_SERIES_TRIGONOMETRIC_SINH;
+    if (expr_is_unary_pattern_kind(term, EXPR_PATTERN_UNARY_COSH) && expr_match_unary_expr(term, argument_out))
+        return EXPR_SERIES_TRIGONOMETRIC_COSH;
+    return EXPR_SERIES_TRIGONOMETRIC_NONE;
+}
+
+static string_t *expr_series_expand_trigonometric_progression(const string_t *source, bool *expanded_out,
+                                                              string_t **display_TeX_out)
+{
+    const char *text = string_c_str(source);
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    size_t ellipsis_index = SIZE_MAX;
+    expr_series_trigonometric_kind_t trigonometric_kind = EXPR_SERIES_TRIGONOMETRIC_NONE;
+    bool unit_angle_step = false;
+    expr_t *angle_step = NULL;
+    expr_t *endpoint_term = NULL;
+    expr_t *endpoint = NULL;
+    char *endpoint_text = NULL;
+    char *endpoint_TeX = NULL;
+    char *angle_step_text = NULL;
+    char *angle_step_TeX = NULL;
+    string_t *expanded = NULL;
+    string_t *TeX = NULL;
+    bool matched = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &term_count))
+        return NULL;
+    for (size_t i = 0u; i < term_count; ++i) {
+        if (expr_series_is_ellipsis(text, terms[i])) {
+            ellipsis_index = i;
+            break;
+        }
+    }
+    if (ellipsis_index < 3u || ellipsis_index == SIZE_MAX || ellipsis_index + 2u != term_count)
+        goto cleanup;
+
+    for (size_t i = 0u; i < ellipsis_index; ++i) {
+        expr_t *term = expr_series_parse_term_expression(text, terms[i]);
+        expr_t *expanded_term = term ? expr_expand_preserved_for_display(term) : NULL;
+        const expr_t *matched_term = expanded_term ? expanded_term : term;
+        const expr_t *argument = NULL;
+        number_t argument_value = NUM_NAN;
+        number_t expected = num_create_from_long((long)i + 1L);
+        const expr_series_trigonometric_kind_t term_kind =
+            expr_series_match_trigonometric_term(matched_term, &argument);
+
+        if (argument)
+            argument_value = expr_eval(argument);
+        if (term_kind == EXPR_SERIES_TRIGONOMETRIC_NONE ||
+            (trigonometric_kind != EXPR_SERIES_TRIGONOMETRIC_NONE && term_kind != trigonometric_kind)) {
+            num_destroy(&expected);
+            num_destroy(&argument_value);
+            expr_free(expanded_term);
+            expr_free(term);
+            goto cleanup;
+        }
+        if (i == 0u) {
+            unit_angle_step = num_is_exact(argument_value) && num_eq(argument_value, NUM_ONE);
+            if (!unit_angle_step &&
+                ((!expr_is_variable(argument) && !expr_is_named_const(argument)) || !num_is_nan(argument_value))) {
+                num_destroy(&expected);
+                num_destroy(&argument_value);
+                expr_free(expanded_term);
+                expr_free(term);
+                goto cleanup;
+            }
+            if (!unit_angle_step)
+                angle_step = expr_clone(argument);
+        } else if (unit_angle_step) {
+            if (!num_is_exact(argument_value) || !num_eq(argument_value, expected)) {
+                num_destroy(&expected);
+                num_destroy(&argument_value);
+                expr_free(expanded_term);
+                expr_free(term);
+                goto cleanup;
+            }
+        } else {
+            long scale = 0L;
+
+            if (!angle_step || !expr_series_match_positive_long_scale(argument, angle_step, &scale) ||
+                scale != (long)i + 1L) {
+                num_destroy(&expected);
+                num_destroy(&argument_value);
+                expr_free(expanded_term);
+                expr_free(term);
+                goto cleanup;
+            }
+        }
+        trigonometric_kind = term_kind;
+        num_destroy(&expected);
+        num_destroy(&argument_value);
+        expr_free(expanded_term);
+        expr_free(term);
+    }
+
+    endpoint_term = expr_series_parse_term_expression(text, terms[ellipsis_index + 1u]);
+    {
+        expr_t *expanded_endpoint_term = endpoint_term ? expr_expand_preserved_for_display(endpoint_term) : NULL;
+        const expr_t *matched_endpoint_term = expanded_endpoint_term ? expanded_endpoint_term : endpoint_term;
+        const expr_t *argument = NULL;
+        number_t endpoint_value = NUM_NAN;
+
+        const bool endpoint_matches =
+            expr_series_match_trigonometric_term(matched_endpoint_term, &argument) == trigonometric_kind;
+        const expr_t *endpoint_argument = argument;
+
+        if (!endpoint_matches || !argument) {
+            expr_free(expanded_endpoint_term);
+            goto cleanup;
+        }
+        if (!unit_angle_step) {
+            const expr_t *left = NULL;
+            const expr_t *right = NULL;
+
+            if (!expr_match_mul_expr(argument, &left, &right) || !left || !right) {
+                expr_free(expanded_endpoint_term);
+                goto cleanup;
+            }
+            if (expr_series_simplified_equal(left, angle_step))
+                endpoint_argument = right;
+            else if (expr_series_simplified_equal(right, angle_step))
+                endpoint_argument = left;
+            else {
+                expr_free(expanded_endpoint_term);
+                goto cleanup;
+            }
+        }
+        endpoint_value = expr_eval(endpoint_argument);
+        if ((!expr_is_variable(endpoint_argument) && !expr_is_named_const(endpoint_argument)) ||
+            !num_is_nan(endpoint_value)) {
+            num_destroy(&endpoint_value);
+            expr_free(expanded_endpoint_term);
+            goto cleanup;
+        }
+        num_destroy(&endpoint_value);
+        endpoint = expr_clone(endpoint_argument);
+        expr_free(expanded_endpoint_term);
+    }
+    endpoint_text = endpoint ? expr_to_string(endpoint, style_UNBOUND) : NULL;
+    endpoint_TeX = endpoint ? expr_to_TeX_body(endpoint) : NULL;
+    angle_step_text = angle_step ? expr_to_string(angle_step, style_UNBOUND) : NULL;
+    angle_step_TeX = angle_step ? expr_to_TeX_body(angle_step) : NULL;
+    expanded = string_new();
+    TeX = string_new();
+    if (!endpoint_text || !endpoint_TeX || (!unit_angle_step && (!angle_step_text || !angle_step_TeX)) ||
+        !expanded || !TeX)
+        goto cleanup;
+    {
+        const bool hyperbolic = trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SINH ||
+                                trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_COSH;
+        const bool sine_family = trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SIN ||
+                                 trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SINH;
+        const char *first_function = hyperbolic ? "sinh" : "sin";
+        const char *second_function = sine_family ? first_function : (hyperbolic ? "cosh" : "cos");
+        const char *TeX_function = trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "\\sin"
+                                   : trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "\\cos"
+                                   : trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "\\sinh"
+                                                                                           : "\\cosh";
+
+        if (unit_angle_step) {
+            if (string_append_format(expanded, "%s((%s)/2)*%s(((%s)+1)/2)/%s(1/2)", first_function,
+                                     endpoint_text, second_function, endpoint_text, first_function) < 0 ||
+                string_append_format(TeX, "\\sum_{k=1}^{%s}%s(k)", endpoint_TeX, TeX_function) < 0)
+                goto cleanup;
+        } else if (string_append_format(expanded, "%s((%s)*(%s)/2)*%s(((%s)+1)*(%s)/2)/%s((%s)/2)",
+                                        first_function, endpoint_text, angle_step_text, second_function,
+                                        endpoint_text, angle_step_text, first_function, angle_step_text) < 0 ||
+                   string_append_format(TeX, "\\sum_{k=1}^{%s}%s(k\\mkern-2mu %s)", endpoint_TeX,
+                                        TeX_function, angle_step_TeX) < 0) {
+            goto cleanup;
+        }
+    }
+    matched = true;
+
+cleanup:
+    free(angle_step_TeX);
+    free(angle_step_text);
+    free(endpoint_TeX);
+    free(endpoint_text);
+    expr_free(endpoint);
+    expr_free(endpoint_term);
+    expr_free(angle_step);
+    free(terms);
+    if (!matched) {
+        string_free(TeX);
+        string_free(expanded);
+        return string_clone(source);
+    }
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    return expanded;
+}
+
 static expr_t *expr_series_parse_quotient_expression(const char *text, expr_series_span_t numerator_span,
                                                      expr_series_span_t denominator_span)
 {
@@ -1014,6 +1436,300 @@ static int expr_series_append_slice(string_t *output, const char *text, size_t s
     return status;
 }
 
+static bool expr_series_reciprocal_square_root(number_t argument_squared, long *root_out)
+{
+    number_t reciprocal_squared = num_div(NUM_ONE, argument_squared);
+    long reciprocal_squared_long = 0L;
+    long root = 0L;
+    bool matched = false;
+
+    *root_out = 0L;
+    if (!expr_series_number_to_long(reciprocal_squared, &reciprocal_squared_long) || reciprocal_squared_long <= 0L)
+        goto cleanup;
+    root = (long)sqrtl((long double)reciprocal_squared_long);
+    while (root > 0L && root > reciprocal_squared_long / root)
+        --root;
+    while (root < LONG_MAX && root + 1L <= reciprocal_squared_long / (root + 1L))
+        ++root;
+    if (root <= 0L || root != reciprocal_squared_long / root || reciprocal_squared_long % root != 0L)
+        goto cleanup;
+    *root_out = root;
+    matched = true;
+
+cleanup:
+    num_destroy(&reciprocal_squared);
+    return matched;
+}
+
+static bool expr_series_arctangent_endpoint_linear(const expr_t *linear, const expr_t *endpoint)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t constant = NUM_NAN;
+    bool subtract = false;
+    long scale = 0L;
+    bool matched = false;
+
+    if (!expr_match_add_sub_expr(linear, &left, &right, &subtract) || subtract || !left || !right)
+        return false;
+    if (expr_match_const_value(right, &constant) && num_is_one(constant))
+        matched = expr_series_match_positive_long_scale(left, endpoint, &scale) && scale == 2L;
+    num_destroy(&constant);
+    constant = NUM_NAN;
+    if (!matched && expr_match_const_value(left, &constant) && num_is_one(constant))
+        matched = expr_series_match_positive_long_scale(right, endpoint, &scale) && scale == 2L;
+    num_destroy(&constant);
+    return matched;
+}
+
+static bool expr_series_arctangent_endpoint_power(const expr_t *power, const expr_t *endpoint, long root)
+{
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+    number_t base_value = NUM_NAN;
+    number_t root_value = num_create_from_long(root);
+    long scale = 0L;
+    bool matched;
+
+    if (!expr_match_pow_expr(power, &base, &exponent) || !base || !exponent ||
+        !expr_match_const_value(base, &base_value)) {
+        num_destroy(&root_value);
+        num_destroy(&base_value);
+        return false;
+    }
+    matched = num_eq(base_value, root_value) &&
+              expr_series_match_positive_long_scale(exponent, endpoint, &scale) && scale == 2L;
+    num_destroy(&root_value);
+    num_destroy(&base_value);
+    return matched;
+}
+
+static bool expr_series_arctangent_symbolic_endpoint(const char *text, expr_series_span_t span,
+                                                      number_t argument_squared, expr_t **endpoint_out)
+{
+    char *term_text = NULL;
+    expr_t *expression = NULL;
+    const expr_t *numerator = NULL;
+    const expr_t *denominator = NULL;
+    const expr_t *minus_one = NULL;
+    const expr_t *endpoint = NULL;
+    const expr_t *left_factor = NULL;
+    const expr_t *right_factor = NULL;
+    number_t minus_one_value = NUM_NAN;
+    number_t endpoint_value = NUM_NAN;
+    long root = 0L;
+    bool matched = false;
+
+    *endpoint_out = NULL;
+    if (!expr_series_reciprocal_square_root(argument_squared, &root))
+        return false;
+    term_text = expr_series_copy_span(text, expr_series_trim(text, span));
+    expression = term_text ? expr_from_string(term_text, NULL) : NULL;
+    free(term_text);
+    if (!expression || !expr_match_div_expr(expression, &numerator, &denominator) || !numerator || !denominator ||
+        !expr_match_pow_expr(numerator, &minus_one, &endpoint) || !minus_one || !endpoint ||
+        !expr_match_const_value(minus_one, &minus_one_value) || !num_eq(minus_one_value, NUM_NEG_ONE) ||
+        !expr_match_mul_expr(denominator, &left_factor, &right_factor) || !left_factor || !right_factor)
+        goto cleanup;
+    endpoint_value = expr_eval(endpoint);
+    if ((!expr_is_variable(endpoint) && !expr_is_named_const(endpoint)) || !num_is_nan(endpoint_value))
+        goto cleanup;
+    if (!((expr_series_arctangent_endpoint_linear(left_factor, endpoint) &&
+           expr_series_arctangent_endpoint_power(right_factor, endpoint, root)) ||
+          (expr_series_arctangent_endpoint_linear(right_factor, endpoint) &&
+           expr_series_arctangent_endpoint_power(left_factor, endpoint, root))))
+        goto cleanup;
+    *endpoint_out = expr_clone(endpoint);
+    matched = *endpoint_out != NULL;
+
+cleanup:
+    num_destroy(&endpoint_value);
+    num_destroy(&minus_one_value);
+    expr_free(expression);
+    return matched;
+}
+
+static bool expr_series_arctangent_argument_squared(const char *text, number_t *argument_squared_out,
+                                                     expr_t **endpoint_out)
+{
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    number_t values[3] = {NUM_NAN, NUM_NAN, NUM_NAN};
+    char *factors[3] = {NULL, NULL, NULL};
+    number_t negative_second = NUM_NAN;
+    number_t argument_squared = NUM_NAN;
+    number_t argument_fourth = NUM_NAN;
+    number_t five = NUM_NAN;
+    number_t expected_third = NUM_NAN;
+    bool matched = false;
+
+    *argument_squared_out = NUM_NAN;
+    *endpoint_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &term_count) ||
+        !((term_count == 4u && expr_series_is_ellipsis(text, terms[3])) ||
+          (term_count == 5u && expr_series_is_ellipsis(text, terms[3]))))
+        goto cleanup;
+    for (size_t i = 0u; i < 3u; ++i) {
+        if (!expr_series_parse_term(text, terms[i], &values[i], &factors[i]) || !factors[i] || *factors[i])
+            goto cleanup;
+    }
+    if (!num_is_one(values[0]) || num_get_sign(values[1]) >= 0 || num_get_sign(values[2]) <= 0)
+        goto cleanup;
+
+    negative_second = num_neg(values[1]);
+    argument_squared = num_mul_long(negative_second, 3L);
+    argument_fourth = num_mul(argument_squared, argument_squared);
+    five = num_create_from_long(5L);
+    expected_third = num_div(argument_fourth, five);
+    if (!num_is_exact(argument_squared) || !num_is_finite(argument_squared) ||
+        num_get_sign(argument_squared) <= 0 ||
+        !num_eq(values[2], expected_third))
+        goto cleanup;
+
+    if (term_count == 5u &&
+        !expr_series_arctangent_symbolic_endpoint(text, terms[4], argument_squared, endpoint_out))
+        goto cleanup;
+    *argument_squared_out = num_clone(argument_squared);
+    matched = true;
+
+cleanup:
+    num_destroy(&expected_third);
+    num_destroy(&five);
+    num_destroy(&argument_fourth);
+    num_destroy(&argument_squared);
+    num_destroy(&negative_second);
+    for (size_t i = 0u; i < 3u; ++i) {
+        free(factors[i]);
+        num_destroy(&values[i]);
+    }
+    free(terms);
+    return matched;
+}
+
+static bool expr_series_endpoint_is_positive_infinity(const expr_t *endpoint,
+                                                      expr_series_binding_lookup_fn lookup_binding,
+                                                      void *lookup_context)
+{
+    number_t endpoint_value = endpoint ? expr_eval(endpoint) : NUM_NAN;
+    bool positive_infinity =
+        num_is_real(endpoint_value) && num_is_inf(endpoint_value) && num_get_sign(endpoint_value) > 0;
+
+    if (!positive_infinity && endpoint && lookup_binding) {
+        char *endpoint_name = expr_to_string(endpoint, style_UNBOUND);
+
+        num_destroy(&endpoint_value);
+        endpoint_value = NUM_NAN;
+        if (endpoint_name && lookup_binding(lookup_context, endpoint_name, &endpoint_value))
+            positive_infinity =
+                num_is_real(endpoint_value) && num_is_inf(endpoint_value) && num_get_sign(endpoint_value) > 0;
+        free(endpoint_name);
+    }
+    num_destroy(&endpoint_value);
+    return positive_infinity;
+}
+
+static string_t *expr_series_arctangent_formula(number_t argument_squared, const expr_t *endpoint,
+                                                bool endpoint_positive_infinity)
+{
+    char *endpoint_text = endpoint ? expr_to_string(endpoint, style_UNBOUND) : NULL;
+    long root = 0L;
+    string_t *formula = NULL;
+
+    if (expr_series_reciprocal_square_root(argument_squared, &root)) {
+        formula = string_new();
+        if (!formula ||
+            (endpoint_text && !endpoint_positive_infinity &&
+             string_append_format(formula,
+                                  "%ld*atan(1/%ld)+(-1)^(%s)/(%ld^(2*(%s)+2)*(2*(%s)+3))*"
+                                  "pFq(2,1,1,(%s)+3/2,(%s)+5/2,-1/%ld^2)",
+                                  root, root, endpoint_text, root, endpoint_text, endpoint_text,
+                                  endpoint_text, endpoint_text, root) < 0) ||
+            ((!endpoint_text || endpoint_positive_infinity) &&
+             string_append_format(formula, "%ld*atan(1/%ld)", root, root) < 0)) {
+            string_free(formula);
+            formula = NULL;
+        }
+    }
+    if (!formula && !endpoint) {
+        string_t *argument_squared_text = num_to_string(argument_squared);
+
+        formula = string_new();
+        if (!argument_squared_text || !formula ||
+            string_append_format(formula, "atan(sqrt(%S))/sqrt(%S)", argument_squared_text,
+                                 argument_squared_text) < 0) {
+            string_free(formula);
+            formula = NULL;
+        }
+        string_free(argument_squared_text);
+    }
+    free(endpoint_text);
+    return formula;
+}
+
+static string_t *expr_series_expand_nested_arctangent_once(const string_t *source, bool *expanded_out,
+                                                           expr_series_binding_lookup_fn lookup_binding,
+                                                           void *lookup_context)
+{
+    const char *text = string_c_str(source);
+    const size_t length = strlen(text);
+    size_t *open_parentheses = calloc(length + 1u, sizeof(*open_parentheses));
+    size_t depth = 0u;
+    string_t *output = NULL;
+
+    *expanded_out = false;
+    if (!open_parentheses)
+        return NULL;
+    for (size_t i = 0u; i < length; ++i) {
+        number_t argument_squared = NUM_NAN;
+        expr_t *endpoint = NULL;
+        char *inner = NULL;
+
+        if (text[i] == '(') {
+            open_parentheses[depth++] = i;
+            continue;
+        }
+        if (text[i] != ')' || depth == 0u)
+            continue;
+        const size_t open = open_parentheses[--depth];
+        expr_series_span_t inner_span = {open + 1u, i};
+
+        inner = expr_series_copy_span(text, inner_span);
+        if (!inner)
+            goto cleanup;
+        if (!expr_series_arctangent_argument_squared(inner, &argument_squared, &endpoint)) {
+            free(inner);
+            continue;
+        }
+        free(inner);
+        const bool endpoint_positive_infinity =
+            expr_series_endpoint_is_positive_infinity(endpoint, lookup_binding, lookup_context);
+        string_t *formula =
+            expr_series_arctangent_formula(argument_squared, endpoint, endpoint_positive_infinity);
+
+        output = string_new();
+        if (!formula || !output || expr_series_append_slice(output, text, 0u, open + 1u) != 0 ||
+            string_append_format(output, "%S", formula) < 0 ||
+            expr_series_append_slice(output, text, i, length) != 0) {
+            string_free(formula);
+            expr_free(endpoint);
+            num_destroy(&argument_squared);
+            string_free(output);
+            output = NULL;
+            goto cleanup;
+        }
+        string_free(formula);
+        expr_free(endpoint);
+        num_destroy(&argument_squared);
+        *expanded_out = true;
+        goto cleanup;
+    }
+    output = string_clone(source);
+
+cleanup:
+    free(open_parentheses);
+    return output;
+}
+
 static void expr_series_destroy_numbers(number_t *values, size_t count)
 {
     if (!values)
@@ -1248,6 +1964,84 @@ cleanup:
     num_destroy(&two);
     num_destroy(&ratio);
     return recognised;
+}
+
+static string_t *expr_series_complete_open_inverse_index_power(const string_t *side, bool *expanded_out)
+{
+    const char *text = string_c_str(side);
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    size_t ellipsis_index = SIZE_MAX;
+    size_t coefficient_count = 0u;
+    number_t *coefficients = NULL;
+    char *factor = NULL;
+    string_t *first_text = NULL;
+    string_t *output = NULL;
+    int exponent = 0;
+
+    *expanded_out = false;
+    if (!expr_series_split_terms(text, &terms, &term_count))
+        return NULL;
+    for (size_t i = 0u; i < term_count; ++i) {
+        if (expr_series_is_ellipsis(text, terms[i])) {
+            ellipsis_index = i;
+            break;
+        }
+    }
+    if (ellipsis_index == SIZE_MAX || ellipsis_index + 1u != term_count || ellipsis_index < 3u)
+        goto unchanged;
+
+    coefficients = calloc(ellipsis_index, sizeof(*coefficients));
+    if (!coefficients)
+        goto allocation_failure;
+    for (size_t i = 0u; i < ellipsis_index; ++i) {
+        char *term_factor = NULL;
+
+        if (!expr_series_parse_term(text, terms[i], &coefficients[coefficient_count], &term_factor)) {
+            free(term_factor);
+            goto unchanged;
+        }
+        ++coefficient_count;
+        if (factor && strcmp(factor, term_factor) != 0) {
+            free(term_factor);
+            goto unchanged;
+        }
+        if (!factor) {
+            factor = term_factor;
+            term_factor = NULL;
+        }
+        free(term_factor);
+    }
+    if (!expr_series_inverse_index_power_exponent(coefficients, coefficient_count, &exponent))
+        goto unchanged;
+
+    first_text = num_to_string(coefficients[0]);
+    output = string_clone(side);
+    if (!first_text || !output)
+        goto allocation_failure;
+    if (factor && *factor) {
+        if (string_append_format(output, " + (%S)*(%s)/inf^%d", first_text, factor, exponent) < 0)
+            goto allocation_failure;
+    } else if (string_append_format(output, " + (%S)/inf^%d", first_text, exponent) < 0) {
+        goto allocation_failure;
+    }
+    *expanded_out = true;
+    goto cleanup;
+
+unchanged:
+    output = string_clone(side);
+    goto cleanup;
+
+allocation_failure:
+    string_free(output);
+    output = NULL;
+
+cleanup:
+    string_free(first_text);
+    free(factor);
+    expr_series_destroy_numbers(coefficients, coefficient_count);
+    free(terms);
+    return output;
 }
 
 static bool expr_series_inverse_index_power_endpoint(const number_t first, const number_t last, int exponent,
@@ -2696,27 +3490,53 @@ static int expr_series_append_symbolic_power_formula(string_t *output, const exp
     return status;
 }
 
-static int expr_series_append_symbolic_alternating_reciprocal_formula(string_t *output, const char *source_text,
-                                                                      const expr_series_result_t *result)
+static int expr_series_append_symbolic_alternating_reciprocal_formula(string_t *output,
+                                                                      const expr_series_result_t *result,
+                                                                      bool endpoint_positive_infinity,
+                                                                      bool *domain_specialised_out)
 {
-    const char *index_name = expr_series_display_index_name(source_text);
     string_t *first_text = num_to_string(result->inverse_index_first);
     char *endpoint_text = expr_to_string(result->symbolic_endpoint, style_UNBOUND);
+    number_t four = num_create_from_long(4L);
+    const bool is_leibniz_pi_series = result->alternating_reciprocal_step == 2L &&
+                                      num_eq(result->inverse_index_first, four);
     int status = -1;
 
     if (!first_text || !endpoint_text)
         goto cleanup;
-    if (num_is_one(result->inverse_index_first)) {
-        if (string_append_format(output, "sum((-1)^(%s)/(%ld*(%s)+1),%s,0,%s)", index_name,
-                                 result->alternating_reciprocal_step, index_name, index_name, endpoint_text) >= 0)
+    if (endpoint_positive_infinity && is_leibniz_pi_series) {
+        if (string_append_cstr(output, "pi") == 0) {
+            if (domain_specialised_out)
+                *domain_specialised_out = true;
             status = 0;
-    } else if (string_append_format(output, "sum((%S)*(-1)^(%s)/(%ld*(%s)+1),%s,0,%s)", first_text,
-                                    index_name, result->alternating_reciprocal_step, index_name, index_name,
-                                    endpoint_text) >= 0) {
+        }
+    } else if (is_leibniz_pi_series &&
+               string_append_format(output,
+                                    "pi+(-1)^(%s)*(digamma((%s)/2+5/4)-digamma((%s)/2+3/4))",
+                                    endpoint_text, endpoint_text, endpoint_text) >= 0) {
+        status = 0;
+    } else if (endpoint_positive_infinity &&
+               string_append_format(output,
+                                    "(%S)/(2*(%ld))*(digamma(((1/(%ld))+1)/2)-digamma(1/(2*(%ld))))",
+                                    first_text, result->alternating_reciprocal_step,
+                                    result->alternating_reciprocal_step,
+                                    result->alternating_reciprocal_step) >= 0) {
+        if (domain_specialised_out)
+            *domain_specialised_out = true;
+        status = 0;
+    } else if (string_append_format(
+                   output,
+                   "(%S)/(2*(%ld))*(digamma(((1/(%ld))+1)/2)-digamma(1/(2*(%ld)))+"
+                   "(-1)^(%s)*(digamma(((%s)+(1/(%ld))+2)/2)-digamma(((%s)+(1/(%ld))+1)/2)))",
+                   first_text, result->alternating_reciprocal_step, result->alternating_reciprocal_step,
+                   result->alternating_reciprocal_step, endpoint_text, endpoint_text,
+                   result->alternating_reciprocal_step, endpoint_text,
+                   result->alternating_reciprocal_step) >= 0) {
         status = 0;
     }
 
 cleanup:
+    num_destroy(&four);
     free(endpoint_text);
     string_free(first_text);
     return status;
@@ -2948,7 +3768,8 @@ model_ready:
             goto allocation_failure;
     } else if (result.kind == EXPR_SERIES_MODEL_ALTERNATING_ARITHMETIC_RECIPROCAL &&
                result.symbolic_endpoint) {
-        if (expr_series_append_symbolic_alternating_reciprocal_formula(output, text, &result) != 0)
+        if (expr_series_append_symbolic_alternating_reciprocal_formula(
+                output, &result, endpoint_positive_infinity, domain_specialised_out) != 0)
             goto allocation_failure;
     } else if (result.kind == EXPR_SERIES_MODEL_INVERSE_INDEX_POWER && result.symbolic_exponent) {
         if (expr_series_append_symbolic_power_formula(output, &result, lookup_binding, lookup_context,
@@ -3039,6 +3860,77 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         bool expanded = false;
 
         bool pass_domain_specialised = false;
+
+        next = expr_series_expand_infinite_prime_product(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_telescoping_product(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_nested_arctangent_once(current, &expanded, lookup_binding, lookup_context);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_trigonometric_progression(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_complete_open_inverse_index_power(current, &expanded);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            continue;
+        }
+        string_free(next);
 
         next = expr_series_expand_once(current, &expanded, &next_display_TeX, lookup_binding, lookup_context,
                                        &pass_domain_specialised);

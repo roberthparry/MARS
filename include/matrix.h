@@ -1443,6 +1443,14 @@ matrix_t *mat_zeta(const matrix_t *A);
 matrix_t *mat_zetap(const matrix_t *A);
 /** @brief Return the principal matrix dilogarithm. */
 matrix_t *mat_dilog(const matrix_t *A);
+/**
+ * @brief Evaluate the harmonic matrix polynomial @f$H_n(A)=\sum_{k=1}^{n}A^k/k@f$.
+ *
+ * @param A Square matrix argument.
+ * @param degree Non-negative polynomial degree.
+ * @return A newly allocated matrix containing the finite logarithmic sum, or NULL on error.
+ */
+matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree);
 matrix_t *mat_gammainv(const matrix_t *A);
 matrix_t *mat_normal_pdf(const matrix_t *A);
 matrix_t *mat_normal_cdf(const matrix_t *A);

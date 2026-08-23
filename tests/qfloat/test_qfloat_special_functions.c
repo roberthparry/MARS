@@ -889,7 +889,7 @@ void test_qf_polygamma(void)
 
 void test_qf_polylog(void)
 {
-    printf(C_CYAN "TEST: qf_dilog/qf_polylog\n" C_RESET);
+    printf(C_CYAN "TEST: qf_dilog/qf_polylog/qf_harmonic_poly\n" C_RESET);
 
     {
         qfloat_t half = qf_from_double(0.5);
@@ -908,6 +908,9 @@ void test_qf_polylog(void)
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ONE, x), qf_neg(qf_log(one_minus_x)), 1e-28);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ZERO, x), qf_div(x, one_minus_x), 1e-28);
     }
+
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_harmonic_poly(4ul, qf_from_double(0.5)),
+                                 qf_div(qf_from_double(131.0), qf_from_double(192.0)), 1e-30);
 
     {
         qfloat_t got =

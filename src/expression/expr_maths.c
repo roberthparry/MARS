@@ -525,6 +525,10 @@ number_t eval_polylog(expr_t *dv)
 {
     return expr_eval_binary_num(dv, num_polylog);
 }
+number_t eval_harmonic_poly(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_harmonic_poly);
+}
 number_t eval_legendre_chi(expr_t *dv)
 {
     return expr_eval_binary_num(dv, num_legendre_chi);
@@ -1921,6 +1925,43 @@ expr_t *deriv_polylog(expr_t *dv)
     out = expr_mul(factor, db);
     expr_free(factor);
     expr_free(db);
+    return out;
+}
+
+expr_t *deriv_harmonic_poly(expr_t *dv)
+{
+    expr_t *degree_derivative = expr_get_dx_internal(dv->a);
+    number_t degree_derivative_value = degree_derivative ? expr_eval_num_internal(degree_derivative) : NUM_NAN;
+    expr_t *one = NULL;
+    expr_t *power = NULL;
+    expr_t *numerator = NULL;
+    expr_t *denominator = NULL;
+    expr_t *factor = NULL;
+    expr_t *argument_derivative = NULL;
+    expr_t *out = NULL;
+
+    if (!num_is_zero(degree_derivative_value)) {
+        num_destroy(&degree_derivative_value);
+        expr_free(degree_derivative);
+        return expr_new_const(NUM_NAN);
+    }
+    num_destroy(&degree_derivative_value);
+    expr_free(degree_derivative);
+
+    one = expr_new_const(NUM_ONE);
+    power = one ? expr_pow_xp(dv->b, dv->a) : NULL;
+    numerator = one && power ? expr_sub(one, power) : NULL;
+    denominator = one ? expr_sub(one, dv->b) : NULL;
+    factor = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+    argument_derivative = expr_get_dx_internal(dv->b);
+    out = factor && argument_derivative ? expr_mul(factor, argument_derivative) : NULL;
+
+    expr_free(argument_derivative);
+    expr_free(factor);
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(power);
+    expr_free(one);
     return out;
 }
 

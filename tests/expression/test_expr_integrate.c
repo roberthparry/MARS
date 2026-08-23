@@ -3293,6 +3293,112 @@ static void test_integrate_log_times_affine_trigonometric_family(void)
     }
 }
 
+static void test_integrate_trigonometric_progression_closed_forms(void)
+{
+    static const double points[] = {0.25, 0.6, 1.1};
+    static const char *const inputs[] = {
+        "{ sin(x)+sin(2x)+sin(3x)+sin(4x)+...+sin(nx) | x=?; n=4 }",
+        "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=?; n=4 }",
+        "{ sinh(x)+sinh(2x)+sinh(3x)+sinh(4x)+...+sinh(nx) | x=?; n=4 }",
+        "{ cosh(x)+cosh(2x)+cosh(3x)+cosh(4x)+...+cosh(nx) | x=?; n=4 }",
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i)
+        assert_string_antiderivative_matches(inputs[i], points, sizeof(points) / sizeof(points[0]));
+
+    assert_string_antiderivative_contains(inputs[1], "Hn(");
+
+    expr_bindings_t *bindings = NULL;
+    expr_t *cosine_sum = expr_from_string(inputs[1], &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *antiderivative = cosine_sum && x ? expr_integrate(cosine_sum, x) : NULL;
+    expr_t *round_trip = antiderivative && x ? expr_create_deriv(antiderivative, x) : NULL;
+    char *round_trip_text = round_trip ? expr_to_string(round_trip, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(round_trip_text);
+    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½x·(n + 1))/sin(x/2)");
+
+    free(round_trip_text);
+    expr_free(round_trip);
+    expr_free(antiderivative);
+    expr_free(cosine_sum);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    antiderivative = expr_from_string(
+        "{ C-1/2*(Hn(n,cos(x)+i*sin(x))-Hn(n,cos(x)-sin(x)*i))*i | x=?; C=?; n=4 }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    round_trip = antiderivative && x ? expr_create_deriv(antiderivative, x) : NULL;
+    round_trip_text = round_trip ? expr_to_string(round_trip, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(round_trip_text);
+    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½x·(n + 1))/sin(x/2)");
+
+    free(round_trip_text);
+    expr_free(round_trip);
+    expr_free(antiderivative);
+    expr_bindings_free(bindings);
+}
+
+static void test_harmonic_poly_calculus(void)
+{
+    static const double points[] = {0.25, 0.6, 1.1};
+    expr_bindings_t *bindings = NULL;
+    expr_t *function = expr_from_string("{ Hn(n,x) | x=?; n=4 }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *derivative = function ? expr_clone(function) : NULL;
+    expr_t *antiderivative = function && x ? expr_integrate(function, x) : NULL;
+    expr_t *round_trip = antiderivative && x ? expr_create_deriv(antiderivative, x) : NULL;
+    char *function_text = function ? expr_to_string(function, style_FUNCTION) : NULL;
+
+    ASSERT_NOT_NULL(function);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(antiderivative);
+    ASSERT_NOT_NULL(round_trip);
+    ASSERT_NOT_NULL(function_text);
+    ASSERT_TRUE(strstr(function_text, "harmonic_poly(n, x)") != NULL);
+
+    for (size_t order = 1u; order <= 4u; ++order) {
+        expr_t *next = derivative && x ? expr_create_deriv(derivative, x) : NULL;
+
+        expr_free(derivative);
+        derivative = next;
+        ASSERT_NOT_NULL(derivative);
+        for (size_t point = 0u; point < sizeof(points) / sizeof(points[0]); ++point) {
+            double value = points[point];
+            double expected;
+            char label[128];
+
+            switch (order) {
+                case 1u:
+                    expected = 1.0 + value + value * value + value * value * value;
+                    break;
+                case 2u:
+                    expected = 1.0 + 2.0 * value + 3.0 * value * value;
+                    break;
+                case 3u:
+                    expected = 2.0 + 6.0 * value;
+                    break;
+                default:
+                    expected = 6.0;
+                    break;
+            }
+            test_expr_set_val_d(x, value);
+            snprintf(label, sizeof(label), "Hn fourth-degree derivative %zu at x=%g", order, value);
+            check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(derivative), qf_from_double(expected));
+            check_q_at(__FILE__, __LINE__, 1, "Hn antiderivative differentiates back", expr_eval_qf(round_trip),
+                       expr_eval_qf(function));
+        }
+    }
+
+    expr_free(round_trip);
+    expr_free(antiderivative);
+    expr_free(derivative);
+    free(function_text);
+    expr_free(function);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_power_composed_bessel_j_family(void)
 {
     static const double points[] = {0.75, 1.0, 1.4};
@@ -3390,6 +3496,8 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_collects_repeated_inverse_and_log_terms, NULL);
     TEST_RUN_SUBTEST(test_integrate_polynomial_exponential_with_symbolic_rate, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_times_affine_trigonometric_family, NULL);
+    TEST_RUN_SUBTEST(test_integrate_trigonometric_progression_closed_forms, NULL);
+    TEST_RUN_SUBTEST(test_harmonic_poly_calculus, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_bessel_j_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_bessel_y_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_lommel_s_family, NULL);

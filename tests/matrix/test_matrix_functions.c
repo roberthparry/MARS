@@ -94,6 +94,36 @@ static void test_number_function_matrix_parity(void)
     }
 }
 
+static void test_mat_harmonic_poly(void)
+{
+    number_t values[] = {num_create_from_long(1L), num_create_from_long(0L), num_create_from_long(0L),
+                         num_create_from_long(2L)};
+    matrix_t *A = mat_create(2u, 2u, values);
+    matrix_t *result = mat_harmonic_poly(A, 2u);
+    number_t value;
+
+    printf(C_CYAN "TEST: harmonic matrix polynomial\n" C_RESET);
+    ASSERT_NOT_NULL(result);
+    if (result) {
+        number_t expected = num_create_from_string("3/2");
+
+        value = mat_get_num(result, 0u, 0u);
+        check_bool("H_2(A)[0,0] = 3/2", num_eq(value, expected));
+        num_destroy(&value);
+        num_destroy(&expected);
+        expected = num_create_from_long(4L);
+        value = mat_get_num(result, 1u, 1u);
+        check_bool("H_2(A)[1,1] = 4", num_eq(value, expected));
+        num_destroy(&value);
+        num_destroy(&expected);
+    }
+
+    mat_free(result);
+    mat_free(A);
+    for (size_t i = 0u; i < sizeof(values) / sizeof(values[0]); ++i)
+        num_destroy(&values[i]);
+}
+
 static void test_eigen_d(void)
 {
     printf(C_CYAN "TEST: eigendecomposition (double)\n" C_RESET);
@@ -6383,6 +6413,7 @@ void run_matrix_function_tests(void)
 {
     TEST_RUN_CASE(test_mat_neg_convenience, NULL);
     TEST_RUN_CASE(test_number_function_matrix_parity, NULL);
+    TEST_RUN_CASE(test_mat_harmonic_poly, NULL);
     TEST_RUN_CASE(test_eigen_d, NULL);
     TEST_RUN_CASE(test_eigen_mp_real, NULL);
     TEST_RUN_CASE(test_eigen_complex, NULL);

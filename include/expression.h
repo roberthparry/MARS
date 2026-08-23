@@ -587,7 +587,7 @@ expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index,
  *                    expr_trigamma (ψ⁽¹⁾), expr_polygamma (ψ⁽ⁿ⁾),
  *                    expr_gammainv (Γ⁻¹), expr_gammainc_lower,
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
- * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ),
+ * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ), expr_harmonic_poly (Hₙ),
  *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
  * Bessel functions:  expr_bessel_j (Jᵥ), expr_bessel_y (Yᵥ)
  * Lommel function:    expr_lommel_s (s_(μ,ν))
@@ -651,6 +651,14 @@ expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
 expr_t *expr_zetap(const expr_t *expr);
 expr_t *expr_dilog(const expr_t *expr);
 expr_t *expr_polylog(unsigned int order, const expr_t *expr);
+/**
+ * @brief Construct the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
+ *
+ * @param degree Non-negative integer degree expression; it is retained.
+ * @param argument Argument expression; it is retained.
+ * @return A newly allocated harmonic-polynomial expression, or NULL on error.
+ */
+expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);

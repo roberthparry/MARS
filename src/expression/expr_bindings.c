@@ -1941,8 +1941,8 @@ static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE]
     0, 4, 0, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 0,
     0, 0, 1, 15, 0, 0, 4, 0, 0, 0, 0, 0, 0, 10, 2, 137,
     0, 0, 0, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1, 0, 0, 1,
-    2, 0, 0, 13, 2, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0,
-    0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 22, 0, 2, 1,
+    2, 8, 0, 13, 2, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 0,
+    0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 26, 0, 22, 0, 2, 1,
     0, 1, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0,
     162, 0, 0, 0, 0, 0, 0};
 
@@ -2016,11 +2016,12 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [78] = {.kw = "gamma", .is_binary = false, .ops = &ops_gamma},
     [79] = {.kw = "dilog", .is_binary = false, .ops = &ops_dilog},
     [80] = {.kw = "E1", .is_binary = false, .ops = &ops_E1},
-    [81] = {.kw = "erfc", .is_binary = false, .ops = &ops_erfc},
+    [81] = {.kw = "harmonic_poly", .is_binary = true, .ops = &ops_harmonic_poly},
     [82] = {.kw = "cubrt", .is_binary = false, .ops = &ops_cubrt},
     [84] = {.kw = "acos", .is_binary = false, .ops = &ops_acos},
     [85] = {.kw = "atanh", .is_binary = false, .ops = &ops_atanh},
     [88] = {.kw = "chi", .is_binary = true, .ops = &ops_legendre_chi},
+    [89] = {.kw = "erfc", .is_binary = false, .ops = &ops_erfc},
     [90] = {.kw = "BesselY", .is_binary = true, .ops = &ops_bessel_y},
     [92] = {.kw = "arsech", .is_binary = false, .ops = &ops_asech},
     [93] = {.kw = "normal_logpdf", .is_binary = false, .ops = &ops_normal_logpdf},
@@ -2080,6 +2081,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [157] = {.kw = "conj", .is_binary = false, .ops = &ops_conj},
     [158] = {.kw = "asech", .is_binary = false, .ops = &ops_asech},
     [159] = {.kw = "partition", .is_binary = false, .ops = &ops_partition},
+    [160] = {.kw = "Hn", .is_binary = true, .ops = &ops_harmonic_poly},
     [161] = {.kw = "root", .is_binary = true, .ops = &ops_root},
     [162] = {.kw = "productlog", .is_binary = false, .ops = &ops_lambert_w},
     [164] = {.kw = "acosech", .is_binary = false, .ops = &ops_acosech},
@@ -4304,7 +4306,7 @@ static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t 
         return;
     }
 
-    sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    sbuf_puts(b, ops == &ops_harmonic_poly ? "harmonic_poly" : (ops && ops->name) ? ops->name : "?");
     sbuf_putc(b, '(');
     emit_binding_func_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
     sbuf_puts(b, ", ");

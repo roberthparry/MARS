@@ -3196,6 +3196,73 @@ static int expr_combine_atan_difference_addends_local(addend_t *terms, size_t n)
     return combined_any;
 }
 
+static expr_t *expr_try_simplify_atan_const_sum_local(const expr_t *a, const expr_t *b)
+{
+    NUM_SCOPE(scope);
+    number_t left = num_new();
+    number_t right = num_new();
+    number_t left_radicand = num_new();
+    number_t right_radicand = num_new();
+    number_t sum = num_new();
+    number_t product = num_new();
+    number_t denominator = num_new();
+    expr_t *out = NULL;
+
+    if (!expr_simplify_atan_const_over_sqrt_local(a, &left, &left_radicand) ||
+        !expr_simplify_atan_const_over_sqrt_local(b, &right, &right_radicand) ||
+        !num_is_one(left_radicand) || !num_is_one(right_radicand) ||
+        !num_gt(left, NUM_ZERO) || !num_gt(right, NUM_ZERO))
+        goto cleanup;
+
+    num_destroy(&sum);
+    sum = num_add(left, right);
+    num_destroy(&product);
+    product = num_mul(left, right);
+    num_destroy(&denominator);
+    denominator = num_sub(NUM_ONE, product);
+    if (num_gt(denominator, NUM_ZERO) && num_eq(sum, denominator)) {
+        expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+
+        out = pi ? expr_div_long(pi, 4L) : NULL;
+        expr_free(pi);
+    }
+
+cleanup:
+    num_destroy(&denominator);
+    num_destroy(&product);
+    num_destroy(&sum);
+    num_destroy(&right_radicand);
+    num_destroy(&left_radicand);
+    num_destroy(&right);
+    num_destroy(&left);
+    return out;
+}
+
+static int expr_combine_atan_sum_addends_local(addend_t *terms, size_t n)
+{
+    for (size_t i = 0; i < n; ++i) {
+        if (!terms[i].base || num_is_zero(terms[i].coeff))
+            continue;
+        for (size_t j = i + 1; j < n; ++j) {
+            expr_t *combined;
+
+            if (!terms[j].base || num_is_zero(terms[j].coeff) ||
+                !num_eq(terms[i].coeff, terms[j].coeff))
+                continue;
+            combined = expr_try_simplify_atan_const_sum_local(terms[i].base, terms[j].base);
+            if (!combined)
+                continue;
+
+            expr_free(terms[i].base);
+            terms[i].base = combined;
+            num_destroy(&terms[j].coeff);
+            terms[j].coeff = num_const(NUM_ZERO);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int expr_combine_log_difference_addends_local(addend_t *terms, size_t n)
 {
     int combined_any = 0;
@@ -3359,6 +3426,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_collect_addends(b, expr_is_op(dv, &ops_sub) ? NUM_NEG_ONE : NUM_ONE, &c_const, &terms, &n, &cap);
     expr_free(b);
 
+    expr_combine_atan_sum_addends_local(terms, n);
     combined_atan_difference = expr_combine_atan_difference_addends_local(terms, n);
     expr_combine_log_difference_addends_local(terms, n);
     expr_combine_common_denominator_addends(terms, n);

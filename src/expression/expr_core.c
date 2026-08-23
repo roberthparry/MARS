@@ -324,7 +324,11 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
     if (wrt->ops == &ops_const)
         return expr_nan_const_shared();
     {
-        expr_t *special = expr_deriv_rational_over_polynomial_power(expr, wrt);
+        expr_t *special = expr_deriv_cosine_harmonic_antiderivative(expr, wrt);
+
+        if (special)
+            return special;
+        special = expr_deriv_rational_over_polynomial_power(expr, wrt);
 
         if (special)
             return special;

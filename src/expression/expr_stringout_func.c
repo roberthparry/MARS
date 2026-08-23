@@ -188,8 +188,16 @@ static size_t function_dag_table_register(function_dag_table_t *table, const exp
     if (!node)
         return (size_t)-1;
     found = function_dag_table_find(table, node);
-    if (found != (size_t)-1)
+    if (found != (size_t)-1) {
+        size_t child = function_dag_table_register(table, node->a);
+
+        if (child != (size_t)-1)
+            table->incoming[child]++;
+        child = function_dag_table_register(table, node->b);
+        if (child != (size_t)-1)
+            table->incoming[child]++;
         return found;
+    }
 
     if (table->count == table->capacity) {
         size_t capacity = table->capacity ? table->capacity * 2u : 32u;
@@ -222,6 +230,107 @@ static size_t function_dag_table_register(function_dag_table_t *table, const exp
             table->incoming[child]++;
     }
     return index;
+}
+
+#define FUNCTION_FACTOR_LIMIT 64u
+
+static size_t function_flatten_mul_factors(const expr_t *node, const expr_t **factors, size_t count)
+{
+    if (!node || count >= FUNCTION_FACTOR_LIMIT)
+        return count;
+    if (expr_is_mul(node)) {
+        count = function_flatten_mul_factors(node->a, factors, count);
+        return function_flatten_mul_factors(node->b, factors, count);
+    }
+    factors[count++] = node;
+    return count;
+}
+
+static bool function_product_parts(const expr_t *node, const expr_t **numerator, const expr_t **denominator)
+{
+    if (expr_is_op(node, &ops_div)) {
+        *numerator = node->a;
+        *denominator = node->b;
+        return true;
+    }
+    if (expr_is_mul(node)) {
+        *numerator = node;
+        *denominator = NULL;
+        return true;
+    }
+    return false;
+}
+
+static bool function_product_factors_are_subset(const expr_t *candidate, const expr_t *container)
+{
+    const expr_t *candidate_factors[FUNCTION_FACTOR_LIMIT];
+    const expr_t *container_factors[FUNCTION_FACTOR_LIMIT];
+    bool matched[FUNCTION_FACTOR_LIMIT] = {false};
+    const expr_t *candidate_numerator = NULL;
+    const expr_t *candidate_denominator = NULL;
+    const expr_t *container_numerator = NULL;
+    const expr_t *container_denominator = NULL;
+    size_t candidate_count;
+    size_t container_count;
+
+    if (!function_product_parts(candidate, &candidate_numerator, &candidate_denominator) ||
+        !function_product_parts(container, &container_numerator, &container_denominator) ||
+        ((candidate_denominator || container_denominator) &&
+         (!candidate_denominator || !container_denominator ||
+          !expr_struct_eq(candidate_denominator, container_denominator))))
+        return false;
+    candidate_count = function_flatten_mul_factors(candidate_numerator, candidate_factors, 0u);
+    container_count = function_flatten_mul_factors(container_numerator, container_factors, 0u);
+    if (candidate_count + (candidate_denominator ? 1u : 0u) < 2u || candidate_count > container_count)
+        return false;
+
+    for (size_t candidate_index = 0u; candidate_index < candidate_count; ++candidate_index) {
+        bool found = false;
+
+        for (size_t container_index = 0u; container_index < container_count; ++container_index) {
+            if (!matched[container_index] &&
+                (candidate_factors[candidate_index] == container_factors[container_index] ||
+                 expr_struct_eq(candidate_factors[candidate_index], container_factors[container_index]))) {
+                matched[container_index] = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return false;
+    }
+    return true;
+}
+
+static size_t function_count_factored_occurrences(const expr_t *node, const expr_t *candidate,
+                                                  bool parent_is_product)
+{
+    const bool node_is_product = expr_is_mul(node) || expr_is_op(node, &ops_div);
+    size_t count = 0u;
+
+    if (!node)
+        return 0u;
+    if (node_is_product && !parent_is_product && function_product_factors_are_subset(candidate, node))
+        count++;
+    count += function_count_factored_occurrences(node->a, candidate, node_is_product);
+    count += function_count_factored_occurrences(node->b, candidate, expr_is_mul(node));
+    return count;
+}
+
+static void function_dag_table_register_factored_occurrences(function_dag_table_t *table,
+                                                             const expr_t *const *roots, size_t root_count)
+{
+    for (size_t candidate_index = 0u; candidate_index < table->count; ++candidate_index) {
+        size_t occurrences = 0u;
+
+        if (!expr_is_mul(table->nodes[candidate_index]) && !expr_is_op(table->nodes[candidate_index], &ops_div))
+            continue;
+        for (size_t root_index = 0u; root_index < root_count; ++root_index)
+            occurrences += function_count_factored_occurrences(roots[root_index], table->nodes[candidate_index],
+                                                               false);
+        if (occurrences > table->incoming[candidate_index])
+            table->incoming[candidate_index] = occurrences;
+    }
 }
 
 static bool function_temporary_table_contains(const function_temporary_table_t *table, const expr_t *node)
@@ -355,6 +464,10 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
     dag_index = function_dag_table_find(dag, node);
     if (dag_index == (size_t)-1 || dag->incoming[dag_index] < 2u)
         return true;
+    /* Packing nodes are an internal representation detail of variadic
+     * hypergeometric functions, not expressions in the MARS language. */
+    if (expr_is_op(node, &ops_hypergeometric_pFq_pack))
+        return true;
     if (node->ops->arity == EXPR_OP_UNARY && node->a && !expr_is_const(node->a) && !expr_is_var(node->a) &&
         !function_temporary_table_contains(temporaries, node->a) &&
         !function_temporary_table_append(temporaries, node->a, variables, constants))
@@ -393,8 +506,16 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
     function_dag_table_init(&dag);
     function_temporary_table_init(&temporaries);
 
-    if (function_dag_table_register(&dag, root) == (size_t)-1 ||
-        !function_collect_shared_temporaries(root, root, &dag, &temporaries, variables, constants)) {
+    if (function_dag_table_register(&dag, root) == (size_t)-1) {
+        function_dag_table_free(&dag);
+        function_temporary_table_free(&temporaries);
+        sbuf_puts(b, "    return ");
+        emit_func(root, b, PREC_LOWEST);
+        sbuf_puts(b, ".\n");
+        return;
+    }
+    function_dag_table_register_factored_occurrences(&dag, &root, 1u);
+    if (!function_collect_shared_temporaries(root, root, &dag, &temporaries, variables, constants)) {
         function_dag_table_free(&dag);
         function_temporary_table_free(&temporaries);
         sbuf_puts(b, "    return ");
@@ -476,6 +597,9 @@ expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *
         find_named_consts_dfs(roots[index], &plan->constants);
         ok = function_dag_table_register(&dag, roots[index]) != (size_t)-1;
     }
+
+    if (ok)
+        function_dag_table_register_factored_occurrences(&dag, roots, count);
 
     for (size_t index = 0u; ok && index < count; ++index) {
         if (roots[index])

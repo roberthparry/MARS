@@ -42,6 +42,13 @@ The precision buttons change the working precision used by the mathematical
 helpers. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
 
+On a desktop-sized screen, each mode now follows the natural page height rather
+than forcing the editor and result panels into the remaining viewport. This
+keeps the controls directly below their editor and avoids large artificial
+blank areas. A resize grip appears only when an editor genuinely runs out of
+space. Result cards still scroll or expand independently when their content
+requires it.
+
 ## Expression mode
 
 Expression mode parses, simplifies and evaluates scalar or matrix-valued
@@ -83,6 +90,21 @@ terminal term. The Rendered TeX derivation shows the inferred sigma before the
 simplified formula and value. The browser neither extrapolates nor rewrites the
 series.
 
+The same native recognition covers finite `sin`, `cos`, `sinh` and `cosh`
+progressions, including inputs such as
+`cos(x)+cos(2x)+cos(3x)+...+cos(nx)`. MARS returns the corresponding geometric-
+series closed form and uses its continuous value at removable singularities
+such as `x = 0`. Integrating the cosine progression produces
+
+$$
+\frac{H_n(e^{ix})-H_n(e^{-ix})}{2i}+C,
+\qquad H_n(z)=\sum_{k=1}^{n}\frac{z^k}{k}.
+$$
+
+Expression input accepts `Hn(n,z)` and `harmonic_poly(n,z)`. The Function card
+uses `harmonic_poly`, and the same native node supports repeated symbolic
+differentiation and direct integration.
+
 The captured editor input is `1+1/2^p+1/3^p+...+1/n^p`; its binding boxes
 supply `p = 2.5` and `n = 100`. MARS recognises
 
@@ -116,7 +138,7 @@ simplified expression:
   forms.
 - **Function** shows an evaluable MARS function. Reused expression-DAG nodes
   are named once as intermediate constants or variables before the return
-  expression.
+  expression. A shared subexpression such as `x/2` is assigned once and reused.
 - **Value** appears whenever supplied bindings allow a numerical result. It is
   the only card that substitutes those bindings; it also appears when
   simplification proves a binding-independent value despite an unset binding.
@@ -127,6 +149,9 @@ Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
 without surrounding spaces. Constants use `const`; arrays use `array`; and
 generated intermediate values use compact names such as `c1` and `v1`.
+Typeable named constants use `@pi`, `@phi`, `@gamma`, `@tau` and `@inf`, with
+their own syntax colour. Values edited in Expression-mode binding controls are
+committed to the expression before evaluation, differentiation or integration.
 Descriptive `$[...]` identifiers remain accepted as input aliases for
 bracketed names and use the subdued off-white italic styling of variable and
 constant names, but result cards do not generate the `$[...]` form.
@@ -183,6 +208,10 @@ MARS Lab passes the entered text unchanged to
 `mat_expression_from_string(...)`. MARSlib owns the complete grammar and
 performs all matrix parsing and evaluation; neither the browser nor the native
 MARS Lab helper interprets matrix-expression syntax.
+
+Rendered matrix values automatically fit the available Value-card width at the
+default zoom. Zoom and expansion recalculate that fit, so a wide matrix remains
+visible without changing the native matrix output.
 
 ### Matrix-expression notation
 

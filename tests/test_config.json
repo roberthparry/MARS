@@ -507,6 +507,7 @@
       "enabled": true,
       "test_symbolic_integration": {
         "enabled": true,
+        "test_harmonic_poly_calculus": true,
         "test_integrate_affine_elementary": true,
         "test_integrate_affine_logs_inverse_and_specials": true,
         "test_integrate_affine_more_trig_and_stats": true,
@@ -555,6 +556,7 @@
         "test_integrate_symbolic_power_exponent": true,
         "test_integrate_symbolic_shifted_sqrt": true,
         "test_integrate_trig_power_products": true,
+        "test_integrate_trigonometric_progression_closed_forms": true,
         "test_integrate_unevaluated_integral_chain_rule_upper": true,
         "test_integrate_unevaluated_integral_constant_upper": true,
         "test_integrate_unevaluated_integral_derivative": true,
@@ -1282,6 +1284,7 @@
     "test_mat_exp_null_safety": true,
     "test_mat_exp_singular": true,
     "test_mat_fun_singular_entire_d": true,
+    "test_mat_harmonic_poly": true,
     "test_mat_inv_trig_null_safety": true,
     "test_mat_log_d": true,
     "test_mat_neg_convenience": true,
