@@ -917,37 +917,6 @@ INDEX_HTML = r"""<!doctype html>
       flex-direction: column;
     }
 
-    #workspacePanel.viewport-fitted,
-    #resultWorkspacePanel.viewport-fitted {
-      position: sticky;
-      top: 0.75rem;
-      align-self: start;
-      height: var(--workspace-panel-height);
-    }
-
-    #workspacePanel.viewport-fitted.manually-expanded,
-    #resultWorkspacePanel.viewport-fitted.manually-expanded {
-      position: relative;
-      top: auto;
-    }
-
-    #workspacePanel.viewport-fitted textarea.editor-manual-size {
-      flex: 0 0 auto;
-    }
-
-    #resultWorkspacePanel.viewport-fitted {
-      display: flex;
-      min-height: 0;
-      flex-direction: column;
-    }
-
-    #resultWorkspacePanel.viewport-fitted > .output-grid,
-    #resultWorkspacePanel.viewport-fitted > .help-pane {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow-y: auto;
-    }
-
     .panel-head {
       display: flex;
       align-items: center;
@@ -2719,6 +2688,10 @@ INDEX_HTML = r"""<!doctype html>
       color: #e78fcb;
     }
 
+    .function-token-constant {
+      color: #dca3cf;
+    }
+
     .function-token-comment {
       color: #83d49b;
       font-style: italic;
@@ -2768,7 +2741,7 @@ INDEX_HTML = r"""<!doctype html>
 
     #value.matrix-tex-value .rendered-zoom-frame {
       display: inline-block;
-      min-width: max-content;
+      min-width: 0;
     }
 
     #value.matrix-tex-value svg {
@@ -4408,7 +4381,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const RESULT_ZOOM_DEFAULT_INDEX = 3;
     let lastTex = '';
     let resultInputBindings = [];
-    let diffequationFitFrame = 0;
+    let renderedTeXFitFrame = 0;
     let solverFitFrame = 0;
     let solverWrapRenderPending = false;
     let lastDerivativeExpression = '';
@@ -4852,7 +4825,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       currentVariables = Array.isArray(state.currentVariables) ? [...state.currentVariables] : [];
       currentDifferentiable = state.currentDifferentiable !== false;
       renderDerivativeButtons(currentVariables);
-      scheduleDiffequationSolutionFit();
+      scheduleRenderedTeXFit();
     }
 
     function syncMatrixControls() {
@@ -4938,18 +4911,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       scheduleWorkspacePanelFit();
     }
 
-    let workspacePanelFitFrame = 0;
     let editorResizeFrame = 0;
-    let workspacePanelBaseHeight = 0;
-
-    function setWorkspacePanelHeight(height) {
-      const fittedHeight = `${Math.max(320, Math.ceil(height))}px`;
-      const manuallyExpanded = workspacePanelBaseHeight > 0 && height > workspacePanelBaseHeight + 1;
-      workspacePanel.style.setProperty('--workspace-panel-height', fittedHeight);
-      resultWorkspacePanel.style.setProperty('--workspace-panel-height', fittedHeight);
-      workspacePanel.classList.toggle('manually-expanded', manuallyExpanded);
-      resultWorkspacePanel.classList.toggle('manually-expanded', manuallyExpanded);
-    }
 
     function textareaCanUseConditionalResize(textarea) {
       return textarea.isConnected &&
@@ -4964,22 +4926,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         textarea.style.removeProperty('max-height');
         delete textarea.dataset.automaticHeight;
       });
-      workspacePanel.classList.remove('manually-expanded');
-      resultWorkspacePanel.classList.remove('manually-expanded');
-    }
-
-    function fittedTextareaExtraHeight() {
-      return labTextareas.reduce((total, textarea) => {
-        if (!textarea.classList.contains('editor-manual-size'))
-          return total;
-        const automaticHeight = Number(textarea.dataset.automaticHeight || 0);
-        return total + Math.max(0, textarea.getBoundingClientRect().height - automaticHeight);
-      }, 0);
     }
 
     function syncEditorResizeGrip() {
       editorResizeFrame = 0;
-      const fittedWorkspace = workspacePanel.classList.contains('viewport-fitted');
       const visibleTextareas = labTextareas.filter(textareaCanUseConditionalResize);
       const maximumTotalExtraHeight = Math.max(96, Math.min(320, window.innerHeight * 0.35));
       const maximumExtraHeight = maximumTotalExtraHeight / Math.max(1, visibleTextareas.length);
@@ -5020,9 +4970,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         }
       });
 
-      if (fittedWorkspace) {
-        setWorkspacePanelHeight(workspacePanelBaseHeight + fittedTextareaExtraHeight());
-      }
     }
 
     function scheduleEditorResizeGrip() {
@@ -5031,34 +4978,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       editorResizeFrame = requestAnimationFrame(syncEditorResizeGrip);
     }
 
-    function fitWorkspacePanelToViewport() {
-      workspacePanelFitFrame = 0;
-      const mode = currentMode();
-      const shouldFit = (mode === 'expression' || mode === 'matrix') && window.innerWidth > 900;
-      workspacePanel.classList.toggle('viewport-fitted', shouldFit);
-      resultWorkspacePanel.classList.toggle('viewport-fitted', shouldFit);
-      if (!shouldFit) {
-        workspacePanel.style.removeProperty('--workspace-panel-height');
-        resultWorkspacePanel.style.removeProperty('--workspace-panel-height');
-        workspacePanel.classList.remove('manually-expanded');
-        resultWorkspacePanel.classList.remove('manually-expanded');
-        workspacePanelBaseHeight = 0;
-        scheduleEditorResizeGrip();
-        return;
-      }
-
-      const top = Math.max(12, workspacePanel.getBoundingClientRect().top);
-      const availableHeight = Math.max(320, window.innerHeight - top - 12);
-      workspacePanelBaseHeight = availableHeight;
-      const extraHeight = fittedTextareaExtraHeight();
-      setWorkspacePanelHeight(availableHeight + extraHeight);
-      scheduleEditorResizeGrip();
-    }
-
     function scheduleWorkspacePanelFit() {
-      if (workspacePanelFitFrame)
-        cancelAnimationFrame(workspacePanelFitFrame);
-      workspacePanelFitFrame = requestAnimationFrame(fitWorkspacePanelToViewport);
+      scheduleEditorResizeGrip();
     }
 
     function syncHelpCards() {
@@ -6519,15 +6440,50 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function commitVisibleBindingInputs() {
-      if (currentMode() === 'expression')
-        return false;
-
       const inputs = Array.from(variableValues.querySelectorAll('.binding-value-input'));
       if (!inputs.length)
         return false;
 
       let current = currentExpressionText();
       let updated = current;
+
+      if (currentMode() === 'expression') {
+        if (!bindingParts(current)) {
+          const enteredBindings = inputs.map((input) => ({
+            name: input.dataset.bindingName || '',
+            kind: input.dataset.bindingKind || 'variable',
+            value: normalisedBindingInputValue(input)
+          })).filter((binding) => binding.name);
+          updated = expressionWithBindings(current, enteredBindings);
+        } else {
+          inputs.forEach((input) => {
+            const name = input.dataset.bindingName || '';
+            const kind = input.dataset.bindingKind || 'variable';
+            const valueText = normalisedBindingInputValue(input);
+            updated = replaceBindingValueInExpression(updated, kind, name, valueText);
+          });
+        }
+
+        if (!updated || updated === current)
+          return false;
+
+        fullExpressionText = expressionForEditor(updated).trim();
+        expr.dataset.fullExpression = fullExpressionText;
+        expr.dataset.bindingRefreshValid = 'true';
+        inputs.forEach((input) => {
+          const name = input.dataset.bindingName || '';
+          const valueText = normalisedBindingInputValue(input);
+          input.value = isUnsetBindingValue(valueText) ? '' : valueText;
+          input.title = valueText;
+          if (isUnsetBindingValue(valueText))
+            bindingValueCache.delete(name);
+          else
+            bindingValueCache.set(name, valueText);
+        });
+        updateHistoryButtons();
+        saveCurrentModeEditorState();
+        return true;
+      }
 
       if (currentMode() === 'matrix' && !bindingParts(current)) {
         const enteredBindings = inputs
@@ -9341,11 +9297,27 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       const width = Number(svg.dataset.baseWidth) || 1;
       const height = Number(svg.dataset.baseHeight) || 1;
-      frame.style.width = `${width * scale}px`;
-      frame.style.height = `${height * scale}px`;
+      let appliedScale = scale;
+      const matrixValue = frame.parentElement && frame.parentElement.matches('#value.matrix-tex-value')
+        ? frame.parentElement
+        : null;
+      if (matrixValue) {
+        const style = getComputedStyle(matrixValue);
+        const availableWidth = Math.max(
+          1,
+          matrixValue.clientWidth -
+            (Number.parseFloat(style.paddingLeft) || 0) -
+            (Number.parseFloat(style.paddingRight) || 0)
+        );
+        const zoom = RESULT_ZOOM_LEVELS[resultZoomIndex(card)];
+        const baseScale = scale / Math.max(zoom, Number.EPSILON);
+        appliedScale = Math.min(baseScale, availableWidth / width) * zoom;
+      }
+      frame.style.width = `${width * appliedScale}px`;
+      frame.style.height = `${height * appliedScale}px`;
       svg.style.width = `${width}px`;
       svg.style.height = `${height}px`;
-      svg.style.transform = `scale(${scale})`;
+      svg.style.transform = `scale(${appliedScale})`;
     }
 
     function applyResultZoom(card) {
@@ -9385,7 +9357,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return;
       card.dataset.zoomIndex = String(Math.max(0, Math.min(RESULT_ZOOM_LEVELS.length - 1, index)));
       applyResultZoom(card);
-      scheduleDiffequationSolutionFit();
+      scheduleRenderedTeXFit();
     }
 
     function stepResultZoom(card, direction) {
@@ -9410,14 +9382,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       const isExpanded = card.classList.contains('expanded-card');
       collapseResultCards();
-      if (isExpanded)
+      if (isExpanded) {
+        requestAnimationFrame(() => applyResultZoom(card));
         return;
+      }
 
       labWorkspace.classList.add('result-card-expanded');
       resultPane.classList.add('card-expanded');
       card.classList.add('expanded-card');
       button.textContent = 'Collapse';
       button.setAttribute('aria-expanded', 'true');
+      requestAnimationFrame(() => applyResultZoom(card));
     }
 
     function setRenderedContent(svg, fallbackText = '') {
@@ -9472,12 +9447,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return base * RESULT_ZOOM_LEVELS[resultZoomIndex(card)];
     }
 
-    function fitDiffequationSolutionToCard() {
-      diffequationFitFrame = 0;
+    function fitRenderedTeXToCard() {
+      renderedTeXFitFrame = 0;
       const fittingDiffequation = currentMode() === 'diffequation';
       const fittingIntegral = currentMode() === 'expression' &&
         /integral\s+result$/i.test(rightPaneTitle.textContent || '');
-      if (!fittingDiffequation && !fittingIntegral)
+      const fittingResponsiveExpression =
+        rendered.dataset.responsiveFit === 'true';
+      if (!fittingDiffequation && !fittingIntegral && !fittingResponsiveExpression)
         return;
 
       const compactSvg = rendered.dataset.compactSvg || '';
@@ -9505,11 +9482,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       );
     }
 
-    function scheduleDiffequationSolutionFit() {
-      if (diffequationFitFrame)
-        cancelAnimationFrame(diffequationFitFrame);
-      diffequationFitFrame = requestAnimationFrame(
-        fitDiffequationSolutionToCard
+    function scheduleRenderedTeXFit() {
+      if (renderedTeXFitFrame)
+        cancelAnimationFrame(renderedTeXFitFrame);
+      renderedTeXFitFrame = requestAnimationFrame(
+        fitRenderedTeXToCard
       );
     }
 
@@ -9596,14 +9573,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     if (typeof ResizeObserver === 'function') {
-      const diffequationResizeObserver = new ResizeObserver(
-        scheduleDiffequationSolutionFit
+      const renderedTeXResizeObserver = new ResizeObserver(
+        scheduleRenderedTeXFit
       );
-      diffequationResizeObserver.observe(rendered);
+      renderedTeXResizeObserver.observe(rendered);
       const solverResizeObserver = new ResizeObserver(scheduleSolverTexFit);
       solverResizeObserver.observe(functionStyle);
     } else {
-      window.addEventListener('resize', scheduleDiffequationSolutionFit);
+      window.addEventListener('resize', scheduleRenderedTeXFit);
       window.addEventListener('resize', scheduleSolverTexFit);
     }
 
@@ -9745,6 +9722,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (numberMatch) {
           appendFunctionToken(fragment, numberMatch[0], 'function-token-number');
           index += numberMatch[0].length;
+          continue;
+        }
+
+        const namedConstantMatch = source.slice(index).match(/^@(?:pi|phi|gamma|tau|inf)\b/u);
+        if (namedConstantMatch) {
+          appendFunctionToken(fragment, namedConstantMatch[0], 'function-token-constant');
+          index += namedConstantMatch[0].length;
           continue;
         }
 
@@ -10078,10 +10062,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       rendered.dataset.displaySvg = data.svg || '';
       rendered.dataset.fullSvg = '';
       rendered.dataset.renderError = data.render_error || '';
+      rendered.dataset.compactTex = displayTex;
+      rendered.dataset.wrappedTex = data.display_wrapped_TeX || displayTex;
+      rendered.dataset.compactSvg = data.svg || '';
+      rendered.dataset.wrappedSvg = data.display_wrapped_svg || '';
+      rendered.dataset.responsiveFallback =
+        data.render_error || data.display_expression || data.expression || 'Could not render result';
+      rendered.dataset.responsiveFit = data.display_wrapped_svg ? 'true' : 'false';
+      delete rendered.dataset.responsiveVariant;
       setRenderedContent(
         data.svg || '',
         data.display_expression || data.expression || 'Could not render result'
       );
+      scheduleRenderedTeXFit();
       resetMoreDigitsButton(
         renderedMore,
         !!fullDisplayTex &&
@@ -10240,6 +10233,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       delete rendered.dataset.compactSvg;
       delete rendered.dataset.wrappedSvg;
       delete rendered.dataset.responsiveFallback;
+      delete rendered.dataset.responsiveFit;
       delete rendered.dataset.responsiveVariant;
       setResultInputText('');
       setValueText('');
@@ -10573,7 +10567,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.svg || '',
           data.render_error || lastTex || data.diagnostic || 'No symbolic solution available'
         );
-        scheduleDiffequationSolutionFit();
+        scheduleRenderedTeXFit();
         resetMoreDigitsButton(renderedMore, false);
         setExpandableText(parsed, parsedMore, data.problem || text, data.problem || text);
         setResultInputText(data.input || text);
@@ -11388,7 +11382,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             integralSvg,
             data.integral_render_error || integralTex
           );
-          scheduleDiffequationSolutionFit();
+          scheduleRenderedTeXFit();
           resetMoreDigitsButton(renderedMore, false);
         } else {
           setRenderedContent('', integralExpression);
@@ -12289,7 +12283,7 @@ def editor_expression_from_fields(fields: dict[str, str]) -> str:
 
 
 def expression_for_display(expression: str) -> str:
-    return expression_for_editor(expression)
+    return re.sub(r"\binf\b", "∞", expression_for_editor(expression), flags=re.IGNORECASE)
 
 
 def array_values_for_display(values: object) -> str:
@@ -13284,7 +13278,25 @@ def compact_long_numeric_tokens(text: str) -> str:
     )
 
 
-def compact_display_TeX(text: str) -> str:
+def compact_short_aligned_equality_TeX(text: str) -> str:
+    source = str(text or "").strip()
+    begin = r"\begin{aligned}[t]"
+    end = r"\end{aligned}"
+    if not source.startswith(begin) or not source.endswith(end):
+        return source
+
+    body = source[len(begin):-len(end)].strip()
+    match = re.fullmatch(
+        r"&?(.*?)\s*\\\\(?:\[[^\]]*\])?\s*&=\s*(.*)",
+        body,
+        flags=re.DOTALL,
+    )
+    if not match:
+        return source
+    return f"{match.group(1).strip()} = {match.group(2).strip()}"
+
+
+def compact_numeric_TeX(text: str) -> str:
     compact = compact_long_numeric_tokens(text)
 
     return re.sub(
@@ -13292,6 +13304,10 @@ def compact_display_TeX(text: str) -> str:
         lambda match: rf"{match.group(1)}\times 10^{{{match.group(2)}}}",
         compact,
     )
+
+
+def compact_display_TeX(text: str) -> str:
+    return compact_short_aligned_equality_TeX(compact_numeric_TeX(text))
 
 
 def precision_numeric_tokens(text: str, precision: int, zero_subprecision: bool = False) -> str:
@@ -15156,8 +15172,6 @@ def mars_binding_values(records: object) -> list[dict[str, str]]:
 
 def expression_with_unset_bindings(expression: str) -> str:
     body, variable_text, constant_text = parse_expression_body(expression)
-    if "..." in body or "…" in body:
-        return body
     variables = [name for name, _ in parse_binding_assignments(variable_text) if name]
     constants = [name for name, _ in parse_binding_assignments(constant_text) if name]
 
@@ -15248,6 +15262,12 @@ def function_binding_initializers(function: str) -> dict[str, str]:
     return initializers
 
 
+def function_binding_value_syntax(value: object) -> str:
+    text = str(value or "?")
+    text = re.sub(r"(?<![@\w])inf\b", "@inf", text, flags=re.IGNORECASE)
+    return text.replace("π", "@pi")
+
+
 def function_for_result_card(
     algebraic_function: str,
     bindings: list[dict[str, str]],
@@ -15266,7 +15286,7 @@ def function_for_result_card(
         )
         if assignment and assignment.group(2) in values:
             indent, name = assignment.group(1), assignment.group(2)
-            value = initializers.get(name, values[name])
+            value = function_binding_value_syntax(initializers.get(name, values[name]))
             if value.upper() == "NAN":
                 value = "?"
             is_array = value.startswith("[")
@@ -15285,7 +15305,7 @@ def function_for_result_card(
         if name not in values:
             lines.append(line)
             continue
-        value = initializers.get(name, values[name])
+        value = function_binding_value_syntax(initializers.get(name, values[name]))
         if value.upper() == "NAN":
             value = "?"
         qualifier = "const " if kinds.get(name) == "constant" else ""
@@ -15298,7 +15318,7 @@ def function_for_result_card(
         additions = []
         for item in missing:
             name = item["name"]
-            value = initializers.get(name, str(item.get("value") or "?"))
+            value = function_binding_value_syntax(initializers.get(name, str(item.get("value") or "?")))
             rendered_value = "?" if value.upper() == "NAN" else value
             is_array = rendered_value.startswith("[")
             qualifier = "array const " if item.get("kind") == "constant" and is_array else (
@@ -15476,16 +15496,11 @@ def prepare_evaluation_fields(
                     fields["value"] = constant_fields["value"]
 
     if fields.get("value"):
-        fields["value"] = format_number_text_for_precision(
-            fields["value"], precision, zero_subprecision=True)
+        fields["value"] = format_number_text_for_precision(fields["value"], precision)
     if fields.get("derivative_value"):
-        fields["derivative_value"] = format_number_text_for_precision(
-            fields["derivative_value"], precision, zero_subprecision=True
-        )
+        fields["derivative_value"] = format_number_text_for_precision(fields["derivative_value"], precision)
     if fields.get("integral_value"):
-        fields["integral_value"] = format_number_text_for_precision(
-            fields["integral_value"], precision, zero_subprecision=True
-        )
+        fields["integral_value"] = format_number_text_for_precision(fields["integral_value"], precision)
     for key in ("value", "derivative_value", "integral_value"):
         if key in fields:
             fields[key] = numeric_value_for_display(fields[key])
@@ -15514,6 +15529,9 @@ def prepare_evaluation_fields(
         fields["derivative_value"] = array_values_for_display(fields["derivative_values"])
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_TeX"] = compact_display_TeX(str(fields["full_display_TeX"]))
+    wrapped_display_TeX = compact_numeric_TeX(str(fields["full_display_TeX"]))
+    if wrapped_display_TeX != fields["display_TeX"]:
+        fields["display_wrapped_TeX"] = wrapped_display_TeX
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
     fields["full_display_derivative_function"] = function_for_display(
         fields.get("derivative_function", "")
@@ -15553,9 +15571,9 @@ def prepare_evaluation_fields(
     symbolic_binding_values = expression_variable_binding_values(str(fields.get("expression") or expression), precision)
     native_binding_values = mars_binding_values(fields.get("bindings"))
     fields["binding_values"] = (
-        authored_binding_values
-        or native_binding_values
-        or (card_binding_values if card_binding_values is not None else symbolic_binding_values)
+        card_binding_values
+        if card_binding_values is not None
+        else (authored_binding_values or native_binding_values or symbolic_binding_values)
     )
     fields["derivative_binding_values"] = mars_binding_values(
         fields.get("derivative_bindings")
@@ -15569,6 +15587,10 @@ def prepare_evaluation_fields(
         fields["svg"] = svg
     elif render_error:
         fields["render_error"] = render_error
+    if fields.get("display_wrapped_TeX"):
+        wrapped_svg, _ = render_TeX_to_svg(str(fields["display_wrapped_TeX"]))
+        if wrapped_svg:
+            fields["display_wrapped_svg"] = wrapped_svg
 
     return fields
 

@@ -152,6 +152,37 @@ static expr_t *integrate_summation(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+static expr_t *integrate_harmonic_poly(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *degree_derivative = NULL;
+    expr_t *next_degree = NULL;
+    expr_t *scaled = NULL;
+    expr_t *next = NULL;
+    expr_t *difference = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr->a || !expr->b || !wrt || (expr->b != wrt && !expr_struct_eq(expr->b, wrt)))
+        return NULL;
+    degree_derivative = expr_create_deriv(expr->a, wrt);
+    if (!degree_derivative || !expr_is_exact_zero(degree_derivative)) {
+        expr_free(degree_derivative);
+        return NULL;
+    }
+    expr_free(degree_derivative);
+
+    next_degree = expr_add_long(expr->a, 1L);
+    scaled = expr_mul(expr->b, expr);
+    next = next_degree ? expr_harmonic_poly(next_degree, expr->b) : NULL;
+    difference = scaled && next ? expr_sub(scaled, next) : NULL;
+    out = difference ? expr_add(difference, expr->b) : NULL;
+
+    expr_free(difference);
+    expr_free(next);
+    expr_free(scaled);
+    expr_free(next_degree);
+    return out;
+}
+
 static expr_t *integrate_zeta_formal(const expr_t *expr, const expr_t *wrt)
 {
     return expr_integral(expr, wrt);
@@ -1065,6 +1096,17 @@ const expr_ops_t ops_polylog = {.eval = eval_polylog,
                                 .apply_binary = expr_polylog_xp,
                                 .simplify = expr_simplify_binary_operator,
                                 .fold_const_unary = NULL};
+const expr_ops_t ops_harmonic_poly = {.eval = eval_harmonic_poly,
+                                      .deriv = deriv_harmonic_poly,
+                                      .kind = EXPR_KIND_HARMONIC_POLY,
+                                      .arity = EXPR_OP_BINARY,
+                                      .name = "Hn",
+                                      .TeX_name = "H",
+                                      .apply_unary = NULL,
+                                      .apply_binary = expr_harmonic_poly,
+                                      .integrate = integrate_harmonic_poly,
+                                      .simplify = expr_simplify_binary_operator,
+                                      .fold_const_unary = NULL};
 const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
                                      .deriv = deriv_legendre_chi,
                                      .reverse = expr_reverse_legendre_chi,
@@ -1647,88 +1689,89 @@ const expr_ops_t ops_factors = {.eval = eval_factors,
 
 expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
 {
-    static const expr_ops_t *const unary_ops_by_kind[EXPR_KIND_COUNT] = {[EXPR_KIND_NEG] = &ops_neg,
-                                                                         [EXPR_KIND_SIN] = &ops_sin,
-                                                                         [EXPR_KIND_COS] = &ops_cos,
-                                                                         [EXPR_KIND_TAN] = &ops_tan,
-                                                                         [EXPR_KIND_SEC] = &ops_sec,
-                                                                         [EXPR_KIND_COSEC] = &ops_cosec,
-                                                                         [EXPR_KIND_COT] = &ops_cot,
-                                                                         [EXPR_KIND_VERSIN] = &ops_versin,
-                                                                         [EXPR_KIND_VERCOS] = &ops_vercos,
-                                                                         [EXPR_KIND_COVERSIN] = &ops_coversin,
-                                                                         [EXPR_KIND_COVERCOS] = &ops_covercos,
-                                                                         [EXPR_KIND_HAVERSIN] = &ops_haversin,
-                                                                         [EXPR_KIND_HAVERCOS] = &ops_havercos,
-                                                                         [EXPR_KIND_HACOVERSIN] = &ops_hacoversin,
-                                                                         [EXPR_KIND_HACOVERCOS] = &ops_hacovercos,
-                                                                         [EXPR_KIND_SINH] = &ops_sinh,
-                                                                         [EXPR_KIND_COSH] = &ops_cosh,
-                                                                         [EXPR_KIND_TANH] = &ops_tanh,
-                                                                         [EXPR_KIND_SECH] = &ops_sech,
-                                                                         [EXPR_KIND_COSECH] = &ops_cosech,
-                                                                         [EXPR_KIND_COTH] = &ops_coth,
-                                                                         [EXPR_KIND_ASIN] = &ops_asin,
-                                                                         [EXPR_KIND_ACOS] = &ops_acos,
-                                                                         [EXPR_KIND_ATAN] = &ops_atan,
-                                                                         [EXPR_KIND_ASEC] = &ops_asec,
-                                                                         [EXPR_KIND_ACOSEC] = &ops_acosec,
-                                                                         [EXPR_KIND_ACOT] = &ops_acot,
-                                                                         [EXPR_KIND_ARCVERSIN] = &ops_arcversin,
-                                                                         [EXPR_KIND_ARCVERCOS] = &ops_arcvercos,
-                                                                         [EXPR_KIND_ARCCOVERSIN] = &ops_arccoversin,
-                                                                         [EXPR_KIND_ARCCOVERCOS] = &ops_arccovercos,
-                                                                         [EXPR_KIND_ARCHAVERSIN] = &ops_archaversin,
-                                                                         [EXPR_KIND_ARCHAVERCOS] = &ops_archavercos,
-                                                                         [EXPR_KIND_ARCHACOVERSIN] = &ops_archacoversin,
-                                                                         [EXPR_KIND_ARCHACOVERCOS] = &ops_archacovercos,
-                                                                         [EXPR_KIND_ASINH] = &ops_asinh,
-                                                                         [EXPR_KIND_ACOSH] = &ops_acosh,
-                                                                         [EXPR_KIND_ATANH] = &ops_atanh,
-                                                                         [EXPR_KIND_ASECH] = &ops_asech,
-                                                                         [EXPR_KIND_ACOSECH] = &ops_acosech,
-                                                                         [EXPR_KIND_ACOTH] = &ops_acoth,
-                                                                         [EXPR_KIND_EXP] = &ops_exp,
-                                                                         [EXPR_KIND_LOG] = &ops_log,
-                                                                         [EXPR_KIND_LOG10] = &ops_log10,
-                                                                         [EXPR_KIND_SQRT] = &ops_sqrt,
-                                                                         [EXPR_KIND_CUBRT] = &ops_cubrt,
-                                                                         [EXPR_KIND_FLOOR] = &ops_floor,
-                                                                         [EXPR_KIND_CEIL] = &ops_ceil,
-                                                                         [EXPR_KIND_ABS] = &ops_abs,
-                                                                         [EXPR_KIND_CONJ] = &ops_conj,
-                                                                         [EXPR_KIND_ERF] = &ops_erf,
-                                                                         [EXPR_KIND_ERFC] = &ops_erfc,
-                                                                         [EXPR_KIND_LGAMMA] = &ops_lgamma,
-                                                                         [EXPR_KIND_ERFINV] = &ops_erfinv,
-                                                                         [EXPR_KIND_ERFCINV] = &ops_erfcinv,
-                                                                         [EXPR_KIND_GAMMA] = &ops_gamma,
-                                                                         [EXPR_KIND_DIGAMMA] = &ops_digamma,
-                                                                         [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
-                                                                         [EXPR_KIND_ZETA] = &ops_zeta,
-                                                                         [EXPR_KIND_ZETAP] = &ops_zetap,
-                                                                         [EXPR_KIND_ZETAH] = &ops_zetah,
-                                                                         [EXPR_KIND_ZATAHP] = &ops_zatahp,
-                                                                         [EXPR_KIND_DILOG] = &ops_dilog,
-                                                                         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
-                                                                         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
-                                                                         [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
-                                                                         [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
-                                                                         [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
-                                                                         [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
-                                                                         [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
-                                                                         [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
-                                                                         [EXPR_KIND_EI] = &ops_Ei,
-                                                                         [EXPR_KIND_E1] = &ops_E1,
-                                                                         [EXPR_KIND_FACTORIAL] = &ops_factorial,
-                                                                         [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
-                                                                         [EXPR_KIND_PARTITION] = &ops_partition,
-                                                                         [EXPR_KIND_ISQRT] = &ops_isqrt,
-                                                                         [EXPR_KIND_IS_PRIME] = &ops_is_prime,
-                                                                         [EXPR_KIND_NEXT_PRIME] = &ops_next_prime,
-                                                                         [EXPR_KIND_PREV_PRIME] = &ops_prev_prime,
-                                                                         [EXPR_KIND_BIT_NOT] = &ops_bit_not,
-                                                                         [EXPR_KIND_FACTORS] = &ops_factors};
+    static const expr_ops_t *const unary_ops_by_kind[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_NEG] = &ops_neg,
+        [EXPR_KIND_SIN] = &ops_sin,
+        [EXPR_KIND_COS] = &ops_cos,
+        [EXPR_KIND_TAN] = &ops_tan,
+        [EXPR_KIND_SEC] = &ops_sec,
+        [EXPR_KIND_COSEC] = &ops_cosec,
+        [EXPR_KIND_COT] = &ops_cot,
+        [EXPR_KIND_VERSIN] = &ops_versin,
+        [EXPR_KIND_VERCOS] = &ops_vercos,
+        [EXPR_KIND_COVERSIN] = &ops_coversin,
+        [EXPR_KIND_COVERCOS] = &ops_covercos,
+        [EXPR_KIND_HAVERSIN] = &ops_haversin,
+        [EXPR_KIND_HAVERCOS] = &ops_havercos,
+        [EXPR_KIND_HACOVERSIN] = &ops_hacoversin,
+        [EXPR_KIND_HACOVERCOS] = &ops_hacovercos,
+        [EXPR_KIND_SINH] = &ops_sinh,
+        [EXPR_KIND_COSH] = &ops_cosh,
+        [EXPR_KIND_TANH] = &ops_tanh,
+        [EXPR_KIND_SECH] = &ops_sech,
+        [EXPR_KIND_COSECH] = &ops_cosech,
+        [EXPR_KIND_COTH] = &ops_coth,
+        [EXPR_KIND_ASIN] = &ops_asin,
+        [EXPR_KIND_ACOS] = &ops_acos,
+        [EXPR_KIND_ATAN] = &ops_atan,
+        [EXPR_KIND_ASEC] = &ops_asec,
+        [EXPR_KIND_ACOSEC] = &ops_acosec,
+        [EXPR_KIND_ACOT] = &ops_acot,
+        [EXPR_KIND_ARCVERSIN] = &ops_arcversin,
+        [EXPR_KIND_ARCVERCOS] = &ops_arcvercos,
+        [EXPR_KIND_ARCCOVERSIN] = &ops_arccoversin,
+        [EXPR_KIND_ARCCOVERCOS] = &ops_arccovercos,
+        [EXPR_KIND_ARCHAVERSIN] = &ops_archaversin,
+        [EXPR_KIND_ARCHAVERCOS] = &ops_archavercos,
+        [EXPR_KIND_ARCHACOVERSIN] = &ops_archacoversin,
+        [EXPR_KIND_ARCHACOVERCOS] = &ops_archacovercos,
+        [EXPR_KIND_ASINH] = &ops_asinh,
+        [EXPR_KIND_ACOSH] = &ops_acosh,
+        [EXPR_KIND_ATANH] = &ops_atanh,
+        [EXPR_KIND_ASECH] = &ops_asech,
+        [EXPR_KIND_ACOSECH] = &ops_acosech,
+        [EXPR_KIND_ACOTH] = &ops_acoth,
+        [EXPR_KIND_EXP] = &ops_exp,
+        [EXPR_KIND_LOG] = &ops_log,
+        [EXPR_KIND_LOG10] = &ops_log10,
+        [EXPR_KIND_SQRT] = &ops_sqrt,
+        [EXPR_KIND_CUBRT] = &ops_cubrt,
+        [EXPR_KIND_FLOOR] = &ops_floor,
+        [EXPR_KIND_CEIL] = &ops_ceil,
+        [EXPR_KIND_ABS] = &ops_abs,
+        [EXPR_KIND_CONJ] = &ops_conj,
+        [EXPR_KIND_ERF] = &ops_erf,
+        [EXPR_KIND_ERFC] = &ops_erfc,
+        [EXPR_KIND_LGAMMA] = &ops_lgamma,
+        [EXPR_KIND_ERFINV] = &ops_erfinv,
+        [EXPR_KIND_ERFCINV] = &ops_erfcinv,
+        [EXPR_KIND_GAMMA] = &ops_gamma,
+        [EXPR_KIND_DIGAMMA] = &ops_digamma,
+        [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
+        [EXPR_KIND_ZETA] = &ops_zeta,
+        [EXPR_KIND_ZETAP] = &ops_zetap,
+        [EXPR_KIND_ZETAH] = &ops_zetah,
+        [EXPR_KIND_ZATAHP] = &ops_zatahp,
+        [EXPR_KIND_DILOG] = &ops_dilog,
+        [EXPR_KIND_GAMMAINV] = &ops_gammainv,
+        [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
+        [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
+        [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
+        [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
+        [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
+        [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
+        [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
+        [EXPR_KIND_EI] = &ops_Ei,
+        [EXPR_KIND_E1] = &ops_E1,
+        [EXPR_KIND_FACTORIAL] = &ops_factorial,
+        [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
+        [EXPR_KIND_PARTITION] = &ops_partition,
+        [EXPR_KIND_ISQRT] = &ops_isqrt,
+        [EXPR_KIND_IS_PRIME] = &ops_is_prime,
+        [EXPR_KIND_NEXT_PRIME] = &ops_next_prime,
+        [EXPR_KIND_PREV_PRIME] = &ops_prev_prime,
+        [EXPR_KIND_BIT_NOT] = &ops_bit_not,
+        [EXPR_KIND_FACTORS] = &ops_factors};
     const expr_ops_t *ops = NULL;
 
     if ((unsigned)kind < (unsigned)EXPR_KIND_COUNT)
@@ -2047,6 +2090,11 @@ expr_t *expr_polylog(unsigned int order, const expr_t *a)
 
     expr_free(order_xp);
     return out;
+}
+/* Construct a native harmonic-polynomial expression. */
+expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)
+{
+    return expr_math_wrap_binary(&ops_harmonic_poly, degree, argument);
 }
 expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg)
 {

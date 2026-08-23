@@ -1880,7 +1880,7 @@ int main(int argc, char **argv)
         print_explicit_root_family(expr, precision);
     value_note[0] = '\0';
     {
-        number_t value_number = expr_eval(expr);
+        number_t value_number = expr_eval(display_expr);
 
         print_owned_number("value", num_clone(value_number), precision);
         if (expr_integral_value_note(expr, value_note, sizeof(value_note)))

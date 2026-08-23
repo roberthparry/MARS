@@ -821,6 +821,7 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_E1(const expr_t *expr)` — E₁(x), exponential integral
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
 - `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
+- `expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)` — native harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k with a symbolic degree expression
 - `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)` — Bessel function of the first kind J_order(argument), with a symbolic real order
 - `expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
@@ -828,6 +829,13 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
 - `expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
 - `expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count, const expr_t *const *lower, const expr_t *argument)` — generalised hypergeometric pFq with explicit upper and lower parameter arrays
+
+The parser accepts both `Hn(n, x)` and `harmonic_poly(n, x)`. Mathematical
+styles render the former as Hₙ(x); `style_FUNCTION` emits the typeable
+`harmonic_poly(n, x)` spelling. For a degree independent of `x`, symbolic
+differentiation uses `(1 - x^n)/(1 - x)`, and direct integration uses
+`x*Hn(n, x) - Hn(n + 1, x) + x`. These rules remain available under repeated
+differentiation.
 
 ### Value-Only Functions (owning)
 
@@ -1024,6 +1032,8 @@ bindings.
     zeta; `zetap(s, a)`, `zatahp(s, a)`, and `zeta2p(s, a)` for its partial
     derivative with respect to `s`
   - `dilog(x)`, `Li2(x)`, and `polylog(n, x)` for Li₂(x) and Liₙ(x)
+  - `Hn(n, x)` and `harmonic_poly(n, x)` for the finite harmonic polynomial
+    Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k
   - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)
   - `BesselJ(order, x)` or `bessel_j(order, x)` for J_order(x)
   - `BesselY(order, x)` or `bessel_y(order, x)` for Y_order(x)

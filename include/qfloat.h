@@ -1288,6 +1288,15 @@ qfloat_t qf_dilog(qfloat_t x);
 qfloat_t qf_polylog(qfloat_t s, qfloat_t x);
 
 /**
+ * @brief Evaluate the harmonic polynomial @f$H_n(x)=\sum_{k=1}^{n}x^k/k@f$.
+ *
+ * @param degree Non-negative integer degree.
+ * @param argument Real argument.
+ * @return The finite logarithmic sum.
+ */
+qfloat_t qf_harmonic_poly(unsigned long degree, qfloat_t argument);
+
+/**
  * @brief Compute Appell's hypergeometric function F1.
  *
  * Uses the defining double series in the bidisc |x| < 1, |y| < 1. Arguments

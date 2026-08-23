@@ -336,6 +336,7 @@ The qfloat layer has no dependency on MPFR.
 
 - `qfloat_t qf_dilog(qfloat_t x)` — principal dilogarithm Li₂(x)
 - `qfloat_t qf_polylog(qfloat_t s, qfloat_t x)` — polylogarithm Li_s(x) for integer real orders currently supported by the implementation
+- `qfloat_t qf_harmonic_poly(unsigned long degree, qfloat_t argument)` — finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k
 - `qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x)` — Legendre chi χ_s(x) for integer real orders currently supported by the implementation
 
 **Hypergeometric families**

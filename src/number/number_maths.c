@@ -5582,6 +5582,37 @@ number_t num_polylog(const number_t order, const number_t number)
     return number_mpfr_polylog_number(&number, order_int);
 }
 
+/* Evaluate the finite logarithmic sum with ordinary number operations. */
+number_t num_harmonic_poly(const number_t degree, const number_t argument)
+{
+    number_t sum = num_clone(NUM_ZERO);
+    number_t power = num_clone(argument);
+    int integer_degree;
+
+    if (!number_try_get_exact_int(degree, &integer_degree) || integer_degree < 0) {
+        num_destroy(&power);
+        num_destroy(&sum);
+        return NUM_NAN;
+    }
+    for (int k = 1; k <= integer_degree; ++k) {
+        number_t denominator = num_create_from_long((long)k);
+        number_t term = num_div(power, denominator);
+        number_t next_sum = num_add(sum, term);
+        number_t next_power = num_mul(power, argument);
+
+        num_destroy(&denominator);
+        num_destroy(&term);
+        num_destroy(&sum);
+        num_destroy(&power);
+        sum = next_sum;
+        power = next_power;
+        if (k == integer_degree)
+            break;
+    }
+    num_destroy(&power);
+    return sum;
+}
+
 number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,
                           size_t variable_count)
 {

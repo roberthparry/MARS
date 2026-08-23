@@ -21,9 +21,9 @@ This directory contains the longer module documentation for MARS.
 - [`number_t`](./number.md) — generic numeric value cluster over exact,
   fixed-precision and multiprecision backends
 - [`qfloat_t`](./qfloat.md) — independent double-double arithmetic and real
-  special functions, including Riemann and Hurwitz zeta
+  special functions, including harmonic polynomials, Riemann and Hurwitz zeta
 - [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
-  and complex special functions
+  and complex special functions, including harmonic polynomials
 - [`matrix_t`](./matrix.md) — generic high-precision matrix with numeric and
   symbolic entries, native expression parsing, symbolic calculus and
   matrix-wide simplification
@@ -31,7 +31,8 @@ This directory contains the longer module documentation for MARS.
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
 - [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
   derivatives, numeric reverse-mode gradients, Cartesian complex presentation,
-  algebraic-series recognition, symbolic integration and helper APIs
+  algebraic-series and progression recognition, harmonic polynomials, symbolic
+  integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries

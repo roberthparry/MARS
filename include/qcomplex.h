@@ -400,6 +400,14 @@ qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
 qcomplex_t qc_zetap(qcomplex_t z);
 qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
 qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z);         /**< polylogarithm Li_s(z), integer s */
+/**
+ * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
+ *
+ * @param degree Non-negative integer degree.
+ * @param argument Complex argument.
+ * @return The finite logarithmic sum.
+ */
+qcomplex_t qc_harmonic_poly(unsigned long degree, qcomplex_t argument);
 qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,
                         qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
 qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,

@@ -1889,6 +1889,23 @@ static void test_to_string_function_style_extracts_short_shared_dag_nodes(void)
     expr_free(f);
 }
 
+static void test_to_string_function_style_extracts_shared_quotient_factor(void)
+{
+    expr_t *f = expr_from_string("sin(n*x/2)*cos((n+1)*x/2)/sin(x/2)", NULL);
+    char *got = expr_to_string(f, style_FUNCTION);
+    const char *expected_assignment = "    v1 = x/2.\n";
+    const char *expected_return = "    return sin(n.v1).cos((n + 1).v1)/sin(v1).\n";
+
+    if (got && strstr(got, expected_assignment) && strstr(got, expected_return))
+        to_string_pass("function style extracts shared quotient factor (FUNC)", got, expected_return);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "function style extracts shared quotient factor (FUNC)", got,
+                       expected_return);
+
+    free(got);
+    expr_free(f);
+}
+
 void test_to_string_function_style(void)
 {
     TEST_RUN_SUBTEST(test_to_string_function_style_expr, NULL);
@@ -1898,6 +1915,7 @@ void test_to_string_function_style(void)
     TEST_RUN_SUBTEST(test_to_string_function_style_preserves_math_names, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style_extracts_variable_dependent_dag_nodes, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style_extracts_short_shared_dag_nodes, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_extracts_shared_quotient_factor, NULL);
 }
 
 static void test_to_string_floor_ceil_expr(void)
@@ -2108,6 +2126,14 @@ void test_to_string_special_functions(void)
         expr_free(x);
         expr_free(lower[0]);
         expr_free(upper[0]);
+        {
+            char *TeX = expr_to_string(f, style_LATEX);
+
+            ASSERT_NOT_NULL(TeX);
+            ASSERT_NOT_NULL(strstr(TeX, "{}_{1}F_{1}\\left(a; b; x\\right)"));
+            ASSERT_NULL(strstr(TeX, "\\begin{matrix}"));
+            free(TeX);
+        }
         check_roundtrip("to_string: general pFq", f, __LINE__);
     }
     {
@@ -3197,7 +3223,7 @@ void test_expressions(void)
         /* 03 */
         {"π * x^2", make_expr_03, "{ πx² | x = 1.25 }",
          "x = 1.25\n"
-         "expr(x) = π*x^2\n"
+         "expr(x) = @pi*x^2\n"
          "return expr(x)",
          __LINE__},
 
@@ -3397,7 +3423,7 @@ void test_expressions(void)
         /* 31 */
         {"π*sin(x)", make_expr_31, "{ π·sin(x) | x = 1.25 }",
          "x = 1.25\n"
-         "expr(x) = π*sin(x)\n"
+         "expr(x) = @pi*sin(x)\n"
          "return expr(x)",
          __LINE__},
 
@@ -3419,7 +3445,7 @@ void test_expressions(void)
         /* 34 */
         {"π*τ*e", make_expr_34, "{ πτe | ; τ = 6.283185307179586476925286766559011 }",
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(τ) = π*τ*e\n"
+         "expr(τ) = @pi*τ*e\n"
          "return expr(τ)",
          __LINE__},
 
@@ -3428,14 +3454,14 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = π*τ*x*y\n"
+         "expr(x,y,τ) = @pi*τ*x*y\n"
          "return expr(x,y,τ)",
          __LINE__},
 
         /* 36 */
         {"exp(x)*π", make_expr_36, "{ π·exp(x) | x = 1.25 }",
          "x = 1.25\n"
-         "expr(x) = π*exp(x)\n"
+         "expr(x) = @pi*exp(x)\n"
          "return expr(x)",
          __LINE__},
 
@@ -3459,7 +3485,7 @@ void test_expressions(void)
         {"π*exp(τ*x)", make_expr_39, "{ π·exp(τx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = π*exp(τ*x)\n"
+         "expr(x,τ) = @pi*exp(τ*x)\n"
          "return expr(x,τ)",
          __LINE__},
 
@@ -3467,14 +3493,14 @@ void test_expressions(void)
         {"exp(π*x)*τ", make_expr_40, "{ τ·exp(πx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = τ*exp(π*x)\n"
+         "expr(x,τ) = τ*exp(@pi*x)\n"
          "return expr(x,τ)",
          __LINE__},
 
         /* 41 */
         {"sin(π*x)", make_expr_41, "{ sin(πx) | x = 1.25 }",
          "x = 1.25\n"
-         "expr(x) = sin(π*x)\n"
+         "expr(x) = sin(@pi*x)\n"
          "return expr(x)",
          __LINE__},
 
@@ -3490,7 +3516,7 @@ void test_expressions(void)
         {"exp(π*τ*x)", make_expr_43, "{ exp(πτx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = exp(π*τ*x)\n"
+         "expr(x,τ) = exp(@pi*τ*x)\n"
          "return expr(x,τ)",
          __LINE__},
 
@@ -3507,7 +3533,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = x + y + e + π + τ\n"
+         "expr(x,y,τ) = x + y + e + @pi + τ\n"
          "return expr(x,y,τ)",
          __LINE__},
 
@@ -3517,7 +3543,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = e + π*x + τ*y + x*y\n"
+         "expr(x,y,τ) = e + @pi*x + τ*y + x*y\n"
          "return expr(x,y,τ)",
          __LINE__},
 
@@ -3527,7 +3553,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = (x + π)*(y + τ)\n"
+         "expr(x,y,τ) = (x + @pi)*(y + τ)\n"
          "return expr(x,y,τ)",
          __LINE__},
 
@@ -3537,7 +3563,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = exp(x + y + π + τ)\n"
+         "expr(x,y,τ) = exp(x + y + @pi + τ)\n"
          "return expr(x,y,τ)",
          __LINE__},
 
@@ -3547,7 +3573,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = sin(x + π)*cos(y + τ)\n"
+         "expr(x,y,τ) = sin(x + @pi)*cos(y + τ)\n"
          "return expr(x,y,τ)",
          __LINE__},
 
@@ -3557,7 +3583,7 @@ void test_expressions(void)
          "x = 1.25\n"
          "y = 1.25\n"
          "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = exp(sin(x + π) + cos(y + τ))\n"
+         "expr(x,y,τ) = exp(sin(x + @pi) + cos(y + τ))\n"
          "return expr(x,y,τ)",
          __LINE__},
     };
@@ -4094,7 +4120,7 @@ void test_expressions_longname(void)
         /* L04 */
         {"@pi * radius^2", make_expr_l04, "{ π·[radius]² | [radius] = 1.25 }",
          "[radius] = 1.25\n"
-         "expr([radius]) = π*[radius]^2\n"
+         "expr([radius]) = @pi*[radius]^2\n"
          "return expr([radius])",
          __LINE__},
 

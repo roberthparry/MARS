@@ -682,6 +682,69 @@ static void flatten_func_mul(expr_t *f, expr_t **buf, int *count, int max)
     }
 }
 
+static const char *function_factored_temporary_name(const expr_t *product, const expr_t *denominator,
+                                                    expr_t **factors, int factor_count, bool *consumed)
+{
+    size_t best_index = (size_t)-1;
+    int best_factor_count = 0;
+    bool best_consumed[64] = {false};
+
+    for (size_t temporary_index = 0u; temporary_index < function_temporary_context.count; ++temporary_index) {
+        const expr_t *candidate = function_temporary_context.nodes[temporary_index];
+        const expr_t *candidate_numerator = candidate;
+        const expr_t *candidate_denominator = NULL;
+        expr_t *candidate_factors[64];
+        bool candidate_consumed[64] = {false};
+        int candidate_count = 0;
+        bool matches = true;
+
+        if (!candidate || candidate == function_temporary_context.expanded_node || candidate == product ||
+            expr_struct_eq(candidate, product))
+            continue;
+        if (expr_is_op(candidate, &ops_div)) {
+            candidate_numerator = candidate->a;
+            candidate_denominator = candidate->b;
+        } else if (!expr_is_mul(candidate)) {
+            continue;
+        }
+        if ((candidate_denominator || denominator) &&
+            (!candidate_denominator || !denominator || !expr_struct_eq(candidate_denominator, denominator)))
+            continue;
+        flatten_mul((expr_t *)candidate_numerator, candidate_factors, &candidate_count, 64);
+        if (candidate_count + (candidate_denominator ? 1 : 0) < 2 || candidate_count > factor_count ||
+            candidate_count <= best_factor_count)
+            continue;
+
+        for (int candidate_factor = 0; candidate_factor < candidate_count; ++candidate_factor) {
+            bool found = false;
+
+            for (int product_factor = 0; product_factor < factor_count; ++product_factor) {
+                if (!candidate_consumed[product_factor] &&
+                    (candidate_factors[candidate_factor] == factors[product_factor] ||
+                     expr_struct_eq(candidate_factors[candidate_factor], factors[product_factor]))) {
+                    candidate_consumed[product_factor] = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) {
+            best_index = temporary_index;
+            best_factor_count = candidate_count;
+            memcpy(best_consumed, candidate_consumed, sizeof(best_consumed));
+        }
+    }
+
+    if (best_index == (size_t)-1)
+        return NULL;
+    memcpy(consumed, best_consumed, sizeof(best_consumed));
+    return function_temporary_context.names[best_index];
+}
+
 static int expr_tostring_is_named_const_pow_d(const expr_t *f)
 {
     return expr_is_pow_d_expr(f) && expr_is_const(f->a) && f->a->name && *f->a->name;
@@ -2605,6 +2668,17 @@ static void emit_TeX_polylog(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+static void emit_TeX_harmonic_poly(const expr_t *f, sbuf_t *b)
+{
+    if (!f || !expr_is_op(f, &ops_harmonic_poly) || !f->a || !f->b)
+        return;
+    sbuf_puts(b, "H_{");
+    emit_TeX_expr(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, "}(");
+    emit_TeX_expr(f->b, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
 static void emit_TeX_legendre_chi(const expr_t *f, sbuf_t *b)
 {
     long order;
@@ -2690,7 +2764,7 @@ static void emit_TeX_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
 
     if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
         return;
-    snprintf(order, sizeof(order), "{}_{%zu}F_{%zu}\\left(\\begin{matrix}", p, q);
+    snprintf(order, sizeof(order), "{}_{%zu}F_{%zu}\\left(", p, q);
     sbuf_puts(b, order);
     if (p == 0u)
         sbuf_puts(b, "-");
@@ -2699,7 +2773,7 @@ static void emit_TeX_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
             sbuf_puts(b, ", ");
         emit_TeX_expr(upper[i], b, 0);
     }
-    sbuf_puts(b, "\\\\");
+    sbuf_puts(b, "; ");
     if (q == 0u)
         sbuf_puts(b, "-");
     for (size_t i = 0u; i < q; ++i) {
@@ -2707,7 +2781,7 @@ static void emit_TeX_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
             sbuf_puts(b, ", ");
         emit_TeX_expr(lower[i], b, 0);
     }
-    sbuf_puts(b, "\\end{matrix}; ");
+    sbuf_puts(b, "; ");
     emit_TeX_expr(argument, b, 0);
     sbuf_puts(b, "\\right)");
     free(lower);
@@ -3502,6 +3576,10 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_polylog(f, b);
             return;
         }
+        if (expr_is_op(f, &ops_harmonic_poly)) {
+            emit_TeX_harmonic_poly(f, b);
+            return;
+        }
         if (expr_has_legendre_chi_order(f)) {
             emit_TeX_legendre_chi(f, b);
             return;
@@ -4154,6 +4232,15 @@ static size_t function_ascii_vulgar_fraction(char *out, const char *text)
 
 void emit_func_fragment(sbuf_t *b, const char *text)
 {
+    static const struct {
+        const char *symbol;
+        const char *alias;
+    } named_constants[] = {
+        {"π", "@pi"},
+        {"φ", "@phi"},
+        {"γ", "@gamma"},
+        {"τ", "@tau"},
+    };
     char *normalised;
     size_t input_length;
     size_t input_index = 0u;
@@ -4163,11 +4250,11 @@ void emit_func_fragment(sbuf_t *b, const char *text)
         return;
 
     input_length = strlen(text);
-    if (input_length > ((size_t)-1 - 1u) / 2u) {
+    if (input_length > ((size_t)-1 - 1u) / 3u) {
         sbuf_puts(b, text);
         return;
     }
-    normalised = malloc(input_length * 2u + 1u);
+    normalised = malloc(input_length * 3u + 1u);
     if (!normalised) {
         sbuf_puts(b, text);
         return;
@@ -4175,12 +4262,36 @@ void emit_func_fragment(sbuf_t *b, const char *text)
 
     while (text[input_index] != '\0') {
         size_t fraction_width = function_ascii_stacked_fraction(normalised + output_index, text + input_index);
+        bool emitted_named_constant = false;
 
         if (fraction_width == 0u)
             fraction_width = function_ascii_vulgar_fraction(normalised + output_index, text + input_index);
         if (fraction_width != 0u) {
             output_index += strlen(normalised + output_index);
             input_index += fraction_width;
+            continue;
+        }
+        for (size_t constant_index = 0u;
+             constant_index < sizeof(named_constants) / sizeof(named_constants[0]); ++constant_index) {
+            size_t symbol_width = strlen(named_constants[constant_index].symbol);
+
+            if (strncmp(text + input_index, named_constants[constant_index].symbol, symbol_width) != 0)
+                continue;
+            strcpy(normalised + output_index, named_constants[constant_index].alias);
+            output_index += strlen(named_constants[constant_index].alias);
+            input_index += symbol_width;
+            emitted_named_constant = true;
+            break;
+        }
+        if (emitted_named_constant)
+            continue;
+        if (strncmp(text + input_index, "inf", 3u) == 0 &&
+            (input_index == 0u || (!isalnum((unsigned char)text[input_index - 1u]) &&
+                                   text[input_index - 1u] != '_' && text[input_index - 1u] != '@')) &&
+            !isalnum((unsigned char)text[input_index + 3u]) && text[input_index + 3u] != '_') {
+            memcpy(normalised + output_index, "@inf", 4u);
+            output_index += 4u;
+            input_index += 3u;
             continue;
         }
         if (text[input_index] == ' ') {
@@ -4338,6 +4449,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_MUL < parent_prec;
         bool leading_half_as_divisor = false;
         bool emitted = false;
+        bool consumed[64] = {false};
+        const char *factored_temporary;
 
         if (need)
             sbuf_putc(b, '(');
@@ -4346,20 +4459,29 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         int n = 0;
         flatten_func_mul((expr_t *)f, fac, &n, 64);
         sort_factors(fac, n);
-        leading_half_as_divisor = n > 1 && expr_is_const_half_local(fac[0]);
+        factored_temporary = function_factored_temporary_name(f, NULL, fac, n, consumed);
+        leading_half_as_divisor = n > 1 && !consumed[0] && expr_is_const_half_local(fac[0]);
 
         for (int i = 0; i < n; i++) {
-            if (leading_half_as_divisor && i == 0)
+            if (consumed[i] || (leading_half_as_divisor && i == 0))
                 continue;
 
             if (emitted)
                 sbuf_putc(b, '.');
-            if (n > 1 && !function_temporary_name(fac[i]) && mul_factor_needs_visible_parens(fac[i]))
+            if ((n > 1 || factored_temporary) && !function_temporary_name(fac[i]) &&
+                mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, '(');
             emit_func(fac[i], b, PREC_MUL);
-            if (n > 1 && !function_temporary_name(fac[i]) && mul_factor_needs_visible_parens(fac[i]))
+            if ((n > 1 || factored_temporary) && !function_temporary_name(fac[i]) &&
+                mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, ')');
             emitted = true;
+        }
+
+        if (factored_temporary) {
+            if (emitted)
+                sbuf_putc(b, '.');
+            sbuf_puts(b, factored_temporary);
         }
 
         if (leading_half_as_divisor)
@@ -4403,6 +4525,40 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     /* Division: a/b */
     if (expr_is_op(f, &ops_div)) {
         int need = PREC_MUL < parent_prec;
+        expr_t *numerator_factors[64];
+        bool consumed[64] = {false};
+        const char *factored_temporary;
+        int numerator_count = 0;
+
+        flatten_func_mul(f->a, numerator_factors, &numerator_count, 64);
+        sort_factors(numerator_factors, numerator_count);
+        factored_temporary =
+            function_factored_temporary_name(f, f->b, numerator_factors, numerator_count, consumed);
+        if (factored_temporary) {
+            bool emitted = false;
+
+            if (need)
+                sbuf_putc(b, '(');
+            for (int index = 0; index < numerator_count; ++index) {
+                if (consumed[index])
+                    continue;
+                if (emitted)
+                    sbuf_putc(b, '.');
+                if (mul_factor_needs_visible_parens(numerator_factors[index]))
+                    sbuf_putc(b, '(');
+                emit_func(numerator_factors[index], b, PREC_MUL);
+                if (mul_factor_needs_visible_parens(numerator_factors[index]))
+                    sbuf_putc(b, ')');
+                emitted = true;
+            }
+            if (emitted)
+                sbuf_putc(b, '.');
+            sbuf_puts(b, factored_temporary);
+            if (need)
+                sbuf_putc(b, ')');
+            return;
+        }
+
         if (need)
             sbuf_putc(b, '(');
 
@@ -4504,7 +4660,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_lambert_wn(f, b);
             return;
         }
-        sbuf_puts(b, f->ops->name);
+        sbuf_puts(b, expr_is_op(f, &ops_harmonic_poly) ? "harmonic_poly" : f->ops->name);
         sbuf_putc(b, '(');
         emit_func(f->a, b, 0);
         sbuf_puts(b, ", ");

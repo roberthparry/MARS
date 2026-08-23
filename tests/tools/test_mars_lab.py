@@ -56,11 +56,14 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn(".datetime-local-body {\n      max-height: none;\n      overflow: visible;", html)
         self.assertNotIn(".datetime-local-body {\n      max-height: 20rem;\n      overflow: auto;", html)
 
-    def test_primary_actions_follow_the_editor_in_viewport_fitted_modes(self) -> None:
+    def test_primary_actions_follow_the_editor_without_forcing_panel_height(self) -> None:
         html = mars_lab.INDEX_HTML
 
         self.assertNotIn("#workspacePanel.viewport-fitted #expr {\n      flex: 1 1 auto;", html)
         self.assertNotIn("#workspacePanel > .controls:not(.derivative-controls) {\n      margin-top: auto;", html)
+        self.assertNotIn("#workspacePanel.viewport-fitted,", html)
+        self.assertNotIn("--workspace-panel-height", html)
+        self.assertNotIn("function fitWorkspacePanelToViewport()", html)
 
     def test_textarea_resize_grip_appears_only_when_space_runs_out_in_any_mode(self) -> None:
         html = mars_lab.INDEX_HTML
@@ -72,13 +75,11 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn("const spaceLimited = textarea.scrollHeight > textarea.clientHeight + 1;", html)
         self.assertIn("textarea.classList.toggle('editor-space-limited', spaceLimited);", html)
         self.assertIn("textarea.classList.add('editor-manual-size');", html)
-        self.assertIn("setWorkspacePanelHeight(workspacePanelBaseHeight + fittedTextareaExtraHeight());", html)
         self.assertIn("labTextareas.forEach((textarea) => expressionEditorResizeObserver.observe(textarea));", html)
         self.assertIn("const maximumTotalExtraHeight = Math.max(96, Math.min(320, window.innerHeight * 0.35));", html)
         self.assertIn("const maximumExtraHeight = maximumTotalExtraHeight / Math.max(1, visibleTextareas.length);", html)
         self.assertIn("const manuallyResized = Math.abs(currentHeight - automaticHeight) > 2;", html)
         self.assertIn("textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;", html)
-        self.assertIn("#workspacePanel.viewport-fitted.manually-expanded,", html)
 
     def test_every_scrollable_lab_element_uses_the_MARS_scrollbar_theme(self) -> None:
         html = mars_lab.INDEX_HTML
@@ -122,6 +123,7 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn("'function-token-function'", html)
         self.assertIn("'function-token-bracket'", html)
         self.assertIn("'function-token-number'", html)
+        self.assertIn("'function-token-constant'", html)
         self.assertIn("'function-token-comment'", html)
         self.assertIn("fragment.appendChild(document.createTextNode(text));", html)
         self.assertIn("token.textContent = text;", html)
@@ -155,6 +157,8 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn(".function-token-function {\n      color: #72ddd0;\n      font-weight: 700;", html)
         self.assertIn(".function-token-bracket {\n      color: #f3bd68;\n      font-weight: 400;", html)
         self.assertIn(".function-token-number {\n      color: #e78fcb;", html)
+        self.assertIn(".function-token-constant {\n      color: #dca3cf;", html)
+        self.assertIn("const namedConstantMatch = source.slice(index).match", html)
         self.assertIn(".function-token-comment {\n      color: #83d49b;", html)
         self.assertIn("const functionOpeningBrackets = new Set();", html)
         self.assertIn("const functionBracketStack = [];", html)
@@ -267,6 +271,12 @@ class EquationResultTests(unittest.TestCase):
             mars_lab.function_for_result_card(function, bindings),
             "equation equ(x) {\n    return equation(x = 1).\n}\n\nx = 3.\noutput(equ(x).solve()).",
         )
+
+    def test_function_card_uses_typeable_infinity_for_constant_binding(self) -> None:
+        function = "expression expr(const n) {\n    return n.\n}\n\nconst n = ?.\noutput(expr(n))."
+        bindings = [{"name": "n", "kind": "constant", "value": "inf"}]
+
+        self.assertIn("const n = @inf.", mars_lab.function_for_result_card(function, bindings))
 
     def test_use_as_input_reads_the_equation_card(self) -> None:
         self.assertIn(
@@ -562,6 +572,14 @@ class MatrixResultTests(unittest.TestCase):
         )
         self.assertIn("const svg = String(data.value_svg || '');", mars_lab.INDEX_HTML)
         self.assertIn("frame.innerHTML = svg;", mars_lab.INDEX_HTML)
+
+    def test_matrix_value_tex_fits_the_card_at_default_zoom(self) -> None:
+        html = mars_lab.INDEX_HTML
+
+        self.assertIn("#value.matrix-tex-value .rendered-zoom-frame {\n      display: inline-block;\n      min-width: 0;", html)
+        self.assertIn("const matrixValue = frame.parentElement && frame.parentElement.matches('#value.matrix-tex-value')", html)
+        self.assertIn("appliedScale = Math.min(baseScale, availableWidth / width) * zoom;", html)
+        self.assertIn("svg.style.transform = `scale(${appliedScale})`;", html)
 
     def test_matrix_result_uses_distinct_native_expression_and_function_cards(self) -> None:
         fields = {
@@ -1978,7 +1996,7 @@ class DiffequationResultTests(unittest.TestCase):
     def test_solution_wrapping_uses_the_available_card_width(self) -> None:
         html = mars_lab.INDEX_HTML
 
-        self.assertIn("function fitDiffequationSolutionToCard()", html)
+        self.assertIn("function fitRenderedTeXToCard()", html)
         self.assertIn("compactWidth > renderedContentWidth() + 1", html)
         self.assertIn("new ResizeObserver", html)
         self.assertIn("data.solutions_wrapped_TeX || lastTex", html)
@@ -2811,6 +2829,179 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_expression_mode_accepts_nested_open_arctangent_series(self) -> None:
+        source = "1/2(1-1/(3*2^2)+1/(5*2^4)-....)+1/3(1-1/(3*3^2)+1/(5*3^4)-....)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "atan(½) + atan(⅓)")
+        self.assertIn(r"\arctan(\frac{1}{2}) + \arctan(\frac{1}{3})", fields["tex"])
+        self.assertAlmostEqual(float(fields["value"]), math.pi / 4.0, places=15)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_accepts_telescoping_product_ellipsis(self) -> None:
+        source = "(1+1/2)(1+1/3)(1+1/4)...(1+1/10)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "¹¹⁄₂")
+        self.assertIn(r"\prod_{k=2}^{10}\left(1+\frac{1}{k}\right)", fields["derivation_TeX"])
+        self.assertIn("return 11/2.", fields["function"])
+        self.assertEqual(fields["value"], "5.5")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_accepts_infinite_prime_product_ellipsis(self) -> None:
+        source = "(1+1/2)(1+1/3)(1+1/5)(1+1/7)(1+1/11)(1+1/13)(1+1/17)..."
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "inf")
+        self.assertIn(r"\prod_{p\in\mathbb{P}}\left(1+\frac{1}{p}\right)=+\infty", fields["derivation_TeX"])
+        self.assertIn("return @inf.", fields["function"])
+        self.assertEqual(fields["value"], "∞")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_accepts_reciprocal_infinite_prime_product_ellipsis(self) -> None:
+        source = "(1-1/2)(1-1/3)(1-1/5)(1-1/7)(1-1/11)(1-1/13)(1-1/17)..."
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "0")
+        self.assertIn(r"\prod_{p\in\mathbb{P}}\left(1-\frac{1}{p}\right)=0", fields["derivation_TeX"])
+        self.assertIn("return 0.", fields["function"])
+        self.assertEqual(fields["value"], "0")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_accepts_finite_nested_arctangent_series(self) -> None:
+        source = (
+            "{ 2*(1-1/(3*2^2)+1/(5*2^4)-....+(-1)^n/((2n+1)*2^(2*n)))"
+            "+4/3*(1-1/(3*3^2)+1/(5*3^4)-....+(-1)^n/((2n+1)*3^(2*n))) | n = 2 }"
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "n", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("hypergeometric_pFq", fields["function"])
+        self.assertIn(r"{}_{2}F_{1}", fields["tex"])
+        self.assertAlmostEqual(float(fields["value"]), 3.1455761316872428, places=15)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_evaluates_infinite_nested_arctangent_series_as_pi(self) -> None:
+        source = (
+            "{ 2*(1-1/(3*2^2)+1/(5*2^4)-....+(-1)^n/((2n+1)*2^(2*n)))"
+            "+4/3*(1-1/(3*3^2)+1/(5*3^4)-....+(-1)^n/((2n+1)*3^(2*n))) | n = inf }"
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "n", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["unbound"], "π")
+        self.assertEqual(fields["tex"], r"\pi")
+        self.assertAlmostEqual(float(fields["value"]), math.pi, places=15)
+
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, save_expression=False, wrt="n", action="evaluate"
+        )
+        self.assertIn(r"{}_{2}F_{1}", payload["display_TeX"])
+        self.assertIn("n = ∞", payload["display_expression"])
+        self.assertIn("@pi", payload["display_function"])
+        self.assertIn("n = @inf.", payload["display_function"])
+        self.assertNotIn("π", payload["display_function"])
+        self.assertAlmostEqual(float(payload["value"]), math.pi, places=15)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_hoists_shared_hypergeometric_parameters(self) -> None:
+        source = (
+            "{ 2*(1-1/(3*2^2)+1/(5*2^4)-....+(-1)^n/((2n+1)*2^(2*n)))"
+            "+4/3*(1-1/(3*3^2)+1/(5*3^4)-....+(-1)^n/((2n+1)*3^(2*n)))-pi | ; n = 2000 }"
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, save_expression=False, wrt="x", action="evaluate"
+        )
+        function = str(payload["display_function"])
+        half_parameters = re.findall(r"const (c\d+) = c\d+/2\.", function)
+        self.assertEqual(len(half_parameters), 2, function)
+        for name in half_parameters:
+            self.assertEqual(function.count(name), 3, function)
+        self.assertNotIn("hypergeometric_pFq_pack", function)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_preserves_the_tiny_finite_machin_remainder(self) -> None:
+        source = (
+            "{ 2*(1-1/(3*2^2)+1/(5*2^4)-....+(-1)^n/((2n+1)*2^(2*n)))"
+            "+4/3*(1-1/(3*3^2)+1/(5*3^4)-....+(-1)^n/((2n+1)*3^(2*n)))-pi | n = 1000 }"
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "n", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertNotIn("atan", fields["unbound"])
+        self.assertNotIn("π", fields["unbound"])
+        self.assertNotEqual(fields["value"], "0")
+        self.assertRegex(fields["value"], r"^1\.739700075321556[0-9]*E-606$")
+
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, save_expression=False, wrt="n"
+        )
+        self.assertEqual(payload["value"], fields["value"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_expression_mode_displays_the_finite_leibniz_sum_formula(self) -> None:
+        source = "4-4/3+4/5-4/7+...+4(-1)^n/(2n+1)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "n", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("π +", fields["unbound"])
+        self.assertIn("digamma(n/2 + 5/4) - digamma(n/2 + 3/4)", fields["function"])
+        self.assertIn(r"\sum_{k=0}^{n}", fields["derivation_TeX"])
+        self.assertIn(r"\psi^{(0)}(\frac{n}{2} + \frac{5}{4})", fields["derivation_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_expression_mode_accepts_a_symbolic_harmonic_series_endpoint(self) -> None:
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
             self.expression_binary, "1 + 1/2 + 1/3 + ... + 1/N", 64, "x", "evaluate"
@@ -2818,7 +3009,7 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["expression"], "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }")
-        self.assertIn("return digamma(N + 1) + γ.", fields["function"])
+        self.assertIn("return digamma(N + 1) + @gamma.", fields["function"])
         self.assertIn(r"\sum_{n=1}^{N}\frac{1}{n}", fields["derivation_TeX"])
         self.assertIn(r"\psi^{(0)}(N + 1) + \gamma", fields["derivation_TeX"])
         self.assertEqual(fields["value"], "NAN")
@@ -2852,7 +3043,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(returncode, 0, raw)
         self.assertNotIn("...", fields["unbound"])
         self.assertEqual(fields["unbound"], "π²/6 - ψ⁽¹⁾(2001)")
-        self.assertIn("return π^2/6 - trigamma(2001).", fields["function"])
+        self.assertIn("return @pi^2/6 - trigamma(2001).", fields["function"])
         self.assertTrue(fields["value"].startswith("1.6444341918273931041807483139675"), raw)
         self.assertIn(r"\sum_{n=1}^{2000}\frac{1}{n^{2}}", fields["derivation_TeX"])
         self.assertIn(r"\frac{\pi^{2}}{6} - \psi^{(1)}(2001)", fields["derivation_TeX"])
@@ -2864,7 +3055,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(large_returncode, 0, large_raw)
         self.assertEqual(large_fields["unbound"], "π²/6 - ψ⁽¹⁾(100000001)")
-        self.assertIn("return π^2/6 - trigamma(100000001).", large_fields["function"])
+        self.assertIn("return @pi^2/6 - trigamma(100000001).", large_fields["function"])
         self.assertTrue(large_fields["value"].startswith("1.6449340568482264864724149999793"), large_raw)
         self.assertIn(r"\sum_{n=1}^{100000000}\frac{1}{n^{2}}", large_fields["derivation_TeX"])
         self.assertIn(r"\frac{\pi^{2}}{6} - \psi^{(1)}(100000001)", large_fields["derivation_TeX"])
@@ -3122,6 +3313,40 @@ class ExpressionResultTests(unittest.TestCase):
             mars_lab.compact_display_TeX("1.0000000000000000000000...x10^57"),
             r"1.0000000000000000000000...\times 10^{57}",
         )
+        short_derivation = (
+            "\\begin{aligned}[t]\n"
+            "&\\sum_{n=1}^{\\infty}\\frac{1}{n^{2}} \\\\\n"
+            "&= \\frac{\\pi^{2}}{6}\n"
+            "\\end{aligned}"
+        )
+        self.assertEqual(
+            mars_lab.compact_display_TeX(short_derivation),
+            r"\sum_{n=1}^{\infty}\frac{1}{n^{2}} = \frac{\pi^{2}}{6}",
+        )
+        case_derivation = (
+            "\\begin{aligned}[t]\n"
+            "&\\sum_{k=1}^{n}\\frac{1}{k^{s}} \\\\\n"
+            "&= \\begin{cases}\n"
+            "\\psi^{(0)}(n + 1) + \\gamma, & s = 1, \\\\\n"
+            "\\zeta(s) - \\zeta(s, n + 1), & s \\ne 1.\n"
+            "\\end{cases}\n"
+            "\\end{aligned}"
+        )
+        self.assertEqual(
+            mars_lab.compact_display_TeX(case_derivation),
+            "\\sum_{k=1}^{n}\\frac{1}{k^{s}} = \\begin{cases}\n"
+            "\\psi^{(0)}(n + 1) + \\gamma, & s = 1, \\\\\n"
+            "\\zeta(s) - \\zeta(s, n + 1), & s \\ne 1.\n"
+            "\\end{cases}",
+        )
+        self.assertIn(
+            "compactWidth > renderedContentWidth() + 1",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "rendered.dataset.responsiveFit === 'true'",
+            mars_lab.INDEX_HTML,
+        )
         self.assertEqual(
             mars_lab.restore_compact_binding_values(
                 f"{{ x | x = {abbreviated} }}",
@@ -3236,9 +3461,9 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertIn(
             "bindingsWithAuthoredValues(\n"
-            "            Array.isArray(data.binding_values) ? data.binding_values : [],\n"
-            "            data.expression || updated\n"
-            "          )",
+            "          Array.isArray(data.binding_values) ? data.binding_values : [],\n"
+            "          updated\n"
+            "        )",
             mars_lab.INDEX_HTML,
         )
 
@@ -3421,6 +3646,32 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_symbolic_inverse_power_series_uses_one_outer_equation_line_when_it_fits(self) -> None:
+        source = "1+1/2^s+1/3^s+1/4^s+...+1/n^s"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "s", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="s", action="evaluate"
+        )
+        self.assertTrue(
+            payload["display_TeX"].startswith(
+                r"\sum_{k=1}^{n}\frac{1}{k^{s}} = \begin{cases}"
+            )
+        )
+        self.assertNotIn(r"\begin{aligned}", payload["display_TeX"])
+        self.assertTrue(payload["display_wrapped_TeX"].startswith(r"\begin{aligned}[t]"))
+        self.assertIn(
+            "\\sum_{k=1}^{n}\\frac{1}{k^{s}} \\\\\n&= \\begin{cases}",
+            payload["display_wrapped_TeX"],
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_bound_inverse_power_series_derivative_value_uses_the_generic_derivative(self) -> None:
         source = "1+1/2^p+1/3^p+...+1/n^p | p=-2; n=1000"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -3495,12 +3746,11 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\psi^{(0)}(n + 1) + \gamma", rendered)
         self.assertNotIn(r"\zeta", rendered)
         self.assertEqual(payload["full_display_expression"], "{ ψ⁽⁰⁾(n + 1) + γ | ; n = 100 }")
-        self.assertIn("return digamma(n + 1) + γ.", payload["full_display_function"])
+        self.assertIn("return digamma(n + 1) + @gamma.", payload["full_display_function"])
         self.assertNotIn("zeta(", payload["full_display_function"])
         self.assertEqual(
             payload["binding_values"],
             [
-                {"name": "p", "value": "1", "display": "1", "kind": "variable"},
                 {"name": "n", "value": "100", "display": "100", "kind": "constant"},
             ],
         )
@@ -3524,7 +3774,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\sum_{k=1}^{\infty}\frac{1}{k^{2}}", payload["full_display_TeX"])
         self.assertIn(r"\frac{\pi^{2}}{6}", payload["full_display_TeX"])
         self.assertNotIn(r"\psi", payload["full_display_TeX"])
-        self.assertIn("return π^2/6.", payload["full_display_function"])
+        self.assertIn("return @pi^2/6.", payload["full_display_function"])
         self.assertNotIn("trigamma", payload["full_display_function"])
         self.assertTrue(payload["value"].startswith("1.64493406684822643647"))
 
@@ -3545,8 +3795,202 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(payload["full_display_expression"], "π²/6")
         self.assertIn(r"\sum_{n=1}^{\infty}\frac{1}{n^{2}}", payload["full_display_TeX"])
         self.assertIn(r"\frac{\pi^{2}}{6}", payload["full_display_TeX"])
-        self.assertIn("return π^2/6.", payload["full_display_function"])
+        self.assertIn("return @pi^2/6.", payload["full_display_function"])
         self.assertTrue(payload["value"].startswith("1.64493406684822643647"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_inverse_square_series_accepts_a_trailing_ellipsis(self) -> None:
+        source = "1+1/2^2+1/3^2+1/4^2+..."
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(fields["algebraic_specialisation"], "domain-required")
+        self.assertEqual(payload["full_display_expression"], "π²/6")
+        self.assertEqual(
+            payload["display_TeX"],
+            r"\sum_{n=1}^{\infty}\frac{1}{n^{2}} = \frac{\pi^{2}}{6}",
+        )
+        self.assertIn(r"\sum_{n=1}^{\infty}\frac{1}{n^{2}}", payload["full_display_TeX"])
+        self.assertIn(r"\frac{\pi^{2}}{6}", payload["full_display_TeX"])
+        self.assertIn("return @pi^2/6.", payload["full_display_function"])
+        self.assertTrue(payload["value"].startswith("1.64493406684822643647"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_sine_progression_ellipsis_uses_the_geometric_series_closed_form(self) -> None:
+        source = "sin(1)+sin(2)+sin(3)+sin(4)+...+sin(n)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "n", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="n", action="evaluate"
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "{ sin(n/2)·sin(1/2·(n + 1))/sin(½) | ; n = ? }",
+        )
+        self.assertEqual(
+            payload["display_TeX"],
+            r"\sum_{k=1}^{n}\sin(k) = "
+            r"\frac{\sin(\frac{n}{2})\mkern-2mu \sin(\frac{n + 1}{2})}{\sin(\frac{1}{2})}",
+        )
+        self.assertIn("return sin(n/2).sin((n + 1)/2)/sin(1/2).", payload["full_display_function"])
+        self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_cosine_progression_with_symbolic_step_uses_the_geometric_series_closed_form(self) -> None:
+        source = "cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx)"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "{ sin(nx/2)·cos(x/2·(n + 1))/sin(x/2) | x = ?; n = ? }",
+        )
+        self.assertEqual(
+            payload["display_TeX"],
+            r"\sum_{k=1}^{n}\cos(k\mkern-2mu x) = "
+            r"\frac{\sin(\frac{n\mkern-2mu x}{2})\mkern-2mu "
+            r"\cos(\frac{x}{2}\mkern-2mu \left(n + 1\right))}{\sin(\frac{x}{2})}",
+        )
+        self.assertIn("v1 = x/2.", payload["full_display_function"])
+        self.assertIn("return sin(n.v1).cos((n + 1).v1)/sin(v1).", payload["full_display_function"])
+
+        bound_source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=0.5; n=4 }"
+        bound_fields, bound_raw, bound_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, bound_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(bound_returncode, 0, bound_raw)
+        bound_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, bound_fields, bound_source, 64, False, wrt="x", action="evaluate"
+        )
+        expected = sum(math.cos(k * 0.5) for k in range(1, 5))
+        self.assertAlmostEqual(float(bound_payload["value"]), expected, places=15)
+
+        zero_source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=0; n=4 }"
+        zero_fields, zero_raw, zero_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, zero_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(zero_returncode, 0, zero_raw)
+        zero_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, zero_fields, zero_source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(zero_payload["value"], "4")
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_cosine_progression_has_a_finite_symbolic_antiderivative(self) -> None:
+        source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=pi/12; n=100 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 3328, "x", "integral"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("Hn(n, cos(x) + sin(x)·i) - Hn(n, cos(x) - sin(x)·i)", fields["integral"])
+        self.assertEqual(
+            fields["integral_TeX"],
+            r"\frac{H_{n}(\cos(x) + \sin(x)\mkern-2mu i) - "
+            r"H_{n}(\cos(x) - \sin(x)\mkern-2mu i)}{2\mkern-2mu i} + C",
+        )
+        self.assertIn(
+            "return (harmonic_poly(n, v1 + v3) - harmonic_poly(n, v1 - v3))/(2.i) + C.",
+            fields["integral_function"],
+        )
+        self.assertIn("x = @pi/12.", fields["integral_function"])
+        self.assertIn("const n = 100.", fields["integral_function"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_hyperbolic_progression_ellipses_use_geometric_series_closed_forms(self) -> None:
+        cases = (
+            (
+                "sinh",
+                "{ sinh(nx/2)·sinh(x/2·(n + 1))/sinh(x/2) | x = ?; n = ? }",
+                r"\frac{\sinh(\frac{n\mkern-2mu x}{2})\mkern-2mu "
+                r"\sinh(\frac{x}{2}\mkern-2mu \left(n + 1\right))}{\sinh(\frac{x}{2})}",
+                0.0,
+            ),
+            (
+                "cosh",
+                "{ sinh(nx/2)·cosh(x/2·(n + 1))/sinh(x/2) | x = ?; n = ? }",
+                r"\frac{\sinh(\frac{n\mkern-2mu x}{2})\mkern-2mu "
+                r"\cosh(\frac{x}{2}\mkern-2mu \left(n + 1\right))}{\sinh(\frac{x}{2})}",
+                4.0,
+            ),
+        )
+
+        for function, expected_expression, expected_formula, expected_at_zero in cases:
+            with self.subTest(function=function):
+                source = f"{function}(x)+{function}(2x)+{function}(3x)+{function}(4x)+...+{function}(nx)"
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 64, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+                )
+                self.assertEqual(payload["full_display_expression"], expected_expression)
+                self.assertEqual(
+                    payload["display_TeX"],
+                    rf"\sum_{{k=1}}^{{n}}\{function}(k\mkern-2mu x) = {expected_formula}",
+                )
+                self.assertIn("v1 = x/2.", payload["full_display_function"])
+                self.assertIn(
+                    f"return sinh(n.v1).{function}((n + 1).v1)/sinh(v1).",
+                    payload["full_display_function"],
+                )
+
+                bound_source = (
+                    f"{{ {function}(x)+{function}(2x)+{function}(3x)+{function}(4x)+...+{function}(nx) "
+                    "| x=0.25; n=4 }"
+                )
+                bound_fields, bound_raw, bound_returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, bound_source, 64, "x", "evaluate"
+                )
+                self.assertEqual(bound_returncode, 0, bound_raw)
+                bound_payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, bound_fields, bound_source, 64, False, wrt="x", action="evaluate"
+                )
+                numeric_function = math.sinh if function == "sinh" else math.cosh
+                expected = sum(numeric_function(k * 0.25) for k in range(1, 5))
+                self.assertAlmostEqual(float(bound_payload["value"]), expected, places=15)
+
+                zero_source = (
+                    f"{{ {function}(x)+{function}(2x)+{function}(3x)+{function}(4x)+...+{function}(nx) "
+                    "| x=0; n=4 }"
+                )
+                zero_fields, zero_raw, zero_returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, zero_source, 64, "x", "evaluate"
+                )
+                self.assertEqual(zero_returncode, 0, zero_raw)
+                zero_payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, zero_fields, zero_source, 64, False, wrt="x", action="evaluate"
+                )
+                self.assertEqual(float(zero_payload["value"]), expected_at_zero)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -3636,7 +4080,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(payload["full_display_TeX"], r"\tan(c\mkern-2mu x + \pi\mkern-2mu y)")
         self.assertEqual(payload["full_display_expression"], "{ tan(cx + πy) | x = ?, y = ?; c = ? }")
         self.assertIn("expression expr(x, y, const c)", payload["full_display_function"])
-        self.assertIn("return tan(c.x + π.y).", payload["full_display_function"])
+        self.assertIn("return tan(c.x + @pi.y).", payload["full_display_function"])
         self.assertIn("\nconst c = ?.\n", payload["full_display_function"])
         self.assertNotIn("value", payload)
 
@@ -4034,10 +4478,11 @@ class ExpressionResultTests(unittest.TestCase):
         function = payload["full_display_function"]
         self.assertIn("const c1 = sqrt(2).", function)
         self.assertIn("const c2 = root(2, 4).", function)
-        self.assertIn("const c3 = (c1 + 1)/2.", function)
-        self.assertIn("const c4 = sqrt(c3).", function)
+        self.assertIn("const c3 = c1 + 1.", function)
+        self.assertIn("const c4 = c3/2.", function)
+        self.assertIn("const c5 = sqrt(c4).", function)
         self.assertIn(
-            "return 1/c1.(sqrt(c2 + c4) + sqrt(c2 - c4).i).",
+            "return 1/c1.(sqrt(c2 + c5) + sqrt(c2 - c5).i).",
             function,
         )
         self.assertEqual(
@@ -4088,11 +4533,12 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertNotIn("e^{", payload["full_display_TeX"])
         self.assertIn("    const c1 = sqrt(2).", payload["full_display_function"])
         self.assertIn("    const c2 = root(2, 4).", payload["full_display_function"])
-        self.assertIn("    const c3 = (c1 + 1)/2.", payload["full_display_function"])
-        self.assertIn("    const c4 = sqrt(c3).", payload["full_display_function"])
+        self.assertIn("    const c3 = c1 + 1.", payload["full_display_function"])
+        self.assertIn("    const c4 = c3/2.", payload["full_display_function"])
+        self.assertIn("    const c5 = sqrt(c4).", payload["full_display_function"])
         self.assertIn(
-            "    return 1/c1.exp(i.k.π/2)."
-            "(sqrt(c2 + c4) + sqrt(c2 - c4).i).",
+            "    return 1/c1.exp(@pi.i.k/2)."
+            "(sqrt(c2 + c5) + sqrt(c2 - c5).i).",
             payload["full_display_function"],
         )
         self.assertTrue(all(len(line) <= 130 for line in payload["full_display_function"].splitlines()))
@@ -4676,7 +5122,7 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + y\mkern-2mu i} + C")
         self.assertEqual(payload["integral"], "∫dx = { 2·√(x + yi) + C | x = ?, y = ?; C = ? }")
-        self.assertIn("return 2.(x + y.i)^½ + C.", payload["full_display_integral_function"])
+        self.assertIn("return 2.(x + y.i)^1/2 + C.", payload["full_display_integral_function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4829,6 +5275,18 @@ class ExpressionResultTests(unittest.TestCase):
             "fullExpressionText = expressionForEditor(updatedSource).trim();",
             expression_branch,
         )
+
+    def test_evaluate_captures_expression_binding_values_before_requesting_results(self) -> None:
+        visible_commit = mars_lab.INDEX_HTML.split(
+            "function commitVisibleBindingInputs() {", 1
+        )[1].split(
+            "\n    async function toggleBindingKind", 1
+        )[0]
+
+        self.assertIn("if (currentMode() === 'expression') {", visible_commit)
+        self.assertIn("normalisedBindingInputValue(input)", visible_commit)
+        self.assertIn("fullExpressionText = expressionForEditor(updated).trim();", visible_commit)
+        self.assertIn("expr.dataset.fullExpression = fullExpressionText;", visible_commit)
 
     def test_calculus_errors_clear_stale_result_cards(self) -> None:
         self.assertGreaterEqual(

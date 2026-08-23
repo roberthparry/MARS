@@ -1079,6 +1079,7 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |
 | `mat_zetap(A)` | Derivative of the Riemann zeta matrix function |
 | `mat_dilog(A)` | Principal matrix dilogarithm |
+| `mat_harmonic_poly(A, degree)` | Finite harmonic matrix polynomial Hₙ(A) = Σₖ₌₁ⁿ Aᵏ/k |
 | `mat_gammainv(A)` | Matrix inverse gamma function |
 | `mat_normal_pdf(A)` | Matrix normal probability density function |
 | `mat_normal_cdf(A)` | Matrix normal cumulative distribution function |

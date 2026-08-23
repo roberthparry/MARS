@@ -455,6 +455,7 @@ when the selected principal root is not real.
 | `num_Ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
 | `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
 | `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |
+| `num_harmonic_poly(degree, x)` | Evaluates the finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k; the degree must be an exact non-negative integer. |
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
 | `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
 | `num_bessel_y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |

@@ -106,6 +106,7 @@ void run_number_special_function_tests(void)
         number_t one_half = num_div(one, two);
         number_t dilog_half = num_dilog(one_half);
         number_t polylog2_half = num_polylog(two, one_half);
+        number_t harmonic4_half = num_harmonic_poly(four, one_half);
         number_t dilog_two = num_dilog(two);
         number_t three_halves = num_div(three, two);
         number_t one_quarter = num_div(one, four);
@@ -161,6 +162,7 @@ void run_number_special_function_tests(void)
                                  "0.58224052646501250590265632015968", "1e-30");
         assert_number_close_text("num_polylog(2, 1/2) = num_dilog(1/2)", polylog2_half,
                                  "0.58224052646501250590265632015968", "1e-30");
+        assert_number_string("num_harmonic_poly(4, 1/2)", harmonic4_half, "¹³¹⁄₁₉₂");
         ASSERT_TRUE(!num_is_real(dilog_two));
         assert_number_close_number("num_versin(pi/3) = 1/2", versin_pi3, one_half, "1e-30");
         assert_number_close_number("num_vercos(pi/3) = 3/2", vercos_pi3, three_halves, "1e-30");
@@ -244,6 +246,7 @@ void run_number_special_function_tests(void)
         num_destroy(&one_half);
         num_destroy(&dilog_half);
         num_destroy(&polylog2_half);
+        num_destroy(&harmonic4_half);
         num_destroy(&dilog_two);
         num_destroy(&three_halves);
         num_destroy(&one_quarter);

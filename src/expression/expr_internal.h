@@ -103,6 +103,7 @@ typedef enum {
     EXPR_KIND_E1,
     EXPR_KIND_DILOG,
     EXPR_KIND_POLYLOG,
+    EXPR_KIND_HARMONIC_POLY,
     EXPR_KIND_LEGENDRE_CHI,
     EXPR_KIND_BESSEL_J,
     EXPR_KIND_BESSEL_Y,
@@ -411,6 +412,7 @@ extern const expr_ops_t ops_zetah;
 extern const expr_ops_t ops_zatahp;
 extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog;
+extern const expr_ops_t ops_harmonic_poly;
 extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
@@ -625,6 +627,7 @@ number_t expr_eval_num_internal(const expr_t *dv);
 expr_t *expr_get_dx_internal(const expr_t *dv);
 const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
+expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
 expr_t *expr_new_binary_internal(const expr_ops_t *ops, const expr_t *a, const expr_t *b);
 expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent);

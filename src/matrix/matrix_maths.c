@@ -3872,6 +3872,54 @@ DEFINE_MATRIX_UNARY_FUNCTION(dilog)
 
 #undef DEFINE_MATRIX_UNARY_FUNCTION
 
+/* Evaluate the finite logarithmic matrix polynomial by repeated multiplication. */
+matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree)
+{
+    matrix_t *power = NULL;
+    matrix_t *sum = NULL;
+
+    if (!A || A->rows != A->cols)
+        return NULL;
+    power = mat_copy_preserving_store(A);
+    sum = power ? mat_scalar_mul(power, &NUM_ZERO) : NULL;
+    if (!power || !sum)
+        goto cleanup;
+    if (degree == 0u) {
+        mat_free(power);
+        return sum;
+    }
+
+    for (unsigned int k = 1u;; ++k) {
+        number_t divisor = num_create_from_long((long)k);
+        matrix_t *term = mat_scalar_div(power, &divisor);
+        matrix_t *next_sum = term ? mat_add(sum, term) : NULL;
+
+        num_destroy(&divisor);
+        mat_free(term);
+        if (!next_sum)
+            goto cleanup;
+        mat_free(sum);
+        sum = next_sum;
+        if (k == degree)
+            break;
+
+        matrix_t *next_power = mat_mul(power, A);
+
+        if (!next_power)
+            goto cleanup;
+        mat_free(power);
+        power = next_power;
+    }
+
+    mat_free(power);
+    return sum;
+
+cleanup:
+    mat_free(sum);
+    mat_free(power);
+    return NULL;
+}
+
 matrix_t *mat_sinh(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&

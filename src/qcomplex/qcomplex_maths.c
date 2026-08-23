@@ -986,6 +986,21 @@ qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z)
     return qc_polylog_series_int(order, z);
 }
 
+/* Evaluate the finite logarithmic sum directly because its degree is finite. */
+qcomplex_t qc_harmonic_poly(unsigned long degree, qcomplex_t argument)
+{
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t power = argument;
+
+    for (unsigned long k = 1ul; k <= degree; ++k) {
+        sum = qc_add(sum, qc_div(power, qc_make(qf_from_double((double)k), QF_ZERO)));
+        if (k == degree)
+            break;
+        power = qc_mul(power, argument);
+    }
+    return sum;
+}
+
 static int qc_lauricella_append(qcomplex_t **values, size_t *count, size_t *capacity, qcomplex_t value)
 {
     qcomplex_t *grown;

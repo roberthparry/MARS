@@ -307,6 +307,11 @@ void emit_name_func(sbuf_t *b, const char *name)
         return;
     }
 
+    if (strcmp(name, "π") == 0) {
+        sbuf_puts(b, "@pi");
+        return;
+    }
+
     if (expr_tostring_is_simple_name(name)) {
         sbuf_puts(b, name);
     } else {

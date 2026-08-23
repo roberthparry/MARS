@@ -87,6 +87,7 @@ enum { EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN = EXPR_KIND_ADD, EXPR_INTEGRATE_DIV_F
 
 static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_inverse_power_zeta_difference(const expr_t *expr, const expr_t *wrt);
+static expr_t *integrate_trigonometric_progression_closed_form(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_inverse_symbolic_square_sum(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor, const expr_t *antiderivative);
@@ -506,6 +507,339 @@ static const char *integrate_series_index_name(const expr_t *expr)
         if (!integrate_expr_has_named_symbol(expr, candidates[i]))
             return candidates[i];
     return "q";
+}
+
+typedef enum {
+    INTEGRATE_PROGRESSION_SIN,
+    INTEGRATE_PROGRESSION_COS,
+    INTEGRATE_PROGRESSION_SINH,
+    INTEGRATE_PROGRESSION_COSH,
+} integrate_progression_kind_t;
+
+static const expr_t *integrate_progression_endpoint(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *candidate;
+
+    if (!expr)
+        return NULL;
+    if ((expr_is_var(expr) || expr_is_named_const(expr)) && !is_wrt(expr, wrt) && !depends_on_wrt(expr, wrt))
+        return expr;
+    candidate = integrate_progression_endpoint(expr->a, wrt);
+    return candidate ? candidate : integrate_progression_endpoint(expr->b, wrt);
+}
+
+static expr_t *integrate_progression_formula(const expr_t *endpoint, const expr_t *wrt,
+                                             integrate_progression_kind_t kind)
+{
+    expr_t *endpoint_times_wrt = expr_mul(endpoint, wrt);
+    expr_t *first_argument = endpoint_times_wrt ? expr_div_long(endpoint_times_wrt, 2L) : NULL;
+    expr_t *endpoint_plus_one = expr_add_long(endpoint, 1L);
+    expr_t *next_times_wrt = endpoint_plus_one ? expr_mul(endpoint_plus_one, wrt) : NULL;
+    expr_t *second_argument = next_times_wrt ? expr_div_long(next_times_wrt, 2L) : NULL;
+    expr_t *denominator_argument = expr_div_long(wrt, 2L);
+    expr_t *first = NULL;
+    expr_t *second = NULL;
+    expr_t *denominator = NULL;
+    expr_t *numerator = NULL;
+    expr_t *formula = NULL;
+    expr_t *simplified = NULL;
+    const bool hyperbolic = kind == INTEGRATE_PROGRESSION_SINH || kind == INTEGRATE_PROGRESSION_COSH;
+    const bool sine_family = kind == INTEGRATE_PROGRESSION_SIN || kind == INTEGRATE_PROGRESSION_SINH;
+
+    if (first_argument)
+        first = hyperbolic ? expr_sinh(first_argument) : expr_sin(first_argument);
+    if (second_argument) {
+        if (sine_family)
+            second = hyperbolic ? expr_sinh(second_argument) : expr_sin(second_argument);
+        else
+            second = hyperbolic ? expr_cosh(second_argument) : expr_cos(second_argument);
+    }
+    if (denominator_argument)
+        denominator = hyperbolic ? expr_sinh(denominator_argument) : expr_sin(denominator_argument);
+    numerator = first && second ? expr_mul(first, second) : NULL;
+    formula = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+    simplified = formula ? expr_simplify(formula) : NULL;
+
+    expr_free(formula);
+    expr_free(numerator);
+    expr_free(denominator);
+    expr_free(second);
+    expr_free(first);
+    expr_free(denominator_argument);
+    expr_free(second_argument);
+    expr_free(next_times_wrt);
+    expr_free(endpoint_plus_one);
+    expr_free(first_argument);
+    expr_free(endpoint_times_wrt);
+    return simplified;
+}
+
+static bool integrate_progression_kind_matches(const expr_t *expr, const expr_t *endpoint, const expr_t *wrt,
+                                               integrate_progression_kind_t kind)
+{
+    expr_t *formula = integrate_progression_formula(endpoint, wrt, kind);
+    bool matched = formula && (expr_struct_eq(expr, formula) || expr_equal_exact_local(expr, formula));
+
+    expr_free(formula);
+    return matched;
+}
+
+static expr_t *integrate_cosine_progression_antiderivative(const expr_t *endpoint, const expr_t *wrt)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *positive_exponent = imaginary_unit ? expr_mul(imaginary_unit, wrt) : NULL;
+    expr_t *negative_exponent = positive_exponent ? expr_neg(positive_exponent) : NULL;
+    expr_t *positive_argument = positive_exponent ? expr_exp(positive_exponent) : NULL;
+    expr_t *negative_argument = negative_exponent ? expr_exp(negative_exponent) : NULL;
+    expr_t *positive_sum = positive_argument ? expr_harmonic_poly(endpoint, positive_argument) : NULL;
+    expr_t *negative_sum = negative_argument ? expr_harmonic_poly(endpoint, negative_argument) : NULL;
+    expr_t *difference = positive_sum && negative_sum ? expr_sub(positive_sum, negative_sum) : NULL;
+    expr_t *denominator = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    expr_t *out = difference && denominator ? expr_div(difference, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(difference);
+    expr_free(negative_sum);
+    expr_free(positive_sum);
+    expr_free(negative_argument);
+    expr_free(positive_argument);
+    expr_free(negative_exponent);
+    expr_free(positive_exponent);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static void collect_harmonic_poly_local(const expr_t *expr, const expr_t **nodes, size_t *count)
+{
+    if (!expr || !nodes || !count || *count > 2u)
+        return;
+    if (expr_is_op(expr, &ops_harmonic_poly)) {
+        nodes[(*count)++] = expr;
+        return;
+    }
+    collect_harmonic_poly_local(expr->a, nodes, count);
+    collect_harmonic_poly_local(expr->b, nodes, count);
+}
+
+static bool harmonic_degrees_match_local(const expr_t *left, const expr_t *right)
+{
+    const char *left_name;
+    const char *right_name;
+
+    if (!left || !right)
+        return false;
+    if (expr_struct_eq(left, right) || expr_equal_exact_local(left, right))
+        return true;
+    left_name = expr_symbol_name(left);
+    right_name = expr_symbol_name(right);
+    return left_name && right_name && strcmp(left_name, right_name) == 0;
+}
+
+static expr_t *wrt_dependent_addends_local(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr || !depends_on_wrt(expr, wrt))
+        return expr_new_const(NUM_ZERO);
+    if (!expr_is_op(expr, &ops_add) && !expr_is_op(expr, &ops_sub))
+        return expr_clone(expr);
+
+    left = wrt_dependent_addends_local(expr->a, wrt);
+    right = wrt_dependent_addends_local(expr->b, wrt);
+    out = left && right ? (expr_is_op(expr, &ops_add) ? expr_add(left, right) : expr_sub(left, right)) : NULL;
+    expr_free(right);
+    expr_free(left);
+    return out;
+}
+
+static bool harmonic_argument_is_euler_local(const expr_t *argument, const expr_t *wrt, bool positive)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *sine = expr_sin(wrt);
+    expr_t *cosine = expr_cos(wrt);
+    expr_t *imaginary_sine = imaginary_unit && sine ? expr_mul(imaginary_unit, sine) : NULL;
+    expr_t *cartesian = cosine && imaginary_sine
+                            ? (positive ? expr_add(cosine, imaginary_sine) : expr_sub(cosine, imaginary_sine))
+                            : NULL;
+    expr_t *signed_exponent = imaginary_unit ? expr_mul(imaginary_unit, wrt) : NULL;
+    expr_t *negative_exponent = signed_exponent && !positive ? expr_neg(signed_exponent) : NULL;
+    expr_t *exponential = signed_exponent
+                              ? expr_exp(positive ? signed_exponent : negative_exponent)
+                              : NULL;
+    expr_t *cartesian_simplified = cartesian ? expr_simplify(cartesian) : NULL;
+    expr_t *exponential_simplified = exponential ? expr_simplify(exponential) : NULL;
+    bool matched = (cartesian_simplified &&
+                    (expr_struct_eq(argument, cartesian_simplified) ||
+                     expr_equal_exact_local(argument, cartesian_simplified))) ||
+                   (exponential_simplified &&
+                    (expr_struct_eq(argument, exponential_simplified) ||
+                     expr_equal_exact_local(argument, exponential_simplified)));
+
+    expr_free(exponential_simplified);
+    expr_free(cartesian_simplified);
+    expr_free(exponential);
+    expr_free(negative_exponent);
+    expr_free(signed_exponent);
+    expr_free(cartesian);
+    expr_free(imaginary_sine);
+    expr_free(cosine);
+    expr_free(sine);
+    expr_free(imaginary_unit);
+    return matched;
+}
+
+static bool expr_same_unbound_local(const expr_t *left, const expr_t *right)
+{
+    char *left_text;
+    char *right_text;
+    bool matched;
+
+    if (!left || !right)
+        return false;
+    if (expr_struct_eq(left, right) || expr_equal_exact_local(left, right))
+        return true;
+    left_text = expr_to_string(left, style_UNBOUND);
+    right_text = expr_to_string(right, style_UNBOUND);
+    matched = left_text && right_text && strcmp(left_text, right_text) == 0;
+    free(right_text);
+    free(left_text);
+    return matched;
+}
+
+static bool harmonic_pair_has_antiderivative_scale_local(const expr_t *dependent, const expr_t *positive,
+                                                         const expr_t *negative)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *difference = expr_sub(positive, negative);
+    expr_t *denominator = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    expr_t *quotient = difference && denominator ? expr_div(difference, denominator) : NULL;
+    expr_t *negated = difference ? expr_neg(difference) : NULL;
+    expr_t *half_negated = negated ? expr_div_long(negated, 2L) : NULL;
+    expr_t *product = half_negated && imaginary_unit ? expr_mul(half_negated, imaginary_unit) : NULL;
+    expr_t *rescaled = dependent && denominator ? expr_mul(dependent, denominator) : NULL;
+    expr_t *difference_simplified = difference ? expr_simplify(difference) : NULL;
+    expr_t *quotient_simplified = quotient ? expr_simplify(quotient) : NULL;
+    expr_t *product_simplified = product ? expr_simplify(product) : NULL;
+    bool matched = expr_same_unbound_local(dependent, quotient_simplified) ||
+                   expr_same_unbound_local(dependent, product_simplified);
+
+    if (!matched && rescaled && difference_simplified) {
+        expr_t *rescaled_simplified = expr_simplify(rescaled);
+
+        matched = expr_same_unbound_local(rescaled_simplified, difference_simplified);
+        expr_free(rescaled_simplified);
+    }
+
+    expr_free(difference_simplified);
+    expr_free(rescaled);
+    expr_free(product_simplified);
+    expr_free(quotient_simplified);
+    expr_free(product);
+    expr_free(half_negated);
+    expr_free(negated);
+    expr_free(quotient);
+    expr_free(denominator);
+    expr_free(difference);
+    expr_free(imaginary_unit);
+    return matched;
+}
+
+expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *harmonics[3] = {NULL, NULL, NULL};
+    size_t harmonic_count = 0u;
+    expr_t *dependent = NULL;
+    expr_t *dependent_simplified = NULL;
+    expr_t *out = NULL;
+    bool ordered_pair;
+
+    collect_harmonic_poly_local(expr, harmonics, &harmonic_count);
+    if (harmonic_count != 2u || !harmonics[0]->a || !harmonics[0]->b || !harmonics[1]->a || !harmonics[1]->b ||
+        depends_on_wrt(harmonics[0]->a, wrt) || !harmonic_degrees_match_local(harmonics[0]->a, harmonics[1]->a))
+        return NULL;
+
+    dependent = wrt_dependent_addends_local(expr, wrt);
+    dependent_simplified = dependent ? expr_simplify(dependent) : NULL;
+    ordered_pair = harmonic_argument_is_euler_local(harmonics[0]->b, wrt, true) &&
+                   harmonic_argument_is_euler_local(harmonics[1]->b, wrt, false) &&
+                   harmonic_pair_has_antiderivative_scale_local(dependent_simplified, harmonics[0], harmonics[1]);
+    if (!ordered_pair)
+        ordered_pair = harmonic_argument_is_euler_local(harmonics[1]->b, wrt, true) &&
+                       harmonic_argument_is_euler_local(harmonics[0]->b, wrt, false) &&
+                       harmonic_pair_has_antiderivative_scale_local(dependent_simplified, harmonics[1], harmonics[0]);
+    if (ordered_pair)
+        out = integrate_progression_formula(harmonics[0]->a, wrt, INTEGRATE_PROGRESSION_COS);
+
+    expr_free(dependent_simplified);
+    expr_free(dependent);
+    return out;
+}
+
+static expr_t *integrate_progression_antiderivative(const expr_t *expr, const expr_t *endpoint, const expr_t *wrt,
+                                                    integrate_progression_kind_t kind)
+{
+    expr_t *index = expr_new_named_var(NUM_NAN, integrate_series_index_name(expr));
+    expr_t *argument = index ? expr_mul(index, wrt) : NULL;
+    expr_t *primitive = NULL;
+    expr_t *term = NULL;
+    expr_t *lower = expr_new_const(NUM_ONE);
+    expr_t *summation = NULL;
+
+    if (kind == INTEGRATE_PROGRESSION_COS) {
+        expr_free(lower);
+        expr_free(index);
+        return integrate_cosine_progression_antiderivative(endpoint, wrt);
+    }
+
+    if (argument) {
+        switch (kind) {
+            case INTEGRATE_PROGRESSION_SIN:
+                primitive = expr_cos(argument);
+                if (primitive) {
+                    expr_t *negated = expr_neg(primitive);
+
+                    expr_free(primitive);
+                    primitive = negated;
+                }
+                break;
+
+            case INTEGRATE_PROGRESSION_COS:
+                break;
+
+            case INTEGRATE_PROGRESSION_SINH:
+                primitive = expr_cosh(argument);
+                break;
+
+            case INTEGRATE_PROGRESSION_COSH:
+                primitive = expr_sinh(argument);
+                break;
+        }
+    }
+    term = primitive && index ? expr_div(primitive, index) : NULL;
+    summation = term && lower ? expr_new_finite_summation_range(term, index, lower, endpoint) : NULL;
+
+    expr_free(lower);
+    expr_free(term);
+    expr_free(primitive);
+    expr_free(argument);
+    expr_free(index);
+    return summation;
+}
+
+static expr_t *integrate_trigonometric_progression_closed_form(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *endpoint = integrate_progression_endpoint(expr, wrt);
+
+    if (!endpoint)
+        return NULL;
+    for (integrate_progression_kind_t kind = INTEGRATE_PROGRESSION_SIN; kind <= INTEGRATE_PROGRESSION_COSH;
+         kind++) {
+        if (integrate_progression_kind_matches(expr, endpoint, wrt, kind))
+            return integrate_progression_antiderivative(expr, endpoint, wrt, kind);
+    }
+    return NULL;
 }
 
 /* Recognise the finite inverse-power sum before integrating its two zeta terms separately. */
@@ -2975,8 +3309,10 @@ static expr_t *integrate_div_rule_dispatch(unsigned int features, const expr_t *
 expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
 {
     unsigned int features = integrate_div_rule_features(expr, wrt);
-    expr_t *matched = integrate_div_rule_dispatch(features, expr, wrt);
+    expr_t *matched = integrate_trigonometric_progression_closed_form(expr, wrt);
 
+    if (!matched)
+        matched = integrate_div_rule_dispatch(features, expr, wrt);
     if (matched)
         return matched;
     return integrate_exact_substitution_product(expr, wrt);

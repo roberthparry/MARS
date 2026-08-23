@@ -35,6 +35,10 @@ static void test_from_string_function_hash(void)
     check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
     check_parse_val("finite sum is registered in the perfect hash", "sum(k,k,1,10)", 55.0, __LINE__);
+    check_parse_num("harmonic_poly is registered in the perfect hash", "harmonic_poly(4, 1/2)", "131/192",
+                    __LINE__);
+    check_parse_expr("harmonic_poly bindings use the binding perfect hash",
+                     "{ harmonic_poly(n,x) | x=1/2; n=4 }", "{ Hn(n, x) | x = ¹⁄₂; n = 4 }", __LINE__);
     unset_zetap = expr_from_string("zetap(NAN)", NULL);
     ASSERT_NOT_NULL(unset_zetap);
     unset_value = expr_eval(unset_zetap);
@@ -148,6 +152,279 @@ static void test_from_string_series_ellipsis(void)
     char *function_text;
     expr_bindings_t *bindings = NULL;
 
+    {
+        const char *product_source = "(1+1/2)(1+1/3)(1+1/4)...(1+1/10)";
+        string_t *product_derivation_TeX = NULL;
+        expr_t *product = expr_from_string_with_derivation_TeX(product_source, NULL, &product_derivation_TeX);
+        char *product_text;
+        number_t product_value;
+        number_t product_expected = num_create_from_string("11/2");
+
+        ASSERT_NOT_NULL(product);
+        ASSERT_NOT_NULL(product_derivation_TeX);
+        product_text = expr_to_string(product, style_UNBOUND);
+        ASSERT_NOT_NULL(product_text);
+        TEST_ASSERT_STR_EQ(product_text, "¹¹⁄₂");
+        ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX),
+                               "\\prod_{k=2}^{10}\\left(1+\\frac{1}{k}\\right)"));
+        ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX), "\\frac{10+1}{2}"));
+        product_value = expr_eval(product);
+        ASSERT_TRUE(num_is_exact(product_value));
+        ASSERT_TRUE(num_eq(product_value, product_expected));
+        num_destroy(&product_expected);
+        num_destroy(&product_value);
+        free(product_text);
+        expr_free(product);
+        string_free(product_derivation_TeX);
+    }
+
+    {
+        const char *prime_product_source = "(1+1/2)(1+1/3)(1+1/5)(1+1/7)(1+1/11)(1+1/13)(1+1/17)...";
+        string_t *prime_product_derivation_TeX = NULL;
+        expr_t *prime_product =
+            expr_from_string_with_derivation_TeX(prime_product_source, NULL, &prime_product_derivation_TeX);
+        number_t prime_product_value;
+
+        ASSERT_NOT_NULL(prime_product);
+        ASSERT_NOT_NULL(prime_product_derivation_TeX);
+        ASSERT_NOT_NULL(strstr(string_c_str(prime_product_derivation_TeX),
+                               "\\prod_{p\\in\\mathbb{P}}\\left(1+\\frac{1}{p}\\right)=+\\infty"));
+        prime_product_value = expr_eval(prime_product);
+        ASSERT_TRUE(num_is_inf(prime_product_value));
+        ASSERT_TRUE(num_get_sign(prime_product_value) > 0);
+        num_destroy(&prime_product_value);
+        expr_free(prime_product);
+        string_free(prime_product_derivation_TeX);
+    }
+
+    {
+        const char *reciprocal_prime_product_source =
+            "(1-1/2)(1-1/3)(1-1/5)(1-1/7)(1-1/11)(1-1/13)(1-1/17)...";
+        string_t *reciprocal_prime_product_derivation_TeX = NULL;
+        expr_t *reciprocal_prime_product = expr_from_string_with_derivation_TeX(
+            reciprocal_prime_product_source, NULL, &reciprocal_prime_product_derivation_TeX);
+        char *reciprocal_prime_product_text;
+        number_t reciprocal_prime_product_value;
+
+        ASSERT_NOT_NULL(reciprocal_prime_product);
+        ASSERT_NOT_NULL(reciprocal_prime_product_derivation_TeX);
+        reciprocal_prime_product_text = expr_to_string(reciprocal_prime_product, style_UNBOUND);
+        ASSERT_NOT_NULL(reciprocal_prime_product_text);
+        TEST_ASSERT_STR_EQ(reciprocal_prime_product_text, "0");
+        ASSERT_NOT_NULL(strstr(string_c_str(reciprocal_prime_product_derivation_TeX),
+                               "\\prod_{p\\in\\mathbb{P}}\\left(1-\\frac{1}{p}\\right)=0"));
+        reciprocal_prime_product_value = expr_eval(reciprocal_prime_product);
+        ASSERT_TRUE(num_is_zero(reciprocal_prime_product_value));
+        num_destroy(&reciprocal_prime_product_value);
+        free(reciprocal_prime_product_text);
+        expr_free(reciprocal_prime_product);
+        string_free(reciprocal_prime_product_derivation_TeX);
+    }
+
+    {
+        const char *open_inverse_square_source = "1+1/2^2+1/3^2+1/4^2+...";
+        string_t *open_inverse_square_derivation_TeX = NULL;
+        expr_t *open_inverse_square = expr_from_string_with_derivation_TeX(
+            open_inverse_square_source, NULL, &open_inverse_square_derivation_TeX);
+        char *open_inverse_square_text;
+        number_t open_inverse_square_value;
+
+        ASSERT_NOT_NULL(open_inverse_square);
+        ASSERT_NOT_NULL(open_inverse_square_derivation_TeX);
+        open_inverse_square_text = expr_to_string(open_inverse_square, style_UNBOUND);
+        ASSERT_NOT_NULL(open_inverse_square_text);
+        TEST_ASSERT_STR_EQ(open_inverse_square_text, "π²/6");
+        ASSERT_NOT_NULL(strstr(string_c_str(open_inverse_square_derivation_TeX),
+                               "\\sum_{n=1}^{\\infty}\\frac{1}{n^{2}}"));
+        ASSERT_NOT_NULL(strstr(string_c_str(open_inverse_square_derivation_TeX), "\\frac{\\pi^{2}}{6}"));
+        open_inverse_square_value = expr_eval(open_inverse_square);
+        ASSERT_TRUE(num_is_finite(open_inverse_square_value));
+        ASSERT_EQ_DOUBLE(num_to_double(open_inverse_square_value), M_PI * M_PI / 6.0, 1e-15);
+        num_destroy(&open_inverse_square_value);
+        free(open_inverse_square_text);
+        expr_free(open_inverse_square);
+        string_free(open_inverse_square_derivation_TeX);
+    }
+
+    {
+        const char *sine_progression_source = "sin(1)+sin(2)+sin(3)+sin(4)+...+sin(n)";
+        string_t *sine_progression_derivation_TeX = NULL;
+        expr_t *sine_progression = expr_from_string_with_derivation_TeX(
+            sine_progression_source, NULL, &sine_progression_derivation_TeX);
+        char *sine_progression_text;
+        expr_t *bound_sine_progression;
+        number_t sine_progression_value;
+        double expected_value = 0.0;
+
+        ASSERT_NOT_NULL(sine_progression);
+        ASSERT_NOT_NULL(sine_progression_derivation_TeX);
+        sine_progression_text = expr_to_string(sine_progression, style_UNBOUND);
+        ASSERT_NOT_NULL(sine_progression_text);
+        ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(n/2)"));
+        ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(1/2·(n + 1))"));
+        ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(½)"));
+        ASSERT_NOT_NULL(strstr(string_c_str(sine_progression_derivation_TeX),
+                               "\\sum_{k=1}^{n}\\sin(k)"));
+        ASSERT_NOT_NULL(strstr(string_c_str(sine_progression_derivation_TeX),
+                               "\\frac{\\sin(\\frac{n}{2})"));
+        free(sine_progression_text);
+        expr_free(sine_progression);
+        string_free(sine_progression_derivation_TeX);
+
+        bound_sine_progression = expr_from_string(
+            "{ sin(1)+sin(2)+sin(3)+sin(4)+...+sin(n) | n=4 }", NULL);
+        ASSERT_NOT_NULL(bound_sine_progression);
+        sine_progression_value = expr_eval(bound_sine_progression);
+        for (long k = 1L; k <= 4L; ++k)
+            expected_value += sin((double)k);
+        ASSERT_TRUE(num_is_finite(sine_progression_value));
+        ASSERT_EQ_DOUBLE(num_to_double(sine_progression_value), expected_value, 1e-15);
+        num_destroy(&sine_progression_value);
+        expr_free(bound_sine_progression);
+    }
+
+    {
+        const char *cosine_progression_source = "cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx)";
+        string_t *cosine_progression_derivation_TeX = NULL;
+        expr_t *cosine_progression = expr_from_string_with_derivation_TeX(
+            cosine_progression_source, NULL, &cosine_progression_derivation_TeX);
+        char *cosine_progression_text;
+        expr_t *bound_cosine_progression;
+        number_t cosine_progression_value;
+        double expected_value = 0.0;
+
+        ASSERT_NOT_NULL(cosine_progression);
+        ASSERT_NOT_NULL(cosine_progression_derivation_TeX);
+        cosine_progression_text = expr_to_string(cosine_progression, style_UNBOUND);
+        ASSERT_NOT_NULL(cosine_progression_text);
+        ASSERT_NOT_NULL(strstr(cosine_progression_text, "sin(nx/2)"));
+        ASSERT_NOT_NULL(strstr(cosine_progression_text, "cos(x/2·(n + 1))"));
+        ASSERT_NOT_NULL(strstr(cosine_progression_text, "sin(x/2)"));
+        ASSERT_NOT_NULL(strstr(string_c_str(cosine_progression_derivation_TeX),
+                               "\\sum_{k=1}^{n}\\cos(k\\mkern-2mu x)"));
+        free(cosine_progression_text);
+        expr_free(cosine_progression);
+        string_free(cosine_progression_derivation_TeX);
+
+        bound_cosine_progression = expr_from_string(
+            "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=0.5; n=4 }", NULL);
+        ASSERT_NOT_NULL(bound_cosine_progression);
+        cosine_progression_value = expr_eval(bound_cosine_progression);
+        for (long k = 1L; k <= 4L; ++k)
+            expected_value += cos(0.5 * (double)k);
+        ASSERT_TRUE(num_is_finite(cosine_progression_value));
+        ASSERT_EQ_DOUBLE(num_to_double(cosine_progression_value), expected_value, 1e-15);
+        num_destroy(&cosine_progression_value);
+        expr_free(bound_cosine_progression);
+
+        bound_cosine_progression = expr_from_string(
+            "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=0; n=4 }", NULL);
+        ASSERT_NOT_NULL(bound_cosine_progression);
+        cosine_progression_value = expr_eval(bound_cosine_progression);
+        ASSERT_TRUE(num_is_finite(cosine_progression_value));
+        ASSERT_EQ_DOUBLE(num_to_double(cosine_progression_value), 4.0, 0.0);
+        num_destroy(&cosine_progression_value);
+        expr_free(bound_cosine_progression);
+    }
+
+    {
+        const char *hyperbolic_sources[] = {
+            "sinh(x)+sinh(2x)+sinh(3x)+sinh(4x)+...+sinh(nx)",
+            "cosh(x)+cosh(2x)+cosh(3x)+cosh(4x)+...+cosh(nx)",
+        };
+        const char *bound_hyperbolic_sources[] = {
+            "{ sinh(x)+sinh(2x)+sinh(3x)+sinh(4x)+...+sinh(nx) | x=0.25; n=4 }",
+            "{ cosh(x)+cosh(2x)+cosh(3x)+cosh(4x)+...+cosh(nx) | x=0.25; n=4 }",
+        };
+        const char *zero_hyperbolic_sources[] = {
+            "{ sinh(x)+sinh(2x)+sinh(3x)+sinh(4x)+...+sinh(nx) | x=0; n=4 }",
+            "{ cosh(x)+cosh(2x)+cosh(3x)+cosh(4x)+...+cosh(nx) | x=0; n=4 }",
+        };
+        const char *series_TeX[] = {"\\sum_{k=1}^{n}\\sinh(k\\mkern-2mu x)",
+                                    "\\sum_{k=1}^{n}\\cosh(k\\mkern-2mu x)"};
+
+        for (size_t hyperbolic_kind = 0u; hyperbolic_kind < 2u; ++hyperbolic_kind) {
+            string_t *hyperbolic_derivation_TeX = NULL;
+            expr_t *hyperbolic_progression = expr_from_string_with_derivation_TeX(
+                hyperbolic_sources[hyperbolic_kind], NULL, &hyperbolic_derivation_TeX);
+            char *hyperbolic_text;
+            expr_t *bound_hyperbolic_progression;
+            number_t hyperbolic_value;
+            double expected_hyperbolic_value = 0.0;
+
+            ASSERT_NOT_NULL(hyperbolic_progression);
+            ASSERT_NOT_NULL(hyperbolic_derivation_TeX);
+            hyperbolic_text = expr_to_string(hyperbolic_progression, style_UNBOUND);
+            ASSERT_NOT_NULL(hyperbolic_text);
+            ASSERT_NOT_NULL(strstr(hyperbolic_text, "sinh(nx/2)"));
+            ASSERT_NOT_NULL(strstr(hyperbolic_text, hyperbolic_kind == 0u ? "sinh(x/2·(n + 1))"
+                                                                         : "cosh(x/2·(n + 1))"));
+            ASSERT_NOT_NULL(strstr(hyperbolic_text, "sinh(x/2)"));
+            ASSERT_NOT_NULL(strstr(string_c_str(hyperbolic_derivation_TeX), series_TeX[hyperbolic_kind]));
+            free(hyperbolic_text);
+            expr_free(hyperbolic_progression);
+            string_free(hyperbolic_derivation_TeX);
+
+            bound_hyperbolic_progression = expr_from_string(bound_hyperbolic_sources[hyperbolic_kind], NULL);
+            ASSERT_NOT_NULL(bound_hyperbolic_progression);
+            hyperbolic_value = expr_eval(bound_hyperbolic_progression);
+            for (long k = 1L; k <= 4L; ++k)
+                expected_hyperbolic_value += hyperbolic_kind == 0u ? sinh(0.25 * (double)k)
+                                                                   : cosh(0.25 * (double)k);
+            ASSERT_TRUE(num_is_finite(hyperbolic_value));
+            ASSERT_EQ_DOUBLE(num_to_double(hyperbolic_value), expected_hyperbolic_value, 1e-15);
+            num_destroy(&hyperbolic_value);
+            expr_free(bound_hyperbolic_progression);
+
+            bound_hyperbolic_progression = expr_from_string(zero_hyperbolic_sources[hyperbolic_kind], NULL);
+            ASSERT_NOT_NULL(bound_hyperbolic_progression);
+            hyperbolic_value = expr_eval(bound_hyperbolic_progression);
+            ASSERT_TRUE(num_is_finite(hyperbolic_value));
+            ASSERT_EQ_DOUBLE(num_to_double(hyperbolic_value), hyperbolic_kind == 0u ? 0.0 : 4.0, 0.0);
+            num_destroy(&hyperbolic_value);
+            expr_free(bound_hyperbolic_progression);
+        }
+    }
+
+    {
+        const char *nested_source =
+            "1/2(1-1/(3*2^2)+1/(5*2^4)-....)+1/3(1-1/(3*3^2)+1/(5*3^4)-....)";
+        expr_t *nested = expr_from_string(nested_source, NULL);
+        char *nested_text;
+        number_t nested_value;
+
+        ASSERT_NOT_NULL(nested);
+        nested_text = expr_to_string(nested, style_UNBOUND);
+        ASSERT_NOT_NULL(nested_text);
+        TEST_ASSERT_STR_EQ(nested_text, "atan(½) + atan(⅓)");
+        nested_value = expr_eval(nested);
+        ASSERT_TRUE(num_is_finite(nested_value));
+        ASSERT_EQ_DOUBLE(num_to_double(nested_value), M_PI / 4.0, 1e-15);
+        num_destroy(&nested_value);
+        free(nested_text);
+        expr_free(nested);
+    }
+
+    {
+        const char *finite_nested_source =
+            "{ 2*(1-1/(3*2^2)+1/(5*2^4)-....+(-1)^n/((2n+1)*2^(2*n)))"
+            "+4/3*(1-1/(3*3^2)+1/(5*3^4)-....+(-1)^n/((2n+1)*3^(2*n))) | n = 2 }";
+        expr_t *finite_nested = expr_from_string(finite_nested_source, NULL);
+        char *finite_nested_function;
+        number_t finite_nested_value;
+
+        ASSERT_NOT_NULL(finite_nested);
+        finite_nested_function = expr_to_string(finite_nested, style_FUNCTION);
+        ASSERT_NOT_NULL(finite_nested_function);
+        ASSERT_NOT_NULL(strstr(finite_nested_function, "hypergeometric_pFq"));
+        finite_nested_value = expr_eval(finite_nested);
+        ASSERT_TRUE(num_is_finite(finite_nested_value));
+        ASSERT_EQ_DOUBLE(num_to_double(finite_nested_value), 3.1455761316872428, 1e-15);
+        num_destroy(&finite_nested_value);
+        free(finite_nested_function);
+        expr_free(finite_nested);
+    }
+
     ASSERT_NOT_NULL(expression);
     ASSERT_NOT_NULL(derivation_TeX);
     expression_text = expr_to_string(expression, style_EXPRESSION);
@@ -155,7 +432,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text, "π²/6 - ψ⁽¹⁾(2001)");
-    ASSERT_NOT_NULL(strstr(function_text, "return π^2/6 - trigamma(2001)."));
+    ASSERT_NOT_NULL(strstr(function_text, "return @pi^2/6 - trigamma(2001)."));
     free(function_text);
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{2000}\\frac{1}{n^{2}}"));
@@ -208,14 +485,27 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(derivation_TeX);
     expression_text = expr_to_string(expression, style_EXPRESSION);
     ASSERT_NOT_NULL(expression_text);
-    ASSERT_NOT_NULL(strstr(expression_text, "Σ_(k=0)^n 4·(-1)^k/(2k + 1)"));
+    ASSERT_NOT_NULL(strstr(expression_text, "π +"));
+    ASSERT_NOT_NULL(strstr(expression_text, "ψ⁽⁰⁾(n/2 + ⁵⁄₄)"));
+    ASSERT_NOT_NULL(strstr(expression_text, "ψ⁽⁰⁾(n/2 + ¾)"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "4\\mkern-2mu \\left(-1\\right)^{k}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(\\frac{n}{2} + \\frac{5}{4})"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(\\frac{n}{2} + \\frac{3}{4})"));
     free(expression_text);
     expr_bindings_free(bindings);
     bindings = NULL;
     expr_free(expression);
     string_free(derivation_TeX);
+
+    expression = expr_from_string(
+        "{ 4 - 4/3 + 4/5 - 4/7 + ... + 4(-1)^n/(2n+1) | n = 10 }", NULL);
+    ASSERT_NOT_NULL(expression);
+    actual = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(actual));
+    ASSERT_EQ_DOUBLE(num_to_double(actual), 3.2323158094055927, 1e-15);
+    num_destroy(&actual);
+    expr_free(expression);
 
     derivation_TeX = NULL;
     expression = expr_from_string_with_derivation_TeX(
@@ -304,7 +594,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text, "π²/6 - ψ⁽¹⁾(100000001)");
-    ASSERT_NOT_NULL(strstr(function_text, "return π^2/6 - trigamma(100000001)."));
+    ASSERT_NOT_NULL(strstr(function_text, "return @pi^2/6 - trigamma(100000001)."));
     free(function_text);
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{100000000}\\frac{1}{n^{2}}"));
@@ -326,7 +616,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text, "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }");
-    ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + γ."));
+    ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + @gamma."));
     free(function_text);
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{N}\\frac{1}{n}"));
@@ -2377,9 +2667,9 @@ static void test_binding_edit_preserves_symbolic_value(void)
     char *fraction_func_text = fraction ? expr_to_string(fraction, style_FUNCTION) : NULL;
     char *tenth_func_text = tenth ? expr_to_string(tenth, style_FUNCTION) : NULL;
     bool expression_preserved = expr_text && strstr(expr_text, "x = π");
-    bool function_preserved = func_text && strstr(func_text, "x = @pi;\noutput(expr(x));");
-    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = 1/2;\noutput(expr(x));");
-    bool tenth_preserved = tenth_func_text && strstr(tenth_func_text, "x = 1/10;\noutput(expr(x));");
+    bool function_preserved = func_text && strstr(func_text, "x = @pi.\noutput(expr(x)).");
+    bool fraction_preserved = fraction_func_text && strstr(fraction_func_text, "x = 1/2.\noutput(expr(x)).");
+    bool tenth_preserved = tenth_func_text && strstr(tenth_func_text, "x = 1/10.\noutput(expr(x)).");
 
     free(tenth_func_text);
     free(fraction_func_text);
@@ -2412,11 +2702,11 @@ static void test_binding_edit_preserves_array_value(void)
     TEST_ASSERT_STR_EQ(expression, "{ x² + c | x = [1, 2, 3]; c = 4 }");
     TEST_ASSERT_STR_EQ(function,
                        "expression expr(array x, const c) {\n"
-                       "    return x^2 + c;\n"
+                       "    return x^2 + c.\n"
                        "}\n\n"
-                       "x = [1, 2, 3];\n"
-                       "const c = 4;\n"
-                       "output(expr(x, c));");
+                       "x = [1, 2, 3].\n"
+                       "const c = 4.\n"
+                       "output(expr(x, c)).");
 
     free(function);
     free(expression);
@@ -2544,7 +2834,7 @@ static void test_from_string_unevaluated_integral(void)
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "return -(cos(3));") != NULL) {
+    if (func_text && strstr(func_text, "return -(cos(3)).") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S literal upper bound function is completed by MARS\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
@@ -2572,7 +2862,7 @@ static void test_from_string_unevaluated_integral(void)
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "return ln(3);") != NULL) {
+    if (func_text && strstr(func_text, "return ln(3).") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S bounded function is completed by MARS\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {

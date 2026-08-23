@@ -212,6 +212,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_E1(z)` | exponential integral E₁(z); satisfies E₁(z) = −Ei(−z) for real z > 0 |
 | `qc_dilog(z)` | principal dilogarithm Li₂(z) |
 | `qc_polylog(s, z)` | polylogarithm Li_s(z) for integer real orders currently supported by the implementation |
+| `qc_harmonic_poly(degree, z)` | finite harmonic polynomial Hₙ(z) = Σₖ₌₁ⁿ zᵏ/k for an `unsigned long` degree |
 | `qc_legendre_chi(s, z)` | Legendre chi χ_s(z) for integer real orders currently supported by the implementation |
 | `qc_hypergeometric_pFq(upper, upper_count, lower, lower_count, argument)` | generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero |
 | `qc_lauricella_f(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
