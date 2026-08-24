@@ -32,7 +32,7 @@ static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *ri
 static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument);
 static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
 static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument);
-expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr);
+expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 static number_t eval_formal_series_component(expr_t *dv)
 {
@@ -106,7 +106,7 @@ static number_t eval_finite_summation(expr_t *dv)
         !expr_summation_bound_to_long(upper, &upper_value))
         return num_clone(NUM_NAN);
     if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms) {
-        expr_t *closed_form = lower_value == 1L ? expr_finite_hyperbolic_progression_closed_form(dv) : NULL;
+        expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(dv) : NULL;
 
         if (closed_form) {
             number_t closed_value = expr_eval(closed_form);
@@ -237,8 +237,16 @@ static expr_t *deriv_product(expr_t *dv)
     return out;
 }
 
-static bool expr_finite_hyperbolic_progression_parts(const expr_t *expr, const expr_t **upper_out,
-                                                     const expr_t **step_out, bool *sinh_term_out)
+typedef enum {
+    EXPR_FINITE_PROGRESSION_NONE,
+    EXPR_FINITE_PROGRESSION_SIN,
+    EXPR_FINITE_PROGRESSION_COS,
+    EXPR_FINITE_PROGRESSION_SINH,
+    EXPR_FINITE_PROGRESSION_COSH,
+} expr_finite_progression_kind_t;
+
+static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out,
+                                          expr_finite_progression_kind_t *kind_out)
 {
     const expr_t *index;
     const expr_t *bounds;
@@ -249,10 +257,10 @@ static bool expr_finite_hyperbolic_progression_parts(const expr_t *expr, const e
     const expr_t *right;
     const expr_t *step;
     number_t lower_value = NUM_NAN;
-    bool sinh_term;
+    expr_finite_progression_kind_t kind = EXPR_FINITE_PROGRESSION_NONE;
     bool matched = false;
 
-    if (!expr || !upper_out || !step_out || !sinh_term_out || !expr_is_op(expr, &ops_summation) ||
+    if (!expr || !upper_out || !step_out || !kind_out || !expr_is_op(expr, &ops_summation) ||
         !expr_is_op(expr->b, &ops_argument_list))
         return false;
     index = expr->b->a;
@@ -264,8 +272,15 @@ static bool expr_finite_hyperbolic_progression_parts(const expr_t *expr, const e
     lower_value = expr_eval(lower);
     if (!num_is_exact(lower_value) || !num_is_one(lower_value))
         goto cleanup;
-    sinh_term = expr_is_op(expr->a, &ops_sinh);
-    if (!sinh_term && !expr_is_op(expr->a, &ops_cosh))
+    if (expr_is_op(expr->a, &ops_sin))
+        kind = EXPR_FINITE_PROGRESSION_SIN;
+    else if (expr_is_op(expr->a, &ops_cos))
+        kind = EXPR_FINITE_PROGRESSION_COS;
+    else if (expr_is_op(expr->a, &ops_sinh))
+        kind = EXPR_FINITE_PROGRESSION_SINH;
+    else if (expr_is_op(expr->a, &ops_cosh))
+        kind = EXPR_FINITE_PROGRESSION_COSH;
+    else
         goto cleanup;
     argument = expr->a->a;
     if (!expr_match_mul_expr(argument, &left, &right))
@@ -279,7 +294,7 @@ static bool expr_finite_hyperbolic_progression_parts(const expr_t *expr, const e
 
     *upper_out = upper;
     *step_out = step;
-    *sinh_term_out = sinh_term;
+    *kind_out = kind;
     matched = true;
 
 cleanup:
@@ -593,12 +608,12 @@ static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, ex
     return expr_simplify_binary_operator(expr, term, bounds);
 }
 
-/* Return the closed form of a recognised finite hyperbolic progression. */
-expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr)
+/* Return the closed form of a recognised finite circular or hyperbolic progression. */
+expr_t *expr_finite_progression_closed_form(const expr_t *expr)
 {
     const expr_t *upper;
     const expr_t *step;
-    bool sinh_term;
+    expr_finite_progression_kind_t kind;
     expr_t *upper_times_step = NULL;
     expr_t *first_argument = NULL;
     expr_t *upper_plus_one = NULL;
@@ -611,18 +626,33 @@ expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr)
     expr_t *denominator = NULL;
     expr_t *closed_form = NULL;
 
-    if (!expr_finite_hyperbolic_progression_parts(expr, &upper, &step, &sinh_term))
+    if (!expr_finite_progression_parts(expr, &upper, &step, &kind))
         return NULL;
     upper_times_step = expr_mul(upper, step);
     first_argument = upper_times_step ? expr_div_long(upper_times_step, 2L) : NULL;
     upper_plus_one = expr_add_long(upper, 1L);
     second_product = upper_plus_one ? expr_mul(upper_plus_one, step) : NULL;
     second_argument = second_product ? expr_div_long(second_product, 2L) : NULL;
-    first_factor = first_argument ? expr_sinh(first_argument) : NULL;
-    second_factor = second_argument ? (sinh_term ? expr_sinh(second_argument) : expr_cosh(second_argument)) : NULL;
+    if (kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS) {
+        first_factor = first_argument ? expr_sin(first_argument) : NULL;
+        second_factor = second_argument
+                            ? (kind == EXPR_FINITE_PROGRESSION_SIN ? expr_sin(second_argument)
+                                                                   : expr_cos(second_argument))
+                            : NULL;
+    } else {
+        first_factor = first_argument ? expr_sinh(first_argument) : NULL;
+        second_factor = second_argument
+                            ? (kind == EXPR_FINITE_PROGRESSION_SINH ? expr_sinh(second_argument)
+                                                                    : expr_cosh(second_argument))
+                            : NULL;
+    }
     numerator = first_factor && second_factor ? expr_mul(first_factor, second_factor) : NULL;
     denominator_argument = expr_div_long(step, 2L);
-    denominator = denominator_argument ? expr_sinh(denominator_argument) : NULL;
+    denominator = denominator_argument
+                      ? (kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS
+                             ? expr_sin(denominator_argument)
+                             : expr_sinh(denominator_argument))
+                      : NULL;
     closed_form = numerator && denominator ? expr_div(numerator, denominator) : NULL;
 
     expr_free(denominator);
@@ -638,8 +668,8 @@ expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr)
     return closed_form;
 }
 
-/* Render a native finite sinh/cosh summation together with its geometric-series identity. */
-char *expr_finite_hyperbolic_progression_identity_TeX(const expr_t *expr)
+/* Render a native finite circular or hyperbolic summation together with its geometric-series identity. */
+char *expr_finite_progression_identity_TeX(const expr_t *expr)
 {
     const expr_t *upper;
     const expr_t *step;
@@ -648,9 +678,9 @@ char *expr_finite_hyperbolic_progression_identity_TeX(const expr_t *expr)
     char *upper_TeX = NULL;
     char *step_TeX = NULL;
     char *identity_TeX = NULL;
-    bool sinh_term;
+    expr_finite_progression_kind_t kind;
 
-    if (!expr_finite_hyperbolic_progression_parts(expr, &upper, &step, &sinh_term))
+    if (!expr_finite_progression_parts(expr, &upper, &step, &kind))
         return NULL;
 
     if (!step->name || !*step->name)
@@ -660,17 +690,24 @@ char *expr_finite_hyperbolic_progression_identity_TeX(const expr_t *expr)
     upper_TeX = expr_to_TeX_body(upper);
     step_TeX = symbolic_step ? expr_to_TeX_body(symbolic_step) : NULL;
     if (summation_TeX && upper_TeX && step_TeX) {
-        const char *second_function = sinh_term ? "\\sinh" : "\\cosh";
-        const char *format = "%s = \\frac{\\sinh(\\frac{%s\\mkern-2mu %s}{2})\\mkern-2mu "
-                             "%s(\\frac{%s}{2}\\mkern-2mu \\left(%s + 1\\right))}{\\sinh(\\frac{%s}{2})}";
-        const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, upper_TeX, step_TeX,
-                                               second_function, step_TeX, upper_TeX, step_TeX) +
+        const bool circular = kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS;
+        const char *first_function = circular ? "\\sin" : "\\sinh";
+        const char *second_function = kind == EXPR_FINITE_PROGRESSION_SIN
+                                          ? "\\sin"
+                                      : kind == EXPR_FINITE_PROGRESSION_COS
+                                          ? "\\cos"
+                                      : kind == EXPR_FINITE_PROGRESSION_SINH ? "\\sinh" : "\\cosh";
+        const char *format = "%s = \\frac{%s(\\frac{%s\\mkern-2mu %s}{2})\\mkern-2mu "
+                             "%s(\\frac{%s}{2}\\mkern-2mu \\left(%s + 1\\right))}{%s(\\frac{%s}{2})}";
+        const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, first_function, upper_TeX,
+                                               step_TeX, second_function, step_TeX, upper_TeX, first_function,
+                                               step_TeX) +
                               1u;
 
         identity_TeX = malloc(length);
         if (identity_TeX)
-            snprintf(identity_TeX, length, format, summation_TeX, upper_TeX, step_TeX, second_function, step_TeX,
-                     upper_TeX, step_TeX);
+            snprintf(identity_TeX, length, format, summation_TeX, first_function, upper_TeX, step_TeX,
+                     second_function, step_TeX, upper_TeX, first_function, step_TeX);
     }
 
     free(step_TeX);

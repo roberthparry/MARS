@@ -215,12 +215,15 @@ static void test_from_string_series_ellipsis(void)
 
     {
         expr_bindings_t *sum_bindings = NULL;
+        expr_bindings_t *sine_bindings = NULL;
         expr_bindings_t *product_bindings = NULL;
         expr_t *sum = expr_from_string("{ @Z_k=1^n sinh(kx)/k | x=0.2; n=4 }", &sum_bindings);
+        expr_t *sine_sum = expr_from_string("{ @Z_k=1^n sin(kx) | x=pi/6; n=100000 }", &sine_bindings);
         expr_t *product = expr_from_string("{ @P_k=1^n (1-1/k^s) | n=4; s=2 }", &product_bindings);
         expr_t *infinite_sum = expr_from_string("{ @Z_n=1 1/n^2 }", NULL);
         expr_t *infinite_product = expr_from_string("{ @P_k=1 (1-1/k^s) }", NULL);
         number_t sum_value;
+        number_t sine_value;
         number_t product_value;
         char *sum_text;
         char *product_text;
@@ -232,19 +235,41 @@ static void test_from_string_series_ellipsis(void)
         char *sum_derivative_function;
 
         ASSERT_NOT_NULL(sum);
+        ASSERT_NOT_NULL(sine_sum);
         ASSERT_NOT_NULL(product);
         ASSERT_NOT_NULL(infinite_sum);
         ASSERT_NOT_NULL(infinite_product);
         ASSERT_NOT_NULL(sum_bindings);
+        ASSERT_NOT_NULL(sine_bindings);
         ASSERT_NOT_NULL(product_bindings);
         ASSERT_TRUE(expr_is_differentiable(sum));
         ASSERT_TRUE(expr_is_differentiable(product));
         ASSERT_NULL(expr_bindings_get(sum_bindings, "k"));
+        ASSERT_NULL(expr_bindings_get(sine_bindings, "k"));
         ASSERT_NULL(expr_bindings_get(product_bindings, "k"));
         sum_value = expr_eval(sum);
+        sine_value = expr_eval(sine_sum);
         product_value = expr_eval(product);
         ASSERT_EQ_DOUBLE(num_to_double(sum_value), 0.8409565217054879, 1e-15);
+        ASSERT_EQ_DOUBLE(num_to_double(sine_value), 3.2320508075688773, 1e-15);
         ASSERT_TRUE(num_is_zero(product_value));
+        {
+            expr_t *sine_closed = expr_finite_progression_closed_form(sine_sum);
+            char *sine_closed_text = sine_closed ? expr_to_string(sine_closed, style_UNBOUND) : NULL;
+            char *sine_identity_TeX = expr_finite_progression_identity_TeX(sine_sum);
+
+            ASSERT_NOT_NULL(sine_closed);
+            ASSERT_NOT_NULL(sine_closed_text);
+            ASSERT_NOT_NULL(sine_identity_TeX);
+            TEST_ASSERT_STR_EQ(sine_closed_text, "sin(nx/2)·sin(x/2·(n + 1))/sin(x/2)");
+            TEST_ASSERT_STR_EQ(sine_identity_TeX,
+                               "\\sum_{k=1}^{n}\\sin(k\\mkern-2mu x) = "
+                               "\\frac{\\sin(\\frac{n\\mkern-2mu x}{2})\\mkern-2mu "
+                               "\\sin(\\frac{x}{2}\\mkern-2mu \\left(n + 1\\right))}{\\sin(\\frac{x}{2})}");
+            free(sine_identity_TeX);
+            free(sine_closed_text);
+            expr_free(sine_closed);
+        }
         sum_text = expr_to_string(sum, style_UNBOUND);
         product_text = expr_to_string(product, style_UNBOUND);
         infinite_sum_text = expr_to_string(infinite_sum, style_UNBOUND);
@@ -289,10 +314,13 @@ static void test_from_string_series_ellipsis(void)
         free(product_text);
         free(sum_text);
         num_destroy(&product_value);
+        num_destroy(&sine_value);
         num_destroy(&sum_value);
         expr_free(infinite_product);
         expr_free(infinite_sum);
         expr_free(product);
+        expr_free(sine_sum);
+        expr_bindings_free(sine_bindings);
         expr_free(sum);
         expr_bindings_free(product_bindings);
         expr_bindings_free(sum_bindings);

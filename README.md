@@ -65,9 +65,11 @@ domain-appropriate closed form, and a Value card appears whenever all required
 parameters have been supplied. Finite `sin`, `cos`, `sinh` and `cosh`
 progressions are recognised directly; harmonic-polynomial notation supplies a
 finite symbolic antiderivative for the cosine progression. Native `@Z` and
-`@P` notation supplies formal sums and products. Weighted hyperbolic sums use a
-bounded Li₁/Lerch representation, stable direct values and an inverse
-calculus simplification that recovers their finite-sum derivative.
+`@P` notation supplies formal sums and products. Formal finite trigonometric
+and hyperbolic progressions expose the same closed formulae and efficient
+values as their ellipsis forms. Weighted hyperbolic sums use a bounded
+Li₁/Lerch representation, stable direct values and an inverse calculus
+simplification that recovers their finite-sum derivative.
 
 After building MARS and installing the Lab's runtime dependencies, start it
 from the repository root:

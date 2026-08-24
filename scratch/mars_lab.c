@@ -71,7 +71,7 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
 
 static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_finite_hyperbolic_progression_identity_TeX(expr);
+    char *body = expr_finite_progression_identity_TeX(expr);
 
     if (!body && expr_is_finite_weighted_sinh_lerch_form(expr))
         body = expr_to_TeX_body(expr);
@@ -1863,7 +1863,7 @@ int main(int argc, char **argv)
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    progression_closed_form = expr_finite_hyperbolic_progression_closed_form(expr);
+    progression_closed_form = expr_finite_progression_closed_form(expr);
     weighted_lerch_form = evaluate_request ? expr_finite_weighted_sinh_lerch_form(expr) : NULL;
     display_expr = weighted_lerch_form
                        ? weighted_lerch_form
@@ -1881,7 +1881,7 @@ int main(int argc, char **argv)
     func_text = expr_text_dup(display_expr, style_FUNCTION);
     recognised_weighted_lerch_form = expr_is_finite_weighted_sinh_lerch_form(expr);
     TeX_text = progression_closed_form
-                   ? expr_finite_hyperbolic_progression_identity_TeX(expr)
+                   ? expr_finite_progression_identity_TeX(expr)
                    : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_TeX_body_dup(display_expr);
 
     printf("input       %s\n", raw_input);
@@ -1923,7 +1923,7 @@ int main(int argc, char **argv)
             rc = 1;
             goto cleanup;
         }
-        derivative_progression_closed_form = expr_finite_hyperbolic_progression_closed_form(deriv);
+        derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
         display_deriv = derivative_progression_closed_form
                             ? derivative_progression_closed_form
                             : display_polynomial_simplified(deriv, wrt, complex_cartesian);
@@ -1949,7 +1949,7 @@ int main(int argc, char **argv)
             deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
             deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
             deriv_TeX_text = derivative_progression_closed_form
-                                 ? expr_finite_hyperbolic_progression_identity_TeX(deriv)
+                                 ? expr_finite_progression_identity_TeX(deriv)
                                  : expr_TeX_body_dup(display_deriv);
         }
         normalise_double_minus_owned(&deriv_text);

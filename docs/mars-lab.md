@@ -112,6 +112,18 @@ a binding control. Mathematical output renders sums with Σ; Function output
 uses `sum(k, 1, n, term)` when the summation itself remains the simplified
 result.
 
+Formal `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
+use the same native geometric-series identities as recognised ellipsis input.
+For example, with supplied `x` and `n`, `@Z_k=1^n sin(kx)` displays
+
+$$
+\sum_{k=1}^{n}\sin(kx)
+=\frac{\sin(nx/2)\sin((n+1)x/2)}{\sin(x/2)},
+$$
+
+and supplies its numerical Value without iterating through a large upper
+bound.
+
 The weighted hyperbolic sum `@Z_k=1^n sinh(kx)/k` has a native Lerch-
 transcendent form built from Li₁ and Φ. Its TeX stays on one line when space
 permits, Expression output uses `Li1` and the capital symbol `Φ`, and Function
