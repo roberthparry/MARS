@@ -6046,6 +6046,32 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertIn(r"\frac{3^{n} - 1}{2}", expression["derivation_TeX"])
         self.assertEqual(expression["value"], "29524")
 
+        # README example: a formal sine sum supplies its geometric closed form and large-bound value.
+        source = "{ @Z_k=1^n sin(kx) | x=pi/6; n=100000 }"
+        expression, raw, returncode = mars_lab.run_mars_lab_fields(
+            scratch / "mars_lab",
+            source,
+            64,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            scratch / "mars_lab", expression, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "{ sin(nx/2)·sin(x/2·(n + 1))/sin(x/2) | x = π/6; n = 100000 }",
+        )
+        self.assertEqual(
+            payload["display_TeX"],
+            r"\sum_{k=1}^{n}\sin(k\mkern-2mu x) = "
+            r"\frac{\sin(\frac{n\mkern-2mu x}{2})\mkern-2mu "
+            r"\sin(\frac{x}{2}\mkern-2mu \left(n + 1\right))}{\sin(\frac{x}{2})}",
+        )
+        self.assertIn("return sin(n.v1).sin((n + 1).v1)/sin(v1).", payload["full_display_function"])
+        self.assertTrue(str(payload.get("value", "")).startswith("3.232050807568877293527446341505872"))
+
         # README examples: symbolic complex elementary functions use Cartesian output.
         for source, expected in (
             ("exp(x+i*y)", "exp(x)·cos(y) + exp(x)·sin(y)·i"),

@@ -1035,6 +1035,9 @@ bindings.
     is not returned as a binding
   - infinite summations and products omit the upper bound: `@Z_k=1 f(k)` and
     `@P_k=1 f(k)` produce `Σ_(k=1)^∞ f(k)` and `@P_k=1 f(k)` respectively
+  - finite `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
+    expose their geometric-series closed forms; supplied bindings therefore
+    evaluate large upper bounds without term-by-term iteration
   - `sqrt(x)` or `√(x)` for a single principal square root; `cubrt(x)` and `root(x, n)` for single principal cube
     and integer-order roots
   - `conj(x)` and `conjugate(x)` for complex conjugation, with postfix `x^*` as the equivalent shorthand

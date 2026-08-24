@@ -182,24 +182,24 @@ bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_is_summation(const expr_t *expr);
 
 /**
- * @brief Return the closed form of a recognised finite hyperbolic progression.
+ * @brief Return the closed form of a recognised finite circular or hyperbolic progression.
  *
  * @param expr Expression to inspect.
  * @return Owning closed-form expression, or `NULL` when no identity applies.
  */
-expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr);
+expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr);
 bool expr_finite_weighted_sinh_lerch_value(const expr_t *expr, number_t *value_out);
 
 /**
- * @brief Render a finite hyperbolic progression as a summation followed by its closed form.
+ * @brief Render a finite circular or hyperbolic progression as a summation followed by its closed form.
  *
  * @param expr Expression to inspect.
  * @return Newly allocated TeX text, or `NULL` when the expression is not a recognised progression.
  */
-char *expr_finite_hyperbolic_progression_identity_TeX(const expr_t *expr);
+char *expr_finite_progression_identity_TeX(const expr_t *expr);
 bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out);
