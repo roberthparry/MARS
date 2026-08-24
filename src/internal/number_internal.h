@@ -18,6 +18,7 @@ number_t num_as_complex_prec(number_t number, size_t precision_bits);
 num_scope_t *number_scope_suspend(void);
 void number_scope_resume(num_scope_t *scope);
 void num_scope_resume_cleanup(num_scope_t **scope);
+number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
 
 #define NUM_SCOPE_SUSPEND(name)                                                                                        \
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()

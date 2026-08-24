@@ -71,7 +71,12 @@ static char *expr_text_dup(const expr_t *expr, style_t style)
 
 static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_TeX_body_wrapped(expr, 280u);
+    char *body = expr_finite_hyperbolic_progression_identity_TeX(expr);
+
+    if (!body && expr_is_finite_weighted_sinh_lerch_form(expr))
+        body = expr_to_TeX_body(expr);
+    if (!body)
+        body = expr_to_TeX_body_wrapped(expr, 280u);
 
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
@@ -1788,8 +1793,11 @@ int main(int argc, char **argv)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = NULL;
     expr_t *display_expr = NULL;
+    expr_t *weighted_lerch_form = NULL;
+    expr_t *progression_closed_form = NULL;
     expr_t *deriv = NULL;
     expr_t *display_deriv = NULL;
+    expr_t *derivative_progression_closed_form = NULL;
     expr_t *integral = NULL;
     expr_t *display_integral = NULL;
     expr_t *wrt = NULL;
@@ -1816,6 +1824,7 @@ int main(int argc, char **argv)
     bool display_expr_owned = false;
     bool display_deriv_owned = false;
     bool domain_specialised = false;
+    bool recognised_weighted_lerch_form = false;
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -1854,9 +1863,15 @@ int main(int argc, char **argv)
     if (bindings)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
-    display_expr = derivation_TeX && string_length(derivation_TeX) > 0u
-                       ? expr_clone(expr)
-                       : display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
+    progression_closed_form = expr_finite_hyperbolic_progression_closed_form(expr);
+    weighted_lerch_form = evaluate_request ? expr_finite_weighted_sinh_lerch_form(expr) : NULL;
+    display_expr = weighted_lerch_form
+                       ? weighted_lerch_form
+                       : progression_closed_form
+                       ? progression_closed_form
+                       : derivation_TeX && string_length(derivation_TeX) > 0u
+                             ? expr_clone(expr)
+                             : display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
     display_expr_owned = display_expr != NULL;
     if (!display_expr)
         display_expr = expr;
@@ -1864,7 +1879,10 @@ int main(int argc, char **argv)
     expr_text = expr_text_dup(display_expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(display_expr, style_FUNCTION);
-    TeX_text = expr_TeX_body_dup(display_expr);
+    recognised_weighted_lerch_form = expr_is_finite_weighted_sinh_lerch_form(expr);
+    TeX_text = progression_closed_form
+                   ? expr_finite_hyperbolic_progression_identity_TeX(expr)
+                   : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_TeX_body_dup(display_expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -1874,13 +1892,16 @@ int main(int argc, char **argv)
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
     printf("algebraic_specialisation  %s\n", domain_specialised ? "domain-required" : "none");
     print_bindings("binding", bindings, precision);
-    printf("differentiable  %s\n", expr_is_differentiable(expr) ? "yes" : "no");
+    printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
     if (evaluate_request)
         print_explicit_root_family(expr, precision);
     value_note[0] = '\0';
     {
-        number_t value_number = expr_eval(display_expr);
+        number_t value_number = NUM_NAN;
+
+        if (!expr_finite_weighted_sinh_lerch_value(expr, &value_number))
+            value_number = expr_eval(expr);
 
         print_owned_number("value", num_clone(value_number), precision);
         if (expr_integral_value_note(expr, value_note, sizeof(value_note)))
@@ -1902,7 +1923,10 @@ int main(int argc, char **argv)
             rc = 1;
             goto cleanup;
         }
-        display_deriv = display_polynomial_simplified(deriv, wrt, complex_cartesian);
+        derivative_progression_closed_form = expr_finite_hyperbolic_progression_closed_form(deriv);
+        display_deriv = derivative_progression_closed_form
+                            ? derivative_progression_closed_form
+                            : display_polynomial_simplified(deriv, wrt, complex_cartesian);
         if (display_deriv) {
             display_deriv_owned = true;
         } else {
@@ -1924,7 +1948,9 @@ int main(int argc, char **argv)
         } else {
             deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
             deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
-            deriv_TeX_text = expr_TeX_body_dup(display_deriv);
+            deriv_TeX_text = derivative_progression_closed_form
+                                 ? expr_finite_hyperbolic_progression_identity_TeX(deriv)
+                                 : expr_TeX_body_dup(display_deriv);
         }
         normalise_double_minus_owned(&deriv_text);
         normalise_double_minus_owned(&deriv_func_text);
@@ -1944,23 +1970,28 @@ int main(int argc, char **argv)
 
     if (integral_request) {
         if (wrt_is_variable) {
-            integral = expr_integrate_family(expr, wrt);
+            integral = expr_integrate_family(display_expr, wrt);
             if (!integral) {
                 printf("integral  no symbolic integral with respect to %s\n", wrt_name);
             } else {
                 const expr_t *family_left = NULL;
                 const expr_t *family_right = NULL;
                 const char *integration_constant_name = NULL;
+                expr_t *weighted_integral_left = NULL;
                 bool family_subtract = false;
 
                 if (expr_match_add_sub_expr(integral, &family_left, &family_right, &family_subtract) &&
                     !family_subtract && expr_is_named_const(family_right))
                     integration_constant_name = expr_symbol_name(family_right);
-                (void)family_left;
-
-                display_integral = expr_contains_summation_for_display(integral)
-                                       ? expr_clone(integral)
-                                       : display_polynomial_simplified(integral, wrt, complex_cartesian);
+                weighted_integral_left = integration_constant_name
+                                             ? expr_finite_weighted_sinh_lerch_form(family_left)
+                                             : NULL;
+                display_integral = weighted_integral_left ? expr_add(weighted_integral_left, family_right) : NULL;
+                expr_free(weighted_integral_left);
+                if (!display_integral)
+                    display_integral = expr_contains_summation_for_display(integral)
+                                           ? expr_clone(integral)
+                                           : display_polynomial_simplified(integral, wrt, complex_cartesian);
                 if (!display_integral)
                     display_integral = integral;
                 if (integration_constant_name) {

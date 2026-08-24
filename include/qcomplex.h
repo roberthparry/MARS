@@ -399,7 +399,16 @@ qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
  */
 qcomplex_t qc_zetap(qcomplex_t z);
 qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
+/**
+ * @brief Compute the order-one polylogarithm Li₁(z).
+ *
+ * @param z Complex argument.
+ * @return Li₁(z) = -log(1-z) on the principal branch.
+ */
+qcomplex_t qc_polylog1(qcomplex_t z);
 qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z);         /**< polylogarithm Li_s(z), integer s */
+/** Compute the principal Lerch transcendent Phi(z,s,a) where implemented. */
+qcomplex_t qc_lerch_phi(qcomplex_t z, qcomplex_t s, qcomplex_t a);
 /**
  * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
  *

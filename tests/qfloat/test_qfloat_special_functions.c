@@ -899,12 +899,15 @@ void test_qf_polylog(void)
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(half), expect, 1e-27);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half), expect, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lerch_phi(half, qf_from_double(2.0), QF_ONE), qf_mul_double(expect, 2.0),
+                                     1e-27);
     }
 
     {
         qfloat_t x = qf_from_double(0.25);
         qfloat_t one_minus_x = qf_sub(QF_ONE, x);
 
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog1(x), qf_neg(qf_log(one_minus_x)), 1e-28);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ONE, x), qf_neg(qf_log(one_minus_x)), 1e-28);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(QF_ZERO, x), qf_div(x, one_minus_x), 1e-28);
     }

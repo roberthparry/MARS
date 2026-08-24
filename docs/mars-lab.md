@@ -105,6 +105,33 @@ Expression input accepts `Hn(n,z)` and `harmonic_poly(n,z)`. The Function card
 uses `harmonic_poly`, and the same native node supports repeated symbolic
 differentiation and direct integration.
 
+Formal finite sums and products use `@Z_k=1^n term` and `@P_k=1^n term`.
+Omitting the upper bound produces the corresponding infinite operator, as in
+`@Z_k=1 term` or `@P_k=1 term`. The operator index is local: it does not create
+a binding control. Mathematical output renders sums with Σ; Function output
+uses `sum(k, 1, n, term)` when the summation itself remains the simplified
+result.
+
+The weighted hyperbolic sum `@Z_k=1^n sinh(kx)/k` has a native Lerch-
+transcendent form built from Li₁ and Φ. Its TeX stays on one line when space
+permits, Expression output uses `Li1` and the capital symbol `Φ`, and Function
+output uses `Li1` and `LerchPhi`. **Use as input** copies that exact parseable
+Expression representation back to the editor while retaining the supplied
+bindings. Differentiating the copied form recognises the identity from which it
+came and returns
+
+$$
+\sum_{k=1}^{n}\cosh(kx)
+=\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)}.
+$$
+
+The Value card evaluates the combined weighted sum through a stable native
+path rather than exposing the large cancelling imaginary parts of individual
+principal-branch terms. It also avoids iterating through every term for a very
+large finite upper bound. The browser receives the simplified algebra,
+renderings and value from MARSlib; it does not parse, simplify or substitute
+the mathematics itself.
+
 The captured editor input is `1+1/2^p+1/3^p+...+1/n^p`; its binding boxes
 supply `p = 2.5` and `n = 100`. MARS recognises
 
@@ -139,9 +166,16 @@ simplified expression:
 - **Function** shows an evaluable MARS function. Reused expression-DAG nodes
   are named once as intermediate constants or variables before the return
   expression. A shared subexpression such as `x/2` is assigned once and reused.
+  When both `exp(x)` and `exp(-x)` are needed, the second temporary reuses the
+  first as `v2 = 1/v1`.
 - **Value** appears whenever supplied bindings allow a numerical result. It is
   the only card that substitutes those bindings; it also appears when
   simplification proves a binding-independent value despite an unset binding.
+
+**Use as input** takes its source from the native parseable Expression result,
+not from TeX or Function presentation. Its binding-aware transfer preserves
+the expression body's order and notation while applying the result bindings to
+the editor controls.
 
 [![MARS Lab expression mode displaying an inverse-power series as a sigma, Hurwitz-zeta formula and numerical value](images/mars-lab/expression.png?v=20260820-2)](images/mars-lab/expression.png?v=20260820-2)
 
@@ -149,6 +183,10 @@ Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
 without surrounding spaces. Constants use `const`; arrays use `array`; and
 generated intermediate values use compact names such as `c1` and `v1`.
+The source annotation above a generated function is enclosed by single
+backticks, so it remains one valid delimited comment even when the card wraps
+it over several visual lines. Two backticks remain the separate line-comment
+syntax.
 Typeable named constants use `@pi`, `@phi`, `@gamma`, `@tau` and `@inf`, with
 their own syntax colour. Values edited in Expression-mode binding controls are
 committed to the expression before evaluation, differentiation or integration.

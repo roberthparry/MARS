@@ -19,11 +19,14 @@ This directory contains the longer module documentation for MARS.
 ## Modules
 
 - [`number_t`](./number.md) — generic numeric value cluster over exact,
-  fixed-precision and multiprecision backends
+  fixed-precision and multiprecision backends, including Li₁ and the Lerch
+  transcendent
 - [`qfloat_t`](./qfloat.md) — independent double-double arithmetic and real
-  special functions, including harmonic polynomials, Riemann and Hurwitz zeta
+  special functions, including harmonic polynomials, Riemann and Hurwitz zeta,
+  Li₁ and the Lerch transcendent
 - [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
-  and complex special functions, including harmonic polynomials
+  and complex special functions, including harmonic polynomials, Li₁ and the
+  Lerch transcendent
 - [`matrix_t`](./matrix.md) — generic high-precision matrix with numeric and
   symbolic entries, native expression parsing, symbolic calculus and
   matrix-wide simplification
@@ -32,7 +35,8 @@ This directory contains the longer module documentation for MARS.
 - [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
   derivatives, numeric reverse-mode gradients, Cartesian complex presentation,
   algebraic-series and progression recognition, harmonic polynomials, symbolic
-  integration and helper APIs
+  sums and products, Li₁ and Lerch-transcendent calculus, integration and
+  helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries
@@ -54,6 +58,8 @@ This directory contains the longer module documentation for MARS.
 
 ## Design Notes
 
+- [Lerch transcendent support](./design-notes/lerch-transcendent.md)
+- [Future differential-equation work](./design-notes/differential-equations.md)
 - [Literate comments and notebook output](./design-notes/literate-comments-and-notebooks.md)
 
 ## Acknowledgements

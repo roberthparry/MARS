@@ -491,7 +491,7 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
     number_t real;
     int has_real_part;
 
-    if (factor && expr_is_op(factor, &ops_summation))
+    if (factor && (expr_is_op(factor, &ops_summation) || expr_is_op(factor, &ops_product)))
         return 1;
 
     if (factor && expr_is_const(factor) && expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
@@ -898,7 +898,7 @@ static int factor_group(const expr_t *f)
 
     if (expr_is_op(f, &ops_indexed_symbol))
         return 3;
-    if (expr_is_op(f, &ops_summation))
+    if (expr_is_op(f, &ops_summation) || expr_is_op(f, &ops_product))
         return 4;
     if (expr_tostring_is_explicit_arbitrary_amplitude(f))
         return 4;
@@ -2514,6 +2514,12 @@ static void emit_expr_polylog(const expr_t *f, sbuf_t *b)
 
     if (!expr_polylog_order(f, &order))
         return;
+    if (order == 1L) {
+        sbuf_puts(b, "polylog(1, ");
+        emit_expr(f->b, b, 0);
+        sbuf_putc(b, ')');
+        return;
+    }
     sbuf_puts(b, "Li");
     emit_subscript_int(b, order);
     sbuf_putc(b, '(');
@@ -3490,7 +3496,12 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
-        int base_needs_parens = pow_base_needs_visible_parens(f->a);
+        int base_is_composite_binding =
+            expr_is_const(f->a) && expr_tostring_should_emit_binding_expr(f->a) && f->a->binding_expr &&
+            f->a->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+            f->a->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
+        int base_needs_parens =
+            pow_base_needs_visible_parens(f->a) || expr_is_op(f->a, &ops_exp) || base_is_composite_binding;
 
         if (expr_is_const(f->b) && (!f->b->name || !*f->b->name) &&
             emit_TeX_unit_fraction_power(f->a, f->b->c, b, parent_prec))
@@ -3530,7 +3541,7 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '}');
             return;
         }
-        if (expr_is_op(f, &ops_summation)) {
+        if (expr_is_op(f, &ops_summation) || expr_is_op(f, &ops_product)) {
             const expr_t *index = f->b;
             const expr_t *lower = NULL;
             const expr_t *upper = NULL;
@@ -3543,7 +3554,7 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                     upper = upper->b;
                 }
             }
-            sbuf_puts(b, "\\sum_{");
+            sbuf_puts(b, expr_is_op(f, &ops_summation) ? "\\sum_{" : "\\prod_{");
             emit_TeX_expr(index, b, 0);
             sbuf_putc(b, '=');
             if (lower)
@@ -3570,6 +3581,16 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, ", ");
             emit_TeX_expr(f->b, b, 0);
             sbuf_putc(b, ')');
+            return;
+        }
+        if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+            sbuf_puts(b, "\\Phi\\left(");
+            emit_TeX_expr(f->a->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_TeX_expr(f->a->b, b, 0);
+            sbuf_puts(b, ", ");
+            emit_TeX_expr(f->b, b, 0);
+            sbuf_puts(b, "\\right)");
             return;
         }
         if (expr_has_polylog_order(f)) {
@@ -4085,10 +4106,12 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
             return;
         }
-        if (expr_is_op(f, &ops_summation)) {
+        if (expr_is_op(f, &ops_summation) || expr_is_op(f, &ops_product)) {
             const expr_t *index = f->b;
             const expr_t *lower = NULL;
             const expr_t *upper = NULL;
+            number_t upper_value = NUM_NAN;
+            bool infinite = false;
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
@@ -4098,20 +4121,39 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                     upper = upper->b;
                 }
             }
-            sbuf_puts(b, "Σ_(");
+            if (upper) {
+                upper_value = expr_eval(upper);
+                infinite = num_is_inf(upper_value) && num_get_sign(upper_value) > 0;
+            }
+            sbuf_puts(b, expr_is_op(f, &ops_summation) ? "Σ_(" : "@P_");
             emit_expr(index, b, 0);
             sbuf_putc(b, '=');
+            if (lower && expr_is_addsub(lower))
+                sbuf_putc(b, '(');
             if (lower)
                 emit_expr(lower, b, 0);
             else
                 sbuf_putc(b, '0');
-            sbuf_puts(b, ")^");
-            if (upper)
+            if (lower && expr_is_addsub(lower))
+                sbuf_putc(b, ')');
+            if (expr_is_op(f, &ops_summation)) {
+                sbuf_putc(b, ')');
+                sbuf_putc(b, '^');
+                if (!upper || infinite)
+                    sbuf_puts(b, "∞");
+                else if (upper && expr_is_addsub(upper))
+                    sbuf_putc(b, '(');
+                if (upper && !infinite)
+                    emit_expr(upper, b, 0);
+                if (upper && !infinite && expr_is_addsub(upper))
+                    sbuf_putc(b, ')');
+            } else if (upper && !infinite) {
+                sbuf_putc(b, '^');
                 emit_expr(upper, b, 0);
-            else
-                sbuf_puts(b, "∞");
+            }
             sbuf_putc(b, ' ');
             emit_expr(f->a, b, PREC_MUL);
+            num_destroy(&upper_value);
             return;
         }
         if (expr_has_polygamma_order(f)) {
@@ -4148,6 +4190,16 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_zetah))
             sbuf_puts(b, "ζ");
+        else if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+            sbuf_puts(b, "Φ(");
+            emit_expr(f->a->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_expr(f->a->b, b, 0);
+            sbuf_puts(b, ", ");
+            emit_expr(f->b, b, 0);
+            sbuf_putc(b, ')');
+            return;
+        }
         else
             sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
@@ -4378,6 +4430,23 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_op(f, &ops_neg)) {
+        int need = PREC_UNARY < parent_prec;
+        int nested_negation = f->a && expr_is_op(f->a, &ops_neg);
+
+        if (need)
+            sbuf_putc(b, '(');
+        sbuf_putc(b, '-');
+        if (nested_negation)
+            sbuf_putc(b, '(');
+        emit_func(f->a, b, nested_negation ? PREC_LOWEST : PREC_UNARY);
+        if (nested_negation)
+            sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
+        return;
+    }
+
     if (f->ops->arity == EXPR_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
         if (need)
@@ -4574,7 +4643,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
     if (expr_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
-        int base_needs_parens = pow_base_needs_visible_parens(f->a);
+        int base_needs_parens = function_temporary_name(f->a) ? 0 : pow_base_needs_visible_parens(f->a);
         if (need)
             sbuf_putc(b, '(');
 
@@ -4584,7 +4653,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         if (base_needs_parens)
             sbuf_putc(b, ')');
         sbuf_putc(b, '^');
-        int ep = pow_exp_needs_parens(f->b);
+        int ep = function_temporary_name(f->b) ? 0 : pow_exp_needs_parens(f->b);
         if (ep)
             sbuf_putc(b, '(');
         emit_func(f->b, b, 0);
@@ -4606,10 +4675,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
             return;
         }
-        if (expr_is_op(f, &ops_summation)) {
+        if (expr_is_op(f, &ops_summation) || expr_is_op(f, &ops_product)) {
             const expr_t *index = f->b;
             const expr_t *lower = NULL;
             const expr_t *upper = NULL;
+            number_t upper_value = NUM_NAN;
+            bool infinite = false;
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
@@ -4619,21 +4690,42 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
                     upper = upper->b;
                 }
             }
-            sbuf_puts(b, "sum(");
-            emit_func(f->a, b, 0);
-            sbuf_puts(b, ", ");
-            emit_func(index, b, 0);
-            sbuf_puts(b, ", ");
-            if (lower)
-                emit_func(lower, b, 0);
-            else
-                sbuf_putc(b, '0');
-            sbuf_puts(b, ", ");
-            if (upper)
-                emit_func(upper, b, 0);
-            else
-                sbuf_puts(b, "@inf");
-            sbuf_putc(b, ')');
+            if (upper) {
+                upper_value = expr_eval(upper);
+                infinite = num_is_inf(upper_value) && num_get_sign(upper_value) > 0;
+            }
+            if (expr_is_op(f, &ops_summation)) {
+                sbuf_puts(b, "sum(");
+                emit_func(index, b, 0);
+                sbuf_puts(b, ", ");
+                if (lower)
+                    emit_func(lower, b, 0);
+                else
+                    sbuf_putc(b, '0');
+                sbuf_puts(b, ", ");
+                if (upper)
+                    emit_func(upper, b, 0);
+                else
+                    sbuf_puts(b, "@inf");
+                sbuf_puts(b, ", ");
+                emit_func(f->a, b, 0);
+                sbuf_putc(b, ')');
+            } else {
+                sbuf_puts(b, "@P_");
+                emit_func(index, b, 0);
+                sbuf_putc(b, '=');
+                if (lower)
+                    emit_func(lower, b, 0);
+                else
+                    sbuf_putc(b, '0');
+                if (upper && !infinite) {
+                    sbuf_putc(b, '^');
+                    emit_func(upper, b, 0);
+                }
+                sbuf_putc(b, ' ');
+                emit_func(f->a, b, PREC_MUL);
+            }
+            num_destroy(&upper_value);
             return;
         }
         if (expr_has_polygamma_order(f)) {
@@ -4642,6 +4734,16 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_lommel_s)) {
             emit_func_lommel_s(f, b);
+            return;
+        }
+        if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+            sbuf_puts(b, "LerchPhi(");
+            emit_func(f->a->a, b, 0);
+            sbuf_puts(b, ", ");
+            emit_func(f->a->b, b, 0);
+            sbuf_puts(b, ", ");
+            emit_func(f->b, b, 0);
+            sbuf_putc(b, ')');
             return;
         }
         if (expr_is_op(f, &ops_appell_f1)) {

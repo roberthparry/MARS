@@ -712,12 +712,15 @@ static void test_polylog(void)
 
         check_qc("Li₂(1/2) = pi²/12 - log(2)²/2", qc_dilog(qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
         check_qc("polylog(2, 1/2) = Li₂(1/2)", qc_polylog(qcr(2.0), qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
+        check_qc("LerchPhi(1/2,2,1) = 2 Li₂(1/2)", qc_lerch_phi(qcr(0.5), qcr(2.0), QC_ONE),
+                 qc_make(qf_mul_double(expect, 2.0), QF_ZERO), 1e-27);
     }
 
     {
         qcomplex_t z = qcz(0.2, 0.1);
         qcomplex_t one_minus_z = qc_sub(QC_ONE, z);
 
+        check_qc("Li₁(z) = -log(1-z)", qc_polylog1(z), qc_neg(qc_log(one_minus_z)), 1e-27);
         check_qc("polylog(1, z) = -log(1-z)", qc_polylog(QC_ONE, z), qc_neg(qc_log(one_minus_z)), 1e-27);
         check_qc("polylog(0, z) = z/(1-z)", qc_polylog(QC_ZERO, z), qc_div(z, one_minus_z), 1e-27);
     }

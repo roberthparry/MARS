@@ -544,6 +544,14 @@ void test_dilog_polylog(void)
     expr_free(c);
 
     c = test_expr_new_var_d(0.5);
+    f = expr_polylog1(c);
+    check_q_at(__FILE__, __LINE__, 1, "polylog1(1/2) = log(2)", expr_eval_qf(f), log2);
+    print_expr_of(f);
+
+    expr_free(f);
+    expr_free(c);
+
+    c = test_expr_new_var_d(0.5);
     f = expr_polylog(2u, c);
     check_q_at(__FILE__, __LINE__, 1, "polylog(2, 1/2) = dilog(1/2)", expr_eval_qf(f), expect);
     print_expr_of(f);

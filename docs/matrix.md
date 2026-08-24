@@ -1079,7 +1079,9 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |
 | `mat_zetap(A)` | Derivative of the Riemann zeta matrix function |
 | `mat_dilog(A)` | Principal matrix dilogarithm |
+| `mat_polylog1(A)` | Principal order-one matrix polylogarithm Li₁(A) |
 | `mat_harmonic_poly(A, degree)` | Finite harmonic matrix polynomial Hₙ(A) = Σₖ₌₁ⁿ Aᵏ/k |
+| `mat_lerch_phi(A, s, a)` | Lerch matrix function Φ(A,s,a), evaluated by its convergent matrix power series |
 | `mat_gammainv(A)` | Matrix inverse gamma function |
 | `mat_normal_pdf(A)` | Matrix normal probability density function |
 | `mat_normal_cdf(A)` | Matrix normal cumulative distribution function |

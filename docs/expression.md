@@ -775,6 +775,7 @@ All functions return owning handles.
 - `expr_t *expr_pow(const expr_t *expr, const number_t *exponent)` — `expr ^ exponent` (borrowed scalar numeric exponent)
 - `expr_t *expr_pow_xp(const expr_t *base, const expr_t *exponent)` — `base ^ exponent`
 - `expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower, const expr_t *upper)` — construct an unevaluated finite sigma with inclusive bounds
+- `expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, const expr_t *lower, const expr_t *upper)` — construct an unevaluated finite product with inclusive bounds
 
 The string grammar accepts `conj(z)` and `conjugate(z)` for complex
 conjugation. Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
@@ -820,8 +821,10 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_Ei(const expr_t *expr)` — Ei(x), exponential integral
 - `expr_t *expr_E1(const expr_t *expr)` — E₁(x), exponential integral
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
+- `expr_t *expr_polylog1(const expr_t *expr)` — order-one polylogarithm Li₁(x) = −Log(1−x), with dedicated derivative, reverse-mode and antiderivative operations
 - `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)` — native harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k with a symbolic degree expression
+- `expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a)` — Lerch transcendent Φ(z,s,a), with derivatives in all three arguments
 - `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)` — Bessel function of the first kind J_order(argument), with a symbolic real order
 - `expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
@@ -829,6 +832,19 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
 - `expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
 - `expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count, const expr_t *const *lower, const expr_t *argument)` — generalised hypergeometric pFq with explicit upper and lower parameter arrays
+
+The parser accepts `Li1(x)` and `Li₁(x)` for the dedicated order-one
+polylogarithm node. Mathematical styles render Li₁(x), while
+`style_FUNCTION` emits `Li1(x)`. Its derivative is `x'/(1-x)`, and direct
+integration of `Li1(x)` gives `(1-x)ln(1-x)-(1-x)`. The general
+`polylog(1,x)` evaluator uses the same numerical identity without replacing
+the dedicated node or its calculus operations.
+
+The parser accepts `lerch_phi(z,s,a)`, `LerchPhi(z,s,a)` and `Φ(z,s,a)`.
+`style_EXPRESSION` uses the capital-phi form `Φ(z,s,a)`, `style_FUNCTION` uses
+`LerchPhi(z,s,a)`, and TeX uses `\Phi`. Numerical evaluation is limited to the
+implemented defining-series domain and exact reductions; unsupported analytic
+continuations remain unavailable instead of silently selecting a branch.
 
 The parser accepts both `Hn(n, x)` and `harmonic_poly(n, x)`. Mathematical
 styles render the former as Hₙ(x); `style_FUNCTION` emits the typeable
@@ -1014,6 +1030,11 @@ bindings.
   - symbolic integral requests `@S f(x) dx`, `@S^u f(x) dx`,
     `@S^b_a f(x) dx`, and `@S_a^b f(x) dx`; `*`, `.`, or `·` may appear
     before the terminal differential
+  - summations `@Z_k=1^n f(k)` and products `@P_k=1^n f(k)`, whose Expression output is
+    respectively `Σ_(k=1)^n f(k)` and `@P_k=1^n f(k)`; the index is local and
+    is not returned as a binding
+  - infinite summations and products omit the upper bound: `@Z_k=1 f(k)` and
+    `@P_k=1 f(k)` produce `Σ_(k=1)^∞ f(k)` and `@P_k=1 f(k)` respectively
   - `sqrt(x)` or `√(x)` for a single principal square root; `cubrt(x)` and `root(x, n)` for single principal cube
     and integer-order roots
   - `conj(x)` and `conjugate(x)` for complex conjugation, with postfix `x^*` as the equivalent shorthand
@@ -1031,7 +1052,9 @@ bindings.
   - `zeta(s, a)`, `ζ(s, a)`, `zetah(s, a)`, and `zeta2(s, a)` for Hurwitz
     zeta; `zetap(s, a)`, `zatahp(s, a)`, and `zeta2p(s, a)` for its partial
     derivative with respect to `s`
-  - `dilog(x)`, `Li2(x)`, and `polylog(n, x)` for Li₂(x) and Liₙ(x)
+  - `Li1(x)` and `Li₁(x)` for the dedicated order-one polylogarithm;
+    `dilog(x)`, `Li2(x)`, and `Li₂(x)` for Li₂(x); and `polylog(n, x)` for Liₙ(x)
+  - `lerch_phi(z, s, a)`, `LerchPhi(z, s, a)`, and `Φ(z, s, a)` for the Lerch transcendent
   - `Hn(n, x)` and `harmonic_poly(n, x)` for the finite harmonic polynomial
     Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k
   - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)

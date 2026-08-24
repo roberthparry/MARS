@@ -151,7 +151,7 @@ static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *b
         return;
     }
 
-    if (expr_is_op(expr, &ops_summation)) {
+    if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
         dummy = expr->b;
         lower = NULL;
         upper = NULL;

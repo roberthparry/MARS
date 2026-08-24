@@ -34,5 +34,6 @@ extern const qfloat_t QFI_BERNOULLI_B8;
 extern const qfloat_t QFI_BERNOULLI_B10;
 
 qfloat_t qfi_zetap_difference_at_one(qfloat_t a);
+qfloat_t qf_lommel_s_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument);
 
 #endif

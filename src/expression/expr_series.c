@@ -56,6 +56,7 @@ typedef struct {
 
 static void expr_series_destroy_numbers(number_t *values, size_t count);
 static bool expr_series_number_to_long(number_t value, long *value_out);
+static int expr_series_append_slice(string_t *output, const char *text, size_t start, size_t end);
 
 static void expr_series_result_init(expr_series_result_t *result)
 {
@@ -1111,6 +1112,170 @@ cleanup:
     *expanded_out = true;
     *display_TeX_out = TeX;
     return expanded;
+}
+
+static bool expr_series_match_weighted_trigonometric_term(const expr_t *term, long index,
+                                                          expr_series_trigonometric_kind_t expected_kind,
+                                                          const expr_t *angle_step)
+{
+    const expr_t *numerator = term;
+    const expr_t *denominator = NULL;
+    const expr_t *argument = NULL;
+    expr_t *expanded = term ? expr_expand_preserved_for_display(term) : NULL;
+    const expr_t *matched = expanded ? expanded : term;
+    number_t denominator_value = NUM_NAN;
+    number_t expected_denominator = num_create_from_long(index);
+    bool matched_term = false;
+
+    if (index > 1L) {
+        if (!expr_match_div_expr(matched, &numerator, &denominator) || !numerator || !denominator)
+            goto cleanup;
+        denominator_value = expr_eval(denominator);
+        if (!num_is_exact(denominator_value) || !num_eq(denominator_value, expected_denominator))
+            goto cleanup;
+    }
+    if (expr_series_match_trigonometric_term(numerator, &argument) != expected_kind || !argument)
+        goto cleanup;
+    if (index == 1L)
+        matched_term = expr_series_simplified_equal(argument, angle_step);
+    else {
+        long scale = 0L;
+
+        matched_term = expr_series_match_positive_long_scale(argument, angle_step, &scale) && scale == index;
+    }
+
+cleanup:
+    num_destroy(&expected_denominator);
+    num_destroy(&denominator_value);
+    expr_free(expanded);
+    return matched_term;
+}
+
+static string_t *expr_series_expand_weighted_trigonometric_progression(const string_t *source, bool *expanded_out,
+                                                                       string_t **display_TeX_out)
+{
+    const char *text = string_c_str(source);
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    size_t ellipsis_index = SIZE_MAX;
+    expr_series_trigonometric_kind_t kind = EXPR_SERIES_TRIGONOMETRIC_NONE;
+    expr_t *first = NULL;
+    expr_t *expanded_first = NULL;
+    const expr_t *first_argument = NULL;
+    expr_t *angle_step = NULL;
+    expr_t *endpoint_term = NULL;
+    expr_t *expanded_endpoint = NULL;
+    const expr_t *endpoint_numerator = NULL;
+    const expr_t *endpoint_denominator = NULL;
+    const expr_t *endpoint_argument = NULL;
+    const expr_t *endpoint_factor = NULL;
+    expr_t *endpoint = NULL;
+    char *angle_text = NULL;
+    char *angle_TeX = NULL;
+    char *endpoint_text = NULL;
+    char *endpoint_TeX = NULL;
+    string_t *output = NULL;
+    string_t *TeX = NULL;
+    bool matched = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &term_count))
+        return NULL;
+    for (size_t i = 0u; i < term_count; ++i) {
+        if (expr_series_is_ellipsis(text, terms[i])) {
+            ellipsis_index = i;
+            break;
+        }
+    }
+    if (ellipsis_index == SIZE_MAX || ellipsis_index < 3u || ellipsis_index + 1u >= term_count)
+        goto cleanup;
+
+    first = expr_series_parse_term_expression(text, terms[0]);
+    expanded_first = first ? expr_expand_preserved_for_display(first) : NULL;
+    kind = expr_series_match_trigonometric_term(expanded_first ? expanded_first : first, &first_argument);
+    if (kind == EXPR_SERIES_TRIGONOMETRIC_NONE || !first_argument)
+        goto cleanup;
+    angle_step = expr_clone(first_argument);
+    if (!angle_step)
+        goto cleanup;
+    for (size_t i = 0u; i < ellipsis_index; ++i) {
+        expr_t *term = expr_series_parse_term_expression(text, terms[i]);
+        const bool term_matches =
+            term && expr_series_match_weighted_trigonometric_term(term, (long)i + 1L, kind, angle_step);
+
+        expr_free(term);
+        if (!term_matches)
+            goto cleanup;
+    }
+
+    endpoint_term = expr_series_parse_term_expression(text, terms[ellipsis_index + 1u]);
+    expanded_endpoint = endpoint_term ? expr_expand_preserved_for_display(endpoint_term) : NULL;
+    if (!expr_match_div_expr(expanded_endpoint ? expanded_endpoint : endpoint_term, &endpoint_numerator,
+                             &endpoint_denominator) ||
+        !endpoint_numerator || !endpoint_denominator ||
+        expr_series_match_trigonometric_term(endpoint_numerator, &endpoint_argument) != kind || !endpoint_argument)
+        goto cleanup;
+    if (expr_match_mul_expr(endpoint_argument, &endpoint_factor, &first_argument) && endpoint_factor &&
+        first_argument && expr_series_simplified_equal(first_argument, angle_step) &&
+        expr_series_simplified_equal(endpoint_factor, endpoint_denominator)) {
+        endpoint = expr_clone(endpoint_denominator);
+    } else if (expr_match_mul_expr(endpoint_argument, &first_argument, &endpoint_factor) && endpoint_factor &&
+               first_argument && expr_series_simplified_equal(first_argument, angle_step) &&
+               expr_series_simplified_equal(endpoint_factor, endpoint_denominator)) {
+        endpoint = expr_clone(endpoint_denominator);
+    }
+    if (!endpoint || (!expr_is_variable(endpoint) && !expr_is_named_const(endpoint)))
+        goto cleanup;
+
+    angle_text = expr_to_string(angle_step, style_UNBOUND);
+    angle_TeX = expr_to_TeX_body(angle_step);
+    endpoint_text = expr_to_string(endpoint, style_UNBOUND);
+    endpoint_TeX = expr_to_TeX_body(endpoint);
+    output = string_new();
+    TeX = string_new();
+    if (!angle_text || !angle_TeX || !endpoint_text || !endpoint_TeX || !output || !TeX)
+        goto cleanup;
+    {
+        const char *function_name = kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "sin"
+                                    : kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "cos"
+                                    : kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "sinh"
+                                                                            : "cosh";
+        const char *TeX_name = kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "\\sin"
+                               : kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "\\cos"
+                               : kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "\\sinh"
+                                                                       : "\\cosh";
+
+        if (expr_series_append_slice(output, text, 0u, expr_series_trim(text, terms[0]).start) != 0 ||
+            string_append_format(output, "sum(k,1,%s,%s(k*(%s))/k)", endpoint_text, function_name, angle_text) < 0 ||
+            expr_series_append_slice(output, text, expr_series_trim(text, terms[ellipsis_index + 1u]).end,
+                                     strlen(text)) != 0 ||
+            string_append_format(TeX, "\\sum_{k=1}^{%s}\\frac{%s(k\\mkern-2mu %s)}{k}", endpoint_TeX,
+                                 TeX_name, angle_TeX) < 0)
+            goto cleanup;
+    }
+    matched = true;
+
+cleanup:
+    free(endpoint_TeX);
+    free(endpoint_text);
+    free(angle_TeX);
+    free(angle_text);
+    expr_free(endpoint);
+    expr_free(expanded_endpoint);
+    expr_free(endpoint_term);
+    expr_free(angle_step);
+    expr_free(expanded_first);
+    expr_free(first);
+    free(terms);
+    if (!matched) {
+        string_free(TeX);
+        string_free(output);
+        return string_clone(source);
+    }
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    return output;
 }
 
 static expr_t *expr_series_parse_quotient_expression(const char *text, expr_series_span_t numerator_span,
@@ -3900,6 +4065,21 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         if (expanded) {
             string_free(current);
             current = next;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_weighted_trigonometric_progression(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
             continue;
         }
         string_free(next);

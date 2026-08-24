@@ -4,8 +4,6 @@
 
 #include "expr_bindings.h"
 #include "expr_maths.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number/number_internal.h"
 #include "ustring.h"
 
 static int expr_text_to_unsigned_long(const string_t *text, unsigned long *out)
@@ -521,13 +519,64 @@ number_t eval_dilog(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_dilog);
 }
+number_t eval_polylog1(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_polylog1);
+}
 number_t eval_polylog(expr_t *dv)
 {
+    number_t order = expr_eval_num_internal(dv->a);
+
+    if (num_is_one(order)) {
+        number_t argument = expr_eval_num_internal(dv->b);
+
+        return num_neg(num_log(num_sub(NUM_ONE, argument)));
+    }
     return expr_eval_binary_num(dv, num_polylog);
 }
 number_t eval_harmonic_poly(expr_t *dv)
 {
     return expr_eval_binary_num(dv, num_harmonic_poly);
+}
+number_t eval_lerch_phi_pack(expr_t *dv)
+{
+    (void)dv;
+    return NUM_NAN;
+}
+bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **s, const expr_t **a)
+{
+    if (z)
+        *z = NULL;
+    if (s)
+        *s = NULL;
+    if (a)
+        *a = NULL;
+    if (!expr || !expr_is_op(expr, &ops_lerch_phi) || !expr->a || !expr->b ||
+        !expr_is_op(expr->a, &ops_lerch_phi_pack) || !expr->a->a || !expr->a->b)
+        return false;
+    if (z)
+        *z = expr->a->a;
+    if (s)
+        *s = expr->a->b;
+    if (a)
+        *a = expr->b;
+    return true;
+}
+number_t eval_lerch_phi(expr_t *dv)
+{
+    const expr_t *z_expr;
+    const expr_t *s_expr;
+    const expr_t *a_expr;
+    number_t z;
+    number_t s;
+    number_t a;
+
+    if (!expr_lerch_phi_unpack(dv, &z_expr, &s_expr, &a_expr))
+        return NUM_NAN;
+    z = expr_eval_num_internal((expr_t *)z_expr);
+    s = expr_eval_num_internal((expr_t *)s_expr);
+    a = expr_eval_num_internal((expr_t *)a_expr);
+    return number_lerch_phi(z, s, a);
 }
 number_t eval_legendre_chi(expr_t *dv)
 {
@@ -1894,6 +1943,19 @@ expr_t *deriv_dilog(expr_t *dv)
     return out;
 }
 
+expr_t *deriv_polylog1(expr_t *dv)
+{
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *denominator = one ? expr_sub(one, dv->a) : NULL;
+    expr_t *out = da && denominator ? expr_div(da, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(one);
+    expr_free(da);
+    return out;
+}
+
 expr_t *deriv_polylog(expr_t *dv)
 {
     number_t order_value = expr_eval_num_internal(dv->a);
@@ -1925,6 +1987,103 @@ expr_t *deriv_polylog(expr_t *dv)
     out = expr_mul(factor, db);
     expr_free(factor);
     expr_free(db);
+    return out;
+}
+
+expr_t *integrate_polylog1(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *one;
+    expr_t *one_minus_argument;
+    expr_t *log_term;
+    expr_t *product;
+    expr_t *out;
+
+    if (!expr || !wrt || !expr_is_op(expr, &ops_polylog1) || !expr_struct_eq(expr->a, wrt))
+        return NULL;
+    one = expr_new_const(NUM_ONE);
+    one_minus_argument = one ? expr_sub(one, expr->a) : NULL;
+    log_term = one_minus_argument ? expr_log(one_minus_argument) : NULL;
+    product = one_minus_argument && log_term ? expr_mul(one_minus_argument, log_term) : NULL;
+    out = product && one_minus_argument ? expr_sub(product, one_minus_argument) : NULL;
+    expr_free(product);
+    expr_free(log_term);
+    expr_free(one_minus_argument);
+    expr_free(one);
+    return out;
+}
+
+expr_t *deriv_lerch_phi_pack(expr_t *dv)
+{
+    (void)dv;
+    return expr_new_const(NUM_NAN);
+}
+
+expr_t *deriv_lerch_phi(expr_t *dv)
+{
+    const expr_t *z;
+    const expr_t *s;
+    const expr_t *a;
+    expr_t *wrts[1];
+    expr_t *dz;
+    expr_t *ds;
+    expr_t *da;
+    expr_t *s_minus_one;
+    expr_t *s_plus_one;
+    expr_t *phi;
+    expr_t *phi_s_minus_one;
+    expr_t *phi_s_plus_one;
+    expr_t *a_times_phi;
+    expr_t *z_numerator;
+    expr_t *z_partial;
+    expr_t *z_term;
+    expr_t *s_partial;
+    expr_t *s_term;
+    expr_t *a_partial;
+    expr_t *scaled_phi_s_plus_one;
+    expr_t *a_term;
+    expr_t *za_terms;
+    expr_t *out;
+
+    if (!expr_lerch_phi_unpack(dv, &z, &s, &a))
+        return expr_new_const(NUM_NAN);
+    dz = expr_get_dx_internal((expr_t *)z);
+    ds = expr_get_dx_internal((expr_t *)s);
+    da = expr_get_dx_internal((expr_t *)a);
+    s_minus_one = expr_add_long(s, -1);
+    s_plus_one = expr_add_long(s, 1);
+    phi = expr_lerch_phi(z, s, a);
+    phi_s_minus_one = expr_lerch_phi(z, s_minus_one, a);
+    phi_s_plus_one = expr_lerch_phi(z, s_plus_one, a);
+    a_times_phi = expr_mul(a, phi);
+    z_numerator = expr_sub(phi_s_minus_one, a_times_phi);
+    z_partial = expr_div(z_numerator, z);
+    z_term = expr_mul(dz, z_partial);
+    wrts[0] = (expr_t *)s;
+    s_partial = expr_new_formal_derivative(dv, 1u, wrts);
+    s_term = expr_mul(ds, s_partial);
+    scaled_phi_s_plus_one = expr_mul(s, phi_s_plus_one);
+    a_partial = expr_neg(scaled_phi_s_plus_one);
+    a_term = expr_mul(da, a_partial);
+    za_terms = expr_add(z_term, s_term);
+    out = expr_add(za_terms, a_term);
+    expr_free(za_terms);
+    expr_free(a_term);
+    expr_free(a_partial);
+    expr_free(scaled_phi_s_plus_one);
+    expr_free(s_term);
+    expr_free(s_partial);
+    expr_free(z_term);
+    expr_free(z_partial);
+    expr_free(z_numerator);
+    expr_free(a_times_phi);
+    expr_free(phi_s_plus_one);
+    expr_free(phi_s_minus_one);
+    expr_free(phi);
+    expr_free(s_plus_one);
+    expr_free(s_minus_one);
+    expr_free(da);
+    expr_free(ds);
+    expr_free(dz);
     return out;
 }
 

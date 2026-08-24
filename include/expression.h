@@ -568,11 +568,20 @@ expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
 /**
  * @brief Build a formal finite summation with explicit inclusive bounds.
  *
- * The returned expression represents @c sum(term,index,lower,upper) without
+ * The returned expression represents @c sum(index,lower,upper,term) without
  * evaluating it. All inputs are borrowed; the caller owns the returned node.
  */
 expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower,
                                         const expr_t *upper);
+
+/**
+ * @brief Build a formal finite product with explicit inclusive bounds.
+ *
+ * The returned expression represents @c product(term,index,lower,upper) without
+ * evaluating it. All inputs are borrowed; the caller owns the returned node.
+ */
+expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, const expr_t *lower,
+                                     const expr_t *upper);
 
 /* ------------------------------------------------------------------------- */
 /* Special functions (owning)                                                */
@@ -588,6 +597,7 @@ expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index,
  *                    expr_gammainv (Γ⁻¹), expr_gammainc_lower,
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
  * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ), expr_harmonic_poly (Hₙ),
+ *                    expr_lerch_phi (Lerch Φ),
  *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
  * Bessel functions:  expr_bessel_j (Jᵥ), expr_bessel_y (Yᵥ)
  * Lommel function:    expr_lommel_s (s_(μ,ν))
@@ -650,6 +660,13 @@ expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
  */
 expr_t *expr_zetap(const expr_t *expr);
 expr_t *expr_dilog(const expr_t *expr);
+/**
+ * @brief Construct the order-one polylogarithm @f$\operatorname{Li}_1(z)@f$.
+ *
+ * @param expr Argument expression; it is retained.
+ * @return A newly allocated order-one polylogarithm expression, or NULL on error.
+ */
+expr_t *expr_polylog1(const expr_t *expr);
 expr_t *expr_polylog(unsigned int order, const expr_t *expr);
 /**
  * @brief Construct the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
@@ -659,6 +676,15 @@ expr_t *expr_polylog(unsigned int order, const expr_t *expr);
  * @return A newly allocated harmonic-polynomial expression, or NULL on error.
  */
 expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument);
+/**
+ * @brief Construct the Lerch transcendent @f$\Phi(z,s,a)@f$.
+ *
+ * @param z Argument expression; it is retained.
+ * @param s Exponent expression; it is retained.
+ * @param a Shift expression; it is retained.
+ * @return A newly allocated Lerch-transcendent expression, or NULL on error.
+ */
+expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
@@ -926,6 +952,10 @@ void expr_print(const expr_t *expr);
  * With an upper substitution, @c @S^u f(x) dx returns the single
  * antiderivative @c F(u). Literal @c ∫ syntax constructs an integral node
  * instead.
+ *
+ * Finite sums and products use @c @Z_k=1^n term and @c @P_k=1^n term.
+ * Omitting @c ^n creates a formal infinite sum or product. The index is local
+ * to the operator and is not returned as a binding.
  *
  * If @p bnd_out is non-NULL and the parsed expression is symbolic, the
  * function also returns an opaque bindings object that can be queried with

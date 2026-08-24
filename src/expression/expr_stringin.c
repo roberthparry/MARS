@@ -61,7 +61,6 @@
 #include "qfloat.h"
 #include "expr_stringin_scan.h"
 #include "expression.h"
-#include "string/string_view.h"
 #include "ustring.h"
 
 /* ------------------------------------------------------------------ */
@@ -183,13 +182,14 @@ static string_view_t expr_parse_text(const expr_parse_state_t *p)
 /* ------------------------------------------------------------------ */
 
 static expr_t *parse_addexpr(expr_parse_state_t *p);
+static expr_t *parse_mulexpr(expr_parse_state_t *p);
 static expr_t *parse_signed_power(expr_parse_state_t *p);
 static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p, char closing, const char *errmsg);
 
 static expr_t *build_ascii_integral_expr(const expr_t *upper, const expr_t *display_integrand, const expr_t *dummy);
 static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower, const expr_t *upper,
                                                  const expr_t *display_integrand, const expr_t *dummy);
-static expr_t *build_ascii_sum_expr(size_t argument_count, expr_t *const *arguments);
+static expr_t *expr_finite_sum_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *expr_zeta_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *expr_zetap_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *build_sine_integral_expr(const expr_t *argument);
@@ -340,6 +340,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [42]  = { .kw = "Wn",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [43]  = { .kw = "log",                .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
     [44]  = { .kw = "beta",               .arity = 2u,       .ops = &ops_beta,           .bfn = expr_beta },
+    [45]  = { .kw = "lerch_phi",          .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
     [46]  = { .kw = "W_-1",               .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [47]  = { .kw = "cubrt",              .arity = 1u,       .ops = &ops_cubrt,          .ufn = expr_cubrt },
     [48]  = { .kw = "hacovercos",         .arity = 1u,       .ops = &ops_hacovercos,     .ufn = expr_hacovercos },
@@ -351,9 +352,11 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [54]  = { .kw = "gammainc_P",         .arity = 2u,       .ops = &ops_gammainc_P,     .bfn = expr_gammainc_P },
     [55]  = { .kw = "ceil",               .arity = 1u,       .ops = &ops_ceil,           .ufn = expr_ceil },
     [56]  = { .kw = "fibonacci",          .arity = 1u,       .ops = &ops_fibonacci,      .ufn = expr_fibonacci },
+    [57]  = { .kw = "LerchPhi",           .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
     [58]  = { .kw = "productlog",         .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
     [59]  = { .kw = "arccoversin",        .arity = 1u,       .ops = &ops_arccoversin,    .ufn = expr_arccoversin },
     [60]  = { .kw = "acot",               .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
+    [61]  = { .kw = "Φ",                  .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
     [62]  = { .kw = "cos",                .arity = 1u,       .ops = &ops_cos,            .ufn = expr_cos },
     [63]  = { .kw = "ln",                 .arity = 1u,       .ops = &ops_log,            .ufn = expr_ln },
     [64]  = { .kw = "BesselJ",            .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
@@ -385,6 +388,8 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [90]  = { .kw = "F₁",                 .arity = 6u,                                   .sfn = expr_appell_f1 },
     [91]  = { .kw = "LauricellaF",        .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [92]  = { .kw = "binomial",           .arity = 2u,       .ops = NULL,                .bfn = expr_binomial },
+    [93]  = { .kw = "Li1",                .arity = 1u,       .ops = &ops_polylog1,       .ufn = expr_polylog1 },
+    [94]  = { .kw = "Li₁",                .arity = 1u,       .ops = &ops_polylog1,       .ufn = expr_polylog1 },
     [96]  = { .kw = "next_prime",         .arity = 1u,       .ops = &ops_next_prime,     .ufn = expr_next_prime },
     [97]  = { .kw = "acoth",              .arity = 1u,       .ops = &ops_acoth,          .ufn = expr_acoth },
     [98]  = { .kw = "arsech",             .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
@@ -394,8 +399,9 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [102] = { .kw = "normal_logpdf",      .arity = 1u,       .ops = &ops_normal_logpdf,  .ufn = expr_normal_logpdf },
     [103] = { .kw = "Wₙ",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [104] = { .kw = "covercos",           .arity = 1u,       .ops = &ops_covercos,       .ufn = expr_covercos },
-    [105] = { .kw = "sum",                .arity = UINT_MAX,                             .vfn = build_ascii_sum_expr },
+    [105] = { .kw = "sum",                .arity = UINT_MAX,                             .vfn = expr_finite_sum_from_args },
     [106] = { .kw = "root",               .arity = 2u,       .ops = &ops_root,           .bfn = expr_root },
+    [107] = { .kw = "Li₂",                .arity = 1u,       .ops = &ops_dilog,          .ufn = expr_dilog },
     [108] = { .kw = "sech",               .arity = 1u,       .ops = &ops_sech,           .ufn = expr_sech },
     [109] = { .kw = "arcsch",             .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
     [110] = { .kw = "gamma",              .arity = 1u,       .ops = &ops_gamma,          .ufn = expr_gamma },
@@ -518,6 +524,21 @@ static const func_entry_t *lookup_func(string_view_t kw)
     if (func_entry_matches(entry, kw))
         return entry;
 
+    /* The three Lerch spellings occupy the table's reserved overflow slots. */
+    for (size_t i = 45u; i <= 61u; i += i == 45u ? 12u : 4u) {
+        entry = &s_funcs[i];
+        if (entry->kw && func_entry_matches(entry, kw))
+            return entry;
+    }
+    for (size_t i = 93u; i <= 94u; ++i) {
+        entry = &s_funcs[i];
+        if (entry->kw && func_entry_matches(entry, kw))
+            return entry;
+    }
+    entry = &s_funcs[107];
+    if (entry->kw && func_entry_matches(entry, kw))
+        return entry;
+
     return NULL;
 }
 
@@ -525,13 +546,18 @@ static const func_entry_t *lookup_func(string_view_t kw)
 expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, const char **canonical_name_out)
 {
     const func_entry_t *entry;
+    string_t *name_string;
 
     if (canonical_name_out)
         *canonical_name_out = NULL;
     if (!name || !argument)
         return NULL;
 
-    entry = lookup_func(string_view_from_chars(name, strlen(name)));
+    name_string = string_new_with(name);
+    if (!name_string)
+        return NULL;
+    entry = lookup_func(string_view_all(name_string));
+    string_free(name_string);
     if (!entry || (entry->arity != 1u && entry->arity != UINT_MAX) || !entry->ufn)
         return NULL;
 
@@ -546,17 +572,25 @@ bool expr_stringin_function_hash_is_valid(void)
 
     for (size_t slot = 0u; slot < FUNC_TABLE_SIZE; ++slot) {
         const func_entry_t *entry = &s_funcs[slot];
+        string_t *keyword_string;
+        string_view_t keyword;
         unsigned bucket;
         unsigned base_slot;
 
         if (!entry->kw)
             continue;
-        string_view_t keyword = string_view_from_chars(entry->kw, strlen(entry->kw));
+        keyword_string = string_new_with(entry->kw);
+        if (!keyword_string)
+            return false;
+        keyword = string_view_all(keyword_string);
 
         func_hashes(keyword, &bucket, &base_slot);
         bucket_used[bucket] = true;
-        if (lookup_func(keyword) != entry)
+        if (lookup_func(keyword) != entry) {
+            string_free(keyword_string);
             return false;
+        }
+        string_free(keyword_string);
     }
 
     for (size_t bucket = 0u; bucket < FUNC_TABLE_SIZE; ++bucket) {
@@ -1054,6 +1088,22 @@ static bool integral_ascii_standin_starts_view(string_view_t text, size_t pos)
     return next == '^' || next == '_' || next == '(' || isspace(next);
 }
 
+static bool finite_operator_ascii_standin_starts_view(string_view_t text, size_t pos, unsigned char *operator_out)
+{
+    unsigned char at = 0u;
+    unsigned char operator_name = 0u;
+    unsigned char marker = 0u;
+
+    if (!expr_parse_view_peek_ascii(text, pos, &at) || at != '@' ||
+        !expr_parse_view_peek_ascii(text, pos + 1u, &operator_name) ||
+        (operator_name != 'Z' && operator_name != 'z' && operator_name != 'P' && operator_name != 'p') ||
+        !expr_parse_view_peek_ascii(text, pos + 2u, &marker) || marker != '_')
+        return false;
+    if (operator_out)
+        *operator_out = operator_name;
+    return true;
+}
+
 static const func_entry_t *lookup_special_func_call_view(string_view_t text, size_t pos, size_t *paren_pos_out)
 {
     static const func_entry_t s_integral_entry = {.kw = "integral", .arity = 3u, .tfn = build_ascii_integral_expr};
@@ -1061,7 +1111,8 @@ static const func_entry_t *lookup_special_func_call_view(string_view_t text, siz
         .kw = "Si", .arity = 1u, .ops = &ops_arbitrary_function, .ufn = build_sine_integral_expr};
     static const func_entry_t s_cosine_integral_entry = {
         .kw = "Ci", .arity = 1u, .ops = &ops_arbitrary_function, .ufn = build_cosine_integral_expr};
-    static const func_entry_t *const entries[] = {&s_integral_entry, &s_sine_integral_entry, &s_cosine_integral_entry};
+    static const func_entry_t *const entries[] = {
+        &s_integral_entry, &s_sine_integral_entry, &s_cosine_integral_entry};
     size_t id_len = scan_ascii_identifier_len_view(text, pos);
     string_view_t ident;
 
@@ -2000,21 +2051,21 @@ static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower, const expr
                  : expr_integral_with_dummy_internal(display_integrand, upper, dummy);
 }
 
-static expr_t *build_ascii_sum_expr(size_t argument_count, expr_t *const *arguments)
+static expr_t *expr_finite_sum_from_args(size_t argument_count, expr_t *const *arguments)
 {
     expr_t *index;
     expr_t *term;
     expr_t *sum;
 
     if (argument_count != 4u || !arguments ||
-        (!expr_is_var(arguments[1]) && !expr_is_named_const(arguments[1])))
+        (!expr_is_var(arguments[0]) && !expr_is_named_const(arguments[0])))
         return NULL;
-    if (expr_is_var(arguments[1]))
-        return expr_new_finite_summation_range(arguments[0], arguments[1], arguments[2], arguments[3]);
+    if (expr_is_var(arguments[0]))
+        return expr_new_finite_summation_range(arguments[3], arguments[0], arguments[1], arguments[2]);
 
-    index = expr_new_named_var(NUM_NAN, arguments[1]->name);
-    term = index ? expr_substitute(arguments[0], arguments[1], index) : NULL;
-    sum = term ? expr_new_finite_summation_range(term, index, arguments[2], arguments[3]) : NULL;
+    index = expr_new_named_var(NUM_NAN, arguments[0]->name);
+    term = index ? expr_substitute(arguments[3], arguments[0], index) : NULL;
+    sum = term ? expr_new_finite_summation_range(term, index, arguments[1], arguments[2]) : NULL;
     expr_free(term);
     expr_free(index);
     return sum;
@@ -2325,6 +2376,96 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     return result;
 }
 
+static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool sigma_notation)
+{
+    string_view_t text = expr_parse_text(p);
+    unsigned char operator_name = sigma_notation ? 'Z' : 0u;
+    expr_t *index = NULL;
+    expr_t *lower = NULL;
+    expr_t *upper = NULL;
+    expr_t *term = NULL;
+    expr_t *result = NULL;
+
+    if (!sigma_notation && !finite_operator_ascii_standin_starts_view(text, expr_parse_pos(p), &operator_name)) {
+        set_error(p, "expected summation or product");
+        return NULL;
+    }
+    if (sigma_notation) {
+        uint32_t sigma = 0u;
+        size_t sigma_length = 0u;
+
+        if (!expr_parse_peek_value(p, &sigma, &sigma_length) || sigma != 0x03A3u) {
+            set_error(p, "expected summation symbol");
+            return NULL;
+        }
+        expr_parse_skip(p, sigma_length);
+        if (!parse_required_char(p, '_', "expected '_' after summation symbol") ||
+            !parse_required_char(p, '(', "expected '(' after summation subscript"))
+            return NULL;
+    } else {
+        expr_parse_skip(p, 3u);
+    }
+    expr_parse_skip_spaces(p);
+    index = parse_signed_power_operand(p);
+    if (!index || (!expr_is_var(index) && !expr_is_named_const(index))) {
+        expr_free(index);
+        set_error(p, "expected summation or product index");
+        return NULL;
+    }
+    expr_parse_skip_spaces(p);
+    if (!parse_required_char(p, '=', "expected '=' after summation or product index"))
+        goto cleanup;
+    expr_parse_skip_spaces(p);
+    lower = parse_signed_power_operand(p);
+    if (!lower)
+        goto cleanup;
+    expr_parse_skip_spaces(p);
+    if (sigma_notation && !parse_required_char(p, ')', "expected ')' after summation lower bound"))
+        goto cleanup;
+    expr_parse_skip_spaces(p);
+    if (expr_parse_consume_char(p, '^')) {
+        expr_parse_skip_spaces(p);
+        upper = parse_signed_power_operand(p);
+        if (!upper)
+            goto cleanup;
+    } else {
+        upper = expr_new_const(NUM_INF);
+        if (!upper)
+            goto cleanup;
+    }
+    expr_parse_skip_spaces(p);
+    term = parse_mulexpr(p);
+    if (!term)
+        goto cleanup;
+    if (expr_is_named_const(index)) {
+        const char *index_name = expr_symbol_name(index);
+        expr_t *variable_index = index_name ? expr_new_named_var(NUM_NAN, index_name) : NULL;
+        expr_t *variable_term = variable_index ? expr_substitute(term, index, variable_index) : NULL;
+
+        if (!variable_index || !variable_term) {
+            expr_free(variable_term);
+            expr_free(variable_index);
+            goto cleanup;
+        }
+        expr_free(term);
+        expr_free(index);
+        term = variable_term;
+        index = variable_index;
+    }
+    result = operator_name == 'Z' || operator_name == 'z'
+                 ? expr_new_finite_summation_range(term, index, lower, upper)
+                 : expr_new_finite_product_range(term, index, lower, upper);
+    if (!result)
+        set_error(p, "could not construct summation or product");
+
+cleanup:
+    expr_free(term);
+    expr_free(upper);
+    expr_free(lower);
+    expr_free(index);
+    return result;
+}
+
 /* ------------------------------------------------------------------ */
 /* Atom parser                                                          */
 /* ------------------------------------------------------------------ */
@@ -2388,6 +2529,8 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
     if ((cp_len > 0 && cp == INTEGRAL_SIGN_CODEPOINT) || integral_ascii_standin_starts_view(text, pos)) {
         return parse_integral_atom(p);
     }
+    if ((cp_len > 0u && cp == 0x03A3u) || finite_operator_ascii_standin_starts_view(text, pos, NULL))
+        return parse_finite_operator_atom(p, cp_len > 0u && cp == 0x03A3u);
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
     if (isdigit(b) || b == '.' || scan_unicode_fraction_len_view(text, pos) > 0u ||
@@ -2577,7 +2720,7 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                 if (!result) {
                     const char *message = "invalid generalised hypergeometric parameters";
 
-                    if (fe->vfn == build_ascii_sum_expr)
+                    if (fe->vfn == expr_finite_sum_from_args)
                         message = "invalid finite summation";
                     else if (fe->vfn == expr_zeta_from_args || fe->vfn == expr_zetap_from_args)
                         message = "zeta accepts one or two arguments";
@@ -3358,6 +3501,7 @@ static expr_t *parse_pure_const(string_view_t text, string_t *errmsg)
 static int has_top_level_equals(string_view_t text)
 {
     int depth = 0;
+    bool finite_operator_index = false;
     string_cursor_t *cursor;
     unsigned char c;
 
@@ -3369,6 +3513,13 @@ static int has_top_level_equals(string_view_t text)
         return 0;
 
     while (!string_cursor_done(cursor)) {
+        size_t pos = string_cursor_position(cursor);
+
+        if (depth == 0 && finite_operator_ascii_standin_starts_view(text, pos, NULL)) {
+            finite_operator_index = true;
+            string_cursor_skip(cursor, 3u);
+            continue;
+        }
         if (string_cursor_peek_ascii(cursor, &c)) {
             if (c == '(' || c == '[') {
                 depth++;
@@ -3381,6 +3532,11 @@ static int has_top_level_equals(string_view_t text)
                 continue;
             }
             if (depth == 0 && c == '=') {
+                if (finite_operator_index) {
+                    finite_operator_index = false;
+                    string_cursor_skip(cursor, 1u);
+                    continue;
+                }
                 string_cursor_free(cursor);
                 return 1;
             }

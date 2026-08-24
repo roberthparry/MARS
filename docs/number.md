@@ -454,7 +454,10 @@ when the selected principal root is not real.
 | `num_E1(x)` | Evaluates the exponential integral `E₁(x)`. |
 | `num_Ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
 | `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
+| `num_polylog1(x)` | Evaluates the order-one polylogarithm `Li₁(x) = −Log(1−x)` on the active backend's principal branch. |
 | `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |
+| `number_lerch_phi(z, s, a)` | Evaluates the Lerch transcendent `Φ(z,s,a)` while preserving the active real or complex backend. |
+| `num_lerch_phi(z, s, a)` | Compatibility spelling for `number_lerch_phi(z, s, a)`. |
 | `num_harmonic_poly(degree, x)` | Evaluates the finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k; the degree must be an exact non-negative integer. |
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
 | `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |

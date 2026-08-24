@@ -151,6 +151,8 @@ bool expr_is_differentiable(const expr_t *dv)
         return false;
     if (dv->ops && dv->ops->diff_kind == EXPR_DIFF_NONE)
         return false;
+    if (dv->ops == &ops_summation || dv->ops == &ops_product)
+        return expr_is_differentiable(dv->a);
     if (dv->ops == &ops_pow_d)
         return expr_is_differentiable(dv->a);
     if (dv->ops == &ops_polygamma)
@@ -324,7 +326,15 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
     if (wrt->ops == &ops_const)
         return expr_nan_const_shared();
     {
-        expr_t *special = expr_deriv_cosine_harmonic_antiderivative(expr, wrt);
+        expr_t *source = expr_finite_weighted_sinh_from_lerch_form(expr);
+        expr_t *special;
+
+        if (source) {
+            special = expr_create_deriv(source, wrt);
+            expr_free(source);
+            return special;
+        }
+        special = expr_deriv_cosine_harmonic_antiderivative(expr, wrt);
 
         if (special)
             return special;

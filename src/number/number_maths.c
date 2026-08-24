@@ -6,8 +6,8 @@
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#define MARS_QFLOAT_INTERNAL_ACCESS
-#include "qfloat/qfloat_internal.h"
+#define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
+#include "internal/qfloat_internal.h"
 #include "ustring.h"
 
 enum {
@@ -4869,6 +4869,24 @@ number_t num_zetah(const number_t s, const number_t a)
                                                 number_mpfr_zetah_mut, number_mpc_zetah_mut);
 }
 
+/* Evaluate the Lerch transcendent using the widest participating backend. */
+number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
+{
+    if (num_is_nan(z) || num_is_nan(s) || num_is_nan(a))
+        return num_clone(NUM_NAN);
+    if (!num_is_real(z) || !num_is_real(s) || !num_is_real(a))
+        return num_create_from_qcomplex(qc_lerch_phi(number_value_to_qcomplex(&z), number_value_to_qcomplex(&s),
+                                                     number_value_to_qcomplex(&a)));
+    return num_create_from_qfloat(qf_lerch_phi(number_value_to_qfloat(&z), number_value_to_qfloat(&s),
+                                               number_value_to_qfloat(&a)));
+}
+
+/* Preserve the established num_* spelling alongside the requested public family name. */
+number_t num_lerch_phi(const number_t z, const number_t s, const number_t a)
+{
+    return number_lerch_phi(z, s, a);
+}
+
 /* Evaluate the first Riemann zeta derivative while preserving the selected numeric backend. */
 number_t num_zetap(const number_t number)
 {
@@ -5562,6 +5580,12 @@ number_t num_dilog(const number_t number)
     return number_apply_unary_math(number, qf_dilog, qc_dilog, number_mpfr_dilog_mut, number_mpc_dilog);
 }
 
+/* Evaluate the order-one polylogarithm using the number's native precision. */
+number_t num_polylog1(const number_t number)
+{
+    return num_neg(num_log(num_sub(NUM_ONE, number)));
+}
+
 number_t num_polylog(const number_t order, const number_t number)
 {
     int order_int;
@@ -5572,6 +5596,8 @@ number_t num_polylog(const number_t order, const number_t number)
         return NUM_NAN;
     if (order_int == 2)
         return num_dilog(number);
+    if (order_int == 1)
+        return num_polylog1(number);
     if (!num_is_real(number))
         return number_mpc_polylog_number(&number, order_int);
     if (number_kind_value(&number) == NUMBER_QFLOAT)
