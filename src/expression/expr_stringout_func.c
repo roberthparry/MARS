@@ -447,6 +447,48 @@ static void function_temporary_table_group_constants(function_temporary_table_t 
     }
 }
 
+static const char *function_temporary_reciprocal_exp_name(const function_temporary_table_t *table, size_t index)
+{
+    const expr_t *node;
+    const expr_t *argument;
+    const expr_t *opposite;
+    bool argument_is_negative;
+
+    if (!table || index >= table->count || !(node = table->nodes[index]) ||
+        !expr_is_op(node, &ops_exp) || !(argument = node->a))
+        return NULL;
+    argument_is_negative = expr_is_op(argument, &ops_neg) && argument->a;
+    opposite = argument_is_negative ? argument->a : argument;
+    for (size_t candidate = 0u; candidate < index; ++candidate) {
+        const expr_t *prior = table->nodes[candidate];
+        const expr_t *prior_argument;
+
+        if (!prior || !expr_is_op(prior, &ops_exp) || !(prior_argument = prior->a))
+            continue;
+        if (argument_is_negative) {
+            if (expr_struct_eq(prior_argument, opposite))
+                return table->names[candidate];
+        } else if (expr_is_op(prior_argument, &ops_neg) && prior_argument->a &&
+                   expr_struct_eq(prior_argument->a, opposite)) {
+            return table->names[candidate];
+        }
+    }
+    return NULL;
+}
+
+static void emit_function_temporary_value(sbuf_t *buffer, const function_temporary_table_t *table, size_t index)
+{
+    const char *reciprocal_exp = function_temporary_reciprocal_exp_name(table, index);
+
+    if (reciprocal_exp) {
+        sbuf_puts(buffer, "1/");
+        sbuf_puts(buffer, reciprocal_exp);
+        return;
+    }
+    emit_func_with_temporaries(table->nodes[index], buffer, PREC_LOWEST, table->nodes,
+                               (const char *const *)table->names, table->count, table->nodes[index]);
+}
+
 static bool function_collect_shared_temporaries(const expr_t *node, const expr_t *root,
                                                 const function_dag_table_t *dag,
                                                 function_temporary_table_t *temporaries,
@@ -461,6 +503,8 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
         return false;
     if (node == root)
         return true;
+    if (expr_is_op(node, &ops_neg) && node->a && (expr_is_const(node->a) || expr_is_var(node->a)))
+        return true;
     dag_index = function_dag_table_find(dag, node);
     if (dag_index == (size_t)-1 || dag->incoming[dag_index] < 2u)
         return true;
@@ -469,6 +513,7 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
     if (expr_is_op(node, &ops_hypergeometric_pFq_pack))
         return true;
     if (node->ops->arity == EXPR_OP_UNARY && node->a && !expr_is_const(node->a) && !expr_is_var(node->a) &&
+        !expr_is_op(node->a, &ops_neg) &&
         !function_temporary_table_contains(temporaries, node->a) &&
         !function_temporary_table_append(temporaries, node->a, variables, constants))
         return false;
@@ -486,7 +531,7 @@ static bool function_append_hierarchical_temporary(const expr_t *node, function_
     sbuf_init(&rendered);
     emit_func_with_temporaries(node, &rendered, PREC_LOWEST, temporaries->nodes,
                                (const char *const *)temporaries->names, temporaries->count, node);
-    if (sbuf_len(&rendered) + strlen("    const r1 = .") > 130u) {
+    if (sbuf_len(&rendered) + strlen("    const r1 = .") > 120u) {
         if (!function_append_hierarchical_temporary(node->a, temporaries, variables, constants) ||
             !function_append_hierarchical_temporary(node->b, temporaries, variables, constants)) {
             sbuf_free(&rendered);
@@ -495,6 +540,36 @@ static bool function_append_hierarchical_temporary(const expr_t *node, function_
     }
     sbuf_free(&rendered);
     return function_temporary_table_append(temporaries, node, variables, constants);
+}
+
+static bool function_append_additive_term_temporaries(const expr_t *node, function_temporary_table_t *temporaries,
+                                                      const varlist_t *variables, const varlist_t *constants)
+{
+    if (!node || expr_is_const(node) || expr_is_var(node))
+        return true;
+    if (expr_is_op(node, &ops_add) || expr_is_op(node, &ops_sub))
+        return function_append_additive_term_temporaries(node->a, temporaries, variables, constants) &&
+               function_append_additive_term_temporaries(node->b, temporaries, variables, constants);
+    if (expr_is_op(node, &ops_neg) && node->a)
+        node = node->a;
+    return function_temporary_table_append(temporaries, node, variables, constants);
+}
+
+static bool function_append_readable_temporaries(const expr_t *node, function_temporary_table_t *temporaries,
+                                                 const varlist_t *variables, const varlist_t *constants)
+{
+    if (node && (expr_is_op(node, &ops_add) || expr_is_op(node, &ops_sub)))
+        return function_append_additive_term_temporaries(node, temporaries, variables, constants);
+    return function_append_hierarchical_temporary(node, temporaries, variables, constants);
+}
+
+static bool function_append_root_readable_temporaries(const expr_t *root, function_temporary_table_t *temporaries,
+                                                      const varlist_t *variables, const varlist_t *constants)
+{
+    if (root && (expr_is_op(root, &ops_add) || expr_is_op(root, &ops_sub)))
+        return function_append_additive_term_temporaries(root, temporaries, variables, constants);
+    return root && function_append_readable_temporaries(root->a, temporaries, variables, constants) &&
+           function_append_readable_temporaries(root->b, temporaries, variables, constants);
 }
 
 static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants)
@@ -527,9 +602,8 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
     sbuf_init(&direct);
     emit_func_with_temporaries(root, &direct, PREC_LOWEST, temporaries.nodes,
                                (const char *const *)temporaries.names, temporaries.count, root);
-    if (sbuf_len(&direct) + strlen("    return .") > 130u &&
-        (!function_append_hierarchical_temporary(root->a, &temporaries, variables, constants) ||
-         !function_append_hierarchical_temporary(root->b, &temporaries, variables, constants))) {
+    if (sbuf_len(&direct) + strlen("    return .") > 105u &&
+        !function_append_root_readable_temporaries(root, &temporaries, variables, constants)) {
         sbuf_free(&direct);
         function_dag_table_free(&dag);
         function_temporary_table_free(&temporaries);
@@ -558,9 +632,7 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
             sbuf_puts(b, "const ");
         sbuf_puts(b, temporaries.names[index]);
         sbuf_puts(b, " = ");
-        emit_func_with_temporaries(temporaries.nodes[index], b, PREC_LOWEST, temporaries.nodes,
-                                   (const char *const *)temporaries.names, temporaries.count,
-                                   temporaries.nodes[index]);
+        emit_function_temporary_value(b, &temporaries, index);
         sbuf_puts(b, ".\n");
     }
     sbuf_putc(b, '\n');
@@ -666,9 +738,7 @@ string_t *expr_function_temporaries_declarations_text(const expr_function_tempor
             sbuf_puts(&buffer, "const ");
         sbuf_puts(&buffer, plan->temporaries.names[index]);
         sbuf_puts(&buffer, " = ");
-        emit_func_with_temporaries(plan->temporaries.nodes[index], &buffer, PREC_LOWEST, plan->temporaries.nodes,
-                                   (const char *const *)plan->temporaries.names, plan->temporaries.count,
-                                   plan->temporaries.nodes[index]);
+        emit_function_temporary_value(&buffer, &plan->temporaries, index);
         sbuf_puts(&buffer, ".\n");
     }
     if (plan->temporaries.count > 0u)

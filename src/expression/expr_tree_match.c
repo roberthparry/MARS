@@ -465,7 +465,7 @@ static bool expr_collect_var_usage_impl(const expr_t *expr, size_t nvars, expr_t
         return true;
     }
 
-    if (expr_is_op(expr, &ops_summation)) {
+    if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
         const expr_t *index = expr->b;
         const expr_t *lower = NULL;
         const expr_t *upper = NULL;

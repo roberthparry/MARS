@@ -427,6 +427,5 @@ number_t number_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_neg_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_const_like(const number_t *like, number_const_id_t id);
-number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
 
 #endif

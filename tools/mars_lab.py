@@ -15,7 +15,7 @@ import datetime as py_datetime
 import errno
 import hashlib
 import ipaddress
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, InvalidOperation, MAX_EMAX, MIN_EMIN, localcontext
 import html
 import http.server
 import json
@@ -9195,7 +9195,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         syncMatrixControls();
       } else if (currentMode() === 'equation' || currentMode() === 'diffequation')
         setExpressionEditor(resultText);
-      else if (!await applyMarsBindingExpression(resultText))
+      else if (!await applyMarsBindingExpression(resultText, resultText))
         return;
       saveCurrentModeEditorState();
       updateHistoryButtons();
@@ -10300,7 +10300,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : ''),
           data.full_display_expression || data.expression || ''
         );
-        setResultInputText(data.expression || data.full_display_expression || '');
+        setResultInputText(data.editor_expression || data.full_display_expression || data.expression || '');
         setExpandableText(
           functionStyle,
           functionMore,
@@ -12324,7 +12324,7 @@ def function_with_source_comment(function: str, source_expression: str) -> str:
     source_body = source_body.strip()
     if not rendered_function or not source_body:
         return rendered_function
-    return f"`` {source_body}\n{rendered_function}"
+    return f"` {source_body} `\n{rendered_function}"
 
 
 def TeX_for_display(tex: str) -> str:
@@ -14089,6 +14089,8 @@ def format_number_text_for_precision(
     try:
         with localcontext() as ctx:
             ctx.prec = max(1, min(MAX_VALUE_PRECISION_DIGITS, int(precision)))
+            ctx.Emax = MAX_EMAX
+            ctx.Emin = MIN_EMIN
             rounded = +Decimal(text)
     except (InvalidOperation, ValueError):
         return text

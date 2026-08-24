@@ -46,7 +46,6 @@ static inline int qf_to_int(qfloat_t x)
 
 qfloat_t qf_renorm(double hi, double lo);
 string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10);
-qfloat_t qf_lommel_s_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument);
 
 typedef struct qfloat_bernoulli_even_term_t {
     double num;

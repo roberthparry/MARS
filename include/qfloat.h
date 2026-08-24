@@ -1275,6 +1275,14 @@ qfloat_t qf_zetap(qfloat_t x);
 qfloat_t qf_dilog(qfloat_t x);
 
 /**
+ * @brief Compute the order-one polylogarithm Li₁(x).
+ *
+ * @param x Input value.
+ * @return Li₁(x) = -log(1-x), or NaN outside the real principal branch.
+ */
+qfloat_t qf_polylog1(qfloat_t x);
+
+/**
  * @brief Compute the polylogarithm Li_s(x) for integer real orders.
  *
  * The order argument must be an integer-valued qfloat. Orders 0, 1, and 2 have
@@ -1286,6 +1294,8 @@ qfloat_t qf_dilog(qfloat_t x);
  * @return Li_s(x), or NaN outside implemented coverage.
  */
 qfloat_t qf_polylog(qfloat_t s, qfloat_t x);
+/** Compute the Lerch transcendent Phi(z,s,a) in its defining convergence disc. */
+qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a);
 
 /**
  * @brief Evaluate the harmonic polynomial @f$H_n(x)=\sum_{k=1}^{n}x^k/k@f$.

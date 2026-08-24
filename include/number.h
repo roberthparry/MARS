@@ -924,6 +924,10 @@ number_t num_zeta(const number_t number);
  * @return An owning number containing ζ(s, a).
  */
 number_t num_zetah(const number_t s, const number_t a);
+/** Compute the Lerch transcendent Phi(z,s,a), preserving the numeric backend. */
+number_t number_lerch_phi(const number_t z, const number_t s, const number_t a);
+/** Compatibility spelling following the existing num_* arithmetic API. */
+number_t num_lerch_phi(const number_t z, const number_t s, const number_t a);
 /**
  * @brief Evaluate the first Hurwitz zeta derivative with respect to its exponent.
  *
@@ -940,6 +944,13 @@ number_t num_zatahp(const number_t s, const number_t a);
  */
 number_t num_zetap(const number_t number);
 number_t num_dilog(const number_t number);
+/**
+ * @brief Evaluate the order-one polylogarithm Li₁(z).
+ *
+ * @param number Real or complex argument on the principal branch.
+ * @return An owning number containing Li₁(number).
+ */
+number_t num_polylog1(const number_t number);
 number_t num_polylog(const number_t order, const number_t number);
 /**
  * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.

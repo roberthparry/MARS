@@ -573,9 +573,11 @@ static int addend_group(const expr_t *dv)
         return 0;
     if (expr_is_op(dv, &ops_var))
         return 1;
-    if (expr_is_op(dv, &ops_const) && dv->name && *dv->name)
+    if (expr_is_op(dv, &ops_summation) || expr_is_op(dv, &ops_product))
         return 2;
-    return 3;
+    if (expr_is_op(dv, &ops_const) && dv->name && *dv->name)
+        return 3;
+    return 4;
 }
 
 typedef struct {

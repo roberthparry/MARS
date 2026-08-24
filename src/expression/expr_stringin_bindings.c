@@ -422,7 +422,7 @@ static int expr_summation_binds_name(const expr_t *expr, const char *name)
 
     if (!expr || !name)
         return 0;
-    if (expr_is_op(expr, &ops_summation)) {
+    if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
         index = expr->b;
         if (expr_is_op(index, &ops_argument_list))
             index = index->a;

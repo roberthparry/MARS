@@ -3869,6 +3869,8 @@ DEFINE_MATRIX_UNARY_FUNCTION(zeta)
 DEFINE_MATRIX_UNARY_FUNCTION(zetap)
 /* Apply the principal scalar dilogarithm through matrix functional calculus. */
 DEFINE_MATRIX_UNARY_FUNCTION(dilog)
+/* Apply the scalar order-one polylogarithm through matrix functional calculus. */
+DEFINE_MATRIX_UNARY_FUNCTION(polylog1)
 
 #undef DEFINE_MATRIX_UNARY_FUNCTION
 
@@ -3911,6 +3913,61 @@ matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree)
         power = next_power;
     }
 
+    mat_free(power);
+    return sum;
+
+cleanup:
+    mat_free(sum);
+    mat_free(power);
+    return NULL;
+}
+
+/* Evaluate the Lerch matrix function through its defining power series. */
+matrix_t *mat_lerch_phi(const matrix_t *Z, const number_t *s, const number_t *a)
+{
+    const unsigned int maximum_terms = 4096u;
+    matrix_t *power = NULL;
+    matrix_t *sum = NULL;
+
+    if (!Z || !s || !a || Z->rows != Z->cols || Z->elem != &number_elem)
+        return NULL;
+    power = mat_create_identity(Z->rows);
+    sum = power ? mat_scalar_mul(power, &NUM_ZERO) : NULL;
+    if (!power || !sum)
+        goto cleanup;
+    for (unsigned int k = 0u; k < maximum_terms; ++k) {
+        number_t shift = num_add_long(*a, (long)k);
+        number_t coefficient = num_div(NUM_ONE, num_pow(shift, *s));
+        matrix_t *term = mat_scalar_mul(power, &coefficient);
+        matrix_t *next_sum = term ? mat_add(sum, term) : NULL;
+        number_t term_norm = NUM_NAN;
+        number_t sum_norm = NUM_NAN;
+        bool converged = term && next_sum && mat_norm(term, MAT_NORM_INF, &term_norm) == 0 &&
+                         mat_norm(next_sum, MAT_NORM_INF, &sum_norm) == 0 && k > 8u &&
+                         num_to_double(term_norm) <= 1e-30 * (1.0 + num_to_double(sum_norm));
+        matrix_t *next_power = !converged && k + 1u < maximum_terms ? mat_mul(power, Z) : NULL;
+
+        num_destroy(&sum_norm);
+        num_destroy(&term_norm);
+        num_destroy(&coefficient);
+        num_destroy(&shift);
+        mat_free(term);
+        if (!next_sum || (!converged && k + 1u < maximum_terms && !next_power)) {
+            mat_free(next_sum);
+            mat_free(next_power);
+            goto cleanup;
+        }
+        mat_free(sum);
+        sum = next_sum;
+        if (converged) {
+            mat_free(power);
+            return sum;
+        }
+        if (k + 1u < maximum_terms) {
+            mat_free(power);
+            power = next_power;
+        }
+    }
     mat_free(power);
     return sum;
 

@@ -67,6 +67,7 @@ static void test_number_function_matrix_parity(void)
         {"zeta", mat_zeta, num_zeta, 2.5},
         {"zetap", mat_zetap, num_zetap, 2.5},
         {"dilog", mat_dilog, num_dilog, 0.25},
+        {"polylog1", mat_polylog1, num_polylog1, 0.25},
     };
 
     printf(C_CYAN "TEST: Number analytic functions are available as matrix functions\n" C_RESET);
@@ -122,6 +123,30 @@ static void test_mat_harmonic_poly(void)
     mat_free(A);
     for (size_t i = 0u; i < sizeof(values) / sizeof(values[0]); ++i)
         num_destroy(&values[i]);
+
+    {
+        number_t half = num_create_from_string("1/2");
+        number_t two = num_create_from_long(2L);
+        number_t one = num_create_from_long(1L);
+        matrix_t *Z = mat_create(1u, 1u, &half);
+        matrix_t *phi = mat_lerch_phi(Z, &two, &one);
+        number_t got = phi ? mat_get_num(phi, 0u, 0u) : num_clone(NUM_NAN);
+        number_t expected = number_lerch_phi(half, two, one);
+        number_t error = num_abs(num_sub(got, expected));
+        number_t tolerance = num_create_from_string("1e-28");
+
+        ASSERT_NOT_NULL(phi);
+        check_bool("matrix Lerch phi agrees with its scalar value", num_lt(error, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&error);
+        num_destroy(&expected);
+        num_destroy(&got);
+        mat_free(phi);
+        mat_free(Z);
+        num_destroy(&one);
+        num_destroy(&two);
+        num_destroy(&half);
+    }
 }
 
 static void test_eigen_d(void)

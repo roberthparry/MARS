@@ -3060,13 +3060,48 @@ qfloat_t qf_polylog(qfloat_t s, qfloat_t x)
     if (order == 0)
         return qf_div(x, qf_sub(QF_ONE, x));
     if (order == 1)
-        return qf_neg(qf_log(qf_sub(QF_ONE, x)));
+        return qf_polylog1(x);
     if (order == 2)
         return qf_dilog(x);
     if (qf_ge(qf_abs(x), qf_from_double(0.95)))
         return QF_NAN;
 
     return qf_polylog_series_int(order, x);
+}
+
+/* Evaluate the order-one polylogarithm on its real principal branch. */
+qfloat_t qf_polylog1(qfloat_t x)
+{
+    return qf_neg(qf_log(qf_sub(QF_ONE, x)));
+}
+
+/* Evaluate the Lerch transcendent in the defining real convergence domain. */
+qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a)
+{
+    qfloat_t sum = QF_ZERO;
+    qfloat_t power = QF_ONE;
+    const qfloat_t tolerance = qf_from_double(1e-34);
+
+    if (qf_isnan(z) || qf_isnan(s) || qf_isnan(a) || qf_le(a, QF_ZERO))
+        return QF_NAN;
+    if (qf_eq(z, QF_ZERO))
+        return qf_pow(a, qf_neg(s));
+    if (qf_eq(s, QF_ZERO))
+        return qf_div(QF_ONE, qf_sub(QF_ONE, z));
+    if (qf_eq(z, QF_ONE))
+        return qf_zetah(s, a);
+    if (qf_ge(qf_abs(z), QF_ONE))
+        return QF_NAN;
+    for (long k = 0L; k < QF_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        qfloat_t denominator = qf_pow(qf_add(a, qf_from_double((double)k)), s);
+        qfloat_t term = qf_div(power, denominator);
+
+        sum = qf_add(sum, term);
+        if (k > 8L && qf_le(qf_abs(term), qf_mul(tolerance, qf_add(QF_ONE, qf_abs(sum)))))
+            return sum;
+        power = qf_mul(power, z);
+    }
+    return QF_NAN;
 }
 
 /* Evaluate the finite logarithmic sum directly because its degree is finite. */

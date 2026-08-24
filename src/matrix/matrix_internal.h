@@ -92,6 +92,7 @@ struct elem_fun_vtable {
     void (*zeta)(void *out, const void *a);
     void (*zetap)(void *out, const void *a);
     void (*dilog)(void *out, const void *a);
+    void (*polylog1)(void *out, const void *a);
     void (*gammainv)(void *out, const void *a);
     void (*normal_pdf)(void *out, const void *a);
     void (*normal_cdf)(void *out, const void *a);

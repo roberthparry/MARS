@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "expr_maths.h"
 #include "ustring.h"
@@ -31,11 +32,27 @@ static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *ri
 static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument);
 static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
 static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument);
+expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr);
 
 static number_t eval_formal_series_component(expr_t *dv)
 {
     (void)dv;
     return num_clone(NUM_NAN);
+}
+
+static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out);
+static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value);
+
+static const expr_t *expr_find_lerch_phi(const expr_t *expr)
+{
+    const expr_t *found;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_lerch_phi))
+        return expr;
+    found = expr_find_lerch_phi(expr->a);
+    return found ? found : expr_find_lerch_phi(expr->b);
 }
 
 static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
@@ -68,7 +85,7 @@ static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
 
 static number_t eval_finite_summation(expr_t *dv)
 {
-    const long maximum_terms = 1000000L;
+    const long maximum_terms = 10000L;
     expr_t *index;
     const expr_t *lower = NULL;
     const expr_t *upper = NULL;
@@ -88,8 +105,19 @@ static number_t eval_finite_summation(expr_t *dv)
     if (!expr_is_var(index) || !upper || (lower && !expr_summation_bound_to_long(lower, &lower_value)) ||
         !expr_summation_bound_to_long(upper, &upper_value))
         return num_clone(NUM_NAN);
-    if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms)
-        return num_clone(NUM_NAN);
+    if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms) {
+        expr_t *closed_form = lower_value == 1L ? expr_finite_hyperbolic_progression_closed_form(dv) : NULL;
+
+        if (closed_form) {
+            number_t closed_value = expr_eval(closed_form);
+
+            expr_free(closed_form);
+            if (num_is_finite(closed_value))
+                return closed_value;
+            num_destroy(&closed_value);
+        }
+        return lower_value == 1L ? eval_finite_weighted_sinh(dv, upper_value) : num_clone(NUM_NAN);
+    }
 
     sum = num_clone(NUM_ZERO);
     for (long value = lower_value; value <= upper_value; ++value) {
@@ -119,6 +147,59 @@ static number_t eval_finite_summation(expr_t *dv)
     return sum;
 }
 
+static number_t eval_finite_product(expr_t *dv)
+{
+    const long maximum_terms = 1000000L;
+    expr_t *index;
+    const expr_t *lower = NULL;
+    const expr_t *upper = NULL;
+    number_t product;
+    long lower_value;
+    long upper_value;
+
+    if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
+        return num_clone(NUM_NAN);
+    index = dv->b->a;
+    upper = dv->b->b;
+    if (expr_is_op(upper, &ops_argument_list)) {
+        lower = upper->a;
+        upper = upper->b;
+    }
+    lower_value = 0L;
+    if (!expr_is_var(index) || !upper || (lower && !expr_summation_bound_to_long(lower, &lower_value)) ||
+        !expr_summation_bound_to_long(upper, &upper_value))
+        return num_clone(NUM_NAN);
+    if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms)
+        return num_clone(NUM_NAN);
+
+    product = num_clone(NUM_ONE);
+    for (long value = lower_value; value <= upper_value; ++value) {
+        number_t index_value = num_create_from_long(value);
+        expr_t *index_expression = expr_new_const(index_value);
+        expr_t *factor_expression = index_expression ? expr_substitute(dv->a, index, index_expression) : NULL;
+        number_t factor;
+        number_t updated;
+
+        num_destroy(&index_value);
+        factor = factor_expression ? expr_eval(factor_expression) : num_clone(NUM_NAN);
+        expr_free(factor_expression);
+        expr_free(index_expression);
+        if (!num_is_finite(factor)) {
+            num_destroy(&factor);
+            num_destroy(&product);
+            product = num_clone(NUM_NAN);
+            break;
+        }
+        updated = num_mul(product, factor);
+        num_destroy(&factor);
+        num_destroy(&product);
+        product = updated;
+        if (value == LONG_MAX)
+            break;
+    }
+    return product;
+}
+
 static expr_t *deriv_indexed_symbol(expr_t *dv)
 {
     expr_t *index_derivative = expr_get_dx_internal(dv->b);
@@ -130,11 +211,473 @@ static expr_t *deriv_indexed_symbol(expr_t *dv)
 
 static expr_t *deriv_summation(expr_t *dv)
 {
-    expr_t *term_derivative = expr_get_dx_internal(dv->a);
+    expr_t *raw_derivative = expr_get_dx_internal(dv->a);
+    expr_t *term_derivative = raw_derivative ? expr_simplify(raw_derivative) : NULL;
     expr_t *out = term_derivative ? expr_new_summation(term_derivative, dv->b) : NULL;
 
+    expr_free(raw_derivative);
     expr_free(term_derivative);
     return out;
+}
+
+static expr_t *deriv_product(expr_t *dv)
+{
+    expr_t *raw_derivative = expr_get_dx_internal(dv->a);
+    expr_t *factor_derivative = raw_derivative ? expr_simplify(raw_derivative) : NULL;
+    expr_t *log_derivative = factor_derivative ? expr_div(factor_derivative, dv->a) : NULL;
+    expr_t *sum = log_derivative ? expr_new_summation(log_derivative, dv->b) : NULL;
+    expr_t *product = sum ? expr_new_product(dv->a, dv->b) : NULL;
+    expr_t *out = product ? expr_mul(product, sum) : NULL;
+
+    expr_free(product);
+    expr_free(sum);
+    expr_free(log_derivative);
+    expr_free(factor_derivative);
+    expr_free(raw_derivative);
+    return out;
+}
+
+static bool expr_finite_hyperbolic_progression_parts(const expr_t *expr, const expr_t **upper_out,
+                                                     const expr_t **step_out, bool *sinh_term_out)
+{
+    const expr_t *index;
+    const expr_t *bounds;
+    const expr_t *lower;
+    const expr_t *upper;
+    const expr_t *argument;
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *step;
+    number_t lower_value = NUM_NAN;
+    bool sinh_term;
+    bool matched = false;
+
+    if (!expr || !upper_out || !step_out || !sinh_term_out || !expr_is_op(expr, &ops_summation) ||
+        !expr_is_op(expr->b, &ops_argument_list))
+        return false;
+    index = expr->b->a;
+    bounds = expr->b->b;
+    if (!index || !expr_is_var(index) || !expr_is_op(bounds, &ops_argument_list))
+        return false;
+    lower = bounds->a;
+    upper = bounds->b;
+    lower_value = expr_eval(lower);
+    if (!num_is_exact(lower_value) || !num_is_one(lower_value))
+        goto cleanup;
+    sinh_term = expr_is_op(expr->a, &ops_sinh);
+    if (!sinh_term && !expr_is_op(expr->a, &ops_cosh))
+        goto cleanup;
+    argument = expr->a->a;
+    if (!expr_match_mul_expr(argument, &left, &right))
+        goto cleanup;
+    if (left == index || (expr_is_var(left) && left->var_id != 0u && left->var_id == index->var_id))
+        step = right;
+    else if (right == index || (expr_is_var(right) && right->var_id != 0u && right->var_id == index->var_id))
+        step = left;
+    else
+        goto cleanup;
+
+    *upper_out = upper;
+    *step_out = step;
+    *sinh_term_out = sinh_term;
+    matched = true;
+
+cleanup:
+    num_destroy(&lower_value);
+    return matched;
+}
+
+static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out)
+{
+    const expr_t *index;
+    const expr_t *bounds;
+    const expr_t *lower;
+    const expr_t *upper;
+    const expr_t *numerator;
+    const expr_t *denominator;
+    const expr_t *left;
+    const expr_t *right;
+    number_t lower_value = NUM_NAN;
+    bool matched = false;
+
+    if (!expr || !expr_is_op(expr, &ops_summation) || !expr_is_op(expr->b, &ops_argument_list))
+        return false;
+    index = expr->b->a;
+    bounds = expr->b->b;
+    if (!index || !expr_is_var(index) || !expr_is_op(bounds, &ops_argument_list))
+        return false;
+    lower = bounds->a;
+    upper = bounds->b;
+    lower_value = expr_eval(lower);
+    if (!num_is_exact(lower_value) || !num_is_one(lower_value) ||
+        !expr_is_op(expr->a, &ops_div) || !(numerator = expr->a->a) || !(denominator = expr->a->b) ||
+        !(denominator == index || (expr_is_var(denominator) && denominator->var_id == index->var_id)) ||
+        !expr_is_op(numerator, &ops_sinh) || !expr_match_mul_expr(numerator->a, &left, &right))
+        goto cleanup;
+    if (left == index)
+        *step_out = right;
+    else if (right == index)
+        *step_out = left;
+    else
+        goto cleanup;
+    *upper_out = upper;
+    matched = true;
+
+cleanup:
+    num_destroy(&lower_value);
+    return matched;
+}
+
+static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
+{
+    const expr_t *upper;
+    const expr_t *step_expr;
+    number_t step;
+    number_t magnitude;
+    number_t q;
+    number_t q_power;
+    number_t dominant_scaled;
+    number_t decaying;
+    number_t dominant;
+    number_t result;
+    double step_double;
+    const long maximum_tail_terms = 10000L;
+
+    if (!expr_finite_weighted_sinh_parts(dv, &upper, &step_expr) || upper_value < 1L)
+        return num_clone(NUM_NAN);
+    (void)upper;
+    step = expr_eval(step_expr);
+    if (!num_is_real(step) || !num_is_finite(step) || num_is_zero(step)) {
+        bool zero = num_is_zero(step);
+
+        num_destroy(&step);
+        return zero ? num_clone(NUM_ZERO) : num_clone(NUM_NAN);
+    }
+    step_double = num_to_double(step);
+    magnitude = step_double < 0.0 ? num_neg(step) : num_clone(step);
+    q = num_exp(num_neg(magnitude));
+    q_power = num_clone(NUM_ONE);
+    dominant_scaled = num_clone(NUM_ZERO);
+    decaying = num_clone(NUM_ZERO);
+    for (long offset = 0L; offset < upper_value && offset < maximum_tail_terms; ++offset) {
+        number_t denominator = num_create_from_long(upper_value - offset);
+        number_t term = num_div(q_power, denominator);
+        number_t updated = num_add(dominant_scaled, term);
+        number_t next_power = num_mul(q_power, q);
+        double term_size = num_to_double(num_abs(term));
+        double total_size = num_to_double(num_abs(updated));
+
+        num_destroy(&dominant_scaled);
+        num_destroy(&q_power);
+        num_destroy(&term);
+        num_destroy(&denominator);
+        dominant_scaled = updated;
+        q_power = next_power;
+        if (offset > 8L && term_size < 1e-30 * (1.0 + total_size))
+            break;
+    }
+    num_destroy(&q_power);
+    q_power = num_clone(q);
+    for (long k = 1L; k <= upper_value && k <= maximum_tail_terms; ++k) {
+        number_t denominator = num_create_from_long(k);
+        number_t term = num_div(q_power, denominator);
+        number_t updated = num_add(decaying, term);
+        number_t next_power = num_mul(q_power, q);
+        double term_size = num_to_double(num_abs(term));
+        double total_size = num_to_double(num_abs(updated));
+
+        num_destroy(&decaying);
+        num_destroy(&q_power);
+        num_destroy(&term);
+        num_destroy(&denominator);
+        decaying = updated;
+        q_power = next_power;
+        if (k > 8L && term_size < 1e-30 * (1.0 + total_size))
+            break;
+    }
+    dominant = num_mul(num_exp(num_mul_long(magnitude, upper_value)), dominant_scaled);
+    result = num_div(num_sub(dominant, decaying), NUM_TWO);
+    if (step_double < 0.0) {
+        number_t negative = num_neg(result);
+
+        num_destroy(&result);
+        result = negative;
+    }
+    num_destroy(&dominant);
+    num_destroy(&decaying);
+    num_destroy(&dominant_scaled);
+    num_destroy(&q_power);
+    num_destroy(&q);
+    num_destroy(&magnitude);
+    num_destroy(&step);
+    return result;
+}
+
+expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
+{
+    const expr_t *n;
+    const expr_t *x;
+    expr_t *one = NULL;
+    expr_t *n_plus_one = NULL;
+    expr_t *negative_x = NULL;
+    expr_t *positive_z = NULL;
+    expr_t *negative_z = NULL;
+    expr_t *positive_polylog = NULL;
+    expr_t *negative_polylog = NULL;
+    expr_t *positive_power = NULL;
+    expr_t *negative_power = NULL;
+    expr_t *positive_phi = NULL;
+    expr_t *negative_phi = NULL;
+    expr_t *positive_tail = NULL;
+    expr_t *negative_tail = NULL;
+    expr_t *positive_polylog_half = NULL;
+    expr_t *negative_polylog_half = NULL;
+    expr_t *positive_tail_half = NULL;
+    expr_t *negative_tail_half = NULL;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_finite_weighted_sinh_parts(expr, &n, &x))
+        return NULL;
+    one = expr_new_const(NUM_ONE);
+    n_plus_one = expr_add_long(n, 1L);
+    negative_x = expr_neg(x);
+    positive_z = expr_exp(x);
+    negative_z = expr_exp(negative_x);
+    positive_polylog = expr_polylog1(positive_z);
+    negative_polylog = expr_polylog1(negative_z);
+    positive_power = expr_pow_xp(positive_z, n_plus_one);
+    negative_power = expr_pow_xp(negative_z, n_plus_one);
+    positive_phi = expr_lerch_phi(positive_z, one, n_plus_one);
+    negative_phi = expr_lerch_phi(negative_z, one, n_plus_one);
+    positive_tail = expr_mul(positive_power, positive_phi);
+    negative_tail = expr_mul(negative_power, negative_phi);
+    positive_polylog_half = expr_mul_num(positive_polylog, &NUM_HALF);
+    negative_polylog_half = expr_mul_num(negative_polylog, &NUM_HALF);
+    positive_tail_half = expr_mul_num(positive_tail, &NUM_HALF);
+    negative_tail_half = expr_mul_num(negative_tail, &NUM_HALF);
+    left = expr_sub(positive_polylog_half, negative_polylog_half);
+    right = expr_sub(negative_tail_half, positive_tail_half);
+    out = expr_add(left, right);
+    expr_free(right);
+    expr_free(left);
+    expr_free(negative_tail_half);
+    expr_free(positive_tail_half);
+    expr_free(negative_polylog_half);
+    expr_free(positive_polylog_half);
+    expr_free(negative_tail);
+    expr_free(positive_tail);
+    expr_free(negative_phi);
+    expr_free(positive_phi);
+    expr_free(negative_power);
+    expr_free(positive_power);
+    expr_free(negative_polylog);
+    expr_free(positive_polylog);
+    expr_free(negative_z);
+    expr_free(positive_z);
+    expr_free(negative_x);
+    expr_free(n_plus_one);
+    expr_free(one);
+    return out;
+}
+
+/* Recover the finite weighted hyperbolic sum represented by a matching Lerch-Phi expression. */
+expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr)
+{
+    const expr_t *phi = expr_find_lerch_phi(expr);
+    const expr_t *z;
+    const expr_t *s;
+    const expr_t *a;
+    const expr_t *x;
+    expr_t *n = NULL;
+    expr_t *candidate = NULL;
+    expr_t *recognised_sum = NULL;
+    expr_t *difference = NULL;
+    expr_t *simplified = NULL;
+    number_t s_value = NUM_NAN;
+    expr_t *out = NULL;
+
+    if (!expr || !phi || !expr_lerch_phi_unpack(phi, &z, &s, &a) ||
+        !expr_is_op(z, &ops_exp) || !(x = z->a))
+        return NULL;
+    if (expr_is_op(x, &ops_neg) && x->a)
+        x = x->a;
+    s_value = expr_eval(s);
+    if (!num_is_exact(s_value) || !num_is_one(s_value))
+        goto cleanup;
+    {
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *raw_n = one ? expr_sub(a, one) : NULL;
+
+        n = raw_n ? expr_simplify(raw_n) : NULL;
+        expr_free(raw_n);
+        expr_free(one);
+    }
+    if (!n)
+        goto cleanup;
+    {
+        expr_t *index = expr_new_var(NUM_NAN);
+        expr_t *argument;
+        expr_t *numerator;
+        expr_t *term;
+        expr_t *lower;
+        expr_t *sum;
+
+        if (index)
+            expr_set_name(index, "k");
+        argument = index ? expr_mul(index, x) : NULL;
+        numerator = argument ? expr_sinh(argument) : NULL;
+        term = numerator ? expr_div(numerator, index) : NULL;
+        lower = expr_new_const(NUM_ONE);
+        sum = term && lower ? expr_new_finite_summation_range(term, index, lower, n) : NULL;
+
+        candidate = sum ? expr_finite_weighted_sinh_lerch_form(sum) : NULL;
+        recognised_sum = sum;
+        expr_free(lower);
+        expr_free(term);
+        expr_free(numerator);
+        expr_free(argument);
+        expr_free(index);
+    }
+    difference = candidate ? expr_sub(expr, candidate) : NULL;
+    simplified = difference ? expr_simplify(difference) : NULL;
+    if (!simplified || !expr_is_exact_zero(simplified))
+        goto cleanup;
+    out = recognised_sum;
+    recognised_sum = NULL;
+
+cleanup:
+    num_destroy(&s_value);
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(candidate);
+    expr_free(recognised_sum);
+    expr_free(n);
+    return out;
+}
+
+/* Return whether an expression is the recognised finite weighted hyperbolic sum in Lerch-Phi form. */
+bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr)
+{
+    expr_t *sum = expr_finite_weighted_sinh_from_lerch_form(expr);
+    bool matched = sum != NULL;
+
+    expr_free(sum);
+    return matched;
+}
+
+/* Evaluate a recognised finite weighted hyperbolic sum in Lerch-Phi form. */
+bool expr_finite_weighted_sinh_lerch_value(const expr_t *expr, number_t *value_out)
+{
+    const expr_t *upper;
+    const expr_t *step;
+    expr_t *sum;
+    long upper_value;
+
+    if (!value_out || !(sum = expr_finite_weighted_sinh_from_lerch_form(expr)))
+        return false;
+    if (!expr_finite_weighted_sinh_parts(sum, &upper, &step) ||
+        !expr_summation_bound_to_long(upper, &upper_value) || upper_value < 1L) {
+        expr_free(sum);
+        return false;
+    }
+    (void)step;
+    *value_out = eval_finite_weighted_sinh(sum, upper_value);
+    expr_free(sum);
+    return num_is_finite(*value_out);
+}
+
+static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, expr_t *term, expr_t *bounds)
+{
+    return expr_simplify_binary_operator(expr, term, bounds);
+}
+
+/* Return the closed form of a recognised finite hyperbolic progression. */
+expr_t *expr_finite_hyperbolic_progression_closed_form(const expr_t *expr)
+{
+    const expr_t *upper;
+    const expr_t *step;
+    bool sinh_term;
+    expr_t *upper_times_step = NULL;
+    expr_t *first_argument = NULL;
+    expr_t *upper_plus_one = NULL;
+    expr_t *second_product = NULL;
+    expr_t *second_argument = NULL;
+    expr_t *first_factor = NULL;
+    expr_t *second_factor = NULL;
+    expr_t *numerator = NULL;
+    expr_t *denominator_argument = NULL;
+    expr_t *denominator = NULL;
+    expr_t *closed_form = NULL;
+
+    if (!expr_finite_hyperbolic_progression_parts(expr, &upper, &step, &sinh_term))
+        return NULL;
+    upper_times_step = expr_mul(upper, step);
+    first_argument = upper_times_step ? expr_div_long(upper_times_step, 2L) : NULL;
+    upper_plus_one = expr_add_long(upper, 1L);
+    second_product = upper_plus_one ? expr_mul(upper_plus_one, step) : NULL;
+    second_argument = second_product ? expr_div_long(second_product, 2L) : NULL;
+    first_factor = first_argument ? expr_sinh(first_argument) : NULL;
+    second_factor = second_argument ? (sinh_term ? expr_sinh(second_argument) : expr_cosh(second_argument)) : NULL;
+    numerator = first_factor && second_factor ? expr_mul(first_factor, second_factor) : NULL;
+    denominator_argument = expr_div_long(step, 2L);
+    denominator = denominator_argument ? expr_sinh(denominator_argument) : NULL;
+    closed_form = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(denominator_argument);
+    expr_free(numerator);
+    expr_free(second_factor);
+    expr_free(first_factor);
+    expr_free(second_argument);
+    expr_free(second_product);
+    expr_free(upper_plus_one);
+    expr_free(first_argument);
+    expr_free(upper_times_step);
+    return closed_form;
+}
+
+/* Render a native finite sinh/cosh summation together with its geometric-series identity. */
+char *expr_finite_hyperbolic_progression_identity_TeX(const expr_t *expr)
+{
+    const expr_t *upper;
+    const expr_t *step;
+    expr_t *symbolic_step = NULL;
+    char *summation_TeX = NULL;
+    char *upper_TeX = NULL;
+    char *step_TeX = NULL;
+    char *identity_TeX = NULL;
+    bool sinh_term;
+
+    if (!expr_finite_hyperbolic_progression_parts(expr, &upper, &step, &sinh_term))
+        return NULL;
+
+    if (!step->name || !*step->name)
+        return NULL;
+    symbolic_step = expr_new_named_var(NUM_NAN, step->name);
+    summation_TeX = expr_to_TeX_body(expr);
+    upper_TeX = expr_to_TeX_body(upper);
+    step_TeX = symbolic_step ? expr_to_TeX_body(symbolic_step) : NULL;
+    if (summation_TeX && upper_TeX && step_TeX) {
+        const char *second_function = sinh_term ? "\\sinh" : "\\cosh";
+        const char *format = "%s = \\frac{\\sinh(\\frac{%s\\mkern-2mu %s}{2})\\mkern-2mu "
+                             "%s(\\frac{%s}{2}\\mkern-2mu \\left(%s + 1\\right))}{\\sinh(\\frac{%s}{2})}";
+        const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, upper_TeX, step_TeX,
+                                               second_function, step_TeX, upper_TeX, step_TeX) +
+                              1u;
+
+        identity_TeX = malloc(length);
+        if (identity_TeX)
+            snprintf(identity_TeX, length, format, summation_TeX, upper_TeX, step_TeX, second_function, step_TeX,
+                     upper_TeX, step_TeX);
+    }
+
+    free(step_TeX);
+    free(upper_TeX);
+    free(summation_TeX);
+    expr_free(symbolic_step);
+    return identity_TeX;
 }
 
 static expr_t *integrate_summation(const expr_t *expr, const expr_t *wrt)
@@ -1085,6 +1628,18 @@ const expr_ops_t ops_dilog = {.eval = eval_dilog,
                               .apply_binary = NULL,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
+const expr_ops_t ops_polylog1 = {.eval = eval_polylog1,
+                                 .deriv = deriv_polylog1,
+                                 .reverse = expr_reverse_polylog1,
+                                 .kind = EXPR_KIND_POLYLOG1,
+                                 .arity = EXPR_OP_UNARY,
+                                 .name = "Li1",
+                                 .TeX_name = "\\operatorname{Li}_{1}",
+                                 .apply_unary = expr_polylog1,
+                                 .apply_binary = NULL,
+                                 .integrate = integrate_polylog1,
+                                 .simplify = expr_simplify_unary_operator,
+                                 .fold_const_unary = NULL};
 const expr_ops_t ops_polylog = {.eval = eval_polylog,
                                 .deriv = deriv_polylog,
                                 .reverse = expr_reverse_polylog,
@@ -1107,6 +1662,29 @@ const expr_ops_t ops_harmonic_poly = {.eval = eval_harmonic_poly,
                                       .integrate = integrate_harmonic_poly,
                                       .simplify = expr_simplify_binary_operator,
                                       .fold_const_unary = NULL};
+const expr_ops_t ops_lerch_phi = {.eval = eval_lerch_phi,
+                                  .deriv = deriv_lerch_phi,
+                                  .reverse_many = expr_reverse_lerch_phi_many,
+                                  .kind = EXPR_KIND_LERCH_PHI,
+                                  .arity = EXPR_OP_BINARY,
+                                  .name = "LerchPhi",
+                                  .TeX_name = "\\Phi",
+                                  .apply_unary = NULL,
+                                  .apply_binary = NULL,
+                                  .integrate = expr_integrate_dispatch_primitive,
+                                  .simplify = expr_simplify_rebuild_binary_operator,
+                                  .fold_const_unary = NULL};
+const expr_ops_t ops_lerch_phi_pack = {.eval = eval_lerch_phi_pack,
+                                       .deriv = deriv_lerch_phi_pack,
+                                       .reverse = expr_reverse_parameter_pack,
+                                       .kind = EXPR_KIND_LERCH_PHI_PACK,
+                                       .arity = EXPR_OP_BINARY,
+                                       .name = "lerch_phi_pack",
+                                       .TeX_name = "\\operatorname{pack}",
+                                       .apply_unary = NULL,
+                                       .apply_binary = NULL,
+                                       .simplify = expr_simplify_rebuild_binary_operator,
+                                       .fold_const_unary = NULL};
 const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
                                      .deriv = deriv_legendre_chi,
                                      .reverse = expr_reverse_legendre_chi,
@@ -1413,8 +1991,19 @@ const expr_ops_t ops_summation = {.eval = eval_finite_summation,
                                   .apply_unary = NULL,
                                   .apply_binary = NULL,
                                   .integrate = integrate_summation,
-                                  .simplify = expr_simplify_binary_operator,
+                                  .simplify = expr_simplify_summation_with_special_forms,
                                   .fold_const_unary = NULL};
+const expr_ops_t ops_product = {.eval = eval_finite_product,
+                                .deriv = deriv_product,
+                                .reverse = expr_reverse_not_differentiable,
+                                .kind = EXPR_KIND_PRODUCT,
+                                .arity = EXPR_OP_BINARY,
+                                .name = "product",
+                                .TeX_name = NULL,
+                                .apply_unary = NULL,
+                                .apply_binary = NULL,
+                                .simplify = expr_simplify_binary_operator,
+                                .fold_const_unary = NULL};
 const expr_ops_t ops_logbeta = {.eval = eval_logbeta,
                                 .deriv = deriv_logbeta,
                                 .reverse = expr_reverse_logbeta,
@@ -1752,7 +2341,10 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_ZETAP] = &ops_zetap,
         [EXPR_KIND_ZETAH] = &ops_zetah,
         [EXPR_KIND_ZATAHP] = &ops_zatahp,
+        [EXPR_KIND_LERCH_PHI] = &ops_lerch_phi,
+        [EXPR_KIND_LERCH_PHI_PACK] = &ops_lerch_phi_pack,
         [EXPR_KIND_DILOG] = &ops_dilog,
+        [EXPR_KIND_POLYLOG1] = &ops_polylog1,
         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
         [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
@@ -2077,6 +2669,11 @@ expr_t *expr_dilog(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_dilog, a);
 }
+/* Construct an order-one polylogarithm expression. */
+expr_t *expr_polylog1(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_polylog1, a);
+}
 expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg)
 {
     return expr_math_wrap_binary(&ops_polylog, order, arg);
@@ -2095,6 +2692,15 @@ expr_t *expr_polylog(unsigned int order, const expr_t *a)
 expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)
 {
     return expr_math_wrap_binary(&ops_harmonic_poly, degree, argument);
+}
+/* Construct a native Lerch-transcendent expression. */
+expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a)
+{
+    expr_t *parameters = expr_math_wrap_binary(&ops_lerch_phi_pack, z, s);
+    expr_t *out = parameters ? expr_math_wrap_binary(&ops_lerch_phi, parameters, a) : NULL;
+
+    expr_free(parameters);
+    return out;
 }
 expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg)
 {
@@ -2537,6 +3143,24 @@ expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index,
     expr_t *range = expr_math_wrap_binary(&ops_argument_list, lower, upper);
     expr_t *bounds = range ? expr_math_wrap_binary(&ops_argument_list, index, range) : NULL;
     expr_t *out = bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
+
+    expr_free(bounds);
+    expr_free(range);
+    return out;
+}
+
+expr_t *expr_new_product(const expr_t *term, const expr_t *index)
+{
+    return expr_math_wrap_binary(&ops_product, term, index);
+}
+
+/* Build a formal finite product with explicit inclusive bounds. */
+expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, const expr_t *lower,
+                                     const expr_t *upper)
+{
+    expr_t *range = expr_math_wrap_binary(&ops_argument_list, lower, upper);
+    expr_t *bounds = range ? expr_math_wrap_binary(&ops_argument_list, index, range) : NULL;
+    expr_t *out = bounds ? expr_math_wrap_binary(&ops_product, term, bounds) : NULL;
 
     expr_free(bounds);
     expr_free(range);

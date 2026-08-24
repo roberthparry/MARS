@@ -102,8 +102,11 @@ typedef enum {
     EXPR_KIND_EI,
     EXPR_KIND_E1,
     EXPR_KIND_DILOG,
+    EXPR_KIND_POLYLOG1,
     EXPR_KIND_POLYLOG,
     EXPR_KIND_HARMONIC_POLY,
+    EXPR_KIND_LERCH_PHI,
+    EXPR_KIND_LERCH_PHI_PACK,
     EXPR_KIND_LEGENDRE_CHI,
     EXPR_KIND_BESSEL_J,
     EXPR_KIND_BESSEL_Y,
@@ -160,6 +163,7 @@ typedef enum {
     EXPR_KIND_INTEGRAL_BOUNDS,
     EXPR_KIND_INDEXED_SYMBOL,
     EXPR_KIND_SUMMATION,
+    EXPR_KIND_PRODUCT,
     EXPR_KIND_FORMAL_DERIVATIVE,
     EXPR_KIND_ARBITRARY_FUNCTION,
     EXPR_KIND_ARGUMENT_LIST,
@@ -331,6 +335,7 @@ extern const expr_ops_t ops_integral_meta;
 extern const expr_ops_t ops_integral_bounds;
 extern const expr_ops_t ops_indexed_symbol;
 extern const expr_ops_t ops_summation;
+extern const expr_ops_t ops_product;
 extern const expr_ops_t ops_formal_derivative;
 extern const expr_ops_t ops_arbitrary_function;
 extern const expr_ops_t ops_argument_list;
@@ -338,6 +343,7 @@ extern const expr_ops_t ops_argument_list;
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
 expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const expr_t *upper);
+expr_t *expr_new_product(const expr_t *term, const expr_t *index);
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts);
 bool expr_is_formal_derivative(const expr_t *expr);
@@ -411,8 +417,11 @@ extern const expr_ops_t ops_zetap;
 extern const expr_ops_t ops_zetah;
 extern const expr_ops_t ops_zatahp;
 extern const expr_ops_t ops_dilog;
+extern const expr_ops_t ops_polylog1;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_harmonic_poly;
+extern const expr_ops_t ops_lerch_phi;
+extern const expr_ops_t ops_lerch_phi_pack;
 extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
@@ -628,6 +637,7 @@ expr_t *expr_get_dx_internal(const expr_t *dv);
 const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
+expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
 expr_t *expr_new_binary_internal(const expr_ops_t *ops, const expr_t *a, const expr_t *b);
 expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent);
@@ -636,6 +646,7 @@ expr_t *expr_integral_with_bounds_internal(const expr_t *integrand, const expr_t
                                            const expr_t *dummy);
 expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg);
 expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg);
+bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **s, const expr_t **a);
 expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg);
 expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg);
 bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
@@ -826,6 +837,7 @@ void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *
 void expr_reverse_zeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_dilog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_polylog1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polylog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_legendre_chi(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_bessel_j(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -834,6 +846,8 @@ void expr_reverse_lommel_s(const expr_t *dv, const number_t *out_bar, number_t *
 void expr_reverse_parameter_pack(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_hypergeometric_pFq(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 int expr_reverse_appell_f1_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+                                void *context);
+int expr_reverse_lerch_phi_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context);
 int expr_reverse_lauricella_f_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                    void *context);

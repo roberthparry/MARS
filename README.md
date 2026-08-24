@@ -20,7 +20,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   public handle
 - **`qfloat_t`** — independent double-double arithmetic, circular function
   families and special functions, including Bessel, Lommel, generalised
-  hypergeometric, Lauricella, Riemann zeta and Hurwitz zeta families
+  hypergeometric, Lauricella, Riemann zeta, Hurwitz zeta, Li₁ and Lerch
+  transcendent families
   (~31–32 decimal digits of precision)
 - **`qcomplex_t`** — double-double complex arithmetic and complex
   special-function families without an MPFR or MPC dependency
@@ -37,6 +38,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   complex elementary functions, symbolic antiderivatives for conservative rule
   families, native algebraic-series ellipsis expansion, harmonic polynomials,
   trigonometric and hyperbolic progression sums, Riemann and Hurwitz zeta
+  calculus, finite sum and product notation, Li₁ and Lerch-transcendent
   calculus, symbolic matrix integration and structural matcher helpers for
   higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
@@ -62,7 +64,10 @@ single-valued. Native algebraic-series recognition supplies the sigma step and
 domain-appropriate closed form, and a Value card appears whenever all required
 parameters have been supplied. Finite `sin`, `cos`, `sinh` and `cosh`
 progressions are recognised directly; harmonic-polynomial notation supplies a
-finite symbolic antiderivative for the cosine progression.
+finite symbolic antiderivative for the cosine progression. Native `@Z` and
+`@P` notation supplies formal sums and products. Weighted hyperbolic sums use a
+bounded Li₁/Lerch representation, stable direct values and an inverse
+calculus simplification that recovers their finite-sum derivative.
 
 After building MARS and installing the Lab's runtime dependencies, start it
 from the repository root:

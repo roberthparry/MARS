@@ -977,13 +977,48 @@ qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z)
     if (order == 0)
         return qc_div(z, qc_sub(QC_ONE, z));
     if (order == 1)
-        return qc_neg(qc_log(qc_sub(QC_ONE, z)));
+        return qc_polylog1(z);
     if (order == 2)
         return qc_dilog(z);
     if (qf_ge(qc_abs(z), qf_from_double(0.95)))
         return QC_NAN;
 
     return qc_polylog_series_int(order, z);
+}
+
+/* Evaluate the order-one polylogarithm on the complex principal branch. */
+qcomplex_t qc_polylog1(qcomplex_t z)
+{
+    return qc_neg(qc_log(qc_sub(QC_ONE, z)));
+}
+
+/* Evaluate the Lerch transcendent in the defining complex convergence domain. */
+qcomplex_t qc_lerch_phi(qcomplex_t z, qcomplex_t s, qcomplex_t a)
+{
+    qcomplex_t sum = QC_ZERO;
+    qcomplex_t power = QC_ONE;
+    const qfloat_t tolerance = qf_from_double(1e-34);
+
+    if (qc_isnan(z) || qc_isnan(s) || qc_isnan(a))
+        return QC_NAN;
+    if (qc_eq(z, QC_ZERO))
+        return qc_pow(a, qc_neg(s));
+    if (qc_eq(s, QC_ZERO))
+        return qc_div(QC_ONE, qc_sub(QC_ONE, z));
+    if (qc_eq(z, QC_ONE))
+        return qc_zetah(s, a);
+    if (qf_ge(qc_abs(z), QF_ONE))
+        return QC_NAN;
+    for (long k = 0L; k < QC_POLYLOG_SERIES_MAX_TERMS; ++k) {
+        qcomplex_t shift = qc_add(a, qc_make(qf_from_double((double)k), QF_ZERO));
+        qcomplex_t term = qc_div(power, qc_pow(shift, s));
+
+        sum = qc_add(sum, term);
+        if (k > 8L && qf_le(qc_abs(term), qf_mul(tolerance, qf_add(QF_ONE, qc_abs(sum)))))
+            return sum;
+        power = qc_mul(power, z);
+    }
+    return QC_NAN;
 }
 
 /* Evaluate the finite logarithmic sum directly because its degree is finite. */

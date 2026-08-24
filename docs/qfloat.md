@@ -335,7 +335,9 @@ The qfloat layer has no dependency on MPFR.
 **Polylogarithms**
 
 - `qfloat_t qf_dilog(qfloat_t x)` — principal dilogarithm Li₂(x)
+- `qfloat_t qf_polylog1(qfloat_t x)` — order-one polylogarithm Li₁(x) = −ln(1−x) on the real principal branch
 - `qfloat_t qf_polylog(qfloat_t s, qfloat_t x)` — polylogarithm Li_s(x) for integer real orders currently supported by the implementation
+- `qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a)` — Lerch transcendent Φ(z,s,a) in the defining disc |z| < 1, with exact reductions at z = 0, z = 1 and s = 0
 - `qfloat_t qf_harmonic_poly(unsigned long degree, qfloat_t argument)` — finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k
 - `qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x)` — Legendre chi χ_s(x) for integer real orders currently supported by the implementation
 

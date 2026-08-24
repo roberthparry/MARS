@@ -34,11 +34,36 @@ static void test_from_string_function_hash(void)
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
     check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
-    check_parse_val("finite sum is registered in the perfect hash", "sum(k,k,1,10)", 55.0, __LINE__);
+    check_parse_val("finite sum is registered in the perfect hash", "sum(k,1,10,k)", 55.0, __LINE__);
     check_parse_num("harmonic_poly is registered in the perfect hash", "harmonic_poly(4, 1/2)", "131/192",
                     __LINE__);
     check_parse_expr("harmonic_poly bindings use the binding perfect hash",
                      "{ harmonic_poly(n,x) | x=1/2; n=4 }", "{ Hn(n, x) | x = ¹⁄₂; n = 4 }", __LINE__);
+    check_parse_num("Lerch phi evaluates through its polylogarithm reduction", "lerch_phi(0.5,2,1)",
+                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
+    check_parse_num("LerchPhi is registered in the perfect hash", "LerchPhi(0.5,2,1)",
+                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
+    check_parse_num("capital phi is registered in the perfect hash", "Φ(0.5,2,1)",
+                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
+    check_parse_val("Li1 aliases polylogarithm of order one", "Li1(0.5)", 0.6931471805599453, __LINE__);
+    check_parse_val("display Li subscript one aliases polylogarithm of order one", "Li₁(0.5)",
+                    0.6931471805599453, __LINE__);
+    check_parse_val("display Li subscript two aliases dilogarithm", "Li₂(0.5)", 0.5822405264650125, __LINE__);
+    check_parse_TeX("Lerch phi renders as capital phi", "lerch_phi(1/2,2,1)",
+                    "\\Phi\\left(\\frac{1}{2}, 2, 1\\right)", __LINE__);
+    {
+        expr_t *lerch = expr_from_string("lerch_phi(1/2,2,1)", NULL);
+        char *expression_text = lerch ? expr_to_string(lerch, style_EXPRESSION) : NULL;
+        char *function_text = lerch ? expr_to_string(lerch, style_FUNCTION) : NULL;
+
+        ASSERT_NOT_NULL(expression_text);
+        ASSERT_NOT_NULL(function_text);
+        ASSERT_NOT_NULL(strstr(expression_text, "Φ("));
+        ASSERT_NOT_NULL(strstr(function_text, "LerchPhi("));
+        free(function_text);
+        free(expression_text);
+        expr_free(lerch);
+    }
     unset_zetap = expr_from_string("zetap(NAN)", NULL);
     ASSERT_NOT_NULL(unset_zetap);
     unset_value = expr_eval(unset_zetap);
@@ -151,6 +176,127 @@ static void test_from_string_series_ellipsis(void)
     char *expression_text;
     char *function_text;
     expr_bindings_t *bindings = NULL;
+
+    {
+        const char *weighted_source =
+            "{ sinh(x)+sinh(2x)/2+sinh(3x)/3+sinh(4x)/4+...+sinh(nx)/n+C | x=pi/12; n=100, C=? }";
+        expr_bindings_t *weighted_bindings = NULL;
+        expr_t *weighted = expr_from_string(weighted_source, &weighted_bindings);
+        char *weighted_text;
+        char *weighted_function;
+
+        ASSERT_NOT_NULL(weighted);
+        ASSERT_NOT_NULL(weighted_bindings);
+        weighted_text = expr_to_string(weighted, style_EXPRESSION);
+        weighted_function = expr_to_string(weighted, style_FUNCTION);
+        ASSERT_NOT_NULL(weighted_text);
+        ASSERT_NOT_NULL(weighted_function);
+        TEST_ASSERT_STR_EQ(weighted_text, "{ Σ_(k=1)^n sinh(kx)/k + C | x = π/12; n = 100, C = NAN }");
+        ASSERT_NOT_NULL(strstr(weighted_function, "return sum(k, 1, n, sinh(k.x)/k) + C."));
+        ASSERT_NULL(expr_bindings_get(weighted_bindings, "k"));
+        {
+            expr_bindings_t *round_trip_bindings = NULL;
+            expr_t *round_trip = expr_from_string(weighted_text, &round_trip_bindings);
+            char *round_trip_text = round_trip ? expr_to_string(round_trip, style_EXPRESSION) : NULL;
+
+            ASSERT_NOT_NULL(round_trip);
+            ASSERT_NOT_NULL(round_trip_bindings);
+            TEST_ASSERT_STR_EQ(round_trip_text, weighted_text);
+            ASSERT_NULL(expr_bindings_get(round_trip_bindings, "k"));
+            free(round_trip_text);
+            expr_free(round_trip);
+            expr_bindings_free(round_trip_bindings);
+        }
+        free(weighted_function);
+        free(weighted_text);
+        expr_free(weighted);
+        expr_bindings_free(weighted_bindings);
+    }
+
+    {
+        expr_bindings_t *sum_bindings = NULL;
+        expr_bindings_t *product_bindings = NULL;
+        expr_t *sum = expr_from_string("{ @Z_k=1^n sinh(kx)/k | x=0.2; n=4 }", &sum_bindings);
+        expr_t *product = expr_from_string("{ @P_k=1^n (1-1/k^s) | n=4; s=2 }", &product_bindings);
+        expr_t *infinite_sum = expr_from_string("{ @Z_n=1 1/n^2 }", NULL);
+        expr_t *infinite_product = expr_from_string("{ @P_k=1 (1-1/k^s) }", NULL);
+        number_t sum_value;
+        number_t product_value;
+        char *sum_text;
+        char *product_text;
+        char *infinite_sum_text;
+        char *infinite_product_text;
+        const expr_t *x_binding;
+        expr_t *sum_derivative;
+        char *sum_derivative_text;
+        char *sum_derivative_function;
+
+        ASSERT_NOT_NULL(sum);
+        ASSERT_NOT_NULL(product);
+        ASSERT_NOT_NULL(infinite_sum);
+        ASSERT_NOT_NULL(infinite_product);
+        ASSERT_NOT_NULL(sum_bindings);
+        ASSERT_NOT_NULL(product_bindings);
+        ASSERT_TRUE(expr_is_differentiable(sum));
+        ASSERT_TRUE(expr_is_differentiable(product));
+        ASSERT_NULL(expr_bindings_get(sum_bindings, "k"));
+        ASSERT_NULL(expr_bindings_get(product_bindings, "k"));
+        sum_value = expr_eval(sum);
+        product_value = expr_eval(product);
+        ASSERT_EQ_DOUBLE(num_to_double(sum_value), 0.8409565217054879, 1e-15);
+        ASSERT_TRUE(num_is_zero(product_value));
+        sum_text = expr_to_string(sum, style_UNBOUND);
+        product_text = expr_to_string(product, style_UNBOUND);
+        infinite_sum_text = expr_to_string(infinite_sum, style_UNBOUND);
+        infinite_product_text = expr_to_string(infinite_product, style_UNBOUND);
+        TEST_ASSERT_STR_EQ(sum_text, "Σ_(k=1)^n sinh(kx)/k");
+        TEST_ASSERT_STR_EQ(product_text, "@P_k=1^n (1 - 1/k^s)");
+        TEST_ASSERT_STR_EQ(infinite_sum_text, "Σ_(n=1)^∞ 1/n²");
+        TEST_ASSERT_STR_EQ(infinite_product_text, "@P_k=1 (1 - 1/k^s)");
+        x_binding = expr_bindings_get(sum_bindings, "x");
+        ASSERT_NOT_NULL(x_binding);
+        sum_derivative = expr_create_deriv(sum, x_binding);
+        ASSERT_NOT_NULL(sum_derivative);
+        sum_derivative_text = expr_to_string(sum_derivative, style_UNBOUND);
+        sum_derivative_function = expr_to_string(sum_derivative, style_FUNCTION);
+        TEST_ASSERT_STR_EQ(sum_derivative_text, "Σ_(k=1)^n cosh(kx)");
+        ASSERT_NOT_NULL(strstr(sum_derivative_function, "return sum(k, 1, n, cosh(k.x))."));
+        free(sum_derivative_function);
+        free(sum_derivative_text);
+        expr_free(sum_derivative);
+        {
+            const char *lerch_source =
+                "{ ½·Li1(exp(x)) - ½·Li1(exp(-x)) + "
+                "(½·exp(-x)^(n + 1)·Φ(exp(-x), 1, n + 1) - ½·exp(x)^(n + 1)·Φ(exp(x), 1, n + 1)) | "
+                "x=pi/6; n=10 }";
+            expr_bindings_t *lerch_bindings = NULL;
+            expr_t *lerch_form = expr_from_string(lerch_source, &lerch_bindings);
+            const expr_t *lerch_x = lerch_bindings ? expr_bindings_get(lerch_bindings, "x") : NULL;
+            expr_t *lerch_derivative = lerch_form && lerch_x ? expr_create_deriv(lerch_form, lerch_x) : NULL;
+            char *lerch_derivative_text = lerch_derivative ? expr_to_string(lerch_derivative, style_UNBOUND) : NULL;
+
+            ASSERT_NOT_NULL(lerch_form);
+            ASSERT_NOT_NULL(lerch_x);
+            ASSERT_NOT_NULL(lerch_derivative);
+            TEST_ASSERT_STR_EQ(lerch_derivative_text, "sinh(nx/2)·cosh(x/2·(n + 1))/sinh(x/2)");
+            free(lerch_derivative_text);
+            expr_free(lerch_derivative);
+            expr_free(lerch_form);
+            expr_bindings_free(lerch_bindings);
+        }
+        free(infinite_product_text);
+        free(infinite_sum_text);
+        free(product_text);
+        free(sum_text);
+        num_destroy(&product_value);
+        num_destroy(&sum_value);
+        expr_free(infinite_product);
+        expr_free(infinite_sum);
+        expr_free(product);
+        expr_free(sum);
+        expr_bindings_free(product_bindings);
+        expr_bindings_free(sum_bindings);
+    }
 
     {
         const char *product_source = "(1+1/2)(1+1/3)(1+1/4)...(1+1/10)";
@@ -470,8 +616,8 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_TRUE(num_is_exact(actual));
     ASSERT_TRUE(num_eq(actual, expected));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=0}^{10}"));
-    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "(-1)^{n}"));
-    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "2n + 1"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\left(-1\\right)^{n}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "2\\mkern-2mu n + 1"));
     num_destroy(&actual);
     num_destroy(&expected);
     expr_free(expression);

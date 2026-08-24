@@ -2,8 +2,8 @@
 #include <stdlib.h>
 
 #include "expr_maths.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number/number_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 
 static inline void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
@@ -665,6 +665,14 @@ void expr_reverse_dilog(const expr_t *dv, const number_t *out_bar, number_t *a_b
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
+void expr_reverse_polylog1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t denominator = num_sub(NUM_ONE, expr_eval_num_internal(dv->a));
+    number_t factor = num_div(*out_bar, denominator);
+
+    expr_reverse_unary(expr_reverse_num_clone(factor), a_bar, b_bar);
+}
+
 void expr_reverse_polylog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t order_value = expr_eval_num_internal(dv->a);
@@ -879,6 +887,40 @@ int expr_reverse_appell_f1_many(const expr_t *dv, const number_t *out_bar, expr_
     y_factor = num_mul(num_div(num_mul(av, b2v), cv), num_appell_f1(a1, b1v, num_add(b2v, NUM_ONE), c1, xv, yv));
     return expr_reverse_emit(out_bar, x_factor, accumulate, context, x) == 0 &&
                    expr_reverse_emit(out_bar, y_factor, accumulate, context, y) == 0
+               ? 0
+               : -1;
+}
+
+int expr_reverse_lerch_phi_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+                                void *context)
+{
+    const expr_t *z = NULL;
+    const expr_t *s = NULL;
+    const expr_t *a = NULL;
+    number_t zv;
+    number_t sv;
+    number_t av;
+    number_t phi;
+    number_t z_partial;
+    number_t a_partial;
+    number_t h = num_create_from_string("1e-8");
+    number_t s_partial;
+
+    if (!expr_lerch_phi_unpack(dv, &z, &s, &a))
+        return -1;
+    zv = expr_eval_num_internal(z);
+    sv = expr_eval_num_internal(s);
+    av = expr_eval_num_internal(a);
+    phi = number_lerch_phi(zv, sv, av);
+    z_partial = num_div(num_sub(number_lerch_phi(zv, num_sub(sv, NUM_ONE), av), num_mul(av, phi)), zv);
+    a_partial = num_neg(num_mul(sv, number_lerch_phi(zv, num_add(sv, NUM_ONE), av)));
+    s_partial = num_div(num_sub(number_lerch_phi(zv, num_add(sv, h), av),
+                                number_lerch_phi(zv, num_sub(sv, h), av)),
+                        num_mul_long(h, 2L));
+    num_destroy(&h);
+    return expr_reverse_emit(out_bar, z_partial, accumulate, context, z) == 0 &&
+                   expr_reverse_emit(out_bar, s_partial, accumulate, context, s) == 0 &&
+                   expr_reverse_emit(out_bar, a_partial, accumulate, context, a) == 0
                ? 0
                : -1;
 }
