@@ -119,8 +119,10 @@ particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
 as native Cartesian expressions rather than unevaluated integral nodes.
 
 Riemann and Hurwitz zeta nodes participate in the same symbolic calculus.
-Differentiating `zeta(s)` produces `zetap(s)`. For Hurwitz zeta,
-`∂ζ(s,a)/∂s = zatahp(s,a)` and `∂ζ(s,a)/∂a = -s·ζ(s+1,a)`, with the chain
+Differentiating `zeta(s)` produces `ζ'(s)` in Expression style and `zetap(s)`
+in Function style. For Hurwitz zeta,
+`∂ζ(s,a)/∂s = ζ'(s,a)` (`zatahp(s,a)` in Function style) and
+`∂ζ(s,a)/∂a = -s·ζ(s+1,a)`, with the chain
 rule applied when either argument is itself an expression. Integrating
 `zetap(s)` with respect to `s` returns `zeta(s)`, while integrating
 `zetah(s,a)` with respect to `a` returns `zetah(s-1,a)/(1-s)` wherever that
@@ -796,6 +798,8 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_gamma(const expr_t *expr)` — Γ(x)
 - `expr_t *expr_lgamma(const expr_t *expr)` — ln|Γ(x)|
 - `expr_t *expr_digamma(const expr_t *expr)` — ψ(x) = d/dx ln Γ(x)
+- `expr_t *expr_qdigamma(const expr_t *q, const expr_t *expr)` — q-digamma ψ_q(x), with formal
+  partial derivatives in both arguments and a formal primitive when no elementary antiderivative is available
 - `expr_t *expr_trigamma(const expr_t *expr)` — ψ'(x)
 - `expr_t *expr_polygamma(unsigned int order, const expr_t *expr)` — ψ⁽ⁿ⁾(x)
 - `expr_t *expr_zeta(const expr_t *s)` — Riemann zeta ζ(s)
@@ -835,20 +839,20 @@ collision-free lookup tables rather than by a client-side rewrite.
 
 The parser accepts `Li1(x)` and `Li₁(x)` for the dedicated order-one
 polylogarithm node. Mathematical styles render Li₁(x), while
-`style_FUNCTION` emits `Li1(x)`. Its derivative is `x'/(1-x)`, and direct
+`style_FUNCTION` emits `li1(x)`. Its derivative is `x'/(1-x)`, and direct
 integration of `Li1(x)` gives `(1-x)ln(1-x)-(1-x)`. The general
 `polylog(1,x)` evaluator uses the same numerical identity without replacing
 the dedicated node or its calculus operations.
 
 The parser accepts `lerch_phi(z,s,a)`, `LerchPhi(z,s,a)` and `Φ(z,s,a)`.
 `style_EXPRESSION` uses the capital-phi form `Φ(z,s,a)`, `style_FUNCTION` uses
-`LerchPhi(z,s,a)`, and TeX uses `\Phi`. Numerical evaluation is limited to the
+`lerchphi(z,s,a)`, and TeX uses `\Phi`. Numerical evaluation is limited to the
 implemented defining-series domain and exact reductions; unsupported analytic
 continuations remain unavailable instead of silently selecting a branch.
 
-The parser accepts both `Hn(n, x)` and `harmonic_poly(n, x)`. Mathematical
+The parser accepts `Hn(n, x)`, `harmonic_poly(n, x)`, and `harmonicpoly(n, x)`. Mathematical
 styles render the former as Hₙ(x); `style_FUNCTION` emits the typeable
-`harmonic_poly(n, x)` spelling. For a degree independent of `x`, symbolic
+`harmonicpoly(n, x)` spelling. For a degree independent of `x`, symbolic
 differentiation uses `(1 - x^n)/(1 - x)`, and direct integration uses
 `x*Hn(n, x) - Hn(n + 1, x) + x`. These rules remain available under repeated
 differentiation.
@@ -915,6 +919,14 @@ suitable for later differentiation. Descriptive identifiers such as
 `$[sqrt(2)]` remain valid input aliases for bracketed names and are
 canonicalised to `[sqrt(2)]`, but Function-style output does not generate the
 `$[...]` form.
+
+Built-in function names in `style_FUNCTION` use canonical concatenated lowercase
+spellings, such as `normalpdf`, `gammainclower`, `besselj`, `lerchphi`,
+`hypergeometricpfq`, and the bit operations `and`, `or`, `xor`, `not`, `shl`,
+and `shr`. Existing mixed-case and underscore spellings remain accepted as
+Expression input aliases and retain their mathematical rendering in other
+styles.
+
 MARS Lab applies presentation-only syntax colouring to this text: function
 names are bold turquoise and their matching call brackets are non-bold gold.
 Grouping brackets retain the ordinary text colour, and copied Function text is
@@ -1030,9 +1042,10 @@ bindings.
   - symbolic integral requests `@S f(x) dx`, `@S^u f(x) dx`,
     `@S^b_a f(x) dx`, and `@S_a^b f(x) dx`; `*`, `.`, or `·` may appear
     before the terminal differential
-  - summations `@Z_k=1^n f(k)` and products `@P_k=1^n f(k)`, whose Expression output is
-    respectively `Σ_(k=1)^n f(k)` and `@P_k=1^n f(k)`; the index is local and
-    is not returned as a binding
+  - summations `@Z_(k=1)^n f(k)` and products `@P_(k=1)^n f(k)`, whose
+    lower-bound parentheses may be omitted and whose Expression output is respectively
+    `Σ_(k=1)^n f(k)` and `@P_k=1^n f(k)`; `@Z` is an ASCII replacement for `Σ`,
+    while the index is local and is not returned as a binding
   - infinite summations and products omit the upper bound: `@Z_k=1 f(k)` and
     `@P_k=1 f(k)` produce `Σ_(k=1)^∞ f(k)` and `@P_k=1 f(k)` respectively
   - finite `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
@@ -1050,10 +1063,12 @@ bindings.
     `archaversin(x)`, `archavercos(x)`, `archacoversin(x)`, and
     `archacovercos(x)` for the corresponding inverse functions
   - `gamma(x)` and `Γ(x)` for the gamma function
-  - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
-  - `zeta(s)` and `ζ(s)` for Riemann zeta; `zetap(s)` for its derivative
+  - `digamma(x)`, `trigamma(x)`, `polygamma(n, x)`, and `ψ(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
+  - `ψq(q, x)` for the q-digamma ψ_q(x), with `qdigamma(q, x)` retained as a word alias; TeX renders the
+    base as a subscript
+  - `zeta(s)` and `ζ(s)` for Riemann zeta; `zetap(s)` and `ζ'(s)` for its derivative
   - `zeta(s, a)`, `ζ(s, a)`, `zetah(s, a)`, and `zeta2(s, a)` for Hurwitz
-    zeta; `zetap(s, a)`, `zatahp(s, a)`, and `zeta2p(s, a)` for its partial
+    zeta; `zetap(s, a)`, `zatahp(s, a)`, `zeta2p(s, a)`, and `ζ'(s, a)` for its partial
     derivative with respect to `s`
   - `Li1(x)` and `Li₁(x)` for the dedicated order-one polylogarithm;
     `dilog(x)`, `Li2(x)`, and `Li₂(x)` for Li₂(x); and `polylog(n, x)` for Liₙ(x)

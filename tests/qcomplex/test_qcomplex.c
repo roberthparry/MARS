@@ -714,6 +714,9 @@ static void test_polylog(void)
         check_qc("polylog(2, 1/2) = Li₂(1/2)", qc_polylog(qcr(2.0), qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
         check_qc("LerchPhi(1/2,2,1) = 2 Li₂(1/2)", qc_lerch_phi(qcr(0.5), qcr(2.0), QC_ONE),
                  qc_make(qf_mul_double(expect, 2.0), QF_ZERO), 1e-27);
+        check_qc("q-digamma recurrence", qc_sub(qc_qdigamma(qcr(0.5), qcr(2.0)),
+                                                  qc_qdigamma(qcr(0.5), QC_ONE)),
+                 qcrs("0.69314718055994530941723212145817656807550013436026"), 1e-29);
     }
 
     {

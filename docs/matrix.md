@@ -1074,6 +1074,7 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_gamma(A)` | Matrix gamma function |
 | `mat_lgamma(A)` | Matrix log gamma function |
 | `mat_digamma(A)` | Matrix digamma function (psi) |
+| `mat_qdigamma(A, q)` | Matrix q-digamma function ψ_q(A), using the convergent Lambert matrix series and reciprocal-q continuation |
 | `mat_trigamma(A)` | Matrix trigamma function |
 | `mat_tetragamma(A)` | Matrix tetragamma function |
 | `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |

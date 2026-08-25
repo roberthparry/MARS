@@ -26,11 +26,23 @@ The finite sum can alternatively be represented as
 \right] + C.
 \]
 
-The finite hyperbolic sum remains the preferred short display when it is safe
-to evaluate directly. The Lerch representation provides bounded symbolic work
-for very large endpoints. Individual terms can cross complex logarithmic
-branch cuts even though their combination is real, so the combined expression
-controls branch selection and real-result recovery.
+The corresponding weighted cosh sum is
+
+\[
+\sum_{k=1}^{n}\frac{\cosh(kx)}{k}
+=\frac{1}{2}\left[
+\operatorname{Li}_1(e^x)+\operatorname{Li}_1(e^{-x})
+-e^{(n+1)x}\Phi(e^x,1,n+1)
+-e^{-(n+1)x}\Phi(e^{-x},1,n+1)
+\right].
+\]
+
+MARS Lab displays the Lerch representation whenever either weighted
+hyperbolic sum is recognised. Consequently, a result produced quickly for a
+very large endpoint visibly exposes the bounded-work formula; it is never
+presented as though every term had been summed directly. Individual terms can
+cross complex logarithmic branch cuts even though their combination is real,
+so the combined expression controls branch selection and real-result recovery.
 
 ## Public Numeric Families
 
@@ -44,9 +56,9 @@ families are `qf_polylog1()`, `qc_polylog1()`, `num_polylog1()`,
 Numerical evaluation currently covers the defining disc \(|z|<1\), together
 with the exact reductions at \(z=0\), \(z=1\), and \(s=0\). Values requiring
 general analytic continuation return NaN rather than selecting an accidental
-branch. The finite weighted hyperbolic sum has a separate stable numerical
-evaluation which works backwards from its dominant endpoint, so a large bound
-does not require one operation per term.
+branch. The finite weighted sinh and cosh sums have a separate stable numerical
+evaluation which works backwards from their dominant endpoint, so a large
+bound does not require one operation per term.
 
 The matrix implementation evaluates the convergent power series with matrix
 powers and scalar coefficients. It accepts square `number_t` matrices and
@@ -59,7 +71,7 @@ Expression input accepts `lerch_phi(z,s,a)`, `LerchPhi(z,s,a)`, and
 `Li₁(z)`, alongside `Li2(z)` and `Li₂(z)` for the dilogarithm. Output uses:
 
 - `Φ(z,s,a)` and `Li1(z)` in `style_EXPRESSION`;
-- `LerchPhi(z, s, a)` and `Li1(z)` in `style_FUNCTION`; and
+- `lerchphi(z, s, a)` and `li1(z)` in `style_FUNCTION`; and
 - `\Phi\left(z,s,a\right)` and `\operatorname{Li}_{1}(z)` in TeX.
 
 Function temporaries preserve the reciprocal exponential relationship: after
@@ -67,8 +79,9 @@ Function temporaries preserve the reciprocal exponential relationship: after
 The source annotation is enclosed by single backticks so it remains one
 delimited comment when its presentation wraps across lines.
 
-Formal user-input sums and products use `@Z_k=1^n term` and
-`@P_k=1^n term`. Omitting `^n` denotes an infinite operator. The index belongs
+Formal user-input sums and products use `@Z_(k=1)^n term` and
+`@P_(k=1)^n term`, with optional lower-bound parentheses. `@Z` is the ASCII
+replacement for `Σ`. Omitting `^n` denotes an infinite operator. The index belongs
 to the operator and does not become an ordinary expression binding. Sums use
 the sigma symbol in mathematical expression output and
 `sum(k, 1, n, term)` in Function output when no closed form replaces them.
@@ -81,9 +94,9 @@ antiderivative. Lerch Φ supplies derivatives with respect to its `z`, `s`, and
 represents it. These operations remain available under repeated
 differentiation and integration dispatch.
 
-For the weighted hyperbolic identity, the simplifier recognises the complete
-Li₁/Lerch expression as the finite source sum. Differentiation therefore
-returns the existing finite-cosh identity
+For each weighted hyperbolic identity, the simplifier recognises the complete
+Li₁/Lerch expression as the finite source sum. Differentiating the weighted
+sinh form therefore returns the existing finite-cosh identity
 
 \[
 \sum_{k=1}^{n}\cosh(kx)
@@ -91,7 +104,8 @@ returns the existing finite-cosh identity
 \]
 
 rather than exposing the term-by-term derivative of the special-function
-representation. Supplied bindings are retained, so the same result also has a
+representation. The weighted cosh form correspondingly returns the existing
+finite-sinh identity. Supplied bindings are retained, so each result also has a
 numeric derivative value.
 
 MARS Lab's **Use as input** action receives an exact parseable editor

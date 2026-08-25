@@ -192,6 +192,20 @@ expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr);
 bool expr_finite_weighted_sinh_lerch_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_weighted_cosh_lerch_form(const expr_t *expr);
+expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr);
+bool expr_is_finite_weighted_cosh_lerch_form(const expr_t *expr);
+bool expr_finite_weighted_cosh_lerch_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_weighted_sin_lerch_form(const expr_t *expr);
+bool expr_finite_weighted_sin_lerch_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_weighted_cos_lerch_form(const expr_t *expr);
+bool expr_finite_weighted_cos_lerch_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_tangent_from_qdigamma_form(const expr_t *expr);
+bool expr_is_finite_tangent_qdigamma_form(const expr_t *expr);
+bool expr_finite_tangent_qdigamma_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_tanh_from_qdigamma_form(const expr_t *expr);
+expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr);
+bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_out);
 
 /**
  * @brief Render a finite circular or hyperbolic progression as a summation followed by its closed form.

@@ -137,12 +137,30 @@ static void test_mat_harmonic_poly(void)
 
         ASSERT_NOT_NULL(phi);
         check_bool("matrix Lerch phi agrees with its scalar value", num_lt(error, tolerance));
-        num_destroy(&tolerance);
         num_destroy(&error);
         num_destroy(&expected);
         num_destroy(&got);
         mat_free(phi);
         mat_free(Z);
+
+        Z = mat_create(1u, 1u, &one);
+        if (Z) {
+            matrix_t *psi_q = mat_qdigamma(Z, &half);
+            number_t matrix_value = psi_q ? mat_get_num(psi_q, 0u, 0u) : num_clone(NUM_NAN);
+            number_t scalar_value = num_qdigamma(half, one);
+            number_t delta = num_sub(matrix_value, scalar_value);
+            number_t difference = num_abs(delta);
+
+            ASSERT_NOT_NULL(psi_q);
+            check_bool("matrix q-digamma agrees with its scalar value", num_lt(difference, tolerance));
+            num_destroy(&difference);
+            num_destroy(&delta);
+            num_destroy(&scalar_value);
+            num_destroy(&matrix_value);
+            mat_free(psi_q);
+            mat_free(Z);
+        }
+        num_destroy(&tolerance);
         num_destroy(&one);
         num_destroy(&two);
         num_destroy(&half);

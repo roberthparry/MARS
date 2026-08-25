@@ -10,15 +10,77 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
 
 static void test_from_string_function_hash(void)
 {
+    static const char *const lowercase_alias_inputs[] = {
+        "lerchphi(1/2,2,1)",
+        "besselj(0,1)",
+        "bessely(0,1)",
+        "lommels(1,0,1)",
+        "lauricellaf(3,1.25,0.5,1.5,2,1.25,0.1,0.2,0.15)",
+        "hypergeometricpfq(0,0,1/5)",
+        "harmonicpoly(4,1/2)",
+        "legendrechi(2,1/2)",
+        "normalpdf(0)",
+        "normalcdf(0)",
+        "normallogpdf(0)",
+        "gammaincp(1,1)",
+        "gammaincq(1,1)",
+        "lambertw0(0)",
+        "li1(1/2)",
+        "li2(1/2)",
+        "nextprime(10)",
+        "isprime(11)",
+        "and(6,3)",
+        "or(6,3)",
+        "xor(6,3)",
+        "not(0)",
+        "shl(1,2)",
+        "shr(4,1)",
+        "appellf1(1,1,1,2,1/10,1/10)",
+        "betapdf(1/2,2,2)",
+        "logbetapdf(1/2,2,2)",
+        "ei(1)",
+        "e1(1)",
+        "f1(1,1,1,2,1/10,1/10)",
+        "gammainclower(1,1)",
+        "gammaincupper(1,1)",
+        "hn(4,1/2)",
+        "lambertwm1(-1/exp(1))",
+        "lambertwn(0,1)",
+        "pfq(0,0,1/5)",
+        "prevprime(10)",
+        "w(0)",
+        "w0(0)",
+        "wm1(-1/exp(1))",
+        "wn(0,1)",
+    };
     expr_t *unset_zetap;
     number_t unset_value;
 
     ASSERT_TRUE(expr_stringin_function_hash_is_valid());
+    for (size_t i = 0u; i < sizeof(lowercase_alias_inputs) / sizeof(lowercase_alias_inputs[0]); ++i) {
+        expr_t *alias = expr_from_string(lowercase_alias_inputs[i], NULL);
+
+        ASSERT_NOT_NULL(alias);
+        expr_free(alias);
+    }
+    check_parse_val("bare Lambert aliases remain ordinary algebra without call parentheses",
+                    "{ w + w0 + wm1 + wn | w = 1; w0 = 2; m1 = 3; n = 4 }", 10.0, __LINE__);
+    check_parse_expr("w followed by call parentheses selects principal Lambert W", "w(x)",
+                     "{ W(x) | x = NAN }", __LINE__);
+    check_parse_expr("w0 followed by call parentheses selects Lambert W zero branch", "w0(x)",
+                     "{ W₀(x) | x = NAN }", __LINE__);
+    check_parse_expr("wm1 followed by call parentheses selects Lambert W minus-one branch", "wm1(x)",
+                     "{ W₋₁(x) | x = NAN }", __LINE__);
+    check_parse_expr("wn followed by call parentheses selects a named Lambert W branch", "wn(n,x)",
+                     "{ Wₙ(n, x) | x = NAN; n = NAN }", __LINE__);
     check_parse_num("zeta is registered in the perfect hash", "zeta(3)",
                     "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
-    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ zetap(x) | x = NAN }", __LINE__);
+    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ ζ'(x) | x = NAN }", __LINE__);
     check_parse_expr("zetap bindings use the binding perfect hash", "{ zetap(x) | x = 3 }",
-                     "{ zetap(x) | x = 3 }", __LINE__);
+                     "{ ζ'(x) | x = 3 }", __LINE__);
+    check_parse_expr("zeta-prime symbol selects the Riemann derivative", "ζ'(x)", "{ ζ'(x) | x = NAN }", __LINE__);
+    check_parse_expr("zeta-prime symbol selects the Hurwitz derivative", "ζ'(s, a)",
+                     "{ ζ'(s, a) | s = NAN; a = NAN }", __LINE__);
     check_parse_expr("the zeta symbol is a perfect-hash alias", "ζ(x)", "{ ζ(x) | x = NAN }", __LINE__);
     check_parse_num("the zeta symbol evaluates through its alias", "ζ(3)",
                     "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
@@ -32,6 +94,14 @@ static void test_from_string_function_hash(void)
                     "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
     check_parse_num("zatahp is registered in the perfect hash", "zatahp(2.5, 101)",
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
+    check_parse_num("qdigamma is registered in the perfect hash", "qdigamma(1/2,1)",
+                    "-0.4205290343560457797847369304069241", __LINE__);
+    check_parse_num("q-digamma symbol is registered in the perfect hash", "ψq(1/2,1)",
+                    "-0.4205290343560457797847369304069241", __LINE__);
+    check_parse_expr("qdigamma bindings use the binding perfect hash", "{ qdigamma(q,z) | q=1/2; z=1 }",
+                     "{ ψq(q, z) | q = ¹⁄₂; z = 1 }", __LINE__);
+    check_parse_expr("q-digamma symbol bindings use the binding perfect hash", "{ ψq(q,z) | q=1/2; z=1 }",
+                     "{ ψq(q, z) | q = ¹⁄₂; z = 1 }", __LINE__);
     check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
     check_parse_val("finite sum is registered in the perfect hash", "sum(k,1,10,k)", 55.0, __LINE__);
@@ -51,6 +121,8 @@ static void test_from_string_function_hash(void)
     check_parse_val("display Li subscript two aliases dilogarithm", "Li₂(0.5)", 0.5822405264650125, __LINE__);
     check_parse_TeX("Lerch phi renders as capital phi", "lerch_phi(1/2,2,1)",
                     "\\Phi\\left(\\frac{1}{2}, 2, 1\\right)", __LINE__);
+    check_parse_TeX("q-digamma renders its base as a subscript", "qdigamma(1/2,1)",
+                    "\\psi_{\\frac{1}{2}}\\left(1\\right)", __LINE__);
     {
         expr_t *lerch = expr_from_string("lerch_phi(1/2,2,1)", NULL);
         char *expression_text = lerch ? expr_to_string(lerch, style_EXPRESSION) : NULL;
@@ -59,7 +131,7 @@ static void test_from_string_function_hash(void)
         ASSERT_NOT_NULL(expression_text);
         ASSERT_NOT_NULL(function_text);
         ASSERT_NOT_NULL(strstr(expression_text, "Φ("));
-        ASSERT_NOT_NULL(strstr(function_text, "LerchPhi("));
+        ASSERT_NOT_NULL(strstr(function_text, "lerchphi("));
         free(function_text);
         free(expression_text);
         expr_free(lerch);
@@ -70,6 +142,68 @@ static void test_from_string_function_hash(void)
     TEST_ASSERT_TRUE(num_is_nan(unset_value), "zetap preserves an unset value");
     num_destroy(&unset_value);
     expr_free(unset_zetap);
+}
+
+static void test_from_function_body_syntax(void)
+{
+    /* Function syntax distinguishes calls from explicit multiplication. */
+    expr_bindings_t *expression_bindings = NULL;
+    expr_bindings_t *call_bindings = NULL;
+    expr_bindings_t *product_bindings = NULL;
+    expr_bindings_t *arbitrary_bindings = NULL;
+    expr_t *expression_product = expr_from_string("w (x)", &expression_bindings);
+    expr_t *call = expr_from_function_body("w (x)", &call_bindings);
+    expr_t *product = expr_from_function_body("w.(x)", &product_bindings);
+    expr_t *arbitrary = expr_from_function_body("xyzw (x + 1)", &arbitrary_bindings);
+    expr_t *missing_operator = expr_from_function_body("x y", NULL);
+    string_t *text_source = string_new_with("w0 (x)");
+    expr_t *text_call = text_source ? expr_from_function_body_text(text_source, NULL) : NULL;
+    char *expression_product_text = expression_product ? expr_to_function_body(expression_product) : NULL;
+    char *call_text = call ? expr_to_function_body(call) : NULL;
+    char *product_text = product ? expr_to_function_body(product) : NULL;
+    char *arbitrary_text = arbitrary ? expr_to_function_body(arbitrary) : NULL;
+    char *text_call_text = text_call ? expr_to_function_body(text_call) : NULL;
+
+    ASSERT_NOT_NULL(expression_product);
+    ASSERT_NOT_NULL(call);
+    ASSERT_NOT_NULL(product);
+    ASSERT_NOT_NULL(arbitrary);
+    ASSERT_NOT_NULL(text_call);
+    ASSERT_NULL(missing_operator);
+    ASSERT_NOT_NULL(expression_product_text);
+    ASSERT_NOT_NULL(call_text);
+    ASSERT_NOT_NULL(product_text);
+    ASSERT_NOT_NULL(arbitrary_text);
+    ASSERT_NOT_NULL(text_call_text);
+    TEST_ASSERT_STR_EQ(expression_product_text, "w.x");
+    TEST_ASSERT_STR_EQ(call_text, "w(x)");
+    TEST_ASSERT_STR_EQ(product_text, "w.x");
+    TEST_ASSERT_STR_EQ(arbitrary_text, "xyzw(x + 1)");
+    TEST_ASSERT_STR_EQ(text_call_text, "w0(x)");
+    ASSERT_NOT_NULL(expr_bindings_get(expression_bindings, "w"));
+    ASSERT_NOT_NULL(expr_bindings_get(expression_bindings, "x"));
+    ASSERT_NOT_NULL(expr_bindings_get(call_bindings, "x"));
+    ASSERT_NULL(expr_bindings_get(call_bindings, "w"));
+    ASSERT_NOT_NULL(expr_bindings_get(product_bindings, "w"));
+    ASSERT_NOT_NULL(expr_bindings_get(product_bindings, "x"));
+    ASSERT_NOT_NULL(expr_bindings_get(arbitrary_bindings, "x"));
+    ASSERT_NULL(expr_bindings_get(arbitrary_bindings, "xyzw"));
+
+    free(text_call_text);
+    free(arbitrary_text);
+    free(product_text);
+    free(call_text);
+    free(expression_product_text);
+    string_free(text_source);
+    expr_free(text_call);
+    expr_free(arbitrary);
+    expr_free(product);
+    expr_free(call);
+    expr_free(expression_product);
+    expr_bindings_free(arbitrary_bindings);
+    expr_bindings_free(product_bindings);
+    expr_bindings_free(call_bindings);
+    expr_bindings_free(expression_bindings);
 }
 
 static void test_from_string_conjugation(void)
@@ -217,18 +351,30 @@ static void test_from_string_series_ellipsis(void)
         expr_bindings_t *sum_bindings = NULL;
         expr_bindings_t *sine_bindings = NULL;
         expr_bindings_t *product_bindings = NULL;
+        expr_bindings_t *parenthesised_sum_bindings = NULL;
+        expr_bindings_t *parenthesised_product_bindings = NULL;
         expr_t *sum = expr_from_string("{ @Z_k=1^n sinh(kx)/k | x=0.2; n=4 }", &sum_bindings);
         expr_t *sine_sum = expr_from_string("{ @Z_k=1^n sin(kx) | x=pi/6; n=100000 }", &sine_bindings);
         expr_t *product = expr_from_string("{ @P_k=1^n (1-1/k^s) | n=4; s=2 }", &product_bindings);
+        expr_t *parenthesised_sum =
+            expr_from_string("{ @Z_(k=1)^n sin(kx) | x=pi/6; n=100000 }", &parenthesised_sum_bindings);
+        expr_t *parenthesised_product =
+            expr_from_string("{ @P_(k=1)^n (1-1/k^s) | n=4; s=2 }", &parenthesised_product_bindings);
         expr_t *infinite_sum = expr_from_string("{ @Z_n=1 1/n^2 }", NULL);
         expr_t *infinite_product = expr_from_string("{ @P_k=1 (1-1/k^s) }", NULL);
+        expr_t *parenthesised_infinite_sum = expr_from_string("{ @Z_(n=1) 1/n^2 }", NULL);
+        expr_t *parenthesised_infinite_product = expr_from_string("{ @P_(k=1) (1-1/k^s) }", NULL);
         number_t sum_value;
         number_t sine_value;
         number_t product_value;
         char *sum_text;
         char *product_text;
+        char *parenthesised_sum_text;
+        char *parenthesised_product_text;
         char *infinite_sum_text;
         char *infinite_product_text;
+        char *parenthesised_infinite_sum_text;
+        char *parenthesised_infinite_product_text;
         const expr_t *x_binding;
         expr_t *sum_derivative;
         char *sum_derivative_text;
@@ -237,16 +383,24 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(sum);
         ASSERT_NOT_NULL(sine_sum);
         ASSERT_NOT_NULL(product);
+        ASSERT_NOT_NULL(parenthesised_sum);
+        ASSERT_NOT_NULL(parenthesised_product);
         ASSERT_NOT_NULL(infinite_sum);
         ASSERT_NOT_NULL(infinite_product);
+        ASSERT_NOT_NULL(parenthesised_infinite_sum);
+        ASSERT_NOT_NULL(parenthesised_infinite_product);
         ASSERT_NOT_NULL(sum_bindings);
         ASSERT_NOT_NULL(sine_bindings);
         ASSERT_NOT_NULL(product_bindings);
+        ASSERT_NOT_NULL(parenthesised_sum_bindings);
+        ASSERT_NOT_NULL(parenthesised_product_bindings);
         ASSERT_TRUE(expr_is_differentiable(sum));
         ASSERT_TRUE(expr_is_differentiable(product));
         ASSERT_NULL(expr_bindings_get(sum_bindings, "k"));
         ASSERT_NULL(expr_bindings_get(sine_bindings, "k"));
         ASSERT_NULL(expr_bindings_get(product_bindings, "k"));
+        ASSERT_NULL(expr_bindings_get(parenthesised_sum_bindings, "k"));
+        ASSERT_NULL(expr_bindings_get(parenthesised_product_bindings, "k"));
         sum_value = expr_eval(sum);
         sine_value = expr_eval(sine_sum);
         product_value = expr_eval(product);
@@ -272,12 +426,20 @@ static void test_from_string_series_ellipsis(void)
         }
         sum_text = expr_to_string(sum, style_UNBOUND);
         product_text = expr_to_string(product, style_UNBOUND);
+        parenthesised_sum_text = expr_to_string(parenthesised_sum, style_UNBOUND);
+        parenthesised_product_text = expr_to_string(parenthesised_product, style_UNBOUND);
         infinite_sum_text = expr_to_string(infinite_sum, style_UNBOUND);
         infinite_product_text = expr_to_string(infinite_product, style_UNBOUND);
+        parenthesised_infinite_sum_text = expr_to_string(parenthesised_infinite_sum, style_UNBOUND);
+        parenthesised_infinite_product_text = expr_to_string(parenthesised_infinite_product, style_UNBOUND);
         TEST_ASSERT_STR_EQ(sum_text, "Σ_(k=1)^n sinh(kx)/k");
         TEST_ASSERT_STR_EQ(product_text, "@P_k=1^n (1 - 1/k^s)");
+        TEST_ASSERT_STR_EQ(parenthesised_sum_text, "Σ_(k=1)^n sin(kx)");
+        TEST_ASSERT_STR_EQ(parenthesised_product_text, product_text);
         TEST_ASSERT_STR_EQ(infinite_sum_text, "Σ_(n=1)^∞ 1/n²");
         TEST_ASSERT_STR_EQ(infinite_product_text, "@P_k=1 (1 - 1/k^s)");
+        TEST_ASSERT_STR_EQ(parenthesised_infinite_sum_text, infinite_sum_text);
+        TEST_ASSERT_STR_EQ(parenthesised_infinite_product_text, infinite_product_text);
         x_binding = expr_bindings_get(sum_bindings, "x");
         ASSERT_NOT_NULL(x_binding);
         sum_derivative = expr_create_deriv(sum, x_binding);
@@ -309,18 +471,51 @@ static void test_from_string_series_ellipsis(void)
             expr_free(lerch_form);
             expr_bindings_free(lerch_bindings);
         }
+        {
+            expr_t *weighted_cosh = expr_from_string("{ @Z_k=1^n cosh(kx)/k | x=0.2; n=4 }", NULL);
+            expr_t *cosh_lerch_form = weighted_cosh ? expr_finite_weighted_cosh_lerch_form(weighted_cosh) : NULL;
+            expr_t *recovered_cosh = cosh_lerch_form ? expr_finite_weighted_cosh_from_lerch_form(cosh_lerch_form) : NULL;
+            char *cosh_lerch_text = cosh_lerch_form ? expr_to_string(cosh_lerch_form, style_UNBOUND) : NULL;
+            number_t direct_value = weighted_cosh ? expr_eval(weighted_cosh) : num_clone(NUM_NAN);
+            number_t lerch_value = NUM_NAN;
+
+            ASSERT_NOT_NULL(weighted_cosh);
+            ASSERT_NOT_NULL(cosh_lerch_form);
+            ASSERT_NOT_NULL(recovered_cosh);
+            TEST_ASSERT_STR_EQ(cosh_lerch_text,
+                               "½·Li1(exp(x)) + ½·Li1(exp(-x)) - ½·exp(-x)^(n + 1)·Φ(exp(-x), 1, n + 1) - "
+                               "½·exp(x)^(n + 1)·Φ(exp(x), 1, n + 1)");
+            ASSERT_TRUE(expr_finite_weighted_cosh_lerch_value(cosh_lerch_form, &lerch_value));
+            ASSERT_EQ_DOUBLE(num_to_double(lerch_value), num_to_double(direct_value), 1e-15);
+            free(cosh_lerch_text);
+            num_destroy(&lerch_value);
+            num_destroy(&direct_value);
+            expr_free(recovered_cosh);
+            expr_free(cosh_lerch_form);
+            expr_free(weighted_cosh);
+        }
         free(infinite_product_text);
         free(infinite_sum_text);
+        free(parenthesised_infinite_product_text);
+        free(parenthesised_infinite_sum_text);
         free(product_text);
         free(sum_text);
+        free(parenthesised_product_text);
+        free(parenthesised_sum_text);
         num_destroy(&product_value);
         num_destroy(&sine_value);
         num_destroy(&sum_value);
         expr_free(infinite_product);
         expr_free(infinite_sum);
+        expr_free(parenthesised_infinite_product);
+        expr_free(parenthesised_infinite_sum);
         expr_free(product);
+        expr_free(parenthesised_product);
+        expr_bindings_free(parenthesised_product_bindings);
         expr_free(sine_sum);
         expr_bindings_free(sine_bindings);
+        expr_free(parenthesised_sum);
+        expr_bindings_free(parenthesised_sum_bindings);
         expr_free(sum);
         expr_bindings_free(product_bindings);
         expr_bindings_free(sum_bindings);
@@ -590,7 +785,7 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(finite_nested);
         finite_nested_function = expr_to_string(finite_nested, style_FUNCTION);
         ASSERT_NOT_NULL(finite_nested_function);
-        ASSERT_NOT_NULL(strstr(finite_nested_function, "hypergeometric_pFq"));
+        ASSERT_NOT_NULL(strstr(finite_nested_function, "hypergeometricpfq"));
         finite_nested_value = expr_eval(finite_nested);
         ASSERT_TRUE(num_is_finite(finite_nested_value));
         ASSERT_EQ_DOUBLE(num_to_double(finite_nested_value), 3.1455761316872428, 1e-15);
@@ -1095,6 +1290,10 @@ static void test_from_string_special_functions(void)
     check_parse_val("ψ⁽³⁾(2) = pi^4/15 - 6", "{ ψ⁽³⁾(x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
     check_parse_expr("polygamma expression uses standard symbol", "{ polygamma(2, x) | x = ? }",
                      "{ ψ⁽²⁾(x) | x = NAN }", __LINE__);
+    check_parse_expr("symbolic polygamma order uses the base psi symbol", "{ polygamma(n, x) | n = ?; x = ? }",
+                     "{ ψ(n, x) | n = NAN; x = NAN }", __LINE__);
+    check_parse_expr("base psi symbol round-trips symbolic polygamma", "{ ψ(n, x) | n = ?; x = ? }",
+                     "{ ψ(n, x) | n = NAN; x = NAN }", __LINE__);
     check_parse_val("dilog(1/2) = pi^2/12 - log(2)^2/2", "{ dilog(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("Li2(1/2) aliases dilog", "{ Li2(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("polylog(2, 1/2) = dilog(1/2)", "{ polylog(2, x) | x = 0.5 }", 0.5822405264650125, __LINE__);
@@ -3606,4 +3805,5 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_unevaluated_integral, NULL);
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);
+    TEST_RUN_SUBTEST(test_from_function_body_syntax, NULL);
 }

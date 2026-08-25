@@ -22,6 +22,7 @@ enum {
     QF_EI_SERIES_MAX_TERMS = 800,
     QF_EI_NEG_ASYMP_MAX_TERMS = 100,
     QF_POLYLOG_SERIES_MAX_TERMS = 10000,
+    QF_QDIGAMMA_SERIES_MAX_TERMS = 1000000,
     QF_LAURICELLA_INITIAL_CAPACITY = 16,
     QF_LAURICELLA_MAX_COEFFICIENTS = 16384,
     QF_LAURICELLA_SMALL_TERM_RUN = 8,
@@ -1670,6 +1671,43 @@ qfloat_t qf_digamma(qfloat_t x)
 
     /* Region E: x > 20 → asymptotic */
     return qf_digamma_asymp(x);
+}
+
+/* Evaluate the q-digamma function on its real principal branch. */
+qfloat_t qf_qdigamma(qfloat_t q, qfloat_t z)
+{
+    const qfloat_t tolerance = qf_from_double(1e-34);
+    qfloat_t log_q;
+    qfloat_t power;
+    qfloat_t sum;
+
+    if (qf_isnan(q) || qf_isnan(z) || qf_le(q, QF_ZERO))
+        return QF_NAN;
+    if (qf_eq(q, QF_ONE))
+        return qf_digamma(z);
+    if (qf_gt(q, QF_ONE)) {
+        qfloat_t reciprocal = qf_div(QF_ONE, q);
+        qfloat_t shifted = qf_sub(z, qf_from_double(1.5));
+
+        return qf_add(qf_qdigamma(reciprocal, z), qf_mul(shifted, qf_log(q)));
+    }
+
+    log_q = qf_log(q);
+    power = qf_pow(q, z);
+    sum = qf_neg(qf_log(qf_sub(QF_ONE, q)));
+    for (long k = 0L; k < QF_QDIGAMMA_SERIES_MAX_TERMS; ++k) {
+        qfloat_t denominator = qf_sub(QF_ONE, power);
+        qfloat_t term;
+
+        if (qf_eq(denominator, QF_ZERO))
+            return QF_NAN;
+        term = qf_mul(log_q, qf_div(power, denominator));
+        sum = qf_add(sum, term);
+        if (k > 8L && qf_le(qf_abs(term), qf_mul(tolerance, qf_add(QF_ONE, qf_abs(sum)))))
+            return sum;
+        power = qf_mul(power, q);
+    }
+    return QF_NAN;
 }
 
 /* trigamma */

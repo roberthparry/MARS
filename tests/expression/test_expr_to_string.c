@@ -2042,6 +2042,34 @@ void test_to_string_special_functions(void)
         expr_free(x);
     }
     {
+        expr_t *q = test_expr_new_named_var_d(0.5, "q");
+        expr_t *z = test_expr_new_named_var_d(1.0, "z");
+        expr_t *f = expr_qdigamma(q, z);
+        expr_t *dq = f ? expr_create_deriv(f, q) : NULL;
+        expr_t *dz = f ? expr_create_deriv(f, z) : NULL;
+        expr_t *q_primitive = f ? expr_integrate(f, q) : NULL;
+        expr_t *z_primitive = f ? expr_integrate(f, z) : NULL;
+        char *dq_text = dq ? expr_to_string(dq, style_UNBOUND) : NULL;
+        char *dz_text = dz ? expr_to_string(dz, style_UNBOUND) : NULL;
+
+        check_roundtrip("to_string: qdigamma(q,z)", f, __LINE__);
+        ASSERT_NOT_NULL(dq_text);
+        ASSERT_NOT_NULL(dz_text);
+        ASSERT_NOT_NULL(strstr(dq_text, "Dq(ψq(q, z))"));
+        ASSERT_NOT_NULL(strstr(dz_text, "Dz(ψq(q, z))"));
+        ASSERT_TRUE(expr_contains_integral_operation(q_primitive));
+        ASSERT_TRUE(expr_contains_integral_operation(z_primitive));
+        free(dz_text);
+        free(dq_text);
+        expr_free(z_primitive);
+        expr_free(q_primitive);
+        expr_free(dz);
+        expr_free(dq);
+        expr_free(f);
+        expr_free(z);
+        expr_free(q);
+    }
+    {
         expr_t *x = test_expr_new_named_var_d(1.0, "x");
         check_roundtrip("to_string: W₀(x)", expr_lambert_w0(x), __LINE__);
         expr_free(x);
@@ -2160,7 +2188,7 @@ static void test_to_string_appell_f1(void)
     static const char *const inputs[] = {"{ appell_f1(1, 1, 1, 2, x, y) }", "{ F1(1, 1, 1, 2, x, y) }",
                                          "{ F_1(1, 1, 1, 2, x, y) }", "{ F₁(1, 1, 1, 2, x, y) }", NULL};
     const char *expect_expr = "F₁(1; 1, 1; 2; x, y)";
-    const char *expect_func = "appell_f1(1, 1, 1, 2, x, y)";
+    const char *expect_func = "appellf1(1, 1, 1, 2, x, y)";
     const char *expect_TeX = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
 
     for (size_t i = 0u; inputs[i]; ++i) {
@@ -2187,6 +2215,64 @@ static void test_to_string_appell_f1(void)
         free(got_func);
         free(got_expr);
         expr_free(f);
+    }
+}
+
+static void test_to_string_function_uses_lowercase_builtin_names(void)
+{
+    static const struct {
+        const char *source;
+        const char *expected;
+    } cases[] = {
+        {"{ Li1(x) }", "return li1("},
+        {"{ Li2(x) }", "return li2("},
+        {"{ Ei(x) }", "return ei("},
+        {"{ E1(x) }", "return e1("},
+        {"{ normal_pdf(x) }", "return normalpdf("},
+        {"{ normal_cdf(x) }", "return normalcdf("},
+        {"{ normal_logpdf(x) }", "return normallogpdf("},
+        {"{ gammainc_lower(a, x) }", "return gammainclower("},
+        {"{ gammainc_upper(a, x) }", "return gammaincupper("},
+        {"{ gammainc_P(a, x) }", "return gammaincp("},
+        {"{ gammainc_Q(a, x) }", "return gammaincq("},
+        {"{ is_prime(n) }", "return isprime("},
+        {"{ next_prime(n) }", "return nextprime("},
+        {"{ prev_prime(n) }", "return prevprime("},
+        {"{ AND(a, b) }", "return and("},
+        {"{ OR(a, b) }", "return or("},
+        {"{ XOR(a, b) }", "return xor("},
+        {"{ NOT(a) }", "return not("},
+        {"{ SHL(a, b) }", "return shl("},
+        {"{ SHR(a, b) }", "return shr("},
+        {"{ BesselJ(n, x) }", "return besselj("},
+        {"{ BesselY(n, x) }", "return bessely("},
+        {"{ harmonic_poly(n, x) }", "return harmonicpoly("},
+        {"{ legendre_chi(s, x) }", "return legendrechi("},
+        {"{ LommelS(mu, nu, x) }", "return lommels("},
+        {"{ LerchPhi(z, s, a) }", "return lerchphi("},
+        {"{ qdigamma(q, z) }", "return qdigamma("},
+        {"{ W(x) }", "return w("},
+        {"{ W0(x) }", "return w0("},
+        {"{ W-1(x) }", "return wm1("},
+        {"{ Wn(n, x) }", "return wn("},
+        {"{ appell_f1(a, b1, b2, c, x, y) }", "return appellf1("},
+        {"{ lauricella_f(2, a, b1, b2, c, x, y) }", "return lauricellaf("},
+        {"{ hypergeometric_pFq(1, 1, a, b, x) }", "return hypergeometricpfq("},
+    };
+
+    for (size_t index = 0u; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        expr_t *expression = expr_from_string(cases[index].source, NULL);
+        char *function = expression ? expr_to_string(expression, style_FUNCTION) : NULL;
+
+        ASSERT_NOT_NULL(expression);
+        if (function && strstr(function, cases[index].expected))
+            to_string_pass("canonical lowercase FUNCTION name", function, cases[index].expected);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, "canonical lowercase FUNCTION name", function,
+                           cases[index].expected);
+
+        free(function);
+        expr_free(expression);
     }
 }
 
@@ -2226,6 +2312,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_floor_ceil, NULL);
     TEST_RUN_SUBTEST(test_to_string_special_functions, NULL);
     TEST_RUN_SUBTEST(test_to_string_appell_f1, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_uses_lowercase_builtin_names, NULL);
 }
 
 /* ============================================================

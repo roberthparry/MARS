@@ -15,6 +15,7 @@ enum {
     QC_GAMMAINC_SERIES_MAX_TERMS = 10000,
     QC_EI_SERIES_MAX_TERMS = 10000,
     QC_POLYLOG_SERIES_MAX_TERMS = 10000,
+    QC_QDIGAMMA_SERIES_MAX_TERMS = 100000,
     QC_LAURICELLA_INITIAL_CAPACITY = 16,
     QC_LAURICELLA_MAX_COEFFICIENTS = 16384,
     QC_LAURICELLA_SMALL_TERM_RUN = 8,
@@ -183,6 +184,52 @@ qcomplex_t qc_digamma(qcomplex_t z)
     result = qc_sub(result, qc_mul(qc_make(QFI_BERNOULLI_B10, QF_ZERO), qc_mul(qc_make(QF_ONE_TENTH, QF_ZERO), z10)));
 
     return qc_add(result, psi);
+}
+
+/* Evaluate the q-digamma function on the complex principal branch. */
+qcomplex_t qc_qdigamma(qcomplex_t q, qcomplex_t z)
+{
+    const qfloat_t tolerance = qf_from_double(1e-34);
+    qfloat_t magnitude;
+    qcomplex_t log_q;
+    qcomplex_t power;
+    qcomplex_t sum;
+
+    if (qc_isnan(q) || qc_isnan(z) || qc_eq(q, QC_ZERO))
+        return QC_NAN;
+    if (qc_eq(q, QC_ONE))
+        return qc_digamma(z);
+    if (qf_eq(qc_imag(q), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO) && qf_gt(qc_real(q), QF_ZERO))
+        return qc_make(qf_qdigamma(qc_real(q), qc_real(z)), QF_ZERO);
+
+    magnitude = qc_abs(q);
+    if (qf_le(qf_abs(qf_sub(magnitude, QF_ONE)), qf_from_double(1e-28)))
+        return QC_NAN;
+    if (qf_gt(magnitude, QF_ONE)) {
+        qcomplex_t reciprocal = qc_div(QC_ONE, q);
+        qcomplex_t shifted = qc_sub(z, qc_make(qf_from_double(1.5), QF_ZERO));
+
+        return qc_add(qc_qdigamma(reciprocal, z), qc_mul(shifted, qc_log(q)));
+    }
+    if (qf_ge(magnitude, QF_ONE))
+        return QC_NAN;
+
+    log_q = qc_log(q);
+    power = qc_pow(q, z);
+    sum = qc_neg(qc_log(qc_sub(QC_ONE, q)));
+    for (long k = 0L; k < QC_QDIGAMMA_SERIES_MAX_TERMS; ++k) {
+        qcomplex_t denominator = qc_sub(QC_ONE, power);
+        qcomplex_t term;
+
+        if (qc_eq(denominator, QC_ZERO))
+            return QC_NAN;
+        term = qc_mul(log_q, qc_div(power, denominator));
+        sum = qc_add(sum, term);
+        if (k > 8L && qf_le(qc_abs(term), qf_mul(tolerance, qf_add(QF_ONE, qc_abs(sum)))))
+            return sum;
+        power = qc_mul(power, q);
+    }
+    return QC_NAN;
 }
 
 qcomplex_t qc_trigamma(qcomplex_t z)

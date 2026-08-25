@@ -892,6 +892,18 @@ void test_qf_polylog(void)
     printf(C_CYAN "TEST: qf_dilog/qf_polylog/qf_harmonic_poly\n" C_RESET);
 
     {
+        qfloat_t q = qf_from_double(0.5);
+        qfloat_t psi_one = qf_qdigamma(q, QF_ONE);
+        qfloat_t psi_two = qf_qdigamma(q, qf_from_double(2.0));
+        qfloat_t expected_one = qf_from_string("-0.4205290343560457797847369304069241");
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi_one, expected_one, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_sub(psi_two, psi_one), qf_neg(qf_log(q)), 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_qdigamma(QF_ONE, qf_from_double(2.5)), qf_digamma(qf_from_double(2.5)),
+                                     1e-30);
+    }
+
+    {
         qfloat_t half = qf_from_double(0.5);
         qfloat_t log2 = qf_log(qf_from_double(2.0));
         qfloat_t expect =

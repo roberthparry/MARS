@@ -3977,6 +3977,146 @@ cleanup:
     return NULL;
 }
 
+/* Evaluate the q-digamma matrix function through its Lambert series. */
+matrix_t *mat_qdigamma(const matrix_t *Z, const number_t *q)
+{
+    const unsigned int maximum_terms = 4096u;
+    matrix_t *identity = NULL;
+    matrix_t *scaled = NULL;
+    matrix_t *base = NULL;
+    matrix_t *power = NULL;
+    matrix_t *sum = NULL;
+    number_t magnitude = NUM_NAN;
+    number_t log_q = NUM_NAN;
+    number_t q_power = NUM_NAN;
+    bool series_converged = false;
+
+    if (!Z || !q || Z->rows != Z->cols || Z->elem != &number_elem || num_is_nan(*q) || num_is_zero(*q))
+        return NULL;
+    if (num_is_one(*q))
+        return mat_digamma(Z);
+    magnitude = num_abs(*q);
+    if (num_gt(magnitude, NUM_ONE)) {
+        number_t reciprocal = num_div(NUM_ONE, *q);
+        number_t three_halves = num_create_from_string("1.5");
+        matrix_t *continued = mat_qdigamma(Z, &reciprocal);
+        matrix_t *offset;
+        matrix_t *shifted;
+        matrix_t *correction;
+        matrix_t *out;
+
+        identity = mat_create_identity(Z->rows);
+        offset = identity ? mat_scalar_mul(identity, &three_halves) : NULL;
+        shifted = offset ? mat_sub(Z, offset) : NULL;
+        log_q = num_log(*q);
+        correction = shifted ? mat_scalar_mul(shifted, &log_q) : NULL;
+        out = continued && correction ? mat_add(continued, correction) : NULL;
+        mat_free(correction);
+        mat_free(shifted);
+        mat_free(offset);
+        mat_free(identity);
+        mat_free(continued);
+        num_destroy(&three_halves);
+        num_destroy(&reciprocal);
+        num_destroy(&log_q);
+        num_destroy(&magnitude);
+        return out;
+    }
+    if (fabs(num_to_double(magnitude) - 1.0) <= 1e-14 || num_ge(magnitude, NUM_ONE)) {
+        num_destroy(&magnitude);
+        return NULL;
+    }
+
+    log_q = num_log(*q);
+    identity = mat_create_identity(Z->rows);
+    scaled = identity ? mat_scalar_mul((matrix_t *)Z, &log_q) : NULL;
+    base = scaled ? mat_exp(scaled) : NULL;
+    power = base ? mat_copy_preserving_store(base) : NULL;
+    if (identity) {
+        number_t one_minus_q = num_sub(NUM_ONE, *q);
+        number_t logarithm = num_log(one_minus_q);
+        number_t constant = num_neg(logarithm);
+
+        sum = mat_scalar_mul(identity, &constant);
+        num_destroy(&constant);
+        num_destroy(&logarithm);
+        num_destroy(&one_minus_q);
+    }
+    q_power = num_clone(*q);
+    if (!identity || !scaled || !base || !power || !sum)
+        goto cleanup;
+
+    for (unsigned int k = 1u; k <= maximum_terms; ++k) {
+        number_t denominator = num_sub(NUM_ONE, q_power);
+        number_t coefficient;
+        matrix_t *term;
+        matrix_t *next_sum;
+        number_t term_norm = NUM_NAN;
+        number_t sum_norm = NUM_NAN;
+        bool converged;
+        matrix_t *next_power = NULL;
+
+        if (num_is_zero(denominator)) {
+            num_destroy(&denominator);
+            goto cleanup;
+        }
+        coefficient = num_div(log_q, denominator);
+        term = mat_scalar_mul(power, &coefficient);
+        next_sum = term ? mat_add(sum, term) : NULL;
+        converged = term && next_sum && mat_norm(term, MAT_NORM_INF, &term_norm) == 0 &&
+                    mat_norm(next_sum, MAT_NORM_INF, &sum_norm) == 0 && k > 8u &&
+                    num_to_double(term_norm) <= 1e-30 * (1.0 + num_to_double(sum_norm));
+        if (!converged && k < maximum_terms)
+            next_power = mat_mul(power, base);
+        num_destroy(&sum_norm);
+        num_destroy(&term_norm);
+        num_destroy(&coefficient);
+        num_destroy(&denominator);
+        mat_free(term);
+        if (!next_sum || (!converged && k < maximum_terms && !next_power)) {
+            mat_free(next_sum);
+            mat_free(next_power);
+            goto cleanup;
+        }
+        mat_free(sum);
+        sum = next_sum;
+        if (converged) {
+            series_converged = true;
+            break;
+        }
+        if (k < maximum_terms) {
+            number_t next_q_power = num_mul(q_power, *q);
+
+            mat_free(power);
+            power = next_power;
+            num_destroy(&q_power);
+            q_power = next_q_power;
+        }
+    }
+    if (!series_converged)
+        goto cleanup;
+
+    mat_free(power);
+    mat_free(base);
+    mat_free(scaled);
+    mat_free(identity);
+    num_destroy(&q_power);
+    num_destroy(&log_q);
+    num_destroy(&magnitude);
+    return sum;
+
+cleanup:
+    mat_free(sum);
+    mat_free(power);
+    mat_free(base);
+    mat_free(scaled);
+    mat_free(identity);
+    num_destroy(&q_power);
+    num_destroy(&log_q);
+    num_destroy(&magnitude);
+    return NULL;
+}
+
 matrix_t *mat_sinh(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&

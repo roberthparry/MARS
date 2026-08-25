@@ -266,6 +266,8 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_gamma(qfloat_t x)` — Γ(x)
 - `qfloat_t qf_lgamma(qfloat_t x)` — ln|Γ(x)|
 - `qfloat_t qf_digamma(qfloat_t x)` — ψ(x) = d/dx ln Γ(x)
+- `qfloat_t qf_qdigamma(qfloat_t q, qfloat_t x)` — the q-digamma ψ_q(x), using the real defining
+  series for `0 < q < 1`, reciprocal-q continuation for `q > 1`, and ordinary digamma at `q = 1`
 - `qfloat_t qf_trigamma(qfloat_t x)` — ψ'(x); pole at non-positive integers
 - `qfloat_t qf_tetragamma(qfloat_t x)` — ψ''(x); pole at non-positive integers
 - `qfloat_t qf_polygamma(unsigned int order, qfloat_t x)` — ψ⁽ⁿ⁾(x)

@@ -1194,6 +1194,19 @@ qfloat_t qf_lgamma(qfloat_t x);
 qfloat_t qf_digamma(qfloat_t x);
 
 /**
+ * @brief Compute the q-digamma function.
+ *
+ * Evaluates the logarithmic derivative of the q-gamma function.  The defining
+ * series is used for @f$0<q<1@f$, reciprocal-base continuation is used for
+ * @f$q>1@f$, and @f$q=1@f$ returns the ordinary digamma limit.
+ *
+ * @param q Positive real base.
+ * @param z Real argument away from the poles.
+ * @return @f$\psi_q(z)@f$, or NaN outside the implemented real domain.
+ */
+qfloat_t qf_qdigamma(qfloat_t q, qfloat_t z);
+
+/**
  * @brief Compute the trigamma function (psi'(x), the first derivative of
  *        digamma) for a qfloat_t argument.
  *

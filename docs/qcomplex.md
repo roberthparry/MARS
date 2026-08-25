@@ -186,6 +186,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_gamma(z)` | Γ(z) |
 | `qc_lgamma(z)` | ln Γ(z) |
 | `qc_digamma(z)` | ψ(z) = Γ′(z)/Γ(z) |
+| `qc_qdigamma(q, z)` | q-digamma ψ_q(z), defined by its principal complex series for `abs(q) < 1`, reciprocal-q continuation for `abs(q) > 1`, and ordinary digamma at `q = 1` |
 | `qc_trigamma(z)` | ψ₁(z) = ψ′(z) |
 | `qc_tetragamma(z)` | ψ₂(z) = −ψ^(2)(z) (positive, = +2Σ 1/(z+k)³) |
 | `qc_polygamma(n, z)` | ψ⁽ⁿ⁾(z) |
