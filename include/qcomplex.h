@@ -365,6 +365,16 @@ qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse compleme
 qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
 qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
+/**
+ * @brief Compute the complex q-digamma function.
+ *
+ * @param q Complex base inside or outside the unit circle; @f$q=1@f$ selects
+ *          the ordinary digamma limit.
+ * @param z Complex argument away from the poles.
+ * @return @f$\psi_q(z)@f$ on the principal branch, or complex NaN where the
+ *         defining continuation is unavailable.
+ */
+qcomplex_t qc_qdigamma(qcomplex_t q, qcomplex_t z);
 qcomplex_t qc_trigamma(qcomplex_t z);                      /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);                    /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */

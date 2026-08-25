@@ -600,4 +600,22 @@ void run_number_special_function_tests(void)
         num_destroy(&zero);
         num_destroy(&three);
     }
+
+    {
+        number_t q = num_create_from_string("1/2");
+        number_t one = num_create_from_long(1L);
+        number_t two = num_create_from_long(2L);
+        number_t psi_two = number_qdigamma(q, two);
+        number_t psi_one = num_qdigamma(q, one);
+        number_t recurrence = num_sub(psi_two, psi_one);
+
+        assert_number_close_text("number_qdigamma recurrence", recurrence,
+                                 "0.69314718055994530941723212145817656807550013436026", "1e-29");
+        num_destroy(&recurrence);
+        num_destroy(&psi_one);
+        num_destroy(&psi_two);
+        num_destroy(&two);
+        num_destroy(&one);
+        num_destroy(&q);
+    }
 }

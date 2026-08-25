@@ -86,6 +86,7 @@ typedef enum {
     EXPR_KIND_ERFCINV,
     EXPR_KIND_GAMMA,
     EXPR_KIND_DIGAMMA,
+    EXPR_KIND_QDIGAMMA,
     EXPR_KIND_TRIGAMMA,
     EXPR_KIND_ZETA,
     EXPR_KIND_ZETAP,
@@ -221,7 +222,8 @@ typedef struct expr_ops {
     expr_op_kind_t kind;
     expr_arity_t arity;
     expr_diff_kind_t diff_kind;
-    const char *name;
+    const char *expression_name;
+    const char *function_name;
     const char *TeX_name;
     const struct expr_ops *direct_inverse;
     expr_inverse_unary_fn inverse_unary;
@@ -231,6 +233,16 @@ typedef struct expr_ops {
     expr_simplify_fn simplify;
     expr_fold_const_unary_fn fold_const_unary;
 } expr_ops_t;
+
+static inline const char *expr_ops_expression_name(const expr_ops_t *ops)
+{
+    return ops ? ops->expression_name : "?";
+}
+
+static inline const char *expr_ops_function_name(const expr_ops_t *ops)
+{
+    return ops ? ops->function_name : "?";
+}
 
 typedef struct expr_deriv_cache {
     uint64_t wrt_id;
@@ -411,6 +423,7 @@ extern const expr_ops_t ops_erfinv;
 extern const expr_ops_t ops_erfcinv;
 extern const expr_ops_t ops_gamma;
 extern const expr_ops_t ops_digamma;
+extern const expr_ops_t ops_qdigamma;
 extern const expr_ops_t ops_trigamma;
 extern const expr_ops_t ops_zeta;
 extern const expr_ops_t ops_zetap;
@@ -637,7 +650,9 @@ expr_t *expr_get_dx_internal(const expr_t *dv);
 const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
+expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
+expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr);
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
 expr_t *expr_new_binary_internal(const expr_ops_t *ops, const expr_t *a, const expr_t *b);
 expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent);
@@ -833,6 +848,7 @@ void expr_reverse_erfcinv(const expr_t *dv, const number_t *out_bar, number_t *a
 void expr_reverse_gamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_lgamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_digamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_qdigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_zeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

@@ -906,6 +906,24 @@ number_t num_acoth(const number_t number);
 number_t num_gamma(const number_t number);
 number_t num_lgamma(const number_t number);
 number_t num_digamma(const number_t number);
+/**
+ * @brief Evaluate the q-digamma function using the widest participating backend.
+ *
+ * @param q Scalar base.
+ * @param z Scalar argument.
+ * @return An owning number containing @f$\psi_q(z)@f$, or NaN outside the implemented domain.
+ */
+number_t number_qdigamma(const number_t q, const number_t z);
+/**
+ * @brief Evaluate the q-digamma function.
+ *
+ * This is the conventional @c num_ alias of number_qdigamma().
+ *
+ * @param q Scalar base.
+ * @param z Scalar argument.
+ * @return An owning number containing @f$\psi_q(z)@f$, or NaN outside the implemented domain.
+ */
+number_t num_qdigamma(const number_t q, const number_t z);
 number_t num_trigamma(const number_t number);
 number_t num_tetragamma(const number_t number);
 number_t num_polygamma(unsigned int order, const number_t number);

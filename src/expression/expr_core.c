@@ -329,9 +329,18 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
         expr_t *source = expr_finite_weighted_sinh_from_lerch_form(expr);
         expr_t *special;
 
+        if (!source)
+            source = expr_finite_weighted_cosh_from_lerch_form(expr);
         if (source) {
+            expr_t *closed_form;
+
             special = expr_create_deriv(source, wrt);
             expr_free(source);
+            closed_form = special ? expr_finite_progression_closed_form(special) : NULL;
+            if (closed_form) {
+                expr_free(special);
+                return closed_form;
+            }
             return special;
         }
         special = expr_deriv_cosine_harmonic_antiderivative(expr, wrt);

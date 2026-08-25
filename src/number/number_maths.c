@@ -4762,6 +4762,23 @@ number_t num_digamma(const number_t number)
                                                           NULL);
 }
 
+/* Evaluate q-digamma through the qfloat or qcomplex backend. */
+number_t number_qdigamma(const number_t q, const number_t z)
+{
+    if (num_is_nan(q) || num_is_nan(z))
+        return num_clone(NUM_NAN);
+    if (!num_is_real(q) || !num_is_real(z))
+        return num_create_from_qcomplex(
+            qc_qdigamma(number_value_to_qcomplex(&q), number_value_to_qcomplex(&z)));
+    return num_create_from_qfloat(qf_qdigamma(number_value_to_qfloat(&q), number_value_to_qfloat(&z)));
+}
+
+/* Preserve the conventional num_ spelling for q-digamma. */
+number_t num_qdigamma(const number_t q, const number_t z)
+{
+    return number_qdigamma(q, z);
+}
+
 number_t num_trigamma(const number_t number)
 {
     if (num_is_real(number) && num_is_inf(number) && num_get_sign(number) > 0)

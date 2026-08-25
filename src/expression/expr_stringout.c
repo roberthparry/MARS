@@ -1324,6 +1324,67 @@ static void emit_argument_list_expr(const expr_t *f, sbuf_t *b)
     emit_expr(f->b, b, PREC_LOWEST);
 }
 
+static void emit_formal_derivative_func(const expr_t *f, sbuf_t *b)
+{
+    sbuf_putc(b, 'D');
+    for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
+        const expr_t *wrt = f->formal_wrts[i];
+
+        emit_name_func(b, (wrt && wrt->name) ? wrt->name : "x");
+    }
+    sbuf_putc(b, '(');
+    emit_func(f->a, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
+static void emit_arbitrary_function_func(const expr_t *f, sbuf_t *b)
+{
+    const char *name = f->name ? f->name : "F";
+    const char *function_name = name;
+    size_t length;
+    size_t prime_count = 0u;
+
+    if (strcmp(name, "BesselJ") == 0)
+        function_name = "besselj";
+    else if (strcmp(name, "BesselY") == 0)
+        function_name = "bessely";
+    else if (strcmp(name, "LommelS") == 0)
+        function_name = "lommels";
+
+    length = strlen(function_name);
+    while (prime_count < length && function_name[length - prime_count - 1u] == '\'')
+        ++prime_count;
+    if (prime_count > 0u && prime_count < length) {
+        char *base_name = strndup(function_name, length - prime_count);
+
+        if (base_name) {
+            if (expr_tostring_is_safe_func_name(base_name))
+                sbuf_puts(b, base_name);
+            else
+                emit_name_func(b, base_name);
+            free(base_name);
+            for (size_t i = 0u; i < prime_count; ++i)
+                sbuf_putc(b, '\'');
+        } else {
+            emit_name_func(b, function_name);
+        }
+    } else if (expr_tostring_is_safe_func_name(function_name)) {
+        sbuf_puts(b, function_name);
+    } else {
+        emit_name_func(b, function_name);
+    }
+    sbuf_putc(b, '(');
+    emit_func(f->a, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
+static void emit_argument_list_func(const expr_t *f, sbuf_t *b)
+{
+    emit_func(f->a, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_func(f->b, b, PREC_LOWEST);
+}
+
 static void emit_arbitrary_function_TeX(const expr_t *f, sbuf_t *b)
 {
     const char *name = f->name ? f->name : "F";
@@ -2435,16 +2496,7 @@ static const char *expr_unary_name(const expr_t *f)
 {
     if (!f || !f->ops)
         return "?";
-
-    if (expr_is_op(f, &ops_gamma))
-        return "Γ";
-    if (expr_is_op(f, &ops_digamma))
-        return "ψ⁽⁰⁾";
-    if (expr_is_op(f, &ops_trigamma))
-        return "ψ⁽¹⁾";
-    if (expr_is_op(f, &ops_zeta))
-        return "ζ";
-    return f->ops->name ? f->ops->name : "?";
+    return expr_ops_expression_name(f->ops);
 }
 
 static int expr_polygamma_order(const expr_t *f, long *order)
@@ -2488,7 +2540,8 @@ static int expr_has_legendre_chi_order(const expr_t *f)
 
 static void emit_expr_lambert_wn(const expr_t *f, sbuf_t *b)
 {
-    sbuf_puts(b, "Wₙ(");
+    sbuf_puts(b, expr_ops_expression_name(f->ops));
+    sbuf_putc(b, '(');
     emit_expr(f->a, b, 0);
     sbuf_puts(b, ", ");
     emit_expr(f->b, b, 0);
@@ -2501,7 +2554,8 @@ static void emit_expr_polygamma(const expr_t *f, sbuf_t *b)
 
     if (!expr_polygamma_order(f, &order))
         return;
-    sbuf_puts(b, "ψ⁽");
+    sbuf_puts(b, expr_ops_expression_name(f->ops));
+    sbuf_puts(b, "⁽");
     emit_superscript_int(b, order);
     sbuf_puts(b, "⁾(");
     emit_expr(f->b, b, 0);
@@ -2551,7 +2605,8 @@ static void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
 
     if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
         return;
-    sbuf_puts(b, "F₁(");
+    sbuf_puts(b, expr_ops_expression_name(f->ops));
+    sbuf_putc(b, '(');
     emit_expr(a, b, 0);
     sbuf_puts(b, "; ");
     emit_expr(b1, b, 0);
@@ -2577,7 +2632,8 @@ static void emit_expr_lauricella_f(const expr_t *f, sbuf_t *out)
 
     if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
         return;
-    snprintf(prefix, sizeof(prefix), "LauricellaF(%zu, ", count);
+    snprintf(prefix, sizeof(prefix), "(%zu, ", count);
+    sbuf_puts(out, expr_ops_expression_name(f->ops));
     sbuf_puts(out, prefix);
     emit_expr(a, out, 0);
     for (size_t i = 0u; i < count; ++i) {
@@ -2606,7 +2662,8 @@ static void emit_expr_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
 
     if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
         return;
-    snprintf(counts, sizeof(counts), "HypergeometricpFq(%zu, %zu", p, q);
+    snprintf(counts, sizeof(counts), "(%zu, %zu", p, q);
+    sbuf_puts(b, expr_ops_expression_name(f->ops));
     sbuf_puts(b, counts);
     for (size_t i = 0u; i < p; ++i) {
         sbuf_puts(b, ", ");
@@ -2631,7 +2688,8 @@ static void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, "LommelS(");
+    sbuf_puts(b, expr_ops_expression_name(f->ops));
+    sbuf_putc(b, '(');
     emit_expr(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_expr(nu, b, 0);
@@ -2828,7 +2886,8 @@ static void emit_func_polygamma(const expr_t *f, sbuf_t *b)
     if (!expr_polygamma_order(f, &order))
         return;
     snprintf(buf, sizeof(buf), "%ld", order);
-    sbuf_puts(b, "polygamma(");
+    emit_function_builtin_name(b, f->ops);
+    sbuf_putc(b, '(');
     sbuf_puts(b, buf);
     sbuf_puts(b, ", ");
     emit_func(f->b, b, 0);
@@ -2846,7 +2905,8 @@ static void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
 
     if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
         return;
-    sbuf_puts(b, "appell_f1(");
+    emit_function_builtin_name(b, f->ops);
+    sbuf_putc(b, '(');
     emit_func(a, b, 0);
     sbuf_puts(b, ", ");
     emit_func(b1, b, 0);
@@ -2872,7 +2932,8 @@ static void emit_func_lauricella_f(const expr_t *f, sbuf_t *out)
 
     if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
         return;
-    snprintf(prefix, sizeof(prefix), "lauricella_f(%zu, ", count);
+    snprintf(prefix, sizeof(prefix), "(%zu, ", count);
+    emit_function_builtin_name(out, f->ops);
     sbuf_puts(out, prefix);
     emit_func(a, out, 0);
     for (size_t i = 0u; i < count; ++i) {
@@ -2901,7 +2962,8 @@ static void emit_func_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
 
     if (!expr_hypergeometric_pFq_unpack(f, &upper, &p, &lower, &q, &argument))
         return;
-    snprintf(counts, sizeof(counts), "hypergeometric_pFq(%zu, %zu", p, q);
+    snprintf(counts, sizeof(counts), "(%zu, %zu", p, q);
+    emit_function_builtin_name(b, f->ops);
     sbuf_puts(b, counts);
     for (size_t i = 0u; i < p; ++i) {
         sbuf_puts(b, ", ");
@@ -2926,7 +2988,8 @@ static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
 
     if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
         return;
-    sbuf_puts(b, "lommel_s(");
+    emit_function_builtin_name(b, f->ops);
+    sbuf_putc(b, '(');
     emit_func(mu, b, 0);
     sbuf_puts(b, ", ");
     emit_func(nu, b, 0);
@@ -2937,11 +3000,18 @@ static void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
 
 static void emit_func_lambert_wn(const expr_t *f, sbuf_t *b)
 {
-    sbuf_puts(b, "lambert_wn(");
+    emit_function_builtin_name(b, f->ops);
+    sbuf_putc(b, '(');
     emit_func(f->a, b, 0);
     sbuf_puts(b, ", ");
     emit_func(f->b, b, 0);
     sbuf_putc(b, ')');
+}
+
+/* Emit the canonical built-in name stored for FUNCTION source. */
+void emit_function_builtin_name(sbuf_t *b, const expr_ops_t *ops)
+{
+    sbuf_puts(b, expr_ops_function_name(ops));
 }
 
 static int TeX_exp_needs_parens(const expr_t *e)
@@ -3570,6 +3640,14 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_expr(f->a, b, PREC_MUL);
             return;
         }
+        if (expr_is_op(f, &ops_qdigamma)) {
+            sbuf_puts(b, "\\psi_{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "}\\left(");
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)");
+            return;
+        }
         if (expr_is_op(f, &ops_polygamma)) {
             emit_TeX_polygamma(f, b);
             return;
@@ -3635,7 +3713,7 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, f->ops->name);
+        sbuf_puts(b, expr_ops_expression_name(f->ops));
         sbuf_puts(b, "}(");
         emit_TeX_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
@@ -4188,10 +4266,9 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_hypergeometric_pFq(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_zetah))
-            sbuf_puts(b, "ζ");
-        else if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
-            sbuf_puts(b, "Φ(");
+        if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+            sbuf_puts(b, expr_ops_expression_name(f->ops));
+            sbuf_putc(b, '(');
             emit_expr(f->a->a, b, 0);
             sbuf_puts(b, ", ");
             emit_expr(f->a->b, b, 0);
@@ -4201,7 +4278,7 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         else
-            sbuf_puts(b, f->ops->name);
+            sbuf_puts(b, expr_ops_expression_name(f->ops));
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
@@ -4388,15 +4465,15 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_formal_derivative(f)) {
-        emit_formal_derivative_expr(f, b);
+        emit_formal_derivative_func(f, b);
         return;
     }
     if (expr_is_arbitrary_function(f)) {
-        emit_arbitrary_function_expr(f, b);
+        emit_arbitrary_function_func(f, b);
         return;
     }
     if (expr_is_op(f, &ops_argument_list)) {
-        emit_argument_list_expr(f, b);
+        emit_argument_list_func(f, b);
         return;
     }
 
@@ -4452,7 +4529,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_putc(b, '(');
 
-        sbuf_puts(b, f->ops->name);
+        emit_function_builtin_name(b, f->ops);
         sbuf_putc(b, '(');
         emit_func(f->a, b, 0);
         sbuf_putc(b, ')');
@@ -4737,7 +4814,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
-            sbuf_puts(b, "LerchPhi(");
+            emit_function_builtin_name(b, f->ops);
+            sbuf_putc(b, '(');
             emit_func(f->a->a, b, 0);
             sbuf_puts(b, ", ");
             emit_func(f->a->b, b, 0);
@@ -4762,7 +4840,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_lambert_wn(f, b);
             return;
         }
-        sbuf_puts(b, expr_is_op(f, &ops_harmonic_poly) ? "harmonic_poly" : f->ops->name);
+        emit_function_builtin_name(b, f->ops);
         sbuf_putc(b, '(');
         emit_func(f->a, b, 0);
         sbuf_puts(b, ", ");

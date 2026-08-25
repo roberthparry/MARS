@@ -1435,6 +1435,19 @@ matrix_t *mat_erfcinv(const matrix_t *A);
 matrix_t *mat_gamma(const matrix_t *A);
 matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
+/**
+ * @brief Evaluate the q-digamma matrix function @f$\psi_q(Z)@f$.
+ *
+ * The matrix occupies the analytic argument and @p q is a scalar base.  The
+ * defining Lambert series is used when its matrix series converges,
+ * reciprocal-base continuation is used outside the unit circle, and
+ * @f$q=1@f$ selects mat_digamma().
+ *
+ * @param Z Square matrix argument.
+ * @param q Scalar base.
+ * @return A newly allocated result matrix, or NULL outside implemented convergence coverage.
+ */
+matrix_t *mat_qdigamma(const matrix_t *Z, const number_t *q);
 matrix_t *mat_trigamma(const matrix_t *A);
 matrix_t *mat_tetragamma(const matrix_t *A);
 /** @brief Return the analytically continued Riemann zeta matrix function. */

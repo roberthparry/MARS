@@ -423,6 +423,8 @@ when the selected principal root is not real.
 | `num_gamma(x)` | Evaluates Euler's gamma function `Γ(x)`. |
 | `num_lgamma(x)` | Evaluates the principal logarithm of `Γ(x)`. |
 | `num_digamma(x)` | Evaluates `ψ(x)`, the logarithmic derivative of gamma. |
+| `number_qdigamma(q, x)` | Evaluates the q-digamma `ψ_q(x)` while preserving the active real or complex backend. |
+| `num_qdigamma(q, x)` | Compatibility spelling for `number_qdigamma(q, x)`. |
 | `num_trigamma(x)` | Evaluates `ψ⁽¹⁾(x)`, the derivative of digamma. |
 | `num_tetragamma(x)` | Evaluates `ψ⁽²⁾(x)`, the derivative of trigamma. |
 | `num_polygamma(m, x)` | Evaluates the order-`m` polygamma function `ψ⁽ᵐ⁾(x)`. |

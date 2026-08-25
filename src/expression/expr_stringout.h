@@ -39,5 +39,6 @@ int expr_tostring_is_safe_func_name(const char *name);
 /* Emission helpers. */
 void emit_name(sbuf_t *b, const char *name);
 void emit_name_func(sbuf_t *b, const char *name);
+void emit_function_builtin_name(sbuf_t *b, const expr_ops_t *ops);
 
 #endif /* EXPR_STRINGOUT_H */

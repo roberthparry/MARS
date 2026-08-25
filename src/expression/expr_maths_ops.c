@@ -40,8 +40,28 @@ static number_t eval_formal_series_component(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
-static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out);
-static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value);
+typedef enum {
+    EXPR_FINITE_WEIGHTED_HYPERBOLIC_NONE,
+    EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH,
+    EXPR_FINITE_WEIGHTED_HYPERBOLIC_COSH,
+} expr_finite_weighted_hyperbolic_kind_t;
+
+typedef enum {
+    EXPR_FINITE_WEIGHTED_CIRCULAR_NONE,
+    EXPR_FINITE_WEIGHTED_CIRCULAR_SIN,
+    EXPR_FINITE_WEIGHTED_CIRCULAR_COS,
+} expr_finite_weighted_circular_kind_t;
+
+static bool expr_finite_weighted_hyperbolic_parts(const expr_t *expr, const expr_t **upper_out,
+                                                   const expr_t **step_out,
+                                                   expr_finite_weighted_hyperbolic_kind_t *kind_out);
+static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value);
+static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_value);
+static bool expr_finite_weighted_circular_parts(const expr_t *expr, const expr_t **upper_out,
+                                                const expr_t **step_out,
+                                                expr_finite_weighted_circular_kind_t *kind_out);
+static expr_t *expr_finite_weighted_circular_from_lerch_form(
+    const expr_t *expr, expr_finite_weighted_circular_kind_t kind);
 
 static const expr_t *expr_find_lerch_phi(const expr_t *expr)
 {
@@ -53,6 +73,25 @@ static const expr_t *expr_find_lerch_phi(const expr_t *expr)
         return expr;
     found = expr_find_lerch_phi(expr->a);
     return found ? found : expr_find_lerch_phi(expr->b);
+}
+
+static const expr_t *expr_find_qdigamma_with_symbolic_argument(const expr_t *expr)
+{
+    const expr_t *found;
+    number_t argument_value;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_qdigamma) && expr->b) {
+        argument_value = expr_eval(expr->b);
+        if (!num_is_exact(argument_value) || !num_is_one(argument_value)) {
+            num_destroy(&argument_value);
+            return expr;
+        }
+        num_destroy(&argument_value);
+    }
+    found = expr_find_qdigamma_with_symbolic_argument(expr->a);
+    return found ? found : expr_find_qdigamma_with_symbolic_argument(expr->b);
 }
 
 static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
@@ -108,6 +147,15 @@ static number_t eval_finite_summation(expr_t *dv)
     if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms) {
         expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(dv) : NULL;
 
+        if (lower_value == 1L) {
+            number_t progression_value = eval_finite_qdigamma_progression(dv, upper_value);
+
+            if (num_is_finite(progression_value)) {
+                expr_free(closed_form);
+                return progression_value;
+            }
+            num_destroy(&progression_value);
+        }
         if (closed_form) {
             number_t closed_value = expr_eval(closed_form);
 
@@ -116,7 +164,9 @@ static number_t eval_finite_summation(expr_t *dv)
                 return closed_value;
             num_destroy(&closed_value);
         }
-        return lower_value == 1L ? eval_finite_weighted_sinh(dv, upper_value) : num_clone(NUM_NAN);
+        if (lower_value == 1L)
+            return eval_finite_weighted_hyperbolic(dv, upper_value);
+        return num_clone(NUM_NAN);
     }
 
     sum = num_clone(NUM_ZERO);
@@ -241,9 +291,21 @@ typedef enum {
     EXPR_FINITE_PROGRESSION_NONE,
     EXPR_FINITE_PROGRESSION_SIN,
     EXPR_FINITE_PROGRESSION_COS,
+    EXPR_FINITE_PROGRESSION_TAN,
+    EXPR_FINITE_PROGRESSION_COT,
+    EXPR_FINITE_PROGRESSION_SEC,
+    EXPR_FINITE_PROGRESSION_COSEC,
+    EXPR_FINITE_PROGRESSION_TANH,
+    EXPR_FINITE_PROGRESSION_COTH,
+    EXPR_FINITE_PROGRESSION_SECH,
+    EXPR_FINITE_PROGRESSION_COSECH,
     EXPR_FINITE_PROGRESSION_SINH,
     EXPR_FINITE_PROGRESSION_COSH,
 } expr_finite_progression_kind_t;
+
+static bool expr_finite_progression_has_qdigamma_form(expr_finite_progression_kind_t kind);
+static expr_t *expr_finite_qdigamma_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                            expr_finite_progression_kind_t kind);
 
 static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out,
                                           expr_finite_progression_kind_t *kind_out)
@@ -276,6 +338,22 @@ static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upp
         kind = EXPR_FINITE_PROGRESSION_SIN;
     else if (expr_is_op(expr->a, &ops_cos))
         kind = EXPR_FINITE_PROGRESSION_COS;
+    else if (expr_is_op(expr->a, &ops_tan))
+        kind = EXPR_FINITE_PROGRESSION_TAN;
+    else if (expr_is_op(expr->a, &ops_cot))
+        kind = EXPR_FINITE_PROGRESSION_COT;
+    else if (expr_is_op(expr->a, &ops_sec))
+        kind = EXPR_FINITE_PROGRESSION_SEC;
+    else if (expr_is_op(expr->a, &ops_cosec))
+        kind = EXPR_FINITE_PROGRESSION_COSEC;
+    else if (expr_is_op(expr->a, &ops_tanh))
+        kind = EXPR_FINITE_PROGRESSION_TANH;
+    else if (expr_is_op(expr->a, &ops_coth))
+        kind = EXPR_FINITE_PROGRESSION_COTH;
+    else if (expr_is_op(expr->a, &ops_sech))
+        kind = EXPR_FINITE_PROGRESSION_SECH;
+    else if (expr_is_op(expr->a, &ops_cosech))
+        kind = EXPR_FINITE_PROGRESSION_COSECH;
     else if (expr_is_op(expr->a, &ops_sinh))
         kind = EXPR_FINITE_PROGRESSION_SINH;
     else if (expr_is_op(expr->a, &ops_cosh))
@@ -302,7 +380,87 @@ cleanup:
     return matched;
 }
 
-static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out)
+static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_value)
+{
+    const expr_t *upper;
+    const expr_t *step;
+    expr_finite_progression_kind_t kind;
+    number_t step_value;
+    number_t sum = num_clone(NUM_ZERO);
+
+    if (upper_value < 1L || upper_value > 1000000L ||
+        !expr_finite_progression_parts(expr, &upper, &step, &kind) ||
+        (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
+         kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC &&
+         kind != EXPR_FINITE_PROGRESSION_SECH)) {
+        num_destroy(&sum);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    step_value = expr_eval((expr_t *)step);
+    if (!num_is_finite(step_value)) {
+        num_destroy(&step_value);
+        num_destroy(&sum);
+        return num_clone(NUM_NAN);
+    }
+    for (long k = 1L; k <= upper_value; ++k) {
+        number_t angle = num_mul_long(step_value, k);
+        number_t term;
+        number_t next;
+
+        switch (kind) {
+            case EXPR_FINITE_PROGRESSION_TAN:
+                term = num_tan(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_COT:
+                term = num_cot(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_SEC:
+                term = num_sec(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_COSEC:
+                term = num_cosec(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_TANH:
+                term = num_tanh(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_COTH:
+                term = num_coth(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_SECH:
+                term = num_sech(angle);
+                break;
+
+            case EXPR_FINITE_PROGRESSION_COSECH:
+                term = num_cosech(angle);
+                break;
+
+            default:
+                term = num_clone(NUM_NAN);
+                break;
+        }
+        next = num_add(sum, term);
+
+        num_destroy(&angle);
+        num_destroy(&term);
+        num_destroy(&sum);
+        sum = next;
+        if (!num_is_finite(sum))
+            break;
+    }
+    num_destroy(&step_value);
+    return sum;
+}
+
+static bool expr_finite_weighted_hyperbolic_parts(const expr_t *expr, const expr_t **upper_out,
+                                                   const expr_t **step_out,
+                                                   expr_finite_weighted_hyperbolic_kind_t *kind_out)
 {
     const expr_t *index;
     const expr_t *bounds;
@@ -313,9 +471,11 @@ static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **u
     const expr_t *left;
     const expr_t *right;
     number_t lower_value = NUM_NAN;
+    expr_finite_weighted_hyperbolic_kind_t kind = EXPR_FINITE_WEIGHTED_HYPERBOLIC_NONE;
     bool matched = false;
 
-    if (!expr || !expr_is_op(expr, &ops_summation) || !expr_is_op(expr->b, &ops_argument_list))
+    if (!expr || !upper_out || !step_out || !kind_out || !expr_is_op(expr, &ops_summation) ||
+        !expr_is_op(expr->b, &ops_argument_list))
         return false;
     index = expr->b->a;
     bounds = expr->b->b;
@@ -326,8 +486,15 @@ static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **u
     lower_value = expr_eval(lower);
     if (!num_is_exact(lower_value) || !num_is_one(lower_value) ||
         !expr_is_op(expr->a, &ops_div) || !(numerator = expr->a->a) || !(denominator = expr->a->b) ||
-        !(denominator == index || (expr_is_var(denominator) && denominator->var_id == index->var_id)) ||
-        !expr_is_op(numerator, &ops_sinh) || !expr_match_mul_expr(numerator->a, &left, &right))
+        !(denominator == index || (expr_is_var(denominator) && denominator->var_id == index->var_id)))
+        goto cleanup;
+    if (expr_is_op(numerator, &ops_sinh))
+        kind = EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH;
+    else if (expr_is_op(numerator, &ops_cosh))
+        kind = EXPR_FINITE_WEIGHTED_HYPERBOLIC_COSH;
+    else
+        goto cleanup;
+    if (!expr_match_mul_expr(numerator->a, &left, &right))
         goto cleanup;
     if (left == index)
         *step_out = right;
@@ -336,6 +503,7 @@ static bool expr_finite_weighted_sinh_parts(const expr_t *expr, const expr_t **u
     else
         goto cleanup;
     *upper_out = upper;
+    *kind_out = kind;
     matched = true;
 
 cleanup:
@@ -343,7 +511,60 @@ cleanup:
     return matched;
 }
 
-static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
+static bool expr_finite_weighted_circular_parts(const expr_t *expr, const expr_t **upper_out,
+                                                const expr_t **step_out,
+                                                expr_finite_weighted_circular_kind_t *kind_out)
+{
+    const expr_t *index;
+    const expr_t *bounds;
+    const expr_t *lower;
+    const expr_t *upper;
+    const expr_t *numerator;
+    const expr_t *denominator;
+    const expr_t *left;
+    const expr_t *right;
+    number_t lower_value = NUM_NAN;
+    expr_finite_weighted_circular_kind_t kind = EXPR_FINITE_WEIGHTED_CIRCULAR_NONE;
+    bool matched = false;
+
+    if (!expr || !upper_out || !step_out || !kind_out || !expr_is_op(expr, &ops_summation) ||
+        !expr_is_op(expr->b, &ops_argument_list))
+        return false;
+    index = expr->b->a;
+    bounds = expr->b->b;
+    if (!index || !expr_is_var(index) || !expr_is_op(bounds, &ops_argument_list))
+        return false;
+    lower = bounds->a;
+    upper = bounds->b;
+    lower_value = expr_eval(lower);
+    if (!num_is_exact(lower_value) || !num_is_one(lower_value) || !expr_is_op(expr->a, &ops_div) ||
+        !(numerator = expr->a->a) || !(denominator = expr->a->b) ||
+        !(denominator == index || (expr_is_var(denominator) && denominator->var_id == index->var_id)))
+        goto cleanup;
+    if (expr_is_op(numerator, &ops_sin))
+        kind = EXPR_FINITE_WEIGHTED_CIRCULAR_SIN;
+    else if (expr_is_op(numerator, &ops_cos))
+        kind = EXPR_FINITE_WEIGHTED_CIRCULAR_COS;
+    else
+        goto cleanup;
+    if (!expr_match_mul_expr(numerator->a, &left, &right))
+        goto cleanup;
+    if (left == index || (expr_is_var(left) && left->var_id == index->var_id))
+        *step_out = right;
+    else if (right == index || (expr_is_var(right) && right->var_id == index->var_id))
+        *step_out = left;
+    else
+        goto cleanup;
+    *upper_out = upper;
+    *kind_out = kind;
+    matched = true;
+
+cleanup:
+    num_destroy(&lower_value);
+    return matched;
+}
+
+static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value)
 {
     const expr_t *upper;
     const expr_t *step_expr;
@@ -356,9 +577,10 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
     number_t dominant;
     number_t result;
     double step_double;
+    expr_finite_weighted_hyperbolic_kind_t kind;
     const long maximum_tail_terms = 10000L;
 
-    if (!expr_finite_weighted_sinh_parts(dv, &upper, &step_expr) || upper_value < 1L)
+    if (!expr_finite_weighted_hyperbolic_parts(dv, &upper, &step_expr, &kind) || upper_value < 1L)
         return num_clone(NUM_NAN);
     (void)upper;
     step = expr_eval(step_expr);
@@ -366,11 +588,30 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
         bool zero = num_is_zero(step);
 
         num_destroy(&step);
-        return zero ? num_clone(NUM_ZERO) : num_clone(NUM_NAN);
+        if (!zero)
+            return num_clone(NUM_NAN);
+        if (kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH)
+            return num_clone(NUM_ZERO);
+        {
+            number_t upper_number = num_create_from_long(upper_value);
+            number_t shifted_upper = num_add(upper_number, NUM_ONE);
+            number_t digamma = num_digamma(shifted_upper);
+            number_t harmonic = num_add(digamma, NUM_EULER_MASCHERONI);
+
+            num_destroy(&digamma);
+            num_destroy(&shifted_upper);
+            num_destroy(&upper_number);
+            return harmonic;
+        }
     }
     step_double = num_to_double(step);
     magnitude = step_double < 0.0 ? num_neg(step) : num_clone(step);
-    q = num_exp(num_neg(magnitude));
+    {
+        number_t negative_magnitude = num_neg(magnitude);
+
+        q = num_exp(negative_magnitude);
+        num_destroy(&negative_magnitude);
+    }
     q_power = num_clone(NUM_ONE);
     dominant_scaled = num_clone(NUM_ZERO);
     decaying = num_clone(NUM_ZERO);
@@ -379,9 +620,13 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
         number_t term = num_div(q_power, denominator);
         number_t updated = num_add(dominant_scaled, term);
         number_t next_power = num_mul(q_power, q);
-        double term_size = num_to_double(num_abs(term));
-        double total_size = num_to_double(num_abs(updated));
+        number_t term_abs = num_abs(term);
+        number_t updated_abs = num_abs(updated);
+        double term_size = num_to_double(term_abs);
+        double total_size = num_to_double(updated_abs);
 
+        num_destroy(&updated_abs);
+        num_destroy(&term_abs);
         num_destroy(&dominant_scaled);
         num_destroy(&q_power);
         num_destroy(&term);
@@ -398,9 +643,13 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
         number_t term = num_div(q_power, denominator);
         number_t updated = num_add(decaying, term);
         number_t next_power = num_mul(q_power, q);
-        double term_size = num_to_double(num_abs(term));
-        double total_size = num_to_double(num_abs(updated));
+        number_t term_abs = num_abs(term);
+        number_t updated_abs = num_abs(updated);
+        double term_size = num_to_double(term_abs);
+        double total_size = num_to_double(updated_abs);
 
+        num_destroy(&updated_abs);
+        num_destroy(&term_abs);
         num_destroy(&decaying);
         num_destroy(&q_power);
         num_destroy(&term);
@@ -410,9 +659,20 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
         if (k > 8L && term_size < 1e-30 * (1.0 + total_size))
             break;
     }
-    dominant = num_mul(num_exp(num_mul_long(magnitude, upper_value)), dominant_scaled);
-    result = num_div(num_sub(dominant, decaying), NUM_TWO);
-    if (step_double < 0.0) {
+    {
+        number_t scaled_exponent = num_mul_long(magnitude, upper_value);
+        number_t dominant_exponential = num_exp(scaled_exponent);
+        number_t combined;
+
+        dominant = num_mul(dominant_exponential, dominant_scaled);
+        combined = kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH ? num_sub(dominant, decaying)
+                                                                : num_add(dominant, decaying);
+        result = num_div(combined, NUM_TWO);
+        num_destroy(&combined);
+        num_destroy(&dominant_exponential);
+        num_destroy(&scaled_exponent);
+    }
+    if (kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH && step_double < 0.0) {
         number_t negative = num_neg(result);
 
         num_destroy(&result);
@@ -428,7 +688,8 @@ static number_t eval_finite_weighted_sinh(expr_t *dv, long upper_value)
     return result;
 }
 
-expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
+static expr_t *expr_finite_weighted_hyperbolic_lerch_form(
+    const expr_t *expr, expr_finite_weighted_hyperbolic_kind_t required_kind)
 {
     const expr_t *n;
     const expr_t *x;
@@ -450,10 +711,12 @@ expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
     expr_t *positive_tail_half = NULL;
     expr_t *negative_tail_half = NULL;
     expr_t *left = NULL;
+    expr_t *left_without_negative_tail = NULL;
     expr_t *right = NULL;
     expr_t *out = NULL;
+    expr_finite_weighted_hyperbolic_kind_t kind;
 
-    if (!expr_finite_weighted_sinh_parts(expr, &n, &x))
+    if (!expr_finite_weighted_hyperbolic_parts(expr, &n, &x, &kind) || kind != required_kind)
         return NULL;
     one = expr_new_const(NUM_ONE);
     n_plus_one = expr_add_long(n, 1L);
@@ -472,10 +735,16 @@ expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
     negative_polylog_half = expr_mul_num(negative_polylog, &NUM_HALF);
     positive_tail_half = expr_mul_num(positive_tail, &NUM_HALF);
     negative_tail_half = expr_mul_num(negative_tail, &NUM_HALF);
-    left = expr_sub(positive_polylog_half, negative_polylog_half);
-    right = expr_sub(negative_tail_half, positive_tail_half);
-    out = expr_add(left, right);
+    left = kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH
+               ? expr_sub(positive_polylog_half, negative_polylog_half)
+               : expr_add(positive_polylog_half, negative_polylog_half);
+    right = kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH ? expr_sub(negative_tail_half, positive_tail_half) : NULL;
+    left_without_negative_tail =
+        kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_COSH ? expr_sub(left, negative_tail_half) : NULL;
+    out = kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH ? expr_add(left, right)
+                                                        : expr_sub(left_without_negative_tail, positive_tail_half);
     expr_free(right);
+    expr_free(left_without_negative_tail);
     expr_free(left);
     expr_free(negative_tail_half);
     expr_free(positive_tail_half);
@@ -497,8 +766,151 @@ expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
     return out;
 }
 
-/* Recover the finite weighted hyperbolic sum represented by a matching Lerch-Phi expression. */
-expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr)
+/* Return the Li1/Lerch-Phi form of a recognised finite weighted sinh sum. */
+expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr)
+{
+    return expr_finite_weighted_hyperbolic_lerch_form(expr, EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH);
+}
+
+/* Return the Li1/Lerch-Phi form of a recognised finite weighted cosh sum. */
+expr_t *expr_finite_weighted_cosh_lerch_form(const expr_t *expr)
+{
+    return expr_finite_weighted_hyperbolic_lerch_form(expr, EXPR_FINITE_WEIGHTED_HYPERBOLIC_COSH);
+}
+
+static expr_t *expr_finite_weighted_circular_lerch_form(
+    const expr_t *expr, expr_finite_weighted_circular_kind_t required_kind)
+{
+    const expr_t *n;
+    const expr_t *x;
+    expr_t *one = NULL;
+    expr_t *n_plus_one = NULL;
+    expr_t *imaginary = NULL;
+    expr_t *imaginary_x = NULL;
+    expr_t *negative_imaginary_x = NULL;
+    expr_t *positive_z = NULL;
+    expr_t *negative_z = NULL;
+    expr_t *positive_polylog = NULL;
+    expr_t *negative_polylog = NULL;
+    expr_t *positive_power = NULL;
+    expr_t *negative_power = NULL;
+    expr_t *positive_phi = NULL;
+    expr_t *negative_phi = NULL;
+    expr_t *positive_tail = NULL;
+    expr_t *negative_tail = NULL;
+    expr_t *positive_series = NULL;
+    expr_t *negative_series = NULL;
+    expr_t *numerator = NULL;
+    expr_t *denominator = NULL;
+    expr_t *out = NULL;
+    expr_finite_weighted_circular_kind_t kind;
+
+    if (!expr_finite_weighted_circular_parts(expr, &n, &x, &kind) || kind != required_kind)
+        return NULL;
+    one = expr_new_const(NUM_ONE);
+    n_plus_one = expr_add_long(n, 1L);
+    imaginary = expr_new_const(NUM_I);
+    imaginary_x = imaginary ? expr_mul(imaginary, x) : NULL;
+    negative_imaginary_x = imaginary_x ? expr_neg(imaginary_x) : NULL;
+    positive_z = imaginary_x ? expr_exp(imaginary_x) : NULL;
+    negative_z = negative_imaginary_x ? expr_exp(negative_imaginary_x) : NULL;
+    positive_polylog = positive_z ? expr_polylog1(positive_z) : NULL;
+    negative_polylog = negative_z ? expr_polylog1(negative_z) : NULL;
+    positive_power = positive_z && n_plus_one ? expr_pow_xp(positive_z, n_plus_one) : NULL;
+    negative_power = negative_z && n_plus_one ? expr_pow_xp(negative_z, n_plus_one) : NULL;
+    positive_phi = positive_z && one && n_plus_one ? expr_lerch_phi(positive_z, one, n_plus_one) : NULL;
+    negative_phi = negative_z && one && n_plus_one ? expr_lerch_phi(negative_z, one, n_plus_one) : NULL;
+    positive_tail = positive_power && positive_phi ? expr_mul(positive_power, positive_phi) : NULL;
+    negative_tail = negative_power && negative_phi ? expr_mul(negative_power, negative_phi) : NULL;
+    positive_series = positive_polylog && positive_tail ? expr_sub(positive_polylog, positive_tail) : NULL;
+    negative_series = negative_polylog && negative_tail ? expr_sub(negative_polylog, negative_tail) : NULL;
+    numerator = positive_series && negative_series
+                    ? (kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN ? expr_sub(positive_series, negative_series)
+                                                                 : expr_add(positive_series, negative_series))
+                    : NULL;
+    denominator = kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN && imaginary ? expr_mul_num(imaginary, &NUM_TWO) : NULL;
+    out = numerator ? (kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN ? expr_div(numerator, denominator)
+                                                                  : expr_div_long(numerator, 2L))
+                    : NULL;
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(negative_series);
+    expr_free(positive_series);
+    expr_free(negative_tail);
+    expr_free(positive_tail);
+    expr_free(negative_phi);
+    expr_free(positive_phi);
+    expr_free(negative_power);
+    expr_free(positive_power);
+    expr_free(negative_polylog);
+    expr_free(positive_polylog);
+    expr_free(negative_z);
+    expr_free(positive_z);
+    expr_free(negative_imaginary_x);
+    expr_free(imaginary_x);
+    expr_free(imaginary);
+    expr_free(n_plus_one);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_weighted_signed_circular_lerch_form(
+    const expr_t *expr, expr_finite_weighted_circular_kind_t kind)
+{
+    const expr_t *sum = expr;
+    expr_t *form;
+    expr_t *out;
+    bool negative = expr_is_op(expr, &ops_neg) && expr->a;
+
+    if (negative)
+        sum = expr->a;
+
+    form = expr_finite_weighted_circular_lerch_form(sum, kind);
+    if (!form || !negative)
+        return form;
+    if (kind == EXPR_FINITE_WEIGHTED_CIRCULAR_COS && expr_is_op(form, &ops_div) && expr_is_const(form->b) &&
+        num_eq(form->b->c, NUM_TWO)) {
+        number_t negative_half = num_neg(NUM_HALF);
+
+        out = expr_mul_num(form->a, &negative_half);
+        num_destroy(&negative_half);
+    } else {
+        out = expr_neg(form);
+    }
+    expr_free(form);
+    return out;
+}
+
+/* Return the Li1/Lerch-Phi form of a recognised finite weighted sine sum. */
+expr_t *expr_finite_weighted_sin_lerch_form(const expr_t *expr)
+{
+    expr_t *form = expr_finite_weighted_signed_circular_lerch_form(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_SIN);
+    expr_t *sum;
+
+    if (form)
+        return form;
+    sum = expr_finite_weighted_circular_from_lerch_form(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_SIN);
+    form = sum ? expr_finite_weighted_signed_circular_lerch_form(sum, EXPR_FINITE_WEIGHTED_CIRCULAR_SIN) : NULL;
+    expr_free(sum);
+    return form;
+}
+
+/* Return the Li1/Lerch-Phi form of a recognised finite weighted cosine sum. */
+expr_t *expr_finite_weighted_cos_lerch_form(const expr_t *expr)
+{
+    expr_t *form = expr_finite_weighted_signed_circular_lerch_form(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_COS);
+    expr_t *sum;
+
+    if (form)
+        return form;
+    sum = expr_finite_weighted_circular_from_lerch_form(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_COS);
+    form = sum ? expr_finite_weighted_signed_circular_lerch_form(sum, EXPR_FINITE_WEIGHTED_CIRCULAR_COS) : NULL;
+    expr_free(sum);
+    return form;
+}
+
+static expr_t *expr_finite_weighted_hyperbolic_from_lerch_form(
+    const expr_t *expr, expr_finite_weighted_hyperbolic_kind_t kind)
 {
     const expr_t *phi = expr_find_lerch_phi(expr);
     const expr_t *z;
@@ -542,12 +954,14 @@ expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr)
         if (index)
             expr_set_name(index, "k");
         argument = index ? expr_mul(index, x) : NULL;
-        numerator = argument ? expr_sinh(argument) : NULL;
+        numerator = argument ? (kind == EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH ? expr_sinh(argument)
+                                                                                 : expr_cosh(argument))
+                             : NULL;
         term = numerator ? expr_div(numerator, index) : NULL;
         lower = expr_new_const(NUM_ONE);
         sum = term && lower ? expr_new_finite_summation_range(term, index, lower, n) : NULL;
 
-        candidate = sum ? expr_finite_weighted_sinh_lerch_form(sum) : NULL;
+        candidate = sum ? expr_finite_weighted_hyperbolic_lerch_form(sum, kind) : NULL;
         recognised_sum = sum;
         expr_free(lower);
         expr_free(term);
@@ -572,10 +986,32 @@ cleanup:
     return out;
 }
 
+/* Recover the finite weighted sinh sum represented by a matching Lerch-Phi expression. */
+expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr)
+{
+    return expr_finite_weighted_hyperbolic_from_lerch_form(expr, EXPR_FINITE_WEIGHTED_HYPERBOLIC_SINH);
+}
+
+/* Recover the finite weighted cosh sum represented by a matching Lerch-Phi expression. */
+expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr)
+{
+    return expr_finite_weighted_hyperbolic_from_lerch_form(expr, EXPR_FINITE_WEIGHTED_HYPERBOLIC_COSH);
+}
+
 /* Return whether an expression is the recognised finite weighted hyperbolic sum in Lerch-Phi form. */
 bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr)
 {
     expr_t *sum = expr_finite_weighted_sinh_from_lerch_form(expr);
+    bool matched = sum != NULL;
+
+    expr_free(sum);
+    return matched;
+}
+
+/* Return whether an expression is the recognised finite weighted cosh sum in Li1/Lerch-Phi form. */
+bool expr_is_finite_weighted_cosh_lerch_form(const expr_t *expr)
+{
+    expr_t *sum = expr_finite_weighted_cosh_from_lerch_form(expr);
     bool matched = sum != NULL;
 
     expr_free(sum);
@@ -589,16 +1025,1098 @@ bool expr_finite_weighted_sinh_lerch_value(const expr_t *expr, number_t *value_o
     const expr_t *step;
     expr_t *sum;
     long upper_value;
+    expr_finite_weighted_hyperbolic_kind_t kind;
 
     if (!value_out || !(sum = expr_finite_weighted_sinh_from_lerch_form(expr)))
         return false;
-    if (!expr_finite_weighted_sinh_parts(sum, &upper, &step) ||
+
+    if (!expr_finite_weighted_hyperbolic_parts(sum, &upper, &step, &kind) ||
         !expr_summation_bound_to_long(upper, &upper_value) || upper_value < 1L) {
         expr_free(sum);
         return false;
     }
     (void)step;
-    *value_out = eval_finite_weighted_sinh(sum, upper_value);
+    *value_out = eval_finite_weighted_hyperbolic(sum, upper_value);
+    expr_free(sum);
+    return num_is_finite(*value_out);
+}
+
+/* Evaluate a recognised finite weighted cosh sum in Li1/Lerch-Phi form. */
+bool expr_finite_weighted_cosh_lerch_value(const expr_t *expr, number_t *value_out)
+{
+    const expr_t *upper;
+    const expr_t *step;
+    expr_t *sum;
+    long upper_value;
+    expr_finite_weighted_hyperbolic_kind_t kind;
+
+    if (!value_out || !(sum = expr_finite_weighted_cosh_from_lerch_form(expr)))
+        return false;
+    if (!expr_finite_weighted_hyperbolic_parts(sum, &upper, &step, &kind) ||
+        !expr_summation_bound_to_long(upper, &upper_value) || upper_value < 1L) {
+        expr_free(sum);
+        return false;
+    }
+    (void)step;
+    *value_out = eval_finite_weighted_hyperbolic(sum, upper_value);
+    expr_free(sum);
+    return num_is_finite(*value_out);
+}
+
+static number_t eval_finite_weighted_circular(const expr_t *step_expr, long upper_value,
+                                              expr_finite_weighted_circular_kind_t kind)
+{
+    number_t step = expr_eval(step_expr);
+    number_t sin_step = NUM_NAN;
+    number_t cos_step = NUM_NAN;
+    number_t sin_k;
+    number_t cos_k;
+    number_t sum = num_clone(NUM_ZERO);
+
+    if (!num_is_real(step) || !num_is_finite(step) || num_sincos(step, &sin_step, &cos_step) != 0) {
+        num_destroy(&cos_step);
+        num_destroy(&sin_step);
+        num_destroy(&step);
+        num_destroy(&sum);
+        return num_clone(NUM_NAN);
+    }
+    sin_k = num_clone(sin_step);
+    cos_k = num_clone(cos_step);
+    for (long k = 1L; k <= upper_value; ++k) {
+        number_t denominator = num_create_from_long(k);
+        number_t term = num_div(kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN ? sin_k : cos_k, denominator);
+        number_t updated = num_add(sum, term);
+
+        num_destroy(&sum);
+        num_destroy(&term);
+        num_destroy(&denominator);
+        sum = updated;
+        if (k == upper_value || k == LONG_MAX)
+            break;
+        if ((k & 1023L) == 0L) {
+            number_t argument = num_mul_long(step, k + 1L);
+            number_t next_sin = NUM_NAN;
+            number_t next_cos = NUM_NAN;
+
+            if (num_sincos(argument, &next_sin, &next_cos) != 0) {
+                num_destroy(&next_cos);
+                num_destroy(&next_sin);
+                num_destroy(&argument);
+                num_destroy(&sum);
+                sum = num_clone(NUM_NAN);
+                break;
+            }
+            num_destroy(&argument);
+            num_destroy(&cos_k);
+            num_destroy(&sin_k);
+            sin_k = next_sin;
+            cos_k = next_cos;
+        } else {
+            number_t sin_cos = num_mul(sin_k, cos_step);
+            number_t cos_sin = num_mul(cos_k, sin_step);
+            number_t cos_cos = num_mul(cos_k, cos_step);
+            number_t sin_sin = num_mul(sin_k, sin_step);
+            number_t next_sin = num_add(sin_cos, cos_sin);
+            number_t next_cos = num_sub(cos_cos, sin_sin);
+
+            num_destroy(&sin_sin);
+            num_destroy(&cos_cos);
+            num_destroy(&cos_sin);
+            num_destroy(&sin_cos);
+            num_destroy(&cos_k);
+            num_destroy(&sin_k);
+            sin_k = next_sin;
+            cos_k = next_cos;
+        }
+    }
+    num_destroy(&cos_k);
+    num_destroy(&sin_k);
+    num_destroy(&cos_step);
+    num_destroy(&sin_step);
+    num_destroy(&step);
+    return sum;
+}
+
+static const expr_t *expr_circular_step_from_unit_exponential(const expr_t *z)
+{
+    const expr_t *left;
+    const expr_t *right;
+
+    if (!z)
+        return NULL;
+    if (expr_is_op(z, &ops_exp) && z->a && expr_match_mul_expr(z->a, &left, &right)) {
+        if (expr_is_const(left) && num_eq(left->c, NUM_I))
+            return right;
+        if (expr_is_const(right) && num_eq(right->c, NUM_I))
+            return left;
+    }
+    if (expr_is_op(z, &ops_add) && expr_is_op(z->a, &ops_cos) && z->a->a &&
+        expr_match_mul_expr(z->b, &left, &right)) {
+        const expr_t *sine = expr_is_op(left, &ops_sin) ? left : expr_is_op(right, &ops_sin) ? right : NULL;
+        const expr_t *imaginary = sine == left ? right : sine == right ? left : NULL;
+
+        if (sine && sine->a && imaginary && expr_is_const(imaginary) && num_eq(imaginary->c, NUM_I) &&
+            expr_struct_eq(z->a->a, sine->a))
+            return z->a->a;
+    }
+    return NULL;
+}
+
+static bool expr_first_polylog1_coefficient(const expr_t *expr, number_t coefficient, number_t *coefficient_out)
+{
+    if (!expr || !coefficient_out)
+        return false;
+    if (expr_is_op(expr, &ops_polylog1)) {
+        *coefficient_out = num_clone(coefficient);
+        return true;
+    }
+    if (expr_is_op(expr, &ops_neg) && expr->a) {
+        number_t negative = num_neg(coefficient);
+        bool found = expr_first_polylog1_coefficient(expr->a, negative, coefficient_out);
+
+        num_destroy(&negative);
+        return found;
+    }
+    if ((expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) && expr->a && expr->b) {
+        if (expr_first_polylog1_coefficient(expr->a, coefficient, coefficient_out))
+            return true;
+        if (expr_is_op(expr, &ops_sub)) {
+            number_t negative = num_neg(coefficient);
+            bool found = expr_first_polylog1_coefficient(expr->b, negative, coefficient_out);
+
+            num_destroy(&negative);
+            return found;
+        }
+        return expr_first_polylog1_coefficient(expr->b, coefficient, coefficient_out);
+    }
+    if (expr_is_op(expr, &ops_mul) && expr->a && expr->b) {
+        if (expr_is_const(expr->a)) {
+            number_t scaled = num_mul(coefficient, expr->a->c);
+            bool found = expr_first_polylog1_coefficient(expr->b, scaled, coefficient_out);
+
+            num_destroy(&scaled);
+            return found;
+        }
+        if (expr_is_const(expr->b)) {
+            number_t scaled = num_mul(coefficient, expr->b->c);
+            bool found = expr_first_polylog1_coefficient(expr->a, scaled, coefficient_out);
+
+            num_destroy(&scaled);
+            return found;
+        }
+    }
+    if (expr_is_op(expr, &ops_div) && expr->a && expr_is_const(expr->b)) {
+        number_t scaled = num_div(coefficient, expr->b->c);
+        bool found = expr_first_polylog1_coefficient(expr->a, scaled, coefficient_out);
+
+        num_destroy(&scaled);
+        return found;
+    }
+    return false;
+}
+
+static expr_t *expr_finite_weighted_circular_from_lerch_form(
+    const expr_t *expr, expr_finite_weighted_circular_kind_t kind)
+{
+    const expr_t *base = expr;
+    const expr_t *phi;
+    const expr_t *z;
+    const expr_t *s;
+    const expr_t *a;
+    const expr_t *x;
+    expr_t *n = NULL;
+    expr_t *candidate = NULL;
+    expr_t *normalised_candidate = NULL;
+    expr_t *sum = NULL;
+    expr_t *difference = NULL;
+    expr_t *simplified = NULL;
+    expr_t *out = NULL;
+    number_t s_value = NUM_NAN;
+    number_t polylog_coefficient = NUM_NAN;
+    bool negative = expr_is_op(expr, &ops_neg) && expr->a;
+
+    if (negative)
+        base = expr->a;
+    phi = expr_find_lerch_phi(base);
+    if (!phi || !expr_lerch_phi_unpack(phi, &z, &s, &a) || !(x = expr_circular_step_from_unit_exponential(z)))
+        return NULL;
+    s_value = expr_eval(s);
+    if (!num_is_exact(s_value) || !num_is_one(s_value))
+        goto cleanup;
+    {
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *raw_n = one ? expr_sub(a, one) : NULL;
+
+        n = raw_n ? expr_simplify(raw_n) : NULL;
+        expr_free(raw_n);
+        expr_free(one);
+    }
+    if (!n)
+        goto cleanup;
+    {
+        expr_t *index = expr_new_var(NUM_NAN);
+        expr_t *argument;
+        expr_t *numerator;
+        expr_t *term;
+        expr_t *lower;
+
+        if (index)
+            expr_set_name(index, "k");
+        argument = index ? expr_mul(index, x) : NULL;
+        numerator = argument ? (kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN ? expr_sin(argument) : expr_cos(argument))
+                             : NULL;
+        term = numerator ? expr_div(numerator, index) : NULL;
+        lower = expr_new_const(NUM_ONE);
+        sum = term && lower ? expr_new_finite_summation_range(term, index, lower, n) : NULL;
+        candidate = sum ? expr_finite_weighted_circular_lerch_form(sum, kind) : NULL;
+        expr_free(lower);
+        expr_free(term);
+        expr_free(numerator);
+        expr_free(argument);
+        expr_free(index);
+    }
+    normalised_candidate = candidate ? expr_simplify(candidate) : NULL;
+    difference = normalised_candidate ? expr_sub(base, normalised_candidate) : NULL;
+    simplified = difference ? expr_simplify(difference) : NULL;
+    if (!simplified || !expr_is_exact_zero(simplified)) {
+        expr_free(simplified);
+        expr_free(difference);
+        difference = normalised_candidate ? expr_add(base, normalised_candidate) : NULL;
+        simplified = difference ? expr_simplify(difference) : NULL;
+        if (simplified && expr_is_exact_zero(simplified)) {
+            negative = !negative;
+        } else {
+            number_t coefficient_real;
+            number_t coefficient_imaginary;
+            bool coefficient_matches;
+
+            if (!expr_first_polylog1_coefficient(base, NUM_ONE, &polylog_coefficient))
+                goto cleanup;
+            coefficient_real = num_real_part(polylog_coefficient);
+            coefficient_imaginary = num_imag_part(polylog_coefficient);
+            coefficient_matches = kind == EXPR_FINITE_WEIGHTED_CIRCULAR_COS
+                                      ? num_is_zero(coefficient_imaginary) && !num_is_zero(coefficient_real)
+                                      : num_is_zero(coefficient_real) && !num_is_zero(coefficient_imaginary);
+            if (coefficient_matches)
+                negative = kind == EXPR_FINITE_WEIGHTED_CIRCULAR_COS
+                               ? num_to_double(coefficient_real) < 0.0
+                               : num_to_double(coefficient_imaginary) > 0.0;
+            num_destroy(&coefficient_imaginary);
+            num_destroy(&coefficient_real);
+            if (!coefficient_matches)
+                goto cleanup;
+        }
+    }
+    out = negative ? expr_neg(sum) : expr_clone(sum);
+
+cleanup:
+    num_destroy(&s_value);
+    num_destroy(&polylog_coefficient);
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(normalised_candidate);
+    expr_free(candidate);
+    expr_free(sum);
+    expr_free(n);
+    return out;
+}
+
+static bool expr_finite_weighted_circular_value(const expr_t *expr, expr_finite_weighted_circular_kind_t required_kind,
+                                                number_t *value_out)
+{
+    const expr_t *sum = expr;
+    const expr_t *upper;
+    const expr_t *step;
+    long upper_value;
+    expr_finite_weighted_circular_kind_t kind;
+    bool negative;
+    expr_t *recovered = NULL;
+
+    if (!expr || !value_out)
+        return false;
+    negative = expr_is_op(expr, &ops_neg) && expr->a;
+    if (negative)
+        sum = expr->a;
+    if (!expr_finite_weighted_circular_parts(sum, &upper, &step, &kind)) {
+        recovered = expr_finite_weighted_circular_from_lerch_form(expr, required_kind);
+        sum = recovered;
+        negative = sum && expr_is_op(sum, &ops_neg) && sum->a;
+        if (negative)
+            sum = sum->a;
+    }
+    if (!sum || !expr_finite_weighted_circular_parts(sum, &upper, &step, &kind) || kind != required_kind ||
+        !expr_summation_bound_to_long(upper, &upper_value) || upper_value < 1L || upper_value > 1000000L)
+        goto failure;
+    *value_out = eval_finite_weighted_circular(step, upper_value, kind);
+    if (negative && num_is_finite(*value_out)) {
+        number_t negated = num_neg(*value_out);
+
+        num_destroy(value_out);
+        *value_out = negated;
+    }
+    expr_free(recovered);
+    return num_is_finite(*value_out);
+
+failure:
+    expr_free(recovered);
+    return false;
+}
+
+/* Evaluate a recognised finite weighted sine sum. */
+bool expr_finite_weighted_sin_lerch_value(const expr_t *expr, number_t *value_out)
+{
+    return expr_finite_weighted_circular_value(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_SIN, value_out);
+}
+
+/* Evaluate a recognised finite weighted cosine sum. */
+bool expr_finite_weighted_cos_lerch_value(const expr_t *expr, number_t *value_out)
+{
+    return expr_finite_weighted_circular_value(expr, EXPR_FINITE_WEIGHTED_CIRCULAR_COS, value_out);
+}
+
+static expr_t *expr_finite_tangent_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *exponent = imaginary_unit ? expr_mul(imaginary_unit, step) : NULL;
+    expr_t *double_exponent = exponent ? expr_mul_long(exponent, 2L) : NULL;
+    expr_t *q = double_exponent ? expr_exp(double_exponent) : NULL;
+    expr_t *q_squared = q ? expr_pow_long(q, 2L) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *psi_q_one = q && one ? expr_qdigamma(q, one) : NULL;
+    expr_t *psi_q_upper = q && upper_plus_one ? expr_qdigamma(q, upper_plus_one) : NULL;
+    expr_t *psi_q_difference = psi_q_one && psi_q_upper ? expr_sub(psi_q_one, psi_q_upper) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    expr_t *first_numerator = twice_i && psi_q_difference ? expr_mul(twice_i, psi_q_difference) : NULL;
+    expr_t *first_term = first_numerator && log_q ? expr_div(first_numerator, log_q) : NULL;
+    expr_t *psi_q2_one = q_squared && one ? expr_qdigamma(q_squared, one) : NULL;
+    expr_t *psi_q2_upper = q_squared && upper_plus_one ? expr_qdigamma(q_squared, upper_plus_one) : NULL;
+    expr_t *psi_q2_difference = psi_q2_one && psi_q2_upper ? expr_sub(psi_q2_one, psi_q2_upper) : NULL;
+    expr_t *log_q2 = q_squared ? expr_log(q_squared) : NULL;
+    expr_t *four_i = imaginary_unit ? expr_mul_long(imaginary_unit, 4L) : NULL;
+    expr_t *second_numerator = four_i && psi_q2_difference ? expr_mul(four_i, psi_q2_difference) : NULL;
+    expr_t *second_term = second_numerator && log_q2 ? expr_div(second_numerator, log_q2) : NULL;
+    expr_t *i_n = imaginary_unit ? expr_mul(imaginary_unit, upper) : NULL;
+    expr_t *first_difference = i_n && first_term ? expr_sub(i_n, first_term) : NULL;
+    expr_t *out = first_difference && second_term ? expr_add(first_difference, second_term) : NULL;
+
+    expr_free(first_difference);
+    expr_free(i_n);
+    expr_free(second_term);
+    expr_free(second_numerator);
+    expr_free(four_i);
+    expr_free(log_q2);
+    expr_free(psi_q2_difference);
+    expr_free(psi_q2_upper);
+    expr_free(psi_q2_one);
+    expr_free(first_term);
+    expr_free(first_numerator);
+    expr_free(twice_i);
+    expr_free(log_q);
+    expr_free(psi_q_difference);
+    expr_free(psi_q_upper);
+    expr_free(psi_q_one);
+    expr_free(upper_plus_one);
+    expr_free(q_squared);
+    expr_free(q);
+    expr_free(double_exponent);
+    expr_free(exponent);
+    expr_free(one);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static expr_t *expr_finite_tangent_progression_sum(const expr_t *upper, const expr_t *step)
+{
+    expr_t *index = expr_new_var(NUM_NAN);
+    expr_t *argument;
+    expr_t *term;
+    expr_t *lower;
+    expr_t *sum;
+
+    if (index)
+        expr_set_name(index, "k");
+    argument = index ? expr_mul(index, step) : NULL;
+    term = argument ? expr_tan(argument) : NULL;
+    lower = expr_new_const(NUM_ONE);
+    sum = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
+    expr_free(lower);
+    expr_free(term);
+    expr_free(argument);
+    expr_free(index);
+    return sum;
+}
+
+static expr_t *expr_finite_tanh_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *double_step = expr_mul_long(step, -2L);
+    expr_t *q = double_step ? expr_exp(double_step) : NULL;
+    expr_t *q_squared = q ? expr_pow_long(q, 2L) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *psi_q_one = q && one ? expr_qdigamma(q, one) : NULL;
+    expr_t *psi_q_upper = q && upper_plus_one ? expr_qdigamma(q, upper_plus_one) : NULL;
+    expr_t *psi_q_difference = psi_q_one && psi_q_upper ? expr_sub(psi_q_one, psi_q_upper) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *first_numerator = psi_q_difference ? expr_mul_long(psi_q_difference, 2L) : NULL;
+    expr_t *first_term = first_numerator && log_q ? expr_div(first_numerator, log_q) : NULL;
+    expr_t *psi_q2_one = q_squared && one ? expr_qdigamma(q_squared, one) : NULL;
+    expr_t *psi_q2_upper = q_squared && upper_plus_one ? expr_qdigamma(q_squared, upper_plus_one) : NULL;
+    expr_t *psi_q2_difference = psi_q2_one && psi_q2_upper ? expr_sub(psi_q2_one, psi_q2_upper) : NULL;
+    expr_t *log_q2 = q_squared ? expr_log(q_squared) : NULL;
+    expr_t *second_numerator = psi_q2_difference ? expr_mul_long(psi_q2_difference, 4L) : NULL;
+    expr_t *second_term = second_numerator && log_q2 ? expr_div(second_numerator, log_q2) : NULL;
+    expr_t *first_difference = first_term ? expr_sub(upper, first_term) : NULL;
+    expr_t *out = first_difference && second_term ? expr_add(first_difference, second_term) : NULL;
+
+    expr_free(first_difference);
+    expr_free(second_term);
+    expr_free(second_numerator);
+    expr_free(log_q2);
+    expr_free(psi_q2_difference);
+    expr_free(psi_q2_upper);
+    expr_free(psi_q2_one);
+    expr_free(first_term);
+    expr_free(first_numerator);
+    expr_free(log_q);
+    expr_free(psi_q_difference);
+    expr_free(psi_q_upper);
+    expr_free(psi_q_one);
+    expr_free(upper_plus_one);
+    expr_free(q_squared);
+    expr_free(q);
+    expr_free(double_step);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_tanh_progression_sum(const expr_t *upper, const expr_t *step)
+{
+    expr_t *index = expr_new_var(NUM_NAN);
+    expr_t *argument;
+    expr_t *term;
+    expr_t *lower;
+    expr_t *sum;
+
+    if (index)
+        expr_set_name(index, "k");
+    argument = index ? expr_mul(index, step) : NULL;
+    term = argument ? expr_tanh(argument) : NULL;
+    lower = expr_new_const(NUM_ONE);
+    sum = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
+    expr_free(lower);
+    expr_free(term);
+    expr_free(argument);
+    expr_free(index);
+    return sum;
+}
+
+static expr_t *expr_finite_qdigamma_difference(const expr_t *q, const expr_t *argument, const expr_t *upper)
+{
+    expr_t *upper_argument = expr_add(argument, upper);
+    expr_t *first = expr_qdigamma(q, argument);
+    expr_t *last = upper_argument ? expr_qdigamma(q, upper_argument) : NULL;
+    expr_t *difference = first && last ? expr_sub(first, last) : NULL;
+
+    expr_free(last);
+    expr_free(first);
+    expr_free(upper_argument);
+    return difference;
+}
+
+static expr_t *expr_finite_cot_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *exponent = imaginary_unit ? expr_mul(imaginary_unit, step) : NULL;
+    expr_t *double_exponent = exponent ? expr_mul_long(exponent, 2L) : NULL;
+    expr_t *q = double_exponent ? expr_exp(double_exponent) : NULL;
+    expr_t *difference = q && one ? expr_finite_qdigamma_difference(q, one, upper) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    expr_t *numerator = twice_i && difference ? expr_mul(twice_i, difference) : NULL;
+    expr_t *quotient = numerator && log_q ? expr_div(numerator, log_q) : NULL;
+    expr_t *i_n = imaginary_unit ? expr_mul(imaginary_unit, upper) : NULL;
+    expr_t *negative_i_n = i_n ? expr_neg(i_n) : NULL;
+    expr_t *out = negative_i_n && quotient ? expr_sub(negative_i_n, quotient) : NULL;
+
+    expr_free(negative_i_n);
+    expr_free(i_n);
+    expr_free(quotient);
+    expr_free(numerator);
+    expr_free(twice_i);
+    expr_free(log_q);
+    expr_free(difference);
+    expr_free(q);
+    expr_free(double_exponent);
+    expr_free(exponent);
+    expr_free(one);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static expr_t *expr_finite_coth_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *exponent = expr_mul_long(step, -2L);
+    expr_t *q = exponent ? expr_exp(exponent) : NULL;
+    expr_t *difference = q && one ? expr_finite_qdigamma_difference(q, one, upper) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *numerator = difference ? expr_mul_long(difference, 2L) : NULL;
+    expr_t *quotient = numerator && log_q ? expr_div(numerator, log_q) : NULL;
+    expr_t *out = quotient ? expr_add(upper, quotient) : NULL;
+
+    expr_free(quotient);
+    expr_free(numerator);
+    expr_free(log_q);
+    expr_free(difference);
+    expr_free(q);
+    expr_free(exponent);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_cosecant_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                            bool hyperbolic)
+{
+    expr_t *imaginary_unit = hyperbolic ? NULL : expr_new_named_const(NUM_I, "i");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *exponent = hyperbolic ? expr_neg(step) : (imaginary_unit ? expr_mul(imaginary_unit, step) : NULL);
+    expr_t *q = exponent ? expr_exp(exponent) : NULL;
+    expr_t *q_squared = q ? expr_pow_long(q, 2L) : NULL;
+    expr_t *difference = q && one ? expr_finite_qdigamma_difference(q, one, upper) : NULL;
+    expr_t *difference_squared = q_squared && one ? expr_finite_qdigamma_difference(q_squared, one, upper) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *log_q_squared = q_squared ? expr_log(q_squared) : NULL;
+    expr_t *coefficient = hyperbolic ? expr_new_const(NUM_TWO) : expr_mul_long(imaginary_unit, 2L);
+    expr_t *first_numerator = coefficient && difference ? expr_mul(coefficient, difference) : NULL;
+    expr_t *second_numerator = coefficient && difference_squared ? expr_mul(coefficient, difference_squared) : NULL;
+    expr_t *first = first_numerator && log_q ? expr_div(first_numerator, log_q) : NULL;
+    expr_t *second = second_numerator && log_q_squared ? expr_div(second_numerator, log_q_squared) : NULL;
+    expr_t *out = first && second ? (hyperbolic ? expr_sub(first, second) : expr_sub(second, first)) : NULL;
+
+    expr_free(second);
+    expr_free(first);
+    expr_free(second_numerator);
+    expr_free(first_numerator);
+    expr_free(coefficient);
+    expr_free(log_q_squared);
+    expr_free(log_q);
+    expr_free(difference_squared);
+    expr_free(difference);
+    expr_free(q_squared);
+    expr_free(q);
+    expr_free(exponent);
+    expr_free(one);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static expr_t *expr_finite_secant_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                          bool hyperbolic)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *exponent = hyperbolic ? expr_neg(step) : (imaginary_unit ? expr_mul(imaginary_unit, step) : NULL);
+    expr_t *q = exponent ? expr_exp(exponent) : NULL;
+    expr_t *log_q = q ? expr_log(q) : NULL;
+    expr_t *i_pi = imaginary_unit && pi ? expr_mul(imaginary_unit, pi) : NULL;
+    expr_t *twice_log_q = log_q ? expr_mul_long(log_q, 2L) : NULL;
+    expr_t *shift = i_pi && twice_log_q ? expr_div(i_pi, twice_log_q) : NULL;
+    expr_t *minus_argument = one && shift ? expr_sub(one, shift) : NULL;
+    expr_t *plus_argument = one && shift ? expr_add(one, shift) : NULL;
+    expr_t *minus_difference = q && minus_argument
+                                   ? expr_finite_qdigamma_difference(q, minus_argument, upper)
+                                   : NULL;
+    expr_t *plus_difference = q && plus_argument ? expr_finite_qdigamma_difference(q, plus_argument, upper) : NULL;
+    expr_t *difference = minus_difference && plus_difference ? expr_sub(minus_difference, plus_difference) : NULL;
+    expr_t *numerator = imaginary_unit && difference ? expr_mul(imaginary_unit, difference) : NULL;
+    expr_t *out = numerator && log_q ? expr_div(numerator, log_q) : NULL;
+
+    expr_free(numerator);
+    expr_free(difference);
+    expr_free(plus_difference);
+    expr_free(minus_difference);
+    expr_free(plus_argument);
+    expr_free(minus_argument);
+    expr_free(shift);
+    expr_free(twice_log_q);
+    expr_free(i_pi);
+    expr_free(log_q);
+    expr_free(q);
+    expr_free(exponent);
+    expr_free(one);
+    expr_free(pi);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static expr_t *expr_finite_progression_sum(const expr_t *upper, const expr_t *step,
+                                           expr_finite_progression_kind_t kind)
+{
+    expr_t *index = expr_new_var(NUM_NAN);
+    expr_t *argument;
+    expr_t *term = NULL;
+    expr_t *lower;
+    expr_t *sum;
+
+    if (index)
+        expr_set_name(index, "k");
+    argument = index ? expr_mul(index, step) : NULL;
+    if (argument) {
+        switch (kind) {
+            case EXPR_FINITE_PROGRESSION_TAN:
+                term = expr_tan(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_COT:
+                term = expr_cot(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_SEC:
+                term = expr_sec(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_COSEC:
+                term = expr_cosec(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_TANH:
+                term = expr_tanh(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_COTH:
+                term = expr_coth(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_SECH:
+                term = expr_sech(argument);
+                break;
+            case EXPR_FINITE_PROGRESSION_COSECH:
+                term = expr_cosech(argument);
+                break;
+            default:
+                break;
+        }
+    }
+    lower = expr_new_const(NUM_ONE);
+    sum = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
+    expr_free(lower);
+    expr_free(term);
+    expr_free(argument);
+    expr_free(index);
+    return sum;
+}
+
+static void expr_collect_qdigammas(const expr_t *expr, const expr_t **items, size_t capacity, size_t *count)
+{
+    if (!expr || !items || !count || *count >= capacity)
+        return;
+    if (expr_is_op(expr, &ops_qdigamma))
+        items[(*count)++] = expr;
+    expr_collect_qdigammas(expr->a, items, capacity, count);
+    expr_collect_qdigammas(expr->b, items, capacity, count);
+}
+
+static bool expr_contains_imaginary_unit(const expr_t *expr);
+
+static expr_t *expr_euler_base_step(const expr_t *q)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *cosine;
+    const expr_t *imaginary_term;
+    const expr_t *sine;
+    bool subtract;
+
+    if (!expr_match_add_sub_expr(q, &left, &right, &subtract) || subtract)
+        return NULL;
+    if (expr_is_op(left, &ops_cos)) {
+        cosine = left;
+        imaginary_term = right;
+    } else if (expr_is_op(right, &ops_cos)) {
+        cosine = right;
+        imaginary_term = left;
+    } else {
+        return NULL;
+    }
+    if (expr_is_op(imaginary_term, &ops_sin))
+        sine = imaginary_term;
+    else if (imaginary_term && expr_is_op(imaginary_term->a, &ops_sin))
+        sine = imaginary_term->a;
+    else if (imaginary_term && expr_is_op(imaginary_term->b, &ops_sin))
+        sine = imaginary_term->b;
+    else
+        return NULL;
+    if (!expr_contains_imaginary_unit(imaginary_term) || !expr_struct_eq(cosine->a, sine->a))
+        return NULL;
+    return expr_clone(cosine->a);
+}
+
+static bool expr_contains_imaginary_unit(const expr_t *expr)
+{
+    number_t value;
+    bool matched;
+
+    if (!expr)
+        return false;
+    value = expr_eval((expr_t *)expr);
+    matched = !expr->a && !expr->b && num_eq(value, NUM_I);
+    num_destroy(&value);
+    return matched || expr_contains_imaginary_unit(expr->a) || expr_contains_imaginary_unit(expr->b);
+}
+
+static bool expr_q_base_is_circular(const expr_t *q)
+{
+    expr_t *euler_step = expr_euler_base_step(q);
+    const bool circular = euler_step != NULL || (expr_is_op(q, &ops_exp) && expr_contains_imaginary_unit(q->a));
+
+    expr_free(euler_step);
+    return circular;
+}
+
+static bool expr_is_exact_one_value(const expr_t *expr)
+{
+    number_t value = expr_eval((expr_t *)expr);
+    const bool one = num_is_exact(value) && num_is_one(value);
+
+    num_destroy(&value);
+    return one;
+}
+
+static expr_t *expr_finite_progression_step_from_q(const expr_t *q, expr_finite_progression_kind_t kind)
+{
+    expr_t *imaginary_unit = NULL;
+    expr_t *divisor = NULL;
+    expr_t *raw_step = NULL;
+    expr_t *step = NULL;
+
+    if (!q)
+        return NULL;
+    if (!expr_is_op(q, &ops_exp) || !q->a) {
+        expr_t *euler_step = expr_euler_base_step(q);
+
+        if (!euler_step || (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
+                            kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC)) {
+            expr_free(euler_step);
+            return NULL;
+        }
+        if (kind == EXPR_FINITE_PROGRESSION_TAN || kind == EXPR_FINITE_PROGRESSION_COT) {
+            expr_t *half_step = expr_div_long(euler_step, 2L);
+
+            expr_free(euler_step);
+            euler_step = half_step;
+        }
+        return euler_step;
+    }
+    if (kind == EXPR_FINITE_PROGRESSION_SEC || kind == EXPR_FINITE_PROGRESSION_COSEC) {
+        const expr_t *left;
+        const expr_t *right;
+        const expr_t *exponent = q->a;
+        bool negate_step = false;
+
+        while (expr_is_op(exponent, &ops_neg) && exponent->a) {
+            negate_step = !negate_step;
+            exponent = exponent->a;
+        }
+
+        if (expr_match_mul_expr(exponent, &left, &right)) {
+            number_t left_value = expr_eval((expr_t *)left);
+            number_t right_value = expr_eval((expr_t *)right);
+            const expr_t *step_source = num_eq(left_value, NUM_I) ? right
+                                        : num_eq(right_value, NUM_I) ? left
+                                                                    : NULL;
+            expr_t *circular_step = expr_clone(step_source);
+
+            num_destroy(&right_value);
+            num_destroy(&left_value);
+            if (circular_step && negate_step) {
+                expr_t *negative_step = expr_neg(circular_step);
+
+                expr_free(circular_step);
+                circular_step = negative_step;
+            }
+            if (circular_step)
+                return circular_step;
+        }
+        imaginary_unit = expr_new_named_const(NUM_I, "i");
+        divisor = imaginary_unit ? expr_neg(imaginary_unit) : NULL;
+        raw_step = divisor ? expr_mul(q->a, divisor) : NULL;
+        step = raw_step ? expr_simplify(raw_step) : NULL;
+        expr_free(raw_step);
+        expr_free(divisor);
+        expr_free(imaginary_unit);
+        return step;
+    }
+    switch (kind) {
+        case EXPR_FINITE_PROGRESSION_TAN:
+        case EXPR_FINITE_PROGRESSION_COT:
+            imaginary_unit = expr_new_named_const(NUM_I, "i");
+            divisor = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+            break;
+
+        case EXPR_FINITE_PROGRESSION_SEC:
+        case EXPR_FINITE_PROGRESSION_COSEC:
+            divisor = expr_new_named_const(NUM_I, "i");
+            break;
+
+        case EXPR_FINITE_PROGRESSION_TANH:
+        case EXPR_FINITE_PROGRESSION_COTH:
+            divisor = expr_new_const(NUM_TWO);
+            break;
+
+        case EXPR_FINITE_PROGRESSION_SECH:
+        case EXPR_FINITE_PROGRESSION_COSECH:
+            divisor = expr_new_const(NUM_NEG_ONE);
+            break;
+
+        default:
+            break;
+    }
+    raw_step = divisor ? expr_div(q->a, divisor) : NULL;
+    if (raw_step && (kind == EXPR_FINITE_PROGRESSION_TANH || kind == EXPR_FINITE_PROGRESSION_COTH)) {
+        expr_t *negative_step = expr_neg(raw_step);
+
+        expr_free(raw_step);
+        raw_step = negative_step;
+    }
+    step = raw_step ? expr_simplify(raw_step) : NULL;
+    expr_free(raw_step);
+    expr_free(divisor);
+    expr_free(imaginary_unit);
+    return step;
+}
+
+static bool expr_matches_finite_qdigamma_candidate(const expr_t *expr, const expr_t *candidate)
+{
+    expr_t *difference;
+    expr_t *simplified;
+    bool matched;
+
+    if (!expr || !candidate)
+        return false;
+    if (expr_struct_eq(expr, candidate))
+        return true;
+    difference = expr_sub(expr, candidate);
+    simplified = difference ? expr_simplify(difference) : NULL;
+    matched = simplified && expr_is_exact_zero(simplified);
+    expr_free(simplified);
+    expr_free(difference);
+    return matched;
+}
+
+/* Recover any supported finite quotient progression represented by its q-digamma identity. */
+expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr)
+{
+    const expr_t *qdigammas[16];
+    size_t count = 0u;
+
+    if (!expr)
+        return NULL;
+    expr_collect_qdigammas(expr, qdigammas, sizeof(qdigammas) / sizeof(qdigammas[0]), &count);
+    for (size_t first = 0u; first < count; ++first) {
+        for (size_t second = first + 1u; second < count; ++second) {
+            expr_t *raw_upper;
+            expr_t *upper;
+
+            if (!expr_struct_eq(qdigammas[first]->a, qdigammas[second]->a))
+                continue;
+            raw_upper = expr_sub(qdigammas[second]->b, qdigammas[first]->b);
+            upper = raw_upper ? expr_simplify(raw_upper) : NULL;
+            expr_free(raw_upper);
+            if (!upper)
+                continue;
+            for (unsigned orientation = 0u; orientation < 2u; ++orientation) {
+                expr_t *oriented_upper = orientation == 0u ? expr_clone(upper) : expr_neg(upper);
+
+                for (expr_finite_progression_kind_t kind = EXPR_FINITE_PROGRESSION_TAN;
+                     kind <= EXPR_FINITE_PROGRESSION_COSECH; ++kind) {
+                    expr_t *step;
+                    expr_t *candidate;
+                    expr_t *sum;
+
+                    if (!expr_finite_progression_has_qdigamma_form(kind))
+                        continue;
+                    step = expr_finite_progression_step_from_q(qdigammas[first]->a, kind);
+                    candidate = step ? expr_finite_qdigamma_progression_closed_form(oriented_upper, step, kind) : NULL;
+                    if (!(count >= 4u && !expr_is_exact_one_value(qdigammas[first]->b) &&
+                          ((kind == EXPR_FINITE_PROGRESSION_SEC &&
+                                           expr_q_base_is_circular(qdigammas[first]->a)) ||
+                                          (kind == EXPR_FINITE_PROGRESSION_SECH &&
+                                           !expr_q_base_is_circular(qdigammas[first]->a)))) &&
+                        !expr_matches_finite_qdigamma_candidate(expr, candidate)) {
+                        expr_free(candidate);
+                        expr_free(step);
+                        continue;
+                    }
+                    sum = expr_finite_progression_sum(oriented_upper, step, kind);
+                    expr_free(candidate);
+                    expr_free(step);
+                    expr_free(oriented_upper);
+                    expr_free(upper);
+                    return sum;
+                }
+                expr_free(oriented_upper);
+            }
+            expr_free(upper);
+        }
+    }
+    return NULL;
+}
+
+/* Recover a finite tangent progression represented by its q-digamma identity. */
+expr_t *expr_finite_tangent_from_qdigamma_form(const expr_t *expr)
+{
+    const expr_t *qdigamma = expr_find_qdigamma_with_symbolic_argument(expr);
+    const expr_t *q;
+    expr_t *one = NULL;
+    expr_t *raw_upper = NULL;
+    expr_t *upper = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *twice_i = NULL;
+    expr_t *raw_step = NULL;
+    expr_t *step = NULL;
+    expr_t *sum = NULL;
+    expr_t *candidate = NULL;
+    expr_t *difference = NULL;
+    expr_t *simplified = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !qdigamma || !(q = qdigamma->a) || !expr_is_op(q, &ops_exp) || !q->a)
+        return NULL;
+    one = expr_new_const(NUM_ONE);
+    raw_upper = one ? expr_sub(qdigamma->b, one) : NULL;
+    upper = raw_upper ? expr_simplify(raw_upper) : NULL;
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    raw_step = twice_i ? expr_div(q->a, twice_i) : NULL;
+    step = raw_step ? expr_simplify(raw_step) : NULL;
+    sum = upper && step ? expr_finite_tangent_progression_sum(upper, step) : NULL;
+    candidate = upper && step ? expr_finite_tangent_progression_closed_form(upper, step) : NULL;
+    if (!sum || !candidate)
+        goto cleanup;
+    if (!expr_struct_eq(expr, candidate)) {
+        difference = expr_sub(expr, candidate);
+        simplified = difference ? expr_simplify(difference) : NULL;
+        if (!simplified || !expr_is_exact_zero(simplified))
+            goto cleanup;
+    }
+    out = sum;
+    sum = NULL;
+
+cleanup:
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(candidate);
+    expr_free(sum);
+    expr_free(step);
+    expr_free(raw_step);
+    expr_free(twice_i);
+    expr_free(imaginary_unit);
+    expr_free(upper);
+    expr_free(raw_upper);
+    expr_free(one);
+    return out;
+}
+
+/* Recover a finite hyperbolic-tangent progression represented by its q-digamma identity. */
+expr_t *expr_finite_tanh_from_qdigamma_form(const expr_t *expr)
+{
+    const expr_t *qdigamma = expr_find_qdigamma_with_symbolic_argument(expr);
+    const expr_t *q;
+    expr_t *one = NULL;
+    expr_t *raw_upper = NULL;
+    expr_t *upper = NULL;
+    expr_t *raw_step = NULL;
+    expr_t *step = NULL;
+    expr_t *sum = NULL;
+    expr_t *candidate = NULL;
+    expr_t *difference = NULL;
+    expr_t *simplified = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !qdigamma || !(q = qdigamma->a) || !expr_is_op(q, &ops_exp) || !q->a)
+        return NULL;
+    one = expr_new_const(NUM_ONE);
+    raw_upper = one ? expr_sub(qdigamma->b, one) : NULL;
+    upper = raw_upper ? expr_simplify(raw_upper) : NULL;
+    raw_step = expr_div_long(q->a, -2L);
+    step = raw_step ? expr_simplify(raw_step) : NULL;
+    sum = upper && step ? expr_finite_tanh_progression_sum(upper, step) : NULL;
+    candidate = upper && step ? expr_finite_tanh_progression_closed_form(upper, step) : NULL;
+    if (!sum || !candidate)
+        goto cleanup;
+    if (!expr_struct_eq(expr, candidate)) {
+        difference = expr_sub(expr, candidate);
+        simplified = difference ? expr_simplify(difference) : NULL;
+        if (!simplified || !expr_is_exact_zero(simplified))
+            goto cleanup;
+    }
+    out = sum;
+    sum = NULL;
+
+cleanup:
+    expr_free(simplified);
+    expr_free(difference);
+    expr_free(candidate);
+    expr_free(sum);
+    expr_free(step);
+    expr_free(raw_step);
+    expr_free(upper);
+    expr_free(raw_upper);
+    expr_free(one);
+    return out;
+}
+
+/* Return whether an expression is the recognised finite tangent q-digamma identity. */
+bool expr_is_finite_tangent_qdigamma_form(const expr_t *expr)
+{
+    expr_t *sum = expr_finite_tangent_from_qdigamma_form(expr);
+    const bool matched = sum != NULL;
+
+    expr_free(sum);
+    return matched;
+}
+
+/* Evaluate a recognised finite tangent q-digamma identity through its finite real sum. */
+bool expr_finite_tangent_qdigamma_value(const expr_t *expr, number_t *value_out)
+{
+    expr_t *sum;
+    const expr_t *upper;
+    const expr_t *step;
+    expr_finite_progression_kind_t kind;
+    long upper_value;
+
+    if (!value_out || !(sum = expr_finite_tangent_from_qdigamma_form(expr)))
+        return false;
+    if (!expr_finite_progression_parts(sum, &upper, &step, &kind) || kind != EXPR_FINITE_PROGRESSION_TAN ||
+        !expr_summation_bound_to_long(upper, &upper_value)) {
+        expr_free(sum);
+        return false;
+    }
+    (void)step;
+    *value_out = eval_finite_qdigamma_progression(sum, upper_value);
+    expr_free(sum);
+    return num_is_finite(*value_out);
+}
+
+/* Evaluate any recognised finite quotient-progression q-digamma identity through its finite sum. */
+bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_out)
+{
+    expr_t *sum;
+    const expr_t *upper;
+    const expr_t *step;
+    expr_finite_progression_kind_t kind;
+    long upper_value;
+
+    if (!value_out || !(sum = expr_finite_progression_from_qdigamma_form(expr)))
+        return false;
+    if (!expr_finite_progression_parts(sum, &upper, &step, &kind) ||
+        (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
+         kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC &&
+         kind != EXPR_FINITE_PROGRESSION_SECH) ||
+        !expr_summation_bound_to_long(upper, &upper_value)) {
+        expr_free(sum);
+        return false;
+    }
+    (void)step;
+    *value_out = eval_finite_qdigamma_progression(sum, upper_value);
     expr_free(sum);
     return num_is_finite(*value_out);
 }
@@ -606,6 +2124,39 @@ bool expr_finite_weighted_sinh_lerch_value(const expr_t *expr, number_t *value_o
 static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, expr_t *term, expr_t *bounds)
 {
     return expr_simplify_binary_operator(expr, term, bounds);
+}
+
+static bool expr_finite_progression_has_qdigamma_form(expr_finite_progression_kind_t kind)
+{
+    return kind == EXPR_FINITE_PROGRESSION_TAN || kind == EXPR_FINITE_PROGRESSION_COT ||
+           kind == EXPR_FINITE_PROGRESSION_SEC || kind == EXPR_FINITE_PROGRESSION_COSEC ||
+           kind == EXPR_FINITE_PROGRESSION_TANH || kind == EXPR_FINITE_PROGRESSION_COTH ||
+           kind == EXPR_FINITE_PROGRESSION_SECH || kind == EXPR_FINITE_PROGRESSION_COSECH;
+}
+
+static expr_t *expr_finite_qdigamma_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                            expr_finite_progression_kind_t kind)
+{
+    switch (kind) {
+        case EXPR_FINITE_PROGRESSION_TAN:
+            return expr_finite_tangent_progression_closed_form(upper, step);
+        case EXPR_FINITE_PROGRESSION_COT:
+            return expr_finite_cot_progression_closed_form(upper, step);
+        case EXPR_FINITE_PROGRESSION_SEC:
+            return expr_finite_secant_progression_closed_form(upper, step, false);
+        case EXPR_FINITE_PROGRESSION_COSEC:
+            return expr_finite_cosecant_progression_closed_form(upper, step, false);
+        case EXPR_FINITE_PROGRESSION_TANH:
+            return expr_finite_tanh_progression_closed_form(upper, step);
+        case EXPR_FINITE_PROGRESSION_COTH:
+            return expr_finite_coth_progression_closed_form(upper, step);
+        case EXPR_FINITE_PROGRESSION_SECH:
+            return expr_finite_secant_progression_closed_form(upper, step, true);
+        case EXPR_FINITE_PROGRESSION_COSECH:
+            return expr_finite_cosecant_progression_closed_form(upper, step, true);
+        default:
+            return NULL;
+    }
 }
 
 /* Return the closed form of a recognised finite circular or hyperbolic progression. */
@@ -628,6 +2179,8 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
 
     if (!expr_finite_progression_parts(expr, &upper, &step, &kind))
         return NULL;
+    if (expr_finite_progression_has_qdigamma_form(kind))
+        return expr_finite_qdigamma_progression_closed_form(upper, step, kind);
     upper_times_step = expr_mul(upper, step);
     first_argument = upper_times_step ? expr_div_long(upper_times_step, 2L) : NULL;
     upper_plus_one = expr_add_long(upper, 1L);
@@ -685,6 +2238,24 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
 
     if (!step->name || !*step->name)
         return NULL;
+    if (expr_finite_progression_has_qdigamma_form(kind)) {
+        expr_t *closed_form = expr_finite_qdigamma_progression_closed_form(upper, step, kind);
+        char *closed_form_TeX = closed_form ? expr_to_TeX_body(closed_form) : NULL;
+
+        summation_TeX = expr_to_TeX_body(expr);
+        if (summation_TeX && closed_form_TeX) {
+            const char *format = "%s = %s";
+            const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, closed_form_TeX) + 1u;
+
+            identity_TeX = malloc(length);
+            if (identity_TeX)
+                snprintf(identity_TeX, length, format, summation_TeX, closed_form_TeX);
+        }
+        free(closed_form_TeX);
+        free(summation_TeX);
+        expr_free(closed_form);
+        return identity_TeX;
+    }
     symbolic_step = expr_new_named_var(NUM_NAN, step->name);
     summation_TeX = expr_to_TeX_body(expr);
     upper_TeX = expr_to_TeX_body(upper);
@@ -834,7 +2405,8 @@ const expr_ops_t ops_atan2 = {.eval = eval_atan2,
                               .reverse = expr_reverse_atan2,
                               .kind = EXPR_KIND_ATAN2,
                               .arity = EXPR_OP_BINARY,
-                              .name = "atan2",
+                              .expression_name = "atan2",
+                              .function_name = "atan2",
                               .TeX_name = "\\operatorname{atan2}",
                               .apply_unary = NULL,
                               .apply_binary = expr_atan2,
@@ -846,7 +2418,8 @@ const expr_ops_t ops_sin = {.eval = eval_sin,
                             .reverse = expr_reverse_sin,
                             .kind = EXPR_KIND_SIN,
                             .arity = EXPR_OP_UNARY,
-                            .name = "sin",
+                            .expression_name = "sin",
+                            .function_name = "sin",
                             .TeX_name = "\\sin",
                             .direct_inverse = &ops_asin,
                             .inverse_unary = expr_asin,
@@ -860,7 +2433,8 @@ const expr_ops_t ops_cos = {.eval = eval_cos,
                             .reverse = expr_reverse_cos,
                             .kind = EXPR_KIND_COS,
                             .arity = EXPR_OP_UNARY,
-                            .name = "cos",
+                            .expression_name = "cos",
+                            .function_name = "cos",
                             .TeX_name = "\\cos",
                             .direct_inverse = &ops_acos,
                             .inverse_unary = expr_acos,
@@ -874,7 +2448,8 @@ const expr_ops_t ops_tan = {.eval = eval_tan,
                             .reverse = expr_reverse_tan,
                             .kind = EXPR_KIND_TAN,
                             .arity = EXPR_OP_UNARY,
-                            .name = "tan",
+                            .expression_name = "tan",
+                            .function_name = "tan",
                             .TeX_name = "\\tan",
                             .direct_inverse = &ops_atan,
                             .inverse_unary = expr_atan,
@@ -888,7 +2463,8 @@ const expr_ops_t ops_sec = {.eval = eval_sec,
                             .reverse = expr_reverse_sec,
                             .kind = EXPR_KIND_SEC,
                             .arity = EXPR_OP_UNARY,
-                            .name = "sec",
+                            .expression_name = "sec",
+                            .function_name = "sec",
                             .TeX_name = "\\sec",
                             .direct_inverse = &ops_asec,
                             .inverse_unary = expr_asec,
@@ -902,7 +2478,8 @@ const expr_ops_t ops_cosec = {.eval = eval_cosec,
                               .reverse = expr_reverse_cosec,
                               .kind = EXPR_KIND_COSEC,
                               .arity = EXPR_OP_UNARY,
-                              .name = "cosec",
+                              .expression_name = "cosec",
+                              .function_name = "cosec",
                               .TeX_name = "\\operatorname{cosec}",
                               .direct_inverse = &ops_acosec,
                               .inverse_unary = expr_acosec,
@@ -916,7 +2493,8 @@ const expr_ops_t ops_cot = {.eval = eval_cot,
                             .reverse = expr_reverse_cot,
                             .kind = EXPR_KIND_COT,
                             .arity = EXPR_OP_UNARY,
-                            .name = "cot",
+                            .expression_name = "cot",
+                            .function_name = "cot",
                             .TeX_name = "\\cot",
                             .direct_inverse = &ops_acot,
                             .inverse_unary = expr_acot,
@@ -930,7 +2508,8 @@ const expr_ops_t ops_versin = {.eval = eval_versin,
                                .reverse = expr_reverse_versin,
                                .kind = EXPR_KIND_VERSIN,
                                .arity = EXPR_OP_UNARY,
-                               .name = "versin",
+                               .expression_name = "versin",
+                               .function_name = "versin",
                                .TeX_name = "\\operatorname{versin}",
                                .direct_inverse = &ops_arcversin,
                                .inverse_unary = expr_arcversin,
@@ -943,7 +2522,8 @@ const expr_ops_t ops_vercos = {.eval = eval_vercos,
                                .reverse = expr_reverse_vercos,
                                .kind = EXPR_KIND_VERCOS,
                                .arity = EXPR_OP_UNARY,
-                               .name = "vercos",
+                               .expression_name = "vercos",
+                               .function_name = "vercos",
                                .TeX_name = "\\operatorname{vercos}",
                                .direct_inverse = &ops_arcvercos,
                                .inverse_unary = expr_arcvercos,
@@ -956,7 +2536,8 @@ const expr_ops_t ops_coversin = {.eval = eval_coversin,
                                  .reverse = expr_reverse_coversin,
                                  .kind = EXPR_KIND_COVERSIN,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "coversin",
+                                 .expression_name = "coversin",
+                                 .function_name = "coversin",
                                  .TeX_name = "\\operatorname{coversin}",
                                  .direct_inverse = &ops_arccoversin,
                                  .inverse_unary = expr_arccoversin,
@@ -969,7 +2550,8 @@ const expr_ops_t ops_covercos = {.eval = eval_covercos,
                                  .reverse = expr_reverse_covercos,
                                  .kind = EXPR_KIND_COVERCOS,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "covercos",
+                                 .expression_name = "covercos",
+                                 .function_name = "covercos",
                                  .TeX_name = "\\operatorname{covercos}",
                                  .direct_inverse = &ops_arccovercos,
                                  .inverse_unary = expr_arccovercos,
@@ -982,7 +2564,8 @@ const expr_ops_t ops_haversin = {.eval = eval_haversin,
                                  .reverse = expr_reverse_haversin,
                                  .kind = EXPR_KIND_HAVERSIN,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "haversin",
+                                 .expression_name = "haversin",
+                                 .function_name = "haversin",
                                  .TeX_name = "\\operatorname{haversin}",
                                  .direct_inverse = &ops_archaversin,
                                  .inverse_unary = expr_archaversin,
@@ -995,7 +2578,8 @@ const expr_ops_t ops_havercos = {.eval = eval_havercos,
                                  .reverse = expr_reverse_havercos,
                                  .kind = EXPR_KIND_HAVERCOS,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "havercos",
+                                 .expression_name = "havercos",
+                                 .function_name = "havercos",
                                  .TeX_name = "\\operatorname{havercos}",
                                  .direct_inverse = &ops_archavercos,
                                  .inverse_unary = expr_archavercos,
@@ -1008,7 +2592,8 @@ const expr_ops_t ops_hacoversin = {.eval = eval_hacoversin,
                                    .reverse = expr_reverse_hacoversin,
                                    .kind = EXPR_KIND_HACOVERSIN,
                                    .arity = EXPR_OP_UNARY,
-                                   .name = "hacoversin",
+                                   .expression_name = "hacoversin",
+                                   .function_name = "hacoversin",
                                    .TeX_name = "\\operatorname{hacoversin}",
                                    .direct_inverse = &ops_archacoversin,
                                    .inverse_unary = expr_archacoversin,
@@ -1021,7 +2606,8 @@ const expr_ops_t ops_hacovercos = {.eval = eval_hacovercos,
                                    .reverse = expr_reverse_hacovercos,
                                    .kind = EXPR_KIND_HACOVERCOS,
                                    .arity = EXPR_OP_UNARY,
-                                   .name = "hacovercos",
+                                   .expression_name = "hacovercos",
+                                   .function_name = "hacovercos",
                                    .TeX_name = "\\operatorname{hacovercos}",
                                    .direct_inverse = &ops_archacovercos,
                                    .inverse_unary = expr_archacovercos,
@@ -1034,7 +2620,8 @@ const expr_ops_t ops_sinh = {.eval = eval_sinh,
                              .reverse = expr_reverse_sinh,
                              .kind = EXPR_KIND_SINH,
                              .arity = EXPR_OP_UNARY,
-                             .name = "sinh",
+                             .expression_name = "sinh",
+                             .function_name = "sinh",
                              .TeX_name = "\\sinh",
                              .direct_inverse = &ops_asinh,
                              .inverse_unary = expr_asinh,
@@ -1048,7 +2635,8 @@ const expr_ops_t ops_cosh = {.eval = eval_cosh,
                              .reverse = expr_reverse_cosh,
                              .kind = EXPR_KIND_COSH,
                              .arity = EXPR_OP_UNARY,
-                             .name = "cosh",
+                             .expression_name = "cosh",
+                             .function_name = "cosh",
                              .TeX_name = "\\cosh",
                              .direct_inverse = &ops_acosh,
                              .inverse_unary = expr_acosh,
@@ -1062,7 +2650,8 @@ const expr_ops_t ops_tanh = {.eval = eval_tanh,
                              .reverse = expr_reverse_tanh,
                              .kind = EXPR_KIND_TANH,
                              .arity = EXPR_OP_UNARY,
-                             .name = "tanh",
+                             .expression_name = "tanh",
+                             .function_name = "tanh",
                              .TeX_name = "\\tanh",
                              .direct_inverse = &ops_atanh,
                              .inverse_unary = expr_atanh,
@@ -1076,7 +2665,8 @@ const expr_ops_t ops_sech = {.eval = eval_sech,
                              .reverse = expr_reverse_sech,
                              .kind = EXPR_KIND_SECH,
                              .arity = EXPR_OP_UNARY,
-                             .name = "sech",
+                             .expression_name = "sech",
+                             .function_name = "sech",
                              .TeX_name = "\\operatorname{sech}",
                              .direct_inverse = &ops_asech,
                              .inverse_unary = expr_asech,
@@ -1090,7 +2680,8 @@ const expr_ops_t ops_cosech = {.eval = eval_cosech,
                                .reverse = expr_reverse_cosech,
                                .kind = EXPR_KIND_COSECH,
                                .arity = EXPR_OP_UNARY,
-                               .name = "cosech",
+                               .expression_name = "cosech",
+                               .function_name = "cosech",
                                .TeX_name = "\\operatorname{cosech}",
                                .direct_inverse = &ops_acosech,
                                .inverse_unary = expr_acosech,
@@ -1104,7 +2695,8 @@ const expr_ops_t ops_coth = {.eval = eval_coth,
                              .reverse = expr_reverse_coth,
                              .kind = EXPR_KIND_COTH,
                              .arity = EXPR_OP_UNARY,
-                             .name = "coth",
+                             .expression_name = "coth",
+                             .function_name = "coth",
                              .TeX_name = "\\coth",
                              .direct_inverse = &ops_acoth,
                              .inverse_unary = expr_acoth,
@@ -1118,7 +2710,8 @@ const expr_ops_t ops_asin = {.eval = eval_asin,
                              .reverse = expr_reverse_asin,
                              .kind = EXPR_KIND_ASIN,
                              .arity = EXPR_OP_UNARY,
-                             .name = "asin",
+                             .expression_name = "asin",
+                             .function_name = "asin",
                              .TeX_name = "\\sin^{-1}",
                              .inverse_unary = expr_sin,
                              .apply_unary = expr_asin,
@@ -1131,7 +2724,8 @@ const expr_ops_t ops_acos = {.eval = eval_acos,
                              .reverse = expr_reverse_acos,
                              .kind = EXPR_KIND_ACOS,
                              .arity = EXPR_OP_UNARY,
-                             .name = "acos",
+                             .expression_name = "acos",
+                             .function_name = "acos",
                              .TeX_name = "\\cos^{-1}",
                              .inverse_unary = expr_cos,
                              .apply_unary = expr_acos,
@@ -1144,7 +2738,8 @@ const expr_ops_t ops_atan = {.eval = eval_atan,
                              .reverse = expr_reverse_atan,
                              .kind = EXPR_KIND_ATAN,
                              .arity = EXPR_OP_UNARY,
-                             .name = "atan",
+                             .expression_name = "atan",
+                             .function_name = "atan",
                              .TeX_name = "\\arctan",
                              .inverse_unary = expr_tan,
                              .apply_unary = expr_atan,
@@ -1157,7 +2752,8 @@ const expr_ops_t ops_asec = {.eval = eval_asec,
                              .reverse = expr_reverse_asec,
                              .kind = EXPR_KIND_ASEC,
                              .arity = EXPR_OP_UNARY,
-                             .name = "asec",
+                             .expression_name = "asec",
+                             .function_name = "asec",
                              .TeX_name = "\\sec^{-1}",
                              .inverse_unary = expr_sec,
                              .apply_unary = expr_asec,
@@ -1170,7 +2766,8 @@ const expr_ops_t ops_acosec = {.eval = eval_acosec,
                                .reverse = expr_reverse_acosec,
                                .kind = EXPR_KIND_ACOSEC,
                                .arity = EXPR_OP_UNARY,
-                               .name = "acosec",
+                               .expression_name = "acosec",
+                               .function_name = "acosec",
                                .TeX_name = "\\operatorname{cosec}^{-1}",
                                .inverse_unary = expr_cosec,
                                .apply_unary = expr_acosec,
@@ -1183,7 +2780,8 @@ const expr_ops_t ops_acot = {.eval = eval_acot,
                              .reverse = expr_reverse_acot,
                              .kind = EXPR_KIND_ACOT,
                              .arity = EXPR_OP_UNARY,
-                             .name = "acot",
+                             .expression_name = "acot",
+                             .function_name = "acot",
                              .TeX_name = "\\cot^{-1}",
                              .inverse_unary = expr_cot,
                              .apply_unary = expr_acot,
@@ -1196,7 +2794,8 @@ const expr_ops_t ops_arcversin = {.eval = eval_arcversin,
                                   .reverse = expr_reverse_arcversin,
                                   .kind = EXPR_KIND_ARCVERSIN,
                                   .arity = EXPR_OP_UNARY,
-                                  .name = "arcversin",
+                                  .expression_name = "arcversin",
+                                  .function_name = "arcversin",
                                   .TeX_name = "\\operatorname{arcversin}",
                                   .inverse_unary = expr_versin,
                                   .apply_unary = expr_arcversin,
@@ -1208,7 +2807,8 @@ const expr_ops_t ops_arcvercos = {.eval = eval_arcvercos,
                                   .reverse = expr_reverse_arcvercos,
                                   .kind = EXPR_KIND_ARCVERCOS,
                                   .arity = EXPR_OP_UNARY,
-                                  .name = "arcvercos",
+                                  .expression_name = "arcvercos",
+                                  .function_name = "arcvercos",
                                   .TeX_name = "\\operatorname{arcvercos}",
                                   .inverse_unary = expr_vercos,
                                   .apply_unary = expr_arcvercos,
@@ -1220,7 +2820,8 @@ const expr_ops_t ops_arccoversin = {.eval = eval_arccoversin,
                                     .reverse = expr_reverse_arccoversin,
                                     .kind = EXPR_KIND_ARCCOVERSIN,
                                     .arity = EXPR_OP_UNARY,
-                                    .name = "arccoversin",
+                                    .expression_name = "arccoversin",
+                                    .function_name = "arccoversin",
                                     .TeX_name = "\\operatorname{arccoversin}",
                                     .inverse_unary = expr_coversin,
                                     .apply_unary = expr_arccoversin,
@@ -1232,7 +2833,8 @@ const expr_ops_t ops_arccovercos = {.eval = eval_arccovercos,
                                     .reverse = expr_reverse_arccovercos,
                                     .kind = EXPR_KIND_ARCCOVERCOS,
                                     .arity = EXPR_OP_UNARY,
-                                    .name = "arccovercos",
+                                    .expression_name = "arccovercos",
+                                    .function_name = "arccovercos",
                                     .TeX_name = "\\operatorname{arccovercos}",
                                     .inverse_unary = expr_covercos,
                                     .apply_unary = expr_arccovercos,
@@ -1244,7 +2846,8 @@ const expr_ops_t ops_archaversin = {.eval = eval_archaversin,
                                     .reverse = expr_reverse_archaversin,
                                     .kind = EXPR_KIND_ARCHAVERSIN,
                                     .arity = EXPR_OP_UNARY,
-                                    .name = "archaversin",
+                                    .expression_name = "archaversin",
+                                    .function_name = "archaversin",
                                     .TeX_name = "\\operatorname{archaversin}",
                                     .inverse_unary = expr_haversin,
                                     .apply_unary = expr_archaversin,
@@ -1256,7 +2859,8 @@ const expr_ops_t ops_archavercos = {.eval = eval_archavercos,
                                     .reverse = expr_reverse_archavercos,
                                     .kind = EXPR_KIND_ARCHAVERCOS,
                                     .arity = EXPR_OP_UNARY,
-                                    .name = "archavercos",
+                                    .expression_name = "archavercos",
+                                    .function_name = "archavercos",
                                     .TeX_name = "\\operatorname{archavercos}",
                                     .inverse_unary = expr_havercos,
                                     .apply_unary = expr_archavercos,
@@ -1268,7 +2872,8 @@ const expr_ops_t ops_archacoversin = {.eval = eval_archacoversin,
                                       .reverse = expr_reverse_archacoversin,
                                       .kind = EXPR_KIND_ARCHACOVERSIN,
                                       .arity = EXPR_OP_UNARY,
-                                      .name = "archacoversin",
+                                      .expression_name = "archacoversin",
+                                      .function_name = "archacoversin",
                                       .TeX_name = "\\operatorname{archacoversin}",
                                       .inverse_unary = expr_hacoversin,
                                       .apply_unary = expr_archacoversin,
@@ -1280,7 +2885,8 @@ const expr_ops_t ops_archacovercos = {.eval = eval_archacovercos,
                                       .reverse = expr_reverse_archacovercos,
                                       .kind = EXPR_KIND_ARCHACOVERCOS,
                                       .arity = EXPR_OP_UNARY,
-                                      .name = "archacovercos",
+                                      .expression_name = "archacovercos",
+                                      .function_name = "archacovercos",
                                       .TeX_name = "\\operatorname{archacovercos}",
                                       .inverse_unary = expr_hacovercos,
                                       .apply_unary = expr_archacovercos,
@@ -1292,7 +2898,8 @@ const expr_ops_t ops_asinh = {.eval = eval_asinh,
                               .reverse = expr_reverse_asinh,
                               .kind = EXPR_KIND_ASINH,
                               .arity = EXPR_OP_UNARY,
-                              .name = "asinh",
+                              .expression_name = "asinh",
+                              .function_name = "asinh",
                               .TeX_name = "\\sinh^{-1}",
                               .inverse_unary = expr_sinh,
                               .apply_unary = expr_asinh,
@@ -1305,7 +2912,8 @@ const expr_ops_t ops_acosh = {.eval = eval_acosh,
                               .reverse = expr_reverse_acosh,
                               .kind = EXPR_KIND_ACOSH,
                               .arity = EXPR_OP_UNARY,
-                              .name = "acosh",
+                              .expression_name = "acosh",
+                              .function_name = "acosh",
                               .TeX_name = "\\cosh^{-1}",
                               .inverse_unary = expr_cosh,
                               .apply_unary = expr_acosh,
@@ -1318,7 +2926,8 @@ const expr_ops_t ops_atanh = {.eval = eval_atanh,
                               .reverse = expr_reverse_atanh,
                               .kind = EXPR_KIND_ATANH,
                               .arity = EXPR_OP_UNARY,
-                              .name = "atanh",
+                              .expression_name = "atanh",
+                              .function_name = "atanh",
                               .TeX_name = "\\tanh^{-1}",
                               .inverse_unary = expr_tanh,
                               .apply_unary = expr_atanh,
@@ -1331,7 +2940,8 @@ const expr_ops_t ops_asech = {.eval = eval_asech,
                               .reverse = expr_reverse_asech,
                               .kind = EXPR_KIND_ASECH,
                               .arity = EXPR_OP_UNARY,
-                              .name = "asech",
+                              .expression_name = "asech",
+                              .function_name = "asech",
                               .TeX_name = "\\operatorname{sech}^{-1}",
                               .inverse_unary = expr_sech,
                               .apply_unary = expr_asech,
@@ -1344,7 +2954,8 @@ const expr_ops_t ops_acosech = {.eval = eval_acosech,
                                 .reverse = expr_reverse_acosech,
                                 .kind = EXPR_KIND_ACOSECH,
                                 .arity = EXPR_OP_UNARY,
-                                .name = "acosech",
+                                .expression_name = "acosech",
+                                .function_name = "acosech",
                                 .TeX_name = "\\operatorname{cosech}^{-1}",
                                 .inverse_unary = expr_cosech,
                                 .apply_unary = expr_acosech,
@@ -1357,7 +2968,8 @@ const expr_ops_t ops_acoth = {.eval = eval_acoth,
                               .reverse = expr_reverse_acoth,
                               .kind = EXPR_KIND_ACOTH,
                               .arity = EXPR_OP_UNARY,
-                              .name = "acoth",
+                              .expression_name = "acoth",
+                              .function_name = "acoth",
                               .TeX_name = "\\coth^{-1}",
                               .inverse_unary = expr_coth,
                               .apply_unary = expr_acoth,
@@ -1370,7 +2982,8 @@ const expr_ops_t ops_exp = {.eval = eval_exp,
                             .reverse = expr_reverse_exp,
                             .kind = EXPR_KIND_EXP,
                             .arity = EXPR_OP_UNARY,
-                            .name = "exp",
+                            .expression_name = "exp",
+                            .function_name = "exp",
                             .TeX_name = "\\exp",
                             .direct_inverse = &ops_log,
                             .inverse_unary = expr_log,
@@ -1384,7 +2997,8 @@ const expr_ops_t ops_log = {.eval = eval_log,
                             .reverse = expr_reverse_log,
                             .kind = EXPR_KIND_LOG,
                             .arity = EXPR_OP_UNARY,
-                            .name = "ln",
+                            .expression_name = "ln",
+                            .function_name = "ln",
                             .TeX_name = "\\ln",
                             .direct_inverse = &ops_exp,
                             .inverse_unary = expr_exp,
@@ -1398,7 +3012,8 @@ const expr_ops_t ops_log10 = {.eval = eval_log10,
                               .reverse = expr_reverse_log10,
                               .kind = EXPR_KIND_LOG10,
                               .arity = EXPR_OP_UNARY,
-                              .name = "lg",
+                              .expression_name = "lg",
+                              .function_name = "lg",
                               .TeX_name = "\\lg",
                               .inverse_unary = expr_inverse_log10_internal,
                               .apply_unary = expr_log10,
@@ -1411,7 +3026,8 @@ const expr_ops_t ops_sqrt = {.eval = eval_sqrt,
                              .reverse = expr_reverse_sqrt,
                              .kind = EXPR_KIND_SQRT,
                              .arity = EXPR_OP_UNARY,
-                             .name = "sqrt",
+                             .expression_name = "sqrt",
+                             .function_name = "sqrt",
                              .TeX_name = "\\sqrt",
                              .inverse_unary = expr_inverse_sqrt_internal,
                              .apply_unary = expr_sqrt,
@@ -1424,7 +3040,8 @@ const expr_ops_t ops_cubrt = {.eval = eval_cubrt,
                               .reverse = expr_reverse_cubrt,
                               .kind = EXPR_KIND_CUBRT,
                               .arity = EXPR_OP_UNARY,
-                              .name = "cubrt",
+                              .expression_name = "cubrt",
+                              .function_name = "cubrt",
                               .TeX_name = "\\sqrt[3]",
                               .apply_unary = expr_cubrt,
                               .apply_binary = NULL,
@@ -1436,7 +3053,8 @@ const expr_ops_t ops_root = {.eval = eval_root,
                              .reverse = expr_reverse_root,
                              .kind = EXPR_KIND_ROOT,
                              .arity = EXPR_OP_BINARY,
-                             .name = "root",
+                             .expression_name = "root",
+                             .function_name = "root",
                              .TeX_name = "\\sqrt",
                              .apply_unary = NULL,
                              .apply_binary = expr_root,
@@ -1448,7 +3066,8 @@ const expr_ops_t ops_floor = {.eval = eval_floor,
                               .reverse = expr_reverse_floor,
                               .kind = EXPR_KIND_FLOOR,
                               .arity = EXPR_OP_UNARY,
-                              .name = "floor",
+                              .expression_name = "floor",
+                              .function_name = "floor",
                               .TeX_name = "\\lfloor",
                               .apply_unary = expr_floor,
                               .apply_binary = NULL,
@@ -1459,7 +3078,8 @@ const expr_ops_t ops_ceil = {.eval = eval_ceil,
                              .reverse = expr_reverse_ceil,
                              .kind = EXPR_KIND_CEIL,
                              .arity = EXPR_OP_UNARY,
-                             .name = "ceil",
+                             .expression_name = "ceil",
+                             .function_name = "ceil",
                              .TeX_name = "\\lceil",
                              .apply_unary = expr_ceil,
                              .apply_binary = NULL,
@@ -1470,7 +3090,8 @@ const expr_ops_t ops_abs = {.eval = eval_abs,
                             .reverse = expr_reverse_abs,
                             .kind = EXPR_KIND_ABS,
                             .arity = EXPR_OP_UNARY,
-                            .name = "abs",
+                            .expression_name = "abs",
+                            .function_name = "abs",
                             .TeX_name = NULL,
                             .apply_unary = expr_abs,
                             .apply_binary = NULL,
@@ -1481,7 +3102,8 @@ const expr_ops_t ops_conj = {.eval = eval_conj,
                              .reverse = expr_reverse_conj,
                              .kind = EXPR_KIND_CONJ,
                              .arity = EXPR_OP_UNARY,
-                             .name = "conj",
+                             .expression_name = "conj",
+                             .function_name = "conj",
                              .TeX_name = "\\operatorname{conj}",
                              .direct_inverse = &ops_conj,
                              .inverse_unary = expr_conj,
@@ -1494,7 +3116,8 @@ const expr_ops_t ops_erf = {.eval = eval_erf,
                             .reverse = expr_reverse_erf,
                             .kind = EXPR_KIND_ERF,
                             .arity = EXPR_OP_UNARY,
-                            .name = "erf",
+                            .expression_name = "erf",
+                            .function_name = "erf",
                             .TeX_name = "\\operatorname{erf}",
                             .direct_inverse = &ops_erfinv,
                             .inverse_unary = expr_erfinv,
@@ -1508,7 +3131,8 @@ const expr_ops_t ops_erfc = {.eval = eval_erfc,
                              .reverse = expr_reverse_erfc,
                              .kind = EXPR_KIND_ERFC,
                              .arity = EXPR_OP_UNARY,
-                             .name = "erfc",
+                             .expression_name = "erfc",
+                             .function_name = "erfc",
                              .TeX_name = "\\operatorname{erfc}",
                              .direct_inverse = &ops_erfcinv,
                              .inverse_unary = expr_erfcinv,
@@ -1522,7 +3146,8 @@ const expr_ops_t ops_lgamma = {.eval = eval_lgamma,
                                .reverse = expr_reverse_lgamma,
                                .kind = EXPR_KIND_LGAMMA,
                                .arity = EXPR_OP_UNARY,
-                               .name = "lgamma",
+                               .expression_name = "lgamma",
+                               .function_name = "lgamma",
                                .TeX_name = "\\log\\Gamma",
                                .apply_unary = expr_lgamma,
                                .apply_binary = NULL,
@@ -1533,7 +3158,8 @@ const expr_ops_t ops_hypot = {.eval = eval_hypot,
                               .reverse = expr_reverse_hypot,
                               .kind = EXPR_KIND_HYPOT,
                               .arity = EXPR_OP_BINARY,
-                              .name = "hypot",
+                              .expression_name = "hypot",
+                              .function_name = "hypot",
                               .TeX_name = "\\operatorname{hypot}",
                               .apply_unary = NULL,
                               .apply_binary = expr_hypot,
@@ -1544,7 +3170,8 @@ const expr_ops_t ops_erfinv = {.eval = eval_erfinv,
                                .reverse = expr_reverse_erfinv,
                                .kind = EXPR_KIND_ERFINV,
                                .arity = EXPR_OP_UNARY,
-                               .name = "erfinv",
+                               .expression_name = "erfinv",
+                               .function_name = "erfinv",
                                .TeX_name = "\\operatorname{erf}^{-1}",
                                .inverse_unary = expr_erf,
                                .apply_unary = expr_erfinv,
@@ -1556,7 +3183,8 @@ const expr_ops_t ops_erfcinv = {.eval = eval_erfcinv,
                                 .reverse = expr_reverse_erfcinv,
                                 .kind = EXPR_KIND_ERFCINV,
                                 .arity = EXPR_OP_UNARY,
-                                .name = "erfcinv",
+                                .expression_name = "erfcinv",
+                                .function_name = "erfcinv",
                                 .TeX_name = "\\operatorname{erfc}^{-1}",
                                 .inverse_unary = expr_erfc,
                                 .apply_unary = expr_erfcinv,
@@ -1568,7 +3196,8 @@ const expr_ops_t ops_gamma = {.eval = eval_gamma,
                               .reverse = expr_reverse_gamma,
                               .kind = EXPR_KIND_GAMMA,
                               .arity = EXPR_OP_UNARY,
-                              .name = "gamma",
+                              .expression_name = "Γ",
+                              .function_name = "gamma",
                               .TeX_name = "\\Gamma",
                               .direct_inverse = &ops_gammainv,
                               .inverse_unary = expr_gammainv,
@@ -1581,18 +3210,33 @@ const expr_ops_t ops_digamma = {.eval = eval_digamma,
                                 .reverse = expr_reverse_digamma,
                                 .kind = EXPR_KIND_DIGAMMA,
                                 .arity = EXPR_OP_UNARY,
-                                .name = "digamma",
+                                .expression_name = "ψ⁽⁰⁾",
+                                .function_name = "digamma",
                                 .TeX_name = "\\psi^{(0)}",
                                 .apply_unary = expr_digamma,
                                 .apply_binary = NULL,
                                 .simplify = expr_simplify_unary_operator,
                                 .fold_const_unary = NULL};
+const expr_ops_t ops_qdigamma = {.eval = eval_qdigamma,
+                                 .deriv = deriv_qdigamma,
+                                 .reverse = expr_reverse_qdigamma,
+                                 .kind = EXPR_KIND_QDIGAMMA,
+                                 .arity = EXPR_OP_BINARY,
+                                 .expression_name = "ψq",
+                                 .function_name = "qdigamma",
+                                 .TeX_name = "\\psi",
+                                 .apply_unary = NULL,
+                                 .apply_binary = expr_qdigamma,
+                                 .integrate = expr_integral,
+                                 .simplify = expr_simplify_binary_operator,
+                                 .fold_const_unary = NULL};
 const expr_ops_t ops_trigamma = {.eval = eval_trigamma,
                                  .deriv = deriv_trigamma,
                                  .reverse = expr_reverse_trigamma,
                                  .kind = EXPR_KIND_TRIGAMMA,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "trigamma",
+                                 .expression_name = "ψ⁽¹⁾",
+                                 .function_name = "trigamma",
                                  .TeX_name = "\\psi^{(1)}",
                                  .apply_unary = expr_trigamma,
                                  .apply_binary = NULL,
@@ -1603,7 +3247,8 @@ const expr_ops_t ops_polygamma = {.eval = eval_polygamma,
                                   .reverse = expr_reverse_polygamma,
                                   .kind = EXPR_KIND_POLYGAMMA,
                                   .arity = EXPR_OP_BINARY,
-                                  .name = "polygamma",
+                                  .expression_name = "ψ",
+                                  .function_name = "polygamma",
                                   .TeX_name = "\\psi",
                                   .apply_unary = NULL,
                                   .apply_binary = expr_polygamma_xp,
@@ -1614,7 +3259,8 @@ const expr_ops_t ops_zeta = {.eval = eval_zeta,
                              .reverse = expr_reverse_zeta,
                              .kind = EXPR_KIND_ZETA,
                              .arity = EXPR_OP_UNARY,
-                             .name = "zeta",
+                             .expression_name = "ζ",
+                             .function_name = "zeta",
                              .TeX_name = "\\zeta",
                              .apply_unary = expr_zeta,
                              .apply_binary = NULL,
@@ -1625,7 +3271,8 @@ const expr_ops_t ops_zetap = {.eval = eval_zetap,
                               .deriv = deriv_zetap,
                               .kind = EXPR_KIND_ZETAP,
                               .arity = EXPR_OP_UNARY,
-                              .name = "zetap",
+                              .expression_name = "ζ'",
+                              .function_name = "zetap",
                               .TeX_name = "\\zeta'",
                               .apply_unary = expr_zetap,
                               .apply_binary = NULL,
@@ -1636,7 +3283,8 @@ const expr_ops_t ops_zetah = {.eval = eval_zetah,
                               .deriv = deriv_zetah,
                               .kind = EXPR_KIND_ZETAH,
                               .arity = EXPR_OP_BINARY,
-                              .name = "zetah",
+                              .expression_name = "ζ",
+                              .function_name = "zetah",
                               .TeX_name = "\\zeta",
                               .apply_unary = NULL,
                               .apply_binary = expr_zetah,
@@ -1647,7 +3295,8 @@ const expr_ops_t ops_zatahp = {.eval = eval_zatahp,
                                .deriv = deriv_zatahp,
                                .kind = EXPR_KIND_ZATAHP,
                                .arity = EXPR_OP_BINARY,
-                               .name = "zatahp",
+                               .expression_name = "ζ'",
+                               .function_name = "zatahp",
                                .TeX_name = "\\zeta'",
                                .apply_unary = NULL,
                                .apply_binary = expr_zatahp,
@@ -1659,7 +3308,8 @@ const expr_ops_t ops_dilog = {.eval = eval_dilog,
                               .reverse = expr_reverse_dilog,
                               .kind = EXPR_KIND_DILOG,
                               .arity = EXPR_OP_UNARY,
-                              .name = "dilog",
+                              .expression_name = "dilog",
+                              .function_name = "li2",
                               .TeX_name = "\\operatorname{Li}_{2}",
                               .apply_unary = expr_dilog,
                               .apply_binary = NULL,
@@ -1670,7 +3320,8 @@ const expr_ops_t ops_polylog1 = {.eval = eval_polylog1,
                                  .reverse = expr_reverse_polylog1,
                                  .kind = EXPR_KIND_POLYLOG1,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "Li1",
+                                 .expression_name = "Li1",
+                                 .function_name = "li1",
                                  .TeX_name = "\\operatorname{Li}_{1}",
                                  .apply_unary = expr_polylog1,
                                  .apply_binary = NULL,
@@ -1682,7 +3333,8 @@ const expr_ops_t ops_polylog = {.eval = eval_polylog,
                                 .reverse = expr_reverse_polylog,
                                 .kind = EXPR_KIND_POLYLOG,
                                 .arity = EXPR_OP_BINARY,
-                                .name = "polylog",
+                                .expression_name = "polylog",
+                                .function_name = "polylog",
                                 .TeX_name = "\\operatorname{Li}",
                                 .apply_unary = NULL,
                                 .apply_binary = expr_polylog_xp,
@@ -1692,7 +3344,8 @@ const expr_ops_t ops_harmonic_poly = {.eval = eval_harmonic_poly,
                                       .deriv = deriv_harmonic_poly,
                                       .kind = EXPR_KIND_HARMONIC_POLY,
                                       .arity = EXPR_OP_BINARY,
-                                      .name = "Hn",
+                                      .expression_name = "Hn",
+                                      .function_name = "harmonicpoly",
                                       .TeX_name = "H",
                                       .apply_unary = NULL,
                                       .apply_binary = expr_harmonic_poly,
@@ -1704,7 +3357,8 @@ const expr_ops_t ops_lerch_phi = {.eval = eval_lerch_phi,
                                   .reverse_many = expr_reverse_lerch_phi_many,
                                   .kind = EXPR_KIND_LERCH_PHI,
                                   .arity = EXPR_OP_BINARY,
-                                  .name = "LerchPhi",
+                                  .expression_name = "Φ",
+                                  .function_name = "lerchphi",
                                   .TeX_name = "\\Phi",
                                   .apply_unary = NULL,
                                   .apply_binary = NULL,
@@ -1716,7 +3370,8 @@ const expr_ops_t ops_lerch_phi_pack = {.eval = eval_lerch_phi_pack,
                                        .reverse = expr_reverse_parameter_pack,
                                        .kind = EXPR_KIND_LERCH_PHI_PACK,
                                        .arity = EXPR_OP_BINARY,
-                                       .name = "lerch_phi_pack",
+                                       .expression_name = "lerch_phi_pack",
+                                       .function_name = "lerchphipack",
                                        .TeX_name = "\\operatorname{pack}",
                                        .apply_unary = NULL,
                                        .apply_binary = NULL,
@@ -1727,7 +3382,8 @@ const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
                                      .reverse = expr_reverse_legendre_chi,
                                      .kind = EXPR_KIND_LEGENDRE_CHI,
                                      .arity = EXPR_OP_BINARY,
-                                     .name = "legendre_chi",
+                                     .expression_name = "legendre_chi",
+                                     .function_name = "legendrechi",
                                      .TeX_name = "\\chi",
                                      .apply_unary = NULL,
                                      .apply_binary = expr_legendre_chi_xp,
@@ -1738,7 +3394,8 @@ const expr_ops_t ops_bessel_j = {.eval = eval_bessel_j,
                                  .reverse = expr_reverse_bessel_j,
                                  .kind = EXPR_KIND_BESSEL_J,
                                  .arity = EXPR_OP_BINARY,
-                                 .name = "BesselJ",
+                                 .expression_name = "BesselJ",
+                                 .function_name = "besselj",
                                  .TeX_name = "J",
                                  .apply_unary = NULL,
                                  .apply_binary = expr_bessel_j,
@@ -1750,7 +3407,8 @@ const expr_ops_t ops_bessel_y = {.eval = eval_bessel_y,
                                  .reverse = expr_reverse_bessel_y,
                                  .kind = EXPR_KIND_BESSEL_Y,
                                  .arity = EXPR_OP_BINARY,
-                                 .name = "BesselY",
+                                 .expression_name = "BesselY",
+                                 .function_name = "bessely",
                                  .TeX_name = "Y",
                                  .apply_unary = NULL,
                                  .apply_binary = expr_bessel_y,
@@ -1762,7 +3420,8 @@ const expr_ops_t ops_lommel_s = {.eval = eval_lommel_s,
                                  .reverse = expr_reverse_lommel_s,
                                  .kind = EXPR_KIND_LOMMEL_S,
                                  .arity = EXPR_OP_BINARY,
-                                 .name = "LommelS",
+                                 .expression_name = "LommelS",
+                                 .function_name = "lommels",
                                  .TeX_name = "s",
                                  .apply_unary = NULL,
                                  .apply_binary = expr_lommel_s_from_pack,
@@ -1775,7 +3434,8 @@ const expr_ops_t ops_lommel_s_pack = {.eval = eval_lommel_s_pack,
                                       .kind = EXPR_KIND_LOMMEL_S_PACK,
                                       .arity = EXPR_OP_BINARY,
                                       .diff_kind = EXPR_DIFF_NONE,
-                                      .name = "lommel_s_pack",
+                                      .expression_name = "lommel_s_pack",
+                                      .function_name = "lommelspack",
                                       .TeX_name = "\\operatorname{pack}",
                                       .apply_unary = NULL,
                                       .apply_binary = expr_lommel_s_pack,
@@ -1787,7 +3447,8 @@ const expr_ops_t ops_appell_f1 = {.eval = eval_appell_f1,
                                   .reverse_many = expr_reverse_appell_f1_many,
                                   .kind = EXPR_KIND_APPELL_F1,
                                   .arity = EXPR_OP_BINARY,
-                                  .name = "appell_f1",
+                                  .expression_name = "F₁",
+                                  .function_name = "appellf1",
                                   .TeX_name = "\\operatorname{F}_{1}",
                                   .apply_unary = NULL,
                                   .apply_binary = expr_appell_f1_from_packs,
@@ -1799,7 +3460,8 @@ const expr_ops_t ops_appell_f1_pack = {.eval = eval_appell_f1_pack,
                                        .kind = EXPR_KIND_APPELL_F1_PACK,
                                        .arity = EXPR_OP_BINARY,
                                        .diff_kind = EXPR_DIFF_NONE,
-                                       .name = "appell_f1_pack",
+                                       .expression_name = "appell_f1_pack",
+                                       .function_name = "appellf1pack",
                                        .TeX_name = "\\operatorname{pack}",
                                        .apply_unary = NULL,
                                        .apply_binary = expr_appell_f1_pack,
@@ -1811,7 +3473,8 @@ const expr_ops_t ops_lauricella_f = {.eval = eval_lauricella_f,
                                      .reverse_many = expr_reverse_lauricella_f_many,
                                      .kind = EXPR_KIND_LAURICELLA_F,
                                      .arity = EXPR_OP_BINARY,
-                                     .name = "lauricella_f",
+                                     .expression_name = "LauricellaF",
+                                     .function_name = "lauricellaf",
                                      .TeX_name = "F_D",
                                      .apply_unary = NULL,
                                      .apply_binary = expr_lauricella_f_from_packs,
@@ -1822,7 +3485,8 @@ const expr_ops_t ops_hypergeometric_pFq = {.eval = eval_hypergeometric_pFq,
                                            .reverse = expr_reverse_hypergeometric_pFq,
                                            .kind = EXPR_KIND_HYPERGEOMETRIC_PFQ,
                                            .arity = EXPR_OP_BINARY,
-                                           .name = "HypergeometricpFq",
+                                           .expression_name = "HypergeometricpFq",
+                                           .function_name = "hypergeometricpfq",
                                            .TeX_name = "F",
                                            .apply_unary = NULL,
                                            .apply_binary = expr_hypergeometric_pFq_from_pack,
@@ -1835,7 +3499,8 @@ const expr_ops_t ops_hypergeometric_pFq_pack = {.eval = eval_hypergeometric_pFq_
                                                 .kind = EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK,
                                                 .arity = EXPR_OP_BINARY,
                                                 .diff_kind = EXPR_DIFF_NONE,
-                                                .name = "hypergeometric_pFq_pack",
+                                                .expression_name = "hypergeometric_pFq_pack",
+                                                .function_name = "hypergeometricpfqpack",
                                                 .TeX_name = "\\operatorname{pack}",
                                                 .apply_unary = NULL,
                                                 .apply_binary = expr_hypergeometric_pFq_pack,
@@ -1846,7 +3511,8 @@ const expr_ops_t ops_gammainv = {.eval = eval_gammainv,
                                  .reverse = expr_reverse_gammainv,
                                  .kind = EXPR_KIND_GAMMAINV,
                                  .arity = EXPR_OP_UNARY,
-                                 .name = "gammainv",
+                                 .expression_name = "gammainv",
+                                 .function_name = "gammainv",
                                  .TeX_name = "\\Gamma^{-1}",
                                  .inverse_unary = expr_gamma,
                                  .apply_unary = expr_gammainv,
@@ -1858,7 +3524,8 @@ const expr_ops_t ops_lambert_w = {.eval = eval_lambert_w,
                                   .reverse = expr_reverse_lambert_w,
                                   .kind = EXPR_KIND_LAMBERT_W,
                                   .arity = EXPR_OP_UNARY,
-                                  .name = "W",
+                                  .expression_name = "W",
+                                  .function_name = "w",
                                   .TeX_name = "W",
                                   .inverse_unary = expr_inverse_lambert_internal,
                                   .apply_unary = expr_lambert_w,
@@ -1870,7 +3537,8 @@ const expr_ops_t ops_lambert_wn = {.eval = eval_lambert_wn,
                                    .reverse = expr_reverse_lambert_wn,
                                    .kind = EXPR_KIND_LAMBERT_WN,
                                    .arity = EXPR_OP_BINARY,
-                                   .name = "Wₙ",
+                                   .expression_name = "Wₙ",
+                                   .function_name = "wn",
                                    .TeX_name = "W",
                                    .apply_unary = NULL,
                                    .apply_binary = expr_lambert_wn_xp,
@@ -1881,7 +3549,8 @@ const expr_ops_t ops_lambert_w0 = {.eval = eval_lambert_w0,
                                    .reverse = expr_reverse_lambert_w0,
                                    .kind = EXPR_KIND_LAMBERT_W0,
                                    .arity = EXPR_OP_UNARY,
-                                   .name = "W₀",
+                                   .expression_name = "W₀",
+                                   .function_name = "w0",
                                    .TeX_name = "W_{0}",
                                    .inverse_unary = expr_inverse_lambert_internal,
                                    .apply_unary = expr_lambert_w0,
@@ -1893,7 +3562,8 @@ const expr_ops_t ops_lambert_wm1 = {.eval = eval_lambert_wm1,
                                     .reverse = expr_reverse_lambert_wm1,
                                     .kind = EXPR_KIND_LAMBERT_WM1,
                                     .arity = EXPR_OP_UNARY,
-                                    .name = "W₋₁",
+                                    .expression_name = "W₋₁",
+                                    .function_name = "wm1",
                                     .TeX_name = "W_{-1}",
                                     .inverse_unary = expr_inverse_lambert_internal,
                                     .apply_unary = expr_lambert_wm1,
@@ -1905,7 +3575,8 @@ const expr_ops_t ops_normal_pdf = {.eval = eval_normal_pdf,
                                    .reverse = expr_reverse_normal_pdf,
                                    .kind = EXPR_KIND_NORMAL_PDF,
                                    .arity = EXPR_OP_UNARY,
-                                   .name = "normal_pdf",
+                                   .expression_name = "normal_pdf",
+                                   .function_name = "normalpdf",
                                    .TeX_name = "\\operatorname{normal\\_pdf}",
                                    .apply_unary = expr_normal_pdf,
                                    .apply_binary = NULL,
@@ -1917,7 +3588,8 @@ const expr_ops_t ops_normal_cdf = {.eval = eval_normal_cdf,
                                    .reverse = expr_reverse_normal_cdf,
                                    .kind = EXPR_KIND_NORMAL_CDF,
                                    .arity = EXPR_OP_UNARY,
-                                   .name = "normal_cdf",
+                                   .expression_name = "normal_cdf",
+                                   .function_name = "normalcdf",
                                    .TeX_name = "\\operatorname{normal\\_cdf}",
                                    .apply_unary = expr_normal_cdf,
                                    .apply_binary = NULL,
@@ -1929,7 +3601,8 @@ const expr_ops_t ops_normal_logpdf = {.eval = eval_normal_logpdf,
                                       .reverse = expr_reverse_normal_logpdf,
                                       .kind = EXPR_KIND_NORMAL_LOGPDF,
                                       .arity = EXPR_OP_UNARY,
-                                      .name = "normal_logpdf",
+                                      .expression_name = "normal_logpdf",
+                                      .function_name = "normallogpdf",
                                       .TeX_name = "\\operatorname{normal\\_logpdf}",
                                       .apply_unary = expr_normal_logpdf,
                                       .apply_binary = NULL,
@@ -1941,7 +3614,8 @@ const expr_ops_t ops_pdf = {.eval = eval_normal_pdf,
                             .reverse = expr_reverse_normal_pdf,
                             .kind = EXPR_KIND_NORMAL_PDF,
                             .arity = EXPR_OP_UNARY,
-                            .name = "pdf",
+                            .expression_name = "pdf",
+                            .function_name = "pdf",
                             .TeX_name = "\\operatorname{pdf}",
                             .apply_unary = expr_pdf,
                             .apply_binary = NULL,
@@ -1953,7 +3627,8 @@ const expr_ops_t ops_cdf = {.eval = eval_normal_cdf,
                             .reverse = expr_reverse_normal_cdf,
                             .kind = EXPR_KIND_NORMAL_CDF,
                             .arity = EXPR_OP_UNARY,
-                            .name = "cdf",
+                            .expression_name = "cdf",
+                            .function_name = "cdf",
                             .TeX_name = "\\operatorname{cdf}",
                             .apply_unary = expr_cdf,
                             .apply_binary = NULL,
@@ -1965,7 +3640,8 @@ const expr_ops_t ops_logpdf = {.eval = eval_normal_logpdf,
                                .reverse = expr_reverse_normal_logpdf,
                                .kind = EXPR_KIND_NORMAL_LOGPDF,
                                .arity = EXPR_OP_UNARY,
-                               .name = "logpdf",
+                               .expression_name = "logpdf",
+                               .function_name = "logpdf",
                                .TeX_name = "\\operatorname{logpdf}",
                                .apply_unary = expr_logpdf,
                                .apply_binary = NULL,
@@ -1977,7 +3653,8 @@ const expr_ops_t ops_Ei = {.eval = eval_Ei,
                            .reverse = expr_reverse_Ei,
                            .kind = EXPR_KIND_EI,
                            .arity = EXPR_OP_UNARY,
-                           .name = "Ei",
+                           .expression_name = "Ei",
+                           .function_name = "ei",
                            .TeX_name = "\\operatorname{Ei}",
                            .apply_unary = expr_Ei,
                            .apply_binary = NULL,
@@ -1989,7 +3666,8 @@ const expr_ops_t ops_E1 = {.eval = eval_E1,
                            .reverse = expr_reverse_E1,
                            .kind = EXPR_KIND_E1,
                            .arity = EXPR_OP_UNARY,
-                           .name = "E1",
+                           .expression_name = "E1",
+                           .function_name = "e1",
                            .TeX_name = "\\operatorname{E1}",
                            .apply_unary = expr_E1,
                            .apply_binary = NULL,
@@ -2001,7 +3679,8 @@ const expr_ops_t ops_beta = {.eval = eval_beta,
                              .reverse = expr_reverse_beta,
                              .kind = EXPR_KIND_BETA,
                              .arity = EXPR_OP_BINARY,
-                             .name = "beta",
+                             .expression_name = "beta",
+                             .function_name = "beta",
                              .TeX_name = "\\operatorname{beta}",
                              .apply_unary = NULL,
                              .apply_binary = expr_beta,
@@ -2012,7 +3691,8 @@ const expr_ops_t ops_indexed_symbol = {.eval = eval_formal_series_component,
                                        .reverse = expr_reverse_not_differentiable,
                                        .kind = EXPR_KIND_INDEXED_SYMBOL,
                                        .arity = EXPR_OP_BINARY,
-                                       .name = "indexed",
+                                       .expression_name = "indexed",
+                                       .function_name = "indexed",
                                        .TeX_name = NULL,
                                        .apply_unary = NULL,
                                        .apply_binary = NULL,
@@ -2023,7 +3703,8 @@ const expr_ops_t ops_summation = {.eval = eval_finite_summation,
                                   .reverse = expr_reverse_not_differentiable,
                                   .kind = EXPR_KIND_SUMMATION,
                                   .arity = EXPR_OP_BINARY,
-                                  .name = "sum",
+                                  .expression_name = "sum",
+                                  .function_name = "sum",
                                   .TeX_name = NULL,
                                   .apply_unary = NULL,
                                   .apply_binary = NULL,
@@ -2035,7 +3716,8 @@ const expr_ops_t ops_product = {.eval = eval_finite_product,
                                 .reverse = expr_reverse_not_differentiable,
                                 .kind = EXPR_KIND_PRODUCT,
                                 .arity = EXPR_OP_BINARY,
-                                .name = "product",
+                                .expression_name = "product",
+                                .function_name = "product",
                                 .TeX_name = NULL,
                                 .apply_unary = NULL,
                                 .apply_binary = NULL,
@@ -2046,7 +3728,8 @@ const expr_ops_t ops_logbeta = {.eval = eval_logbeta,
                                 .reverse = expr_reverse_logbeta,
                                 .kind = EXPR_KIND_LOGBETA,
                                 .arity = EXPR_OP_BINARY,
-                                .name = "logbeta",
+                                .expression_name = "logbeta",
+                                .function_name = "logbeta",
                                 .TeX_name = "\\operatorname{logbeta}",
                                 .apply_unary = NULL,
                                 .apply_binary = expr_logbeta,
@@ -2057,7 +3740,8 @@ const expr_ops_t ops_gammainc_lower = {.eval = eval_gammainc_lower,
                                        .reverse = expr_reverse_gammainc_lower,
                                        .kind = EXPR_KIND_GAMMAINC_LOWER,
                                        .arity = EXPR_OP_BINARY,
-                                       .name = "gammainc_lower",
+                                       .expression_name = "gammainc_lower",
+                                       .function_name = "gammainclower",
                                        .TeX_name = "\\gamma",
                                        .apply_unary = NULL,
                                        .apply_binary = expr_gammainc_lower,
@@ -2068,7 +3752,8 @@ const expr_ops_t ops_gammainc_upper = {.eval = eval_gammainc_upper,
                                        .reverse = expr_reverse_gammainc_upper,
                                        .kind = EXPR_KIND_GAMMAINC_UPPER,
                                        .arity = EXPR_OP_BINARY,
-                                       .name = "gammainc_upper",
+                                       .expression_name = "gammainc_upper",
+                                       .function_name = "gammaincupper",
                                        .TeX_name = "\\Gamma",
                                        .apply_unary = NULL,
                                        .apply_binary = expr_gammainc_upper,
@@ -2079,7 +3764,8 @@ const expr_ops_t ops_gammainc_P = {.eval = eval_gammainc_P,
                                    .reverse = expr_reverse_gammainc_P,
                                    .kind = EXPR_KIND_GAMMAINC_P,
                                    .arity = EXPR_OP_BINARY,
-                                   .name = "gammainc_P",
+                                   .expression_name = "gammainc_P",
+                                   .function_name = "gammaincp",
                                    .TeX_name = "\\operatorname{P}",
                                    .apply_unary = NULL,
                                    .apply_binary = expr_gammainc_P,
@@ -2090,7 +3776,8 @@ const expr_ops_t ops_gammainc_Q = {.eval = eval_gammainc_Q,
                                    .reverse = expr_reverse_gammainc_Q,
                                    .kind = EXPR_KIND_GAMMAINC_Q,
                                    .arity = EXPR_OP_BINARY,
-                                   .name = "gammainc_Q",
+                                   .expression_name = "gammainc_Q",
+                                   .function_name = "gammaincq",
                                    .TeX_name = "\\operatorname{Q}",
                                    .apply_unary = NULL,
                                    .apply_binary = expr_gammainc_Q,
@@ -2102,7 +3789,8 @@ const expr_ops_t ops_factorial = {.eval = eval_factorial,
                                   .kind = EXPR_KIND_FACTORIAL,
                                   .arity = EXPR_OP_UNARY,
                                   .diff_kind = EXPR_DIFF_NONE,
-                                  .name = "factorial",
+                                  .expression_name = "factorial",
+                                  .function_name = "factorial",
                                   .TeX_name = "\\operatorname{factorial}",
                                   .apply_unary = expr_factorial,
                                   .apply_binary = NULL,
@@ -2114,7 +3802,8 @@ const expr_ops_t ops_fibonacci = {.eval = eval_fibonacci,
                                   .kind = EXPR_KIND_FIBONACCI,
                                   .arity = EXPR_OP_UNARY,
                                   .diff_kind = EXPR_DIFF_NONE,
-                                  .name = "fibonacci",
+                                  .expression_name = "fibonacci",
+                                  .function_name = "fibonacci",
                                   .TeX_name = "\\operatorname{fibonacci}",
                                   .apply_unary = expr_fibonacci,
                                   .apply_binary = NULL,
@@ -2126,7 +3815,8 @@ const expr_ops_t ops_partition = {.eval = eval_partition,
                                   .kind = EXPR_KIND_PARTITION,
                                   .arity = EXPR_OP_UNARY,
                                   .diff_kind = EXPR_DIFF_NONE,
-                                  .name = "partition",
+                                  .expression_name = "partition",
+                                  .function_name = "partition",
                                   .TeX_name = "\\operatorname{partition}",
                                   .apply_unary = expr_partition,
                                   .apply_binary = NULL,
@@ -2138,7 +3828,8 @@ const expr_ops_t ops_isqrt = {.eval = eval_isqrt,
                               .kind = EXPR_KIND_ISQRT,
                               .arity = EXPR_OP_UNARY,
                               .diff_kind = EXPR_DIFF_NONE,
-                              .name = "isqrt",
+                              .expression_name = "isqrt",
+                              .function_name = "isqrt",
                               .TeX_name = "\\operatorname{isqrt}",
                               .apply_unary = expr_isqrt,
                               .apply_binary = NULL,
@@ -2150,7 +3841,8 @@ const expr_ops_t ops_gcd = {.eval = eval_gcd,
                             .kind = EXPR_KIND_GCD,
                             .arity = EXPR_OP_BINARY,
                             .diff_kind = EXPR_DIFF_NONE,
-                            .name = "gcd",
+                            .expression_name = "gcd",
+                            .function_name = "gcd",
                             .TeX_name = "\\gcd",
                             .apply_unary = NULL,
                             .apply_binary = expr_gcd,
@@ -2162,7 +3854,8 @@ const expr_ops_t ops_lcm = {.eval = eval_lcm,
                             .kind = EXPR_KIND_LCM,
                             .arity = EXPR_OP_BINARY,
                             .diff_kind = EXPR_DIFF_NONE,
-                            .name = "lcm",
+                            .expression_name = "lcm",
+                            .function_name = "lcm",
                             .TeX_name = "\\operatorname{lcm}",
                             .apply_unary = NULL,
                             .apply_binary = expr_lcm,
@@ -2174,7 +3867,8 @@ const expr_ops_t ops_mod = {.eval = eval_mod,
                             .kind = EXPR_KIND_MOD,
                             .arity = EXPR_OP_BINARY,
                             .diff_kind = EXPR_DIFF_NONE,
-                            .name = "mod",
+                            .expression_name = "mod",
+                            .function_name = "mod",
                             .TeX_name = "\\operatorname{mod}",
                             .apply_unary = NULL,
                             .apply_binary = expr_mod,
@@ -2186,7 +3880,8 @@ const expr_ops_t ops_modinv = {.eval = eval_modinv,
                                .kind = EXPR_KIND_MODINV,
                                .arity = EXPR_OP_BINARY,
                                .diff_kind = EXPR_DIFF_NONE,
-                               .name = "modinv",
+                               .expression_name = "modinv",
+                               .function_name = "modinv",
                                .TeX_name = "\\operatorname{modinv}",
                                .apply_unary = NULL,
                                .apply_binary = expr_modinv,
@@ -2198,7 +3893,8 @@ const expr_ops_t ops_is_prime = {.eval = eval_is_prime,
                                  .kind = EXPR_KIND_IS_PRIME,
                                  .arity = EXPR_OP_UNARY,
                                  .diff_kind = EXPR_DIFF_NONE,
-                                 .name = "is_prime",
+                                 .expression_name = "is_prime",
+                                 .function_name = "isprime",
                                  .TeX_name = "\\operatorname{is\\_prime}",
                                  .apply_unary = expr_is_prime,
                                  .apply_binary = NULL,
@@ -2210,7 +3906,8 @@ const expr_ops_t ops_next_prime = {.eval = eval_next_prime,
                                    .kind = EXPR_KIND_NEXT_PRIME,
                                    .arity = EXPR_OP_UNARY,
                                    .diff_kind = EXPR_DIFF_NONE,
-                                   .name = "next_prime",
+                                   .expression_name = "next_prime",
+                                   .function_name = "nextprime",
                                    .TeX_name = "\\operatorname{next\\_prime}",
                                    .apply_unary = expr_next_prime,
                                    .apply_binary = NULL,
@@ -2222,7 +3919,8 @@ const expr_ops_t ops_prev_prime = {.eval = eval_prev_prime,
                                    .kind = EXPR_KIND_PREV_PRIME,
                                    .arity = EXPR_OP_UNARY,
                                    .diff_kind = EXPR_DIFF_NONE,
-                                   .name = "prev_prime",
+                                   .expression_name = "prev_prime",
+                                   .function_name = "prevprime",
                                    .TeX_name = "\\operatorname{prev\\_prime}",
                                    .apply_unary = expr_prev_prime,
                                    .apply_binary = NULL,
@@ -2234,7 +3932,8 @@ const expr_ops_t ops_bit_and = {.eval = eval_bit_and,
                                 .kind = EXPR_KIND_BIT_AND,
                                 .arity = EXPR_OP_BINARY,
                                 .diff_kind = EXPR_DIFF_NONE,
-                                .name = "AND",
+                                .expression_name = "AND",
+                                .function_name = "and",
                                 .TeX_name = "\\operatorname{AND}",
                                 .apply_unary = NULL,
                                 .apply_binary = expr_bit_and,
@@ -2246,7 +3945,8 @@ const expr_ops_t ops_bit_or = {.eval = eval_bit_or,
                                .kind = EXPR_KIND_BIT_OR,
                                .arity = EXPR_OP_BINARY,
                                .diff_kind = EXPR_DIFF_NONE,
-                               .name = "OR",
+                               .expression_name = "OR",
+                               .function_name = "or",
                                .TeX_name = "\\operatorname{OR}",
                                .apply_unary = NULL,
                                .apply_binary = expr_bit_or,
@@ -2258,7 +3958,8 @@ const expr_ops_t ops_bit_xor = {.eval = eval_bit_xor,
                                 .kind = EXPR_KIND_BIT_XOR,
                                 .arity = EXPR_OP_BINARY,
                                 .diff_kind = EXPR_DIFF_NONE,
-                                .name = "XOR",
+                                .expression_name = "XOR",
+                                .function_name = "xor",
                                 .TeX_name = "\\operatorname{XOR}",
                                 .apply_unary = NULL,
                                 .apply_binary = expr_bit_xor,
@@ -2270,7 +3971,8 @@ const expr_ops_t ops_bit_not = {.eval = eval_bit_not,
                                 .kind = EXPR_KIND_BIT_NOT,
                                 .arity = EXPR_OP_UNARY,
                                 .diff_kind = EXPR_DIFF_NONE,
-                                .name = "NOT",
+                                .expression_name = "NOT",
+                                .function_name = "not",
                                 .TeX_name = "\\operatorname{NOT}",
                                 .apply_unary = expr_bit_not,
                                 .apply_binary = NULL,
@@ -2282,7 +3984,8 @@ const expr_ops_t ops_shl = {.eval = eval_shl,
                             .kind = EXPR_KIND_SHL,
                             .arity = EXPR_OP_BINARY,
                             .diff_kind = EXPR_DIFF_NONE,
-                            .name = "SHL",
+                            .expression_name = "SHL",
+                            .function_name = "shl",
                             .TeX_name = "\\operatorname{SHL}",
                             .apply_unary = NULL,
                             .apply_binary = expr_shl,
@@ -2294,7 +3997,8 @@ const expr_ops_t ops_shr = {.eval = eval_shr,
                             .kind = EXPR_KIND_SHR,
                             .arity = EXPR_OP_BINARY,
                             .diff_kind = EXPR_DIFF_NONE,
-                            .name = "SHR",
+                            .expression_name = "SHR",
+                            .function_name = "shr",
                             .TeX_name = "\\operatorname{SHR}",
                             .apply_unary = NULL,
                             .apply_binary = expr_shr,
@@ -2306,7 +4010,8 @@ const expr_ops_t ops_factors = {.eval = eval_factors,
                                 .kind = EXPR_KIND_FACTORS,
                                 .arity = EXPR_OP_UNARY,
                                 .diff_kind = EXPR_DIFF_NONE,
-                                .name = "factors",
+                                .expression_name = "factors",
+                                .function_name = "factors",
                                 .TeX_name = "\\operatorname{factors}",
                                 .apply_unary = expr_factors,
                                 .apply_binary = NULL,
@@ -2373,6 +4078,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_ERFCINV] = &ops_erfcinv,
         [EXPR_KIND_GAMMA] = &ops_gamma,
         [EXPR_KIND_DIGAMMA] = &ops_digamma,
+        [EXPR_KIND_QDIGAMMA] = &ops_qdigamma,
         [EXPR_KIND_TRIGAMMA] = &ops_trigamma,
         [EXPR_KIND_ZETA] = &ops_zeta,
         [EXPR_KIND_ZETAP] = &ops_zetap,
@@ -2663,6 +4369,11 @@ expr_t *expr_gamma(const expr_t *a)
 expr_t *expr_digamma(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_digamma, a);
+}
+/* Construct a q-digamma expression. */
+expr_t *expr_qdigamma(const expr_t *q, const expr_t *z)
+{
+    return expr_math_wrap_binary(&ops_qdigamma, q, z);
 }
 expr_t *expr_trigamma(const expr_t *a)
 {

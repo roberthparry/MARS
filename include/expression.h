@@ -593,7 +593,7 @@ expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, c
  *
  * Error functions:   expr_erf, expr_erfc, expr_erfinv, expr_erfcinv
  * Gamma family:      expr_gamma (Γ), expr_lgamma (log Γ), expr_digamma (ψ⁽⁰⁾),
- *                    expr_trigamma (ψ⁽¹⁾), expr_polygamma (ψ⁽ⁿ⁾),
+ *                    expr_qdigamma (q-digamma ψ_q), expr_trigamma (ψ⁽¹⁾), expr_polygamma (ψ⁽ⁿ⁾),
  *                    expr_gammainv (Γ⁻¹), expr_gammainc_lower,
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
  * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ), expr_harmonic_poly (Hₙ),
@@ -627,6 +627,14 @@ expr_t *expr_erfcinv(const expr_t *expr);
 expr_t *expr_gamma(const expr_t *expr);
 expr_t *expr_lgamma(const expr_t *expr);
 expr_t *expr_digamma(const expr_t *expr);
+/**
+ * @brief Construct a q-digamma expression @f$\psi_q(z)@f$.
+ *
+ * @param q Base expression; it is retained.
+ * @param z Argument expression; it is retained.
+ * @return A newly allocated q-digamma expression, or NULL on error.
+ */
+expr_t *expr_qdigamma(const expr_t *q, const expr_t *z);
 expr_t *expr_trigamma(const expr_t *expr);
 expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
 /**
@@ -999,6 +1007,27 @@ expr_t *expr_from_string_with_derivation_TeX(const char *s, expr_bindings_t **bn
  * once.
  */
 expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Parse a MARS Function-style expression body from text.
+ *
+ * Identifiers are read maximally and whitespace before call parentheses is insignificant, so @c w and @c w(x) are
+ * respectively a value and a call. Multiplication must be explicit with @c . or @c *. Registered calls are resolved
+ * through the built-in function table; other call names construct arbitrary symbolic functions. This parses only an
+ * expression body, not the declaration and statements emitted by @c expr_to_text(..., style_FUNCTION).
+ *
+ * If @p bnd_out is non-NULL, it receives inferred value bindings and must be released with expr_bindings_free(). The
+ * function name in a call is not returned as a value binding. The caller owns the returned expression.
+ */
+expr_t *expr_from_function_body_text(const string_t *text, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Parse a MARS Function-style expression body from a C string.
+ *
+ * This is the plain C-string counterpart to expr_from_function_body_text(). The caller owns the returned expression
+ * and must release it with expr_free().
+ */
+expr_t *expr_from_function_body(const char *source, expr_bindings_t **bnd_out);
 
 /**
  * @brief Serialise an expression into a SQLite-ready payload.

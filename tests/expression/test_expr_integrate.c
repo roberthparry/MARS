@@ -3356,7 +3356,7 @@ static void test_harmonic_poly_calculus(void)
     ASSERT_NOT_NULL(antiderivative);
     ASSERT_NOT_NULL(round_trip);
     ASSERT_NOT_NULL(function_text);
-    ASSERT_TRUE(strstr(function_text, "harmonic_poly(n, x)") != NULL);
+    ASSERT_TRUE(strstr(function_text, "harmonicpoly(n, x)") != NULL);
 
     for (size_t order = 1u; order <= 4u; ++order) {
         expr_t *next = derivative && x ? expr_create_deriv(derivative, x) : NULL;

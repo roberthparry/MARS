@@ -101,11 +101,13 @@ $$
 \qquad H_n(z)=\sum_{k=1}^{n}\frac{z^k}{k}.
 $$
 
-Expression input accepts `Hn(n,z)` and `harmonic_poly(n,z)`. The Function card
-uses `harmonic_poly`, and the same native node supports repeated symbolic
+Expression input accepts `Hn(n,z)`, `harmonic_poly(n,z)`, and `harmonicpoly(n,z)`. The Function card
+uses `harmonicpoly`, and the same native node supports repeated symbolic
 differentiation and direct integration.
 
-Formal finite sums and products use `@Z_k=1^n term` and `@P_k=1^n term`.
+Formal finite sums and products use `@Z_(k=1)^n term` and `@P_(k=1)^n term`.
+The lower-bound parentheses may be omitted, as in `@Z_k=1^n term`;
+`@Z_(k=1)^n` is the ASCII replacement for `Σ_(k=1)^n`.
 Omitting the upper bound produces the corresponding infinite operator, as in
 `@Z_k=1 term` or `@P_k=1 term`. The operator index is local: it does not create
 a binding control. Mathematical output renders sums with Σ; Function output
@@ -114,7 +116,7 @@ result.
 
 Formal `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
 use the same native geometric-series identities as recognised ellipsis input.
-For example, with supplied `x` and `n`, `@Z_k=1^n sin(kx)` displays
+For example, with supplied `x` and `n`, `@Z_(k=1)^n sin(kx)` displays
 
 $$
 \sum_{k=1}^{n}\sin(kx)
@@ -124,13 +126,16 @@ $$
 and supplies its numerical Value without iterating through a large upper
 bound.
 
-The weighted hyperbolic sum `@Z_k=1^n sinh(kx)/k` has a native Lerch-
-transcendent form built from Li₁ and Φ. Its TeX stays on one line when space
-permits, Expression output uses `Li1` and the capital symbol `Φ`, and Function
-output uses `Li1` and `LerchPhi`. **Use as input** copies that exact parseable
-Expression representation back to the editor while retaining the supplied
-bindings. Differentiating the copied form recognises the identity from which it
-came and returns
+The weighted hyperbolic sums `@Z_k=1^n sinh(kx)/k` and
+`@Z_k=1^n cosh(kx)/k` have native Lerch-transcendent forms built from Li₁ and
+Φ. MARS Lab always displays the applicable form, including when a stable
+large-bound evaluator supplies the Value, so the interface never suggests that
+an enormous number of terms was summed directly. TeX stays on one line when
+space permits, Expression output uses `Li1` and the capital symbol `Φ`, and
+Function output uses `li1` and `lerchphi`. **Use as input** copies that exact
+parseable Expression representation back to the editor while retaining the
+supplied bindings. Differentiating the copied weighted-sinh form recognises the
+identity from which it came and returns
 
 $$
 \sum_{k=1}^{n}\cosh(kx)
@@ -143,6 +148,44 @@ principal-branch terms. It also avoids iterating through every term for a very
 large finite upper bound. The browser receives the simplified algebra,
 renderings and value from MARSlib; it does not parse, simplify or substitute
 the mathematics itself.
+
+Weighted circular sums use the corresponding unit-complex Lerch form. For
+example, the input
+
+```text
+{ -Σ_(k=1)^n cos(kx)/k | x = 2; n = 100000 }
+```
+
+has this Expression output:
+
+```text
+{ -½·(Li1(exp(ix)) - exp(ix)^(n + 1)·Φ(exp(ix), 1, n + 1) +
+  (Li1(exp(-ix)) - exp(-ix)^(n + 1)·Φ(exp(-ix), 1, n + 1))) | x = 2; n = 100000 }
+```
+
+Its Function implementation reuses the reciprocal unit exponential:
+
+```text
+expression expr(x, const n) {
+    const c1 = n + 1.
+
+    v1 = i.x.
+    v2 = exp(v1).
+    v3 = 1/v2.
+
+    return -1/2.(li1(v2) - v2^c1.lerchphi(v2, 1, c1) +
+                  (li1(v3) - v3^c1.lerchphi(v3, 1, c1))).
+}
+
+x = 2.
+const n = 100000.
+output(expr(x, n)).
+```
+
+The accompanying Value is approximately
+`0.52053867649950756146719704452337066`. An outer sign is retained in the
+formula and numerical result instead of hiding recognition of the underlying
+weighted sum.
 
 The captured editor input is `1+1/2^p+1/3^p+...+1/n^p`; its binding boxes
 supply `p = 2.5` and `n = 100`. MARS recognises
@@ -166,6 +209,92 @@ Riemann zeta accepts `zeta(s)` or `ζ(s)`. Hurwitz zeta accepts the two-argument
 forms `zeta(s,a)` and `ζ(s,a)`, as well as `zetah(s,a)` and `zeta2(s,a)`.
 Their first-argument derivatives use the trailing-`p` names `zetap`,
 `zatahp`, and `zeta2p`.
+
+A finite tangent progression is shown with its q-digamma identity rather than
+pretending that a large explicit summation was performed symbolically. With
+`q = exp(2ix)`, MARS uses
+
+$$
+\sum_{k=1}^{n}\tan(kx)
+=in-\frac{2i}{\log q}\left(\psi_q(1)-\psi_q(n+1)\right)
++\frac{4i}{\log(q^2)}\left(\psi_{q^2}(1)-\psi_{q^2}(n+1)\right).
+$$
+
+The Expression and Function cards show the same q-digamma formula. The Value
+card evaluates the recognised finite combination by a stable native real sum:
+the separate q-digamma terms are not assigned artificial values on the unit
+circle. Using the displayed formula as input recovers the same summation,
+identity, bindings and value.
+
+The corresponding hyperbolic-tangent progression uses a real q-digamma
+identity. With `q = exp(-2x)`, MARS uses
+
+$$
+\sum_{k=1}^{n}\tanh(kx)
+=n-\frac{2}{\log q}\left(\psi_q(1)-\psi_q(n+1)\right)
++\frac{4}{\log(q^2)}\left(\psi_{q^2}(1)-\psi_{q^2}(n+1)\right).
+$$
+
+For example, `{ @Z_(k=1)^n tanh(kx) | x=2; n=100000 }` displays this
+identity in Rendered TeX, uses `ψq` in Expression style and `qdigamma` in
+Function style, and produces
+`99999.96334436219613677993759997968616482017617755510022062027824`.
+Using that displayed Expression as input recovers the sum identity and the
+same value.
+
+The cotangent, secant and cosecant families use the same native q-digamma
+machinery. Write
+
+$$
+D_q(a,n)=\psi_q(a)-\psi_q(a+n).
+$$
+
+Then the cotangent pair is
+
+$$
+\sum_{k=1}^{n}\cot(kx)=-in-\frac{2i}{\log q}D_q(1,n),\qquad q=e^{2ix},
+$$
+
+$$
+\sum_{k=1}^{n}\coth(kx)=n+\frac{2}{\log q}D_q(1,n),\qquad q=e^{-2x}.
+$$
+
+The cosecant pair follows from
+`cosec(y) = cot(y/2) - cot(y)` and
+`cosech(y) = coth(y/2) - coth(y)`:
+
+$$
+\sum_{k=1}^{n}\operatorname{cosec}(kx)
+=-\frac{2i}{\log q}D_q(1,n)+\frac{2i}{\log(q^2)}D_{q^2}(1,n),
+\qquad q=e^{ix},
+$$
+
+$$
+\sum_{k=1}^{n}\operatorname{cosech}(kx)
+=\frac{2}{\log q}D_q(1,n)-\frac{2}{\log(q^2)}D_{q^2}(1,n),
+\qquad q=e^{-x}.
+$$
+
+Finally, let `a = pi*i/(2*ln(q))`. The secant identities are
+
+$$
+\sum_{k=1}^{n}\sec(kx)
+=\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right),
+\qquad q=e^{ix},
+$$
+
+$$
+\sum_{k=1}^{n}\operatorname{sech}(kx)
+=\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right),
+\qquad q=e^{-x}.
+$$
+
+MARS displays each identity in Rendered TeX, writes `ψq` in Expression style
+and `qdigamma` in Function style, and recovers the original finite sum when the
+displayed Expression is used as input. Circular values and the
+shifted-argument `sech` value are evaluated through the recognised real finite
+sum, avoiding unsupported unit-circle terms and spurious complex cancellation;
+the remaining real-q hyperbolic forms are evaluated directly.
 
 The result cards deliberately show different representations of one native
 simplified expression:

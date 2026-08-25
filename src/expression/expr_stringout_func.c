@@ -494,11 +494,13 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
                                                 function_temporary_table_t *temporaries,
                                                 const varlist_t *variables, const varlist_t *constants)
 {
+    const expr_t *first_child;
     size_t dag_index;
 
     if (!node || expr_is_const(node) || expr_is_var(node) || function_temporary_table_contains(temporaries, node))
         return true;
-    if (!function_collect_shared_temporaries(node->a, root, dag, temporaries, variables, constants) ||
+    first_child = expr_is_op(node, &ops_exp) && expr_is_op(node->a, &ops_neg) && node->a->a ? node->a->a : node->a;
+    if (!function_collect_shared_temporaries(first_child, root, dag, temporaries, variables, constants) ||
         !function_collect_shared_temporaries(node->b, root, dag, temporaries, variables, constants))
         return false;
     if (node == root)

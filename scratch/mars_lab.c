@@ -73,7 +73,8 @@ static char *expr_TeX_body_dup(const expr_t *expr)
 {
     char *body = expr_finite_progression_identity_TeX(expr);
 
-    if (!body && expr_is_finite_weighted_sinh_lerch_form(expr))
+    if (!body &&
+        (expr_is_finite_weighted_sinh_lerch_form(expr) || expr_is_finite_weighted_cosh_lerch_form(expr)))
         body = expr_to_TeX_body(expr);
     if (!body)
         body = expr_to_TeX_body_wrapped(expr, 280u);
@@ -1795,9 +1796,11 @@ int main(int argc, char **argv)
     expr_t *display_expr = NULL;
     expr_t *weighted_lerch_form = NULL;
     expr_t *progression_closed_form = NULL;
+    expr_t *qdigamma_progression_source = NULL;
     expr_t *deriv = NULL;
     expr_t *display_deriv = NULL;
     expr_t *derivative_progression_closed_form = NULL;
+    expr_t *derivative_progression_source = NULL;
     expr_t *integral = NULL;
     expr_t *display_integral = NULL;
     expr_t *wrt = NULL;
@@ -1864,7 +1867,17 @@ int main(int argc, char **argv)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
     progression_closed_form = expr_finite_progression_closed_form(expr);
+    if (!progression_closed_form) {
+        qdigamma_progression_source = expr_finite_progression_from_qdigamma_form(expr);
+        progression_closed_form = expr_finite_progression_closed_form(qdigamma_progression_source);
+    }
     weighted_lerch_form = evaluate_request ? expr_finite_weighted_sinh_lerch_form(expr) : NULL;
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_cosh_lerch_form(expr);
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_sin_lerch_form(expr);
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_cos_lerch_form(expr);
     display_expr = weighted_lerch_form
                        ? weighted_lerch_form
                        : progression_closed_form
@@ -1879,9 +1892,11 @@ int main(int argc, char **argv)
     expr_text = expr_text_dup(display_expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(display_expr, style_FUNCTION);
-    recognised_weighted_lerch_form = expr_is_finite_weighted_sinh_lerch_form(expr);
+    recognised_weighted_lerch_form = weighted_lerch_form != NULL || expr_is_finite_weighted_sinh_lerch_form(expr) ||
+                                     expr_is_finite_weighted_cosh_lerch_form(expr);
     TeX_text = progression_closed_form
-                   ? expr_finite_progression_identity_TeX(expr)
+                   ? expr_finite_progression_identity_TeX(qdigamma_progression_source ? qdigamma_progression_source
+                                                                                     : expr)
                    : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_TeX_body_dup(display_expr);
 
     printf("input       %s\n", raw_input);
@@ -1900,7 +1915,11 @@ int main(int argc, char **argv)
     {
         number_t value_number = NUM_NAN;
 
-        if (!expr_finite_weighted_sinh_lerch_value(expr, &value_number))
+        if (!expr_finite_weighted_sinh_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_cosh_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_sin_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_cos_lerch_value(expr, &value_number) &&
+            !expr_finite_qdigamma_progression_value(expr, &value_number))
             value_number = expr_eval(expr);
 
         print_owned_number("value", num_clone(value_number), precision);
@@ -1911,12 +1930,20 @@ int main(int argc, char **argv)
 
     if (wrt_is_variable && derivative_request) {
         expr_t *derivative_root_base = NULL;
+        expr_t *weighted_derivative_source = NULL;
         const expr_t *derivative_source = display_expr;
         long derivative_root_order = 0L;
 
         if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
             expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOTH))
             derivative_source = expr;
+        weighted_derivative_source = expr_finite_weighted_sinh_from_lerch_form(derivative_source);
+        if (!weighted_derivative_source)
+            weighted_derivative_source = expr_finite_weighted_cosh_from_lerch_form(derivative_source);
+        if (weighted_derivative_source) {
+            derivative_progression_source = expr_create_deriv(weighted_derivative_source, wrt);
+            expr_free(weighted_derivative_source);
+        }
         deriv = expr_create_deriv(derivative_source, wrt);
         if (!deriv) {
             fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
@@ -1924,6 +1951,8 @@ int main(int argc, char **argv)
             goto cleanup;
         }
         derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
+        if (!derivative_progression_closed_form && derivative_progression_source)
+            derivative_progression_closed_form = expr_clone(deriv);
         display_deriv = derivative_progression_closed_form
                             ? derivative_progression_closed_form
                             : display_polynomial_simplified(deriv, wrt, complex_cartesian);
@@ -1949,7 +1978,9 @@ int main(int argc, char **argv)
             deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
             deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
             deriv_TeX_text = derivative_progression_closed_form
-                                 ? expr_finite_progression_identity_TeX(deriv)
+                                 ? expr_finite_progression_identity_TeX(derivative_progression_source
+                                                                           ? derivative_progression_source
+                                                                           : deriv)
                                  : expr_TeX_body_dup(display_deriv);
         }
         normalise_double_minus_owned(&deriv_text);
@@ -2038,6 +2069,8 @@ cleanup:
     free(expr_text);
     if (display_deriv_owned)
         expr_free(display_deriv);
+    expr_free(derivative_progression_source);
+    expr_free(qdigamma_progression_source);
     if (display_integral && display_integral != integral)
         expr_free(display_integral);
     expr_free(integral);

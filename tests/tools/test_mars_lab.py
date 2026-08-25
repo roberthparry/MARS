@@ -2918,7 +2918,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertEqual(returncode, 0, raw)
-        self.assertIn("hypergeometric_pFq", fields["function"])
+        self.assertIn("hypergeometricpfq", fields["function"])
         self.assertIn(r"{}_{2}F_{1}", fields["tex"])
         self.assertAlmostEqual(float(fields["value"]), 3.1455761316872428, places=15)
 
@@ -3701,7 +3701,7 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(
             payload["derivative"],
-            "d/dp = { zetap(p) - zatahp(p, n + 1) | p = -2; n = 1000 }",
+            "d/dp = { ζ'(p) - ζ'(p, n + 1) | p = -2; n = 1000 }",
         )
         self.assertEqual(payload["derivative_TeX"], r"\zeta'(p) - \zeta'(p, n + 1)")
         self.assertIn("p = -2.", payload["full_display_derivative_function"])
@@ -3726,7 +3726,7 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(
             payload["derivative"],
-            "d/dp = { zetap(p) - zatahp(p, n + 1) | p = 1; n = 1000 }",
+            "d/dp = { ζ'(p) - ζ'(p, n + 1) | p = 1; n = 1000 }",
         )
         expected = -sum(math.log(k) / k for k in range(1, 1001))
         self.assertAlmostEqual(float(payload["derivative_value"]), expected, delta=abs(expected) * 1e-14)
@@ -3917,6 +3917,132 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_tangent_progression_displays_qdigamma_formula_and_large_value(self) -> None:
+        source = "{ @Z_(k=1)^n tan(kx) | x=2; n=100000 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertIn(r"\sum_{k=1}^{n}\tan(k\mkern-2mu x) =", payload["display_TeX"])
+        self.assertIn(r"\psi_{e^{2\mkern-2mu i\mkern-2mu x}}", payload["display_TeX"])
+        self.assertIn("ψq(exp(2ix), 1)", payload["full_display_expression"])
+        self.assertIn("qdigamma(v3, 1)", payload["full_display_function"])
+        self.assertTrue(payload["value"].startswith("-220771.582329280672442172970752"))
+
+        round_trip_source = payload["full_display_expression"]
+        round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, round_trip_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(round_trip_returncode, 0, round_trip_raw)
+        round_trip_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            round_trip_fields,
+            round_trip_source,
+            64,
+            False,
+            wrt="x",
+            action="evaluate",
+        )
+        self.assertIn(r"\sum_{k=1}^{n}\tan(k\mkern-2mu x) =", round_trip_payload["display_TeX"])
+        self.assertEqual(round_trip_payload["value"], payload["value"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_tanh_progression_displays_qdigamma_formula_and_large_value(self) -> None:
+        # README example: a large tanh progression exposes and evaluates its q-digamma identity.
+        source = "{ @Z_(k=1)^n tanh(kx) | x=2; n=100000 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertIn(r"\sum_{k=1}^{n}\tanh(k\mkern-2mu x) =", payload["display_TeX"])
+        self.assertIn(r"\psi_{e^{-2\mkern-2mu x}}", payload["display_TeX"])
+        self.assertIn("ψq(exp(-2x), 1)", payload["full_display_expression"])
+        self.assertIn("qdigamma(v2, 1)", payload["full_display_function"])
+        self.assertEqual(
+            payload["value"],
+            "99999.96334436219613677993759997968616482017617755510022062027824",
+        )
+
+        round_trip_source = payload["full_display_expression"]
+        round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, round_trip_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(round_trip_returncode, 0, round_trip_raw)
+        round_trip_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            round_trip_fields,
+            round_trip_source,
+            64,
+            False,
+            wrt="x",
+            action="evaluate",
+        )
+        self.assertIn(r"\sum_{k=1}^{n}\tanh(k\mkern-2mu x) =", round_trip_payload["display_TeX"])
+        self.assertEqual(round_trip_payload["value"], payload["value"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_quotient_progressions_display_qdigamma_formulae_values_and_round_trip(self) -> None:
+        cases = {
+            "cot": (r"\cot", lambda angle: 1.0 / math.tan(angle)),
+            "sec": (r"\sec", lambda angle: 1.0 / math.cos(angle)),
+            "cosec": (r"\operatorname{cosec}", lambda angle: 1.0 / math.sin(angle)),
+            "coth": (r"\coth", lambda angle: 1.0 / math.tanh(angle)),
+            "sech": (r"\operatorname{sech}", lambda angle: 1.0 / math.cosh(angle)),
+            "cosech": (r"\operatorname{cosech}", lambda angle: 1.0 / math.sinh(angle)),
+        }
+
+        for function, (function_TeX, numerical_function) in cases.items():
+            with self.subTest(function=function):
+                source = f"{{ @Z_(k=1)^n {function}(kx) | x=0.2; n=5 }}"
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 64, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+                )
+                self.assertIn(rf"\sum_{{k=1}}^{{n}}{function_TeX}(k\mkern-2mu x) =", payload["display_TeX"])
+                self.assertIn(r"\psi_", payload["display_TeX"])
+                self.assertIn("ψq(", payload["full_display_expression"])
+                self.assertIn("qdigamma(", payload["full_display_function"])
+                expected = sum(numerical_function(k * 0.2) for k in range(1, 6))
+                self.assertAlmostEqual(float(payload["value"].split()[0]), expected, places=14)
+
+                round_trip_source = payload["full_display_expression"]
+                round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, round_trip_source, 64, "x", "evaluate"
+                )
+                self.assertEqual(round_trip_returncode, 0, round_trip_raw)
+                round_trip_payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary,
+                    round_trip_fields,
+                    round_trip_source,
+                    64,
+                    False,
+                    wrt="x",
+                    action="evaluate",
+                )
+                self.assertIn(rf"\sum_{{k=1}}^{{n}}{function_TeX}(k\mkern-2mu x) =", round_trip_payload["display_TeX"])
+                self.assertAlmostEqual(float(round_trip_payload["value"].split()[0]), expected, places=14)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_cosine_progression_has_a_finite_symbolic_antiderivative(self) -> None:
         source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=pi/12; n=100 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -3931,7 +4057,7 @@ class ExpressionResultTests(unittest.TestCase):
             r"H_{n}(\cos(x) - \sin(x)\mkern-2mu i)}{2\mkern-2mu i} + C",
         )
         self.assertIn(
-            "return (harmonic_poly(n, v1 + v3) - harmonic_poly(n, v1 - v3))/(2.i) + C.",
+            "return (harmonicpoly(n, v1 + v3) - harmonicpoly(n, v1 - v3))/(2.i) + C.",
             fields["integral_function"],
         )
         self.assertIn("x = @pi/12.", fields["integral_function"])
@@ -4029,7 +4155,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(round_trip_returncode, 0, round_trip_raw)
         self.assertIn("Φ(", round_trip_fields["expression"])
-        self.assertIn("LerchPhi(", round_trip_fields["function"])
+        self.assertIn("lerchphi(", round_trip_fields["function"])
         self.assertIn("const C = ?.", round_trip_fields["function"])
 
         derivative_source = "{ @Z_k=1^n sinh(kx)/k + C | x = pi/12; n = 100; C = ? }"
@@ -4066,6 +4192,25 @@ class ExpressionResultTests(unittest.TestCase):
     )
     def test_lerch_sum_round_trip_keeps_rendered_TeX_separate_from_expression_style(self) -> None:
         source = "@Z_k=1^n sinh(kx)/k"
+        formula = (
+            "½·Li1(exp(x)) - ½·Li1(exp(-x)) + "
+            "(½·exp(-x)^(n + 1)·Φ(exp(-x), 1, n + 1) - ½·exp(x)^(n + 1)·Φ(exp(x), 1, n + 1))"
+        )
+        function = (
+            "expression expr(x, const n) {\n"
+            "    const c1 = n + 1.\n"
+            "\n"
+            "    v1 = exp(x).\n"
+            "    v2 = 1/v1.\n"
+            "\n"
+            "    return li1(v1)/2 - li1(v2)/2 + "
+            "(v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2).\n"
+            "}\n"
+            "\n"
+            "x = ?.\n"
+            "const n = ?.\n"
+            "output(expr(x, n))."
+        )
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
             self.expression_binary, source, 64, "x", "evaluate"
         )
@@ -4077,17 +4222,16 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\Phi\left(", payload["display_TeX"])
         self.assertIn(r"\frac{", payload["display_TeX"])
         self.assertIn(r"\left(e^{-x}\right)^{n + 1}", payload["display_TeX"])
+        self.assertNotIn(r"\sum", payload["display_TeX"])
         self.assertNotIn("| x =", payload["display_TeX"])
         self.assertNotIn("{ ", payload["display_TeX"])
         self.assertTrue(payload.get("svg"), payload.get("render_error"))
-        self.assertIn("Φ(", payload["full_display_expression"])
-        self.assertIn("LerchPhi(", payload["full_display_function"])
-        self.assertTrue(str(payload["full_display_function"]).startswith("` @Z_k=1^n sinh(kx)/k `\n"))
-        self.assertEqual(
-            payload["editor_expression"],
-            "½·Li1(exp(x)) - ½·Li1(exp(-x)) + "
-            "(½·exp(-x)^(n + 1)·Φ(exp(-x), 1, n + 1) - ½·exp(x)^(n + 1)·Φ(exp(x), 1, n + 1))",
-        )
+        self.assertEqual(payload["full_display_expression"], f"{{ {formula} | x = ?; n = ? }}")
+        self.assertNotIn("Σ_", payload["full_display_expression"])
+        self.assertEqual(fields["function"], function)
+        self.assertEqual(payload["full_display_function"], f"` {source} `\n{function}")
+        self.assertNotIn("return sum(", payload["full_display_function"])
+        self.assertEqual(payload["editor_expression"], formula)
         reused_fields, reused_raw, reused_returncode = mars_lab.run_mars_lab_fields(
             self.expression_binary, str(payload["editor_expression"]), 64, "x", "evaluate"
         )
@@ -4127,8 +4271,8 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("v2 = 1/v1.", bound_reused_function)
         self.assertNotIn("v2 = exp(-x).", bound_reused_function)
         self.assertIn(
-            "return Li1(v1)/2 - Li1(v2)/2 + "
-            "(v2^c1.LerchPhi(v2, 1, c1)/2 - v1^c1.LerchPhi(v1, 1, c1)/2).",
+            "return li1(v1)/2 - li1(v2)/2 + "
+            "(v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2).",
             bound_reused_function,
         )
 
@@ -4152,7 +4296,138 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, large_fields, large_source, 100, False, wrt="x", action="evaluate"
         )
         self.assertIn("Φ(", large_payload["full_display_expression"])
+        self.assertNotIn("Σ_", large_payload["full_display_expression"])
+        self.assertNotIn("return sum(", large_payload["full_display_function"])
         self.assertTrue(str(large_payload.get("value", "")).endswith("E+22739597"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_weighted_cosh_sum_displays_and_reuses_its_lerch_formula(self) -> None:
+        # README example: a large weighted cosh sum exposes the bounded-work formula used for its value.
+        source = "{ @Z_k=1^n cosh(kx)/k | x = 2; n = 100000 }"
+        formula = (
+            "½·Li1(exp(x)) + ½·Li1(exp(-x)) - ½·exp(-x)^(n + 1)·Φ(exp(-x), 1, n + 1) - "
+            "½·exp(x)^(n + 1)·Φ(exp(x), 1, n + 1)"
+        )
+        function = (
+            "expression expr(x, const n) {\n"
+            "    const c1 = n + 1.\n"
+            "\n"
+            "    v1 = exp(x).\n"
+            "    v2 = 1/v1.\n"
+            "\n"
+            "    return li1(v1)/2 + li1(v2)/2 - v2^c1.lerchphi(v2, 1, c1)/2 - "
+            "v1^c1.lerchphi(v1, 1, c1)/2.\n"
+            "}\n"
+            "\n"
+            "x = 2.\n"
+            "const n = 100000.\n"
+            "output(expr(x, n))."
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["expression"], f"{{ {formula} | x = 2; n = 100000 }}")
+        self.assertEqual(fields["unbound"], formula)
+        self.assertIn(r"\Phi\left(e^{x}, 1, n + 1\right)", fields["tex"])
+        self.assertNotIn(r"\sum", fields["tex"])
+        self.assertEqual(fields["function"], function)
+        self.assertNotIn("return sum(", fields["function"])
+        self.assertTrue(str(fields.get("value", "")).endswith("E+86853"))
+
+        sigma_source = "{ Σ_(k=1)^n cosh(kx)/k | x = 2; n = 100000 }"
+        sigma_fields, sigma_raw, sigma_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, sigma_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(sigma_returncode, 0, sigma_raw)
+        self.assertEqual(sigma_fields["expression"], fields["expression"])
+        self.assertEqual(sigma_fields["unbound"], formula)
+        self.assertEqual(sigma_fields["function"], function)
+        self.assertNotIn(r"\sum", sigma_fields["tex"])
+        self.assertNotIn("return sum(", sigma_fields["function"])
+        self.assertEqual(sigma_fields["value"], fields["value"])
+
+        round_trip_source = f"{{ {formula} | x = 2; n = 100000 }}"
+        round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, round_trip_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(round_trip_returncode, 0, round_trip_raw)
+        self.assertEqual(round_trip_fields["unbound"], formula)
+        self.assertEqual(round_trip_fields["value"], fields["value"])
+
+        derivative_fields, derivative_raw, derivative_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, round_trip_source, 64, "x", "derivative"
+        )
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertIn("sinh(nx/2)·sinh(x/2·(n + 1))/sinh(x/2)", derivative_fields["derivative"])
+        self.assertIn(r"\sum_{k=1}^{n}\sinh(k\mkern-2mu x) = ", derivative_fields["derivative_TeX"])
+
+        zero_fields, zero_raw, zero_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{ @Z_k=1^n cosh(kx)/k | x = 0; n = 100000 }", 64, "x", "evaluate"
+        )
+        self.assertEqual(zero_returncode, 0, zero_raw)
+        self.assertEqual(zero_fields["unbound"], formula)
+        self.assertTrue(str(zero_fields.get("value", "")).startswith("12.090146129863427"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_negated_weighted_cosine_sum_displays_its_formula_implementation_and_value(self) -> None:
+        # README example: an outer minus does not hide the weighted circular sum's native formula or value.
+        source = "{ -Σ_(k=1)^n cos(kx)/k | x = 2; n = 100000 }"
+        formula = (
+            "-½·(Li1(exp(ix)) - exp(ix)^(n + 1)·Φ(exp(ix), 1, n + 1) + "
+            "(Li1(exp(-ix)) - exp(-ix)^(n + 1)·Φ(exp(-ix), 1, n + 1)))"
+        )
+        function = (
+            "expression expr(x, const n) {\n"
+            "    const c1 = n + 1.\n"
+            "\n"
+            "    v1 = i.x.\n"
+            "    v2 = exp(v1).\n"
+            "    v3 = 1/v2.\n"
+            "\n"
+            "    return -1/2.(li1(v2) - v2^c1.lerchphi(v2, 1, c1) + "
+            "(li1(v3) - v3^c1.lerchphi(v3, 1, c1))).\n"
+            "}\n"
+            "\n"
+            "x = 2.\n"
+            "const n = 100000.\n"
+            "output(expr(x, n))."
+        )
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["expression"], f"{{ {formula} | x = 2; n = 100000 }}")
+        self.assertEqual(fields["unbound"], formula)
+        self.assertEqual(fields["function"], function)
+        self.assertIn(r"\Phi\left(e^{i\mkern-2mu x}, 1, n + 1\right)", fields["tex"])
+        self.assertNotIn(r"\sum", fields["tex"])
+        self.assertNotIn("return -sum(", fields["function"])
+        self.assertAlmostEqual(float(fields["value"]), 0.5205386764995077, places=15)
+
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(payload["full_display_expression"], fields["expression"])
+        self.assertEqual(payload["full_display_function"], f"` {source.split(' | ', 1)[0][2:]} `\n{function}")
+        self.assertEqual(payload["value"], fields["value"])
+
+        round_trip_source = f"{{ {formula} | x = 2; n = 100000 }}"
+        round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, round_trip_source, 64, "x", "evaluate"
+        )
+        self.assertEqual(round_trip_returncode, 0, round_trip_raw)
+        self.assertEqual(round_trip_fields["expression"], fields["expression"])
+        self.assertEqual(round_trip_fields["function"], function)
+        self.assertEqual(round_trip_fields["value"], fields["value"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4173,7 +4448,7 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, source, 64, "p", "derivative"
         )
         self.assertEqual(derivative_returncode, 0, derivative_raw)
-        self.assertEqual(derivative["derivative"], "d/dp = { zetap(p) - zatahp(p, n + 1) | p = 2; n = 10 }")
+        self.assertEqual(derivative["derivative"], "d/dp = { ζ'(p) - ζ'(p, n + 1) | p = 2; n = 10 }")
         self.assertNotEqual(derivative["derivative_value"], "0")
 
         integral, integral_raw, integral_returncode = mars_lab.run_mars_lab_fields(
@@ -4182,7 +4457,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(integral_returncode, 0, integral_raw)
         self.assertIn("p - Σ_(k=2)^n k^(-p)/ln(k) + C", integral["integral"])
         self.assertEqual(integral["integral_TeX"], r"p - \sum_{k=2}^{n}\frac{k^{-p}}{\ln(k)} + C")
-        self.assertIn("return p - sum(k, 2, n, k^(-(p))/ln(k)) + C.", integral["integral_function"])
+        self.assertIn("return p - sum(k, 2, n, k^(-p)/ln(k)) + C.", integral["integral_function"])
         self.assertEqual(integral["integral_value"], "NAN")
 
     @unittest.skipUnless(
@@ -6047,7 +6322,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(expression["value"], "29524")
 
         # README example: a formal sine sum supplies its geometric closed form and large-bound value.
-        source = "{ @Z_k=1^n sin(kx) | x=pi/6; n=100000 }"
+        source = "{ @Z_(k=1)^n sin(kx) | x=pi/6; n=100000 }"
         expression, raw, returncode = mars_lab.run_mars_lab_fields(
             scratch / "mars_lab",
             source,

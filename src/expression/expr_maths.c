@@ -486,6 +486,10 @@ number_t eval_digamma(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_digamma);
 }
+number_t eval_qdigamma(expr_t *dv)
+{
+    return expr_eval_binary_num(dv, num_qdigamma);
+}
 number_t eval_trigamma(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_trigamma);
@@ -1824,6 +1828,37 @@ expr_t *deriv_gamma(expr_t *dv)
 expr_t *deriv_digamma(expr_t *dv)
 {
     return expr_chain_rule_with_factor(dv, expr_trigamma(dv->a));
+}
+
+expr_t *deriv_qdigamma(expr_t *dv)
+{
+    expr_t *dq;
+    expr_t *dz;
+    expr_t *wrts[1];
+    expr_t *q_partial;
+    expr_t *z_partial;
+    expr_t *q_term;
+    expr_t *z_term;
+    expr_t *out;
+
+    if (!dv || !dv->a || !dv->b)
+        return expr_new_const(NUM_NAN);
+    dq = expr_get_dx_internal(dv->a);
+    dz = expr_get_dx_internal(dv->b);
+    wrts[0] = dv->a;
+    q_partial = expr_new_formal_derivative(dv, 1u, wrts);
+    wrts[0] = dv->b;
+    z_partial = expr_new_formal_derivative(dv, 1u, wrts);
+    q_term = dq && q_partial ? expr_mul(dq, q_partial) : NULL;
+    z_term = dz && z_partial ? expr_mul(dz, z_partial) : NULL;
+    out = q_term && z_term ? expr_add(q_term, z_term) : NULL;
+    expr_free(z_term);
+    expr_free(q_term);
+    expr_free(z_partial);
+    expr_free(q_partial);
+    expr_free(dz);
+    expr_free(dq);
+    return out;
 }
 
 expr_t *deriv_trigamma(expr_t *dv)

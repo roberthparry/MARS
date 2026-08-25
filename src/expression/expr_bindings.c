@@ -1947,6 +1947,7 @@ static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE]
     162, 0, 0, 0, 0, 0, 0};
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
+    [0] = {.kw = "ψq", .is_binary = true, .ops = &ops_qdigamma},
     [1] = {.kw = "zetap", .is_binary = false, .ops = &ops_zetap},
     [2] = {.kw = "sin", .is_binary = false, .ops = &ops_sin},
     [3] = {.kw = "versin", .is_binary = false, .ops = &ops_versin},
@@ -2043,6 +2044,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [115] = {.kw = "exp", .is_binary = false, .ops = &ops_exp},
     [116] = {.kw = "prev_prime", .is_binary = false, .ops = &ops_prev_prime},
     [117] = {.kw = "vercos", .is_binary = false, .ops = &ops_vercos},
+    [118] = {.kw = "qdigamma", .is_binary = true, .ops = &ops_qdigamma},
     [120] = {.kw = "ζ", .is_binary = false, .ops = &ops_zeta},
     [121] = {.kw = "arccot", .is_binary = false, .ops = &ops_acot},
     [122] = {.kw = "coversin", .is_binary = false, .ops = &ops_coversin},
@@ -3851,16 +3853,7 @@ static void emit_binding_TeX_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 
 static void emit_binding_expr_unary_call(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
-    if (ops == &ops_gamma)
-        sbuf_puts(b, "Γ");
-    else if (ops == &ops_digamma)
-        sbuf_puts(b, "ψ⁽⁰⁾");
-    else if (ops == &ops_trigamma)
-        sbuf_puts(b, "ψ⁽¹⁾");
-    else if (ops == &ops_zeta)
-        sbuf_puts(b, "ζ");
-    else
-        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    sbuf_puts(b, expr_ops_expression_name(ops));
     sbuf_putc(b, '(');
     emit_binding_expr(child, b, BIND_PREC_LOWEST);
     sbuf_putc(b, ')');
@@ -3872,7 +3865,7 @@ static void emit_binding_TeX_unary_call(const expr_ops_t *ops, const expr_bindin
 
     if (!name) {
         sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+        sbuf_puts(b, expr_ops_expression_name(ops));
         sbuf_putc(b, '}');
     } else {
         sbuf_puts(b, name);
@@ -4116,10 +4109,7 @@ static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t 
         }
     }
 
-    if (ops == &ops_zetah)
-        sbuf_puts(b, "ζ");
-    else
-        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    sbuf_puts(b, expr_ops_expression_name(ops));
     sbuf_putc(b, '(');
     emit_binding_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
     sbuf_puts(b, ", ");
@@ -4270,7 +4260,7 @@ static void emit_binding_func_unary_op(const expr_binding_expr_t *expr, sbuf_t *
         sbuf_putc(b, '-');
         emit_binding_func_expr(expr->u.unary_op.child, b, BIND_PREC_UNARY);
     } else {
-        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+        emit_function_builtin_name(b, ops);
         sbuf_putc(b, '(');
         emit_binding_func_expr(expr->u.unary_op.child, b, BIND_PREC_LOWEST);
         sbuf_putc(b, ')');
@@ -4306,7 +4296,7 @@ static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t 
         return;
     }
 
-    sbuf_puts(b, ops == &ops_harmonic_poly ? "harmonic_poly" : (ops && ops->name) ? ops->name : "?");
+    emit_function_builtin_name(b, ops);
     sbuf_putc(b, '(');
     emit_binding_func_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
     sbuf_puts(b, ", ");
@@ -4355,7 +4345,7 @@ static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *
         sbuf_puts(b, ops->TeX_name);
     else {
         sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+        sbuf_puts(b, expr_ops_expression_name(ops));
         sbuf_putc(b, '}');
     }
     sbuf_putc(b, '(');

@@ -341,6 +341,29 @@ static void test_reverse_hypergeometric_argument(void)
     expr_free(upper_value);
 }
 
+static void test_reverse_qdigamma_arguments(void)
+{
+    expr_t *q = test_expr_new_named_var_d(0.5, "q");
+    expr_t *z = test_expr_new_named_var_d(1.2, "z");
+    expr_t *function = expr_qdigamma(q, z);
+    const expr_t *variables[] = {q, z};
+    number_t value = NUM_NAN;
+    number_t gradients[2] = {NUM_NAN, NUM_NAN};
+
+    ASSERT_NOT_NULL(function);
+    ASSERT_EQ_INT(expr_eval_derivatives(function, 2u, variables, &value, gradients), 0);
+    ASSERT_TRUE(num_is_finite(value));
+    ASSERT_TRUE(num_is_finite(gradients[0]));
+    ASSERT_TRUE(num_is_finite(gradients[1]));
+
+    num_destroy(&gradients[1]);
+    num_destroy(&gradients[0]);
+    num_destroy(&value);
+    expr_free(function);
+    expr_free(z);
+    expr_free(q);
+}
+
 static void test_reverse_appell_variables(void)
 {
     expr_t *a = test_expr_new_const_d(0.5);
@@ -402,6 +425,7 @@ void test_reverse_mode(void)
     TEST_RUN_SUBTEST(test_reverse_gradient_polynomial_num, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_complex_number_t, NULL);
     TEST_RUN_SUBTEST(test_reverse_special_function_arguments, NULL);
+    TEST_RUN_SUBTEST(test_reverse_qdigamma_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_hypergeometric_argument, NULL);
     TEST_RUN_SUBTEST(test_reverse_appell_variables, NULL);
     TEST_RUN_SUBTEST(test_reverse_lauricella_variables, NULL);
