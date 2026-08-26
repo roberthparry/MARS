@@ -4664,6 +4664,25 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_finite_sum_linearity_splits_additive_progressions(self) -> None:
+        source = "{ @Z_(k=1)^n (sin(kx)+cos(kx)+tan(kx)) | x=1; n=100000 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "{ Σ_(k=1)^n sin(kx) + Σ_(k=1)^n cos(kx) + Σ_(k=1)^n tan(kx) | x = 1; n = 100000 }",
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_cosine_progression_has_a_finite_symbolic_antiderivative(self) -> None:
         source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=pi/12; n=100 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
