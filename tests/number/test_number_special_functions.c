@@ -271,6 +271,49 @@ void run_number_special_function_tests(void)
 
     {
         size_t saved_precision = num_get_default_prec_bits();
+        number_t z;
+        number_t z_plus_one;
+        number_t psi_z;
+        number_t psi_z_plus_one;
+        number_t reciprocal;
+        number_t recurrence_lhs;
+        number_t recurrence_difference;
+        number_t conjugate_z;
+        number_t psi_conjugate_z;
+        number_t conjugate_psi_z;
+
+        ASSERT_EQ_INT(num_set_default_prec_bits(1280u), 0);
+        z = num_create_from_string("1+i");
+        z_plus_one = num_add(z, NUM_ONE);
+        psi_z = num_digamma(z);
+        psi_z_plus_one = num_digamma(z_plus_one);
+        reciprocal = num_inv(z);
+        recurrence_lhs = num_sub(psi_z_plus_one, psi_z);
+        recurrence_difference = num_sub(recurrence_lhs, reciprocal);
+        conjugate_z = num_conj(z);
+        psi_conjugate_z = num_digamma(conjugate_z);
+        conjugate_psi_z = num_conj(psi_z);
+
+        ASSERT_EQ_INT((int)num_get_prec_bits(psi_z), 1280);
+        assert_number_close_text("1280-bit complex digamma recurrence", recurrence_difference, "0", "1e-380");
+        assert_number_close_number("1280-bit complex digamma conjugation", psi_conjugate_z, conjugate_psi_z,
+                                   "1e-380");
+
+        num_destroy(&conjugate_psi_z);
+        num_destroy(&psi_conjugate_z);
+        num_destroy(&conjugate_z);
+        num_destroy(&recurrence_difference);
+        num_destroy(&recurrence_lhs);
+        num_destroy(&reciprocal);
+        num_destroy(&psi_z_plus_one);
+        num_destroy(&psi_z);
+        num_destroy(&z_plus_one);
+        num_destroy(&z);
+        ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
+    }
+
+    {
+        size_t saved_precision = num_get_default_prec_bits();
         number_t order = num_create_from_string("0.5");
         number_t argument = num_create_from_string("1.25");
         number_t two;

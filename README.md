@@ -37,8 +37,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   derivatives and numeric reverse-mode gradients, Cartesian presentation of
   complex elementary functions, symbolic antiderivatives for conservative rule
   families, native algebraic-series ellipsis expansion, harmonic polynomials,
-  trigonometric and hyperbolic progression sums, Riemann and Hurwitz zeta
-  calculus, finite sum and product notation, Li₁ and Lerch-transcendent
+  exact elementary and inverse-function progression sums, Riemann and Hurwitz
+  zeta calculus, finite sum and product notation, Li₁ and Lerch-transcendent
   calculus, symbolic matrix integration and structural matcher helpers for
   higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
@@ -62,14 +62,14 @@ derivatives and their antiderivatives in Cartesian `p + qi` form. Explicit
 fractional powers retain every root branch, while named root functions remain
 single-valued. Native algebraic-series recognition supplies the sigma step and
 domain-appropriate closed form, and a Value card appears whenever all required
-parameters have been supplied. Finite `sin`, `cos`, `sinh` and `cosh`
-progressions are recognised directly; harmonic-polynomial notation supplies a
-finite symbolic antiderivative for the cosine progression. Native `@Z` and
-`@P` notation supplies formal sums and products. Formal finite trigonometric
-and hyperbolic progressions expose the same closed formulae and efficient
-values as their ellipsis forms. Weighted hyperbolic sums use a bounded
-Li₁/Lerch representation, stable direct values and an inverse calculus
-simplification that recovers their finite-sum derivative.
+parameters have been supplied. Finite progressions recognise exact geometric,
+log-gamma, q-digamma, power-sum and small-rational residue identities, including
+composite symbolic steps such as `kax`. Inverse tangent families use compact
+log-gamma forms where available, while unsupported functions visibly remain
+formal sums. Native `@Z` and `@P` notation supplies formal sums and products.
+Weighted hyperbolic sums use a bounded Li₁/Lerch representation, stable direct
+values and an inverse calculus simplification that recovers their finite-sum
+derivative.
 
 After building MARS and installing the Lab's runtime dependencies, start it
 from the repository root:

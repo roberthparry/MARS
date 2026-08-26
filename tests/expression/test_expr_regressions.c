@@ -2190,8 +2190,8 @@ static void test_lgamma_successor_sum_simplifies(void)
     expr_t *not_recurrence_simp = not_recurrence ? expr_simplify(not_recurrence) : NULL;
     char *recurrence_text = recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
     char *not_recurrence_text = not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
-    const char *recurrence_expect = "{ lgamma(x + 1) | x = NAN }";
-    const char *not_recurrence_expect = "{ ln(x + 1) + lgamma(x) | x = NAN }";
+    const char *recurrence_expect = "{ lnΓ(x + 1) | x = NAN }";
+    const char *not_recurrence_expect = "{ ln(x + 1) + lnΓ(x) | x = NAN }";
 
     if (str_eq(recurrence_text, recurrence_expect))
         to_string_pass("ln(x)+lgamma(x) simplifies by log-gamma recurrence", recurrence_text, recurrence_expect);
@@ -3261,7 +3261,7 @@ static void test_binding_successor_and_trig_shape_simplifies(void)
         },
         {
             "{ x | x = ln(pi/5) + lgamma(pi/5) }",
-            "lgamma(π/5 + 1)",
+            "lnΓ(π/5 + 1)",
             "binding log-gamma successor simplifies",
         },
         {

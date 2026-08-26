@@ -416,13 +416,19 @@ the inline fixed-precision fast paths.
 `num_root(number, order)` promotes a negative real radicand to a complex result
 when the selected principal root is not real.
 
+The arbitrary-precision `number_t` backends likewise promote real inputs across
+the principal branch cuts of inverse circular and hyperbolic functions. Thus
+`num_asin(2)` and `num_acosh(1/2)` return complex principal values rather than
+discarding the imaginary component. The double and double-double backends keep
+their existing backend-specific precision and representation.
+
 ### Special Functions
 
 | Function | Meaning |
 | --- | --- |
 | `num_gamma(x)` | Evaluates Euler's gamma function `Γ(x)`. |
 | `num_lgamma(x)` | Evaluates the principal logarithm of `Γ(x)`. |
-| `num_digamma(x)` | Evaluates `ψ(x)`, the logarithmic derivative of gamma. |
+| `num_digamma(x)` | Evaluates `ψ(x)`, the logarithmic derivative of gamma; arbitrary-precision complex inputs retain the active precision and use recurrence and reflection across the complex plane. |
 | `number_qdigamma(q, x)` | Evaluates the q-digamma `ψ_q(x)` while preserving the active real or complex backend. |
 | `num_qdigamma(q, x)` | Compatibility spelling for `number_qdigamma(q, x)`. |
 | `num_trigamma(x)` | Evaluates `ψ⁽¹⁾(x)`, the derivative of digamma. |

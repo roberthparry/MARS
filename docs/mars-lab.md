@@ -126,6 +126,111 @@ $$
 and supplies its numerical Value without iterating through a large upper
 bound.
 
+The exponential progression is geometric as well:
+
+$$
+\sum_{k=1}^{n}e^{kx}
+=\frac{e^x}{e^x-1}\left(e^{nx}-1\right).
+$$
+
+For `{ @Z_(k=1)^n exp(kx) | x=2; n=100000 }`, MARS Lab displays that
+identity, Expression style emits
+`exp(x)/(exp(x) - 1)·(exp(nx) - 1)`, and Function style evaluates the same
+formula using a shared `exp(x)` temporary. Its Value is
+`9.110304914770879911502042940141264278041407847643843263784059825E+86858`.
+At `x = 0`, MARS evaluates the removable limit directly and returns `n`.
+
+Products inside logarithms reduce the corresponding logarithmic progression:
+
+$$
+\sum_{k=1}^{n}\ln(kx)=n\ln(x)+\ln\Gamma(n+1).
+$$
+
+For `{ @Z_(k=1)^n ln(kx) | x=2; n=100000 }`, Expression style emits
+`n·ln(x) + lnΓ(n + 1)`, Function style emits `n.ln(x) + lgamma(n + 1)`, and the
+Value is
+`1120613.939955116396071001320351928512056894536584146906526018233`.
+
+Because `log` denotes the common logarithm, it remains distinct from `ln`:
+
+$$
+\sum_{k=1}^{n}\lg(kx)
+=n\lg(x)+\frac{\ln\Gamma(n+1)}{\ln(10)}.
+$$
+
+For `{ @Z_(k=1)^n log(kx) | x=2; n=100000 }`, the parseable result is
+`n·lg(x) + lnΓ(n + 1)/ln(10)` and the Value is
+`486676.4504663690278820372835671954350107214367484924045390786799`.
+
+The summand function now owns any exact finite-progression reducer. This keeps
+the recogniser independent of function names and lets related functions reuse
+the same mathematics. For example,
+
+$$
+\sum_{k=1}^{n}\operatorname{versin}(kx)
+=n-\frac{\sin(nx/2)\cos((n+1)x/2)}{\sin(x/2)}.
+$$
+
+For `{ @Z_(k=1)^n versin(kx) | x=2; n=100000 }`, Expression style emits
+`n - sin(nx/2)·cos(x/2·(n + 1))/sin(x/2)` and the Value is
+`100000.0242173437116803434689891041295735315676686381885043434219`.
+The other seven versed and haversed functions reduce through the same sine and
+cosine progression operations.
+
+The progression step may itself be a symbolic product. The recogniser removes
+the local index wherever it occurs as one multiplicative factor, so `kax`,
+`akx`, and `axk` all have step `ax`. For
+`{ @Z_(k=1)^n sin(kax) | a=2; x=3; n=100000 }`, Expression style outputs
+`sin(nax/2)·sin(ax/2·(n + 1))/sin(ax/2)` with the supplied bindings,
+Function style introduces `v1 = a.x.` and evaluates
+`v2 = v1/2.` before returning
+`sin(n.v1/2).sin((n + 1).v1/2)/sin(v2)`, and the Value is
+`-0.1868614750758504223995060240052491962444814290852506553280866826`.
+Rendered TeX shows the original sigma followed by that identity. A nonlinear
+argument such as `k²ax` retains another `k` after extraction and therefore
+remains a formal sum.
+
+Positive integer scaling also gives exact homogeneous progressions. In
+particular,
+
+$$
+\sum_{k=1}^{n}\sqrt{kx}
+=\sqrt{x}\left(\zeta(-1/2)-\zeta(-1/2,n+1)\right).
+$$
+
+For `{ @Z_(k=1)^n sqrt(kx) | x=2; n=100000 }`, Expression style emits
+`√(x)·(ζ(-1/2) - ζ(-1/2, n + 1))` and the Value is
+`29814463.01298576613569741465397922838928192939324835606473553721`.
+The analogous cube-root reducer uses exponent `-1/3`; `abs(kx)` and `conj(kx)`
+use the triangular number `n·(n + 1)/2`.
+
+Floor and ceiling use an arithmetic progression for a proved integral step. For
+`{ @Z_(k=1)^n floor(kx) | x=2; n=100000 }`, all result cards retain the native
+domain-required specialisation `x·n/2·(n + 1)` and the Value is `10000100000`.
+
+A proved small rational step `x = p/q` has a repeating residue pattern. Writing
+`m = floor(n/q)` and `r = mod(n, q)`, MARS reduces
+
+$$
+\sum_{k=1}^{n}\left\lfloor\frac{pk}{q}\right\rfloor
+=m\left(\frac{pq(m-1)}{2}+p+\frac{(p-1)(q-1)}{2}+pr\right)
++\sum_{s=1}^{r}\left\lfloor\frac{ps}{q}\right\rfloor .
+$$
+
+The native expression expands the last sum into no more than `q - 1` residue
+indicators, so it never conceals a large term-by-term loop. For
+`{ @Z_(k=1)^n floor(0.6k) | n=100000 }`, Expression style outputs
+`{ ⌊n/5⌋·(15/2·(⌊n/5⌋ - 1) + 7 + 3·mod(n, 5)) + (⌊1/5·(mod(n, 5) + 3)⌋ + ⌊1/5·(mod(n, 5) + 2)⌋ + 2·⌊1/5·(mod(n, 5) + 1)⌋) | n = 100000 }`
+and the Value is `2999990000`. Rendered TeX shows the original sum followed by
+this equality, while Function style emits the same period formula with
+temporaries for `n/5`, `floor(n/5)`, and `mod(n, 5)` rather than
+`sum(k, 1, n, ...)`.
+
+Non-integral rationals currently require reduced denominator `q <= 32` and
+`|p| <= 1000000`. MARS leaves an unset, irrational, or larger rational step
+formal rather than claiming a reduction it has not proved. Ceiling uses the
+corresponding ceiling residues.
+
 The weighted hyperbolic sums `@Z_k=1^n sinh(kx)/k` and
 `@Z_k=1^n cosh(kx)/k` have native Lerch-transcendent forms built from Li₁ and
 Φ. MARS Lab always displays the applicable form, including when a stable
@@ -211,13 +316,12 @@ Their first-argument derivatives use the trailing-`p` names `zetap`,
 `zatahp`, and `zeta2p`.
 
 A finite tangent progression is shown with its q-digamma identity rather than
-pretending that a large explicit summation was performed symbolically. With
-`q = exp(2ix)`, MARS uses
+pretending that a large explicit summation was performed symbolically. MARS
+uses the reduced identity
 
 $$
 \sum_{k=1}^{n}\tan(kx)
-=in-\frac{2i}{\log q}\left(\psi_q(1)-\psi_q(n+1)\right)
-+\frac{4i}{\log(q^2)}\left(\psi_{q^2}(1)-\psi_{q^2}(n+1)\right).
+=in+\frac{\psi_{e^{4ix}}(1)-\psi_{e^{4ix}}(n+1)-\psi_{e^{2ix}}(1)+\psi_{e^{2ix}}(n+1)}{x}.
 $$
 
 The Expression and Function cards show the same q-digamma formula. The Value
@@ -225,6 +329,75 @@ card evaluates the recognised finite combination by a stable native real sum:
 the separate q-digamma terms are not assigned artificial values on the unit
 circle. Using the displayed formula as input recovers the same summation,
 identity, bindings and value.
+
+Inverse circular and inverse hyperbolic progressions use log-gamma identities
+where those identities are genuinely shorter than the original sum. Define
+
+$$
+D_n(s)=\ln\Gamma(n+1+s)-\ln\Gamma(1+s)
+      +\ln\Gamma(1-s)-\ln\Gamma(n+1-s).
+$$
+
+Then MARS uses
+
+$$
+\sum_{k=1}^{n}\operatorname{acot}(kx)=\frac{D_n(i/x)}{2i},
+\qquad
+\sum_{k=1}^{n}\operatorname{acoth}(kx)=\frac{D_n(1/x)}{2},
+$$
+
+and
+
+$$
+\sum_{k=1}^{n}\operatorname{atanh}(kx)
+=\frac{n\left(\ln x-\ln(-x)\right)+D_n(1/x)}{2}.
+$$
+
+For real non-zero `x`, arctangent uses the sign-aware complex-shift log-gamma identity
+
+$$
+\sum_{k=1}^{n}\operatorname{atan}(kx)
+=\frac{n\pi x}{2|x|}+\frac{i}{2}\left(
+\ln\Gamma\left(n+1+\frac{i}{x}\right)-\ln\Gamma\left(1+\frac{i}{x}\right)
++\ln\Gamma\left(1-\frac{i}{x}\right)-\ln\Gamma\left(n+1-\frac{i}{x}\right)
+\right).
+$$
+
+This uses `ln(-ix) - ln(ix) = -iπx/|x|`, keeps the imaginary unit out of the
+denominator, and preserves the principal-logarithm branches for positive and
+negative real `x`. The Value card evaluates the supplied real terms directly at
+the active precision, while the reduced identity remains visible in every
+non-Value card. At `x = 0`, the finite sum evaluates directly to zero. Other
+displayed log-gamma formulae may likewise use their finite terms to cross a
+removable numerical singularity without hiding the symbolic identity.
+
+Differentiating the arctangent progression uses the compact conjugate-pair form
+
+$$
+\frac{\psi(n+1+i/x)-\psi(1+i/x)+\psi(n+1-i/x)-\psi(1-i/x)}{2x^2}
+=\sum_{k=1}^{n}\frac{k}{1+k^2x^2}.
+$$
+
+MARS evaluates its complex digamma terms through the active arbitrary-precision
+backend and returns the mathematically real result. At 386 requested digits,
+`{ @Z_(k=1)^n atan(kx) | x=1; n=1000000000 }` therefore returns a 386-digit
+derivative Value beginning `20.6286155168239341793067112756040338`, without a
+spurious imaginary residue.
+
+The other inverse circular, inverse versed and inverse hyperbolic functions
+have no shorter identity in MARS's current special-function vocabulary. Their
+Rendered TeX and Expression cards therefore keep the sigma visible, and the
+Function card explicitly retains `sum(...)`. With supplied finite bounds of at
+most one million terms, the Value card evaluates that displayed finite sum
+directly. The unchanged sigma and `sum(...)` make this numerical route visible;
+they do not imply an undisplayed closed form.
+
+An exact inverse-function pole remains a numerical result rather than becoming
+an absent Value. For example,
+`{ @Z_(k=1)^n acoth(kx) | x=1; n=1000000000 }` contains
+`acoth(1)` as its first term, so its Value is `∞`; changing `x` to `-1` gives
+`-∞`. The same signed-infinity handling applies when a finite `atanh(kx)`
+progression reaches `kx = 1` or `kx = -1`.
 
 The corresponding hyperbolic-tangent progression uses a real q-digamma
 identity. With `q = exp(-2x)`, MARS uses

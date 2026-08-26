@@ -544,7 +544,7 @@ static bool format_is_negligible(number_t value, int precision)
 {
     number_t mag = num_abs(value);
     number_t tolerance = num_pow10(-(precision > 0 ? precision : 64));
-    bool negligible = num_lt(mag, tolerance);
+    bool negligible = num_is_zero(value) || num_lt(mag, tolerance);
 
     num_destroy(&tolerance);
     num_destroy(&mag);
@@ -630,7 +630,7 @@ static char *owned_number_text(number_t value, int precision)
     } else if (num_is_inf(value)) {
         text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
     } else {
-        text = num_is_real(value) ? format_real_number(num_clone(value), display_precision)
+        text = num_is_real(value) ? format_real_number(num_real_part(value), display_precision)
                                   : format_complex_number(value, display_precision);
     }
 
@@ -1867,6 +1867,8 @@ int main(int argc, char **argv)
         wrt = expr_bindings_get(bindings, wrt_name);
     wrt_is_variable = wrt && expr_is_variable(wrt);
     progression_closed_form = expr_finite_progression_closed_form(expr);
+    if (progression_closed_form && expr_finite_progression_requires_bound_step(expr))
+        domain_specialised = true;
     if (!progression_closed_form) {
         qdigamma_progression_source = expr_finite_progression_from_qdigamma_form(expr);
         progression_closed_form = expr_finite_progression_closed_form(qdigamma_progression_source);
@@ -1932,6 +1934,7 @@ int main(int argc, char **argv)
         expr_t *derivative_root_base = NULL;
         expr_t *weighted_derivative_source = NULL;
         const expr_t *derivative_source = display_expr;
+        bool used_atan_derivative_form = false;
         long derivative_root_order = 0L;
 
         if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
@@ -1944,7 +1947,10 @@ int main(int argc, char **argv)
             derivative_progression_source = expr_create_deriv(weighted_derivative_source, wrt);
             expr_free(weighted_derivative_source);
         }
-        deriv = expr_create_deriv(derivative_source, wrt);
+        deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
+        used_atan_derivative_form = deriv != NULL;
+        if (!deriv)
+            deriv = expr_create_deriv(derivative_source, wrt);
         if (!deriv) {
             fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
             rc = 1;
@@ -1955,6 +1961,7 @@ int main(int argc, char **argv)
             derivative_progression_closed_form = expr_clone(deriv);
         display_deriv = derivative_progression_closed_form
                             ? derivative_progression_closed_form
+                            : used_atan_derivative_form ? expr_beautify(deriv)
                             : display_polynomial_simplified(deriv, wrt, complex_cartesian);
         if (display_deriv) {
             display_deriv_owned = true;
@@ -1993,8 +2000,9 @@ int main(int argc, char **argv)
         print_expression_bindings("derivative_binding", deriv_text, precision);
         if (deriv_values_text)
             printf("d values     %s\n", deriv_values_text);
-        else
+        else {
             print_owned_number("d value", expr_eval(deriv), precision);
+        }
     } else if (derivative_request) {
         printf("derivative  no variable binding named '%s'\n", wrt_name);
     }

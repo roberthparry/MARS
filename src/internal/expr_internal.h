@@ -182,12 +182,20 @@ bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_is_summation(const expr_t *expr);
 
 /**
- * @brief Return the closed form of a recognised finite circular or hyperbolic progression.
+ * @brief Return the closed form supplied by the summand function for a recognised finite progression.
  *
  * @param expr Expression to inspect.
  * @return Owning closed-form expression, or `NULL` when no identity applies.
  */
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
+
+/**
+ * @brief Return whether a progression reduction depends on the supplied value of its step.
+ *
+ * @param expr Expression to inspect.
+ * @return `true` when the native result cards must retain the bound algebraic specialisation.
+ */
+bool expr_finite_progression_requires_bound_step(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr);
@@ -206,9 +214,10 @@ bool expr_finite_tangent_qdigamma_value(const expr_t *expr, number_t *value_out)
 expr_t *expr_finite_tanh_from_qdigamma_form(const expr_t *expr);
 expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr);
 bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_out);
+expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt);
 
 /**
- * @brief Render a finite circular or hyperbolic progression as a summation followed by its closed form.
+ * @brief Render a recognised finite progression as a summation followed by its closed form.
  *
  * @param expr Expression to inspect.
  * @return Newly allocated TeX text, or `NULL` when the expression is not a recognised progression.
@@ -278,6 +287,17 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
 
 string_t *expr_normalise_name_text(const string_t *name);
 string_t *expr_normalise_greek_alias_text(const string_t *alias);
+
+/**
+ * @brief Resolve a canonical Greek symbol to its at-prefixed ASCII alias.
+ *
+ * Lower-case and upper-case symbols retain their case in the returned alias.
+ *
+ * @param symbol Greek Unicode symbol to resolve.
+ * @return Borrowed process-lifetime alias, or `NULL` when the symbol is not registered.
+ */
+const char *expr_greek_symbol_alias(rune_t symbol);
+
 string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);

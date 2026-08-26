@@ -592,7 +592,7 @@ expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, c
  * Arguments are retained (not consumed).
  *
  * Error functions:   expr_erf, expr_erfc, expr_erfinv, expr_erfcinv
- * Gamma family:      expr_gamma (Γ), expr_lgamma (log Γ), expr_digamma (ψ⁽⁰⁾),
+ * Gamma family:      expr_gamma (Γ), expr_lgamma (ln Γ), expr_digamma (ψ⁽⁰⁾),
  *                    expr_qdigamma (q-digamma ψ_q), expr_trigamma (ψ⁽¹⁾), expr_polygamma (ψ⁽ⁿ⁾),
  *                    expr_gammainv (Γ⁻¹), expr_gammainc_lower,
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q

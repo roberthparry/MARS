@@ -124,6 +124,7 @@ static void test_number_real_elementary_parity(void)
     number_t zero = number_text("0");
     number_t complex_zero = number_text("0 + 0i");
     number_t half = number_text("0.5");
+    number_t exact_half = number_text("1/2");
     number_t two = number_text("2");
     number_t neg_one = number_text("-1");
     number_t sin_half = num_sin(half);
@@ -140,9 +141,13 @@ static void test_number_real_elementary_parity(void)
     number_t coth_half = num_coth(half);
     number_t atan_half = num_atan(half);
     number_t asin_half = num_asin(half);
+    number_t asin_two = num_asin(two);
     number_t acos_half = num_acos(half);
+    number_t acos_two = num_acos(two);
     number_t asec_two = num_asec(two);
     number_t acosec_two = num_acosec(two);
+    number_t asec_exact_half = num_asec(exact_half);
+    number_t acosec_exact_half = num_acosec(exact_half);
     number_t asec_zero = num_asec(zero);
     number_t acosec_zero = num_acosec(zero);
     number_t asec_complex_zero = num_asec(complex_zero);
@@ -155,10 +160,14 @@ static void test_number_real_elementary_parity(void)
     number_t acot_one = num_acot(one);
     number_t asinh_half = num_asinh(half);
     number_t acosh_two = num_acosh(two);
+    number_t acosh_exact_half = num_acosh(exact_half);
     number_t atanh_half = num_atanh(half);
+    number_t atanh_two = num_atanh(two);
     number_t asech_half = num_asech(half);
+    number_t asech_two = num_asech(two);
     number_t acosech_one = num_acosech(one);
     number_t acoth_two = num_acoth(two);
+    number_t acoth_exact_half = num_acoth(exact_half);
     number_t atan2_quad_ii = num_atan2(half, neg_one);
     number_t sec_cos = num_mul(sec_half, cos_half);
     number_t cosec_sin = num_mul(cosec_half, sin_half);
@@ -188,9 +197,20 @@ static void test_number_real_elementary_parity(void)
     assert_number_close_text("coth(0.5) * tanh(0.5)", coth_tanh, "1", NUMBER_PARITY_TIGHT_TOL);
     assert_number_string_prefix("atan(0.5)", atan_half, "0.463647609000806116214256231461214");
     assert_number_string_prefix("asin(0.5)", asin_half, "0.523598775598298873077107230546583");
+    assert_number_close_text("asin(2)", asin_two,
+                             "1.5707963267948966192313216916397514420985846996875529104874722961539082031 + "
+                             "1.3169578969248167086250463473079684440269819714675164797684722569204601854i",
+                             NUMBER_PARITY_TIGHT_TOL);
     assert_number_string_prefix("acos(0.5)", acos_half, "1.04719755119659774615421446109316");
+    assert_number_close_text("acos(2)", acos_two,
+                             "-1.3169578969248167086250463473079684440269819714675164797684722569204601854i",
+                             NUMBER_PARITY_TIGHT_TOL);
     assert_number_string_prefix("asec(2)", asec_two, "1.04719755119659774615421446109316");
     assert_number_string_prefix("acosec(2)", acosec_two, "0.523598775598298873077107230546583");
+    assert_number_close_text("asec(1/2) = acos(2)", num_sub(asec_exact_half, acos_two), "0",
+                             NUMBER_PARITY_TIGHT_TOL);
+    assert_number_close_text("acosec(1/2) = asin(2)", num_sub(acosec_exact_half, asin_two), "0",
+                             NUMBER_PARITY_TIGHT_TOL);
     ASSERT_TRUE(num_is_nan(asec_zero));
     ASSERT_TRUE(num_is_nan(acosec_zero));
     ASSERT_TRUE(num_is_nan(asec_complex_zero));
@@ -203,10 +223,18 @@ static void test_number_real_elementary_parity(void)
     assert_number_string_prefix("acot(1)", acot_one, "0.785398163397448309615660845819875");
     assert_number_string_prefix("asinh(0.5)", asinh_half, "0.481211825059603447497758913424368");
     assert_number_string_prefix("acosh(2)", acosh_two, "1.316957896924816708625046347307968");
+    assert_number_real_imag_close("acosh(1/2)", acosh_exact_half, "0", "1.047197551196597746154214461093168",
+                                  NUMBER_PARITY_BRANCH_TOL);
     assert_number_string_prefix("atanh(0.5)", atanh_half, "0.549306144334054845697622618461262");
+    assert_number_real_imag_close("atanh(2)", atanh_two, "0.549306144334054845697622618461262",
+                                  "1.570796326794896619231321691639751", NUMBER_PARITY_BRANCH_TOL);
     assert_number_string_prefix("asech(0.5)", asech_half, "1.316957896924816708625046347307968");
+    assert_number_close_text("asech(2) = acosh(1/2)", num_sub(asech_two, acosh_exact_half), "0",
+                             NUMBER_PARITY_TIGHT_TOL);
     assert_number_string_prefix("acosech(1)", acosech_one, "0.881373587019543025232609324979792");
     assert_number_string_prefix("acoth(2)", acoth_two, "0.549306144334054845697622618461262");
+    assert_number_close_text("acoth(1/2) = atanh(2)", num_sub(acoth_exact_half, atanh_two), "0",
+                             NUMBER_PARITY_TIGHT_TOL);
     assert_number_string_prefix("atan2(0.5, -1)", atan2_quad_ii, "2.67794504458898712224838715181828");
     assert_number_string_prefix("sincos(0.5).sin", sin_pair, "0.479425538604203000273287935215571");
     assert_number_string_prefix("sincos(0.5).cos", cos_pair, "0.877582561890372716116281582603829");
@@ -224,10 +252,14 @@ static void test_number_real_elementary_parity(void)
     num_destroy(&cosec_sin);
     num_destroy(&sec_cos);
     num_destroy(&atan2_quad_ii);
+    num_destroy(&acoth_exact_half);
     num_destroy(&acoth_two);
     num_destroy(&acosech_one);
+    num_destroy(&asech_two);
     num_destroy(&asech_half);
+    num_destroy(&atanh_two);
     num_destroy(&atanh_half);
+    num_destroy(&acosh_exact_half);
     num_destroy(&acosh_two);
     num_destroy(&asinh_half);
     num_destroy(&acot_one);
@@ -242,6 +274,8 @@ static void test_number_real_elementary_parity(void)
     num_destroy(&asec_zero);
     num_destroy(&acosec_two);
     num_destroy(&asec_two);
+    num_destroy(&acosec_exact_half);
+    num_destroy(&asec_exact_half);
     num_destroy(&acos_half);
     num_destroy(&asin_half);
     num_destroy(&atan_half);
@@ -262,6 +296,7 @@ static void test_number_real_elementary_parity(void)
     num_destroy(&half);
     num_destroy(&complex_zero);
     num_destroy(&zero);
+    num_destroy(&exact_half);
     num_destroy(&one);
 }
 

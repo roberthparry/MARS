@@ -1636,6 +1636,115 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     return rc;
 }
 
+static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t target_prec = mpc_get_prec(out);
+    mpfr_prec_t work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
+    unsigned long shift_target = number_polygamma_shift_target(target_prec);
+    mpc_t y, inv, inv2, power, term, sum;
+    mpfr_t coeff, radius2;
+    bool converged = false;
+    int rc = 0;
+
+    mpc_init2(y, work_prec);
+    mpc_init2(inv, work_prec);
+    mpc_init2(inv2, work_prec);
+    mpc_init2(power, work_prec);
+    mpc_init2(term, work_prec);
+    mpc_init2(sum, work_prec);
+    mpfr_init2(coeff, work_prec);
+    mpfr_init2(radius2, work_prec);
+
+    mpc_set(y, z, MPC_RNDNN);
+    mpc_set_ui(sum, 0u, MPC_RNDNN);
+    for (;;) {
+        mpc_norm(radius2, y, MPFR_RNDN);
+        if (mpfr_cmp_ui(radius2, shift_target * shift_target) >= 0)
+            break;
+        mpc_ui_div(term, 1u, y, MPC_RNDNN);
+        mpc_sub(sum, sum, term, MPC_RNDNN);
+        mpc_add_ui(y, y, 1u, MPC_RNDNN);
+    }
+
+    mpc_ui_div(inv, 1u, y, MPC_RNDNN);
+    mpc_sqr(inv2, inv, MPC_RNDNN);
+    mpc_log(term, y, MPC_RNDNN);
+    mpc_add(sum, sum, term, MPC_RNDNN);
+    mpc_div_2ui(term, inv, 1u, MPC_RNDNN);
+    mpc_sub(sum, sum, term, MPC_RNDNN);
+    mpc_set(power, inv2, MPC_RNDNN);
+
+    for (size_t n = 1u; n <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++n) {
+        if (number_mpfr_set_bernoulli_even(coeff, n) != 0) {
+            rc = -1;
+            break;
+        }
+        mpfr_div_ui(coeff, coeff, 2u * n, MPFR_RNDN);
+        mpc_mul_fr(term, power, coeff, MPC_RNDNN);
+        mpc_sub(sum, sum, term, MPC_RNDNN);
+        if (number_mpc_term_below_target(term, target_prec)) {
+            converged = true;
+            break;
+        }
+        mpc_mul(power, power, inv2, MPC_RNDNN);
+    }
+
+    if (rc == 0 && !converged)
+        rc = -1;
+    if (rc == 0)
+        mpc_set(out, sum, rnd);
+
+    mpfr_clear(radius2);
+    mpfr_clear(coeff);
+    mpc_clear(sum);
+    mpc_clear(term);
+    mpc_clear(power);
+    mpc_clear(inv2);
+    mpc_clear(inv);
+    mpc_clear(y);
+    return rc;
+}
+
+static int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t target_prec = mpc_get_prec(out);
+    mpfr_prec_t work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
+    mpc_t reflected_argument, reflected_value, pi_z, cotangent, correction;
+    mpfr_t pi;
+    int rc;
+
+    if (mpfr_cmp_d(mpc_realref(z), 0.5) >= 0)
+        return number_mpc_digamma_positive(out, z, rnd);
+
+    mpc_init2(reflected_argument, work_prec);
+    mpc_init2(reflected_value, work_prec);
+    mpc_init2(pi_z, work_prec);
+    mpc_init2(cotangent, work_prec);
+    mpc_init2(correction, work_prec);
+    mpfr_init2(pi, work_prec);
+
+    mpc_ui_sub(reflected_argument, 1u, z, MPC_RNDNN);
+    rc = number_mpc_digamma_positive(reflected_value, reflected_argument, MPC_RNDNN);
+    if (rc == 0) {
+        mpfr_const_pi(pi, MPFR_RNDN);
+        mpc_mul_fr(pi_z, z, pi, MPC_RNDNN);
+        mpc_cos(cotangent, pi_z, MPC_RNDNN);
+        mpc_sin(correction, pi_z, MPC_RNDNN);
+        mpc_div(cotangent, cotangent, correction, MPC_RNDNN);
+        mpc_mul_fr(correction, cotangent, pi, MPC_RNDNN);
+        mpc_sub(reflected_value, reflected_value, correction, MPC_RNDNN);
+        mpc_set(out, reflected_value, rnd);
+    }
+
+    mpfr_clear(pi);
+    mpc_clear(correction);
+    mpc_clear(cotangent);
+    mpc_clear(pi_z);
+    mpc_clear(reflected_value);
+    mpc_clear(reflected_argument);
+    return rc;
+}
+
 static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_derivative, mpc_rnd_t rnd)
 {
     mpfr_prec_t target_prec = mpc_get_prec(out);
@@ -4356,6 +4465,14 @@ number_t num_asec(const number_t number)
     double d;
     qfloat_t qf;
 
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        num_gt(number, NUM_NEG_ONE) && num_lt(number, NUM_ONE)) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_asec, .mpfr = NULL, .mpc_complex = number_mpc_asec};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
+
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
         return fabs(d) < 1.0 ? number_double_cdouble_unary(d, number_cdouble_asec)
@@ -4377,6 +4494,14 @@ number_t num_acosec(const number_t number)
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        num_gt(number, NUM_NEG_ONE) && num_lt(number, NUM_ONE)) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_acosec, .mpfr = NULL, .mpc_complex = number_mpc_acosec};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4409,11 +4534,20 @@ number_t num_atan2(const number_t y, const number_t x)
     return number_apply_binary_math_with_double(y, x, atan2, qf_atan2, qc_atan2, number_mpfr_atan2_mut, NULL);
 }
 
+/* Return the principal inverse sine. */
 number_t num_asin(const number_t number)
 {
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        (num_lt(number, NUM_NEG_ONE) || num_gt(number, NUM_ONE))) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_asin, .mpfr = NULL, .mpc_complex = mpc_asin};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4431,11 +4565,20 @@ number_t num_asin(const number_t number)
                                                           mpc_asin);
 }
 
+/* Return the principal inverse cosine. */
 number_t num_acos(const number_t number)
 {
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        (num_lt(number, NUM_NEG_ONE) || num_gt(number, NUM_ONE))) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_acos, .mpfr = NULL, .mpc_complex = mpc_acos};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4655,6 +4798,14 @@ number_t num_acosh(const number_t number)
     double d;
     qfloat_t qf;
 
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        num_lt(number, NUM_ONE)) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_acosh, .mpfr = NULL, .mpc_complex = mpc_acosh};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
+
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
         return d < 1.0 ? number_double_cdouble_unary(d, cacosh) : num_create_from_double(acosh(d));
@@ -4675,6 +4826,14 @@ number_t num_atanh(const number_t number)
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        (num_lt(number, NUM_NEG_ONE) || num_gt(number, NUM_ONE))) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_atanh, .mpfr = NULL, .mpc_complex = mpc_atanh};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4697,6 +4856,14 @@ number_t num_asech(const number_t number)
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        (num_le(number, NUM_ZERO) || num_gt(number, NUM_ONE))) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_asech, .mpfr = NULL, .mpc_complex = number_mpc_asech};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4727,6 +4894,14 @@ number_t num_acoth(const number_t number)
     number_kind_t kind = number_kind_value(&number);
     double d;
     qfloat_t qf;
+
+    if (kind != NUMBER_DOUBLE && kind != NUMBER_CDOUBLE && kind != NUMBER_QFLOAT && num_is_real(number) &&
+        num_ge(number, NUM_NEG_ONE) && num_le(number, NUM_ONE)) {
+        const number_unary_math_ops_t ops = {
+            .qreal = NULL, .qcomplex = qc_acoth, .mpfr = NULL, .mpc_complex = number_mpc_acoth};
+
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
 
     if (kind == NUMBER_DOUBLE) {
         d = number_impl_const(&number)->value.d;
@@ -4759,7 +4934,7 @@ number_t num_lgamma(const number_t number)
 number_t num_digamma(const number_t number)
 {
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_digamma, qc_digamma, number_mpfr_digamma_mut,
-                                                          NULL);
+                                                          number_mpc_digamma_mut);
 }
 
 /* Evaluate q-digamma through the qfloat or qcomplex backend. */

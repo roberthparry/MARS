@@ -175,6 +175,12 @@ All declarations are in `include/qcomplex.h`.
 | `qc_acosech(z)` | inverse hyperbolic cosecant (principal branch) |
 | `qc_acoth(z)` | inverse hyperbolic cotangent (principal branch) |
 
+Principal inverse functions follow the upper-side convention when an exactly
+real input lies on a branch cut. In particular, `qc_asin(2)` is
+`1.570796326794896619231321691639751 + 1.316957896924816708625046347307968i`,
+while `qc_acos(2)` is
+`-1.316957896924816708625046347307968i`.
+
 ### Special Functions
 
 | Function | Description |
