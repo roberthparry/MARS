@@ -4645,6 +4645,25 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_tangent_cosine_summand_reduces_before_finite_sum_evaluation(self) -> None:
+        source = "{ @Z_(k=1)^n tan(kx)cos(kx) | x=1; n=1000000000 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
+        )
+        self.assertNotIn("Σ_", payload["full_display_expression"])
+        self.assertNotIn("sum(k, 1, n", payload["full_display_function"])
+        self.assertIn(r"\sum_{k=1}^{n}\tan(k\mkern-2mu x)\mkern-2mu \cos(k\mkern-2mu x) =", payload["display_TeX"])
+        self.assertTrue(payload["value"].startswith("0.4212944867471369486379515293337067831"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_cosine_progression_has_a_finite_symbolic_antiderivative(self) -> None:
         source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=pi/12; n=100 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
