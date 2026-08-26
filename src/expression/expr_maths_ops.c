@@ -2322,8 +2322,16 @@ static expr_t *expr_simplify_linear_summation_term(const expr_t *term, const exp
 
     if (!term || !bounds)
         return NULL;
-    if (!expr_is_op(term, &ops_add))
-        return expr_math_wrap_binary(&ops_summation, term, bounds);
+    if (!expr_is_op(term, &ops_add)) {
+        expr_t *sum = expr_math_wrap_binary(&ops_summation, term, bounds);
+        expr_t *closed_form = sum ? expr_finite_progression_closed_form(sum) : NULL;
+
+        if (closed_form) {
+            expr_free(sum);
+            return closed_form;
+        }
+        return sum;
+    }
 
     left = expr_simplify_linear_summation_term(term->a, bounds);
     right = expr_simplify_linear_summation_term(term->b, bounds);
