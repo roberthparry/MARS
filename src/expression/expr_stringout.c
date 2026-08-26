@@ -3712,9 +3712,14 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_hypergeometric_pFq(f, b);
             return;
         }
-        sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, expr_ops_expression_name(f->ops));
-        sbuf_puts(b, "}(");
+        if (f->ops->TeX_name)
+            sbuf_puts(b, f->ops->TeX_name);
+        else {
+            sbuf_puts(b, "\\operatorname{");
+            sbuf_puts(b, expr_ops_expression_name(f->ops));
+            sbuf_putc(b, '}');
+        }
+        sbuf_putc(b, '(');
         emit_TeX_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
         emit_TeX_expr(f->b, b, 0);
@@ -4450,6 +4455,41 @@ void emit_func_fragment(sbuf_t *b, const char *text)
     free(normalised);
 }
 
+static void emit_func_additive_chain(const expr_t *expr, sbuf_t *b, bool subtract, bool *emitted)
+{
+    const char *temporary_name = function_temporary_name(expr);
+    bool negative;
+    bool effective_subtract;
+
+    if (!temporary_name && expr_is_op(expr, &ops_add)) {
+        emit_func_additive_chain(expr->a, b, subtract, emitted);
+        emit_func_additive_chain(expr->b, b, subtract, emitted);
+        return;
+    }
+    if (!temporary_name && expr_is_op(expr, &ops_sub)) {
+        emit_func_additive_chain(expr->a, b, subtract, emitted);
+        emit_func_additive_chain(expr->b, b, !subtract, emitted);
+        return;
+    }
+    if (!temporary_name && expr_is_op(expr, &ops_neg)) {
+        emit_func_additive_chain(expr->a, b, !subtract, emitted);
+        return;
+    }
+
+    negative = !temporary_name && expr_renders_negative(expr);
+    effective_subtract = subtract != negative;
+    if (*emitted)
+        sbuf_puts(b, effective_subtract ? " - " : " + ");
+    else if (effective_subtract)
+        sbuf_putc(b, '-');
+
+    if (negative)
+        emit_func_abs(expr, b, PREC_ADD);
+    else
+        emit_func(expr, b, PREC_ADD);
+    *emitted = true;
+}
+
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     const char *temporary_name = function_temporary_name(f);
@@ -4510,13 +4550,14 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_op(f, &ops_neg)) {
         int need = PREC_UNARY < parent_prec;
         int nested_negation = f->a && expr_is_op(f->a, &ops_neg);
+        int child_precedence = f->a && (expr_is_mul(f->a) || expr_is_op(f->a, &ops_div)) ? PREC_MUL : PREC_UNARY;
 
         if (need)
             sbuf_putc(b, '(');
         sbuf_putc(b, '-');
         if (nested_negation)
             sbuf_putc(b, '(');
-        emit_func(f->a, b, nested_negation ? PREC_LOWEST : PREC_UNARY);
+        emit_func(f->a, b, nested_negation ? PREC_LOWEST : child_precedence);
         if (nested_negation)
             sbuf_putc(b, ')');
         if (need)
@@ -4640,28 +4681,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
     if (expr_is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
-        int neg;
+        bool emitted = false;
 
         if (need)
             sbuf_putc(b, '(');
 
-        emit_func(f->a, b, PREC_ADD);
-        neg = function_temporary_name(f->b) ? 0 : expr_renders_negative(f->b);
-
-        if (expr_is_op(f, &ops_add))
-            sbuf_puts(b, neg ? " - " : " + ");
-        else
-            sbuf_puts(b, neg ? " + " : " - ");
-
-        int rhs_parens = !function_temporary_name(f->b) && add_rhs_needs_visible_parens(f->b);
-        if (rhs_parens)
-            sbuf_putc(b, '(');
-        if (neg)
-            emit_func_abs(f->b, b, PREC_ADD);
-        else
-            emit_func(f->b, b, PREC_ADD);
-        if (rhs_parens)
-            sbuf_putc(b, ')');
+        emit_func_additive_chain(f, b, false, &emitted);
 
         if (need)
             sbuf_putc(b, ')');

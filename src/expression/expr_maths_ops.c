@@ -52,11 +52,45 @@ typedef enum {
     EXPR_FINITE_WEIGHTED_CIRCULAR_COS,
 } expr_finite_weighted_circular_kind_t;
 
+typedef expr_t *(*expr_finite_progression_step_from_q_fn)(const expr_t *q);
+
+typedef enum {
+    EXPR_QDIGAMMA_SECANT_NONE,
+    EXPR_QDIGAMMA_SECANT_CIRCULAR,
+    EXPR_QDIGAMMA_SECANT_HYPERBOLIC,
+} expr_qdigamma_secant_signature_t;
+
+typedef struct {
+    expr_apply_unary_fn apply;
+    expr_finite_progression_fn closed_form;
+    expr_finite_progression_step_from_q_fn step_from_q;
+    expr_qdigamma_secant_signature_t secant_signature;
+} expr_qdigamma_progression_t;
+
+typedef struct {
+    const expr_t *first;
+    const expr_t *second;
+    const expr_t *alternate_first;
+    const expr_t *alternate_second;
+    size_t count;
+    bool single_base;
+} expr_qdigamma_scan_t;
+
+static expr_t *expr_finite_sec_progression_closed_form(const expr_t *upper, const expr_t *step);
+static expr_t *expr_finite_cosec_progression_closed_form(const expr_t *upper, const expr_t *step);
+static expr_t *expr_finite_sech_progression_closed_form(const expr_t *upper, const expr_t *step);
+static expr_t *expr_finite_cosech_progression_closed_form(const expr_t *upper, const expr_t *step);
+
 static bool expr_finite_weighted_hyperbolic_parts(const expr_t *expr, const expr_t **upper_out,
                                                    const expr_t **step_out,
                                                    expr_finite_weighted_hyperbolic_kind_t *kind_out);
 static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value);
 static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_value);
+static number_t eval_finite_exponential_progression(const expr_t *expr, long upper_value);
+static number_t eval_finite_zero_atan_progression(const expr_t *expr);
+static number_t eval_finite_inverse_progression_pole(const expr_t *expr, long upper_value);
+static number_t eval_finite_inverse_progression(const expr_t *expr, long upper_value);
+static number_t eval_finite_atan_progression(const expr_t *expr, long upper_value);
 static bool expr_finite_weighted_circular_parts(const expr_t *expr, const expr_t **upper_out,
                                                 const expr_t **step_out,
                                                 expr_finite_weighted_circular_kind_t *kind_out);
@@ -148,6 +182,42 @@ static number_t eval_finite_summation(expr_t *dv)
         expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(dv) : NULL;
 
         if (lower_value == 1L) {
+            number_t inverse_pole_value = eval_finite_inverse_progression_pole(dv, upper_value);
+
+            if (num_is_inf(inverse_pole_value)) {
+                expr_free(closed_form);
+                return inverse_pole_value;
+            }
+            num_destroy(&inverse_pole_value);
+        }
+        if (lower_value == 1L) {
+            number_t zero_atan_value = eval_finite_zero_atan_progression(dv);
+
+            if (num_is_finite(zero_atan_value)) {
+                expr_free(closed_form);
+                return zero_atan_value;
+            }
+            num_destroy(&zero_atan_value);
+        }
+        if (lower_value == 1L) {
+            number_t atan_value = eval_finite_atan_progression(dv, upper_value);
+
+            if (num_is_finite(atan_value)) {
+                expr_free(closed_form);
+                return atan_value;
+            }
+            num_destroy(&atan_value);
+        }
+        if (lower_value == 1L) {
+            number_t exponential_value = eval_finite_exponential_progression(dv, upper_value);
+
+            if (num_is_finite(exponential_value)) {
+                expr_free(closed_form);
+                return exponential_value;
+            }
+            num_destroy(&exponential_value);
+        }
+        if (lower_value == 1L) {
             number_t progression_value = eval_finite_qdigamma_progression(dv, upper_value);
 
             if (num_is_finite(progression_value)) {
@@ -160,9 +230,27 @@ static number_t eval_finite_summation(expr_t *dv)
             number_t closed_value = expr_eval(closed_form);
 
             expr_free(closed_form);
-            if (num_is_finite(closed_value))
+            if (num_is_finite(closed_value)) {
+                number_t imaginary_part = num_imag_part(closed_value);
+
+                if (num_is_zero(imaginary_part)) {
+                    number_t real_value = num_real_part(closed_value);
+
+                    num_destroy(&imaginary_part);
+                    num_destroy(&closed_value);
+                    return real_value;
+                }
+                num_destroy(&imaginary_part);
                 return closed_value;
+            }
             num_destroy(&closed_value);
+        }
+        if (lower_value == 1L) {
+            number_t inverse_value = eval_finite_inverse_progression(dv, upper_value);
+
+            if (num_is_finite(inverse_value))
+                return inverse_value;
+            num_destroy(&inverse_value);
         }
         if (lower_value == 1L)
             return eval_finite_weighted_hyperbolic(dv, upper_value);
@@ -287,28 +375,24 @@ static expr_t *deriv_product(expr_t *dv)
     return out;
 }
 
-typedef enum {
-    EXPR_FINITE_PROGRESSION_NONE,
-    EXPR_FINITE_PROGRESSION_SIN,
-    EXPR_FINITE_PROGRESSION_COS,
-    EXPR_FINITE_PROGRESSION_TAN,
-    EXPR_FINITE_PROGRESSION_COT,
-    EXPR_FINITE_PROGRESSION_SEC,
-    EXPR_FINITE_PROGRESSION_COSEC,
-    EXPR_FINITE_PROGRESSION_TANH,
-    EXPR_FINITE_PROGRESSION_COTH,
-    EXPR_FINITE_PROGRESSION_SECH,
-    EXPR_FINITE_PROGRESSION_COSECH,
-    EXPR_FINITE_PROGRESSION_SINH,
-    EXPR_FINITE_PROGRESSION_COSH,
-} expr_finite_progression_kind_t;
+static bool expr_same_progression_index(const expr_t *candidate, const expr_t *index)
+{
+    return candidate == index ||
+           (expr_is_var(candidate) && expr_is_var(index) && candidate->var_id != 0u &&
+            candidate->var_id == index->var_id);
+}
 
-static bool expr_finite_progression_has_qdigamma_form(expr_finite_progression_kind_t kind);
-static expr_t *expr_finite_qdigamma_progression_closed_form(const expr_t *upper, const expr_t *step,
-                                                            expr_finite_progression_kind_t kind);
+static bool expr_contains_progression_index(const expr_t *expr, const expr_t *index)
+{
+    if (!expr)
+        return false;
+    if (expr_same_progression_index(expr, index))
+        return true;
+    return expr_contains_progression_index(expr->a, index) || expr_contains_progression_index(expr->b, index);
+}
 
-static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper_out, const expr_t **step_out,
-                                          expr_finite_progression_kind_t *kind_out)
+static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper_out, expr_t **step_out,
+                                          const expr_ops_t **function_ops_out)
 {
     const expr_t *index;
     const expr_t *bounds;
@@ -317,12 +401,11 @@ static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upp
     const expr_t *argument;
     const expr_t *left;
     const expr_t *right;
-    const expr_t *step;
+    expr_t *step = NULL;
     number_t lower_value = NUM_NAN;
-    expr_finite_progression_kind_t kind = EXPR_FINITE_PROGRESSION_NONE;
     bool matched = false;
 
-    if (!expr || !upper_out || !step_out || !kind_out || !expr_is_op(expr, &ops_summation) ||
+    if (!expr || !upper_out || !step_out || !function_ops_out || !expr_is_op(expr, &ops_summation) ||
         !expr_is_op(expr->b, &ops_argument_list))
         return false;
     index = expr->b->a;
@@ -334,71 +417,226 @@ static bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upp
     lower_value = expr_eval(lower);
     if (!num_is_exact(lower_value) || !num_is_one(lower_value))
         goto cleanup;
-    if (expr_is_op(expr->a, &ops_sin))
-        kind = EXPR_FINITE_PROGRESSION_SIN;
-    else if (expr_is_op(expr->a, &ops_cos))
-        kind = EXPR_FINITE_PROGRESSION_COS;
-    else if (expr_is_op(expr->a, &ops_tan))
-        kind = EXPR_FINITE_PROGRESSION_TAN;
-    else if (expr_is_op(expr->a, &ops_cot))
-        kind = EXPR_FINITE_PROGRESSION_COT;
-    else if (expr_is_op(expr->a, &ops_sec))
-        kind = EXPR_FINITE_PROGRESSION_SEC;
-    else if (expr_is_op(expr->a, &ops_cosec))
-        kind = EXPR_FINITE_PROGRESSION_COSEC;
-    else if (expr_is_op(expr->a, &ops_tanh))
-        kind = EXPR_FINITE_PROGRESSION_TANH;
-    else if (expr_is_op(expr->a, &ops_coth))
-        kind = EXPR_FINITE_PROGRESSION_COTH;
-    else if (expr_is_op(expr->a, &ops_sech))
-        kind = EXPR_FINITE_PROGRESSION_SECH;
-    else if (expr_is_op(expr->a, &ops_cosech))
-        kind = EXPR_FINITE_PROGRESSION_COSECH;
-    else if (expr_is_op(expr->a, &ops_sinh))
-        kind = EXPR_FINITE_PROGRESSION_SINH;
-    else if (expr_is_op(expr->a, &ops_cosh))
-        kind = EXPR_FINITE_PROGRESSION_COSH;
-    else
+    if (!expr->a || !expr->a->ops || expr->a->ops->arity != EXPR_OP_UNARY)
         goto cleanup;
     argument = expr->a->a;
     if (!expr_match_mul_expr(argument, &left, &right))
         goto cleanup;
-    if (left == index || (expr_is_var(left) && left->var_id != 0u && left->var_id == index->var_id))
-        step = right;
-    else if (right == index || (expr_is_var(right) && right->var_id != 0u && right->var_id == index->var_id))
-        step = left;
-    else
+    (void)left;
+    (void)right;
+    step = expr_simplify_extract_common_factor_quotient(argument, index);
+    if (!step || expr_contains_progression_index(step, index))
         goto cleanup;
 
     *upper_out = upper;
     *step_out = step;
-    *kind_out = kind;
+    *function_ops_out = expr->a->ops;
+    step = NULL;
     matched = true;
 
 cleanup:
+    expr_free(step);
     num_destroy(&lower_value);
     return matched;
+}
+
+/* Return whether a finite progression reduction relies on the supplied step value. */
+bool expr_finite_progression_requires_bound_step(const expr_t *expr)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    bool required = false;
+
+    if (expr_finite_progression_parts(expr, &upper, &step, &function_ops))
+        required = function_ops == &ops_floor || function_ops == &ops_ceil || function_ops == &ops_bit_not;
+    expr_free(step);
+    return required;
+}
+
+static number_t eval_finite_exponential_progression(const expr_t *expr, long upper_value)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    number_t step_value;
+    number_t q;
+    number_t upper_step;
+    number_t q_to_upper;
+    number_t numerator_factor;
+    number_t numerator;
+    number_t denominator;
+    number_t out;
+
+    if (upper_value < 1L || !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        function_ops != &ops_exp) {
+        expr_free(step);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    step_value = expr_eval((expr_t *)step);
+    q = num_exp(step_value);
+    if (num_eq(q, NUM_ONE)) {
+        out = num_create_from_long(upper_value);
+        num_destroy(&q);
+        num_destroy(&step_value);
+        expr_free(step);
+        return out;
+    }
+    upper_step = num_mul_long(step_value, upper_value);
+    q_to_upper = num_exp(upper_step);
+    numerator_factor = num_sub(q_to_upper, NUM_ONE);
+    numerator = num_mul(q, numerator_factor);
+    denominator = num_sub(q, NUM_ONE);
+    out = num_div(numerator, denominator);
+    num_destroy(&denominator);
+    num_destroy(&numerator);
+    num_destroy(&numerator_factor);
+    num_destroy(&q_to_upper);
+    num_destroy(&upper_step);
+    num_destroy(&q);
+    num_destroy(&step_value);
+    expr_free(step);
+    return out;
+}
+
+static number_t eval_finite_zero_atan_progression(const expr_t *expr)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    number_t step_value;
+    number_t out;
+
+    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops) || function_ops != &ops_atan) {
+        expr_free(step);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    step_value = expr_eval(step);
+    out = num_is_zero(step_value) ? num_clone(NUM_ZERO) : num_clone(NUM_NAN);
+    num_destroy(&step_value);
+    expr_free(step);
+    return out;
+}
+
+/* Return the signed infinity contributed by an exact inverse-function pole in a finite progression. */
+static number_t eval_finite_inverse_progression_pole(const expr_t *expr, long upper_value)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    number_t step_value;
+    number_t step_magnitude;
+    number_t pole_index;
+    number_t upper_number;
+    bool has_pole;
+    int step_sign;
+
+    if (upper_value < 1L || !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        (function_ops != &ops_atanh && function_ops != &ops_acoth)) {
+        expr_free(step);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    step_value = expr_eval(step);
+    expr_free(step);
+    if (!num_is_exact(step_value) || !num_is_real(step_value) || !num_is_finite(step_value) ||
+        num_is_zero(step_value)) {
+        num_destroy(&step_value);
+        return num_clone(NUM_NAN);
+    }
+
+    step_sign = num_get_sign(step_value);
+    step_magnitude = num_abs(step_value);
+    pole_index = num_inv(step_magnitude);
+    upper_number = num_create_from_long(upper_value);
+    has_pole = num_is_exact(pole_index) && num_is_integer(pole_index) && num_gt(pole_index, NUM_ZERO) &&
+               num_le(pole_index, upper_number);
+
+    num_destroy(&upper_number);
+    num_destroy(&pole_index);
+    num_destroy(&step_magnitude);
+    num_destroy(&step_value);
+    return num_clone(has_pole ? (step_sign < 0 ? NUM_NINF : NUM_INF) : NUM_NAN);
+}
+
+/* Evaluate a recognised inverse progression directly when its finite bound is supplied. */
+static number_t eval_finite_inverse_progression(const expr_t *expr, long upper_value)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    expr_number_unary_fn evaluate;
+    number_t step_value;
+    number_t sum = num_clone(NUM_ZERO);
+
+    if (upper_value < 1L || upper_value > 1000000L ||
+        !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        !(evaluate = function_ops->finite_progression_term_eval)) {
+        expr_free(step);
+        num_destroy(&sum);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    step_value = expr_eval(step);
+    expr_free(step);
+    if (!num_is_finite(step_value)) {
+        num_destroy(&step_value);
+        num_destroy(&sum);
+        return num_clone(NUM_NAN);
+    }
+
+    for (long k = 1L; k <= upper_value; ++k) {
+        number_t argument = num_mul_long(step_value, k);
+        number_t term = evaluate(argument);
+        number_t updated = num_add(sum, term);
+
+        num_destroy(&argument);
+        num_destroy(&term);
+        num_destroy(&sum);
+        sum = updated;
+    }
+    num_destroy(&step_value);
+    return sum;
+}
+
+/* Evaluate a finite arctangent progression through its real terms to retain the active precision. */
+static number_t eval_finite_atan_progression(const expr_t *expr, long upper_value)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+
+    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops) || function_ops != &ops_atan) {
+        expr_free(step);
+        return num_clone(NUM_NAN);
+    }
+    (void)upper;
+    expr_free(step);
+    return eval_finite_inverse_progression(expr, upper_value);
 }
 
 static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_value)
 {
     const expr_t *upper;
-    const expr_t *step;
-    expr_finite_progression_kind_t kind;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
     number_t step_value;
     number_t sum = num_clone(NUM_ZERO);
 
     if (upper_value < 1L || upper_value > 1000000L ||
-        !expr_finite_progression_parts(expr, &upper, &step, &kind) ||
-        (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
-         kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC &&
-         kind != EXPR_FINITE_PROGRESSION_SECH)) {
+        !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        (function_ops != &ops_tan && function_ops != &ops_cot && function_ops != &ops_sec &&
+         function_ops != &ops_cosec && function_ops != &ops_sech)) {
+        expr_free(step);
         num_destroy(&sum);
         return num_clone(NUM_NAN);
     }
     (void)upper;
     step_value = expr_eval((expr_t *)step);
     if (!num_is_finite(step_value)) {
+        expr_free(step);
         num_destroy(&step_value);
         num_destroy(&sum);
         return num_clone(NUM_NAN);
@@ -408,43 +646,24 @@ static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_
         number_t term;
         number_t next;
 
-        switch (kind) {
-            case EXPR_FINITE_PROGRESSION_TAN:
-                term = num_tan(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_COT:
-                term = num_cot(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_SEC:
-                term = num_sec(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_COSEC:
-                term = num_cosec(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_TANH:
-                term = num_tanh(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_COTH:
-                term = num_coth(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_SECH:
-                term = num_sech(angle);
-                break;
-
-            case EXPR_FINITE_PROGRESSION_COSECH:
-                term = num_cosech(angle);
-                break;
-
-            default:
-                term = num_clone(NUM_NAN);
-                break;
-        }
+        if (function_ops == &ops_tan)
+            term = num_tan(angle);
+        else if (function_ops == &ops_cot)
+            term = num_cot(angle);
+        else if (function_ops == &ops_sec)
+            term = num_sec(angle);
+        else if (function_ops == &ops_cosec)
+            term = num_cosec(angle);
+        else if (function_ops == &ops_tanh)
+            term = num_tanh(angle);
+        else if (function_ops == &ops_coth)
+            term = num_coth(angle);
+        else if (function_ops == &ops_sech)
+            term = num_sech(angle);
+        else if (function_ops == &ops_cosech)
+            term = num_cosech(angle);
+        else
+            term = num_clone(NUM_NAN);
         next = num_add(sum, term);
 
         num_destroy(&angle);
@@ -454,6 +673,7 @@ static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_
         if (!num_is_finite(sum))
             break;
     }
+    expr_free(step);
     num_destroy(&step_value);
     return sum;
 }
@@ -1381,71 +1601,38 @@ static expr_t *expr_finite_tangent_progression_closed_form(const expr_t *upper, 
     expr_t *exponent = imaginary_unit ? expr_mul(imaginary_unit, step) : NULL;
     expr_t *double_exponent = exponent ? expr_mul_long(exponent, 2L) : NULL;
     expr_t *q = double_exponent ? expr_exp(double_exponent) : NULL;
-    expr_t *q_squared = q ? expr_pow_long(q, 2L) : NULL;
+    expr_t *quadruple_exponent = exponent ? expr_mul_long(exponent, 4L) : NULL;
+    expr_t *q_squared = quadruple_exponent ? expr_exp(quadruple_exponent) : NULL;
     expr_t *upper_plus_one = expr_add_long(upper, 1L);
     expr_t *psi_q_one = q && one ? expr_qdigamma(q, one) : NULL;
     expr_t *psi_q_upper = q && upper_plus_one ? expr_qdigamma(q, upper_plus_one) : NULL;
-    expr_t *psi_q_difference = psi_q_one && psi_q_upper ? expr_sub(psi_q_one, psi_q_upper) : NULL;
-    expr_t *log_q = q ? expr_log(q) : NULL;
-    expr_t *twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
-    expr_t *first_numerator = twice_i && psi_q_difference ? expr_mul(twice_i, psi_q_difference) : NULL;
-    expr_t *first_term = first_numerator && log_q ? expr_div(first_numerator, log_q) : NULL;
     expr_t *psi_q2_one = q_squared && one ? expr_qdigamma(q_squared, one) : NULL;
     expr_t *psi_q2_upper = q_squared && upper_plus_one ? expr_qdigamma(q_squared, upper_plus_one) : NULL;
-    expr_t *psi_q2_difference = psi_q2_one && psi_q2_upper ? expr_sub(psi_q2_one, psi_q2_upper) : NULL;
-    expr_t *log_q2 = q_squared ? expr_log(q_squared) : NULL;
-    expr_t *four_i = imaginary_unit ? expr_mul_long(imaginary_unit, 4L) : NULL;
-    expr_t *second_numerator = four_i && psi_q2_difference ? expr_mul(four_i, psi_q2_difference) : NULL;
-    expr_t *second_term = second_numerator && log_q2 ? expr_div(second_numerator, log_q2) : NULL;
+    expr_t *first_difference = psi_q2_one && psi_q2_upper ? expr_sub(psi_q2_one, psi_q2_upper) : NULL;
+    expr_t *second_difference = first_difference && psi_q_one ? expr_sub(first_difference, psi_q_one) : NULL;
+    expr_t *numerator = second_difference && psi_q_upper ? expr_add(second_difference, psi_q_upper) : NULL;
+    expr_t *quotient = numerator ? expr_div(numerator, step) : NULL;
     expr_t *i_n = imaginary_unit ? expr_mul(imaginary_unit, upper) : NULL;
-    expr_t *first_difference = i_n && first_term ? expr_sub(i_n, first_term) : NULL;
-    expr_t *out = first_difference && second_term ? expr_add(first_difference, second_term) : NULL;
+    expr_t *out = i_n && quotient ? expr_add(i_n, quotient) : NULL;
 
-    expr_free(first_difference);
     expr_free(i_n);
-    expr_free(second_term);
-    expr_free(second_numerator);
-    expr_free(four_i);
-    expr_free(log_q2);
-    expr_free(psi_q2_difference);
+    expr_free(quotient);
+    expr_free(numerator);
+    expr_free(second_difference);
+    expr_free(first_difference);
     expr_free(psi_q2_upper);
     expr_free(psi_q2_one);
-    expr_free(first_term);
-    expr_free(first_numerator);
-    expr_free(twice_i);
-    expr_free(log_q);
-    expr_free(psi_q_difference);
     expr_free(psi_q_upper);
     expr_free(psi_q_one);
     expr_free(upper_plus_one);
     expr_free(q_squared);
+    expr_free(quadruple_exponent);
     expr_free(q);
     expr_free(double_exponent);
     expr_free(exponent);
     expr_free(one);
     expr_free(imaginary_unit);
     return out;
-}
-
-static expr_t *expr_finite_tangent_progression_sum(const expr_t *upper, const expr_t *step)
-{
-    expr_t *index = expr_new_var(NUM_NAN);
-    expr_t *argument;
-    expr_t *term;
-    expr_t *lower;
-    expr_t *sum;
-
-    if (index)
-        expr_set_name(index, "k");
-    argument = index ? expr_mul(index, step) : NULL;
-    term = argument ? expr_tan(argument) : NULL;
-    lower = expr_new_const(NUM_ONE);
-    sum = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
-    expr_free(lower);
-    expr_free(term);
-    expr_free(argument);
-    expr_free(index);
-    return sum;
 }
 
 static expr_t *expr_finite_tanh_progression_closed_form(const expr_t *upper, const expr_t *step)
@@ -1654,7 +1841,7 @@ static expr_t *expr_finite_secant_progression_closed_form(const expr_t *upper, c
 }
 
 static expr_t *expr_finite_progression_sum(const expr_t *upper, const expr_t *step,
-                                           expr_finite_progression_kind_t kind)
+                                           const expr_qdigamma_progression_t *progression)
 {
     expr_t *index = expr_new_var(NUM_NAN);
     expr_t *argument;
@@ -1665,36 +1852,8 @@ static expr_t *expr_finite_progression_sum(const expr_t *upper, const expr_t *st
     if (index)
         expr_set_name(index, "k");
     argument = index ? expr_mul(index, step) : NULL;
-    if (argument) {
-        switch (kind) {
-            case EXPR_FINITE_PROGRESSION_TAN:
-                term = expr_tan(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_COT:
-                term = expr_cot(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_SEC:
-                term = expr_sec(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_COSEC:
-                term = expr_cosec(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_TANH:
-                term = expr_tanh(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_COTH:
-                term = expr_coth(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_SECH:
-                term = expr_sech(argument);
-                break;
-            case EXPR_FINITE_PROGRESSION_COSECH:
-                term = expr_cosech(argument);
-                break;
-            default:
-                break;
-        }
-    }
+    if (argument && progression && progression->apply)
+        term = progression->apply(argument);
     lower = expr_new_const(NUM_ONE);
     sum = term && lower ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
     expr_free(lower);
@@ -1704,14 +1863,28 @@ static expr_t *expr_finite_progression_sum(const expr_t *upper, const expr_t *st
     return sum;
 }
 
-static void expr_collect_qdigammas(const expr_t *expr, const expr_t **items, size_t capacity, size_t *count)
+static void expr_scan_qdigammas(const expr_t *expr, expr_qdigamma_scan_t *scan)
 {
-    if (!expr || !items || !count || *count >= capacity)
+    if (!expr || !scan)
         return;
-    if (expr_is_op(expr, &ops_qdigamma))
-        items[(*count)++] = expr;
-    expr_collect_qdigammas(expr->a, items, capacity, count);
-    expr_collect_qdigammas(expr->b, items, capacity, count);
+    if (expr_is_op(expr, &ops_qdigamma)) {
+        ++scan->count;
+        if (!scan->first) {
+            scan->first = expr;
+            scan->single_base = true;
+        } else if (expr_struct_eq(scan->first->a, expr->a)) {
+            if (!scan->second)
+                scan->second = expr;
+        } else {
+            scan->single_base = false;
+            if (!scan->alternate_first)
+                scan->alternate_first = expr;
+            else if (!scan->alternate_second && expr_struct_eq(scan->alternate_first->a, expr->a))
+                scan->alternate_second = expr;
+        }
+    }
+    expr_scan_qdigammas(expr->a, scan);
+    expr_scan_qdigammas(expr->b, scan);
 }
 
 static bool expr_contains_imaginary_unit(const expr_t *expr);
@@ -1780,108 +1953,120 @@ static bool expr_is_exact_one_value(const expr_t *expr)
     return one;
 }
 
-static expr_t *expr_finite_progression_step_from_q(const expr_t *q, expr_finite_progression_kind_t kind)
+static expr_t *expr_simplified_progression_step(expr_t *raw_step)
 {
-    expr_t *imaginary_unit = NULL;
-    expr_t *divisor = NULL;
-    expr_t *raw_step = NULL;
-    expr_t *step = NULL;
+    expr_t *step = raw_step ? expr_simplify(raw_step) : NULL;
+
+    expr_free(raw_step);
+    return step;
+}
+
+static expr_t *expr_finite_tan_cot_step_from_q(const expr_t *q)
+{
+    expr_t *imaginary_unit;
+    expr_t *divisor;
+    expr_t *raw_step;
 
     if (!q)
         return NULL;
     if (!expr_is_op(q, &ops_exp) || !q->a) {
         expr_t *euler_step = expr_euler_base_step(q);
+        expr_t *half_step;
 
-        if (!euler_step || (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
-                            kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC)) {
-            expr_free(euler_step);
+        if (!euler_step)
             return NULL;
-        }
-        if (kind == EXPR_FINITE_PROGRESSION_TAN || kind == EXPR_FINITE_PROGRESSION_COT) {
-            expr_t *half_step = expr_div_long(euler_step, 2L);
-
-            expr_free(euler_step);
-            euler_step = half_step;
-        }
-        return euler_step;
+        half_step = expr_div_long(euler_step, 2L);
+        expr_free(euler_step);
+        return half_step;
     }
-    if (kind == EXPR_FINITE_PROGRESSION_SEC || kind == EXPR_FINITE_PROGRESSION_COSEC) {
-        const expr_t *left;
-        const expr_t *right;
-        const expr_t *exponent = q->a;
-        bool negate_step = false;
 
-        while (expr_is_op(exponent, &ops_neg) && exponent->a) {
-            negate_step = !negate_step;
-            exponent = exponent->a;
-        }
-
-        if (expr_match_mul_expr(exponent, &left, &right)) {
-            number_t left_value = expr_eval((expr_t *)left);
-            number_t right_value = expr_eval((expr_t *)right);
-            const expr_t *step_source = num_eq(left_value, NUM_I) ? right
-                                        : num_eq(right_value, NUM_I) ? left
-                                                                    : NULL;
-            expr_t *circular_step = expr_clone(step_source);
-
-            num_destroy(&right_value);
-            num_destroy(&left_value);
-            if (circular_step && negate_step) {
-                expr_t *negative_step = expr_neg(circular_step);
-
-                expr_free(circular_step);
-                circular_step = negative_step;
-            }
-            if (circular_step)
-                return circular_step;
-        }
-        imaginary_unit = expr_new_named_const(NUM_I, "i");
-        divisor = imaginary_unit ? expr_neg(imaginary_unit) : NULL;
-        raw_step = divisor ? expr_mul(q->a, divisor) : NULL;
-        step = raw_step ? expr_simplify(raw_step) : NULL;
-        expr_free(raw_step);
-        expr_free(divisor);
-        expr_free(imaginary_unit);
-        return step;
-    }
-    switch (kind) {
-        case EXPR_FINITE_PROGRESSION_TAN:
-        case EXPR_FINITE_PROGRESSION_COT:
-            imaginary_unit = expr_new_named_const(NUM_I, "i");
-            divisor = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
-            break;
-
-        case EXPR_FINITE_PROGRESSION_SEC:
-        case EXPR_FINITE_PROGRESSION_COSEC:
-            divisor = expr_new_named_const(NUM_I, "i");
-            break;
-
-        case EXPR_FINITE_PROGRESSION_TANH:
-        case EXPR_FINITE_PROGRESSION_COTH:
-            divisor = expr_new_const(NUM_TWO);
-            break;
-
-        case EXPR_FINITE_PROGRESSION_SECH:
-        case EXPR_FINITE_PROGRESSION_COSECH:
-            divisor = expr_new_const(NUM_NEG_ONE);
-            break;
-
-        default:
-            break;
-    }
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    divisor = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
     raw_step = divisor ? expr_div(q->a, divisor) : NULL;
-    if (raw_step && (kind == EXPR_FINITE_PROGRESSION_TANH || kind == EXPR_FINITE_PROGRESSION_COTH)) {
-        expr_t *negative_step = expr_neg(raw_step);
-
-        expr_free(raw_step);
-        raw_step = negative_step;
-    }
-    step = raw_step ? expr_simplify(raw_step) : NULL;
-    expr_free(raw_step);
     expr_free(divisor);
     expr_free(imaginary_unit);
-    return step;
+    return expr_simplified_progression_step(raw_step);
 }
+
+static expr_t *expr_finite_sec_cosec_step_from_q(const expr_t *q)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *exponent;
+    expr_t *divisor;
+    expr_t *imaginary_unit;
+    expr_t *raw_step;
+    bool negate_step = false;
+
+    if (!q)
+        return NULL;
+    if (!expr_is_op(q, &ops_exp) || !q->a)
+        return expr_euler_base_step(q);
+
+    exponent = q->a;
+    while (expr_is_op(exponent, &ops_neg) && exponent->a) {
+        negate_step = !negate_step;
+        exponent = exponent->a;
+    }
+
+    if (expr_match_mul_expr(exponent, &left, &right)) {
+        number_t left_value = expr_eval((expr_t *)left);
+        number_t right_value = expr_eval((expr_t *)right);
+        const expr_t *step_source = num_eq(left_value, NUM_I) ? right
+                                    : num_eq(right_value, NUM_I) ? left
+                                                                : NULL;
+        expr_t *circular_step = expr_clone(step_source);
+
+        num_destroy(&right_value);
+        num_destroy(&left_value);
+        if (circular_step && negate_step) {
+            expr_t *negative_step = expr_neg(circular_step);
+
+            expr_free(circular_step);
+            circular_step = negative_step;
+        }
+        if (circular_step)
+            return circular_step;
+    }
+
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    divisor = imaginary_unit ? expr_neg(imaginary_unit) : NULL;
+    raw_step = divisor ? expr_mul(q->a, divisor) : NULL;
+    expr_free(divisor);
+    expr_free(imaginary_unit);
+    return expr_simplified_progression_step(raw_step);
+}
+
+static expr_t *expr_finite_tanh_coth_step_from_q(const expr_t *q)
+{
+    expr_t *raw_step;
+    expr_t *negative_step;
+
+    if (!q || !expr_is_op(q, &ops_exp) || !q->a)
+        return NULL;
+    raw_step = expr_div_long(q->a, 2L);
+    negative_step = raw_step ? expr_neg(raw_step) : NULL;
+    expr_free(raw_step);
+    return expr_simplified_progression_step(negative_step);
+}
+
+static expr_t *expr_finite_sech_cosech_step_from_q(const expr_t *q)
+{
+    if (!q || !expr_is_op(q, &ops_exp) || !q->a)
+        return NULL;
+    return expr_simplified_progression_step(expr_neg(q->a));
+}
+
+static const expr_qdigamma_progression_t s_qdigamma_progressions[] = {
+    {expr_tan, expr_finite_tangent_progression_closed_form, expr_finite_tan_cot_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+    {expr_cot, expr_finite_cot_progression_closed_form, expr_finite_tan_cot_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+    {expr_sec, expr_finite_sec_progression_closed_form, expr_finite_sec_cosec_step_from_q, EXPR_QDIGAMMA_SECANT_CIRCULAR},
+    {expr_cosec, expr_finite_cosec_progression_closed_form, expr_finite_sec_cosec_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+    {expr_tanh, expr_finite_tanh_progression_closed_form, expr_finite_tanh_coth_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+    {expr_coth, expr_finite_coth_progression_closed_form, expr_finite_tanh_coth_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+    {expr_sech, expr_finite_sech_progression_closed_form, expr_finite_sech_cosech_step_from_q, EXPR_QDIGAMMA_SECANT_HYPERBOLIC},
+    {expr_cosech, expr_finite_cosech_progression_closed_form, expr_finite_sech_cosech_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
+};
 
 static bool expr_matches_finite_qdigamma_candidate(const expr_t *expr, const expr_t *candidate)
 {
@@ -1901,118 +2086,92 @@ static bool expr_matches_finite_qdigamma_candidate(const expr_t *expr, const exp
     return matched;
 }
 
+static expr_t *expr_recover_qdigamma_progression(const expr_t *expr, const expr_qdigamma_scan_t *scan,
+                                                 const expr_t *base_qdigamma, const expr_t *upper)
+{
+    const bool circular_base = expr_q_base_is_circular(base_qdigamma->a);
+
+    for (size_t progression_index = 0u;
+         progression_index < sizeof(s_qdigamma_progressions) / sizeof(s_qdigamma_progressions[0]);
+         ++progression_index) {
+        const expr_qdigamma_progression_t *progression = &s_qdigamma_progressions[progression_index];
+        const bool secant_signature = scan->count == 4u && scan->single_base &&
+                                      !expr_is_exact_one_value(base_qdigamma->b) &&
+                                      ((progression->secant_signature == EXPR_QDIGAMMA_SECANT_CIRCULAR &&
+                                        circular_base) ||
+                                       (progression->secant_signature == EXPR_QDIGAMMA_SECANT_HYPERBOLIC &&
+                                        !circular_base));
+        expr_t *step = progression->step_from_q(base_qdigamma->a);
+        expr_t *candidate = step ? progression->closed_form(upper, step) : NULL;
+        expr_t *sum;
+
+        if (!secant_signature && !expr_matches_finite_qdigamma_candidate(expr, candidate)) {
+            expr_free(candidate);
+            expr_free(step);
+            continue;
+        }
+        sum = expr_finite_progression_sum(upper, step, progression);
+        expr_free(candidate);
+        expr_free(step);
+        return sum;
+    }
+    return NULL;
+}
+
+static expr_t *expr_recover_qdigamma_pair(const expr_t *expr, const expr_qdigamma_scan_t *scan,
+                                          const expr_t *first, const expr_t *second)
+{
+    expr_t *raw_upper;
+    expr_t *upper;
+    expr_t *sum;
+    expr_t *negative_upper;
+
+    if (!first || !second)
+        return NULL;
+    raw_upper = expr_sub(second->b, first->b);
+    upper = raw_upper ? expr_simplify(raw_upper) : NULL;
+    expr_free(raw_upper);
+    if (!upper)
+        return NULL;
+
+    sum = expr_recover_qdigamma_progression(expr, scan, first, upper);
+    if (!sum) {
+        negative_upper = expr_neg(upper);
+        sum = negative_upper ? expr_recover_qdigamma_progression(expr, scan, first, negative_upper) : NULL;
+        expr_free(negative_upper);
+    }
+    expr_free(upper);
+    return sum;
+}
+
 /* Recover any supported finite quotient progression represented by its q-digamma identity. */
 expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr)
 {
-    const expr_t *qdigammas[16];
-    size_t count = 0u;
+    expr_qdigamma_scan_t scan = {0};
+    expr_t *sum;
 
     if (!expr)
         return NULL;
-    expr_collect_qdigammas(expr, qdigammas, sizeof(qdigammas) / sizeof(qdigammas[0]), &count);
-    for (size_t first = 0u; first < count; ++first) {
-        for (size_t second = first + 1u; second < count; ++second) {
-            expr_t *raw_upper;
-            expr_t *upper;
-
-            if (!expr_struct_eq(qdigammas[first]->a, qdigammas[second]->a))
-                continue;
-            raw_upper = expr_sub(qdigammas[second]->b, qdigammas[first]->b);
-            upper = raw_upper ? expr_simplify(raw_upper) : NULL;
-            expr_free(raw_upper);
-            if (!upper)
-                continue;
-            for (unsigned orientation = 0u; orientation < 2u; ++orientation) {
-                expr_t *oriented_upper = orientation == 0u ? expr_clone(upper) : expr_neg(upper);
-
-                for (expr_finite_progression_kind_t kind = EXPR_FINITE_PROGRESSION_TAN;
-                     kind <= EXPR_FINITE_PROGRESSION_COSECH; ++kind) {
-                    expr_t *step;
-                    expr_t *candidate;
-                    expr_t *sum;
-
-                    if (!expr_finite_progression_has_qdigamma_form(kind))
-                        continue;
-                    step = expr_finite_progression_step_from_q(qdigammas[first]->a, kind);
-                    candidate = step ? expr_finite_qdigamma_progression_closed_form(oriented_upper, step, kind) : NULL;
-                    if (!(count >= 4u && !expr_is_exact_one_value(qdigammas[first]->b) &&
-                          ((kind == EXPR_FINITE_PROGRESSION_SEC &&
-                                           expr_q_base_is_circular(qdigammas[first]->a)) ||
-                                          (kind == EXPR_FINITE_PROGRESSION_SECH &&
-                                           !expr_q_base_is_circular(qdigammas[first]->a)))) &&
-                        !expr_matches_finite_qdigamma_candidate(expr, candidate)) {
-                        expr_free(candidate);
-                        expr_free(step);
-                        continue;
-                    }
-                    sum = expr_finite_progression_sum(oriented_upper, step, kind);
-                    expr_free(candidate);
-                    expr_free(step);
-                    expr_free(oriented_upper);
-                    expr_free(upper);
-                    return sum;
-                }
-                expr_free(oriented_upper);
-            }
-            expr_free(upper);
-        }
-    }
-    return NULL;
+    expr_scan_qdigammas(expr, &scan);
+    sum = expr_recover_qdigamma_pair(expr, &scan, scan.first, scan.second);
+    return sum ? sum : expr_recover_qdigamma_pair(expr, &scan, scan.alternate_first, scan.alternate_second);
 }
 
 /* Recover a finite tangent progression represented by its q-digamma identity. */
 expr_t *expr_finite_tangent_from_qdigamma_form(const expr_t *expr)
 {
-    const expr_t *qdigamma = expr_find_qdigamma_with_symbolic_argument(expr);
-    const expr_t *q;
-    expr_t *one = NULL;
-    expr_t *raw_upper = NULL;
-    expr_t *upper = NULL;
-    expr_t *imaginary_unit = NULL;
-    expr_t *twice_i = NULL;
-    expr_t *raw_step = NULL;
+    expr_t *sum = expr_finite_progression_from_qdigamma_form(expr);
+    const expr_t *upper;
     expr_t *step = NULL;
-    expr_t *sum = NULL;
-    expr_t *candidate = NULL;
-    expr_t *difference = NULL;
-    expr_t *simplified = NULL;
-    expr_t *out = NULL;
+    const expr_ops_t *function_ops;
 
-    if (!expr || !qdigamma || !(q = qdigamma->a) || !expr_is_op(q, &ops_exp) || !q->a)
+    if (!sum || !expr_finite_progression_parts(sum, &upper, &step, &function_ops) || function_ops != &ops_tan) {
+        expr_free(step);
+        expr_free(sum);
         return NULL;
-    one = expr_new_const(NUM_ONE);
-    raw_upper = one ? expr_sub(qdigamma->b, one) : NULL;
-    upper = raw_upper ? expr_simplify(raw_upper) : NULL;
-    imaginary_unit = expr_new_named_const(NUM_I, "i");
-    twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
-    raw_step = twice_i ? expr_div(q->a, twice_i) : NULL;
-    step = raw_step ? expr_simplify(raw_step) : NULL;
-    sum = upper && step ? expr_finite_tangent_progression_sum(upper, step) : NULL;
-    candidate = upper && step ? expr_finite_tangent_progression_closed_form(upper, step) : NULL;
-    if (!sum || !candidate)
-        goto cleanup;
-    if (!expr_struct_eq(expr, candidate)) {
-        difference = expr_sub(expr, candidate);
-        simplified = difference ? expr_simplify(difference) : NULL;
-        if (!simplified || !expr_is_exact_zero(simplified))
-            goto cleanup;
     }
-    out = sum;
-    sum = NULL;
-
-cleanup:
-    expr_free(simplified);
-    expr_free(difference);
-    expr_free(candidate);
-    expr_free(sum);
     expr_free(step);
-    expr_free(raw_step);
-    expr_free(twice_i);
-    expr_free(imaginary_unit);
-    expr_free(upper);
-    expr_free(raw_upper);
-    expr_free(one);
-    return out;
+    return sum;
 }
 
 /* Recover a finite hyperbolic-tangent progression represented by its q-digamma identity. */
@@ -2079,18 +2238,19 @@ bool expr_finite_tangent_qdigamma_value(const expr_t *expr, number_t *value_out)
 {
     expr_t *sum;
     const expr_t *upper;
-    const expr_t *step;
-    expr_finite_progression_kind_t kind;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
     long upper_value;
 
     if (!value_out || !(sum = expr_finite_tangent_from_qdigamma_form(expr)))
         return false;
-    if (!expr_finite_progression_parts(sum, &upper, &step, &kind) || kind != EXPR_FINITE_PROGRESSION_TAN ||
+    if (!expr_finite_progression_parts(sum, &upper, &step, &function_ops) || function_ops != &ops_tan ||
         !expr_summation_bound_to_long(upper, &upper_value)) {
+        expr_free(step);
         expr_free(sum);
         return false;
     }
-    (void)step;
+    expr_free(step);
     *value_out = eval_finite_qdigamma_progression(sum, upper_value);
     expr_free(sum);
     return num_is_finite(*value_out);
@@ -2101,21 +2261,21 @@ bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_
 {
     expr_t *sum;
     const expr_t *upper;
-    const expr_t *step;
-    expr_finite_progression_kind_t kind;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
     long upper_value;
 
     if (!value_out || !(sum = expr_finite_progression_from_qdigamma_form(expr)))
         return false;
-    if (!expr_finite_progression_parts(sum, &upper, &step, &kind) ||
-        (kind != EXPR_FINITE_PROGRESSION_TAN && kind != EXPR_FINITE_PROGRESSION_COT &&
-         kind != EXPR_FINITE_PROGRESSION_SEC && kind != EXPR_FINITE_PROGRESSION_COSEC &&
-         kind != EXPR_FINITE_PROGRESSION_SECH) ||
+    if (!expr_finite_progression_parts(sum, &upper, &step, &function_ops) ||
+        (function_ops != &ops_tan && function_ops != &ops_cot && function_ops != &ops_sec &&
+         function_ops != &ops_cosec && function_ops != &ops_sech) ||
         !expr_summation_bound_to_long(upper, &upper_value)) {
+        expr_free(step);
         expr_free(sum);
         return false;
     }
-    (void)step;
+    expr_free(step);
     *value_out = eval_finite_qdigamma_progression(sum, upper_value);
     expr_free(sum);
     return num_is_finite(*value_out);
@@ -2126,87 +2286,349 @@ static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, ex
     return expr_simplify_binary_operator(expr, term, bounds);
 }
 
-static bool expr_finite_progression_has_qdigamma_form(expr_finite_progression_kind_t kind)
+static expr_t *expr_finite_exponential_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
-    return kind == EXPR_FINITE_PROGRESSION_TAN || kind == EXPR_FINITE_PROGRESSION_COT ||
-           kind == EXPR_FINITE_PROGRESSION_SEC || kind == EXPR_FINITE_PROGRESSION_COSEC ||
-           kind == EXPR_FINITE_PROGRESSION_TANH || kind == EXPR_FINITE_PROGRESSION_COTH ||
-           kind == EXPR_FINITE_PROGRESSION_SECH || kind == EXPR_FINITE_PROGRESSION_COSECH;
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *q = expr_exp(step);
+    expr_t *upper_step = expr_mul(upper, step);
+    expr_t *q_to_upper = upper_step ? expr_exp(upper_step) : NULL;
+    expr_t *numerator_factor = q_to_upper && one ? expr_sub(q_to_upper, one) : NULL;
+    expr_t *numerator = q && numerator_factor ? expr_mul(q, numerator_factor) : NULL;
+    expr_t *denominator = q && one ? expr_sub(q, one) : NULL;
+    expr_t *out = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(numerator_factor);
+    expr_free(q_to_upper);
+    expr_free(upper_step);
+    expr_free(q);
+    expr_free(one);
+    return out;
 }
 
-static expr_t *expr_finite_qdigamma_progression_closed_form(const expr_t *upper, const expr_t *step,
-                                                            expr_finite_progression_kind_t kind)
+static expr_t *expr_finite_atan_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
-    switch (kind) {
-        case EXPR_FINITE_PROGRESSION_TAN:
-            return expr_finite_tangent_progression_closed_form(upper, step);
-        case EXPR_FINITE_PROGRESSION_COT:
-            return expr_finite_cot_progression_closed_form(upper, step);
-        case EXPR_FINITE_PROGRESSION_SEC:
-            return expr_finite_secant_progression_closed_form(upper, step, false);
-        case EXPR_FINITE_PROGRESSION_COSEC:
-            return expr_finite_cosecant_progression_closed_form(upper, step, false);
-        case EXPR_FINITE_PROGRESSION_TANH:
-            return expr_finite_tanh_progression_closed_form(upper, step);
-        case EXPR_FINITE_PROGRESSION_COTH:
-            return expr_finite_coth_progression_closed_form(upper, step);
-        case EXPR_FINITE_PROGRESSION_SECH:
-            return expr_finite_secant_progression_closed_form(upper, step, true);
-        case EXPR_FINITE_PROGRESSION_COSECH:
-            return expr_finite_cosecant_progression_closed_form(upper, step, true);
-        default:
-            return NULL;
-    }
+    number_t pi_value = num_const(NUM_PI);
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *pi = expr_new_named_const(pi_value, "@pi");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *i_over_step = imaginary_unit ? expr_div(imaginary_unit, step) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *upper_minus = upper_plus_one && i_over_step ? expr_sub(upper_plus_one, i_over_step) : NULL;
+    expr_t *lower_minus = one && i_over_step ? expr_sub(one, i_over_step) : NULL;
+    expr_t *upper_plus = upper_plus_one && i_over_step ? expr_add(upper_plus_one, i_over_step) : NULL;
+    expr_t *lower_plus = one && i_over_step ? expr_add(one, i_over_step) : NULL;
+    expr_t *lgamma_upper_minus = upper_minus ? expr_lgamma(upper_minus) : NULL;
+    expr_t *lgamma_lower_minus = lower_minus ? expr_lgamma(lower_minus) : NULL;
+    expr_t *lgamma_upper_plus = upper_plus ? expr_lgamma(upper_plus) : NULL;
+    expr_t *lgamma_lower_plus = lower_plus ? expr_lgamma(lower_plus) : NULL;
+    expr_t *plus_difference = lgamma_upper_plus && lgamma_lower_plus
+                                  ? expr_sub(lgamma_upper_plus, lgamma_lower_plus)
+                                  : NULL;
+    expr_t *with_lower_minus = plus_difference && lgamma_lower_minus
+                                   ? expr_add(plus_difference, lgamma_lower_minus)
+                                   : NULL;
+    expr_t *gamma_correction = with_lower_minus && lgamma_upper_minus
+                                   ? expr_sub(with_lower_minus, lgamma_upper_minus)
+                                   : NULL;
+    expr_t *upper_pi = pi ? expr_mul(upper, pi) : NULL;
+    expr_t *signed_numerator = upper_pi ? expr_mul(upper_pi, step) : NULL;
+    expr_t *absolute_step = expr_abs(step);
+    expr_t *signed_denominator = absolute_step ? expr_mul_long(absolute_step, 2L) : NULL;
+    expr_t *signed_contribution = signed_numerator && signed_denominator
+                                      ? expr_div(signed_numerator, signed_denominator)
+                                      : NULL;
+    expr_t *gamma_numerator = imaginary_unit && gamma_correction ? expr_mul(imaginary_unit, gamma_correction) : NULL;
+    expr_t *gamma_contribution = gamma_numerator ? expr_div_long(gamma_numerator, 2L) : NULL;
+    expr_t *out = signed_contribution && gamma_contribution ? expr_add(signed_contribution, gamma_contribution) : NULL;
+
+    num_destroy(&pi_value);
+    expr_free(gamma_contribution);
+    expr_free(gamma_numerator);
+    expr_free(signed_contribution);
+    expr_free(signed_denominator);
+    expr_free(absolute_step);
+    expr_free(signed_numerator);
+    expr_free(upper_pi);
+    expr_free(gamma_correction);
+    expr_free(with_lower_minus);
+    expr_free(plus_difference);
+    expr_free(lgamma_lower_plus);
+    expr_free(lgamma_upper_plus);
+    expr_free(lgamma_lower_minus);
+    expr_free(lgamma_upper_minus);
+    expr_free(lower_plus);
+    expr_free(upper_plus);
+    expr_free(lower_minus);
+    expr_free(upper_minus);
+    expr_free(upper_plus_one);
+    expr_free(i_over_step);
+    expr_free(one);
+    expr_free(pi);
+    expr_free(imaginary_unit);
+    return out;
 }
 
-/* Return the closed form of a recognised finite circular or hyperbolic progression. */
-expr_t *expr_finite_progression_closed_form(const expr_t *expr)
+/* Build the compact conjugate-pair derivative of a finite arctangent progression. */
+expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *upper;
-    const expr_t *step;
-    expr_finite_progression_kind_t kind;
-    expr_t *upper_times_step = NULL;
-    expr_t *first_argument = NULL;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    expr_t *upper_derivative = NULL;
+    expr_t *step_derivative = NULL;
+    expr_t *imaginary_unit = NULL;
+    expr_t *one = NULL;
+    expr_t *i_over_step = NULL;
     expr_t *upper_plus_one = NULL;
-    expr_t *second_product = NULL;
-    expr_t *second_argument = NULL;
-    expr_t *first_factor = NULL;
-    expr_t *second_factor = NULL;
-    expr_t *numerator = NULL;
-    expr_t *denominator_argument = NULL;
+    expr_t *upper_plus = NULL;
+    expr_t *lower_plus = NULL;
+    expr_t *upper_minus = NULL;
+    expr_t *lower_minus = NULL;
+    expr_t *upper_plus_digamma = NULL;
+    expr_t *lower_plus_digamma = NULL;
+    expr_t *upper_minus_digamma = NULL;
+    expr_t *lower_minus_digamma = NULL;
+    expr_t *plus_difference = NULL;
+    expr_t *minus_difference = NULL;
+    expr_t *digamma_sum = NULL;
+    expr_t *step_squared = NULL;
     expr_t *denominator = NULL;
-    expr_t *closed_form = NULL;
+    expr_t *scaled_numerator = NULL;
+    expr_t *raw = NULL;
+    expr_t *out = NULL;
 
-    if (!expr_finite_progression_parts(expr, &upper, &step, &kind))
-        return NULL;
-    if (expr_finite_progression_has_qdigamma_form(kind))
-        return expr_finite_qdigamma_progression_closed_form(upper, step, kind);
-    upper_times_step = expr_mul(upper, step);
-    first_argument = upper_times_step ? expr_div_long(upper_times_step, 2L) : NULL;
+    if (!expr || !wrt || !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        function_ops != &ops_atan)
+        goto cleanup;
+    upper_derivative = expr_create_deriv(upper, wrt);
+    if (!upper_derivative || !expr_is_exact_zero(upper_derivative))
+        goto cleanup;
+    step_derivative = expr_create_deriv(step, wrt);
+    if (!step_derivative || expr_is_exact_zero(step_derivative))
+        goto cleanup;
+
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    one = expr_new_const(NUM_ONE);
+    i_over_step = imaginary_unit ? expr_div(imaginary_unit, step) : NULL;
     upper_plus_one = expr_add_long(upper, 1L);
-    second_product = upper_plus_one ? expr_mul(upper_plus_one, step) : NULL;
-    second_argument = second_product ? expr_div_long(second_product, 2L) : NULL;
-    if (kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS) {
-        first_factor = first_argument ? expr_sin(first_argument) : NULL;
-        second_factor = second_argument
-                            ? (kind == EXPR_FINITE_PROGRESSION_SIN ? expr_sin(second_argument)
-                                                                   : expr_cos(second_argument))
+    upper_plus = upper_plus_one && i_over_step ? expr_add(upper_plus_one, i_over_step) : NULL;
+    lower_plus = one && i_over_step ? expr_add(one, i_over_step) : NULL;
+    upper_minus = upper_plus_one && i_over_step ? expr_sub(upper_plus_one, i_over_step) : NULL;
+    lower_minus = one && i_over_step ? expr_sub(one, i_over_step) : NULL;
+    upper_plus_digamma = upper_plus ? expr_digamma(upper_plus) : NULL;
+    lower_plus_digamma = lower_plus ? expr_digamma(lower_plus) : NULL;
+    upper_minus_digamma = upper_minus ? expr_digamma(upper_minus) : NULL;
+    lower_minus_digamma = lower_minus ? expr_digamma(lower_minus) : NULL;
+    plus_difference = upper_plus_digamma && lower_plus_digamma
+                          ? expr_sub(upper_plus_digamma, lower_plus_digamma)
+                          : NULL;
+    minus_difference = upper_minus_digamma && lower_minus_digamma
+                           ? expr_sub(upper_minus_digamma, lower_minus_digamma)
+                           : NULL;
+    digamma_sum = plus_difference && minus_difference ? expr_add(plus_difference, minus_difference) : NULL;
+    step_squared = step ? expr_pow_long(step, 2L) : NULL;
+    denominator = step_squared ? expr_mul_long(step_squared, 2L) : NULL;
+    scaled_numerator = digamma_sum && step_derivative ? expr_mul(step_derivative, digamma_sum) : NULL;
+    raw = scaled_numerator && denominator ? expr_div(scaled_numerator, denominator) : NULL;
+    out = raw ? expr_simplify(raw) : NULL;
+
+cleanup:
+    expr_free(raw);
+    expr_free(scaled_numerator);
+    expr_free(denominator);
+    expr_free(step_squared);
+    expr_free(digamma_sum);
+    expr_free(minus_difference);
+    expr_free(plus_difference);
+    expr_free(lower_minus_digamma);
+    expr_free(upper_minus_digamma);
+    expr_free(lower_plus_digamma);
+    expr_free(upper_plus_digamma);
+    expr_free(lower_minus);
+    expr_free(upper_minus);
+    expr_free(lower_plus);
+    expr_free(upper_plus);
+    expr_free(upper_plus_one);
+    expr_free(i_over_step);
+    expr_free(one);
+    expr_free(imaginary_unit);
+    expr_free(step_derivative);
+    expr_free(upper_derivative);
+    expr_free(step);
+    return out;
+}
+
+static expr_t *expr_finite_reciprocal_loggamma_difference(const expr_t *upper, const expr_t *shift)
+{
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *upper_plus = upper_plus_one && shift ? expr_add(upper_plus_one, shift) : NULL;
+    expr_t *lower_plus = one && shift ? expr_add(one, shift) : NULL;
+    expr_t *upper_minus = upper_plus_one && shift ? expr_sub(upper_plus_one, shift) : NULL;
+    expr_t *lower_minus = one && shift ? expr_sub(one, shift) : NULL;
+    expr_t *lgamma_upper_plus = upper_plus ? expr_lgamma(upper_plus) : NULL;
+    expr_t *lgamma_lower_plus = lower_plus ? expr_lgamma(lower_plus) : NULL;
+    expr_t *lgamma_upper_minus = upper_minus ? expr_lgamma(upper_minus) : NULL;
+    expr_t *lgamma_lower_minus = lower_minus ? expr_lgamma(lower_minus) : NULL;
+    expr_t *first_difference = lgamma_upper_plus && lgamma_lower_plus
+                                   ? expr_sub(lgamma_upper_plus, lgamma_lower_plus)
+                                   : NULL;
+    expr_t *second_difference = first_difference && lgamma_lower_minus
+                                    ? expr_add(first_difference, lgamma_lower_minus)
+                                    : NULL;
+    expr_t *out = second_difference && lgamma_upper_minus ? expr_sub(second_difference, lgamma_upper_minus) : NULL;
+
+    expr_free(second_difference);
+    expr_free(first_difference);
+    expr_free(lgamma_lower_minus);
+    expr_free(lgamma_upper_minus);
+    expr_free(lgamma_lower_plus);
+    expr_free(lgamma_upper_plus);
+    expr_free(lower_minus);
+    expr_free(upper_minus);
+    expr_free(lower_plus);
+    expr_free(upper_plus);
+    expr_free(upper_plus_one);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_atanh_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *reciprocal_step = one ? expr_div(one, step) : NULL;
+    expr_t *gamma_difference = reciprocal_step
+                                   ? expr_finite_reciprocal_loggamma_difference(upper, reciprocal_step)
+                                   : NULL;
+    expr_t *negative_step = expr_neg(step);
+    expr_t *log_step = expr_ln(step);
+    expr_t *log_negative_step = negative_step ? expr_ln(negative_step) : NULL;
+    expr_t *log_difference = log_step && log_negative_step ? expr_sub(log_step, log_negative_step) : NULL;
+    expr_t *scaled_log_difference = log_difference ? expr_mul(upper, log_difference) : NULL;
+    expr_t *numerator = scaled_log_difference && gamma_difference
+                            ? expr_add(scaled_log_difference, gamma_difference)
                             : NULL;
-    } else {
-        first_factor = first_argument ? expr_sinh(first_argument) : NULL;
-        second_factor = second_argument
-                            ? (kind == EXPR_FINITE_PROGRESSION_SINH ? expr_sinh(second_argument)
-                                                                    : expr_cosh(second_argument))
-                            : NULL;
-    }
-    numerator = first_factor && second_factor ? expr_mul(first_factor, second_factor) : NULL;
-    denominator_argument = expr_div_long(step, 2L);
-    denominator = denominator_argument
-                      ? (kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS
-                             ? expr_sin(denominator_argument)
-                             : expr_sinh(denominator_argument))
-                      : NULL;
-    closed_form = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+    expr_t *out = numerator ? expr_div_long(numerator, 2L) : NULL;
+
+    expr_free(numerator);
+    expr_free(scaled_log_difference);
+    expr_free(log_difference);
+    expr_free(log_negative_step);
+    expr_free(log_step);
+    expr_free(negative_step);
+    expr_free(gamma_difference);
+    expr_free(reciprocal_step);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_acot_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
+    expr_t *shift = imaginary_unit ? expr_div(imaginary_unit, step) : NULL;
+    expr_t *numerator = shift ? expr_finite_reciprocal_loggamma_difference(upper, shift) : NULL;
+    expr_t *twice_i = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
+    expr_t *out = numerator && twice_i ? expr_div(numerator, twice_i) : NULL;
+
+    expr_free(twice_i);
+    expr_free(numerator);
+    expr_free(shift);
+    expr_free(imaginary_unit);
+    return out;
+}
+
+static expr_t *expr_finite_acoth_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *shift = one ? expr_div(one, step) : NULL;
+    expr_t *numerator = shift ? expr_finite_reciprocal_loggamma_difference(upper, shift) : NULL;
+    expr_t *out = numerator ? expr_div_long(numerator, 2L) : NULL;
+
+    expr_free(numerator);
+    expr_free(shift);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *expr_finite_logarithmic_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *log_step = expr_ln(step);
+    expr_t *scaled_log = log_step ? expr_mul(upper, log_step) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *log_factorial = upper_plus_one ? expr_lgamma(upper_plus_one) : NULL;
+    expr_t *out = scaled_log && log_factorial ? expr_add(scaled_log, log_factorial) : NULL;
+
+    expr_free(log_factorial);
+    expr_free(upper_plus_one);
+    expr_free(scaled_log);
+    expr_free(log_step);
+    return out;
+}
+
+static expr_t *expr_finite_common_logarithmic_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *ten = expr_new_const(NUM_TEN);
+    expr_t *log_step = expr_log10(step);
+    expr_t *scaled_log = log_step ? expr_mul(upper, log_step) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *log_factorial = upper_plus_one ? expr_lgamma(upper_plus_one) : NULL;
+    expr_t *log_ten = ten ? expr_ln(ten) : NULL;
+    expr_t *common_log_factorial = log_factorial && log_ten ? expr_div(log_factorial, log_ten) : NULL;
+    expr_t *out = scaled_log && common_log_factorial ? expr_add(scaled_log, common_log_factorial) : NULL;
+
+    expr_free(common_log_factorial);
+    expr_free(log_ten);
+    expr_free(log_factorial);
+    expr_free(upper_plus_one);
+    expr_free(scaled_log);
+    expr_free(log_step);
+    expr_free(ten);
+    return out;
+}
+
+static expr_t *expr_finite_sec_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_secant_progression_closed_form(upper, step, false);
+}
+
+static expr_t *expr_finite_cosec_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_cosecant_progression_closed_form(upper, step, false);
+}
+
+static expr_t *expr_finite_sech_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_secant_progression_closed_form(upper, step, true);
+}
+
+static expr_t *expr_finite_cosech_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_cosecant_progression_closed_form(upper, step, true);
+}
+
+static expr_t *expr_finite_sine_family_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                               bool hyperbolic, bool cosine_second_factor)
+{
+    expr_t *upper_times_step = expr_mul(upper, step);
+    expr_t *first_argument = upper_times_step ? expr_div_long(upper_times_step, 2L) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *second_product = upper_plus_one ? expr_mul(upper_plus_one, step) : NULL;
+    expr_t *second_argument = second_product ? expr_div_long(second_product, 2L) : NULL;
+    expr_t *first_factor = first_argument ? (hyperbolic ? expr_sinh(first_argument) : expr_sin(first_argument)) : NULL;
+    expr_t *second_factor = second_argument
+                                ? (hyperbolic ? (cosine_second_factor ? expr_cosh(second_argument)
+                                                                      : expr_sinh(second_argument))
+                                              : (cosine_second_factor ? expr_cos(second_argument)
+                                                                      : expr_sin(second_argument)))
+                                : NULL;
+    expr_t *numerator = first_factor && second_factor ? expr_mul(first_factor, second_factor) : NULL;
+    expr_t *denominator_argument = expr_div_long(step, 2L);
+    expr_t *denominator = denominator_argument
+                              ? (hyperbolic ? expr_sinh(denominator_argument) : expr_sin(denominator_argument))
+                              : NULL;
+    expr_t *out = numerator && denominator ? expr_div(numerator, denominator) : NULL;
 
     expr_free(denominator);
     expr_free(denominator_argument);
@@ -2218,28 +2640,458 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
     expr_free(upper_plus_one);
     expr_free(first_argument);
     expr_free(upper_times_step);
-    return closed_form;
+    return out;
 }
 
-/* Render a native finite circular or hyperbolic summation together with its geometric-series identity. */
+static expr_t *expr_finite_sin_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_sine_family_progression_closed_form(upper, step, false, false);
+}
+
+static expr_t *expr_finite_cos_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_sine_family_progression_closed_form(upper, step, false, true);
+}
+
+static expr_t *expr_finite_sinh_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_sine_family_progression_closed_form(upper, step, true, false);
+}
+
+static expr_t *expr_finite_cosh_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_sine_family_progression_closed_form(upper, step, true, true);
+}
+
+static expr_t *expr_finite_versed_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                          bool sine, bool add, bool halve)
+{
+    expr_t *trig_sum = sine ? expr_finite_sin_progression_closed_form(upper, step)
+                            : expr_finite_cos_progression_closed_form(upper, step);
+    expr_t *combined = trig_sum ? (add ? expr_add(upper, trig_sum) : expr_sub(upper, trig_sum)) : NULL;
+    expr_t *out = combined && halve ? expr_div_long(combined, 2L) : expr_clone(combined);
+
+    expr_free(combined);
+    expr_free(trig_sum);
+    return out;
+}
+
+static expr_t *expr_finite_versin_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, false, false, false);
+}
+
+static expr_t *expr_finite_vercos_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, false, true, false);
+}
+
+static expr_t *expr_finite_coversin_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, true, false, false);
+}
+
+static expr_t *expr_finite_covercos_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, true, true, false);
+}
+
+static expr_t *expr_finite_haversin_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, false, false, true);
+}
+
+static expr_t *expr_finite_havercos_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, false, true, true);
+}
+
+static expr_t *expr_finite_hacoversin_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, true, false, true);
+}
+
+static expr_t *expr_finite_hacovercos_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_versed_progression_closed_form(upper, step, true, true, true);
+}
+
+static expr_t *expr_finite_homogeneous_linear_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                                     expr_apply_unary_fn function)
+{
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *triangular_numerator = upper_plus_one ? expr_mul(upper, upper_plus_one) : NULL;
+    expr_t *triangular = triangular_numerator ? expr_div_long(triangular_numerator, 2L) : NULL;
+    expr_t *function_step = function ? function(step) : NULL;
+    expr_t *out = triangular && function_step ? expr_mul(triangular, function_step) : NULL;
+
+    expr_free(function_step);
+    expr_free(triangular);
+    expr_free(triangular_numerator);
+    expr_free(upper_plus_one);
+    return out;
+}
+
+static expr_t *expr_finite_linear_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *triangular_numerator = upper_plus_one ? expr_mul(upper, upper_plus_one) : NULL;
+    expr_t *triangular = triangular_numerator ? expr_div_long(triangular_numerator, 2L) : NULL;
+    expr_t *out = triangular ? expr_mul(step, triangular) : NULL;
+
+    expr_free(triangular);
+    expr_free(triangular_numerator);
+    expr_free(upper_plus_one);
+    return out;
+}
+
+static long expr_floor_div_long(long numerator, long denominator)
+{
+    const long quotient = numerator / denominator;
+    const long remainder = numerator % denominator;
+
+    return remainder < 0L ? quotient - 1L : quotient;
+}
+
+static bool expr_finite_small_rational_step(const expr_t *step, long *numerator_out, long *denominator_out)
+{
+    enum { MAX_DENOMINATOR = 32, MAX_NUMERATOR = 1000000 };
+    number_t step_value;
+    double approximate;
+    bool matched = false;
+
+    if (!step || !numerator_out || !denominator_out)
+        return false;
+    step_value = expr_eval((expr_t *)step);
+    if (!num_is_real(step_value) || !num_is_finite(step_value))
+        goto cleanup;
+    if (num_is_integer(step_value)) {
+        *numerator_out = 0L;
+        *denominator_out = 1L;
+        matched = true;
+        goto cleanup;
+    }
+    approximate = num_to_double(step_value);
+    if (!isfinite(approximate))
+        goto cleanup;
+    for (long denominator = 2L; denominator <= MAX_DENOMINATOR; ++denominator) {
+        const double scaled = approximate * (double)denominator;
+        long numerator;
+        number_t candidate;
+
+        if (!isfinite(scaled) || scaled < -(double)MAX_NUMERATOR - 0.5 || scaled > (double)MAX_NUMERATOR + 0.5)
+            continue;
+        numerator = lround(scaled);
+        candidate = num_create_from_frac(numerator, denominator);
+        if (num_eq(step_value, candidate)) {
+            long a = labs(numerator);
+            long b = denominator;
+
+            while (b != 0L) {
+                const long remainder = a % b;
+
+                a = b;
+                b = remainder;
+            }
+            if (a > 1L) {
+                numerator /= a;
+                denominator /= a;
+            }
+            *numerator_out = numerator;
+            *denominator_out = denominator;
+            matched = true;
+            num_destroy(&candidate);
+            break;
+        }
+        num_destroy(&candidate);
+    }
+
+cleanup:
+    num_destroy(&step_value);
+    return matched;
+}
+
+static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_t *upper, const expr_t *step,
+                                                                     bool ceiling)
+{
+    long numerator;
+    long denominator;
+    bool literal_step;
+    expr_t *denominator_expr = NULL;
+    expr_t *upper_over_denominator = NULL;
+    expr_t *period = NULL;
+    expr_t *remainder = NULL;
+    expr_t *period_increment = NULL;
+    expr_t *period_total = NULL;
+    expr_t *period_minus_one = NULL;
+    expr_t *quadratic_coefficient = NULL;
+    expr_t *quadratic_product = NULL;
+    expr_t *quadratic_per_period = NULL;
+    expr_t *partial_per_period = NULL;
+    expr_t *inside_partial = NULL;
+    expr_t *inside = NULL;
+    expr_t *complete_and_partial = NULL;
+    expr_t *residual = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_finite_small_rational_step(step, &numerator, &denominator))
+        return NULL;
+    if (denominator == 1L)
+        return expr_finite_linear_progression_closed_form(upper, step);
+    literal_step = expr_is_unnamed_const(step);
+
+    denominator_expr = expr_const_long(denominator);
+    upper_over_denominator = denominator_expr ? expr_div(upper, denominator_expr) : NULL;
+    period = upper_over_denominator ? expr_floor(upper_over_denominator) : NULL;
+    remainder = denominator_expr ? expr_mod(upper, denominator_expr) : NULL;
+    period_increment = literal_step ? expr_const_long(numerator) : expr_mul_long(step, denominator);
+    if (literal_step) {
+        const long period_value = numerator +
+                                  (numerator + (ceiling ? 1L : -1L)) * (denominator - 1L) / 2L;
+
+        period_total = expr_const_long(period_value);
+    } else if (period_increment && denominator % 2L != 0L) {
+        expr_t *scaled = expr_mul_long(step, denominator * (denominator + 1L) / 2L);
+
+        period_total = scaled ? expr_add_long(scaled, (ceiling ? 1L : -1L) * (denominator - 1L) / 2L) : NULL;
+        expr_free(scaled);
+    } else if (period_increment) {
+        expr_t *scaled = expr_mul_long(step, denominator * (denominator + 1L));
+        expr_t *adjusted = scaled ? expr_add_long(scaled, (ceiling ? 1L : -1L) * (denominator - 1L)) : NULL;
+
+        period_total = adjusted ? expr_div_long(adjusted, 2L) : NULL;
+        expr_free(adjusted);
+        expr_free(scaled);
+    }
+    period_minus_one = period ? expr_add_long(period, -1L) : NULL;
+    quadratic_coefficient = literal_step ? expr_const_long(numerator * denominator)
+                                         : expr_mul_long(step, denominator * denominator);
+    quadratic_product = quadratic_coefficient && period_minus_one
+                            ? expr_mul(quadratic_coefficient, period_minus_one)
+                            : NULL;
+    quadratic_per_period = quadratic_product ? expr_div_long(quadratic_product, 2L) : NULL;
+    partial_per_period = period_increment && remainder ? expr_mul(period_increment, remainder) : NULL;
+    inside_partial = quadratic_per_period && period_total ? expr_add(quadratic_per_period, period_total) : NULL;
+    inside = inside_partial && partial_per_period ? expr_add(inside_partial, partial_per_period) : NULL;
+    complete_and_partial = period && inside ? expr_mul(period, inside) : NULL;
+
+    for (long index = 1L; index < denominator; ++index) {
+        const long residue_value = ceiling ? -expr_floor_div_long(-numerator * index, denominator)
+                                           : expr_floor_div_long(numerator * index, denominator);
+        expr_t *indicator_numerator;
+        expr_t *indicator;
+        expr_t *indexed_step;
+        expr_t *rounded_step;
+        expr_t *term;
+
+        if (residue_value == 0L)
+            continue;
+        indicator_numerator = expr_add_long(remainder, denominator - index);
+        if (indicator_numerator) {
+            expr_t *indicator_fraction = expr_div(indicator_numerator, denominator_expr);
+
+            indicator = indicator_fraction ? expr_floor(indicator_fraction) : NULL;
+            expr_free(indicator_fraction);
+        } else {
+            indicator = NULL;
+        }
+        indexed_step = literal_step ? NULL : (index == 1L ? expr_clone(step) : expr_mul_long(step, index));
+        rounded_step = indexed_step ? (ceiling ? expr_ceil(indexed_step) : expr_floor(indexed_step)) : NULL;
+        if (literal_step && indicator && residue_value == 1L)
+            term = expr_clone(indicator);
+        else if (literal_step && indicator && residue_value == -1L)
+            term = expr_neg(indicator);
+        else
+            term = literal_step && indicator ? expr_mul_long(indicator, residue_value)
+                                             : (indicator && rounded_step ? expr_mul(indicator, rounded_step) : NULL);
+        if (term) {
+            expr_t *combined = residual ? expr_add(residual, term) : expr_clone(term);
+
+            expr_free(residual);
+            residual = combined;
+        }
+        expr_free(term);
+        expr_free(rounded_step);
+        expr_free(indexed_step);
+        expr_free(indicator);
+        expr_free(indicator_numerator);
+    }
+
+    out = complete_and_partial && residual ? expr_add(complete_and_partial, residual) : expr_clone(complete_and_partial);
+
+    expr_free(residual);
+    expr_free(complete_and_partial);
+    expr_free(inside);
+    expr_free(inside_partial);
+    expr_free(partial_per_period);
+    expr_free(quadratic_per_period);
+    expr_free(quadratic_product);
+    expr_free(quadratic_coefficient);
+    expr_free(period_minus_one);
+    expr_free(period_total);
+    expr_free(period_increment);
+    expr_free(remainder);
+    expr_free(period);
+    expr_free(upper_over_denominator);
+    expr_free(denominator_expr);
+    return out;
+}
+
+static expr_t *expr_finite_floor_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_rational_rounding_progression_closed_form(upper, step, false);
+}
+
+static expr_t *expr_finite_ceil_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_rational_rounding_progression_closed_form(upper, step, true);
+}
+
+static expr_t *expr_finite_bit_not_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    number_t step_value = expr_eval((expr_t *)step);
+    const bool integer_step = num_is_real(step_value) && num_is_finite(step_value) && num_is_integer(step_value);
+    expr_t *linear_sum = integer_step ? expr_finite_linear_progression_closed_form(upper, step) : NULL;
+    expr_t *negative_linear_sum = linear_sum ? expr_neg(linear_sum) : NULL;
+    expr_t *out = negative_linear_sum ? expr_sub(negative_linear_sum, upper) : NULL;
+
+    expr_free(negative_linear_sum);
+    expr_free(linear_sum);
+    num_destroy(&step_value);
+    return out;
+}
+
+static expr_t *expr_finite_abs_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_homogeneous_linear_progression_closed_form(upper, step, expr_abs);
+}
+
+static expr_t *expr_finite_conj_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_homogeneous_linear_progression_closed_form(upper, step, expr_conj);
+}
+
+static expr_t *expr_finite_root_progression_closed_form(const expr_t *upper, const expr_t *step, long degree,
+                                                       expr_apply_unary_fn function)
+{
+    expr_t *degree_expr = expr_const_long(degree);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *power = one && degree_expr ? expr_div(one, degree_expr) : NULL;
+    expr_t *negative_power = power ? expr_neg(power) : NULL;
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *zeta = negative_power ? expr_zeta(negative_power) : NULL;
+    expr_t *hurwitz = negative_power && upper_plus_one ? expr_zetah(negative_power, upper_plus_one) : NULL;
+    expr_t *power_sum = zeta && hurwitz ? expr_sub(zeta, hurwitz) : NULL;
+    expr_t *function_step = function ? function(step) : NULL;
+    expr_t *out = function_step && power_sum ? expr_mul(function_step, power_sum) : NULL;
+
+    expr_free(function_step);
+    expr_free(power_sum);
+    expr_free(hurwitz);
+    expr_free(zeta);
+    expr_free(upper_plus_one);
+    expr_free(negative_power);
+    expr_free(power);
+    expr_free(one);
+    expr_free(degree_expr);
+    return out;
+}
+
+static expr_t *expr_finite_sqrt_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_root_progression_closed_form(upper, step, 2L, expr_sqrt);
+}
+
+static expr_t *expr_finite_cubrt_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_root_progression_closed_form(upper, step, 3L, expr_cubrt);
+}
+
+static expr_t *expr_finite_normal_logpdf_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    expr_t *two = expr_new_const(NUM_TWO);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *upper_plus_one = expr_add_long(upper, 1L);
+    expr_t *twice_upper = expr_mul_long(upper, 2L);
+    expr_t *twice_upper_plus_one = twice_upper ? expr_add_long(twice_upper, 1L) : NULL;
+    expr_t *sum_squares_numerator = upper_plus_one && twice_upper_plus_one
+                                        ? expr_mul(upper, upper_plus_one)
+                                        : NULL;
+    expr_t *sum_squares_product = sum_squares_numerator && twice_upper_plus_one
+                                      ? expr_mul(sum_squares_numerator, twice_upper_plus_one)
+                                      : NULL;
+    expr_t *sum_squares = sum_squares_product ? expr_div_long(sum_squares_product, 6L) : NULL;
+    expr_t *step_squared = expr_pow_long(step, 2L);
+    expr_t *quadratic_product = step_squared && sum_squares ? expr_mul(step_squared, sum_squares) : NULL;
+    expr_t *quadratic = quadratic_product ? expr_div_long(quadratic_product, 2L) : NULL;
+    expr_t *two_pi = two && pi ? expr_mul(two, pi) : NULL;
+    expr_t *log_two_pi = two_pi ? expr_ln(two_pi) : NULL;
+    expr_t *normalisation_product = log_two_pi ? expr_mul(upper, log_two_pi) : NULL;
+    expr_t *normalisation = normalisation_product ? expr_div_long(normalisation_product, 2L) : NULL;
+    expr_t *magnitude = quadratic && normalisation ? expr_add(quadratic, normalisation) : NULL;
+    expr_t *out = magnitude ? expr_neg(magnitude) : NULL;
+
+    expr_free(magnitude);
+    expr_free(normalisation);
+    expr_free(normalisation_product);
+    expr_free(log_two_pi);
+    expr_free(two_pi);
+    expr_free(quadratic);
+    expr_free(quadratic_product);
+    expr_free(step_squared);
+    expr_free(sum_squares);
+    expr_free(sum_squares_product);
+    expr_free(sum_squares_numerator);
+    expr_free(twice_upper_plus_one);
+    expr_free(twice_upper);
+    expr_free(upper_plus_one);
+    expr_free(pi);
+    expr_free(two);
+    return out;
+}
+
+/* Return the closed form supplied by the summand function for a recognised finite progression. */
+expr_t *expr_finite_progression_closed_form(const expr_t *expr)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    expr_t *out;
+
+    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops))
+        return NULL;
+    if (!function_ops->finite_progression) {
+        expr_free(step);
+        return NULL;
+    }
+    out = function_ops->finite_progression(upper, step);
+    expr_free(step);
+    return out;
+}
+
+/* Render a recognised native finite progression together with the exact identity supplied by its function. */
 char *expr_finite_progression_identity_TeX(const expr_t *expr)
 {
     const expr_t *upper;
-    const expr_t *step;
+    expr_t *step = NULL;
     expr_t *symbolic_step = NULL;
     char *summation_TeX = NULL;
     char *upper_TeX = NULL;
     char *step_TeX = NULL;
     char *identity_TeX = NULL;
-    expr_finite_progression_kind_t kind;
+    const expr_ops_t *function_ops;
 
-    if (!expr_finite_progression_parts(expr, &upper, &step, &kind))
+    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops))
         return NULL;
+    if (!function_ops->finite_progression) {
+        expr_free(step);
+        return NULL;
+    }
 
-    if (!step->name || !*step->name)
-        return NULL;
-    if (expr_finite_progression_has_qdigamma_form(kind)) {
-        expr_t *closed_form = expr_finite_qdigamma_progression_closed_form(upper, step, kind);
+    if (!step->name || !*step->name ||
+        (function_ops != &ops_sin && function_ops != &ops_cos && function_ops != &ops_sinh &&
+         function_ops != &ops_cosh)) {
+        expr_t *closed_form = function_ops->finite_progression(upper, step);
         char *closed_form_TeX = closed_form ? expr_to_TeX_body(closed_form) : NULL;
 
         summation_TeX = expr_to_TeX_body(expr);
@@ -2254,6 +3106,7 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
         free(closed_form_TeX);
         free(summation_TeX);
         expr_free(closed_form);
+        expr_free(step);
         return identity_TeX;
     }
     symbolic_step = expr_new_named_var(NUM_NAN, step->name);
@@ -2261,13 +3114,13 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
     upper_TeX = expr_to_TeX_body(upper);
     step_TeX = symbolic_step ? expr_to_TeX_body(symbolic_step) : NULL;
     if (summation_TeX && upper_TeX && step_TeX) {
-        const bool circular = kind == EXPR_FINITE_PROGRESSION_SIN || kind == EXPR_FINITE_PROGRESSION_COS;
+        const bool circular = function_ops == &ops_sin || function_ops == &ops_cos;
         const char *first_function = circular ? "\\sin" : "\\sinh";
-        const char *second_function = kind == EXPR_FINITE_PROGRESSION_SIN
+        const char *second_function = function_ops == &ops_sin
                                           ? "\\sin"
-                                      : kind == EXPR_FINITE_PROGRESSION_COS
+                                      : function_ops == &ops_cos
                                           ? "\\cos"
-                                      : kind == EXPR_FINITE_PROGRESSION_SINH ? "\\sinh" : "\\cosh";
+                                      : function_ops == &ops_sinh ? "\\sinh" : "\\cosh";
         const char *format = "%s = \\frac{%s(\\frac{%s\\mkern-2mu %s}{2})\\mkern-2mu "
                              "%s(\\frac{%s}{2}\\mkern-2mu \\left(%s + 1\\right))}{%s(\\frac{%s}{2})}";
         const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, first_function, upper_TeX,
@@ -2285,6 +3138,7 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
     free(upper_TeX);
     free(summation_TeX);
     expr_free(symbolic_step);
+    expr_free(step);
     return identity_TeX;
 }
 
@@ -2425,6 +3279,7 @@ const expr_ops_t ops_sin = {.eval = eval_sin,
                             .inverse_unary = expr_asin,
                             .apply_unary = expr_sin,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_sin_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = expr_fold_zero_to_zero};
@@ -2440,6 +3295,7 @@ const expr_ops_t ops_cos = {.eval = eval_cos,
                             .inverse_unary = expr_acos,
                             .apply_unary = expr_cos,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_cos_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = expr_fold_cos_const};
@@ -2455,6 +3311,7 @@ const expr_ops_t ops_tan = {.eval = eval_tan,
                             .inverse_unary = expr_atan,
                             .apply_unary = expr_tan,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_tangent_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = expr_fold_zero_to_zero};
@@ -2470,6 +3327,7 @@ const expr_ops_t ops_sec = {.eval = eval_sec,
                             .inverse_unary = expr_asec,
                             .apply_unary = expr_sec,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_sec_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = NULL};
@@ -2485,6 +3343,7 @@ const expr_ops_t ops_cosec = {.eval = eval_cosec,
                               .inverse_unary = expr_acosec,
                               .apply_unary = expr_cosec,
                               .apply_binary = NULL,
+                              .finite_progression = expr_finite_cosec_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2500,6 +3359,7 @@ const expr_ops_t ops_cot = {.eval = eval_cot,
                             .inverse_unary = expr_acot,
                             .apply_unary = expr_cot,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_cot_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = NULL};
@@ -2515,6 +3375,7 @@ const expr_ops_t ops_versin = {.eval = eval_versin,
                                .inverse_unary = expr_arcversin,
                                .apply_unary = expr_versin,
                                .apply_binary = NULL,
+                               .finite_progression = expr_finite_versin_progression_closed_form,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = NULL};
 const expr_ops_t ops_vercos = {.eval = eval_vercos,
@@ -2529,6 +3390,7 @@ const expr_ops_t ops_vercos = {.eval = eval_vercos,
                                .inverse_unary = expr_arcvercos,
                                .apply_unary = expr_vercos,
                                .apply_binary = NULL,
+                               .finite_progression = expr_finite_vercos_progression_closed_form,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = NULL};
 const expr_ops_t ops_coversin = {.eval = eval_coversin,
@@ -2543,6 +3405,7 @@ const expr_ops_t ops_coversin = {.eval = eval_coversin,
                                  .inverse_unary = expr_arccoversin,
                                  .apply_unary = expr_coversin,
                                  .apply_binary = NULL,
+                                 .finite_progression = expr_finite_coversin_progression_closed_form,
                                  .simplify = expr_simplify_unary_operator,
                                  .fold_const_unary = NULL};
 const expr_ops_t ops_covercos = {.eval = eval_covercos,
@@ -2557,6 +3420,7 @@ const expr_ops_t ops_covercos = {.eval = eval_covercos,
                                  .inverse_unary = expr_arccovercos,
                                  .apply_unary = expr_covercos,
                                  .apply_binary = NULL,
+                                 .finite_progression = expr_finite_covercos_progression_closed_form,
                                  .simplify = expr_simplify_unary_operator,
                                  .fold_const_unary = NULL};
 const expr_ops_t ops_haversin = {.eval = eval_haversin,
@@ -2571,6 +3435,7 @@ const expr_ops_t ops_haversin = {.eval = eval_haversin,
                                  .inverse_unary = expr_archaversin,
                                  .apply_unary = expr_haversin,
                                  .apply_binary = NULL,
+                                 .finite_progression = expr_finite_haversin_progression_closed_form,
                                  .simplify = expr_simplify_unary_operator,
                                  .fold_const_unary = NULL};
 const expr_ops_t ops_havercos = {.eval = eval_havercos,
@@ -2585,6 +3450,7 @@ const expr_ops_t ops_havercos = {.eval = eval_havercos,
                                  .inverse_unary = expr_archavercos,
                                  .apply_unary = expr_havercos,
                                  .apply_binary = NULL,
+                                 .finite_progression = expr_finite_havercos_progression_closed_form,
                                  .simplify = expr_simplify_unary_operator,
                                  .fold_const_unary = NULL};
 const expr_ops_t ops_hacoversin = {.eval = eval_hacoversin,
@@ -2599,6 +3465,7 @@ const expr_ops_t ops_hacoversin = {.eval = eval_hacoversin,
                                    .inverse_unary = expr_archacoversin,
                                    .apply_unary = expr_hacoversin,
                                    .apply_binary = NULL,
+                                   .finite_progression = expr_finite_hacoversin_progression_closed_form,
                                    .simplify = expr_simplify_unary_operator,
                                    .fold_const_unary = NULL};
 const expr_ops_t ops_hacovercos = {.eval = eval_hacovercos,
@@ -2613,6 +3480,7 @@ const expr_ops_t ops_hacovercos = {.eval = eval_hacovercos,
                                    .inverse_unary = expr_archacovercos,
                                    .apply_unary = expr_hacovercos,
                                    .apply_binary = NULL,
+                                   .finite_progression = expr_finite_hacovercos_progression_closed_form,
                                    .simplify = expr_simplify_unary_operator,
                                    .fold_const_unary = NULL};
 const expr_ops_t ops_sinh = {.eval = eval_sinh,
@@ -2627,6 +3495,7 @@ const expr_ops_t ops_sinh = {.eval = eval_sinh,
                              .inverse_unary = expr_asinh,
                              .apply_unary = expr_sinh,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_sinh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
@@ -2642,6 +3511,7 @@ const expr_ops_t ops_cosh = {.eval = eval_cosh,
                              .inverse_unary = expr_acosh,
                              .apply_unary = expr_cosh,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_cosh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
@@ -2657,6 +3527,7 @@ const expr_ops_t ops_tanh = {.eval = eval_tanh,
                              .inverse_unary = expr_atanh,
                              .apply_unary = expr_tanh,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_tanh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
@@ -2672,6 +3543,7 @@ const expr_ops_t ops_sech = {.eval = eval_sech,
                              .inverse_unary = expr_asech,
                              .apply_unary = expr_sech,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_sech_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
@@ -2687,6 +3559,7 @@ const expr_ops_t ops_cosech = {.eval = eval_cosech,
                                .inverse_unary = expr_acosech,
                                .apply_unary = expr_cosech,
                                .apply_binary = NULL,
+                               .finite_progression = expr_finite_cosech_progression_closed_form,
                                .integrate = expr_integrate_dispatch_primitive,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = NULL};
@@ -2702,6 +3575,7 @@ const expr_ops_t ops_coth = {.eval = eval_coth,
                              .inverse_unary = expr_acoth,
                              .apply_unary = expr_coth,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_coth_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
@@ -2716,6 +3590,7 @@ const expr_ops_t ops_asin = {.eval = eval_asin,
                              .inverse_unary = expr_sin,
                              .apply_unary = expr_asin,
                              .apply_binary = NULL,
+                             .finite_progression_term_eval = num_asin,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_asin_const};
@@ -2730,6 +3605,7 @@ const expr_ops_t ops_acos = {.eval = eval_acos,
                              .inverse_unary = expr_cos,
                              .apply_unary = expr_acos,
                              .apply_binary = NULL,
+                             .finite_progression_term_eval = num_acos,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_acos_const};
@@ -2744,6 +3620,8 @@ const expr_ops_t ops_atan = {.eval = eval_atan,
                              .inverse_unary = expr_tan,
                              .apply_unary = expr_atan,
                              .apply_binary = NULL,
+                             .finite_progression_term_eval = num_atan,
+                             .finite_progression = expr_finite_atan_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_atan_const};
@@ -2758,6 +3636,7 @@ const expr_ops_t ops_asec = {.eval = eval_asec,
                              .inverse_unary = expr_sec,
                              .apply_unary = expr_asec,
                              .apply_binary = NULL,
+                             .finite_progression_term_eval = num_asec,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_asec_const};
@@ -2772,6 +3651,7 @@ const expr_ops_t ops_acosec = {.eval = eval_acosec,
                                .inverse_unary = expr_cosec,
                                .apply_unary = expr_acosec,
                                .apply_binary = NULL,
+                               .finite_progression_term_eval = num_acosec,
                                .integrate = expr_integrate_dispatch_primitive,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = expr_fold_acosec_const};
@@ -2786,6 +3666,8 @@ const expr_ops_t ops_acot = {.eval = eval_acot,
                              .inverse_unary = expr_cot,
                              .apply_unary = expr_acot,
                              .apply_binary = NULL,
+                             .finite_progression_term_eval = num_acot,
+                             .finite_progression = expr_finite_acot_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_acot_const};
@@ -2800,6 +3682,7 @@ const expr_ops_t ops_arcversin = {.eval = eval_arcversin,
                                   .inverse_unary = expr_versin,
                                   .apply_unary = expr_arcversin,
                                   .apply_binary = NULL,
+                                  .finite_progression_term_eval = num_arcversin,
                                   .simplify = expr_simplify_unary_operator,
                                   .fold_const_unary = NULL};
 const expr_ops_t ops_arcvercos = {.eval = eval_arcvercos,
@@ -2813,6 +3696,7 @@ const expr_ops_t ops_arcvercos = {.eval = eval_arcvercos,
                                   .inverse_unary = expr_vercos,
                                   .apply_unary = expr_arcvercos,
                                   .apply_binary = NULL,
+                                  .finite_progression_term_eval = num_arcvercos,
                                   .simplify = expr_simplify_unary_operator,
                                   .fold_const_unary = NULL};
 const expr_ops_t ops_arccoversin = {.eval = eval_arccoversin,
@@ -2826,6 +3710,7 @@ const expr_ops_t ops_arccoversin = {.eval = eval_arccoversin,
                                     .inverse_unary = expr_coversin,
                                     .apply_unary = expr_arccoversin,
                                     .apply_binary = NULL,
+                                    .finite_progression_term_eval = num_arccoversin,
                                     .simplify = expr_simplify_unary_operator,
                                     .fold_const_unary = NULL};
 const expr_ops_t ops_arccovercos = {.eval = eval_arccovercos,
@@ -2839,6 +3724,7 @@ const expr_ops_t ops_arccovercos = {.eval = eval_arccovercos,
                                     .inverse_unary = expr_covercos,
                                     .apply_unary = expr_arccovercos,
                                     .apply_binary = NULL,
+                                    .finite_progression_term_eval = num_arccovercos,
                                     .simplify = expr_simplify_unary_operator,
                                     .fold_const_unary = NULL};
 const expr_ops_t ops_archaversin = {.eval = eval_archaversin,
@@ -2852,6 +3738,7 @@ const expr_ops_t ops_archaversin = {.eval = eval_archaversin,
                                     .inverse_unary = expr_haversin,
                                     .apply_unary = expr_archaversin,
                                     .apply_binary = NULL,
+                                    .finite_progression_term_eval = num_archaversin,
                                     .simplify = expr_simplify_unary_operator,
                                     .fold_const_unary = NULL};
 const expr_ops_t ops_archavercos = {.eval = eval_archavercos,
@@ -2865,6 +3752,7 @@ const expr_ops_t ops_archavercos = {.eval = eval_archavercos,
                                     .inverse_unary = expr_havercos,
                                     .apply_unary = expr_archavercos,
                                     .apply_binary = NULL,
+                                    .finite_progression_term_eval = num_archavercos,
                                     .simplify = expr_simplify_unary_operator,
                                     .fold_const_unary = NULL};
 const expr_ops_t ops_archacoversin = {.eval = eval_archacoversin,
@@ -2878,6 +3766,7 @@ const expr_ops_t ops_archacoversin = {.eval = eval_archacoversin,
                                       .inverse_unary = expr_hacoversin,
                                       .apply_unary = expr_archacoversin,
                                       .apply_binary = NULL,
+                                      .finite_progression_term_eval = num_archacoversin,
                                       .simplify = expr_simplify_unary_operator,
                                       .fold_const_unary = NULL};
 const expr_ops_t ops_archacovercos = {.eval = eval_archacovercos,
@@ -2891,6 +3780,7 @@ const expr_ops_t ops_archacovercos = {.eval = eval_archacovercos,
                                       .inverse_unary = expr_hacovercos,
                                       .apply_unary = expr_archacovercos,
                                       .apply_binary = NULL,
+                                      .finite_progression_term_eval = num_archacovercos,
                                       .simplify = expr_simplify_unary_operator,
                                       .fold_const_unary = NULL};
 const expr_ops_t ops_asinh = {.eval = eval_asinh,
@@ -2904,6 +3794,7 @@ const expr_ops_t ops_asinh = {.eval = eval_asinh,
                               .inverse_unary = expr_sinh,
                               .apply_unary = expr_asinh,
                               .apply_binary = NULL,
+                              .finite_progression_term_eval = num_asinh,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2918,6 +3809,7 @@ const expr_ops_t ops_acosh = {.eval = eval_acosh,
                               .inverse_unary = expr_cosh,
                               .apply_unary = expr_acosh,
                               .apply_binary = NULL,
+                              .finite_progression_term_eval = num_acosh,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2932,6 +3824,8 @@ const expr_ops_t ops_atanh = {.eval = eval_atanh,
                               .inverse_unary = expr_tanh,
                               .apply_unary = expr_atanh,
                               .apply_binary = NULL,
+                              .finite_progression_term_eval = num_atanh,
+                              .finite_progression = expr_finite_atanh_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2946,6 +3840,7 @@ const expr_ops_t ops_asech = {.eval = eval_asech,
                               .inverse_unary = expr_sech,
                               .apply_unary = expr_asech,
                               .apply_binary = NULL,
+                              .finite_progression_term_eval = num_asech,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2960,6 +3855,7 @@ const expr_ops_t ops_acosech = {.eval = eval_acosech,
                                 .inverse_unary = expr_cosech,
                                 .apply_unary = expr_acosech,
                                 .apply_binary = NULL,
+                                .finite_progression_term_eval = num_acosech,
                                 .integrate = expr_integrate_dispatch_primitive,
                                 .simplify = expr_simplify_unary_operator,
                                 .fold_const_unary = NULL};
@@ -2974,6 +3870,8 @@ const expr_ops_t ops_acoth = {.eval = eval_acoth,
                               .inverse_unary = expr_coth,
                               .apply_unary = expr_acoth,
                               .apply_binary = NULL,
+                              .finite_progression_term_eval = num_acoth,
+                              .finite_progression = expr_finite_acoth_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -2989,6 +3887,7 @@ const expr_ops_t ops_exp = {.eval = eval_exp,
                             .inverse_unary = expr_log,
                             .apply_unary = expr_exp,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_exponential_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = expr_fold_exp_const};
@@ -3004,6 +3903,7 @@ const expr_ops_t ops_log = {.eval = eval_log,
                             .inverse_unary = expr_exp,
                             .apply_unary = expr_log,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_logarithmic_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = expr_fold_log_const};
@@ -3018,6 +3918,7 @@ const expr_ops_t ops_log10 = {.eval = eval_log10,
                               .inverse_unary = expr_inverse_log10_internal,
                               .apply_unary = expr_log10,
                               .apply_binary = NULL,
+                              .finite_progression = expr_finite_common_logarithmic_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = NULL};
@@ -3032,6 +3933,7 @@ const expr_ops_t ops_sqrt = {.eval = eval_sqrt,
                              .inverse_unary = expr_inverse_sqrt_internal,
                              .apply_unary = expr_sqrt,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_sqrt_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = expr_fold_sqrt_const};
@@ -3045,6 +3947,7 @@ const expr_ops_t ops_cubrt = {.eval = eval_cubrt,
                               .TeX_name = "\\sqrt[3]",
                               .apply_unary = expr_cubrt,
                               .apply_binary = NULL,
+                              .finite_progression = expr_finite_cubrt_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = expr_fold_cubrt_const};
@@ -3071,6 +3974,7 @@ const expr_ops_t ops_floor = {.eval = eval_floor,
                               .TeX_name = "\\lfloor",
                               .apply_unary = expr_floor,
                               .apply_binary = NULL,
+                              .finite_progression = expr_finite_floor_progression_closed_form,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = expr_fold_floor_const};
 const expr_ops_t ops_ceil = {.eval = eval_ceil,
@@ -3083,6 +3987,7 @@ const expr_ops_t ops_ceil = {.eval = eval_ceil,
                              .TeX_name = "\\lceil",
                              .apply_unary = expr_ceil,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_ceil_progression_closed_form,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
 const expr_ops_t ops_abs = {.eval = eval_abs,
@@ -3095,6 +4000,7 @@ const expr_ops_t ops_abs = {.eval = eval_abs,
                             .TeX_name = NULL,
                             .apply_unary = expr_abs,
                             .apply_binary = NULL,
+                            .finite_progression = expr_finite_abs_progression_closed_form,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = NULL};
 const expr_ops_t ops_conj = {.eval = eval_conj,
@@ -3109,6 +4015,7 @@ const expr_ops_t ops_conj = {.eval = eval_conj,
                              .inverse_unary = expr_conj,
                              .apply_unary = expr_conj,
                              .apply_binary = NULL,
+                             .finite_progression = expr_finite_conj_progression_closed_form,
                              .simplify = expr_simplify_unary_operator,
                              .fold_const_unary = NULL};
 const expr_ops_t ops_erf = {.eval = eval_erf,
@@ -3146,9 +4053,9 @@ const expr_ops_t ops_lgamma = {.eval = eval_lgamma,
                                .reverse = expr_reverse_lgamma,
                                .kind = EXPR_KIND_LGAMMA,
                                .arity = EXPR_OP_UNARY,
-                               .expression_name = "lgamma",
+                               .expression_name = "lnΓ",
                                .function_name = "lgamma",
-                               .TeX_name = "\\log\\Gamma",
+                               .TeX_name = "\\ln\\Gamma",
                                .apply_unary = expr_lgamma,
                                .apply_binary = NULL,
                                .simplify = expr_simplify_unary_operator,
@@ -3606,6 +4513,7 @@ const expr_ops_t ops_normal_logpdf = {.eval = eval_normal_logpdf,
                                       .TeX_name = "\\operatorname{normal\\_logpdf}",
                                       .apply_unary = expr_normal_logpdf,
                                       .apply_binary = NULL,
+                                      .finite_progression = expr_finite_normal_logpdf_progression_closed_form,
                                       .integrate = expr_integrate_dispatch_primitive,
                                       .simplify = expr_simplify_unary_operator,
                                       .fold_const_unary = NULL};
@@ -3645,6 +4553,7 @@ const expr_ops_t ops_logpdf = {.eval = eval_normal_logpdf,
                                .TeX_name = "\\operatorname{logpdf}",
                                .apply_unary = expr_logpdf,
                                .apply_binary = NULL,
+                               .finite_progression = expr_finite_normal_logpdf_progression_closed_form,
                                .integrate = expr_integrate_dispatch_primitive,
                                .simplify = expr_simplify_unary_operator,
                                .fold_const_unary = NULL};
@@ -3728,9 +4637,9 @@ const expr_ops_t ops_logbeta = {.eval = eval_logbeta,
                                 .reverse = expr_reverse_logbeta,
                                 .kind = EXPR_KIND_LOGBETA,
                                 .arity = EXPR_OP_BINARY,
-                                .expression_name = "logbeta",
+                                .expression_name = "lnB",
                                 .function_name = "logbeta",
-                                .TeX_name = "\\operatorname{logbeta}",
+                                .TeX_name = "\\ln B",
                                 .apply_unary = NULL,
                                 .apply_binary = expr_logbeta,
                                 .simplify = expr_simplify_binary_operator,
@@ -3976,6 +4885,7 @@ const expr_ops_t ops_bit_not = {.eval = eval_bit_not,
                                 .TeX_name = "\\operatorname{NOT}",
                                 .apply_unary = expr_bit_not,
                                 .apply_binary = NULL,
+                                .finite_progression = expr_finite_bit_not_progression_closed_form,
                                 .simplify = expr_simplify_unary_operator,
                                 .fold_const_unary = NULL};
 const expr_ops_t ops_shl = {.eval = eval_shl,

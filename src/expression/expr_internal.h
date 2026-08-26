@@ -179,10 +179,12 @@ typedef int (*expr_reverse_many_fn)(const expr_t *dv, const number_t *out_bar, e
                                     void *context);
 typedef expr_t *(*expr_apply_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_apply_binary_fn)(const expr_t *left, const expr_t *right);
+typedef number_t (*expr_number_unary_fn)(const number_t value);
 typedef expr_t *(*expr_simplify_fn)(const expr_t *tmpl, expr_t *a, expr_t *b);
 typedef int (*expr_fold_const_unary_fn)(const number_t *in, number_t *out);
 typedef expr_t *(*expr_inverse_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
+typedef expr_t *(*expr_finite_progression_fn)(const expr_t *upper, const expr_t *step);
 
 static inline number_t expr_reverse_num_sq(const number_t value)
 {
@@ -229,6 +231,8 @@ typedef struct expr_ops {
     expr_inverse_unary_fn inverse_unary;
     expr_apply_unary_fn apply_unary;
     expr_apply_binary_fn apply_binary;
+    expr_number_unary_fn finite_progression_term_eval;
+    expr_finite_progression_fn finite_progression;
     expr_integrate_fn integrate;
     expr_simplify_fn simplify;
     expr_fold_const_unary_fn fold_const_unary;
@@ -356,6 +360,7 @@ expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
 expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const expr_t *upper);
 expr_t *expr_new_product(const expr_t *term, const expr_t *index);
+bool expr_finite_progression_requires_bound_step(const expr_t *expr);
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts);
 bool expr_is_formal_derivative(const expr_t *expr);
@@ -971,6 +976,7 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
 char *expr_normalise_name(const char *name);
 string_t *expr_normalise_name_text(const string_t *name);
 string_t *expr_normalise_greek_alias_text(const string_t *alias);
+const char *expr_greek_symbol_alias(rune_t symbol);
 char *expr_take_string_as_c_string(string_t *text);
 char *expr_normalise_binding_name(const char *name);
 string_t *expr_normalise_binding_name_text(const string_t *name);

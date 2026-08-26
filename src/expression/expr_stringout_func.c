@@ -12,47 +12,38 @@ static void emit_name_c(sbuf_t *b, const char *name)
     emit_name_func(b, name);
 }
 
-static void emit_assignment_value(sbuf_t *b, char *value)
+static void emit_assignment_value(sbuf_t *b, const char *value)
 {
-    static const struct {
-        const char *symbol;
-        const char *alias;
-    } aliases[] = {
-        {"π", "@pi"},
-        {"φ", "@phi"},
-        {"γ", "@gamma"},
-        {"τ", "@tau"},
-    };
-    char *cursor = value;
+    string_t *source;
+    string_t *translated;
+    string_cursor_t *cursor;
+    bool failed = false;
 
-    if (!cursor) {
+    if (!value) {
         sbuf_puts(b, "NAN");
         return;
     }
 
-    while (*cursor) {
-        char *match = NULL;
-        size_t alias_index = 0u;
+    source = string_new_with(value);
+    translated = string_new();
+    cursor = source ? string_cursor_new(source) : NULL;
+    if (!source || !translated || !cursor)
+        failed = true;
 
-        for (size_t i = 0u; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
-            char *candidate = strstr(cursor, aliases[i].symbol);
+    while (!failed && !string_cursor_done(cursor)) {
+        rune_t symbol = string_cursor_peek(cursor);
+        const char *alias = expr_greek_symbol_alias(symbol);
+        int status = alias ? string_append_cstr(translated, alias) : string_append_rune(translated, symbol);
 
-            if (candidate && (!match || candidate < match)) {
-                match = candidate;
-                alias_index = i;
-            }
-        }
-        if (!match) {
-            emit_func_fragment(b, cursor);
-            break;
-        }
-
-        *match = '\0';
-        emit_func_fragment(b, cursor);
-        *match = aliases[alias_index].symbol[0];
-        sbuf_puts(b, aliases[alias_index].alias);
-        cursor = match + strlen(aliases[alias_index].symbol);
+        if (status != 0)
+            failed = true;
+        string_cursor_next(cursor);
     }
+
+    emit_func_fragment(b, failed ? value : string_c_str(translated));
+    string_cursor_free(cursor);
+    string_free(translated);
+    string_free(source);
 }
 
 static void emit_function_output_arg_list(sbuf_t *b, const varlist_t *vl, const varlist_t *cl)
@@ -499,15 +490,19 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
 
     if (!node || expr_is_const(node) || expr_is_var(node) || function_temporary_table_contains(temporaries, node))
         return true;
+    dag_index = function_dag_table_find(dag, node);
+    if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u &&
+        expr_is_op(node, &ops_neg)) {
+        if (node->a && (expr_is_const(node->a) || expr_is_var(node->a)))
+            return true;
+        return function_temporary_table_append(temporaries, node, variables, constants);
+    }
     first_child = expr_is_op(node, &ops_exp) && expr_is_op(node->a, &ops_neg) && node->a->a ? node->a->a : node->a;
     if (!function_collect_shared_temporaries(first_child, root, dag, temporaries, variables, constants) ||
         !function_collect_shared_temporaries(node->b, root, dag, temporaries, variables, constants))
         return false;
     if (node == root)
         return true;
-    if (expr_is_op(node, &ops_neg) && node->a && (expr_is_const(node->a) || expr_is_var(node->a)))
-        return true;
-    dag_index = function_dag_table_find(dag, node);
     if (dag_index == (size_t)-1 || dag->incoming[dag_index] < 2u)
         return true;
     /* Packing nodes are an internal representation detail of variadic
@@ -562,6 +557,14 @@ static bool function_append_readable_temporaries(const expr_t *node, function_te
 {
     if (node && (expr_is_op(node, &ops_add) || expr_is_op(node, &ops_sub)))
         return function_append_additive_term_temporaries(node, temporaries, variables, constants);
+    if (node && expr_is_mul(node) && node->a && node->b) {
+        if (expr_is_op(node->a, &ops_add) || expr_is_op(node->a, &ops_sub))
+            return function_append_additive_term_temporaries(node->a, temporaries, variables, constants) &&
+                   function_append_hierarchical_temporary(node->b, temporaries, variables, constants);
+        if (expr_is_op(node->b, &ops_add) || expr_is_op(node->b, &ops_sub))
+            return function_append_hierarchical_temporary(node->a, temporaries, variables, constants) &&
+                   function_append_additive_term_temporaries(node->b, temporaries, variables, constants);
+    }
     return function_append_hierarchical_temporary(node, temporaries, variables, constants);
 }
 

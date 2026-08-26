@@ -213,8 +213,15 @@ qcomplex_t qc_hacovercos(qcomplex_t z)
 {
     return qc_ldexp(qc_covercos(z), -1);
 }
+/* Return the principal complex inverse sine. */
 qcomplex_t qc_asin(qcomplex_t z)
 {
+    if (qf_eq(qc_imag(z), QF_ZERO) && qf_gt(qf_abs(qc_real(z)), QF_ONE)) {
+        qfloat_t magnitude = qf_acosh(qf_abs(qc_real(z)));
+
+        return qf_signbit(qc_real(z)) ? qc_make(qf_neg(qf_ldexp(QF_PI, -1)), magnitude)
+                                      : qc_make(qf_ldexp(QF_PI, -1), magnitude);
+    }
     /* asin(z) = -i log(iz + sqrt(1-z^2)) */
     /* -i*(a+bi) = b - ai, so re=qc_imag(ln), im=-qc_real(ln) */
     qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
@@ -222,8 +229,14 @@ qcomplex_t qc_asin(qcomplex_t z)
     qcomplex_t ln = qc_log(qc_add(iz, sqrt_term));
     return qc_make(qc_imag(ln), qf_neg(qc_real(ln)));
 }
+/* Return the principal complex inverse cosine. */
 qcomplex_t qc_acos(qcomplex_t z)
 {
+    if (qf_eq(qc_imag(z), QF_ZERO) && qf_gt(qf_abs(qc_real(z)), QF_ONE)) {
+        qfloat_t magnitude = qf_acosh(qf_abs(qc_real(z)));
+
+        return qf_signbit(qc_real(z)) ? qc_make(QF_PI, qf_neg(magnitude)) : qc_make(QF_ZERO, qf_neg(magnitude));
+    }
     /* acos(z) = -i log(z + i sqrt(1-z^2)) */
     /* -i*(a+bi) = b - ai, so re=qc_imag(ln), im=-qc_real(ln) */
     qcomplex_t sqrt_term = qc_sqrt(qc_sub(QC_ONE, qc_mul(z, z)));

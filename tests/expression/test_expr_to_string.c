@@ -929,7 +929,7 @@ static void test_to_string_gammainv_TeX(void)
     expr_t *f = expr_from_string("{ lgamma(x) - ln(5) | x = gammainv(5) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
-    const char *expect = "\\left\\{ \\log\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
+    const char *expect = "\\left\\{ \\ln\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
                          "x = \\Gamma^{-1}(5) \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "gammainv inverse gamma (TEX)", got);

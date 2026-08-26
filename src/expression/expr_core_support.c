@@ -300,17 +300,102 @@ typedef struct {
     const char *upper;
 } greek_entry_t;
 
+typedef struct {
+    uint32_t codepoint;
+    const char *alias;
+} greek_symbol_alias_entry_t;
+
 enum { GREEK_HT_SIZE = 30 };
 
 static const greek_entry_t s_greek_names[GREEK_HT_SIZE] = {
-    [0] = {"theta", 5, "θ", "Θ"},  [1] = {"psi", 3, "ψ", "Ψ"},      [2] = {"chi", 3, "χ", "Χ"},
-    [4] = {"lambda", 6, "λ", "Λ"}, [5] = {"delta", 5, "δ", "Δ"},    [6] = {"omicron", 8, "ο", "Ο"},
-    [8] = {"iota", 4, "ι", "Ι"},   [10] = {"mu", 2, "μ", "Μ"},      [11] = {"pi", 2, "π", "Π"},
-    [12] = {"phi", 3, "φ", "Φ"},   [13] = {"alpha", 5, "α", "Α"},   [14] = {"zeta", 4, "ζ", "Ζ"},
-    [15] = {"tau", 3, "τ", "Τ"},   [16] = {"rho", 3, "ρ", "Ρ"},     [17] = {"beta", 4, "β", "Β"},
-    [19] = {"nu", 2, "ν", "Ν"},    [20] = {"kappa", 5, "κ", "Κ"},   [22] = {"sigma", 5, "σ", "Σ"},
-    [23] = {"xi", 2, "ξ", "Ξ"},    [24] = {"eta", 3, "η", "Η"},     [25] = {"epsilon", 7, "ε", "Ε"},
-    [26] = {"gamma", 5, "γ", "Γ"}, [27] = {"upsilon", 7, "υ", "Υ"}, [29] = {"omega", 5, "ω", "Ω"}};
+    [0]  = {"theta", 5, "θ", "Θ"},
+    [1]  = {"psi", 3, "ψ", "Ψ"},
+    [2]  = {"chi", 3, "χ", "Χ"},
+    [4]  = {"lambda", 6, "λ", "Λ"},
+    [5]  = {"delta", 5, "δ", "Δ"},
+    [6]  = {"omicron", 8, "ο", "Ο"},
+    [8]  = {"iota", 4, "ι", "Ι"},
+    [10] = {"mu", 2, "μ", "Μ"},
+    [11] = {"pi", 2, "π", "Π"},
+    [12] = {"phi", 3, "φ", "Φ"},
+    [13] = {"alpha", 5, "α", "Α"},
+    [14] = {"zeta", 4, "ζ", "Ζ"},
+    [15] = {"tau", 3, "τ", "Τ"},
+    [16] = {"rho", 3, "ρ", "Ρ"},
+    [17] = {"beta", 4, "β", "Β"},
+    [19] = {"nu", 2, "ν", "Ν"},
+    [20] = {"kappa", 5, "κ", "Κ"},
+    [22] = {"sigma", 5, "σ", "Σ"},
+    [23] = {"xi", 2, "ξ", "Ξ"},
+    [24] = {"eta", 3, "η", "Η"},
+    [25] = {"epsilon", 7, "ε", "Ε"},
+    [26] = {"gamma", 5, "γ", "Γ"},
+    [27] = {"upsilon", 7, "υ", "Υ"},
+    [29] = {"omega", 5, "ω", "Ω"},
+};
+
+enum { GREEK_SYMBOL_ALIAS_HT_SIZE = 57 };
+
+static const greek_symbol_alias_entry_t s_greek_symbol_aliases[GREEK_SYMBOL_ALIAS_HT_SIZE] = {
+    [0]  = {0x03c9u, "@omega"},
+    [1]  = {0x0391u, "@ALPHA"},
+    [2]  = {0x0392u, "@BETA"},
+    [3]  = {0x0393u, "@GAMMA"},
+    [4]  = {0x0394u, "@DELTA"},
+    [5]  = {0x0395u, "@EPSILON"},
+    [6]  = {0x0396u, "@ZETA"},
+    [7]  = {0x0397u, "@ETA"},
+    [8]  = {0x0398u, "@THETA"},
+    [9]  = {0x0399u, "@IOTA"},
+    [10] = {0x039au, "@KAPPA"},
+    [11] = {0x039bu, "@LAMBDA"},
+    [12] = {0x039cu, "@MU"},
+    [13] = {0x039du, "@NU"},
+    [14] = {0x039eu, "@XI"},
+    [15] = {0x039fu, "@OMICRON"},
+    [16] = {0x03a0u, "@PI"},
+    [17] = {0x03a1u, "@RHO"},
+    [19] = {0x03a3u, "@SIGMA"},
+    [20] = {0x03a4u, "@TAU"},
+    [21] = {0x03a5u, "@UPSILON"},
+    [22] = {0x03a6u, "@PHI"},
+    [23] = {0x03a7u, "@CHI"},
+    [24] = {0x03a8u, "@PSI"},
+    [25] = {0x03a9u, "@OMEGA"},
+    [33] = {0x03b1u, "@alpha"},
+    [34] = {0x03b2u, "@beta"},
+    [35] = {0x03b3u, "@gamma"},
+    [36] = {0x03b4u, "@delta"},
+    [37] = {0x03b5u, "@epsilon"},
+    [38] = {0x03b6u, "@zeta"},
+    [39] = {0x03b7u, "@eta"},
+    [40] = {0x03b8u, "@theta"},
+    [41] = {0x03b9u, "@iota"},
+    [42] = {0x03bau, "@kappa"},
+    [43] = {0x03bbu, "@lambda"},
+    [44] = {0x03bcu, "@mu"},
+    [45] = {0x03bdu, "@nu"},
+    [46] = {0x03beu, "@xi"},
+    [47] = {0x03bfu, "@omicron"},
+    [48] = {0x03c0u, "@pi"},
+    [49] = {0x03c1u, "@rho"},
+    [50] = {0x03c2u, "@sigma"},
+    [51] = {0x03c3u, "@sigma"},
+    [52] = {0x03c4u, "@tau"},
+    [53] = {0x03c5u, "@upsilon"},
+    [54] = {0x03c6u, "@phi"},
+    [55] = {0x03c7u, "@chi"},
+    [56] = {0x03c8u, "@psi"},
+};
+
+/* Resolve a supported Greek symbol through the reverse perfect hash. */
+const char *expr_greek_symbol_alias(rune_t symbol)
+{
+    uint32_t codepoint = rune_value(symbol);
+    const greek_symbol_alias_entry_t *entry = &s_greek_symbol_aliases[codepoint % GREEK_SYMBOL_ALIAS_HT_SIZE];
+
+    return entry->codepoint == codepoint ? entry->alias : NULL;
+}
 
 char *expr_take_string_as_c_string(string_t *text)
 {

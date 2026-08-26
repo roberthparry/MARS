@@ -435,6 +435,17 @@ static void test_trig(void)
         check_qc("asin(sin(z)) = z", qc_asin(qc_sin(z4)), z4, 1e-27);
     }
 
+    check_qc("asin(2) follows upper side of real cut", qc_asin(qcr(2.0)),
+             qczs("1.57079632679489661923132169163975144209858469968755",
+                  "1.31695789692481670862504634730796844402698197146752"),
+             1e-29);
+    check_qc("asin(-2) follows upper side of real cut", qc_asin(qcr(-2.0)),
+             qczs("-1.57079632679489661923132169163975144209858469968755",
+                  "1.31695789692481670862504634730796844402698197146752"),
+             1e-29);
+    check_qc("acos(2) follows upper side of real cut", qc_acos(qcr(2.0)),
+             qczs("0", "-1.31695789692481670862504634730796844402698197146752"), 1e-29);
+
     {
         qcomplex_t z5 = qcz(0.4, 0.3);
         check_qc("acos(cos(z)) = z", qc_acos(qc_cos(z5)), z5, 1e-27);

@@ -815,7 +815,8 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_lambert_w0(const expr_t *expr)` — Lambert W principal branch W₀(x)
 - `expr_t *expr_lambert_wm1(const expr_t *expr)` — Lambert W branch W₋₁(x)
 - `expr_t *expr_beta(const expr_t *left, const expr_t *right)` — B(a, b)
-- `expr_t *expr_logbeta(const expr_t *left, const expr_t *right)` — ln B(a, b)
+- `expr_t *expr_logbeta(const expr_t *left, const expr_t *right)` — ln B(a, b); Expression style writes
+  `lnB(a, b)`, Function style writes `logbeta(a, b)`, and legacy `logbeta(a, b)` expression input remains accepted
 - `expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b)` — beta distribution PDF
 - `expr_t *expr_logbeta_pdf(const expr_t *x, const expr_t *a, const expr_t *b)` — log beta distribution PDF
 - `expr_t *expr_binomial(const expr_t *n, const expr_t *k)` — binomial coefficient
@@ -1048,9 +1049,47 @@ bindings.
     while the index is local and is not returned as a binding
   - infinite summations and products omit the upper bound: `@Z_k=1 f(k)` and
     `@P_k=1 f(k)` produce `Σ_(k=1)^∞ f(k)` and `@P_k=1 f(k)` respectively
-  - finite `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
-    expose their geometric-series closed forms; supplied bindings therefore
-    evaluate large upper bounds without term-by-term iteration
+  - unary operations can opt into finite-progression reduction through their
+    expression operation table, rather than through a central list of function
+    names. Exact reducers cover `exp`, the circular and hyperbolic sine/cosine
+    families, the q-digamma quotient families, all eight versed/haversed
+    functions, `abs`, `conj`, `sqrt`, `cubrt`, `normal_logpdf`, and `logpdf`.
+    Functions without a genuine general identity remain formal sums
+  - the local index may occur anywhere as one factor of the function argument.
+    Thus `fn(kax)`, `fn(akx)`, and `fn(axk)` all pass the complete symbolic step
+    `ax` to the reducer. The recogniser removes exactly one `k` factor and
+    rejects a quotient that still contains the local index, so nonlinear input
+    such as `fn(k²ax)` remains formal
+  - finite `exp(kx)`, `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from
+    1 to `n` expose their geometric-series closed forms; supplied bindings
+    therefore evaluate large upper bounds without term-by-term iteration. The
+    exponential form is `exp(x)·(exp(nx) - 1)/(exp(x) - 1)`, with the removable
+    `x = 0` value evaluated as `n`
+  - the finite logarithmic progression `@Z_(k=1)^n ln(kx)` reduces to
+    `n·ln(x) + lnΓ(n + 1)`, so large supplied upper bounds use log-gamma
+    rather than term-by-term iteration
+  - common-log input remains base ten: `@Z_(k=1)^n log(kx)` reduces to
+    `n·lg(x) + lnΓ(n + 1)/ln(10)` rather than using the natural-log formula
+  - homogeneous progressions use power-sum identities: `abs(kx)` and
+    `conj(kx)` use the triangular number, while `sqrt(kx)` and `cubrt(kx)` use
+    the corresponding Riemann-zeta minus Hurwitz-zeta power sum
+  - `floor(kx)` and `ceil(kx)` reduce to `x·n·(n + 1)/2` when the supplied
+    binding proves that `x` is integral. A proved small reduced rational step
+    `x = p/q` instead uses complete periods of length `q` and expands at most
+    `q - 1` residue terms; decimal `0.6` is therefore recognised as `3/5`.
+    Non-integral rationals currently require `q <= 32` and `|p| <= 1000000`.
+    Unary bitwise `not(kx)` similarly uses `-x·n·(n + 1)/2 - n` for an integral
+    step. The native result marks these as domain-required specialisations so
+    every result card retains the condition; an unset, irrational, or larger
+    rational step remains a formal sum
+  - `atan(kx)`, `acot(kx)`, `atanh(kx)`, and `acoth(kx)` use finite log-gamma
+    identities. Arctangent keeps its real-axis branch explicit through
+    `x/abs(x)`, and its derivative reduces to a conjugate pair of digamma
+    differences. Other inverse-function progressions remain formal; supplied
+    bounds of at most one million terms may still be evaluated directly
+  - exact `atanh` and `acoth` progression poles return signed infinity. A
+    supplied zero step gives the removable `atan(kx)` value zero, and complex
+    digamma evaluation retains the active arbitrary precision
   - `sqrt(x)` or `√(x)` for a single principal square root; `cubrt(x)` and `root(x, n)` for single principal cube
     and integer-order roots
   - `conj(x)` and `conjugate(x)` for complex conjugation, with postfix `x^*` as the equivalent shorthand

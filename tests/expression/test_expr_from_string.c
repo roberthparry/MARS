@@ -1281,6 +1281,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("Γ(3) = 2", "{ Γ(x) | x = 3 }", 2.0, __LINE__);
     check_parse_val("gammainv(gamma(2.5)) = 2.5", "{ gammainv(x) | x = 1.329340388179137 }", 2.5, __LINE__);
     check_parse_val("lgamma(1) = 0", "{ lgamma(x) | x = 1 }", 0.0, __LINE__);
+    check_parse_val("lnΓ(1) = 0", "{ lnΓ(x) | x = 1 }", 0.0, __LINE__);
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽⁰⁾(1) = -gamma_E", "{ ψ⁽⁰⁾(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽¹⁾(1) = pi²/6", "{ ψ⁽¹⁾(x) | x = 1 }", M_PI * M_PI / 6.0, __LINE__);
@@ -1368,6 +1369,7 @@ static void test_from_string_special_functions(void)
     /* Binary functions */
     check_parse_val("beta(1,1) = 1", "{ beta(x, y) | x = 1, y = 1 }", 1.0, __LINE__);
     check_parse_val("logbeta(1,1) = 0", "{ logbeta(x, y) | x = 1, y = 1 }", 0.0, __LINE__);
+    check_parse_val("lnB(1,1) = 0", "{ lnB(x, y) | x = 1, y = 1 }", 0.0, __LINE__);
     check_parse_val("gammainc_lower(1,1) = 1-exp(-1)", "{ gammainc_lower(s, x) | s = 1, x = 1 }", 1.0 - exp(-1.0),
                     __LINE__);
     check_parse_val("gammainc_upper(1,1) = exp(-1)", "{ gammainc_upper(s, x) | s = 1, x = 1 }", exp(-1.0), __LINE__);
@@ -2642,6 +2644,41 @@ static void test_from_string_greek_binding_lookup(void)
     expr_free(expr);
 }
 
+static void test_greek_symbol_reverse_perfect_hash(void)
+{
+    static const struct {
+        const char *symbol;
+        const char *alias;
+    } cases[] = {
+        {"α", "@alpha"},     {"Α", "@ALPHA"},     {"β", "@beta"},       {"Β", "@BETA"},
+        {"γ", "@gamma"},     {"Γ", "@GAMMA"},     {"δ", "@delta"},      {"Δ", "@DELTA"},
+        {"ε", "@epsilon"},   {"Ε", "@EPSILON"},   {"ζ", "@zeta"},       {"Ζ", "@ZETA"},
+        {"η", "@eta"},       {"Η", "@ETA"},       {"θ", "@theta"},      {"Θ", "@THETA"},
+        {"ι", "@iota"},      {"Ι", "@IOTA"},      {"κ", "@kappa"},      {"Κ", "@KAPPA"},
+        {"λ", "@lambda"},    {"Λ", "@LAMBDA"},    {"μ", "@mu"},         {"Μ", "@MU"},
+        {"ν", "@nu"},        {"Ν", "@NU"},        {"ξ", "@xi"},         {"Ξ", "@XI"},
+        {"ο", "@omicron"},   {"Ο", "@OMICRON"},   {"π", "@pi"},         {"Π", "@PI"},
+        {"ρ", "@rho"},       {"Ρ", "@RHO"},       {"ς", "@sigma"},      {"σ", "@sigma"},
+        {"Σ", "@SIGMA"},
+        {"τ", "@tau"},       {"Τ", "@TAU"},       {"υ", "@upsilon"},    {"Υ", "@UPSILON"},
+        {"φ", "@phi"},       {"Φ", "@PHI"},       {"χ", "@chi"},        {"Χ", "@CHI"},
+        {"ψ", "@psi"},       {"Ψ", "@PSI"},       {"ω", "@omega"},      {"Ω", "@OMEGA"},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        string_t *symbol = string_new_with(cases[i].symbol);
+        string_cursor_t *cursor = symbol ? string_cursor_new(symbol) : NULL;
+
+        TEST_ASSERT_NOT_NULL(symbol);
+        TEST_ASSERT_NOT_NULL(cursor);
+        TEST_ASSERT_STR_EQ(expr_greek_symbol_alias(string_cursor_peek(cursor)), cases[i].alias);
+        string_cursor_free(cursor);
+        string_free(symbol);
+    }
+
+    TEST_ASSERT_NULL(expr_greek_symbol_alias(rune_from_value((uint32_t)'x')));
+}
+
 static void test_from_string_bindings_with_implicit_builtin_constant(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3796,6 +3833,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_expression_string_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_greek_binding_lookup, NULL);
+    TEST_RUN_SUBTEST(test_greek_symbol_reverse_perfect_hash, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_implicit_builtin_constant, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);

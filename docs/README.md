@@ -34,9 +34,9 @@ This directory contains the longer module documentation for MARS.
 - [`diffequ_t`](./diffequation.md) — ODE/PDE parsing and symbolic solving, including selected linearisations and symmetry metadata
 - [`expr_t`](./expression.md) — differentiable expression DAGs, symbolic
   derivatives, numeric reverse-mode gradients, Cartesian complex presentation,
-  algebraic-series and progression recognition, harmonic polynomials, symbolic
-  sums and products, Li₁ and Lerch-transcendent calculus, integration and
-  helper APIs
+  algebraic-series and extensible finite-progression recognition, harmonic
+  polynomials, symbolic sums and products, Li₁ and Lerch-transcendent calculus,
+  integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries
