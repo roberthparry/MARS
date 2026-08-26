@@ -2314,13 +2314,41 @@ bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_
     return num_is_finite(*value_out);
 }
 
+static expr_t *expr_simplify_linear_summation_term(const expr_t *term, const expr_t *bounds)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!term || !bounds)
+        return NULL;
+    if (!expr_is_op(term, &ops_add))
+        return expr_math_wrap_binary(&ops_summation, term, bounds);
+
+    left = expr_simplify_linear_summation_term(term->a, bounds);
+    right = expr_simplify_linear_summation_term(term->b, bounds);
+    out = left && right ? expr_add_simplify_owned(left, right) : NULL;
+    if (!out) {
+        expr_free(left);
+        expr_free(right);
+    }
+    return out;
+}
+
 static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, expr_t *term, expr_t *bounds)
 {
     expr_t *simplified_term = term ? expr_simplify(term) : NULL;
+    expr_t *out;
 
     if (simplified_term) {
         expr_free(term);
         term = simplified_term;
+    }
+    if (term && expr_is_op(term, &ops_add)) {
+        out = expr_simplify_linear_summation_term(term, bounds);
+        expr_free(term);
+        expr_free(bounds);
+        return out;
     }
     return expr_simplify_binary_operator(expr, term, bounds);
 }
