@@ -45,7 +45,6 @@ connections have also taken him to the Netherlands since childhood,
 particularly Amsterdam, Limmen, Castricum and Alkmaar. Earlier travels, many
 years ago, also took him to Swaziland, Bahrain, Botswana, Nigeria and Australia.
 
-MARS brings together his long-standing interests in mathematics, navigation,
-astronomy and computer programming. It reflects his lifelong curiosity about
-the origins of mathematical formulae, the principles behind them and how our
-state-of-the-art tools might assist that exploration.
+MARS brings together his interests in navigation and computer programming with
+a deeper interest in how we perceive the world around us and in the mathematics
+that governs its workings.
