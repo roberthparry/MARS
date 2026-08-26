@@ -159,6 +159,8 @@ static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
 static number_t eval_finite_summation(expr_t *dv)
 {
     const long maximum_terms = 10000L;
+    expr_t *simplified_term;
+    expr_t *simplified_sum;
     expr_t *index;
     const expr_t *lower = NULL;
     const expr_t *upper = NULL;
@@ -178,6 +180,21 @@ static number_t eval_finite_summation(expr_t *dv)
     if (!expr_is_var(index) || !upper || (lower && !expr_summation_bound_to_long(lower, &lower_value)) ||
         !expr_summation_bound_to_long(upper, &upper_value))
         return num_clone(NUM_NAN);
+
+    /* Reduce identities inside the summand before any term-by-term evaluation can occur. */
+    simplified_term = expr_simplify(dv->a);
+    if (simplified_term && !expr_struct_eq(simplified_term, dv->a)) {
+        simplified_sum = expr_math_wrap_binary(&ops_summation, simplified_term, dv->b);
+        expr_free(simplified_term);
+        if (simplified_sum) {
+            number_t result = expr_eval(simplified_sum);
+
+            expr_free(simplified_sum);
+            return result;
+        }
+    } else {
+        expr_free(simplified_term);
+    }
     if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms) {
         expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(dv) : NULL;
 
