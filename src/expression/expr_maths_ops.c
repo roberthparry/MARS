@@ -2316,6 +2316,12 @@ bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_
 
 static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, expr_t *term, expr_t *bounds)
 {
+    expr_t *simplified_term = term ? expr_simplify(term) : NULL;
+
+    if (simplified_term) {
+        expr_free(term);
+        term = simplified_term;
+    }
     return expr_simplify_binary_operator(expr, term, bounds);
 }
 
@@ -3117,8 +3123,12 @@ static expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr)
         return NULL;
 
     simplified_term = expr_simplify(expr->a);
-    if (!expr_match_mul_expr(simplified_term, &scale, &progression))
+    if (!expr_match_mul_expr(simplified_term, &scale, &progression)) {
+        unscaled_sum = expr_math_wrap_binary(&ops_summation, simplified_term, expr->b);
+        unscaled_closed_form = expr_finite_progression_direct_closed_form(unscaled_sum);
+        out = unscaled_closed_form ? expr_simplify(unscaled_closed_form) : NULL;
         goto cleanup;
+    }
     if (expr_contains_progression_index(scale, index)) {
         const expr_t *swap = scale;
 
