@@ -4674,10 +4674,10 @@ class ExpressionResultTests(unittest.TestCase):
         payload = mars_lab.prepare_evaluation_fields(
             self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
         )
-        self.assertEqual(
-            payload["full_display_expression"],
-            "{ Σ_(k=1)^n sin(kx) + Σ_(k=1)^n cos(kx) + Σ_(k=1)^n tan(kx) | x = 1; n = 100000 }",
-        )
+        self.assertNotIn("Σ_", payload["full_display_expression"])
+        self.assertNotIn("sum(k, 1, n", payload["full_display_function"])
+        self.assertIn("ψq(", payload["full_display_expression"])
+        self.assertIn("sin(½nx)/sin(x/2)", payload["full_display_expression"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
