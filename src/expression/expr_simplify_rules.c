@@ -320,7 +320,7 @@ static expr_t *simplify_scaled_radical_quotient_term(const expr_t *term, const e
     return out;
 }
 
-expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
+static expr_t *expr_simplify_try_sqrt_quotient_impl(expr_t *num, expr_t *den)
 {
     bool pure_square_root;
     bool scaled_square_root;
@@ -463,6 +463,20 @@ expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
         expr_free(num);
         expr_free(den);
     }
+    return out;
+}
+
+/* Simplify a square-root quotient without allowing mutually inverse rewrite rules to exhaust the stack. */
+expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
+{
+    static _Thread_local size_t sqrt_quotient_depth;
+    expr_t *out;
+
+    if (sqrt_quotient_depth >= 8u)
+        return NULL;
+    sqrt_quotient_depth++;
+    out = expr_simplify_try_sqrt_quotient_impl(num, den);
+    sqrt_quotient_depth--;
     return out;
 }
 

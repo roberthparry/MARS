@@ -2009,7 +2009,10 @@ int main(int argc, char **argv)
 
     if (integral_request) {
         if (wrt_is_variable) {
-            integral = expr_integrate_family(display_expr, wrt);
+            const expr_t *integral_source =
+                progression_closed_form && expr_is_finite_inverse_progression(expr) ? expr : display_expr;
+
+            integral = expr_integrate_family(integral_source, wrt);
             if (!integral) {
                 printf("integral  no symbolic integral with respect to %s\n", wrt_name);
             } else {

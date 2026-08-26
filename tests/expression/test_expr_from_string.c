@@ -424,6 +424,30 @@ static void test_from_string_series_ellipsis(void)
             free(sine_closed_text);
             expr_free(sine_closed);
         }
+        {
+            expr_bindings_t *scaled_bindings = NULL;
+            expr_t *scaled_sum =
+                expr_from_string("{ @Z_(k=1)^n sin(kx)cos(kx) | n=1000000000; x=1 }", &scaled_bindings);
+            expr_t *scaled_closed = scaled_sum ? expr_finite_progression_closed_form(scaled_sum) : NULL;
+            char *scaled_closed_text = scaled_closed ? expr_to_string(scaled_closed, style_UNBOUND) : NULL;
+            char *scaled_identity_TeX = scaled_sum ? expr_finite_progression_identity_TeX(scaled_sum) : NULL;
+            number_t scaled_value = scaled_sum ? expr_eval(scaled_sum) : num_clone(NUM_NAN);
+
+            ASSERT_NOT_NULL(scaled_sum);
+            ASSERT_NOT_NULL(scaled_bindings);
+            ASSERT_NOT_NULL(scaled_closed);
+            ASSERT_NOT_NULL(scaled_identity_TeX);
+            TEST_ASSERT_STR_EQ(scaled_closed_text, "½·sin(nx)·sin(x·(n + 1))/sin(x)");
+            ASSERT_NOT_NULL(strstr(scaled_identity_TeX,
+                                   "\\sum_{k=1}^{n}\\sin(k\\mkern-2mu x)\\mkern-2mu \\cos(k\\mkern-2mu x) ="));
+            ASSERT_EQ_DOUBLE(num_to_double(scaled_value), 0.3243317797820831, 1e-15);
+            num_destroy(&scaled_value);
+            free(scaled_identity_TeX);
+            free(scaled_closed_text);
+            expr_free(scaled_closed);
+            expr_free(scaled_sum);
+            expr_bindings_free(scaled_bindings);
+        }
         sum_text = expr_to_string(sum, style_UNBOUND);
         product_text = expr_to_string(product, style_UNBOUND);
         parenthesised_sum_text = expr_to_string(parenthesised_sum, style_UNBOUND);

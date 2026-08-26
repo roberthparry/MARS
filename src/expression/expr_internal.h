@@ -361,6 +361,7 @@ expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const expr_t *upper);
 expr_t *expr_new_product(const expr_t *term, const expr_t *index);
 bool expr_finite_progression_requires_bound_step(const expr_t *expr);
+bool expr_is_finite_inverse_progression(const expr_t *expr);
 
 expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts);
 bool expr_is_formal_derivative(const expr_t *expr);

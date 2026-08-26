@@ -454,6 +454,22 @@ bool expr_finite_progression_requires_bound_step(const expr_t *expr)
     return required;
 }
 
+/* Return whether an expression is a recognised finite inverse-function progression. */
+bool expr_is_finite_inverse_progression(const expr_t *expr)
+{
+    const expr_t *upper;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops;
+    bool recognised = false;
+
+    if (expr_finite_progression_parts(expr, &upper, &step, &function_ops))
+        recognised = function_ops == &ops_atan || function_ops == &ops_acot || function_ops == &ops_atanh ||
+                     function_ops == &ops_acoth;
+    (void)upper;
+    expr_free(step);
+    return recognised;
+}
+
 static number_t eval_finite_exponential_progression(const expr_t *expr, long upper_value)
 {
     const expr_t *upper;
@@ -3050,8 +3066,7 @@ static expr_t *expr_finite_normal_logpdf_progression_closed_form(const expr_t *u
     return out;
 }
 
-/* Return the closed form supplied by the summand function for a recognised finite progression. */
-expr_t *expr_finite_progression_closed_form(const expr_t *expr)
+static expr_t *expr_finite_progression_direct_closed_form(const expr_t *expr)
 {
     const expr_t *upper;
     expr_t *step = NULL;
@@ -3069,6 +3084,73 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
     return out;
 }
 
+static expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr)
+{
+    const expr_t *index;
+    const expr_t *scale;
+    const expr_t *progression;
+    expr_t *simplified_term = NULL;
+    expr_t *unscaled_sum = NULL;
+    expr_t *unscaled_closed_form = NULL;
+    expr_t *scaled_closed_form = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr_is_op(expr, &ops_summation) || !expr_is_op(expr->b, &ops_argument_list) ||
+        !(index = expr->b->a) || !expr_is_var(index))
+        return NULL;
+
+    simplified_term = expr_simplify(expr->a);
+    if (!expr_match_mul_expr(simplified_term, &scale, &progression))
+        goto cleanup;
+    if (expr_contains_progression_index(scale, index)) {
+        const expr_t *swap = scale;
+
+        scale = progression;
+        progression = swap;
+    }
+    if (expr_contains_progression_index(scale, index) || !expr_contains_progression_index(progression, index))
+        goto cleanup;
+
+    unscaled_sum = expr_math_wrap_binary(&ops_summation, progression, expr->b);
+    unscaled_closed_form = expr_finite_progression_direct_closed_form(unscaled_sum);
+    scaled_closed_form = unscaled_closed_form ? expr_mul(scale, unscaled_closed_form) : NULL;
+    out = scaled_closed_form ? expr_simplify(scaled_closed_form) : NULL;
+
+cleanup:
+    expr_free(scaled_closed_form);
+    expr_free(unscaled_closed_form);
+    expr_free(unscaled_sum);
+    expr_free(simplified_term);
+    return out;
+}
+
+/* Return the closed form supplied by the summand function for a recognised finite progression. */
+expr_t *expr_finite_progression_closed_form(const expr_t *expr)
+{
+    expr_t *out = expr_finite_progression_direct_closed_form(expr);
+
+    return out ? out : expr_finite_progression_scaled_closed_form(expr);
+}
+
+static char *expr_finite_progression_generic_identity_TeX(const expr_t *expr, const expr_t *closed_form)
+{
+    char *summation_TeX = expr_to_TeX_body(expr);
+    char *closed_form_TeX = expr_to_TeX_body(closed_form);
+    char *identity_TeX = NULL;
+
+    if (summation_TeX && closed_form_TeX) {
+        const char *format = "%s = %s";
+        const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, closed_form_TeX) + 1u;
+
+        identity_TeX = malloc(length);
+        if (identity_TeX)
+            snprintf(identity_TeX, length, format, summation_TeX, closed_form_TeX);
+    }
+    free(closed_form_TeX);
+    free(summation_TeX);
+    return identity_TeX;
+}
+
 /* Render a recognised native finite progression together with the exact identity supplied by its function. */
 char *expr_finite_progression_identity_TeX(const expr_t *expr)
 {
@@ -3081,8 +3163,13 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
     char *identity_TeX = NULL;
     const expr_ops_t *function_ops;
 
-    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops))
-        return NULL;
+    if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops)) {
+        expr_t *closed_form = expr_finite_progression_scaled_closed_form(expr);
+
+        identity_TeX = closed_form ? expr_finite_progression_generic_identity_TeX(expr, closed_form) : NULL;
+        expr_free(closed_form);
+        return identity_TeX;
+    }
     if (!function_ops->finite_progression) {
         expr_free(step);
         return NULL;
@@ -3092,19 +3179,8 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
         (function_ops != &ops_sin && function_ops != &ops_cos && function_ops != &ops_sinh &&
          function_ops != &ops_cosh)) {
         expr_t *closed_form = function_ops->finite_progression(upper, step);
-        char *closed_form_TeX = closed_form ? expr_to_TeX_body(closed_form) : NULL;
 
-        summation_TeX = expr_to_TeX_body(expr);
-        if (summation_TeX && closed_form_TeX) {
-            const char *format = "%s = %s";
-            const size_t length = (size_t)snprintf(NULL, 0, format, summation_TeX, closed_form_TeX) + 1u;
-
-            identity_TeX = malloc(length);
-            if (identity_TeX)
-                snprintf(identity_TeX, length, format, summation_TeX, closed_form_TeX);
-        }
-        free(closed_form_TeX);
-        free(summation_TeX);
+        identity_TeX = closed_form ? expr_finite_progression_generic_identity_TeX(expr, closed_form) : NULL;
         expr_free(closed_form);
         expr_free(step);
         return identity_TeX;
