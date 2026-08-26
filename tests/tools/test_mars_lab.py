@@ -4034,6 +4034,24 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(len(derivative_payload["derivative_value"].replace(".", "")), 386)
         self.assertTrue(derivative_payload["derivative_value"].startswith("20.6286155168239341793067112756040338"))
 
+        integral_fields, integral_raw, integral_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, derivative_source, 386, "x", "integral"
+        )
+        self.assertEqual(integral_returncode, 0, integral_raw)
+        integral_payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            integral_fields,
+            derivative_source,
+            386,
+            False,
+            wrt="x",
+            action="integral",
+        )
+        self.assertIn("Σ_(k=1)^n", integral_payload["integral"])
+        self.assertIn("atan(kx)", integral_payload["integral"])
+        self.assertIn("ln(k²x² + 1)", integral_payload["integral"])
+        self.assertNotIn("integral_value", integral_payload)
+
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
@@ -4596,6 +4614,32 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertIn("Σ_(k=1)^n", payload["full_display_expression"])
         self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_product_to_angle_summand_reduces_to_a_scaled_finite_progression(self) -> None:
+        source = "{ @Z_(k=1)^n sin(kx)cos(kx) | n=1000000000; x=1 }"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 386, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 386, False, wrt="x", action="evaluate"
+        )
+        self.assertEqual(
+            payload["full_display_expression"],
+            "{ ½·sin(nx)·sin(x·(n + 1))/sin(x) | n = 1000000000; x = 1 }",
+        )
+        self.assertNotIn("Σ_", payload["full_display_expression"])
+        self.assertNotIn("sum(k, 1, n", payload["full_display_function"])
+        self.assertIn(
+            r"\sum_{k=1}^{n}\sin(k\mkern-2mu x)\mkern-2mu \cos(k\mkern-2mu x) =",
+            payload["display_TeX"],
+        )
+        self.assertTrue(payload["value"].startswith("0.324331779782083079598855793137727724891966"))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),

@@ -5911,7 +5911,7 @@ static expr_t *expr_simplify_once(const expr_t *dv)
     return out;
 }
 
-expr_t *expr_simplify(const expr_t *dv)
+static expr_t *expr_simplify_impl(const expr_t *dv)
 {
     enum { MAX_SIMPLIFY_PASSES = 64 };
     expr_t *cur;
@@ -5956,4 +5956,22 @@ expr_t *expr_simplify(const expr_t *dv)
     }
 
     return cur;
+}
+
+/* Simplify an expression while bounding recursion through exceptionally deep or cyclic rewrite trees. */
+expr_t *expr_simplify(const expr_t *dv)
+{
+    static _Thread_local size_t simplify_depth;
+    expr_t *out;
+
+    if (!dv)
+        return NULL;
+    if (simplify_depth >= 128u) {
+        expr_retain(dv);
+        return (expr_t *)dv;
+    }
+    simplify_depth++;
+    out = expr_simplify_impl(dv);
+    simplify_depth--;
+    return out;
 }

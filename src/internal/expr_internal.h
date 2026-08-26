@@ -196,6 +196,12 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  * @return `true` when the native result cards must retain the bound algebraic specialisation.
  */
 bool expr_finite_progression_requires_bound_step(const expr_t *expr);
+/**
+ * @brief Return whether an expression is a recognised finite inverse-function progression.
+ * @param expr Expression to inspect.
+ * @return `true` for a recognised finite inverse-function progression.
+ */
+bool expr_is_finite_inverse_progression(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 bool expr_is_finite_weighted_sinh_lerch_form(const expr_t *expr);

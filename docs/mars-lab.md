@@ -392,6 +392,11 @@ most one million terms, the Value card evaluates that displayed finite sum
 directly. The unchanged sigma and `sum(...)` make this numerical route visible;
 they do not imply an undisplayed closed form.
 
+Integrating an inverse-function progression likewise operates term by term and
+retains the finite sigma when the resulting weighted logarithmic sum has no
+shorter supported form. MARS does not attempt a large numerical sum merely to
+populate the integral Value.
+
 An exact inverse-function pole remains a numerical result rather than becoming
 an absent Value. For example,
 `{ @Z_(k=1)^n acoth(kx) | x=1; n=1000000000 }` contains

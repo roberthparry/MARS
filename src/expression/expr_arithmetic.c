@@ -147,19 +147,27 @@ static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io
 
 static number_t eval_div_removable_singularity(expr_t *dv)
 {
+    static _Thread_local size_t removable_singularity_depth;
     const expr_t *wrt = NULL;
     const expr_t *numer = dv->a;
     const expr_t *denom = dv->b;
+    number_t result = num_clone(NUM_NAN);
 
     if (!expr_find_single_var_local(dv, &wrt) || !wrt)
         return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    if (removable_singularity_depth >= 8u)
+        return result;
+    removable_singularity_depth++;
 
     for (size_t depth = 0u; depth < 8u; ++depth) {
         number_t numer_value = expr_eval_num_internal(numer);
         number_t denom_value = expr_eval_num_internal(denom);
 
-        if (!num_is_zero(numer_value) || !num_is_zero(denom_value))
-            return num_div(numer_value, denom_value);
+        if (!num_is_zero(numer_value) || !num_is_zero(denom_value)) {
+            num_destroy(&result);
+            result = num_div(numer_value, denom_value);
+            break;
+        }
 
         const expr_t *dnumer = expr_get_deriv(numer, wrt);
         const expr_t *ddenom = expr_get_deriv(denom, wrt);
@@ -170,7 +178,8 @@ static number_t eval_div_removable_singularity(expr_t *dv)
         denom = ddenom;
     }
 
-    return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    removable_singularity_depth--;
+    return result;
 }
 
 static number_t eval_div(expr_t *dv)
