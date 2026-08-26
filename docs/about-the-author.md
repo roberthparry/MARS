@@ -36,11 +36,10 @@ to write C and explore scientific computing as a personal interest.
 
 Outside his professional work, Rob has undertaken cycle tours, enjoyed snorkel
 diving and won cups at school for .22-calibre rifle shooting. He has also done
-some yachting, although an enthusiasm for celestial navigation has proved
-considerably more durable than his tolerance for many days on a cold, wet,
-windswept and salt-soaked platform, cramped for space and under a potentially
-lethal boom. Although he no longer enjoys travelling as much as he once did, he
-has greatly enjoyed recent visits to Greece and the Azores. His Dutch family
+some yachting, though his enthusiasm for celestial navigation has outlasted his
+tolerance for cold, wet days at sea beneath a potentially lethal boom. Although
+he no longer enjoys travelling as much as he once did, he has greatly enjoyed
+recent visits to Greece and the Azores. His Dutch family
 connections have also taken him to the Netherlands since childhood,
 particularly Amsterdam, Limmen, Castricum and Alkmaar. Earlier travels, many
 years ago, also took him to Swaziland, Bahrain, Botswana, Nigeria and Australia.
