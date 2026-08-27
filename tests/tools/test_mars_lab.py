@@ -113,6 +113,21 @@ class MobileAccessTests(unittest.TestCase):
             mars_lab.INDEX_HTML,
         )
 
+    def test_result_panel_does_not_clip_the_value_card(self) -> None:
+        self.assertIn(
+            "#resultWorkspacePanel {\n"
+            "      min-height: min-content;\n"
+            "      overflow: visible;\n"
+            "    }",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn("valueCard.toggleAttribute('hidden', !visible);", mars_lab.INDEX_HTML)
+        self.assertIn("valueCard.style.setProperty('display', 'block', 'important');", mars_lab.INDEX_HTML)
+        self.assertLess(
+            mars_lab.INDEX_HTML.index('id="functionCard"'),
+            mars_lab.INDEX_HTML.index('id="valueCard"'),
+        )
+
     def test_function_cards_apply_safe_syntax_colouring(self) -> None:
         html = mars_lab.INDEX_HTML
 
@@ -171,6 +186,16 @@ class MobileAccessTests(unittest.TestCase):
         self.assertEqual(
             mars_lab.function_with_source_comment(function, "root(1+i,4)"),
             "` root(1+i,4) `\n" + function,
+        )
+
+    def test_function_source_comment_uses_mathematical_sum_and_product_symbols(self) -> None:
+        function = "expression expr() {\n    return 1.\n}\n\noutput(expr())."
+
+        self.assertTrue(
+            mars_lab.function_with_source_comment(function, "@Z_(k=1)^n k").startswith("` Σ_(k=1)^n k `\n")
+        )
+        self.assertTrue(
+            mars_lab.function_with_source_comment(function, "@P_(k=1)^n k").startswith("` Π_(k=1)^n k `\n")
         )
 
     def test_rendered_TeX_uses_a_slightly_larger_default_scale(self) -> None:
@@ -3518,7 +3543,10 @@ class ExpressionResultTests(unittest.TestCase):
             "async function evaluateExpression(options = {}) {", 1
         )[1].split("\n    async function evaluateMatrix", 1)[0]
 
-        self.assertIn("setValueCardVisible(!!data.value);", expression_evaluation)
+        self.assertIn(
+            "setValueCardVisible(Boolean(String(value.textContent || '').trim()));",
+            expression_evaluation,
+        )
         self.assertIn(
             "setValueCardVisible(Boolean(String(value.textContent || '').trim()));",
             mars_lab.INDEX_HTML,
@@ -3583,6 +3611,86 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("x = ?", payload["full_display_function"])
         self.assertIn("y = ?", payload["full_display_function"])
         self.assertNotIn("value", payload)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_large_exponential_sine_sum_has_a_formula_and_value(self) -> None:
+        # README example: the exponential-sine progression has a bounded-work formula and Value.
+        expression = "{ @Z_(k=1)^n exp(kx)sin(kx) | x = 1; n = 100000000 }"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            128,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            128,
+            False,
+            action="evaluate",
+        )
+
+        self.assertIn(r"\sum_{k=1}^{n}e^{k\mkern-2mu x}", payload["full_display_TeX"])
+        self.assertIn(r"= \frac{e^{x}\mkern-2mu \sin(x) -", payload["full_display_TeX"])
+        self.assertIn("exp(x)·sin(x) - exp(x·(n + 1))·sin(x·(n + 1))", payload["full_display_expression"])
+        self.assertIn("+ sin(nx)·exp(x·(n + 2))", payload["full_display_expression"])
+        self.assertIn("1 - 2·exp(x)·cos(x) + exp(2x)", payload["full_display_expression"])
+        self.assertIn("return (v1.sin(x) - exp(v2).sin(v2)", payload["full_display_function"])
+        self.assertTrue(payload["full_display_function"].startswith("` Σ_(k=1)^n exp(kx)sin(kx) `\n"))
+        self.assertIn("x = 1.", payload["full_display_function"])
+        self.assertIn("const n = 100000000.", payload["full_display_function"])
+        self.assertTrue(payload["value"].startswith("1.804482674473709321302888821113364953"))
+        self.assertTrue(payload["value"].endswith("E+43429448"))
+
+        small_expression = "{ @Z_(k=1)^n exp(kx)sin(kx) | x = 0.2; n = 5 }"
+        small_fields, _, small_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            small_expression,
+            64,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(small_returncode, 0)
+        expected = sum(math.exp(k * 0.2) * math.sin(k * 0.2) for k in range(1, 6))
+        self.assertAlmostEqual(float(small_fields["value"]), expected, places=14)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_oversized_unsupported_sum_explains_why_no_value_was_computed(self) -> None:
+        # README example: an oversized sum without a shortcut reports why its Value is unavailable.
+        expression = "{ @Z_(k=1)^n asin(kx) | x = 0.2; n = 100000000 }"
+        fields, _, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            expression,
+            64,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(returncode, 0)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary,
+            fields,
+            expression,
+            64,
+            False,
+            action="evaluate",
+        )
+
+        self.assertNotIn("value", payload)
+        self.assertEqual(
+            payload["value_note"],
+            "Value not computed: the finite sum exceeds the safe direct-evaluation limit and has no supported "
+            "numerical shortcut.",
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),

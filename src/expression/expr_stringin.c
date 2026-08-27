@@ -197,6 +197,7 @@ static expr_t *build_ascii_integral_expr(const expr_t *upper, const expr_t *disp
 static expr_t *build_ascii_bounded_integral_expr(const expr_t *lower, const expr_t *upper,
                                                  const expr_t *display_integrand, const expr_t *dummy);
 static expr_t *expr_finite_sum_from_args(size_t argument_count, expr_t *const *arguments);
+static expr_t *expr_finite_product_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *expr_zeta_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *expr_zetap_from_args(size_t argument_count, expr_t *const *arguments);
 static expr_t *build_sine_integral_expr(const expr_t *argument);
@@ -1224,12 +1225,14 @@ static const func_entry_t *lookup_special_func_call_view(string_view_t text, siz
                                                          size_t *paren_pos_out)
 {
     static const func_entry_t s_integral_entry = {.kw = "integral", .arity = 3u, .tfn = build_ascii_integral_expr};
+    static const func_entry_t s_product_entry = {
+        .kw = "product", .arity = UINT_MAX, .vfn = expr_finite_product_from_args};
     static const func_entry_t s_sine_integral_entry = {
         .kw = "Si", .arity = 1u, .ops = &ops_arbitrary_function, .ufn = build_sine_integral_expr};
     static const func_entry_t s_cosine_integral_entry = {
         .kw = "Ci", .arity = 1u, .ops = &ops_arbitrary_function, .ufn = build_cosine_integral_expr};
     static const func_entry_t *const entries[] = {
-        &s_integral_entry, &s_sine_integral_entry, &s_cosine_integral_entry};
+        &s_integral_entry, &s_product_entry, &s_sine_integral_entry, &s_cosine_integral_entry};
     size_t id_len = scan_ascii_identifier_len_view(text, pos);
     string_view_t ident;
 
@@ -2191,6 +2194,26 @@ static expr_t *expr_finite_sum_from_args(size_t argument_count, expr_t *const *a
     return sum;
 }
 
+static expr_t *expr_finite_product_from_args(size_t argument_count, expr_t *const *arguments)
+{
+    expr_t *index;
+    expr_t *factor;
+    expr_t *product;
+
+    if (argument_count != 4u || !arguments ||
+        (!expr_is_var(arguments[0]) && !expr_is_named_const(arguments[0])))
+        return NULL;
+    if (expr_is_var(arguments[0]))
+        return expr_new_finite_product_range(arguments[3], arguments[0], arguments[1], arguments[2]);
+
+    index = expr_new_named_var(NUM_NAN, arguments[0]->name);
+    factor = index ? expr_substitute(arguments[3], arguments[0], index) : NULL;
+    product = factor ? expr_new_finite_product_range(factor, index, arguments[1], arguments[2]) : NULL;
+    expr_free(factor);
+    expr_free(index);
+    return product;
+}
+
 static expr_t *expr_zeta_from_args(size_t argument_count, expr_t *const *arguments)
 {
     if (!arguments)
@@ -2496,32 +2519,35 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     return result;
 }
 
-static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool sigma_notation)
+static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematical_notation)
 {
     string_view_t text = expr_parse_text(p);
-    unsigned char operator_name = sigma_notation ? 'Z' : 0u;
-    bool parenthesised_lower_bound = sigma_notation;
+    unsigned char operator_name = 0u;
+    bool parenthesised_lower_bound = mathematical_notation;
     expr_t *index = NULL;
     expr_t *lower = NULL;
     expr_t *upper = NULL;
     expr_t *term = NULL;
     expr_t *result = NULL;
 
-    if (!sigma_notation && !finite_operator_ascii_standin_starts_view(text, expr_parse_pos(p), &operator_name)) {
+    if (!mathematical_notation &&
+        !finite_operator_ascii_standin_starts_view(text, expr_parse_pos(p), &operator_name)) {
         set_error(p, "expected summation or product");
         return NULL;
     }
-    if (sigma_notation) {
-        uint32_t sigma = 0u;
-        size_t sigma_length = 0u;
+    if (mathematical_notation) {
+        uint32_t operator_symbol = 0u;
+        size_t operator_length = 0u;
 
-        if (!expr_parse_peek_value(p, &sigma, &sigma_length) || sigma != 0x03A3u) {
-            set_error(p, "expected summation symbol");
+        if (!expr_parse_peek_value(p, &operator_symbol, &operator_length) ||
+            (operator_symbol != 0x03A3u && operator_symbol != 0x03A0u)) {
+            set_error(p, "expected summation or product symbol");
             return NULL;
         }
-        expr_parse_skip(p, sigma_length);
-        if (!parse_required_char(p, '_', "expected '_' after summation symbol") ||
-            !parse_required_char(p, '(', "expected '(' after summation subscript"))
+        operator_name = operator_symbol == 0x03A3u ? 'Z' : 'P';
+        expr_parse_skip(p, operator_length);
+        if (!parse_required_char(p, '_', "expected '_' after summation or product symbol") ||
+            !parse_required_char(p, '(', "expected '(' after summation or product subscript"))
             return NULL;
     } else {
         expr_parse_skip(p, 3u);
@@ -2653,8 +2679,10 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
     if ((cp_len > 0 && cp == INTEGRAL_SIGN_CODEPOINT) || integral_ascii_standin_starts_view(text, pos)) {
         return parse_integral_atom(p);
     }
-    if ((cp_len > 0u && cp == 0x03A3u) || finite_operator_ascii_standin_starts_view(text, pos, NULL))
-        return parse_finite_operator_atom(p, cp_len > 0u && cp == 0x03A3u);
+    if ((cp_len > 0u && cp == 0x03A3u) ||
+        (cp_len > 0u && cp == 0x03A0u && expr_parse_view_peek_ascii(text, pos + cp_len, &b) && b == '_') ||
+        finite_operator_ascii_standin_starts_view(text, pos, NULL))
+        return parse_finite_operator_atom(p, cp_len > 0u && (cp == 0x03A3u || cp == 0x03A0u));
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
     if (isdigit(b) || b == '.' || scan_unicode_fraction_len_view(text, pos) > 0u ||
@@ -2846,6 +2874,8 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
 
                     if (fe->vfn == expr_finite_sum_from_args)
                         message = "invalid finite summation";
+                    else if (fe->vfn == expr_finite_product_from_args)
+                        message = "invalid finite product";
                     else if (fe->vfn == expr_zeta_from_args || fe->vfn == expr_zetap_from_args)
                         message = "zeta accepts one or two arguments";
                     set_error(p, message);

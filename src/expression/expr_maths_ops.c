@@ -156,6 +156,32 @@ static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
     return true;
 }
 
+/* Report whether a finite summation is too large for direct term-by-term evaluation. */
+bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr)
+{
+    const long maximum_terms = 10000L;
+    const expr_t *lower = NULL;
+    const expr_t *upper = NULL;
+    long lower_value = 0L;
+    long upper_value;
+
+    if (!expr)
+        return false;
+    if (expr_is_op(expr, &ops_summation) && expr_is_op(expr->b, &ops_argument_list)) {
+        upper = expr->b->b;
+        if (expr_is_op(upper, &ops_argument_list)) {
+            lower = upper->a;
+            upper = upper->b;
+        }
+        if (upper && (!lower || expr_summation_bound_to_long(lower, &lower_value)) &&
+            expr_summation_bound_to_long(upper, &upper_value) && upper_value >= lower_value &&
+            upper_value - lower_value >= maximum_terms)
+            return true;
+    }
+    return expr_finite_summation_exceeds_direct_limit(expr->a) ||
+           expr_finite_summation_exceeds_direct_limit(expr->b);
+}
+
 static number_t eval_finite_summation(expr_t *dv)
 {
     const long maximum_terms = 10000L;
@@ -3143,6 +3169,121 @@ static expr_t *expr_finite_progression_direct_closed_form(const expr_t *expr)
     return out;
 }
 
+/* Build the real closed form of a finite exponential-sine geometric progression. */
+static expr_t *expr_finite_exponential_sine_progression_closed_form(const expr_t *expr)
+{
+    const expr_t *index;
+    const expr_t *bounds;
+    const expr_t *lower;
+    const expr_t *upper;
+    const expr_t *exponential;
+    const expr_t *sine;
+    expr_t *step = NULL;
+    expr_t *one = NULL;
+    expr_t *two = NULL;
+    expr_t *q = NULL;
+    expr_t *q_to_upper_plus_one = NULL;
+    expr_t *q_to_upper_plus_two = NULL;
+    expr_t *upper_step = NULL;
+    expr_t *upper_plus_one = NULL;
+    expr_t *upper_plus_one_step = NULL;
+    expr_t *upper_plus_two = NULL;
+    expr_t *upper_plus_two_step = NULL;
+    expr_t *twice_step = NULL;
+    expr_t *sin_step = NULL;
+    expr_t *sin_upper_step = NULL;
+    expr_t *sin_upper_plus_one_step = NULL;
+    expr_t *cos_step = NULL;
+    expr_t *middle = NULL;
+    expr_t *last = NULL;
+    expr_t *first = NULL;
+    expr_t *first_minus_middle = NULL;
+    expr_t *numerator = NULL;
+    expr_t *twice_q = NULL;
+    expr_t *twice_q_cos = NULL;
+    expr_t *exp_twice_step = NULL;
+    expr_t *denominator_head = NULL;
+    expr_t *denominator = NULL;
+    expr_t *out = NULL;
+    number_t lower_value = NUM_NAN;
+    const expr_t *left;
+    const expr_t *right;
+
+    if (!expr || !expr_is_op(expr, &ops_summation) || !expr_is_op(expr->b, &ops_argument_list) ||
+        !(index = expr->b->a) || !expr_is_var(index) || !(bounds = expr->b->b) ||
+        !expr_is_op(bounds, &ops_argument_list) || !(lower = bounds->a) || !(upper = bounds->b) ||
+        !expr_match_mul_expr(expr->a, &left, &right))
+        return NULL;
+    exponential = expr_is_op(left, &ops_exp) ? left : expr_is_op(right, &ops_exp) ? right : NULL;
+    sine = expr_is_op(left, &ops_sin) ? left : expr_is_op(right, &ops_sin) ? right : NULL;
+    lower_value = expr_eval(lower);
+    if (!exponential || !sine || !expr_struct_eq(exponential->a, sine->a) || !num_is_exact(lower_value) ||
+        !num_is_one(lower_value))
+        goto cleanup;
+    step = expr_simplify_extract_common_factor_quotient(exponential->a, index);
+    if (!step || expr_contains_progression_index(step, index))
+        goto cleanup;
+
+    one = expr_new_const(NUM_ONE);
+    two = expr_new_const(NUM_TWO);
+    q = expr_exp(step);
+    upper_step = expr_mul(upper, step);
+    upper_plus_one = expr_add_long(upper, 1L);
+    upper_plus_one_step = upper_plus_one ? expr_mul(upper_plus_one, step) : NULL;
+    upper_plus_two = expr_add_long(upper, 2L);
+    upper_plus_two_step = upper_plus_two ? expr_mul(upper_plus_two, step) : NULL;
+    twice_step = expr_mul_long(step, 2L);
+    q_to_upper_plus_one = upper_plus_one_step ? expr_exp(upper_plus_one_step) : NULL;
+    q_to_upper_plus_two = upper_plus_two_step ? expr_exp(upper_plus_two_step) : NULL;
+    sin_step = expr_sin(step);
+    sin_upper_step = upper_step ? expr_sin(upper_step) : NULL;
+    sin_upper_plus_one_step = upper_plus_one_step ? expr_sin(upper_plus_one_step) : NULL;
+    cos_step = expr_cos(step);
+    first = q && sin_step ? expr_mul(q, sin_step) : NULL;
+    middle = q_to_upper_plus_one && sin_upper_plus_one_step
+                 ? expr_mul(q_to_upper_plus_one, sin_upper_plus_one_step)
+                 : NULL;
+    last = q_to_upper_plus_two && sin_upper_step ? expr_mul(q_to_upper_plus_two, sin_upper_step) : NULL;
+    first_minus_middle = first && middle ? expr_sub(first, middle) : NULL;
+    numerator = first_minus_middle && last ? expr_add(first_minus_middle, last) : NULL;
+    twice_q = two && q ? expr_mul(two, q) : NULL;
+    twice_q_cos = twice_q && cos_step ? expr_mul(twice_q, cos_step) : NULL;
+    exp_twice_step = twice_step ? expr_exp(twice_step) : NULL;
+    denominator_head = one && twice_q_cos ? expr_sub(one, twice_q_cos) : NULL;
+    denominator = denominator_head && exp_twice_step ? expr_add(denominator_head, exp_twice_step) : NULL;
+    out = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+
+cleanup:
+    num_destroy(&lower_value);
+    expr_free(denominator);
+    expr_free(denominator_head);
+    expr_free(exp_twice_step);
+    expr_free(twice_q_cos);
+    expr_free(twice_q);
+    expr_free(numerator);
+    expr_free(first_minus_middle);
+    expr_free(first);
+    expr_free(last);
+    expr_free(middle);
+    expr_free(cos_step);
+    expr_free(sin_upper_plus_one_step);
+    expr_free(sin_upper_step);
+    expr_free(sin_step);
+    expr_free(twice_step);
+    expr_free(upper_plus_two_step);
+    expr_free(upper_plus_two);
+    expr_free(upper_plus_one_step);
+    expr_free(upper_plus_one);
+    expr_free(upper_step);
+    expr_free(q_to_upper_plus_two);
+    expr_free(q_to_upper_plus_one);
+    expr_free(q);
+    expr_free(two);
+    expr_free(one);
+    expr_free(step);
+    return out;
+}
+
 static expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr)
 {
     const expr_t *index;
@@ -3190,8 +3331,10 @@ cleanup:
 /* Return the closed form supplied by the summand function for a recognised finite progression. */
 expr_t *expr_finite_progression_closed_form(const expr_t *expr)
 {
-    expr_t *out = expr_finite_progression_direct_closed_form(expr);
+    expr_t *out = expr_finite_exponential_sine_progression_closed_form(expr);
 
+    if (!out)
+        out = expr_finite_progression_direct_closed_form(expr);
     return out ? out : expr_finite_progression_scaled_closed_form(expr);
 }
 
@@ -3227,7 +3370,10 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr)
     const expr_ops_t *function_ops;
 
     if (!expr_finite_progression_parts(expr, &upper, &step, &function_ops)) {
-        expr_t *closed_form = expr_finite_progression_scaled_closed_form(expr);
+        expr_t *closed_form = expr_finite_exponential_sine_progression_closed_form(expr);
+
+        if (!closed_form)
+            closed_form = expr_finite_progression_scaled_closed_form(expr);
 
         identity_TeX = closed_form ? expr_finite_progression_generic_identity_TeX(expr, closed_form) : NULL;
         expr_free(closed_form);

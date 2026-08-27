@@ -105,6 +105,9 @@ static void test_from_string_function_hash(void)
     check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
                     "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
     check_parse_val("finite sum is registered in the perfect hash", "sum(k,1,10,k)", 55.0, __LINE__);
+    check_parse_val("finite product is a built-in function", "product(k,1,4,k)", 24.0, __LINE__);
+    check_parse_expr("infinite product is a built-in function", "product(k,1,inf,1-1/k^2)",
+                     "Π_(k=1)^∞ (1 - 1/k²)", __LINE__);
     check_parse_num("harmonic_poly is registered in the perfect hash", "harmonic_poly(4, 1/2)", "131/192",
                     __LINE__);
     check_parse_expr("harmonic_poly bindings use the binding perfect hash",
@@ -156,6 +159,7 @@ static void test_from_function_body_syntax(void)
     expr_t *product = expr_from_function_body("w.(x)", &product_bindings);
     expr_t *arbitrary = expr_from_function_body("xyzw (x + 1)", &arbitrary_bindings);
     expr_t *missing_operator = expr_from_function_body("x y", NULL);
+    expr_t *infinite_product = expr_from_function_body("product(k, 1, @inf, 1 - 1/k^2)", NULL);
     string_t *text_source = string_new_with("w0 (x)");
     expr_t *text_call = text_source ? expr_from_function_body_text(text_source, NULL) : NULL;
     char *expression_product_text = expression_product ? expr_to_function_body(expression_product) : NULL;
@@ -170,6 +174,7 @@ static void test_from_function_body_syntax(void)
     ASSERT_NOT_NULL(arbitrary);
     ASSERT_NOT_NULL(text_call);
     ASSERT_NULL(missing_operator);
+    ASSERT_NOT_NULL(infinite_product);
     ASSERT_NOT_NULL(expression_product_text);
     ASSERT_NOT_NULL(call_text);
     ASSERT_NOT_NULL(product_text);
@@ -196,6 +201,7 @@ static void test_from_function_body_syntax(void)
     free(expression_product_text);
     string_free(text_source);
     expr_free(text_call);
+    expr_free(infinite_product);
     expr_free(arbitrary);
     expr_free(product);
     expr_free(call);
@@ -448,6 +454,28 @@ static void test_from_string_series_ellipsis(void)
             expr_free(scaled_sum);
             expr_bindings_free(scaled_bindings);
         }
+        {
+            expr_t *scaled_product = expr_from_string("x@P_(k=1)^100 (1-(x/(k@pi))^2)", NULL);
+            char *scaled_product_TeX = scaled_product ? expr_to_TeX_body(scaled_product) : NULL;
+            char *scaled_product_text = scaled_product ? expr_to_string(scaled_product, style_UNBOUND) : NULL;
+            char *scaled_product_function = scaled_product ? expr_to_string(scaled_product, style_FUNCTION) : NULL;
+            expr_t *scaled_product_round_trip = scaled_product_text ? expr_from_string(scaled_product_text, NULL) : NULL;
+
+            ASSERT_NOT_NULL(scaled_product);
+            ASSERT_NOT_NULL(scaled_product_text);
+            ASSERT_NOT_NULL(scaled_product_function);
+            ASSERT_NOT_NULL(scaled_product_round_trip);
+            TEST_ASSERT_STR_EQ(scaled_product_text, "x·Π_(k=1)^100 (1 - (x/(πk))²)");
+            ASSERT_NOT_NULL(strstr(scaled_product_function, "return x.product(k, 1, 100, 1 - (x/(@pi.k))^2)."));
+            TEST_ASSERT_STR_EQ(scaled_product_TeX,
+                               "x\\mkern-2mu \\prod_{k=1}^{100}\\left(1 - \\left(\\frac{x}{\\pi\\mkern-2mu "
+                               "k}\\right)^{2}\\right)");
+            expr_free(scaled_product_round_trip);
+            free(scaled_product_function);
+            free(scaled_product_text);
+            free(scaled_product_TeX);
+            expr_free(scaled_product);
+        }
         sum_text = expr_to_string(sum, style_UNBOUND);
         product_text = expr_to_string(product, style_UNBOUND);
         parenthesised_sum_text = expr_to_string(parenthesised_sum, style_UNBOUND);
@@ -457,11 +485,11 @@ static void test_from_string_series_ellipsis(void)
         parenthesised_infinite_sum_text = expr_to_string(parenthesised_infinite_sum, style_UNBOUND);
         parenthesised_infinite_product_text = expr_to_string(parenthesised_infinite_product, style_UNBOUND);
         TEST_ASSERT_STR_EQ(sum_text, "Σ_(k=1)^n sinh(kx)/k");
-        TEST_ASSERT_STR_EQ(product_text, "@P_k=1^n (1 - 1/k^s)");
+        TEST_ASSERT_STR_EQ(product_text, "Π_(k=1)^n (1 - 1/k^s)");
         TEST_ASSERT_STR_EQ(parenthesised_sum_text, "Σ_(k=1)^n sin(kx)");
         TEST_ASSERT_STR_EQ(parenthesised_product_text, product_text);
         TEST_ASSERT_STR_EQ(infinite_sum_text, "Σ_(n=1)^∞ 1/n²");
-        TEST_ASSERT_STR_EQ(infinite_product_text, "@P_k=1 (1 - 1/k^s)");
+        TEST_ASSERT_STR_EQ(infinite_product_text, "Π_(k=1)^∞ (1 - 1/k^s)");
         TEST_ASSERT_STR_EQ(parenthesised_infinite_sum_text, infinite_sum_text);
         TEST_ASSERT_STR_EQ(parenthesised_infinite_product_text, infinite_product_text);
         x_binding = expr_bindings_get(sum_bindings, "x");

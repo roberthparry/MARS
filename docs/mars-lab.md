@@ -140,6 +140,18 @@ formula using a shared `exp(x)` temporary. Its Value is
 `9.110304914770879911502042940141264278041407847643843263784059825E+86858`.
 At `x = 0`, MARS evaluates the removable limit directly and returns `n`.
 
+The exponential-sine progression is the imaginary part of a complex geometric
+series, so MARS also reduces it without iterating through its terms:
+
+$$
+\sum_{k=1}^{n}e^{kx}\sin(kx)
+=\frac{e^x\left(\sin x-e^{nx}\sin((n+1)x)+e^{(n+1)x}\sin(nx)\right)}
+       {1-2e^x\cos x+e^{2x}}.
+$$
+
+For `{ @Z_(k=1)^n exp(kx)sin(kx) | x=1; n=100000000 }`, the Value begins
+`1.804482674473709321302888821113364953E+43429448` at 128-digit precision.
+
 Products inside logarithms reduce the corresponding logarithmic progression:
 
 $$
@@ -390,7 +402,10 @@ Rendered TeX and Expression cards therefore keep the sigma visible, and the
 Function card explicitly retains `sum(...)`. With supplied finite bounds of at
 most one million terms, the Value card evaluates that displayed finite sum
 directly. The unchanged sigma and `sum(...)` make this numerical route visible;
-they do not imply an undisplayed closed form.
+they do not imply an undisplayed closed form. When a sum exceeds the safe direct
+evaluation limit and has no supported shortcut, the Value card instead displays
+`Value not computed: the finite sum exceeds the safe direct-evaluation limit and
+has no supported numerical shortcut.`
 
 Integrating an inverse-function progression likewise operates term by term and
 retains the finite sigma when the resulting weighted logarithmic sum has no
