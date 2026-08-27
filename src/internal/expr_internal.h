@@ -181,6 +181,9 @@ bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
 /** Return whether an expression is a formal summation node. */
 bool expr_is_summation(const expr_t *expr);
 
+/** Return whether a finite summation exceeds the native direct-evaluation limit. */
+bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr);
+
 /**
  * @brief Return the closed form supplied by the summand function for a recognised finite progression.
  *

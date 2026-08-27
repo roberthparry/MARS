@@ -491,9 +491,6 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
     number_t real;
     int has_real_part;
 
-    if (factor && (expr_is_op(factor, &ops_summation) || expr_is_op(factor, &ops_product)))
-        return 1;
-
     if (factor && expr_is_const(factor) && expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
         if (factor->binding_expr->kind == EXPR_BINDING_EXPR_ADD || factor->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
             return 1;
@@ -4208,7 +4205,7 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 upper_value = expr_eval(upper);
                 infinite = num_is_inf(upper_value) && num_get_sign(upper_value) > 0;
             }
-            sbuf_puts(b, expr_is_op(f, &ops_summation) ? "Σ_(" : "@P_");
+            sbuf_puts(b, expr_is_op(f, &ops_summation) ? "Σ_(" : "Π_(");
             emit_expr(index, b, 0);
             sbuf_putc(b, '=');
             if (lower && expr_is_addsub(lower))
@@ -4219,21 +4216,16 @@ void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_putc(b, '0');
             if (lower && expr_is_addsub(lower))
                 sbuf_putc(b, ')');
-            if (expr_is_op(f, &ops_summation)) {
-                sbuf_putc(b, ')');
-                sbuf_putc(b, '^');
-                if (!upper || infinite)
-                    sbuf_puts(b, "∞");
-                else if (upper && expr_is_addsub(upper))
-                    sbuf_putc(b, '(');
-                if (upper && !infinite)
-                    emit_expr(upper, b, 0);
-                if (upper && !infinite && expr_is_addsub(upper))
-                    sbuf_putc(b, ')');
-            } else if (upper && !infinite) {
-                sbuf_putc(b, '^');
+            sbuf_putc(b, ')');
+            sbuf_putc(b, '^');
+            if (!upper || infinite)
+                sbuf_puts(b, "∞");
+            else if (expr_is_addsub(upper))
+                sbuf_putc(b, '(');
+            if (upper && !infinite)
                 emit_expr(upper, b, 0);
-            }
+            if (upper && !infinite && expr_is_addsub(upper))
+                sbuf_putc(b, ')');
             sbuf_putc(b, ' ');
             emit_expr(f->a, b, PREC_MUL);
             num_destroy(&upper_value);
@@ -4796,37 +4788,21 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
                 upper_value = expr_eval(upper);
                 infinite = num_is_inf(upper_value) && num_get_sign(upper_value) > 0;
             }
-            if (expr_is_op(f, &ops_summation)) {
-                sbuf_puts(b, "sum(");
-                emit_func(index, b, 0);
-                sbuf_puts(b, ", ");
-                if (lower)
-                    emit_func(lower, b, 0);
-                else
-                    sbuf_putc(b, '0');
-                sbuf_puts(b, ", ");
-                if (upper)
-                    emit_func(upper, b, 0);
-                else
-                    sbuf_puts(b, "@inf");
-                sbuf_puts(b, ", ");
-                emit_func(f->a, b, 0);
-                sbuf_putc(b, ')');
-            } else {
-                sbuf_puts(b, "@P_");
-                emit_func(index, b, 0);
-                sbuf_putc(b, '=');
-                if (lower)
-                    emit_func(lower, b, 0);
-                else
-                    sbuf_putc(b, '0');
-                if (upper && !infinite) {
-                    sbuf_putc(b, '^');
-                    emit_func(upper, b, 0);
-                }
-                sbuf_putc(b, ' ');
-                emit_func(f->a, b, PREC_MUL);
-            }
+            sbuf_puts(b, expr_is_op(f, &ops_summation) ? "sum(" : "product(");
+            emit_func(index, b, 0);
+            sbuf_puts(b, ", ");
+            if (lower)
+                emit_func(lower, b, 0);
+            else
+                sbuf_putc(b, '0');
+            sbuf_puts(b, ", ");
+            if (upper && !infinite)
+                emit_func(upper, b, 0);
+            else
+                sbuf_puts(b, "@inf");
+            sbuf_puts(b, ", ");
+            emit_func(f->a, b, 0);
+            sbuf_putc(b, ')');
             num_destroy(&upper_value);
             return;
         }

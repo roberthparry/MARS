@@ -917,6 +917,11 @@ INDEX_HTML = r"""<!doctype html>
       flex-direction: column;
     }
 
+    #resultWorkspacePanel {
+      min-height: min-content;
+      overflow: visible;
+    }
+
     .panel-head {
       display: flex;
       align-items: center;
@@ -4727,6 +4732,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       if (!visible && valueCard.classList.contains('expanded-card'))
         collapseResultCards();
       valueCard.classList.toggle('hidden', !visible);
+      valueCard.toggleAttribute('hidden', !visible);
+      if (visible)
+        valueCard.style.setProperty('display', 'block', 'important');
+      else
+        valueCard.style.removeProperty('display');
     }
 
     function snapshotElementState(element) {
@@ -10311,7 +10321,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           ? `${data.value || ''}\n${data.value_note}`
           : (data.value || ''));
         valueTitle.textContent = data.root_value ? 'Values' : 'Value';
-        setValueCardVisible(!!data.value);
+        setValueCardVisible(Boolean(String(value.textContent || '').trim()));
         lastEvaluationInputText = text;
         if (!data.partial_error)
           saveLastExpression(editorText || fullExpressionText || expr.value.trim());
@@ -12321,7 +12331,7 @@ def function_for_display(function: str) -> str:
 def function_with_source_comment(function: str, source_expression: str) -> str:
     rendered_function = str(function or "").strip()
     source_body, _, _ = parse_expression_body(source_expression)
-    source_body = source_body.strip()
+    source_body = source_body.strip().replace("@Z", "Σ").replace("@P", "Π")
     if not rendered_function or not source_body:
         return rendered_function
     return f"` {source_body} `\n{rendered_function}"
@@ -15508,7 +15518,7 @@ def prepare_evaluation_fields(
             fields[key] = numeric_value_for_display(fields[key])
             if fields[key] == "?":
                 fields.pop(key, None)
-    if not fields.get("value"):
+    if not fields.get("value") and not fields.get("value_note"):
         fields.pop("value_note", None)
 
     precision_limit_result_fields(fields, precision)

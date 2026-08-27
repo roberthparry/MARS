@@ -1927,6 +1927,9 @@ int main(int argc, char **argv)
         print_owned_number("value", num_clone(value_number), precision);
         if (expr_integral_value_note(expr, value_note, sizeof(value_note)))
             printf("value_note  %s\n", value_note);
+        else if (num_is_nan(value_number) && expr_finite_summation_exceeds_direct_limit(expr))
+            printf("value_note  Value not computed: the finite sum exceeds the safe direct-evaluation limit and has "
+                   "no supported numerical shortcut.\n");
         num_destroy(&value_number);
     }
 
