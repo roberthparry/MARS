@@ -293,6 +293,23 @@ static uint64_t alloc_var_id(void)
     return next_var_id++;
 }
 
+static const expr_t *expr_find_source_symbol(const expr_t *expr, const expr_t *symbol)
+{
+    const expr_t *found;
+
+    if (!expr || !symbol)
+        return NULL;
+    if (expr_is_var(symbol) && expr_is_var(expr) &&
+        ((symbol->var_id != 0u && expr->var_id == symbol->var_id) ||
+         (symbol->name && *symbol->name && expr->name && strcmp(expr->name, symbol->name) == 0)))
+        return expr;
+    if (expr_is_const(symbol) && expr_is_const(expr) && symbol->name && *symbol->name && expr->name &&
+        strcmp(expr->name, symbol->name) == 0)
+        return expr;
+    found = expr_find_source_symbol(expr->a, symbol);
+    return found ? found : expr_find_source_symbol(expr->b, symbol);
+}
+
 typedef struct {
     const char *ascii;
     size_t klen;
@@ -1402,4 +1419,82 @@ expr_t *expr_clone(const expr_t *expr)
     }
 
     return NULL;
+}
+
+static expr_t *expr_clone_linked_symbols_internal(const expr_t *expr, const expr_t *source)
+{
+    const expr_t *source_symbol;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *out = NULL;
+
+    if (!expr)
+        return NULL;
+
+    if (expr_is_const(expr) || expr_is_var(expr)) {
+        source_symbol = expr_find_source_symbol(source, expr);
+        if (source_symbol) {
+            expr_retain(source_symbol);
+            return (expr_t *)source_symbol;
+        }
+        return expr_clone(expr);
+    }
+
+    if (expr->ops->kind == EXPR_KIND_FORMAL_DERIVATIVE) {
+        left = expr_clone_linked_symbols_internal(expr->a, source);
+        if (!left)
+            return NULL;
+        out = expr_new_formal_derivative(left, expr->formal_wrt_count, expr->formal_wrts);
+        expr_free(left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr_is_arbitrary_function(expr)) {
+        left = expr_clone_linked_symbols_internal(expr->a, source);
+        if (!left)
+            return NULL;
+        out = expr_new_arbitrary_function(expr->name, left);
+        expr_free(left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
+        left = expr_clone_linked_symbols_internal(expr->a, source);
+        if (!left)
+            return NULL;
+        out = expr_new_pow_const_internal(left, expr->c);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_UNARY) {
+        left = expr_clone_linked_symbols_internal(expr->a, source);
+        if (!left)
+            return NULL;
+        out = expr_new_unary_internal(expr->ops, left);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    if (expr->ops->arity == EXPR_OP_BINARY) {
+        left = expr_clone_linked_symbols_internal(expr->a, source);
+        right = expr_clone_linked_symbols_internal(expr->b, source);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr_new_binary_internal(expr->ops, left, right);
+        expr_clone_copy_metadata(out, expr);
+        return out;
+    }
+
+    return NULL;
+}
+
+expr_t *expr_clone_linked_symbols(const expr_t *expr, const expr_t *source)
+{
+    return expr_clone_linked_symbols_internal(expr, source);
 }

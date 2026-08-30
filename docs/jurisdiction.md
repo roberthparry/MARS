@@ -158,6 +158,46 @@ deep destroy of the holiday events it owns.
 - Useful when you want to stream results into your own container or stop early.
 - Returns `false` on rule-loading or rule-evaluation failure.
 
+### `jurisdict_default_gmt_offset()`
+
+Reports whether the condition described by default gmt offset holds.
+
+```c
+bool jurisdict_default_gmt_offset(jurisdiction_t *jurisdiction, const datetime_t *date, double *offset_hours);
+```
+
+### `jurisdict_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+jurisdiction_t *jurisdict_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `jurisdict_dst_transition_datetimes()`
+
+Reports whether the condition described by dst transition datetimes holds.
+
+```c
+bool jurisdict_dst_transition_datetimes(jurisdiction_t *jurisdiction, int year, datetime_t **clocks_forward, datetime_t **clocks_back);
+```
+
+### `jurisdict_dst_transition_details()`
+
+Reports whether the condition described by dst transition details holds.
+
+```c
+bool jurisdict_dst_transition_details(jurisdiction_t *jurisdiction, int year, datetime_t **clocks_forward, double *forward_from_offset_hours, double *forward_to_offset_hours, datetime_t **clocks_back, double *back_from_offset_hours, double *back_to_offset_hours);
+```
+
+### `jurisdict_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool jurisdict_serialize(const jurisdiction_t *jurisdiction, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
 ## Example: Range, Holiday, and Working-Day Queries
 
 ```c

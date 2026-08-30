@@ -314,6 +314,38 @@ All declarations are in `include/integrator.h`.
 
 ---
 
+### `intg_get_exact_result()`
+
+Returns the public result described by get exact result.
+
+```c
+const expr_t *intg_get_exact_result(const integrator_t *ig);
+```
+
+### `intg_integrand_has_unbound_parameters()`
+
+Reports whether the condition described by integrand has unbound parameters holds.
+
+```c
+bool intg_integrand_has_unbound_parameters(const expr_t *integrand, size_t ndim, expr_t *const *vars);
+```
+
+### `intg_integrate_iterated_symbolic()`
+
+Returns the public result described by integrate iterated symbolic.
+
+```c
+expr_t *intg_integrate_iterated_symbolic(const expr_t *integrand, size_t ndim, expr_t *const *vars, const intg_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi, size_t max_steps, size_t *completed_steps_out, expr_t **first_antiderivative_out);
+```
+
+### `intg_integrate_iterated_symbolic_best_effort()`
+
+Returns the public result described by integrate iterated symbolic best effort.
+
+```c
+expr_t *intg_integrate_iterated_symbolic_best_effort(const expr_t *integrand, size_t ndim, expr_t *const *vars, const intg_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi, size_t *completed_steps_out, size_t *remaining_ndim_out, expr_t **remaining_vars_out, number_t *remaining_lo_num_out, number_t *remaining_hi_num_out, const number_t *lo_num, const number_t *hi_num);
+```
+
 ## Design Notes
 
 **Nodes and weights** are stored as static high-precision quadrature tables, so

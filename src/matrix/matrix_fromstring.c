@@ -3159,7 +3159,7 @@ int mat_expression_evaluate(const char *text, mat_bindings_t **bindings_out, con
                 scalar = NULL;
         }
     } else {
-        number_t value = num_new();
+        number_t value = NUM_NAN;
 
         if ((scalar_function->function == MF_MATRIX_FUNCTION_DETERMINANT && mat_det(matrix, &value) == 0) ||
             (scalar_function->function == MF_MATRIX_FUNCTION_TRACE && mat_trace(matrix, &value) == 0))

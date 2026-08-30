@@ -669,3 +669,139 @@ Reconstruct an almanac engine from a serialised payload.
 Returns a newly allocated almanac engine on success, or `NULL` if the payload
 does not match the expected almanac serialisation format or the configured
 engine cannot be reopened.
+
+### `almanac_body_code()`
+
+Returns the public result described by body code.
+
+```c
+const char *almanac_body_code(almanac_body_id_t body_id);
+```
+
+### `almanac_body_display_name()`
+
+Returns the public result described by body display name.
+
+```c
+const char *almanac_body_display_name(almanac_body_id_t body_id);
+```
+
+### `almanac_body_id_from_code()`
+
+Returns the public result described by body id from code.
+
+```c
+almanac_body_id_t almanac_body_id_from_code(const char *body_code);
+```
+
+### `almanac_lunar_eclipse_moon_semi_diameter_degrees()`
+
+Returns the public result described by lunar eclipse moon semi diameter degrees.
+
+```c
+double almanac_lunar_eclipse_moon_semi_diameter_degrees(const almanac_lunar_eclipse_t *event);
+```
+
+### `almanac_lunar_eclipse_opposition_error_degrees()`
+
+Returns the public result described by lunar eclipse opposition error degrees.
+
+```c
+double almanac_lunar_eclipse_opposition_error_degrees(const almanac_lunar_eclipse_t *event);
+```
+
+### `almanac_lunar_eclipse_penumbral_radius_degrees()`
+
+Returns the public result described by lunar eclipse penumbral radius degrees.
+
+```c
+double almanac_lunar_eclipse_penumbral_radius_degrees(const almanac_lunar_eclipse_t *event);
+```
+
+### `almanac_lunar_eclipse_umbral_radius_degrees()`
+
+Returns the public result described by lunar eclipse umbral radius degrees.
+
+```c
+double almanac_lunar_eclipse_umbral_radius_degrees(const almanac_lunar_eclipse_t *event);
+```
+
+### `almanac_solar_eclipse_in_progress()`
+
+Reports whether the condition described by solar eclipse in progress holds.
+
+```c
+bool almanac_solar_eclipse_in_progress(almanac_t *almanac, const almanac_observer_t *observer, const datetime_t *moment);
+```
+
+### `almanac_solar_eclipse_is_central()`
+
+Reports whether the condition described by solar eclipse is central holds.
+
+```c
+bool almanac_solar_eclipse_is_central(const almanac_solar_eclipse_t *event);
+```
+
+### `almanac_solar_eclipse_moon_semi_diameter_degrees()`
+
+Returns the public result described by solar eclipse moon semi diameter degrees.
+
+```c
+double almanac_solar_eclipse_moon_semi_diameter_degrees(const almanac_solar_eclipse_t *event);
+```
+
+### `almanac_solar_eclipse_separation_degrees()`
+
+Returns the public result described by solar eclipse separation degrees.
+
+```c
+double almanac_solar_eclipse_separation_degrees(const almanac_solar_eclipse_t *event);
+```
+
+### `almanac_solar_eclipse_sun_semi_diameter_degrees()`
+
+Returns the public result described by solar eclipse sun semi diameter degrees.
+
+```c
+double almanac_solar_eclipse_sun_semi_diameter_degrees(const almanac_solar_eclipse_t *event);
+```
+
+### `almanac_solar_transit_chord_distance_fraction()`
+
+Returns the public result described by solar transit chord distance fraction.
+
+```c
+double almanac_solar_transit_chord_distance_fraction(const almanac_solar_transit_t *event);
+```
+
+### `almanac_solar_transit_is_interior()`
+
+Reports whether the condition described by solar transit is interior holds.
+
+```c
+bool almanac_solar_transit_is_interior(const almanac_solar_transit_t *event);
+```
+
+### `almanac_solar_transit_planet_semi_diameter_degrees()`
+
+Returns the public result described by solar transit planet semi diameter degrees.
+
+```c
+double almanac_solar_transit_planet_semi_diameter_degrees(const almanac_solar_transit_t *event);
+```
+
+### `almanac_solar_transit_separation_degrees()`
+
+Returns the public result described by solar transit separation degrees.
+
+```c
+double almanac_solar_transit_separation_degrees(const almanac_solar_transit_t *event);
+```
+
+### `almanac_solar_transit_solar_semi_diameter_degrees()`
+
+Returns the public result described by solar transit solar semi diameter degrees.
+
+```c
+double almanac_solar_transit_solar_semi_diameter_degrees(const almanac_solar_transit_t *event);
+```

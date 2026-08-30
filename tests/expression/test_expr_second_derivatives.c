@@ -1060,6 +1060,28 @@ void test_second_deriv_logbeta(void)
     expr_free(x);
 }
 
+void test_second_deriv_complex_product(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string("r*exp(i*theta)", &bindings);
+    expr_t *theta = bindings ? expr_bindings_get(bindings, "theta") : NULL;
+    expr_t *first = expression && theta ? expr_create_deriv(expression, theta) : NULL;
+    expr_t *second = first && theta ? expr_create_deriv(first, theta) : NULL;
+    char *text = second ? expr_to_string(second, style_EXPRESSION) : NULL;
+
+    if (str_eq(text, "{ -r·exp(iθ) | r = NAN, θ = NAN }"))
+        to_string_pass("d²/dθ²{r·exp(iθ)}", text, "{ -r·exp(iθ) | r = NAN, θ = NAN }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "d²/dθ²{r·exp(iθ)}", text,
+                       "{ -r·exp(iθ) | r = NAN, θ = NAN }");
+
+    free(text);
+    expr_free(second);
+    expr_free(first);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+}
+
 void test_second_derivatives(void)
 {
     TEST_RUN_SUBTEST(test_second_deriv_var, NULL);
@@ -1111,5 +1133,6 @@ void test_second_derivatives(void)
     TEST_RUN_SUBTEST(test_second_deriv_lambert_wm1, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_beta, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_logbeta, NULL);
+    TEST_RUN_SUBTEST(test_second_deriv_complex_product, NULL);
     TEST_RUN_SUBTEST(test_second_deriv_digamma, NULL);
 }

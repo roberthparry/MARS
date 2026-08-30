@@ -5885,6 +5885,7 @@ static expr_t *expr_hypergeometric_parameter_set(size_t count, const expr_t *con
         return NULL;
     count_value = num_create_from_long((long)count);
     count_expr = expr_new_const(count_value);
+    num_destroy(&count_value);
     value_expr = count_expr ? expr_hypergeometric_parameter_values(count, values, count_expr) : NULL;
     set = count_expr && value_expr ? expr_hypergeometric_pFq_pack(count_expr, value_expr) : NULL;
     expr_free(value_expr);

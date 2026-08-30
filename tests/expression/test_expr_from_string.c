@@ -1135,7 +1135,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text, "{ ζ(-p) - ζ(-p, n + 1) | p = NAN; n = NAN }");
-    ASSERT_NOT_NULL(strstr(function_text, "zeta(v1) - zetah(v1, n + 1)"));
+    ASSERT_NOT_NULL(strstr(function_text, "zeta(-p) - zetah(-p, n + 1)"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}k^{p}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\zeta(-p) - \\zeta(-p, n + 1)"));
     free(function_text);
@@ -1540,37 +1540,37 @@ static void test_from_string_array_bindings(void)
          "{ x | x = [1, 2, 3] }",
          "{ x | x = [1, 2, 3] }",
          "expression expr(array x) {\n"
-         "    return x;\n"
+         "    return x.\n"
          "}\n\n"
-         "x = [1, 2, 3];\n"
-         "output(expr(x));"},
+         "x = [1, 2, 3].\n"
+         "output(expr(x))."},
         {"specified array variable binding",
          "{ x^2 + c | x = [1, 2, 3]; c = 4 }",
          "{ x² + c | x = [1, 2, 3]; c = 4 }",
          "expression expr(array x, const c) {\n"
-         "    return x^2 + c;\n"
+         "    return x^2 + c.\n"
          "}\n\n"
-         "x = [1, 2, 3];\n"
-         "const c = 4;\n"
-         "output(expr(x, c));"},
+         "x = [1, 2, 3].\n"
+         "const c = 4.\n"
+         "output(expr(x, c))."},
         {"specified array constant binding",
          "{ x^2 + c | x = ?; c = [1, 2, 3] }",
          "{ x² + c | x = NAN; c = [1, 2, 3] }",
          "expression expr(x, array const c) {\n"
-         "    return x^2 + c;\n"
+         "    return x^2 + c.\n"
          "}\n\n"
-         "x = ?;\n"
-         "array const c = [1, 2, 3];\n"
-         "output(expr(x, c));"},
+         "x = ?.\n"
+         "array const c = [1, 2, 3].\n"
+         "output(expr(x, c))."},
         {"unspecified array bindings",
          "{ x + c | x = []; c = [?] }",
          "{ x + c | x = [?]; c = [?] }",
          "expression expr(array x, array const c) {\n"
-         "    return x + c;\n"
+         "    return x + c.\n"
          "}\n\n"
-         "x = [?];\n"
-         "array const c = [?];\n"
-         "output(expr(x, c));"},
+         "x = [?].\n"
+         "array const c = [?].\n"
+         "output(expr(x, c))."},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -2818,7 +2818,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
         "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = NAN, z = NAN, x = NAN }", __LINE__);
     check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
                                 "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
-                                "{ ¼·exp(π·√(x))/x^³⁄₂·(π^2·√(x) - π) | x = 163 }", __LINE__);
+                                "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }", __LINE__);
     check_parse_simplified_expr(
         "nested rational derivative numerator canonicalizes",
         "{ (2*(x^2 + 3*x + 5)*(2*(x + 1)*(2*x + 3) - 9*x - (-x - 1)*(2*x + 3) - 3*x^2 - 15) - 6*(2*x + 3)*((-x - "
@@ -3296,7 +3296,7 @@ static void test_from_string_unevaluated_integral(void)
         printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
         TEST_FAIL();
     }
-    if (func_text && strstr(func_text, "return -(cos(3)).") != NULL) {
+    if (func_text && strstr(func_text, "return -cos(3).") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S literal upper bound function is completed by MARS\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {

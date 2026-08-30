@@ -1,8 +1,73 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
+
+static bool de_pde_exact_small_rational(number_t value, number_t *exact_out)
+{
+    double approximation;
+
+    if (!exact_out || !num_is_real(value) || !num_is_finite(value))
+        return false;
+    approximation = num_to_double(value);
+    for (long denominator = 1L; denominator <= 16L; ++denominator) {
+        long numerator = lround(approximation * (double)denominator);
+        number_t candidate;
+
+        if (numerator < -64L || numerator > 64L)
+            continue;
+        candidate = num_create_from_frac(numerator, denominator);
+        if (num_eq(value, candidate)) {
+            num_destroy(exact_out);
+            *exact_out = candidate;
+            return true;
+        }
+        num_destroy(&candidate);
+    }
+    return false;
+}
+
+static expr_t *de_pde_exact_sample_constant(const expr_t *expr)
+{
+    number_t value;
+    number_t real;
+    number_t imaginary;
+    number_t exact_real = num_new();
+    number_t exact_imaginary = num_new();
+    number_t exact_value;
+    number_t imaginary_term;
+    expr_t *constant = NULL;
+
+    if (!expr)
+        return NULL;
+    value = expr_eval(expr);
+    if (num_is_exact(value)) {
+        constant = expr_new_const(value);
+        goto cleanup_value;
+    }
+
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    if (de_pde_exact_small_rational(real, &exact_real) &&
+        de_pde_exact_small_rational(imaginary, &exact_imaginary)) {
+        imaginary_term = num_mul(exact_imaginary, NUM_I);
+        exact_value = num_add(exact_real, imaginary_term);
+        if (num_eq(value, exact_value))
+            constant = expr_new_const(exact_value);
+        num_destroy(&exact_value);
+        num_destroy(&imaginary_term);
+    }
+    num_destroy(&imaginary);
+    num_destroy(&real);
+
+cleanup_value:
+    num_destroy(&exact_imaginary);
+    num_destroy(&exact_real);
+    num_destroy(&value);
+    return constant;
+}
 
 static bool de_pde_collect_dependent_derivatives(const expr_t *expression, const expr_t *dependent,
                                                  const expr_t **derivatives, size_t *count, size_t capacity)
@@ -277,6 +342,14 @@ static diffequ_solve_result_t *de_pde_solve_stationary_eigenfunction(const diffe
     for (size_t i = 0u; i < de->independent_count; ++i)
         if (de_expr_uses(rate, de->independent_vars[i]))
             goto cleanup;
+    {
+        expr_t *exact_rate = de_pde_exact_sample_constant(rate);
+
+        if (exact_rate) {
+            expr_free(rate);
+            rate = exact_rate;
+        }
+    }
     time_offset = expr_sub_simplify_owned(expr_clone(de->independent_vars[time_index]), expr_clone(initial_time));
     phase_exponent = time_offset ? expr_mul_simplify_owned(expr_clone(rate), time_offset) : NULL;
     time_offset = NULL;

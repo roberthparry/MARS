@@ -1502,7 +1502,7 @@ static void test_to_string_parsed_complex_const_pow_TeX(void)
 {
     expr_t *f = expr_from_string("{ (1 + 2i)^6 + 1 }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "\\left(1 + 2i\\right)^{6} + 1";
+    const char *expect = "118 + 44\\mkern-2mu i";
 
     if (str_eq(got, expect))
         to_string_pass("parsed complex const power base (TEX)", got, expect);
@@ -1517,7 +1517,7 @@ static void test_to_string_parsed_complex_const_pow_expr(void)
 {
     expr_t *f = expr_from_string("{ (1 + 2i)^6 + 1 }", NULL);
     char *got = f ? expr_to_string(f, style_EXPRESSION) : NULL;
-    const char *expect = "(1 + 2i)⁶ + 1";
+    const char *expect = "118 + 44i";
 
     if (str_eq(got, expect))
         to_string_pass("parsed complex const power base (EXPR)", got, expect);

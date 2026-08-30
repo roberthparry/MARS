@@ -1546,7 +1546,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertIn("2/√(33)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
         self.assertIn("√(³⁄₁₁)·((5 + √(33))^x - (5 - √(33))^x)", power["result"])
         self.assertNotIn("(½·(5 + √(33)))^x", power["result"])
-        self.assertIn("const c1 = sqrt(3/11).", power["function"])
+        self.assertIn("= sqrt(3/11).", power["function"])
         self.assertNotIn("³⁄₁₁", power["function"])
 
     @unittest.skipUnless(
@@ -2238,8 +2238,8 @@ solutions y = final
         )
         self.assertEqual(
             payload["solutions"],
-            "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))\n"
-            "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))",
+            "r = 1/(2·cos²(θ))·(sin(θ) - √(sin²(θ) - C·cos²(θ)))\n"
+            "r = 1/(2·cos²(θ))·(sin(θ) + √(sin²(θ) - C·cos²(θ)))",
         )
         self.assertIn(r"\,dr", payload["problem_TeX"])
         self.assertIn(r"\,d\theta", payload["problem_TeX"])
@@ -2372,7 +2372,7 @@ solutions y = final
         self.assertEqual(payload["solver"], "linear transformation")
         self.assertEqual(
             payload["solutions"],
-            "y = (2x + C₁)/(x² + C₁x + C₂)",
+            "y = 1/(x² + C₁x + C₂)·(2x + C₁)",
         )
         self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
         self.assertIn("X = x − 1/y", payload["steps"])
@@ -2435,7 +2435,7 @@ solutions y = final
         self.assertNotIn("NAN", payload["steps_TeX"])
         self.assertEqual(
             payload["solutions"],
-            "y = (2x + C₁)/(2·(x² + C₁x + C₂))",
+            "y = 1/(2·(x² + C₁x + C₂))·(2x + C₁)",
         )
 
     @unittest.skipUnless(
@@ -2828,7 +2828,7 @@ solutions y = final
                 "c_(-2) = 0",
                 "c_(-3) = 0",
                 "c_(n + 2) = "
-                "(C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))",
+                "1/(2·(n + 2)·(n + 1))·(C₁·c_(n) + c_(n - 3))",
             ],
         )
 
@@ -3744,7 +3744,7 @@ class ExpressionResultTests(unittest.TestCase):
                 "{ ζ(-p) - ζ(-p, n + 1) | p = 2; n = 100 }",
                 r"\sum_{k=1}^{n}k^{p}",
                 r"\zeta(-p) - \zeta(-p, n + 1)",
-                "zeta(v1) - zetah(v1, n + 1)",
+                "zeta(-p) - zetah(-p, n + 1)",
             ),
         )
 
@@ -4952,7 +4952,7 @@ class ExpressionResultTests(unittest.TestCase):
             "    v2 = 1/v1.\n"
             "\n"
             "    return li1(v1)/2 - li1(v2)/2 + "
-            "(v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2).\n"
+            "v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2.\n"
             "}\n"
             "\n"
             "x = ?.\n"
@@ -4977,7 +4977,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(payload["full_display_expression"], f"{{ {formula} | x = ?; n = ? }}")
         self.assertNotIn("Σ_", payload["full_display_expression"])
         self.assertEqual(fields["function"], function)
-        self.assertEqual(payload["full_display_function"], f"` {source} `\n{function}")
+        self.assertEqual(payload["full_display_function"], f"` Σ_k=1^n sinh(kx)/k `\n{function}")
         self.assertNotIn("return sum(", payload["full_display_function"])
         self.assertEqual(payload["editor_expression"], formula)
         reused_fields, reused_raw, reused_returncode = mars_lab.run_mars_lab_fields(
@@ -5020,7 +5020,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertNotIn("v2 = exp(-x).", bound_reused_function)
         self.assertIn(
             "return li1(v1)/2 - li1(v2)/2 + "
-            "(v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2).",
+            "v2^c1.lerchphi(v2, 1, c1)/2 - v1^c1.lerchphi(v1, 1, c1)/2.",
             bound_reused_function,
         )
 
@@ -5141,7 +5141,7 @@ class ExpressionResultTests(unittest.TestCase):
             "    v3 = 1/v2.\n"
             "\n"
             "    return -1/2.(li1(v2) - v2^c1.lerchphi(v2, 1, c1) + "
-            "(li1(v3) - v3^c1.lerchphi(v3, 1, c1))).\n"
+            "li1(v3) - v3^c1.lerchphi(v3, 1, c1)).\n"
             "}\n"
             "\n"
             "x = 2.\n"

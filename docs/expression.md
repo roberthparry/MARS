@@ -1182,3 +1182,363 @@ bindings.
   name normalisation as parsing, so Greek-style aliases may be queried in
   either form, such as `@pi` or `π`, `@phi` or `φ`, `@gamma` or `γ`, and
   `@tau` or `τ`.
+
+### `expr_bindings_count()`
+
+Returns the public result described by bindings count.
+
+```c
+size_t expr_bindings_count(const expr_bindings_t *bnd);
+```
+
+### `expr_bindings_expr_at()`
+
+Returns the public result described by bindings expr at.
+
+```c
+expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index);
+```
+
+### `expr_bindings_get_text()`
+
+Returns the public result described by bindings get text.
+
+```c
+expr_t *expr_bindings_get_text(expr_bindings_t *bnd, const string_t *name);
+```
+
+### `expr_bindings_has_symbolic_derivative()`
+
+Reports whether the condition described by bindings has symbolic derivative holds.
+
+```c
+bool expr_bindings_has_symbolic_derivative(const expr_bindings_t *bnd);
+```
+
+### `expr_bindings_has_symbolic_integral()`
+
+Reports whether the condition described by bindings has symbolic integral holds.
+
+```c
+bool expr_bindings_has_symbolic_integral(const expr_bindings_t *bnd);
+```
+
+### `expr_bindings_is_constant_at()`
+
+Reports whether the condition described by bindings is constant at holds.
+
+```c
+bool expr_bindings_is_constant_at(const expr_bindings_t *bnd, size_t index);
+```
+
+### `expr_bindings_name_at()`
+
+Returns the public result described by bindings name at.
+
+```c
+const char *expr_bindings_name_at(const expr_bindings_t *bnd, size_t index);
+```
+
+### `expr_bindings_name_text_at()`
+
+Returns the public result described by bindings name text at.
+
+```c
+const string_t *expr_bindings_name_text_at(const expr_bindings_t *bnd, size_t index);
+```
+
+### `expr_cdf()`
+
+Returns the public result described by cdf.
+
+```c
+expr_t *expr_cdf(const expr_t *expr);
+```
+
+### `expr_clone()`
+
+Creates or reconstructs the public value described by clone.
+
+```c
+expr_t *expr_clone(const expr_t *expr);
+```
+
+### `expr_contains_integral_operation()`
+
+Reports whether the condition described by contains integral operation holds.
+
+```c
+bool expr_contains_integral_operation(const expr_t *expr);
+```
+
+### `expr_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+expr_t *expr_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `expr_display_expanded()`
+
+Returns the public result described by display expanded.
+
+```c
+expr_t *expr_display_expanded(const expr_t *expr);
+```
+
+### `expr_display_simplified()`
+
+Returns the public result described by display simplified.
+
+```c
+expr_t *expr_display_simplified(const expr_t *expr);
+```
+
+### `expr_edit_binding()`
+
+Returns the public result described by edit binding.
+
+```c
+expr_t *expr_edit_binding(const expr_t *expr, const expr_bindings_t *bindings, const char *name, const char *value_text, expr_bindings_t **bindings_out);
+```
+
+### `expr_from_expression_string()`
+
+Creates or reconstructs the public value described by from expression string.
+
+```c
+expr_t *expr_from_expression_string(const char *expr, const char *const *names, expr_t *const *symbols, size_t nsymbols);
+```
+
+### `expr_from_expression_text()`
+
+Creates or reconstructs the public value described by from expression text.
+
+```c
+expr_t *expr_from_expression_text(const string_t *expr, const string_t *const *names, expr_t *const *symbols, size_t nsymbols);
+```
+
+### `expr_from_function_body()`
+
+Creates or reconstructs the public value described by from function body.
+
+```c
+expr_t *expr_from_function_body(const char *source, expr_bindings_t **bnd_out);
+```
+
+### `expr_from_function_body_text()`
+
+Creates or reconstructs the public value described by from function body text.
+
+```c
+expr_t *expr_from_function_body_text(const string_t *text, expr_bindings_t **bnd_out);
+```
+
+### `expr_from_text()`
+
+Creates or reconstructs the public value described by from text.
+
+```c
+expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
+```
+
+### `expr_goal_seek()`
+
+Returns the public result described by goal seek.
+
+```c
+int expr_goal_seek(expr_t *expr, expr_bindings_t *bindings, number_t target, const expr_goal_seek_options_t *options, expr_goal_seek_result_t *result);
+```
+
+### `expr_goal_seek_result_clear()`
+
+Releases or clears the resources associated with goal seek result clear.
+
+```c
+void expr_goal_seek_result_clear(expr_goal_seek_result_t *result);
+```
+
+### `expr_integral_value_note()`
+
+Reports whether the condition described by integral value note holds.
+
+```c
+bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size);
+```
+
+### `expr_integrate_family()`
+
+Returns the public result described by integrate family.
+
+```c
+expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);
+```
+
+### `expr_is_variable()`
+
+Reports whether the condition described by is variable holds.
+
+```c
+bool expr_is_variable(const expr_t *expr);
+```
+
+### `expr_lambert_wn()`
+
+Returns the public result described by lambert wn.
+
+```c
+expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *expr);
+```
+
+### `expr_logpdf()`
+
+Returns the public result described by logpdf.
+
+```c
+expr_t *expr_logpdf(const expr_t *expr);
+```
+
+### `expr_new_integration_constant()`
+
+Creates or reconstructs the public value described by new integration constant.
+
+```c
+expr_t *expr_new_integration_constant(const expr_t *expr, const expr_t *wrt, const expr_t *antiderivative);
+```
+
+### `expr_new_named_const_text()`
+
+Creates or reconstructs the public value described by new named const text.
+
+```c
+expr_t *expr_new_named_const_text(number_t x, const string_t *name);
+```
+
+### `expr_new_named_var_text()`
+
+Creates or reconstructs the public value described by new named var text.
+
+```c
+expr_t *expr_new_named_var_text(number_t x, const string_t *name);
+```
+
+### `expr_pdf()`
+
+Returns the public result described by pdf.
+
+```c
+expr_t *expr_pdf(const expr_t *expr);
+```
+
+### `expr_printf()`
+
+Returns the public result described by printf.
+
+```c
+int expr_printf(const char *fmt, ...);
+```
+
+### `expr_retain()`
+
+Performs the public operation described by retain.
+
+```c
+void expr_retain(const expr_t *expr);
+```
+
+### `expr_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool expr_serialize(const expr_t *expr, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
+### `expr_set_name_text()`
+
+Performs the public operation described by set name text.
+
+```c
+void expr_set_name_text(expr_t *expr, const string_t *name);
+```
+
+### `expr_sprintf()`
+
+Returns the public result described by sprintf.
+
+```c
+int expr_sprintf(char *out, size_t out_size, const char *fmt, ...);
+```
+
+### `expr_sprintf_text()`
+
+Returns the public result described by sprintf text.
+
+```c
+string_t *expr_sprintf_text(const char *fmt, ...);
+```
+
+### `expr_substitute()`
+
+Returns the public result described by substitute.
+
+```c
+expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
+```
+
+### `expr_symbol_name()`
+
+Returns the public result described by symbol name.
+
+```c
+const char *expr_symbol_name(const expr_t *expr);
+```
+
+### `expr_to_TeX_body()`
+
+Returns the public result described by to TeX body.
+
+```c
+char *expr_to_TeX_body(const expr_t *expr);
+```
+
+### `expr_to_TeX_body_wrapped()`
+
+Returns the public result described by to TeX body wrapped.
+
+```c
+char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
+```
+
+### `expr_to_function_body()`
+
+Returns the public result described by to function body.
+
+```c
+char *expr_to_function_body(const expr_t *expr);
+```
+
+### `expr_to_function_body_text()`
+
+Returns the public result described by to function body text.
+
+```c
+string_t *expr_to_function_body_text(const expr_t *expr);
+```
+
+### `expr_to_string()`
+
+Returns the public result described by to string.
+
+```c
+char *expr_to_string(const expr_t *expr, style_t style);
+```
+
+### `expr_vsprintf_text()`
+
+Returns the public result described by vsprintf text.
+
+```c
+string_t *expr_vsprintf_text(const char *fmt, va_list ap);
+```

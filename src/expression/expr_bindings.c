@@ -1267,6 +1267,48 @@ cleanup:
     return success;
 }
 
+bool expr_exact_principal_sqrt_seed(const expr_t *expr, number_t *seed_out)
+{
+    binding_exact_complex_t base = {number_invalid(), number_invalid()};
+    bool have_base = false;
+    bool success = false;
+
+    if (!expr || !seed_out)
+        return false;
+
+    if (expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        have_base = expr_binding_expr_exact_complex(expr->binding_expr->u.unary_op.child, &base);
+    } else if (expr_is_op(expr, &ops_sqrt) && expr->a)
+        have_base = expr_exact_complex_value(expr->a, &base);
+
+    if (!have_base)
+        goto cleanup;
+    if (num_is_zero(base.imag) && num_get_sign(base.real) < 0)
+        goto cleanup;
+    success = binding_exact_complex_root_seed(&base, 2L, seed_out);
+    if (success) {
+        number_t imaginary = num_imag_part(*seed_out);
+
+        if (num_is_zero(imaginary)) {
+            number_t real = num_real_part(*seed_out);
+
+            num_destroy(seed_out);
+            *seed_out = real;
+        }
+        num_destroy(&imaginary);
+    }
+
+cleanup:
+    if (have_base)
+        expr_binding_exact_complex_clear(&base);
+    else {
+        num_destroy(&base.imag);
+        num_destroy(&base.real);
+    }
+    return success;
+}
+
 /* Recover the authored base of an explicit reciprocal power. */
 expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out)
 {
@@ -4341,6 +4383,15 @@ static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *
         sbuf_puts(b, "}(");
         emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
         sbuf_putc(b, ')');
+        return;
+    }
+
+    if (ops == &ops_qdigamma) {
+        sbuf_puts(b, "\\psi_{");
+        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
+        sbuf_puts(b, "}\\left(");
+        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+        sbuf_puts(b, "\\right)");
         return;
     }
 

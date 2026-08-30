@@ -3937,7 +3937,8 @@ matrix_t *mat_lerch_phi(const matrix_t *Z, const number_t *s, const number_t *a)
         goto cleanup;
     for (unsigned int k = 0u; k < maximum_terms; ++k) {
         number_t shift = num_add_long(*a, (long)k);
-        number_t coefficient = num_div(NUM_ONE, num_pow(shift, *s));
+        number_t denominator = num_pow(shift, *s);
+        number_t coefficient = num_div(NUM_ONE, denominator);
         matrix_t *term = mat_scalar_mul(power, &coefficient);
         matrix_t *next_sum = term ? mat_add(sum, term) : NULL;
         number_t term_norm = NUM_NAN;
@@ -3950,6 +3951,7 @@ matrix_t *mat_lerch_phi(const matrix_t *Z, const number_t *s, const number_t *a)
         num_destroy(&sum_norm);
         num_destroy(&term_norm);
         num_destroy(&coefficient);
+        num_destroy(&denominator);
         num_destroy(&shift);
         mat_free(term);
         if (!next_sum || (!converged && k + 1u < maximum_terms && !next_power)) {

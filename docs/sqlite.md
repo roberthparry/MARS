@@ -497,3 +497,27 @@ All declarations are in `include/sqlite.h`.
 - `sqlite_stmt_column_double(stmt, column)` — read a double from the current row
 - `sqlite_stmt_column_is_null(stmt, column)` — test whether the current column is `NULL`
 - `sqlite_stmt_last_error(stmt)` — return the most recent statement error
+
+### `sqlite_stmt_bind_blob()`
+
+Reports whether the condition described by stmt bind blob holds.
+
+```c
+bool sqlite_stmt_bind_blob(sqlite_stmt_t *stmt, int index, const void *value, size_t value_len);
+```
+
+### `sqlite_stmt_column_blob()`
+
+Returns the public result described by stmt column blob.
+
+```c
+const void *sqlite_stmt_column_blob(sqlite_stmt_t *stmt, int column);
+```
+
+### `sqlite_stmt_column_bytes()`
+
+Returns the public result described by stmt column bytes.
+
+```c
+size_t sqlite_stmt_column_bytes(sqlite_stmt_t *stmt, int column);
+```

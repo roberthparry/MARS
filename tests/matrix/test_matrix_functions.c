@@ -132,12 +132,14 @@ static void test_mat_harmonic_poly(void)
         matrix_t *phi = mat_lerch_phi(Z, &two, &one);
         number_t got = phi ? mat_get_num(phi, 0u, 0u) : num_clone(NUM_NAN);
         number_t expected = number_lerch_phi(half, two, one);
-        number_t error = num_abs(num_sub(got, expected));
+        number_t delta = num_sub(got, expected);
+        number_t error = num_abs(delta);
         number_t tolerance = num_create_from_string("1e-28");
 
         ASSERT_NOT_NULL(phi);
         check_bool("matrix Lerch phi agrees with its scalar value", num_lt(error, tolerance));
         num_destroy(&error);
+        num_destroy(&delta);
         num_destroy(&expected);
         num_destroy(&got);
         mat_free(phi);
@@ -5059,6 +5061,8 @@ static void test_number_matrix_functions(void)
     J_trig = mat_create_num(2, 2, jordan_trig_data);
     check_bool("mat_create_num(number upper Jordan for trig/hyperbolic) not NULL", J_trig != NULL);
 
+    mat_free(S);
+    S = NULL;
     S = mat_sin(J_trig);
     C = mat_cos(J_trig);
     T = mat_tan(J_trig);

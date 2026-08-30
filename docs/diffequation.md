@@ -218,7 +218,7 @@ solution:
 input = y'' + 3y*y' + y^3 = 0
 solver = linear transformation
 symmetry = SL(3, ℝ)
-solution = y = (2x + C₁)/(x² + C₁x + C₂)
+solution = y = 1/(x² + C₁x + C₂)·(2x + C₁)
 ```
 
 Setting `y = u'/u` changes the left side into `u'''/u`. Thus `u''' = 0`,
@@ -1138,5 +1138,47 @@ Equivalently, the point transformation is
       X = x − 1/y
       Y = x/y − x²/2
 and d²Y/dX² = 0.
-solution = y = (2x + C₁)/(x² + C₁x + C₂)
+solution = y = 1/(x² + C₁x + C₂)·(2x + C₁)
+```
+
+## API Reference
+
+### `de_condition_count()`
+
+Returns the public result described by condition count.
+
+```c
+size_t de_condition_count(const diffequ_t *de);
+```
+
+### `de_independent_count()`
+
+Returns the public result described by independent count.
+
+```c
+size_t de_independent_count(const diffequ_t *de);
+```
+
+### `de_solve_result_count()`
+
+Returns the public result described by solve result count.
+
+```c
+size_t de_solve_result_count(const diffequ_solve_result_t *result);
+```
+
+### `de_solve_result_solver()`
+
+Returns the public result described by solve result solver.
+
+```c
+de_solver_t de_solve_result_solver(const diffequ_solve_result_t *result);
+```
+
+### `de_solve_result_status()`
+
+Returns the public result described by solve result status.
+
+```c
+de_solve_status_t de_solve_result_status(const diffequ_solve_result_t *result);
 ```

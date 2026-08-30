@@ -312,6 +312,7 @@ static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
+    integrate_rational_partial_fractions,
     integrate_div_quotient_derivative,
     integrate_div_rule_by_numerator_distribution,
     integrate_div_by_exp_denominator,
@@ -788,6 +789,7 @@ static expr_t *integrate_progression_antiderivative(const expr_t *expr, const ex
     expr_t *summation = NULL;
 
     if (kind == INTEGRATE_PROGRESSION_COS) {
+        expr_free(argument);
         expr_free(lower);
         expr_free(index);
         return integrate_cosine_progression_antiderivative(endpoint, wrt);

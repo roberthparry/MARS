@@ -128,7 +128,8 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
                 number_t abs_t = num_abs(t);
                 number_t cdf = num_normal_cdf(abs_t);
                 number_t two = NUM_TWO;
-                number_t p = num_mul(two, num_sub(NUM_ONE, cdf));
+                number_t upper_tail = num_sub(NUM_ONE, cdf);
+                number_t p = num_mul(two, upper_tail);
 
                 mat_set(stderr, i, 0u, &se);
                 mat_set(t_stat, i, 0u, &t);
@@ -140,6 +141,7 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
                 num_destroy(&t);
                 num_destroy(&abs_t);
                 num_destroy(&cdf);
+                num_destroy(&upper_tail);
                 num_destroy(&p);
             }
             out->stderr = stderr;

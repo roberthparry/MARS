@@ -485,3 +485,131 @@ convenience:
 - `int string_builder_append_string(string_builder_t *b, const string_t *s)` — `string_append_string(b, s)`
 - `int string_builder_append_char(string_builder_t *b, char c)` — `string_append_char(b, c)`
 - `int string_builder_format(string_builder_t *b, const char *fmt, ...)` — append formatted text, including `%S`, `%W`, and `%R`
+
+### `rune_from_value()`
+
+Creates or reconstructs the public value described by from value.
+
+```c
+rune_t rune_from_value(uint32_t value);
+```
+
+### `rune_is_control()`
+
+Reports whether the condition described by is control holds.
+
+```c
+bool rune_is_control(rune_t rune);
+```
+
+### `rune_is_fraction()`
+
+Reports whether the condition described by is fraction holds.
+
+```c
+bool rune_is_fraction(rune_t rune);
+```
+
+### `string_append_vformat_with_callback()`
+
+Returns the public result described by append vformat with callback.
+
+```c
+int string_append_vformat_with_callback(string_t *s, const char *fmt, va_list ap, string_format_callback_t callback, void *user);
+```
+
+### `string_byte_length()`
+
+Returns the public result described by byte length.
+
+```c
+size_t string_byte_length(const string_t *s);
+```
+
+### `string_cursor_end_position()`
+
+Returns the public result described by cursor end position.
+
+```c
+string_pos_t string_cursor_end_position(const string_cursor_t *cursor);
+```
+
+### `string_cursor_match_at()`
+
+Reports whether the condition described by cursor match at holds.
+
+```c
+bool string_cursor_match_at(const string_cursor_t *cursor, string_pos_t pos, const char *literal);
+```
+
+### `string_cursor_peek_ascii()`
+
+Reports whether the condition described by cursor peek ascii holds.
+
+```c
+bool string_cursor_peek_ascii(const string_cursor_t *cursor, unsigned char *out);
+```
+
+### `string_cursor_peek_ascii_at()`
+
+Reports whether the condition described by cursor peek ascii at holds.
+
+```c
+bool string_cursor_peek_ascii_at(const string_cursor_t *cursor, string_pos_t pos, unsigned char *out);
+```
+
+### `string_cursor_peek_at()`
+
+Returns the public result described by cursor peek at.
+
+```c
+rune_t string_cursor_peek_at(const string_cursor_t *cursor, string_pos_t pos);
+```
+
+### `string_cursor_skip()`
+
+Reports whether the condition described by cursor skip holds.
+
+```c
+bool string_cursor_skip(string_cursor_t *cursor, string_pos_t span);
+```
+
+### `string_fprintf()`
+
+Returns the public result described by fprintf.
+
+```c
+int string_fprintf(FILE *stream, const char *fmt, ...);
+```
+
+### `string_view_empty()`
+
+Returns the public result described by view empty.
+
+```c
+string_view_t string_view_empty(void);
+```
+
+### `string_view_peek_ascii()`
+
+Reports whether the condition described by view peek ascii holds.
+
+```c
+bool string_view_peek_ascii(string_view_t view, string_pos_t pos, unsigned char *out);
+```
+
+### `string_view_peek_rune_value()`
+
+Reports whether the condition described by view peek rune value holds.
+
+```c
+bool string_view_peek_rune_value(string_view_t view, string_pos_t pos, uint32_t *out, string_pos_t *next_pos_out);
+```
+
+### `string_vsprintf_with_callback()`
+
+Returns the public result described by vsprintf with callback.
+
+```c
+string_t *string_vsprintf_with_callback(const char *fmt, va_list ap, string_format_callback_t callback, void *user);
+```

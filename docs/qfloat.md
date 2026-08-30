@@ -387,6 +387,62 @@ W0(1) = 5.671432904097838729999686622103575E-01
 
 ---
 
+### `qf_from_text()`
+
+Creates or reconstructs the public value described by from text.
+
+```c
+qfloat_t qf_from_text(const string_t *text);
+```
+
+### `qf_get_exponent2()`
+
+Returns the public result described by get exponent2.
+
+```c
+long qf_get_exponent2(qfloat_t x);
+```
+
+### `qf_inline_quick_two_sum()`
+
+Returns the public result described by inline quick two sum.
+
+```c
+static inline void qf_inline_quick_two_sum(double a, double b, double *s, double *e);
+```
+
+### `qf_inline_renorm()`
+
+Returns the public result described by inline renorm.
+
+```c
+static inline qfloat_t qf_inline_renorm(double hi, double lo);
+```
+
+### `qf_inline_two_sum()`
+
+Returns the public result described by inline two sum.
+
+```c
+static inline void qf_inline_two_sum(double a, double b, double *s, double *e);
+```
+
+### `qf_sprintf_text()`
+
+Returns the public result described by sprintf text.
+
+```c
+string_t *qf_sprintf_text(const char *fmt, ...);
+```
+
+### `qf_vsprintf_text()`
+
+Returns the public result described by vsprintf text.
+
+```c
+string_t *qf_vsprintf_text(const char *fmt, va_list ap);
+```
+
 ## Benchmark Coverage
 
 `qfloat_t` has a focused arithmetic and special-functions benchmark here:

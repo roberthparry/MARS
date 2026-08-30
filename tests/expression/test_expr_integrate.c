@@ -56,6 +56,46 @@ static void assert_string_antiderivative_matches(const char *input, const double
     expr_bindings_free(bindings);
 }
 
+static void assert_string_antiderivative_matches_without(const char *input, const double *points, size_t npoints,
+                                                          const char *required,
+                                                          const char *forbidden_first,
+                                                          const char *forbidden_second)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified && x ? expr_integrate(simplified, x) : NULL;
+    expr_t *deriv = anti ? expr_create_deriv(anti, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(deriv);
+    print_antiderivative_text(input, text);
+    for (size_t i = 0; deriv && i < npoints; ++i) {
+        char point_label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(point_label, sizeof(point_label), "%s at x=%g", input, points[i]);
+        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv), expr_eval_qf(simplified));
+    }
+    if (required)
+        ASSERT_TRUE(text && strstr(text, required) != NULL);
+    if (forbidden_first)
+        ASSERT_TRUE(text && strstr(text, forbidden_first) == NULL);
+    if (forbidden_second)
+        ASSERT_TRUE(text && strstr(text, forbidden_second) == NULL);
+
+    free(text);
+    expr_free(deriv);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void assert_string_antiderivative_round_trips(const char *input)
 {
     expr_bindings_t *bindings = NULL;
@@ -1795,7 +1835,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt(a-bx) }", text);
     ASSERT_TRUE(strstr(text, "-2·√(a - bx)/b") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b\\,x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b\\mkern-2mu x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
 
     free(tex);
@@ -1830,8 +1870,8 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^3) }", text);
     ASSERT_TRUE(strstr(text, "2/(b·√(a - bx))") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{2}{b\\,\\sqrt{a - b x}}") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b x}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{2}{b\\mkern-2mu \\sqrt{a - b\\mkern-2mu x}}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\sqrt{a - b\\mkern-2mu x}") != NULL);
     ASSERT_TRUE(strstr(tex, "^{\\frac{1}{2}}") == NULL);
 
     free(tex);
@@ -1854,7 +1894,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^4) }", text);
     ASSERT_TRUE(strstr(text, "1/(b·(a - bx))") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{1}{b\\,\\left(a - b x\\right)}") != NULL);
+    ASSERT_TRUE(strstr(tex, "\\frac{1}{b\\mkern-2mu \\left(a - b\\mkern-2mu x\\right)}") != NULL);
 
     free(tex);
     free(text);
@@ -1876,7 +1916,9 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     ASSERT_NOT_NULL(tex);
     print_antiderivative_text("{ 1/sqrt((a-bx)^5) }", text);
     ASSERT_TRUE(strstr(text, "2/(3b·(a - bx)^³⁄₂)") != NULL);
-    ASSERT_TRUE(strstr(tex, "\\frac{2}{3 b\\,\\left(a - b x\\right)^{\\frac{3}{2}}}") != NULL);
+    ASSERT_TRUE(strstr(tex,
+                       "\\frac{2}{3\\mkern-2mu b\\mkern-2mu \\sqrt{\\left(a - b\\mkern-2mu x\\right)^{3}}}") !=
+                NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{\\frac{2}{3}}") == NULL);
 
     free(tex);
@@ -1957,35 +1999,35 @@ static void test_integrate_symbolic_general_quadratic_denominator(void)
     char *hidden_zero_derivative_text =
         hidden_zero_derivative ? expr_to_string(hidden_zero_derivative, style_UNBOUND) : NULL;
 
-    assert_string_antiderivative_contains("{ 1/(a*x^2+b*x+c) }", "2·atan((2ax + b)/√(4ac - b²))/√(4ac - b²)");
+    assert_string_antiderivative_contains("{ 1/(a*x^2+b*x+c) }", "2·atan(1/√(4ac - b²)·(2ax + b))/√(4ac - b²)");
     assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }", "ln(ax² + bx + c)/a");
-    assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }", "atan((2ax + b)/√(4ac - b²))");
+    assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }", "atan(1/√(4ac - b²)·(2ax + b))");
     assert_string_antiderivative_matches("{ (x+1)/(x^2+3*x+5) }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ (x+1)/(x^2+3*x+5) }", "atan((2x + 3)/√(11))/√(11)");
+    assert_string_antiderivative_contains("{ (x+1)/(x^2+3*x+5) }", "atan(1/√(11)·(2x + 3))/√(11)");
     assert_string_antiderivative_contains("{ (x+1)/(x^2+4*x+5) }", "atan(x + 2)");
 
     ASSERT_NOT_NULL(derivative_text);
-    if (str_eq(derivative_text, "(x + 1)/(x² + 3x + 5)"))
-        to_string_pass("exact quadratic antiderivative simplifies back", derivative_text, "(x + 1)/(x² + 3x + 5)");
+    if (str_eq(derivative_text, "1/(x² + 3x + 5)·(x + 1)"))
+        to_string_pass("exact quadratic antiderivative simplifies back", derivative_text, "1/(x² + 3x + 5)·(x + 1)");
     else
         to_string_fail(__FILE__, __LINE__, 1, "exact quadratic antiderivative simplifies back", derivative_text,
-                       "(x + 1)/(x² + 3x + 5)");
+                       "1/(x² + 3x + 5)·(x + 1)");
 
     ASSERT_NOT_NULL(completed_square_derivative_text);
-    if (str_eq(completed_square_derivative_text, "(x + 1)/(x² + 4x + 5)"))
+    if (str_eq(completed_square_derivative_text, "1/(x² + 4x + 5)·(x + 1)"))
         to_string_pass("completed-square denominators combine", completed_square_derivative_text,
-                       "(x + 1)/(x² + 4x + 5)");
+                       "1/(x² + 4x + 5)·(x + 1)");
     else
         to_string_fail(__FILE__, __LINE__, 1, "completed-square denominators combine", completed_square_derivative_text,
-                       "(x + 1)/(x² + 4x + 5)");
+                       "1/(x² + 4x + 5)·(x + 1)");
 
     ASSERT_NOT_NULL(hidden_zero_derivative_text);
-    if (str_eq(hidden_zero_derivative_text, "(x + 1)/(x² + 4x + 5)"))
+    if (str_eq(hidden_zero_derivative_text, "1/(x² + 4x + 5)·(x + 1)"))
         to_string_pass("polynomial quotient hidden zero simplifies", hidden_zero_derivative_text,
-                       "(x + 1)/(x² + 4x + 5)");
+                       "1/(x² + 4x + 5)·(x + 1)");
     else
         to_string_fail(__FILE__, __LINE__, 1, "polynomial quotient hidden zero simplifies", hidden_zero_derivative_text,
-                       "(x + 1)/(x² + 4x + 5)");
+                       "1/(x² + 4x + 5)·(x + 1)");
 
     free(hidden_zero_derivative_text);
     expr_free(hidden_zero_derivative);
@@ -2223,36 +2265,38 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
                                                        "cosec²(x)·exp(cot(x))·(2·cot(x) + cosec²(x))",
                                                        "cosec²(x)·exp(cot(x))·"
                                                        "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
-                                                       "2·cosec²(x)·(cot(x) + 1))",
+                                                       "2·(cot(x) + 1)·cosec²(x))",
                                                        "cosec²(x)·exp(cot(x))·"
                                                        "((-2·cot(x) - cosec²(x))·"
                                                        "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
-                                                       "2·cosec²(x)·(cot(x) + 1)) + "
-                                                       "2·cosec²(x)·(2·(cot(x) + 1)·(3·cot(x) + cosec²(x)) + "
-                                                       "cosec²(x)))"};
+                                                       "2·(cot(x) + 1)·cosec²(x)) + "
+                                                       "2·(2·(cot(x) + 1)·(3·cot(x) + cosec²(x)) + "
+                                                       "cosec²(x))·cosec²(x))"};
     static const char *const exp_cosec_derivatives[4] = {"-cosec(x)·cot(x)·exp(cosec(x))",
-                                                         "cosec(x)·exp(cosec(x))·(cot²(x)·(cosec(x) + 1) + cosec²(x))",
+                                                         "cosec(x)·exp(cosec(x))·((cosec(x) + 1)·cot²(x) + cosec²(x))",
                                                          "cosec(x)·cot(x)·exp(cosec(x))·"
                                                          "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
-                                                         "(cosec(x) + 1)·(cot²(x)·(cosec(x) + 1) + cosec²(x)))",
+                                                         "(cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x)))",
                                                          "cosec(x)·exp(cosec(x))·"
-                                                         "((-cot²(x)·(cosec(x) + 1) - cosec²(x))·"
+                                                         "((-(cosec(x) + 1)·cot²(x) - cosec²(x))·"
                                                          "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
-                                                         "(cosec(x) + 1)·(cot²(x)·(cosec(x) + 1) + cosec²(x))) + "
-                                                         "cosec(x)·cot²(x)·(2·(cosec(x) + 1)·"
-                                                         "(cosec(x)·(cosec(x) + 6) + cot²(x)) + cot²(x) + cosec²(x)))"};
+                                                         "(cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x))) + "
+                                                         "cosec(x)·(2·(cosec(x) + 1)·"
+                                                         "(cosec(x)·(cosec(x) + 6) + cot²(x)) + cot²(x) + "
+                                                         "cosec²(x))·cot²(x))"};
     static const char *const exp_sec_derivatives[4] = {"sec(x)·tan(x)·exp(sec(x))",
-                                                       "sec(x)·exp(sec(x))·(tan²(x)·(sec(x) + 2) + 1)",
+                                                       "sec(x)·exp(sec(x))·((sec(x) + 2)·tan²(x) + 1)",
                                                        "sec(x)·tan(x)·exp(sec(x))·"
-                                                       "((sec(x) + 1)·(tan²(x)·(sec(x) + 2) + 1) + "
+                                                       "((sec(x) + 1)·((sec(x) + 2)·tan²(x) + 1) + "
                                                        "2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x))",
                                                        "sec(x)·exp(sec(x))·"
-                                                       "((tan²(x)·(sec(x) + 2) + 1)·"
-                                                       "((sec(x) + 1)·(tan²(x)·(sec(x) + 2) + 1) + "
+                                                       "(((sec(x) + 2)·tan²(x) + 1)·"
+                                                       "((sec(x) + 1)·((sec(x) + 2)·tan²(x) + 1) + "
                                                        "2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x)) + "
-                                                       "tan²(x)·(sec(x)·(tan²(x)·(sec(x) + 2) + 1) + "
+                                                       "(sec(x)·((sec(x) + 2)·tan²(x) + 1) + "
                                                        "(sec(x) + 1)·(2·(tan²(x) + 1)·(sec(x) + 2) + tan²(x)·sec(x)) + "
-                                                       "2·(tan²(x) + 1)·(3·sec(x) + 4) + sec(x)·(3·tan²(x) + 2)))"};
+                                                       "2·(tan²(x) + 1)·(3·sec(x) + 4) + "
+                                                       "sec(x)·(3·tan²(x) + 2))·tan²(x))"};
     static const char *const exp_sinh_derivatives[4] = {
         "cosh(x)·exp(sinh(x))", "exp(sinh(x))·(sinh(x) + cosh²(x))",
         "exp(sinh(x))·(cosh(x) + sinh(2x) + cosh(x)·(sinh(x) + cosh²(x)))",
@@ -2278,42 +2322,42 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
         "4·(1 - 2·tanh(x) - tanh²(x))·"
         "(tanh(x)·(tanh(x)·(tanh(x) + 1) - 1) - 1))"};
     static const char *const exp_sech_derivatives[4] = {"-sech(x)·tanh(x)·exp(sech(x))",
-                                                        "sech(x)·exp(sech(x))·(tanh²(x)·(sech(x) + 2) - 1)",
+                                                        "sech(x)·exp(sech(x))·((sech(x) + 2)·tanh²(x) - 1)",
                                                         "sech(x)·tanh(x)·exp(sech(x))·"
                                                         "(2·(1 - tanh²(x))·(sech(x) + 2) - "
-                                                        "(sech(x) + 1)·(tanh²(x)·(sech(x) + 2) - 1) - "
+                                                        "(sech(x) + 1)·((sech(x) + 2)·tanh²(x) - 1) - "
                                                         "tanh²(x)·sech(x))",
                                                         "sech(x)·exp(sech(x))·"
-                                                        "((1 - tanh²(x)·(sech(x) + 1) - tanh²(x))·"
+                                                        "((1 - (sech(x) + 1)·tanh²(x) - tanh²(x))·"
                                                         "(2·(1 - tanh²(x))·(sech(x) + 2) - "
-                                                        "(sech(x) + 1)·(tanh²(x)·(sech(x) + 2) - 1) - "
+                                                        "(sech(x) + 1)·((sech(x) + 2)·tanh²(x) - 1) - "
                                                         "tanh²(x)·sech(x)) + "
-                                                        "tanh²(x)·(2·(1 - tanh²(x))·(-3·sech(x) - 4) - "
+                                                        "(2·(1 - tanh²(x))·(-3·sech(x) - 4) - "
                                                         "(sech(x) + 1)·(2·(1 - tanh²(x))·(sech(x) + 2) - "
-                                                        "tanh²(x)·sech(x)) + sech(x)·(tanh²(x)·(sech(x) + 2) - 1) - "
-                                                        "sech(x)·(2 - 3·tanh²(x))))"};
+                                                        "tanh²(x)·sech(x)) + sech(x)·((sech(x) + 2)·tanh²(x) - 1) - "
+                                                        "sech(x)·(2 - 3·tanh²(x)))·tanh²(x))"};
     static const char *const exp_cosech_hyperbolic_derivatives[4] = {
-        "-cosech(x)·coth(x)·exp(cosech(x))", "cosech(x)·exp(cosech(x))·(coth²(x)·(cosech(x) + 1) + cosech²(x))",
+        "-cosech(x)·coth(x)·exp(cosech(x))", "cosech(x)·exp(cosech(x))·((cosech(x) + 1)·coth²(x) + cosech²(x))",
         "cosech(x)·coth(x)·exp(cosech(x))·"
         "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
-        "(cosech(x) + 1)·(coth²(x)·(cosech(x) + 1) + cosech²(x)))",
+        "(cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x)))",
         "cosech(x)·exp(cosech(x))·"
-        "((-coth²(x)·(cosech(x) + 1) - cosech²(x))·"
+        "((-(cosech(x) + 1)·coth²(x) - cosech²(x))·"
         "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
-        "(cosech(x) + 1)·(coth²(x)·(cosech(x) + 1) + cosech²(x))) + "
-        "cosech(x)·coth²(x)·(2·(cosech(x) + 1)·"
-        "(cosech(x)·(cosech(x) + 6) + coth²(x)) + coth²(x) + cosech²(x)))"};
+        "(cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x))) + "
+        "cosech(x)·(2·(cosech(x) + 1)·"
+        "(cosech(x)·(cosech(x) + 6) + coth²(x)) + coth²(x) + cosech²(x))·coth²(x))"};
     static const char *const exp_coth_hyperbolic_derivatives[4] = {
         "-cosech²(x)·exp(coth(x))", "cosech²(x)·exp(coth(x))·(2·coth(x) + cosech²(x))",
         "cosech²(x)·exp(coth(x))·"
         "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
-        "2·cosech²(x)·(coth(x) + 1))",
+        "2·(coth(x) + 1)·cosech²(x))",
         "cosech²(x)·exp(coth(x))·"
         "((-2·coth(x) - cosech²(x))·"
         "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
-        "2·cosech²(x)·(coth(x) + 1)) + "
-        "2·cosech²(x)·(2·(coth(x) + 1)·(3·coth(x) + cosech²(x)) + "
-        "cosech²(x)))"};
+        "2·(coth(x) + 1)·cosech²(x)) + "
+        "2·(2·(coth(x) + 1)·(3·coth(x) + cosech²(x)) + "
+        "cosech²(x))·cosech²(x))"};
 
     assert_iterated_derivatives_integrate_back("{ exp(sin(x)) }", exp_sin_derivatives, points,
                                                sizeof(points) / sizeof(points[0]));
@@ -2357,12 +2401,12 @@ static void test_integrate_hyperbolic_table_tail(void)
 
     assert_string_antiderivative_contains("{ cosh(x) }", "sinh(x)");
     assert_string_antiderivative_matches("{ cosh(x) }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ exp(a*x)*cosh(b*x) }", "exp(ax)·(a·cosh(bx) - b·sinh(bx))/(a² - b²)");
+    assert_string_antiderivative_contains("{ exp(a*x)*cosh(b*x) }", "exp(ax)/(a² - b²)·(a·cosh(bx) - b·sinh(bx))");
     assert_string_antiderivative_matches_with_ab("{ exp(a*x)*cosh(b*x) }", 3.0, 2.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(x) }", "cosh(x)");
     assert_string_antiderivative_matches("{ sinh(x) }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ exp(a*x)*sinh(b*x) }", "exp(ax)·(a·sinh(bx) - b·cosh(bx))/(a² - b²)");
+    assert_string_antiderivative_contains("{ exp(a*x)*sinh(b*x) }", "exp(ax)/(a² - b²)·(a·sinh(bx) - b·cosh(bx))");
     assert_string_antiderivative_matches_with_ab("{ exp(a*x)*sinh(b*x) }", 3.0, 2.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ exp(x)*tanh(x) }", "exp(x) - 2·atan(exp(x))");
@@ -2370,32 +2414,32 @@ static void test_integrate_hyperbolic_table_tail(void)
     assert_string_antiderivative_contains("{ tanh(a*x) }", "ln(cosh(ax))/a");
     assert_string_antiderivative_matches_with_a("{ tanh(a*x) }", 2.0, points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ cos(a*x)*cosh(b*x) }",
-                                          "(a·sin(ax)·cosh(bx) + b·cos(ax)·sinh(bx))/(a² + b²)");
+                                          "1/(a² + b²)·(a·sin(ax)·cosh(bx) + b·cos(ax)·sinh(bx))");
     assert_string_antiderivative_matches_with_ab("{ cos(a*x)*cosh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ cos(a*x)*sinh(b*x) }",
-                                          "(a·sin(ax)·sinh(bx) + b·cos(ax)·cosh(bx))/(a² + b²)");
+                                          "1/(a² + b²)·(a·sin(ax)·sinh(bx) + b·cos(ax)·cosh(bx))");
     assert_string_antiderivative_matches_with_ab("{ cos(a*x)*sinh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sin(a*x)*cosh(b*x) }",
-                                          "(b·sin(ax)·sinh(bx) - a·cos(ax)·cosh(bx))/(a² + b²)");
+                                          "1/(a² + b²)·(b·sin(ax)·sinh(bx) - a·cos(ax)·cosh(bx))");
     assert_string_antiderivative_matches_with_ab("{ sin(a*x)*cosh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sin(a*x)*sinh(b*x) }",
-                                          "(b·sin(ax)·cosh(bx) - a·cos(ax)·sinh(bx))/(a² + b²)");
+                                          "1/(a² + b²)·(b·sin(ax)·cosh(bx) - a·cos(ax)·sinh(bx))");
     assert_string_antiderivative_matches_with_ab("{ sin(a*x)*sinh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ sinh(a*x)^2 }", "(sinh(2ax) - 2ax)/(4a)");
+    assert_string_antiderivative_contains("{ sinh(a*x)^2 }", "1/(4a)·(sinh(2ax) - 2ax)");
     assert_string_antiderivative_matches_with_a("{ sinh(a*x)^2 }", 2.0, points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(a*x)*sinh(b*x) }",
-                                          "(b·cosh(bx)·sinh(ax) - a·cosh(ax)·sinh(bx))/(b² - a²)");
+                                          "1/(b² - a²)·(b·cosh(bx)·sinh(ax) - a·cosh(ax)·sinh(bx))");
     assert_string_antiderivative_matches_with_ab("{ sinh(a*x)*sinh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(a*x)*cosh(b*x) }",
-                                          "(a·cosh(ax)·cosh(bx) - b·sinh(ax)·sinh(bx))/(a² - b²)");
+                                          "1/(a² - b²)·(a·cosh(ax)·cosh(bx) - b·sinh(ax)·sinh(bx))");
     assert_string_antiderivative_matches_with_ab("{ sinh(a*x)*cosh(b*x) }", 2.0, 3.0, points,
                                                  sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ sinh(a*x)*cosh(a*x) }", "cosh(2ax)/(4a)");
+    assert_string_antiderivative_contains("{ sinh(a*x)*cosh(a*x) }", "¼·cosh(2ax)/a");
     assert_string_antiderivative_matches_with_a("{ sinh(a*x)*cosh(a*x) }", 2.0, points,
                                                 sizeof(points) / sizeof(points[0]));
 }
@@ -2444,33 +2488,23 @@ static void test_integrate_more_by_parts(void)
                                   sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of x^2*acot(x)", x_sq_acot_x, x, outer_points,
                                   sizeof(outer_points) / sizeof(outer_points[0]));
-    assert_string_antiderivative_matches("{ atan(x/(1-x^2)) }", rational_atan_points,
-                                         sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
+    assert_string_antiderivative_matches_without("{ atan(x/(1-x^2)) }", rational_atan_points,
+                                                 sizeof(rational_atan_points) / sizeof(rational_atan_points[0]), NULL,
+                                                 NULL, NULL);
     assert_string_antiderivative_contains("{ atan(x/(1-x^2)) + C }", "ln(x⁴ - x² + 1)");
     assert_string_antiderivative_not_contains("{ atan(x/(1-x^2)) + C }", "∫");
-    assert_string_antiderivative_matches("{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
-                                         "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
-                                         rational_atan_points,
-                                         sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
-    assert_string_antiderivative_not_contains("{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
-                                              "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
-                                              "∫");
-    assert_string_antiderivative_not_contains("{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))"
-                                              "-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
-                                              "atanh");
-    assert_string_antiderivative_matches("{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
-                                         "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
-                                         rational_atan_points,
-                                         sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
-    assert_string_antiderivative_not_contains("{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))"
-                                              "+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
-                                              "∫");
-    assert_string_antiderivative_matches("{ ln(x^4+x^2+1) }", rational_atan_points,
-                                         sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
-    assert_string_antiderivative_not_contains("{ ln(x^4+x^2+1) }", "∫");
-    assert_string_antiderivative_matches("{ (2*x+1)*ln(x^2+1) }", rational_atan_points,
-                                         sizeof(rational_atan_points) / sizeof(rational_atan_points[0]));
-    assert_string_antiderivative_not_contains("{ (2*x+1)*ln(x^2+1) }", "∫");
+    assert_string_antiderivative_matches_without(
+        "{ 1/4*(-ln(x^4-x^2+1)+4*x*atan(x/(1-x^2))-2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        rational_atan_points, sizeof(rational_atan_points) / sizeof(rational_atan_points[0]), NULL, "∫", "atanh");
+    assert_string_antiderivative_matches_without(
+        "{ -1/4*(ln(x^4-x^2+1)-4*x*atan(x/(1-x^2))+2*sqrt(3)*atan((2*x^2-1)/sqrt(3))) }",
+        rational_atan_points, sizeof(rational_atan_points) / sizeof(rational_atan_points[0]), NULL, "∫", NULL);
+    assert_string_antiderivative_matches_without("{ ln(x^4+x^2+1) }", rational_atan_points,
+                                                 sizeof(rational_atan_points) / sizeof(rational_atan_points[0]), NULL,
+                                                 "∫", NULL);
+    assert_string_antiderivative_matches_without("{ (2*x+1)*ln(x^2+1) }", rational_atan_points,
+                                                 sizeof(rational_atan_points) / sizeof(rational_atan_points[0]), NULL,
+                                                 "∫", NULL);
 
     expr_free(x_sq_acot_x);
     expr_free(x_sq_atan_x);
@@ -2480,18 +2514,30 @@ static void test_integrate_more_by_parts(void)
     expr_free(x);
 }
 
-static void test_integrate_partial_fractions(void)
+static void test_integrate_partial_fractions_distinct_linear_factors(void)
 {
     static const double points[] = {-2.5, -0.5, 0.5, 1.5};
-    static const double positive_points[] = {0.25, 0.75, 1.5, 2.5};
-    static const double quartic_points[] = {-2.0, -0.5, 0.0, 0.75, 2.0};
-    number_t three_num = num_create_from_long(3);
     expr_t *x = test_expr_new_named_var_d(0.0, "x");
     expr_t *x_plus_one_a = expr_add_num(x, &NUM_ONE);
     expr_t *x_plus_two_a = expr_add_num(x, &NUM_TWO);
     expr_t *denom_distinct_a = (x_plus_one_a && x_plus_two_a) ? expr_mul(x_plus_one_a, x_plus_two_a) : NULL;
     expr_t *recip_distinct = denom_distinct_a ? expr_num_div(&NUM_ONE, denom_distinct_a) : NULL;
 
+    assert_antiderivative_matches("integral derivative of 1/((x + 1)(x + 2))", recip_distinct, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+
+    expr_free(recip_distinct);
+    expr_free(denom_distinct_a);
+    expr_free(x_plus_two_a);
+    expr_free(x_plus_one_a);
+    expr_free(x);
+}
+
+static void test_integrate_partial_fractions_linear_numerator(void)
+{
+    static const double points[] = {-2.5, -0.5, 0.5, 1.5};
+    number_t three_num = num_create_from_long(3);
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
     expr_t *two_x = expr_mul_num(x, &NUM_TWO);
     expr_t *three = expr_new_const(three_num);
     expr_t *linear_numer = (two_x && three) ? expr_add(two_x, three) : NULL;
@@ -2500,82 +2546,155 @@ static void test_integrate_partial_fractions(void)
     expr_t *denom_distinct_b = (x_plus_one_b && x_plus_two_b) ? expr_mul(x_plus_one_b, x_plus_two_b) : NULL;
     expr_t *linear_over_distinct = (linear_numer && denom_distinct_b) ? expr_div(linear_numer, denom_distinct_b) : NULL;
 
-    expr_t *x_sq_den = test_expr_pow_d(x, 2.0);
-    expr_t *x_sq_minus_one = x_sq_den ? expr_sub_num(x_sq_den, &NUM_ONE) : NULL;
-    expr_t *quadratic_recip = x_sq_minus_one ? expr_num_div(&NUM_ONE, x_sq_minus_one) : NULL;
-
-    assert_antiderivative_matches("integral derivative of 1/((x + 1)(x + 2))", recip_distinct, x, points,
-                                  sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of (2x + 3)/((x + 1)(x + 2))", linear_over_distinct, x, points,
                                   sizeof(points) / sizeof(points[0]));
-    assert_antiderivative_matches("integral derivative of 1/(x^2 - 1)", quadratic_recip, x, positive_points,
-                                  sizeof(positive_points) / sizeof(positive_points[0]));
-    assert_string_antiderivative_matches("{ 1/((x+1)(x+2)(x+3)(x+4)) }", positive_points,
-                                         sizeof(positive_points) / sizeof(positive_points[0]));
-    assert_string_antiderivative_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }", "⅙·(");
-    assert_string_antiderivative_not_contains("{ 1/((x+1)(x+2)(x+3)(x+4)) }", "0.166666");
-    assert_string_antiderivative_matches("{ (x^2+1)/(x^4-x^2+1) }", quartic_points,
-                                         sizeof(quartic_points) / sizeof(quartic_points[0]));
-    assert_string_antiderivative_contains("{ (x^2+1)/(x^4-x^2+1) }", "atan(x/(1 - x²))");
-    assert_string_antiderivative_matches("{ (2*x^3+3*x^2+5*x+7)/(x^4+x^2+1) }", quartic_points,
-                                         sizeof(quartic_points) / sizeof(quartic_points[0]));
-    assert_string_antiderivative_not_contains("{ (2*x^3+3*x^2+5*x+7)/(x^4+x^2+1) }", "∫");
 
-    expr_free(quadratic_recip);
-    expr_free(x_sq_minus_one);
-    expr_free(x_sq_den);
     expr_free(linear_over_distinct);
     expr_free(denom_distinct_b);
     expr_free(x_plus_two_b);
     expr_free(x_plus_one_b);
     expr_free(linear_numer);
-    expr_free(recip_distinct);
-    expr_free(denom_distinct_a);
-    expr_free(x_plus_two_a);
-    expr_free(x_plus_one_a);
     expr_free(three);
     expr_free(two_x);
     expr_free(x);
     num_destroy(&three_num);
 }
 
+static void test_integrate_partial_fractions_quadratic_difference(void)
+{
+    static const double positive_points[] = {0.25, 0.75, 1.5, 2.5};
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *x_sq_den = test_expr_pow_d(x, 2.0);
+    expr_t *x_sq_minus_one = x_sq_den ? expr_sub_num(x_sq_den, &NUM_ONE) : NULL;
+    expr_t *quadratic_recip = x_sq_minus_one ? expr_num_div(&NUM_ONE, x_sq_minus_one) : NULL;
+
+    assert_antiderivative_matches("integral derivative of 1/(x^2 - 1)", quadratic_recip, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+
+    expr_free(quadratic_recip);
+    expr_free(x_sq_minus_one);
+    expr_free(x_sq_den);
+    expr_free(x);
+}
+
+static void test_integrate_partial_fractions_four_linear_factors(void)
+{
+    static const double positive_points[] = {0.25, 0.75, 1.5, 2.5};
+
+    assert_string_antiderivative_matches_without("{ 1/((x+1)(x+2)(x+3)(x+4)) }", positive_points,
+                                                 sizeof(positive_points) / sizeof(positive_points[0]), "⅙·(",
+                                                 "0.166666", NULL);
+}
+
+static void test_integrate_partial_fractions_quartic_arctangent(void)
+{
+    static const double quartic_points[] = {-2.0, -0.5, 0.0, 0.75, 2.0};
+
+    assert_string_antiderivative_matches_without("{ (x^2+1)/(x^4-x^2+1) }", quartic_points,
+                                                 sizeof(quartic_points) / sizeof(quartic_points[0]),
+                                                 "atan(x/(1 - x²))", NULL, NULL);
+}
+
+static void test_integrate_partial_fractions_improper_quartic(void)
+{
+    static const double quartic_points[] = {-2.0, -0.5, 0.0, 0.75, 2.0};
+
+    assert_string_antiderivative_matches_without("{ (2*x^3+3*x^2+5*x+7)/(x^4+x^2+1) }", quartic_points,
+                                                 sizeof(quartic_points) / sizeof(quartic_points[0]), NULL, "∫",
+                                                 NULL);
+}
+
 static void test_integrate_quotient_rule_derivative(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_nth_derivative_integrates_back("{ (3*x^2 + 4*x + 5)/(x^3 + 2*x^2 + 5*x + 1) }", 1u, points,
+                                          sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_first_derivative(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches("{ (3*x - (x + 1)*(2*x + 3) + x^2 + 5)/"
+                                         "(x^2 + 3*x + 5)^2 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_second_derivative(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches("{ (2*(-x - 1)*(x^2 + 3*x + 5) - "
+                                         "2*(2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5))/"
+                                         "(x^2 + 3*x + 5)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_sixth_power(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches("{ 120*(30*x^4 + 84*x - x^6 - 6*x^5 + 220*x^3 + "
+                                         "345*x^2 - 73)/(x^2 + 3*x + 5)^6 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_eleventh_power(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches("{ ((x^2 + 3*x + 5)*(10*x^9) - "
+                                         "10*(2*x + 3)*x^10)/(x^2 + 3*x + 5)^11 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_reciprocal_square(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches("{ 1/(x^2 + 3*x + 5)^2 }", points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_quotient_rule_reducible_quadratic(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches_without("{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }", points,
+                                                 sizeof(points) / sizeof(points[0]),
+                                                 "1/(x² + 3x + 5)·(-2x - 5)", NULL, NULL);
+}
+
+static void test_integrate_quotient_rule_quartic_power(void)
 {
     static const double points[] = {-0.1, 0.25, 1.0, 2.0};
     const char *quartic_power_input = "{ 24*x*(16*x^6-x^10-6*x^8+2*x^4-9*x^2+1)"
                                       "/(x^4-x^2+1)^4 }";
 
-    assert_nth_derivative_integrates_back("{ (3*x^2 + 4*x + 5)/(x^3 + 2*x^2 + 5*x + 1) }", 1u, points,
-                                          sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ (3*x - (x + 1)*(2*x + 3) + x^2 + 5)/"
-                                         "(x^2 + 3*x + 5)^2 }",
-                                         points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ (2*(-x - 1)*(x^2 + 3*x + 5) - "
-                                         "2*(2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5))/"
-                                         "(x^2 + 3*x + 5)^3 }",
-                                         points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ 120*(30*x^4 + 84*x - x^6 - 6*x^5 + 220*x^3 + "
-                                         "345*x^2 - 73)/(x^2 + 3*x + 5)^6 }",
-                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_without(quartic_power_input, points, sizeof(points) / sizeof(points[0]),
+                                                 "1/(x⁴ - x² + 1)³·(6x⁸ + 22x⁶ - 42x⁴ + 4)", NULL,
+                                                 NULL);
+}
+
+static void test_integrate_quotient_rule_cubic_power(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
+    assert_string_antiderivative_matches_without("{ (-4*x^4-6*x^2+2*x-2)/(x^3+x+1)^3 }", points,
+                                                 sizeof(points) / sizeof(points[0]), "1/(x³ + x + 1)²·(x² + 1)",
+                                                 NULL, NULL);
+}
+
+static void test_integrate_quotient_rule_very_high_power(void)
+{
+    static const double points[] = {-0.1, 0.25, 1.0, 2.0};
+
     assert_string_antiderivative_matches("{ (40320*(x^2 + 3*x + 5)*(42*x^5 - 511*x - x^7 - "
                                          "7*x^6 + 385*x^4 + 805*x^3 + 294*x^2 - 289) - "
                                          "40320*(2*x + 3)*(56*x^6 - 2312*x - x^8 - 8*x^7 + "
                                          "616*x^5 + 1610*x^4 + 784*x^3 - 2044*x^2 - 502))/"
                                          "(x^2 + 3*x + 5)^9 }",
                                          points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ ((x^2 + 3*x + 5)*(10*x^9) - "
-                                         "10*(2*x + 3)*x^10)/(x^2 + 3*x + 5)^11 }",
-                                         points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ 1/(x^2 + 3*x + 5)^2 }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_matches("{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }", points,
-                                         sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ (-4*x^3 - 14*x^2 - 22*x - 15)/(x^2 + 3*x + 5)^2 }",
-                                          "(-2x - 5)/(x² + 3x + 5)");
-    assert_string_antiderivative_matches(quartic_power_input, points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains(quartic_power_input, "(6x⁸ + 22x⁶ - 42x⁴ + 4)/(x⁴ - x² + 1)³");
-    assert_string_antiderivative_matches("{ (-4*x^4-6*x^2+2*x-2)/(x^3+x+1)^3 }", points,
-                                         sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ (-4*x^4-6*x^2+2*x-2)/(x^3+x+1)^3 }", "(x² + 1)/(x³ + x + 1)²");
 }
 
 static void test_integrate_unevaluated_integral_derivative(void)
@@ -3203,9 +3322,9 @@ static void test_integrate_collects_repeated_inverse_and_log_terms(void)
     ASSERT_TRUE(strstr(deriv_text, "/(x⁴ - x² + 1)") == NULL);
     ASSERT_TRUE(strstr(deriv_text, "¼·(") == NULL);
     ASSERT_TRUE(strstr(deriv_text, "x·atan(x/(1 - x²)) - ¼·ln(x⁴ - x² + 1)") != NULL);
-    ASSERT_TRUE(strstr(deriv_text, "- ½√3·atan((2x² - 1)/√3)") != NULL);
+    ASSERT_TRUE(strstr(deriv_text, "- ½√3·atan(1/√3·(2x² - 1))") != NULL);
     ASSERT_TRUE(strstr(deriv_text, "ln(x⁴ - x² + 1)") != NULL);
-    ASSERT_TRUE(strstr(deriv_text, "atan((2x² - 1)/√3)") != NULL);
+    ASSERT_TRUE(strstr(deriv_text, "atan(1/√3·(2x² - 1))") != NULL);
 
     for (size_t i = 0u; i < sizeof(points) / sizeof(points[0]); ++i) {
         char label[160];
@@ -3346,7 +3465,7 @@ static void test_harmonic_poly_calculus(void)
     expr_bindings_t *bindings = NULL;
     expr_t *function = expr_from_string("{ Hn(n,x) | x=?; n=4 }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
-    expr_t *derivative = function ? expr_clone(function) : NULL;
+    expr_t *derivative = function ? expr_retain_expr(function) : NULL;
     expr_t *antiderivative = function && x ? expr_integrate(function, x) : NULL;
     expr_t *round_trip = antiderivative && x ? expr_create_deriv(antiderivative, x) : NULL;
     char *function_text = function ? expr_to_string(function, style_FUNCTION) : NULL;
@@ -3475,8 +3594,22 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_hyperbolic_table_tail, NULL);
     TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
-    TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_distinct_linear_factors, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_linear_numerator, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_quadratic_difference, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_four_linear_factors, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_quartic_arctangent, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions_improper_quartic, NULL);
     TEST_RUN_SUBTEST(test_integrate_quotient_rule_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_first_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_second_derivative, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_sixth_power, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_eleventh_power, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_reciprocal_square, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_reducible_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_quartic_power, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_cubic_power, NULL);
+    TEST_RUN_SUBTEST(test_integrate_quotient_rule_very_high_power, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_leibniz_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);
