@@ -1352,6 +1352,246 @@ matrix-specific format specifiers:
 
 ---
 
+### `mat_adjugate()`
+
+Returns the public result described by adjugate.
+
+```c
+matrix_t *mat_adjugate(const matrix_t *A);
+```
+
+### `mat_apply_poly()`
+
+Returns the public result described by apply poly.
+
+```c
+matrix_t *mat_apply_poly(const matrix_t *A, const matrix_t *coeffs);
+```
+
+### `mat_bindings_count()`
+
+Returns the public result described by bindings count.
+
+```c
+size_t mat_bindings_count(const mat_bindings_t *bnd);
+```
+
+### `mat_bindings_expr_at()`
+
+Returns the public result described by bindings expr at.
+
+```c
+expr_t *mat_bindings_expr_at(mat_bindings_t *bnd, size_t index);
+```
+
+### `mat_bindings_from_matrix()`
+
+Creates or reconstructs the public value described by bindings from matrix.
+
+```c
+mat_bindings_t *mat_bindings_from_matrix(const matrix_t *A);
+```
+
+### `mat_bindings_get_text()`
+
+Returns the public result described by bindings get text.
+
+```c
+expr_t *mat_bindings_get_text(mat_bindings_t *bnd, const string_t *name);
+```
+
+### `mat_bindings_is_constant_at()`
+
+Reports whether the condition described by bindings is constant at holds.
+
+```c
+bool mat_bindings_is_constant_at(const mat_bindings_t *bnd, size_t index);
+```
+
+### `mat_bindings_name_at()`
+
+Returns the public result described by bindings name at.
+
+```c
+const char *mat_bindings_name_at(const mat_bindings_t *bnd, size_t index);
+```
+
+### `mat_bindings_name_text_at()`
+
+Returns the public result described by bindings name text at.
+
+```c
+const string_t *mat_bindings_name_text_at(const mat_bindings_t *bnd, size_t index);
+```
+
+### `mat_body_to_string()`
+
+Returns the public result described by body to string.
+
+```c
+char *mat_body_to_string(const matrix_t *A, mat_string_style_t style);
+```
+
+### `mat_body_to_text()`
+
+Returns the public result described by body to text.
+
+```c
+string_t *mat_body_to_text(const matrix_t *A, mat_string_style_t style);
+```
+
+### `mat_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+matrix_t *mat_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `mat_det_expr()`
+
+Returns the public result described by det expr.
+
+```c
+int mat_det_expr(const matrix_t *A, expr_t **determinant);
+```
+
+### `mat_eigendecompose_expr()`
+
+Returns the public result described by eigendecompose expr.
+
+```c
+int mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues, matrix_t **eigenvectors);
+```
+
+### `mat_eigenspace()`
+
+Returns the public result described by eigenspace.
+
+```c
+matrix_t *mat_eigenspace(const matrix_t *A, const number_t *eigenvalue);
+```
+
+### `mat_eigenspace_expr()`
+
+Returns the public result described by eigenspace expr.
+
+```c
+matrix_t *mat_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue);
+```
+
+### `mat_eigenvalues_expr()`
+
+Returns the public result described by eigenvalues expr.
+
+```c
+int mat_eigenvalues_expr(const matrix_t *A, expr_t **eigenvalues);
+```
+
+### `mat_expression_evaluate()`
+
+Returns the public result described by expression evaluate.
+
+```c
+int mat_expression_evaluate(const char *text, mat_bindings_t **bnd_out, const char **operation_out, matrix_t **matrix_out, expr_t **scalar_out);
+```
+
+### `mat_from_text()`
+
+Creates or reconstructs the public value described by from text.
+
+```c
+matrix_t *mat_from_text(const string_t *text);
+```
+
+### `mat_from_text_expr()`
+
+Creates or reconstructs the public value described by from text expr.
+
+```c
+matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
+```
+
+### `mat_generalized_eigenspace()`
+
+Returns the public result described by generalized eigenspace.
+
+```c
+matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenvalue, size_t order);
+```
+
+### `mat_generalized_eigenspace_expr()`
+
+Returns the public result described by generalized eigenspace expr.
+
+```c
+matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order);
+```
+
+### `mat_jordan_chain()`
+
+Returns the public result described by jordan chain.
+
+```c
+matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue, size_t order);
+```
+
+### `mat_jordan_chain_expr()`
+
+Returns the public result described by jordan chain expr.
+
+```c
+matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue, size_t order);
+```
+
+### `mat_jordan_profile()`
+
+Returns the public result described by jordan profile.
+
+```c
+matrix_t *mat_jordan_profile(const matrix_t *A, const number_t *eigenvalue);
+```
+
+### `mat_jordan_profile_expr()`
+
+Returns the public result described by jordan profile expr.
+
+```c
+matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
+```
+
+### `mat_minpoly()`
+
+Returns the public result described by minpoly.
+
+```c
+matrix_t *mat_minpoly(const matrix_t *A);
+```
+
+### `mat_neg()`
+
+Returns the public result described by neg.
+
+```c
+matrix_t *mat_neg(const matrix_t *A);
+```
+
+### `mat_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool mat_serialize(const matrix_t *A, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
+### `mat_trace_expr()`
+
+Returns the public result described by trace expr.
+
+```c
+int mat_trace_expr(const matrix_t *A, expr_t **trace);
+```
+
 ## Design Notes
 
 ### Symbolic Calculus Pipeline

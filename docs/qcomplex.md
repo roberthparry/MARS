@@ -273,6 +273,22 @@ while `qc_acos(2)` is
 
 ---
 
+### `qc_from_text()`
+
+Creates or reconstructs the public value described by from text.
+
+```c
+qcomplex_t qc_from_text(const string_t *text);
+```
+
+### `qc_lambert_wn()`
+
+Returns the public result described by lambert wn.
+
+```c
+qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);
+```
+
 ## Implementation Notes
 
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.

@@ -146,6 +146,39 @@ static bool expr_contains_summation_for_display(const expr_t *expr)
     return expr_contains_summation_for_display(left) || expr_contains_summation_for_display(right);
 }
 
+static expr_t *expr_domain_specialised_inverse_power_derivative(const expr_t *expr, expr_bindings_t *bindings,
+                                                                 const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *endpoint = NULL;
+    expr_t *expected_digamma = NULL;
+    expr_t *riemann_derivative = NULL;
+    expr_t *hurwitz_derivative = NULL;
+    expr_t *derivative = NULL;
+    expr_t *n;
+    bool subtract = false;
+
+    if (!expr || !bindings || !wrt || !expr_match_add_sub_expr(expr, &left, &right, &subtract) || subtract)
+        return NULL;
+    n = expr_bindings_get(bindings, "n");
+    endpoint = n ? expr_add_long(n, 1L) : NULL;
+    expected_digamma = endpoint ? expr_digamma(endpoint) : NULL;
+    if (!expected_digamma || (!expr_struct_eq(left, expected_digamma) && !expr_struct_eq(right, expected_digamma)))
+        goto cleanup;
+
+    riemann_derivative = expr_zetap(wrt);
+    hurwitz_derivative = expr_zatahp(wrt, endpoint);
+    derivative = riemann_derivative && hurwitz_derivative ? expr_sub(riemann_derivative, hurwitz_derivative) : NULL;
+
+cleanup:
+    expr_free(hurwitz_derivative);
+    expr_free(riemann_derivative);
+    expr_free(expected_digamma);
+    expr_free(endpoint);
+    return derivative;
+}
+
 static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
 {
     static const expr_pattern_unary_affine_kind_t kinds[] = {
@@ -1921,8 +1954,19 @@ int main(int argc, char **argv)
             !expr_finite_weighted_cosh_lerch_value(expr, &value_number) &&
             !expr_finite_weighted_sin_lerch_value(expr, &value_number) &&
             !expr_finite_weighted_cos_lerch_value(expr, &value_number) &&
-            !expr_finite_qdigamma_progression_value(expr, &value_number))
+            !expr_finite_qdigamma_progression_value(expr, &value_number)) {
             value_number = expr_eval(expr);
+            if (num_is_zero(value_number) && display_expr != expr) {
+                number_t display_value = expr_eval(display_expr);
+
+                if (num_is_finite(display_value) && !num_is_zero(display_value)) {
+                    num_destroy(&value_number);
+                    value_number = display_value;
+                } else {
+                    num_destroy(&display_value);
+                }
+            }
+        }
 
         print_owned_number("value", num_clone(value_number), precision);
         if (expr_integral_value_note(expr, value_note, sizeof(value_note)))
@@ -1936,7 +1980,7 @@ int main(int argc, char **argv)
     if (wrt_is_variable && derivative_request) {
         expr_t *derivative_root_base = NULL;
         expr_t *weighted_derivative_source = NULL;
-        const expr_t *derivative_source = display_expr;
+        const expr_t *derivative_source = progression_closed_form ? expr : display_expr;
         bool used_atan_derivative_form = false;
         long derivative_root_order = 0L;
 
@@ -1950,7 +1994,9 @@ int main(int argc, char **argv)
             derivative_progression_source = expr_create_deriv(weighted_derivative_source, wrt);
             expr_free(weighted_derivative_source);
         }
-        deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
+        deriv = domain_specialised ? expr_domain_specialised_inverse_power_derivative(expr, bindings, wrt) : NULL;
+        if (!deriv)
+            deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
         used_atan_derivative_form = deriv != NULL;
         if (!deriv)
             deriv = expr_create_deriv(derivative_source, wrt);
@@ -2013,7 +2059,10 @@ int main(int argc, char **argv)
     if (integral_request) {
         if (wrt_is_variable) {
             const expr_t *integral_source =
-                progression_closed_form && expr_is_finite_inverse_progression(expr) ? expr : display_expr;
+                (complex_cartesian ||
+                 (progression_closed_form && expr_is_finite_inverse_progression(expr)))
+                    ? expr
+                    : display_expr;
 
             integral = expr_integrate_family(integral_source, wrt);
             if (!integral) {

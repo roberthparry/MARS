@@ -1918,7 +1918,7 @@ static void test_preserved_complex_function_addend_stays_ungrouped(void)
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *tex = expr ? expr_to_string(expr, style_LATEX) : NULL;
     const char *expect = "{ -c·exp(c) + W(-2) | c = -2 }";
-    const char *expect_TeX = "\\left\\{ -c\\,e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
+    const char *expect_TeX = "\\left\\{ -c\\mkern-2mu e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
 
     if (str_eq(text, expect))
         to_string_pass("preserved complex function addend stays ungrouped", text, expect);
@@ -2066,7 +2066,7 @@ static void test_atan_quotient_derivative_simplifies_to_quartic(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *text = derivative ? expr_to_string(derivative, style_EXPRESSION) : NULL;
-    const char *expect = "{ (x² + 1)/(x⁴ - x² + 1) | x = π/2 }";
+    const char *expect = "{ 1/(x⁴ - x² + 1)·(x² + 1) | x = π/2 }";
 
     if (text && str_eq(text, expect))
         to_string_pass("atan quotient derivative simplifies to quartic", text, expect);
@@ -2477,7 +2477,7 @@ static void test_negative_quotient_derivative_has_single_sign(void)
     expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
     expr_t *deriv = (expr && y) ? expr_create_deriv(expr, y) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *expect = "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | y = π/4, x = π/2 }";
+    const char *expect = "{ 2y·exp(tan(x))/((tan²(x) + 1)²·exp(2·tan(x)) + y²)²·(tan²(x) + 1) | y = π/4, x = π/2 }";
 
     if (str_eq(deriv_text, expect))
         to_string_pass("negative quotient derivative has a single sign", deriv_text, expect);
@@ -2976,11 +2976,11 @@ static void test_real_scalar_over_square_root_combines_into_one_root(void)
         to_string_fail(__FILE__, __LINE__, 1, "real scalar over square root combines into one root",
                        scalar_text ? scalar_text : "(null)", "√(³⁄₁₁)");
 
-    if (str_eq(scaled_text, "√(³⁄₁₁)·x"))
-        to_string_pass("leading real scalar over square root combines into one root", scaled_text, "√(³⁄₁₁)·x");
+    if (str_eq(scaled_text, "x·√(³⁄₁₁)"))
+        to_string_pass("leading real scalar over square root combines into one root", scaled_text, "x·√(³⁄₁₁)");
     else
         to_string_fail(__FILE__, __LINE__, 1, "leading real scalar over square root combines into one root",
-                       scaled_text ? scaled_text : "(null)", "√(³⁄₁₁)·x");
+                       scaled_text ? scaled_text : "(null)", "x·√(³⁄₁₁)");
 
     free(scaled_text);
     free(scalar_text);
@@ -3608,22 +3608,22 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
         const char *tex;
     } cases[] = {{"sqrt(-1)", "{ sqrt(-1) }", "i", "√(-1)",
                   "expression expr() {\n"
-                  "    return sqrt(-1);\n"
+                  "    return sqrt(-1).\n"
                   "}\n\n"
-                  "output(expr());",
+                  "output(expr()).",
                   "\\sqrt{-1}"},
                  {"sqrt(-4)", "{ sqrt(-4) }", "2i", "√(-4)",
                   "expression expr() {\n"
-                  "    return sqrt(-4);\n"
+                  "    return sqrt(-4).\n"
                   "}\n\n"
-                  "output(expr());",
+                  "output(expr()).",
                   "\\sqrt{-4}"},
                  {"sqrt(x) with x = -1", "{ sqrt(x) | x = -1 }", "i", "{ √(x) | x = -1 }",
                   "expression expr(x) {\n"
-                  "    return sqrt(x);\n"
+                  "    return sqrt(x).\n"
                   "}\n\n"
-                  "x = -1\n"
-                  "output(expr(x));",
+                  "x = -1.\n"
+                  "output(expr(x)).",
                   "\\left\\{ \\sqrt{x} \\;\\middle|\\; x = -1 \\right\\}"}};
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3660,7 +3660,7 @@ static void test_symbolic_complex_square_root_beautifies_to_cartesian_form(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "√(½·(√(x² + y²) + x)) + i·y/|y|·√(½·(√(x² + y²) - x))");
+                       "√(½·(√(x² + y²) + x)) + y/|y|·√(½·(√(x² + y²) - x))·i");
 
     free(text);
     expr_free(beautified);
@@ -3717,7 +3717,7 @@ static void test_exact_complex_square_root_beautifies_to_cartesian_surds(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "√(½·(√(13) + 2)) + i·√(½·(√(13) - 2))");
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(13) + 2)) + √(½·(√(13) - 2))·i");
 
     free(text);
     expr_free(beautified);
@@ -3734,7 +3734,7 @@ static void test_unit_complex_square_root_keeps_conjugate_surds_together(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))");
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + √(½·(√(2) - 1))·i");
 
     free(text);
     expr_free(beautified);
@@ -3751,7 +3751,7 @@ static void test_unit_complex_cube_root_beautifies_to_cartesian_surds(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + i·(√(3) - 1))");
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -3768,7 +3768,7 @@ static void test_conjugate_unit_complex_cube_root_keeps_cartesian_surd_symmetry(
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 - i·(√(3) - 1))");
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 - (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -3785,7 +3785,7 @@ static void test_root_order_three_uses_the_principal_cube_root_beautification(vo
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + i·(√(3) - 1))");
+    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -3804,7 +3804,7 @@ static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
                        "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-                       "i·√(root(2, 4) - √(1/2·(√(2) + 1))))");
+                       "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)");
 
     free(text);
     expr_free(beautified);
@@ -3823,7 +3823,7 @@ static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetr
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
                        "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) - "
-                       "i·√(root(2, 4) - √(1/2·(√(2) + 1))))");
+                       "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)");
 
     free(text);
     expr_free(beautified);

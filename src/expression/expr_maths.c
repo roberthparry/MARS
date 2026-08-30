@@ -2135,11 +2135,9 @@ expr_t *deriv_harmonic_poly(expr_t *dv)
     expr_t *out = NULL;
 
     if (!num_is_zero(degree_derivative_value)) {
-        num_destroy(&degree_derivative_value);
         expr_free(degree_derivative);
         return expr_new_const(NUM_NAN);
     }
-    num_destroy(&degree_derivative_value);
     expr_free(degree_derivative);
 
     one = expr_new_const(NUM_ONE);

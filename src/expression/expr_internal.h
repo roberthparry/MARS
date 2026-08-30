@@ -896,6 +896,7 @@ bool expr_is_named_const(const expr_t *dv);
 bool expr_is_summation(const expr_t *expr);
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
 expr_t *expr_clone(const expr_t *expr);
+expr_t *expr_clone_linked_symbols(const expr_t *expr, const expr_t *source);
 expr_t *expr_const_zero(void);
 expr_t *expr_const_one(void);
 expr_t *expr_const_long(long value);
@@ -1030,6 +1031,7 @@ void expr_binding_exact_complex_clear(binding_exact_complex_t *value);
 bool expr_exact_complex_value(const expr_t *expr, binding_exact_complex_t *out);
 bool expr_exact_complex_rational_power(const binding_exact_complex_t *base, number_t exponent, number_t *value_out);
 bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
+bool expr_exact_principal_sqrt_seed(const expr_t *expr, number_t *seed_out);
 bool expr_explicit_root_order(const expr_t *expr, long *order_out);
 
 /* Precision-sensitive binding evaluation. */

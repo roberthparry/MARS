@@ -897,6 +897,11 @@ static int parse_number_view(string_view_t text, number_t *out)
     if (atom_len != len)
         return 0;
 
+    if (expr_parse_view_starts_with_text(text, "@inf", true)) {
+        *out = num_clone(NUM_INF);
+        return 1;
+    }
+
     literal = string_from_view(&text);
     if (!literal)
         return 0;

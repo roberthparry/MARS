@@ -450,9 +450,12 @@
       "test_expr_t_from_string": {
         "enabled": true,
         "test_binding_edit_is_owned_by_expression_library": true,
+        "test_binding_edit_preserves_array_value": true,
         "test_binding_edit_preserves_symbolic_value": true,
         "test_from_expression_string_api": true,
+        "test_from_function_body_syntax": true,
         "test_from_string_arithmetic": true,
+        "test_from_string_array_bindings": true,
         "test_from_string_ascii_alternatives": {
           "enabled": true,
           "test_from_string_composed": true,
@@ -472,6 +475,7 @@
         "test_from_string_exact_value_functions": true,
         "test_from_string_function_hash": true,
         "test_from_string_functions": true,
+        "test_from_string_greek_binding_lookup": true,
         "test_from_string_implicit_symbolic_bindings": true,
         "test_from_string_name_normalisation": true,
         "test_from_string_named_consts": true,
@@ -481,7 +485,8 @@
         "test_from_string_series_ellipsis": true,
         "test_from_string_special_functions": true,
         "test_from_string_unevaluated_integral": true,
-        "test_from_text_api": true
+        "test_from_text_api": true,
+        "test_greek_symbol_reverse_perfect_hash": true
       }
     }
   },
@@ -535,7 +540,12 @@
         "test_integrate_more_by_parts": true,
         "test_integrate_negative_quadratic_exponential": true,
         "test_integrate_other_variable_as_constant": true,
-        "test_integrate_partial_fractions": true,
+        "test_integrate_partial_fractions_distinct_linear_factors": true,
+        "test_integrate_partial_fractions_four_linear_factors": true,
+        "test_integrate_partial_fractions_improper_quartic": true,
+        "test_integrate_partial_fractions_linear_numerator": true,
+        "test_integrate_partial_fractions_quadratic_difference": true,
+        "test_integrate_partial_fractions_quartic_arctangent": true,
         "test_integrate_partial_symbolic_with_unevaluated_term": true,
         "test_integrate_poly_over_centered_quadratic": true,
         "test_integrate_poly_times_affine_power": true,
@@ -544,7 +554,16 @@
         "test_integrate_power_composed_bessel_j_family": true,
         "test_integrate_power_composed_bessel_y_family": true,
         "test_integrate_power_composed_lommel_s_family": true,
+        "test_integrate_quotient_rule_cubic_power": true,
         "test_integrate_quotient_rule_derivative": true,
+        "test_integrate_quotient_rule_eleventh_power": true,
+        "test_integrate_quotient_rule_first_derivative": true,
+        "test_integrate_quotient_rule_quartic_power": true,
+        "test_integrate_quotient_rule_reciprocal_square": true,
+        "test_integrate_quotient_rule_reducible_quadratic": true,
+        "test_integrate_quotient_rule_second_derivative": true,
+        "test_integrate_quotient_rule_sixth_power": true,
+        "test_integrate_quotient_rule_very_high_power": true,
         "test_integrate_reciprocal_and_log": true,
         "test_integrate_scaled_symbolic_sum_before_product_search": true,
         "test_integrate_sec_double_angle_log_tan_cot": true,
@@ -694,6 +713,7 @@
         "test_unit_complex_cube_root_beautifies_to_cartesian_surds": true,
         "test_unit_complex_fourth_root_beautifies_to_cartesian_surds": true,
         "test_unit_complex_square_root_keeps_conjugate_surds_together": true,
+        "test_unresolved_zero_over_zero_returns_nan_without_recursing": true,
         "test_updated_decimal_binding_stays_decimal": true
       }
     }
@@ -712,6 +732,7 @@
         "test_reverse_hypergeometric_argument": true,
         "test_reverse_lauricella_variables": true,
         "test_reverse_matches_symbolic_composite": true,
+        "test_reverse_qdigamma_arguments": true,
         "test_reverse_special_function_arguments": true
       }
     }
@@ -734,6 +755,7 @@
         "test_second_deriv_atan_x_over_sqrt": true,
         "test_second_deriv_atanh": true,
         "test_second_deriv_beta": true,
+        "test_second_deriv_complex_product": true,
         "test_second_deriv_composite": true,
         "test_second_deriv_cos": true,
         "test_second_deriv_cosh": true,
@@ -826,11 +848,15 @@
           "test_to_string_function_style": {
             "enabled": true,
             "test_to_string_function_style_expr": true,
+            "test_to_string_function_style_extracts_shared_quotient_factor": true,
+            "test_to_string_function_style_extracts_short_shared_dag_nodes": true,
+            "test_to_string_function_style_extracts_variable_dependent_dag_nodes": true,
             "test_to_string_function_style_func": true,
             "test_to_string_function_style_preserves_math_names": true,
             "test_to_string_function_style_signed_sum": true,
             "test_to_string_function_style_sub_negative_product": true
           },
+          "test_to_string_function_uses_lowercase_builtin_names": true,
           "test_to_string_gamma_polygamma_standard_names": true,
           "test_to_string_gammainv_TeX": true,
           "test_to_string_lambert_w_TeX": true,
@@ -856,6 +882,7 @@
             "test_to_string_complex_const_pow_TeX": true,
             "test_to_string_complex_const_pow_expr": true,
             "test_to_string_complex_const_pow_func": true,
+            "test_to_string_negative_const_power_base_is_grouped": true,
             "test_to_string_parsed_complex_const_pow_TeX": true,
             "test_to_string_parsed_complex_const_pow_expr": true,
             "test_to_string_pow_superscript_expr": true,

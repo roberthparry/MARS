@@ -42,6 +42,7 @@ static bool expr_simplify_collect_poly_local(const expr_t *expr, const expr_t *v
 static expr_t *expr_simplify_build_flat_poly_local(const expr_t *var, const number_t *coeffs, size_t n);
 static int expr_simplify_exact_sqrt_radicand_local(const expr_t *expr, number_t *radicand_out);
 static expr_t *expr_simplify_try_rational_atan_denominator_local(const expr_t *numerator, const expr_t *denominator);
+static expr_t *expr_simplify_try_cartesian_root_local(const expr_t *base);
 
 static void *expr_xrealloc(void *ptr, size_t size)
 {
@@ -59,6 +60,37 @@ static inline expr_t *expr_new_const_owned_local(number_t value)
     NUM_SCOPE_SUSPEND(saved_scope);
     expr_t *out = expr_new_const(value);
 
+    return out;
+}
+
+static expr_t *expr_new_cartesian_const_local(number_t value)
+{
+    number_t real_value = num_real_part(value);
+    number_t imaginary_value = num_imag_part(value);
+    number_t imaginary_magnitude = num_abs(imaginary_value);
+    expr_t *real = expr_new_const(real_value);
+    expr_t *magnitude = expr_new_const(imaginary_magnitude);
+    expr_t *imaginary_unit = expr_new_const(NUM_I);
+    expr_t *imaginary_term = NULL;
+    expr_t *out = NULL;
+
+    if (magnitude && imaginary_unit)
+        imaginary_term = num_is_one(imaginary_magnitude) ? expr_clone(imaginary_unit)
+                                                         : expr_mul(magnitude, imaginary_unit);
+    if (imaginary_term) {
+        if (num_is_zero(real_value))
+            out = num_sign(imaginary_value) < 0 ? expr_neg(imaginary_term) : expr_clone(imaginary_term);
+        else
+            out = num_sign(imaginary_value) < 0 ? expr_sub(real, imaginary_term) : expr_add(real, imaginary_term);
+    }
+
+    expr_free(imaginary_term);
+    expr_free(imaginary_unit);
+    expr_free(magnitude);
+    expr_free(real);
+    num_destroy(&imaginary_magnitude);
+    num_destroy(&imaginary_value);
+    num_destroy(&real_value);
     return out;
 }
 
@@ -4722,6 +4754,17 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
 
+    if (expr_const_is_one(a) &&
+        (expr_is_addsub(b) ||
+         (expr_is_op(b, &ops_mul) && (expr_is_addsub(b->a) || expr_is_addsub(b->b))))) {
+        expr_t *cartesian_root = expr_simplify_try_cartesian_root_local(b);
+
+        if (cartesian_root) {
+            expr_free(b);
+            b = cartesian_root;
+        }
+    }
+
     {
         expr_t *tangent_sum = expr_simplify_try_tangent_addition_quotient(a, b);
 
@@ -5343,6 +5386,11 @@ static expr_t *expr_simplify_try_cartesian_root_local(const expr_t *base)
     bool sum_is_subtraction;
     bool matched_real_sum;
     expr_t *absolute_imaginary = NULL;
+    expr_t *imaginary_orientation = NULL;
+    expr_t *oriented_imaginary_root = NULL;
+    expr_t *expected_oriented_raw = NULL;
+    expr_t *expected_oriented = NULL;
+    expr_t *actual_oriented = NULL;
     expr_t *imaginary_unit = NULL;
     expr_t *actual_scaled_raw = NULL;
     expr_t *actual_scaled = NULL;
@@ -5406,7 +5454,13 @@ static expr_t *expr_simplify_try_cartesian_root_local(const expr_t *base)
     expected_scaled_product = imaginary_unit ? expr_mul(imaginary_unit, imaginary_part) : NULL;
     expected_scaled_raw = expected_scaled_product ? expr_mul(expected_scaled_product, imaginary_root) : NULL;
     expected_scaled = expected_scaled_raw ? expr_simplify(expected_scaled_raw) : NULL;
-    if (!actual_scaled || !expected_scaled || !expr_struct_eq(actual_scaled, expected_scaled))
+    imaginary_orientation = absolute_imaginary ? expr_div(imaginary_part, absolute_imaginary) : NULL;
+    oriented_imaginary_root = imaginary_orientation ? expr_mul(imaginary_orientation, imaginary_root) : NULL;
+    expected_oriented_raw = oriented_imaginary_root ? expr_mul(imaginary_unit, oriented_imaginary_root) : NULL;
+    expected_oriented = expected_oriented_raw ? expr_simplify(expected_oriented_raw) : NULL;
+    actual_oriented = expr_simplify(imaginary_term);
+    if ((!actual_scaled || !expected_scaled || !expr_struct_eq(actual_scaled, expected_scaled)) &&
+        (!actual_oriented || !expected_oriented || !expr_struct_eq(actual_oriented, expected_oriented)))
         goto cleanup;
 
     imaginary_product = expr_mul(imaginary_unit, imaginary_part);
@@ -5419,6 +5473,11 @@ static expr_t *expr_simplify_try_cartesian_root_local(const expr_t *base)
 cleanup:
     expr_free(raw_result);
     expr_free(imaginary_product);
+    expr_free(actual_oriented);
+    expr_free(expected_oriented);
+    expr_free(expected_oriented_raw);
+    expr_free(oriented_imaginary_root);
+    expr_free(imaginary_orientation);
     expr_free(expected_scaled);
     expr_free(expected_scaled_raw);
     expr_free(expected_scaled_product);
@@ -5966,6 +6025,18 @@ expr_t *expr_simplify(const expr_t *dv)
 
     if (!dv)
         return NULL;
+    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        dv->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        number_t exact_sqrt_seed = num_new();
+
+        if (expr_exact_principal_sqrt_seed(dv, &exact_sqrt_seed)) {
+            out = num_is_real(exact_sqrt_seed) ? expr_new_const(exact_sqrt_seed)
+                                               : expr_new_cartesian_const_local(exact_sqrt_seed);
+            num_destroy(&exact_sqrt_seed);
+            return out;
+        }
+        num_destroy(&exact_sqrt_seed);
+    }
     if (simplify_depth >= 128u) {
         expr_retain(dv);
         return (expr_t *)dv;

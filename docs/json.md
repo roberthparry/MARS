@@ -259,3 +259,19 @@ All declarations are in `include/json.h`.
 - `const string_t *json_object_key_at(const json_t *json, size_t index)` — borrow the key at an index
 - `const json_t *json_object_value_at(const json_t *json, size_t index)` — borrow the value at an index
 - `bool json_object_set(json_t *json, const string_t *key, const json_t *value)` — set a copied value
+
+### `json_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+json_t *json_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `json_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool json_serialize(const json_t *json, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```

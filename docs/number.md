@@ -751,3 +751,261 @@ Results (microseconds per call):
 | `num_E1(5)` | `386.5 µs` | `630.2 µs` | `880.3 µs` | `1.124 ms` | `1.081 ms` | `1.481 ms` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](./benchmarks.md).
+
+## API Reference
+
+### `num_constant_name()`
+
+Returns the public result described by constant name.
+
+```c
+const char *num_constant_name(number_t value);
+```
+
+### `num_constant_value()`
+
+Reports whether the condition described by constant value holds.
+
+```c
+bool num_constant_value(const char *text, number_t *out);
+```
+
+### `num_constant_value_text()`
+
+Reports whether the condition described by constant value text holds.
+
+```c
+bool num_constant_value_text(const string_t *text, number_t *out);
+```
+
+### `num_create_from_text()`
+
+Creates or reconstructs the public value described by create from text.
+
+```c
+number_t num_create_from_text(const string_t *text);
+```
+
+### `num_destroy_slow()`
+
+Performs the public operation described by destroy slow.
+
+```c
+void num_destroy_slow(number_t *number);
+```
+
+### `num_factors_free()`
+
+Releases or clears the resources associated with factors free.
+
+```c
+void num_factors_free(number_factors_t *factors);
+```
+
+### `num_get_effective_prec_bits()`
+
+Returns the public result described by get effective prec bits.
+
+```c
+size_t num_get_effective_prec_bits(const number_t number);
+```
+
+### `num_get_mantissa_bits()`
+
+Returns the public result described by get mantissa bits.
+
+```c
+size_t num_get_mantissa_bits(const number_t number);
+```
+
+### `num_get_mantissa_u64()`
+
+Reports whether the condition described by get mantissa u64 holds.
+
+```c
+bool num_get_mantissa_u64(const number_t number, uint64_t *out);
+```
+
+### `num_is_exact()`
+
+Reports whether the condition described by is exact holds.
+
+```c
+bool num_is_exact(const number_t number);
+```
+
+### `num_is_finite()`
+
+Reports whether the condition described by is finite holds.
+
+```c
+bool num_is_finite(const number_t number);
+```
+
+### `num_is_inf()`
+
+Reports whether the condition described by is inf holds.
+
+```c
+bool num_is_inf(const number_t number);
+```
+
+### `num_is_integer()`
+
+Reports whether the condition described by is integer holds.
+
+```c
+bool num_is_integer(const number_t number);
+```
+
+### `num_is_nan()`
+
+Reports whether the condition described by is nan holds.
+
+```c
+bool num_is_nan(const number_t number);
+```
+
+### `num_is_one()`
+
+Reports whether the condition described by is one holds.
+
+```c
+bool num_is_one(const number_t number);
+```
+
+### `num_pow10()`
+
+Returns the public result described by pow10.
+
+```c
+number_t num_pow10(int exponent10);
+```
+
+### `num_scope_is_active()`
+
+Reports whether the condition described by scope is active holds.
+
+```c
+bool num_scope_is_active(void);
+```
+
+### `num_set_from_string()`
+
+Creates or reconstructs the public value described by set from string.
+
+```c
+int num_set_from_string(number_t *number, const char *text);
+```
+
+### `num_set_from_text()`
+
+Creates or reconstructs the public value described by set from text.
+
+```c
+int num_set_from_text(number_t *number, const string_t *text);
+```
+
+### `num_sign()`
+
+Returns the public result described by sign.
+
+```c
+int num_sign(const number_t number);
+```
+
+### `num_sprintf_text()`
+
+Returns the public result described by sprintf text.
+
+```c
+string_t *num_sprintf_text(const char *fmt, ...);
+```
+
+### `num_to_double()`
+
+Returns the public result described by to double.
+
+```c
+double num_to_double(const number_t number);
+```
+
+### `num_to_qfloat()`
+
+Returns the public result described by to qfloat.
+
+```c
+qfloat_t num_to_qfloat(const number_t number);
+```
+
+### `num_vsprintf_text()`
+
+Returns the public result described by vsprintf text.
+
+```c
+string_t *num_vsprintf_text(const char *fmt, va_list ap);
+```
+
+### `number_inline_kind()`
+
+Returns the public result described by inline kind.
+
+```c
+static inline uint32_t number_inline_kind(number_t number);
+```
+
+### `number_inline_make_qcomplex()`
+
+Returns the public result described by inline make qcomplex.
+
+```c
+static inline number_t number_inline_make_qcomplex(qcomplex_t value);
+```
+
+### `number_inline_make_qcomplex_parts()`
+
+Returns the public result described by inline make qcomplex parts.
+
+```c
+static inline number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag);
+```
+
+### `number_inline_make_qfloat()`
+
+Returns the public result described by inline make qfloat.
+
+```c
+static inline number_t number_inline_make_qfloat(qfloat_t value);
+```
+
+### `number_inline_qcomplex()`
+
+Returns the public result described by inline qcomplex.
+
+```c
+static inline qcomplex_t number_inline_qcomplex(number_t number);
+```
+
+### `number_inline_qcomplex_imag()`
+
+Returns the public result described by inline qcomplex imag.
+
+```c
+static inline qfloat_t number_inline_qcomplex_imag(number_t number);
+```
+
+### `number_inline_qcomplex_real()`
+
+Returns the public result described by inline qcomplex real.
+
+```c
+static inline qfloat_t number_inline_qcomplex_real(number_t number);
+```
+
+### `number_inline_qfloat()`
+
+Returns the public result described by inline qfloat.
+
+```c
+static inline qfloat_t number_inline_qfloat(number_t number);
+```

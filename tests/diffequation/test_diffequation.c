@@ -314,9 +314,9 @@ static void test_diffequ_solves_exact_differential_form(void)
                 (long)DE_SOLVER_EXACT_FIRST_ORDER);
     EXPECT_LONG("exact differential-form solution count", result ? (long)de_solve_result_count(result) : -1L, 2L);
     EXPECT_TEXT("exact differential-form positive branch", positive_text ? string_c_str(positive_text) : NULL,
-                "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
+                "r = 1/(2·cos²(θ))·(sin(θ) - √(sin²(θ) - C·cos²(θ)))");
     EXPECT_TEXT("exact differential-form negative branch", negative_text ? string_c_str(negative_text) : NULL,
-                "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
+                "r = 1/(2·cos²(θ))·(sin(θ) + √(sin²(θ) - C·cos²(θ)))");
 
     string_free(negative_text);
     string_free(positive_text);
@@ -443,7 +443,8 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
                 "x = C₁·cos(t) + C₂·sin(t)");
     EXPECT_TEXT("ordinary derivative fraction input",
                 fraction_equation_text ? string_c_str(fraction_equation_text) : NULL, "Dxx(y) + 4y = 0");
-    EXPECT_TEXT("ordinary derivative fraction TeX", fraction_TeX, "\\frac{d^{2} y}{d x^{2}} + 4 y = 0");
+    EXPECT_TEXT("ordinary derivative fraction TeX", fraction_TeX,
+                "\\frac{d^{2} y}{d x^{2}} + 4\\mkern-2mu y = 0");
 
     free(fraction_TeX);
     string_free(fraction_equation_text);
@@ -518,11 +519,11 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
     EXPECT_TEXT("Unicode repeated partial derivatives",
                 unicode_repeated_text ? string_c_str(unicode_repeated_text) : NULL, "Dxx(u) + Dyy(u) = 0");
     EXPECT_TEXT("visually short PDE stays on one line", compact_TeX,
-                "x \\cdot \\left(y - z\\right) \\cdot "
+                "x\\mkern-2mu \\left(y - z\\right)\\mkern-2mu "
                 "\\frac{\\partial z}{\\partial x} + "
-                "y \\cdot \\left(z - x\\right) \\cdot "
+                "y\\mkern-2mu \\left(z - x\\right)\\mkern-2mu "
                 "\\frac{\\partial z}{\\partial y} = "
-                "z \\cdot \\left(x - y\\right)");
+                "z\\mkern-2mu \\left(x - y\\right)");
 
     free(compact_TeX);
     string_free(unicode_repeated_text);
@@ -613,7 +614,7 @@ static void test_diffequ_solves_linear_initial_value_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     EXPECT_POINTER("linear solution text", text, true);
     if (text)
-        EXPECT_TEXT("linear solution", string_c_str(text), "y = ((x - 1)·exp(x) + 1)/exp(x)");
+        EXPECT_TEXT("linear solution", string_c_str(text), "y = 1/exp(x)·((x - 1)·exp(x) + 1)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -712,7 +713,7 @@ static void test_diffequ_solves_rational_integrating_factor_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     EXPECT_POINTER("rational integrating-factor solution text", text, true);
     if (text)
-        EXPECT_TEXT("rational integrating-factor solution", string_c_str(text), "y = (x⁴ + 3)/(4x)");
+        EXPECT_TEXT("rational integrating-factor solution", string_c_str(text), "y = ¼/x·(x⁴ + 3)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -745,7 +746,7 @@ static void test_diffequ_linear_solution_retains_arbitrary_constant(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     EXPECT_POINTER("unconditioned linear solution text", text, true);
     if (text)
-        EXPECT_TEXT("unconditioned linear solution", string_c_str(text), "y = (C + (x - 1)·exp(x))/exp(x)");
+        EXPECT_TEXT("unconditioned linear solution", string_c_str(text), "y = 1/exp(x)·(C + (x - 1)·exp(x))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -779,7 +780,7 @@ static void test_diffequ_linear_solution_uses_special_function(void)
     EXPECT_POINTER("special-function solution text", text, true);
     if (text)
         EXPECT_TEXT("special-function linear solution", string_c_str(text),
-                    "y = ½·√(π)·(erf(x·√(-1)) - erf(0))/(√(-1)·exp(x²))");
+                    "y = √(π)/(2·√(-1)·exp(x²))·(erf(x·√(-1)) - erf(0))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1280,7 +1281,7 @@ static void test_diffequ_linearizes_exact_third_order_problem(void)
                                      "c_(-1) = 0",
                                      "c_(-2) = 0",
                                      "c_(-3) = 0",
-                                     "c_(n + 2) = (C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))"};
+                                     "c_(n + 2) = 1/(2·(n + 2)·(n + 1))·(C₁·c_(n) + c_(n - 3))"};
     diffequ_t *de = de_from_string("y''' + y''*y' = 3x^2");
     diffequ_solve_result_t *result;
 
@@ -1353,7 +1354,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     const char *source = "y'' + 3yy' + y^3 = 0";
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
-    const char *expected = "y = (2x + C₁)/(x² + C₁x + C₂)";
+    const char *expected = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
 
     EXPECT_POINTER("parsed modified-Emden problem", de, true);
     EXPECT_POINTER("modified-Emden solve result", result, true);
@@ -1420,7 +1421,8 @@ static void test_diffequ_linearizes_scaled_modified_emden_problem(void)
     EXPECT_POINTER("scaled modified-Emden X substitution", strstr(de_solve_result_steps(result), "X = x − 1/(2y)"),
                    true);
     if (text)
-        EXPECT_TEXT("scaled modified-Emden solution", string_c_str(text), "y = (2x + C₁)/(2·(x² + C₁x + C₂))");
+        EXPECT_TEXT("scaled modified-Emden solution", string_c_str(text),
+                    "y = 1/(2·(x² + C₁x + C₂))·(2x + C₁)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1461,7 +1463,7 @@ static void test_diffequ_modified_emden_uses_coefficient_rule(void)
     EXPECT_LONG("coefficient-derived Emden status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_POINTER("coefficient-derived Emden scale", strstr(de_solve_result_steps(result), "3(3)"), true);
     EXPECT_TEXT("coefficient-derived Emden solution", text ? string_c_str(text) : NULL,
-                "y = (2x + C₁)/(3·(x² + C₁x + C₂))");
+                "y = 1/(3·(x² + C₁x + C₂))·(2x + C₁)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2128,29 +2130,29 @@ static void test_diffequ_defaults_bare_differential_operator(void)
             "(D^2 + @omega^2)^4x = 0",
             "{ d⁸x/dt⁸ + 4ω²*d⁶x/dt⁶ + 6ω⁴*d⁴x/dt⁴ + "
             "4ω⁶*d²x/dt² + ω⁸*x = 0 | t = ?; ;  }",
-            "x = (Σ_(k=0)^3 C_(k + 1)·t^k)·cos(ωt) + "
-            "(Σ_(k=0)^3 C_(k + 5)·t^k)·sin(ωt)",
+            "x = Σ_(k=0)^3 C_(k + 1)·t^k·cos(ωt) + "
+            "Σ_(k=0)^3 C_(k + 5)·t^k·sin(ωt)",
         },
         {
             "(D^2 + @omega^2)^4phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
-            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
+            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4@phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
-            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
+            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4φ = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
-            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
+            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
+            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
         },
     };
     bool valid = true;
@@ -2188,8 +2190,8 @@ static void test_diffequ_solves_maximum_repeated_quadratic_power(void)
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
-                 strcmp(string_c_str(text), "x = (Σ_(k=0)^63 C_(k + 1)·t^k)·cos(ωt) + "
-                                            "(Σ_(k=0)^63 C_(k + 65)·t^k)·sin(ωt)") == 0;
+                 strcmp(string_c_str(text), "x = Σ_(k=0)^63 C_(k + 1)·t^k·cos(ωt) + "
+                                            "Σ_(k=0)^63 C_(k + 65)·t^k·sin(ωt)") == 0;
 
     string_free(text);
     de_solve_result_free(result);
@@ -2347,7 +2349,7 @@ static void test_diffequ_solves_scaled_coordinate_characteristics(void)
     EXPECT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0", "z = ½·(2·F(y/(x² + 1)) + y)");
     EXPECT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0; "
                                    "z(x, 1) = (x^2+1)^2",
-                                   "z = ½·(y + 2·((x² + 1)/y)² - 1)");
+                                   "z = ½·(y + 2·(1/y·(x² + 1))² - 1)");
 }
 
 static void test_diffequ_solves_exponential_characteristics(void)
@@ -2523,7 +2525,7 @@ static void test_diffequ_solves_quadratic_characteristic_evolution(void)
     EXPECT_LONG("quadratic characteristic status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("quadratic characteristic solution count", (long)de_solve_result_count(result), 2L);
     EXPECT_TEXT("quadratic characteristic general solution", general_text ? string_c_str(general_text) : NULL,
-                "z = 1/(F(1/x - 1/y) + 1/x)");
+                "z = 1/(F(1·(1/x - 1/y)) + 1/x)");
     EXPECT_TEXT("quadratic characteristic singular solution", singular_text ? string_c_str(singular_text) : NULL,
                 "z = 0");
 
@@ -2709,9 +2711,9 @@ static void test_diffequ_solves_monomial_linear_characteristic_pde(void)
     char *tex = de ? de_to_string(de, style_LATEX) : NULL;
 
     EXPECT_TEXT("Greek dependent-symbol TeX", tex,
-                "x^{2} \\cdot \\frac{\\partial \\psi}{\\partial x} - "
-                "x y \\cdot \\frac{\\partial \\psi}{\\partial y} + "
-                "\\psi y = 0");
+                "x^{2}\\mkern-2mu \\frac{\\partial \\psi}{\\partial x} - "
+                "x\\mkern-2mu y\\mkern-2mu \\frac{\\partial \\psi}{\\partial y} + "
+                "\\psi\\mkern-2mu y = 0");
     EXPECT_CHARACTERISTIC_SOLUTION(source, "ψ = F(xy)·exp(½·1/x·y)");
 
     free(tex);
@@ -2763,7 +2765,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
     EXPECT_TEXT("single-coordinate subscript remains a partial derivative", problem,
                 "{ ∂z/∂y + 2*y*z = x*y^3 | y = ?; ;  }");
     EXPECT_TEXT("single-coordinate subscript partial derivative TeX", tex,
-                "\\frac{\\partial z}{\\partial y} + 2 y z = x y^{3}");
+                "\\frac{\\partial z}{\\partial y} + 2\\mkern-2mu y\\mkern-2mu z = x\\mkern-2mu y^{3}");
     EXPECT_TEXT("parameter-linear PDE solution", text ? string_c_str(text) : NULL, "z = ½x·(y² - 1) + F(x)·exp(-y²)");
     EXPECT_POINTER("parameter-linear PDE integrating-factor derivation", result ? de_solve_result_steps(result) : NULL,
                    true);
@@ -2827,12 +2829,12 @@ static void test_diffequ_parameter_linear_pde_accepts_parameter_rate(void)
            "    input:    %s\n"
            "    expected: %s\n"
            "    actual:   %s\n",
-           source, "z = ¾y/x² - ¾y²/x - ⅜/x³ + ½y³ + F(x)·exp(-2xy)", text ? string_c_str(text) : "NULL");
+           source, "z = ¾y/x² - ¾y²/x + ½y³ - ⅜/x³ + F(x)·exp(-2xy)", text ? string_c_str(text) : "NULL");
     EXPECT_LONG("parameter-rate PDE status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("parameter-rate PDE solver", (long)de_solve_result_solver(result),
                 (long)DE_SOLVER_PARAMETER_LINEAR_PDE);
     EXPECT_TEXT("parameter-rate PDE solution", text ? string_c_str(text) : NULL,
-                "z = ¾y/x² - ¾y²/x - ⅜/x³ + ½y³ + F(x)·exp(-2xy)");
+                "z = ¾y/x² - ¾y²/x + ½y³ - ⅜/x³ + F(x)·exp(-2xy)");
     EXPECT_POINTER("parameter-rate PDE derivation", steps, true);
     if (steps) {
         EXPECT_POINTER("parameter-rate derivation identifies parameter",
@@ -2893,7 +2895,7 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
                                  "      X = x − 1/y\n"
                                  "      Y = x/y − x²/2\n"
                                  "and d²Y/dX² = 0.";
-    const char *expected_solution = "y = (2x + C₁)/(x² + C₁x + C₂)";
+    const char *expected_solution = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
     diffequ_t *ode = de_from_string(source);
     diffequ_solve_result_t *result = ode ? de_solve_with_options(ode, DE_SOLVE_OPTION_STEPS) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;

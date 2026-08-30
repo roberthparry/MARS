@@ -147,6 +147,30 @@ typedef int  (*array_cmp_fn)(const void *a, const void *b);
 
 ---
 
+### `array_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+array_t *array_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `array_elem_size()`
+
+Returns the public result described by elem size.
+
+```c
+size_t array_elem_size(const array_t *arr);
+```
+
+### `array_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool array_serialize(const array_t *arr, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
 ## `array_slice_t`
 
 A lightweight view into a subrange of an `array_t`. Slices do not copy elements — they hold a reference to the parent array and an index mapping. View operations (sort, swap, rotate) reorder the mapping without touching the underlying array.

@@ -181,7 +181,13 @@ bool expr_parse_view_starts_with_text(string_view_t view, const char *text, bool
 size_t expr_parse_scan_special_number_len(string_view_t view, string_pos_t pos, bool include_unicode_infinity,
                                           bool require_identifier_boundary)
 {
-    static const expr_parse_literal_t specials[] = {{.text = "infinity"}, {.text = "nan"}, {.text = "inf"}};
+    static const expr_parse_literal_t specials[] = {
+        {.text = "@infinity"},
+        {.text = "infinity" },
+        {.text = "@inf"     },
+        {.text = "nan"      },
+        {.text = "inf"      },
+    };
     string_view_t remaining =
         string_view_slice(view, pos, string_view_length(view) > pos ? string_view_length(view) - pos : 0u);
     uint32_t value = 0u;

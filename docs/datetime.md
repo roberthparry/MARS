@@ -360,3 +360,267 @@ All counts may be negative (subtract by passing a negative value).
 ### Weekday Navigation
 
 - `datetime_t *datetime_next_weekday(const datetime_t *dttm, weekday_t weekday)` — return a newly allocated `datetime_t` for the next occurrence of `weekday` after `dttm`; caller must free. Returns NULL if `dttm` is uninitialised.
+
+### `datetime_delta_t_seconds()`
+
+Returns the public result described by delta t seconds.
+
+```c
+double datetime_delta_t_seconds(int year);
+```
+
+### `datetime_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+datetime_t *datetime_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `datetime_format_text()`
+
+Returns the public result described by format text.
+
+```c
+string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
+```
+
+### `datetime_from_string()`
+
+Creates or reconstructs the public value described by from string.
+
+```c
+datetime_t *datetime_from_string(const char *text);
+```
+
+### `datetime_init_aztec_nemontemi_start()`
+
+Returns the public result described by init aztec nemontemi start.
+
+```c
+datetime_t *datetime_init_aztec_nemontemi_start(datetime_t *dttm, int year);
+```
+
+### `datetime_init_aztec_xiuhpohualli_new_year()`
+
+Returns the public result described by init aztec xiuhpohualli new year.
+
+```c
+datetime_t *datetime_init_aztec_xiuhpohualli_new_year(datetime_t *dttm, int year);
+```
+
+### `datetime_init_cherokee_great_new_moon_festival()`
+
+Returns the public result described by init cherokee great new moon festival.
+
+```c
+datetime_t *datetime_init_cherokee_great_new_moon_festival(datetime_t *dttm, int year);
+```
+
+### `datetime_init_cherokee_green_corn_ceremony()`
+
+Returns the public result described by init cherokee green corn ceremony.
+
+```c
+datetime_t *datetime_init_cherokee_green_corn_ceremony(datetime_t *dttm, int year);
+```
+
+### `datetime_init_cherokee_new_moon_festival()`
+
+Returns the public result described by init cherokee new moon festival.
+
+```c
+datetime_t *datetime_init_cherokee_new_moon_festival(datetime_t *dttm, int year);
+```
+
+### `datetime_init_cherokee_ripe_corn_ceremony()`
+
+Returns the public result described by init cherokee ripe corn ceremony.
+
+```c
+datetime_t *datetime_init_cherokee_ripe_corn_ceremony(datetime_t *dttm, int year);
+```
+
+### `datetime_init_ethiopian_new_year()`
+
+Returns the public result described by init ethiopian new year.
+
+```c
+datetime_t *datetime_init_ethiopian_new_year(datetime_t *dttm, int year);
+```
+
+### `datetime_init_fasika()`
+
+Returns the public result described by init fasika.
+
+```c
+datetime_t *datetime_init_fasika(datetime_t *dttm, int year);
+```
+
+### `datetime_init_genna()`
+
+Returns the public result described by init genna.
+
+```c
+datetime_t *datetime_init_genna(datetime_t *dttm, int year);
+```
+
+### `datetime_init_mayan_haab_new_year()`
+
+Returns the public result described by init mayan haab new year.
+
+```c
+datetime_t *datetime_init_mayan_haab_new_year(datetime_t *dttm, int year);
+```
+
+### `datetime_init_mayan_wayeb_start()`
+
+Returns the public result described by init mayan wayeb start.
+
+```c
+datetime_t *datetime_init_mayan_wayeb_start(datetime_t *dttm, int year);
+```
+
+### `datetime_init_meskel()`
+
+Returns the public result described by init meskel.
+
+```c
+datetime_t *datetime_init_meskel(datetime_t *dttm, int year);
+```
+
+### `datetime_init_next_sunrise_checked()`
+
+Returns the public result described by init next sunrise checked.
+
+```c
+datetime_t *datetime_init_next_sunrise_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_next_sunset_checked()`
+
+Returns the public result described by init next sunset checked.
+
+```c
+datetime_t *datetime_init_next_sunset_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_previous_sunrise_checked()`
+
+Returns the public result described by init previous sunrise checked.
+
+```c
+datetime_t *datetime_init_previous_sunrise_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_previous_sunset_checked()`
+
+Returns the public result described by init previous sunset checked.
+
+```c
+datetime_t *datetime_init_previous_sunset_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_sunrise_checked()`
+
+Returns the public result described by init sunrise checked.
+
+```c
+datetime_t *datetime_init_sunrise_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_sunset_checked()`
+
+Returns the public result described by init sunset checked.
+
+```c
+datetime_t *datetime_init_sunset_checked(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, double timeZoneOffset, datetime_sun_status_t *status);
+```
+
+### `datetime_init_sunset_observance_start()`
+
+Returns the public result described by init sunset observance start.
+
+```c
+datetime_t *datetime_init_sunset_observance_start(datetime_t *dttm, const datetime_t *observance_date, double latitude, double longitude, double timeZoneOffset);
+```
+
+### `datetime_init_timkat()`
+
+Returns the public result described by init timkat.
+
+```c
+datetime_t *datetime_init_timkat(datetime_t *dttm, int year);
+```
+
+### `datetime_jd_tdb()`
+
+Returns the public result described by jd tdb.
+
+```c
+double datetime_jd_tdb(const datetime_t *dttm);
+```
+
+### `datetime_jd_tt()`
+
+Returns the public result described by jd tt.
+
+```c
+double datetime_jd_tt(const datetime_t *dttm);
+```
+
+### `datetime_moon_phase_name()`
+
+Returns the public result described by moon phase name.
+
+```c
+const char *datetime_moon_phase_name(moon_phase_t phase);
+```
+
+### `datetime_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool datetime_serialize(const datetime_t *dttm, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
+### `datetime_solar_declination()`
+
+Returns the public result described by solar declination.
+
+```c
+double datetime_solar_declination(const datetime_t *dttm);
+```
+
+### `datetime_solar_inclination()`
+
+Returns the public result described by solar inclination.
+
+```c
+double datetime_solar_inclination(const datetime_t *dttm, double latitude);
+```
+
+### `datetime_solar_max_altitude()`
+
+Returns the public result described by solar max altitude.
+
+```c
+double datetime_solar_max_altitude(const datetime_t *dttm, double latitude);
+```
+
+### `datetime_valid_ymd()`
+
+Reports whether the condition described by valid ymd holds.
+
+```c
+bool datetime_valid_ymd(short year, month_t month, uint8_t day);
+```
+
+### `datetime_weekday_name()`
+
+Returns the public result described by weekday name.
+
+```c
+const char *datetime_weekday_name(weekday_t weekday);
+```

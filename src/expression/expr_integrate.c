@@ -16,6 +16,8 @@ typedef struct expr_integrate_dispatch_rule {
     expr_integrate_rule_fn primitive;
 } expr_integrate_dispatch_rule_t;
 
+static _Thread_local unsigned int expr_integrate_depth;
+
 static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_CONST] = {.structural = integrate_constant_rule},
     [EXPR_KIND_VAR] = {.structural = integrate_var_rule},
@@ -754,7 +756,7 @@ static bool expr_integrate_contains_harmonic_poly_local(const expr_t *expr)
     return expr_integrate_contains_harmonic_poly_local(expr->a) || expr_integrate_contains_harmonic_poly_local(expr->b);
 }
 
-expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
+static expr_t *expr_integrate_impl(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *simplified;
     expr_t *raw;
@@ -823,6 +825,26 @@ normalise_result:
     result = simplify_owned(collected);
     expr_integrate_normalize_small_rationals_local(result);
     return result;
+}
+
+/* Create an owning antiderivative whose symbols remain linked to the source bindings. */
+expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *result;
+    expr_t *linked;
+
+    if (expr_integrate_depth > 0u)
+        return expr_integrate_impl(expr, wrt);
+
+    expr_integrate_depth++;
+    result = expr_integrate_impl(expr, wrt);
+    expr_integrate_depth--;
+    if (result && expr_integrate_contains_summation_local(result))
+        return result;
+    linked = result ? expr_clone_linked_symbols(result, expr) : NULL;
+
+    expr_free(result);
+    return linked;
 }
 
 static bool expr_tree_has_symbol_name(const expr_t *expr, const char *name)

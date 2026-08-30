@@ -1380,8 +1380,6 @@ expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b)
     coeff_sign = -(a_sign * b_sign);
 
     if (a_rest && b_rest) {
-        expr_retain(a_rest);
-        expr_retain(b_rest);
         base = expr_mul(a_rest, b_rest);
         simp = expr_simplify(base);
         expr_free(base);

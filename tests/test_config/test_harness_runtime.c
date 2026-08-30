@@ -996,11 +996,11 @@ bool test_assert_validity(const test_validity_contract_t *contract, const void *
     }
 
     if (contract->format) {
-        if (contract->format(expected, expected_text, contract->ctx) != 0) {
+        if (contract->format(expected, expected_text, contract->ctx) < 0) {
             string_clear(expected_text);
             (void)test_format_value_fallback(expected, expected_text);
         }
-        if (contract->format(actual, actual_text, contract->ctx) != 0) {
+        if (contract->format(actual, actual_text, contract->ctx) < 0) {
             string_clear(actual_text);
             (void)test_format_value_fallback(actual, actual_text);
         }
@@ -1218,6 +1218,7 @@ static void test_run_in_group_text(const string_t *file_text, int line, const st
 
     test_print_time(disp_ms);
     string_printf("\n");
+    fflush(stdout);
 cleanup:
     string_free(full_path_text);
 }

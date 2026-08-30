@@ -319,12 +319,87 @@ int expr_cmp(const expr_t *expr1, const expr_t *expr2)
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
 
-expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
+static size_t expr_count_log_linear_combination_terms(const expr_t *expr)
+{
+    if (!expr)
+        return 0u;
+    if (expr_is_op(expr, &ops_log))
+        return 1u;
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub))
+        return expr_count_log_linear_combination_terms(expr->a) + expr_count_log_linear_combination_terms(expr->b);
+    if (expr_is_op(expr, &ops_neg))
+        return expr_count_log_linear_combination_terms(expr->a);
+    if (expr_is_op(expr, &ops_mul)) {
+        if (expr_is_op(expr->a, &ops_const))
+            return expr_count_log_linear_combination_terms(expr->b);
+        if (expr_is_op(expr->b, &ops_const))
+            return expr_count_log_linear_combination_terms(expr->a);
+    }
+    return 0u;
+}
+
+static expr_t *expr_create_log_linear_combination_deriv(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *left;
+    expr_t *right;
+    expr_t *out;
+
+    if (!expr)
+        return NULL;
+    if (expr_is_op(expr, &ops_log)) {
+        expr_t *argument_deriv = expr_create_deriv(expr->a, wrt);
+
+        out = argument_deriv ? expr_div(argument_deriv, expr->a) : NULL;
+        expr_free(argument_deriv);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub)) {
+        left = expr_create_log_linear_combination_deriv(expr->a, wrt);
+        right = expr_create_log_linear_combination_deriv(expr->b, wrt);
+        out = (left && right) ? (expr_is_op(expr, &ops_add) ? expr_add(left, right) : expr_sub(left, right)) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_neg)) {
+        left = expr_create_log_linear_combination_deriv(expr->a, wrt);
+        out = left ? expr_neg(left) : NULL;
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_mul)) {
+        const expr_t *constant = NULL;
+        const expr_t *dependent = NULL;
+
+        if (expr_is_op(expr->a, &ops_const)) {
+            constant = expr->a;
+            dependent = expr->b;
+        } else if (expr_is_op(expr->b, &ops_const)) {
+            constant = expr->b;
+            dependent = expr->a;
+        }
+        if (constant && dependent) {
+            left = expr_create_log_linear_combination_deriv(dependent, wrt);
+            out = left ? expr_mul(constant, left) : NULL;
+            expr_free(left);
+            return out;
+        }
+    }
+    return NULL;
+}
+
+static expr_t *expr_create_deriv_impl(const expr_t *expr, const expr_t *wrt)
 {
     if (!expr || !wrt)
         return NULL;
     if (wrt->ops == &ops_const)
         return expr_nan_const_shared();
+    if (expr_count_log_linear_combination_terms(expr) >= 4u) {
+        expr_t *log_sum_deriv = expr_create_log_linear_combination_deriv(expr, wrt);
+
+        if (log_sum_deriv)
+            return log_sum_deriv;
+    }
     {
         expr_t *source = expr_finite_weighted_sinh_from_lerch_form(expr);
         expr_t *special;
@@ -364,6 +439,20 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
     expr_free(raw);
     tl_wrt = saved_wrt;
     return simp;
+}
+
+/* Create an owning derivative whose symbols remain linked to the source bindings. */
+expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *result;
+    expr_t *linked;
+
+    if (!expr || !wrt)
+        return NULL;
+    result = expr_create_deriv_impl(expr, wrt);
+    linked = result ? expr_clone_linked_symbols(result, expr) : NULL;
+    expr_free(result);
+    return linked;
 }
 
 expr_t *expr_create_2nd_deriv(const expr_t *expr, const expr_t *wrt1, const expr_t *wrt2)

@@ -621,6 +621,7 @@ static expr_t *deriv_sub(expr_t *dv)
 static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv);
 static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *dv);
 static expr_t *deriv_sqrt_affine_over_power(expr_t *dv);
+static expr_t *deriv_atan_matching_sqrt_product(expr_t *dv);
 
 static expr_t *deriv_mul(expr_t *dv)
 {
@@ -629,6 +630,9 @@ static expr_t *deriv_mul(expr_t *dv)
     if (special)
         return special;
     special = deriv_power_inverse_scaled_sqrt_product(dv);
+    if (special)
+        return special;
+    special = deriv_atan_matching_sqrt_product(dv);
     if (special)
         return special;
 
@@ -2041,6 +2045,84 @@ cleanup:
     num_destroy(&arg_radicand);
     num_destroy(&outer_den_scale);
     num_destroy(&arg_den_scale);
+    return out;
+}
+
+static int split_scaled_sqrt_atan_product(const expr_t *expr, number_t *scale_out, number_t *radicand_out,
+                                          const expr_t **atan_out, int *has_root)
+{
+    number_t root_scale = num_new();
+    number_t root_radicand = num_new();
+
+    if (!expr)
+        goto no_match;
+    if (expr_is_op(expr, &ops_atan)) {
+        if (*atan_out)
+            goto no_match;
+        *atan_out = expr;
+        num_destroy(&root_radicand);
+        num_destroy(&root_scale);
+        return 1;
+    }
+    if (split_numeric_scaled_sqrt_denominator(expr, &root_scale, &root_radicand)) {
+        if (*has_root)
+            goto no_match;
+        replace_deriv_number(scale_out, num_mul(*scale_out, root_scale));
+        replace_deriv_number(radicand_out, num_clone(root_radicand));
+        *has_root = 1;
+        num_destroy(&root_radicand);
+        num_destroy(&root_scale);
+        return 1;
+    }
+    if (expr_is_deriv_foldable_real_const(expr)) {
+        replace_deriv_number(scale_out, num_mul(*scale_out, expr->c));
+        num_destroy(&root_radicand);
+        num_destroy(&root_scale);
+        return 1;
+    }
+    if (expr_is_mul(expr)) {
+        int matched = split_scaled_sqrt_atan_product(expr->a, scale_out, radicand_out, atan_out, has_root) &&
+                      split_scaled_sqrt_atan_product(expr->b, scale_out, radicand_out, atan_out, has_root);
+
+        num_destroy(&root_radicand);
+        num_destroy(&root_scale);
+        return matched;
+    }
+
+no_match:
+    num_destroy(&root_radicand);
+    num_destroy(&root_scale);
+    return 0;
+}
+
+static expr_t *deriv_atan_matching_sqrt_product(expr_t *dv)
+{
+    const expr_t *atan_node = NULL;
+    number_t scale = num_clone(NUM_ONE);
+    number_t radicand = num_new();
+    number_t adjusted_scale = num_new();
+    expr_t *radicand_node = NULL;
+    expr_t *root = NULL;
+    expr_t *synthetic = NULL;
+    expr_t *out = NULL;
+    int has_root = 0;
+
+    if (!split_scaled_sqrt_atan_product(dv, &scale, &radicand, &atan_node, &has_root) || !has_root || !atan_node)
+        goto cleanup;
+
+    replace_deriv_number(&adjusted_scale, num_mul(scale, radicand));
+    radicand_node = expr_new_const(radicand);
+    root = radicand_node ? expr_pow(radicand_node, &NUM_HALF) : NULL;
+    synthetic = root ? expr_div(atan_node, root) : NULL;
+    out = synthetic ? deriv_atan_over_matching_sqrt(synthetic, adjusted_scale, atan_node) : NULL;
+
+cleanup:
+    expr_free(synthetic);
+    expr_free(root);
+    expr_free(radicand_node);
+    num_destroy(&adjusted_scale);
+    num_destroy(&radicand);
+    num_destroy(&scale);
     return out;
 }
 

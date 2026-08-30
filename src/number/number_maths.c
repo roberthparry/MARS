@@ -5775,7 +5775,13 @@ number_t num_dilog(const number_t number)
 /* Evaluate the order-one polylogarithm using the number's native precision. */
 number_t num_polylog1(const number_t number)
 {
-    return num_neg(num_log(num_sub(NUM_ONE, number)));
+    number_t one_minus_number = num_sub(NUM_ONE, number);
+    number_t logarithm = num_log(one_minus_number);
+    number_t result = num_neg(logarithm);
+
+    num_destroy(&logarithm);
+    num_destroy(&one_minus_number);
+    return result;
 }
 
 number_t num_polylog(const number_t order, const number_t number)

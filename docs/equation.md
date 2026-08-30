@@ -282,3 +282,61 @@ int main(void)
 ```text
 2x + 3 = 7
 ```
+
+## API Reference
+
+### `equ_deserialise()`
+
+Creates or reconstructs the public value described by deserialise.
+
+```c
+equation_t *equ_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+```
+
+### `equ_is_solved_for()`
+
+Reports whether the condition described by is solved for holds.
+
+```c
+bool equ_is_solved_for(const equation_t *equation, const expr_t *wrt);
+```
+
+### `equ_printf()`
+
+Returns the public result described by printf.
+
+```c
+int equ_printf(const char *fmt, ...);
+```
+
+### `equ_serialize()`
+
+Reports whether the condition described by serialize holds.
+
+```c
+bool equ_serialize(const equation_t *equation, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len);
+```
+
+### `equ_sprintf()`
+
+Returns the public result described by sprintf.
+
+```c
+int equ_sprintf(char *out, size_t out_size, const char *fmt, ...);
+```
+
+### `equ_sprintf_text()`
+
+Returns the public result described by sprintf text.
+
+```c
+string_t *equ_sprintf_text(const char *fmt, ...);
+```
+
+### `equ_vsprintf_text()`
+
+Returns the public result described by vsprintf text.
+
+```c
+string_t *equ_vsprintf_text(const char *fmt, va_list ap);
+```

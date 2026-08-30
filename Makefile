@@ -153,6 +153,7 @@ check-public-distribution:
 
 check-compliance: check-public-distribution
 	@tools/check_compliance.py --quiet
+	@tools/check_markdown_api_coverage.py
 
 # qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
 # to the number backend and must not leak across this module boundary.
@@ -358,10 +359,13 @@ $(QFLOAT_TOOL_BIN): tools/qfloat/gen_qfloat_tables.c $(STATIC_LIB)
 # ------------------------------------------------------------
 # Test targets
 # ------------------------------------------------------------
+VALGRIND_TRACK_ORIGINS ?= no
 VALGRIND := valgrind \
     --leak-check=full \
     --show-leak-kinds=all \
-    --track-origins=yes
+    --errors-for-leak-kinds=definite,indirect,possible \
+    --error-exitcode=99 \
+    --track-origins=$(VALGRIND_TRACK_ORIGINS)
 
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
@@ -374,10 +378,10 @@ test: check-public-distribution $(TEST_BINS)
 	done; exit $$rc
 
 memtest: $(TEST_BINS)
-	@for t in $(TEST_BINS); do \
+	@rc=0; for t in $(TEST_BINS); do \
 	    echo "=== $$t ==="; \
-	    $(VALGRIND) $$t; \
-	done
+	    $(VALGRIND) $$t || rc=1; \
+	done; exit $$rc
 
 define TEST_ALIAS_RULES
 .PHONY: $(1) mem$(1)
@@ -413,7 +417,7 @@ test_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_
 memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
-	{ $(VALGRIND) stdbuf -oL -eL $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	{ $(VALGRIND) $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
 	rc=$$(cat "$$tmp_status"); \
 	rm -f "$$tmp_status"; \
 	if [ "$$rc" -eq 0 ]; then \
@@ -423,7 +427,7 @@ memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_l
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
 	    rm -f "$$tmp_out"; \
 	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
-	    exec $(VALGRIND) stdbuf -oL -eL $<; \
+	    exec $(VALGRIND) $<; \
 	fi; \
 	rm -f "$$tmp_out"; \
 	exit 1

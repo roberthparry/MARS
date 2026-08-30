@@ -911,10 +911,12 @@ void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const, addend_
         changed_den = split_leading_real_scalar(dv->b, &den_scalar, &den_rest);
 
         if (changed_num || changed_den) {
+            number_t scaled_num;
             expr_t *normalised;
 
-            ns = num_mul(scale, num_scalar);
-            ns = num_div(ns, den_scalar);
+            scaled_num = num_mul(scale, num_scalar);
+            ns = num_div(scaled_num, den_scalar);
+            num_destroy(&scaled_num);
             normalised = make_normalised_division_addend(num_rest, den_rest);
             if (normalised) {
                 if ((!num_rest && den_rest) || !expr_contains_addsub_normalised(normalised) ||
