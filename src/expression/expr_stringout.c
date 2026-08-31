@@ -3036,8 +3036,19 @@ static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
 
 static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
-    (void)left;
-    (void)right;
+    const expr_t *right_power_base = NULL;
+
+    if (right && (expr_is_op(right, &ops_pow) || expr_is_pow_d_expr(right)))
+        right_power_base = right->a;
+
+    if (left && expr_is_const(left) && (!left->name || !*left->name) &&
+        ((right_power_base && expr_is_const(right_power_base) &&
+          (!right_power_base->name || !*right_power_base->name)) ||
+         (right && expr_is_const(right) && right->binding_expr &&
+          expr_binding_expr_needs_explicit_mul_separator(right->binding_expr)))) {
+        sbuf_puts(b, " \\times ");
+        return;
+    }
     sbuf_puts(b, "\\mkern-2mu ");
 }
 

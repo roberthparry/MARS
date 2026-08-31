@@ -876,6 +876,7 @@
             "test_to_string_non_simple_var_bracketed_expr": true,
             "test_to_string_non_simple_var_bracketed_func": true
           },
+          "test_to_string_numeric_factor_before_fractional_power_TeX": true,
           "test_to_string_parsed_exp_unit_fraction_root_TeX": true,
           "test_to_string_pow_superscript": {
             "enabled": true,

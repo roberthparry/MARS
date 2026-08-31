@@ -166,6 +166,7 @@ static bool binding_explicit_mul_separator_true(const expr_binding_expr_t *expr)
 static bool binding_explicit_mul_separator_unary(const expr_binding_expr_t *expr);
 static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr);
 static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr);
+static bool binding_explicit_mul_separator_binary_op(const expr_binding_expr_t *expr);
 
 static void emit_binding_expr_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -354,7 +355,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                      .struct_eq = binding_struct_eq_binary_op,
                                      .numeric_literal = binding_numeric_literal_false,
                                      .exact_complex = NULL,
-                                     .explicit_mul_separator = binding_explicit_mul_separator_false,
+                                     .explicit_mul_separator = binding_explicit_mul_separator_binary_op,
                                      .emit_expr = emit_binding_expr_binary_op,
                                      .emit_func = emit_binding_func_binary_op,
                                      .emit_TeX = emit_binding_TeX_binary_op}};
@@ -1044,6 +1045,12 @@ static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr)
 static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr)
 {
     return expr && expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
+}
+
+static bool binding_explicit_mul_separator_binary_op(const expr_binding_expr_t *expr)
+{
+    return expr && expr->u.binary_op.ops == &ops_pow &&
+           expr_binding_expr_is_numeric_literal(expr->u.binary_op.left);
 }
 
 bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr)
@@ -3490,8 +3497,10 @@ static void emit_binding_expr_mul_separator(const expr_binding_expr_t *left, con
 
 static void emit_binding_TeX_mul_separator(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b)
 {
-    (void)left;
-    (void)right;
+    if (expr_binding_expr_is_numeric_literal(left) && expr_binding_expr_needs_explicit_mul_separator(right)) {
+        sbuf_puts(b, " \\times ");
+        return;
+    }
     sbuf_puts(b, "\\mkern-2mu ");
 }
 
