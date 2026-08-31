@@ -910,7 +910,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(strstr(expression_text, "ψ⁽⁰⁾(n/2 + ⁵⁄₄)"));
     ASSERT_NOT_NULL(strstr(expression_text, "ψ⁽⁰⁾(n/2 + ¾)"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}"));
-    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "4\\mkern-2mu \\left(-1\\right)^{k}"));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "4 \\times \\left(-1\\right)^{k}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(\\frac{n}{2} + \\frac{5}{4})"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\psi^{(0)}(\\frac{n}{2} + \\frac{3}{4})"));
     free(expression_text);

@@ -854,6 +854,22 @@ static void test_to_string_parsed_exp_unit_fraction_root_TeX(void)
     expr_free(f);
 }
 
+static void test_to_string_numeric_factor_before_fractional_power_TeX(void)
+{
+    expr_t *f = expr_from_string("{ 5*5^(1/3) }", NULL);
+    char *got = f ? expr_to_string(f, style_LATEX) : NULL;
+    const char *expect = "5 \\times 5^{\\frac{1}{3}}";
+
+    if (str_eq(got, expect))
+        to_string_pass("numeric factor before fractional power is unambiguous (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "numeric factor before fractional power is unambiguous (TEX)",
+                       got ? got : "(null)", expect);
+
+    free(got);
+    expr_free(f);
+}
+
 static void test_to_string_symbolic_constants_TeX(void)
 {
     expr_t *f = expr_from_string("{ exp(@pi*i*3/2*x) }", NULL);
@@ -2291,6 +2307,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_log10_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_exp_unit_fraction_root_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_parsed_exp_unit_fraction_root_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_numeric_factor_before_fractional_power_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_symbolic_constants_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_lambert_w_TeX, NULL);
