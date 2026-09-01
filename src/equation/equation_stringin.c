@@ -276,6 +276,10 @@ equation_t *equ_from_text(const string_t *text)
     expr_free(probe_expr);
     probe_expr = NULL;
 
+    if (!parts.has_bindings && expr_bindings_count(bindings) == 1u && expr_bindings_is_constant_at(bindings, 0u) &&
+        !expr_bindings_promote_single_constant_internal(bindings))
+        goto cleanup;
+
     if (equ_build_symbol_arrays(bindings, &names, &symbols, &symbol_count) != 0)
         goto cleanup;
 

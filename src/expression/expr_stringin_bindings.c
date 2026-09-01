@@ -362,6 +362,28 @@ expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, b
     return copy;
 }
 
+bool expr_bindings_promote_single_constant_internal(expr_bindings_t *bindings)
+{
+    expr_binding_entry_t *entry;
+    expr_t *variable;
+    number_t value;
+
+    if (!bindings || bindings->count != 1u || !bindings->entries[0].is_constant)
+        return false;
+
+    entry = &bindings->entries[0];
+    value = expr_eval(entry->expr);
+    variable = expr_new_named_var_text(value, entry->name);
+    num_destroy(&value);
+    if (!variable)
+        return false;
+
+    expr_free(entry->expr);
+    entry->expr = variable;
+    entry->is_constant = false;
+    return true;
+}
+
 expr_bindings_t *symtab_build_bindings(const symtab_t *t)
 {
     expr_bindings_t *bindings;

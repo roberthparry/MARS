@@ -919,6 +919,27 @@ static void test_equation_solves_quadratic_complex_roots(void)
     equ_free(equation);
 }
 
+static void test_equation_renders_exact_complex_quadratic_roots_as_surds(void)
+{
+    equation_t *equation = equ_from_string("{ u^2 + 5*u + 21 = 0 | u = NAN }");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{59}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 + i\\mkern-2mu \\sqrt{59}}{2}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 - i\\mkern-2mu \\sqrt{59}}{2}"));
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, u, result, "1e-40"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_solves_atan_sum_as_branch_valid_surd(void)
 {
     equation_t *equation = equ_from_string("atan(2x) + atan(x) = pi/4");
@@ -956,6 +977,32 @@ static void test_equation_solves_self_power_with_lambert_w(void)
     ASSERT_TRUE(equ_is_solved_for(RESULT_SOLUTION(result, 0u), x));
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "Wₙ(k, ln(-3) + 2iπn)"));
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "ln(-3) + 2iπn"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_solves_repeated_exponential_power_polynomial(void)
+{
+    equation_t *equation = equ_from_string("2^m + 2^(2m) + 2^(3m) = 84");
+    expr_bindings_t *bindings;
+    expr_t *m;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    bindings = equ_bindings(equation);
+    m = equ_binding(equation, "m");
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_NOT_NULL(m);
+    ASSERT_FALSE(expr_bindings_is_constant_at(bindings, 0u));
+
+    ASSERT_EQ_INT(equ_solve_for(equation, m, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "2 + i"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{59}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\pi"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "n"));
 
     equ_solve_result_free(result);
     equ_free(equation);
@@ -1726,8 +1773,10 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_quadratic_formula, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_two_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_complex_roots, NULL);
+    TEST_RUN_SUBTEST(test_equation_renders_exact_complex_quadratic_roots_as_surds, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_atan_sum_as_branch_valid_surd, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_self_power_with_lambert_w, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_repeated_exponential_power_polynomial, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_zero_product, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_zero_product_factors, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_double_root_once, NULL);
