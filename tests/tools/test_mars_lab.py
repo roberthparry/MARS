@@ -354,6 +354,20 @@ class EquationResultTests(unittest.TestCase):
             ["x ≈ 1", "x ≈ -1"],
         )
 
+    def test_numeric_solution_omits_subprecision_imaginary_zero(self) -> None:
+        fields = {
+            "numeric": "m ≈ 2 + 0E-77i  (n = 0)\n"
+            "m ≈ 2.19615871138938 + 3.09867129454835i  (n = 0)"
+        }
+
+        self.assertEqual(
+            mars_lab.equation_lab_numeric_solution_lines(fields, 78),
+            [
+                "m ≈ 2  (n = 0)",
+                "m ≈ 2.19615871138938 + 3.09867129454835i  (n = 0)",
+            ],
+        )
+
     def test_solution_pane_recognises_exact_fraction_literals(self) -> None:
         html = mars_lab.INDEX_HTML
 
@@ -405,6 +419,27 @@ class EquationResultTests(unittest.TestCase):
                 "x = 1 - 2i",
             ],
         )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
+        "release equation_lab helper is not built",
+    )
+    def test_repeated_power_complex_families_keep_one_TeX_row_per_solution(self) -> None:
+        equation_binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        completed = subprocess.run(
+            [str(equation_binary), "2^(3m) + 2^(2m) + 2^m = 84", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        fields = mars_lab.parse_equation_lab_output(completed.stdout)
+        rows = fields["solutions_TeX"].removeprefix(r"\begin{aligned} ").removesuffix(r" \end{aligned}").split(" \\\\\n")
+
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row.startswith("m &=") for row in rows))
+        self.assertTrue(all(" + i" in row for row in rows))
+        self.assertNotIn("\\\\\n&{} +", fields["solutions_TeX"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),

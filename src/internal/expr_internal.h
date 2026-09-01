@@ -146,6 +146,7 @@ expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_from_expression_text_formal(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                          size_t nsymbols);
 expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, bool constants_only);
+bool expr_bindings_promote_single_constant_internal(expr_bindings_t *bindings);
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
 expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);

@@ -1,4 +1,6 @@
 #include <stdbool.h>
+#include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -393,6 +395,435 @@ static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t
 static int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_atan_sum(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_self_power(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+static number_t equ_quadratic_discriminant(number_t constant, number_t linear, number_t quadratic);
+
+typedef struct {
+    const expr_t **nodes;
+    size_t *powers;
+    size_t count;
+    size_t capacity;
+    const expr_t *base;
+    bool invalid;
+} equ_repeated_power_terms_t;
+
+static bool equ_positive_integer_coefficient(number_t coefficient, size_t *power_out)
+{
+    double approximate;
+    number_t exact;
+    bool ok;
+
+    if (!power_out || !num_is_real(coefficient) || !num_is_integer(coefficient))
+        return false;
+    approximate = num_to_double(coefficient);
+    if (!isfinite(approximate) || approximate < 1.0 || approximate > (double)LONG_MAX)
+        return false;
+    *power_out = (size_t)approximate;
+    exact = num_create_from_long((long)*power_out);
+    ok = num_eq(coefficient, exact);
+    num_destroy(&exact);
+    return ok;
+}
+
+static bool equ_repeated_power_term(const expr_t *expr, const expr_t *wrt, const expr_t **base_out, size_t *power_out)
+{
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+    number_t constant = num_new();
+    number_t coefficient = num_new();
+    bool ok;
+
+    ok = expr_match_pow_expr(expr, &base, &exponent) && base && exponent && !equ_expr_uses_wrt(base, wrt) &&
+         equ_match_affine_linear_expr(exponent, wrt, true, &constant, &coefficient) && num_is_zero(constant) &&
+         equ_positive_integer_coefficient(coefficient, power_out);
+    if (ok)
+        *base_out = base;
+    num_destroy(&coefficient);
+    num_destroy(&constant);
+    return ok;
+}
+
+static void equ_collect_repeated_power_terms(const expr_t *expr, const expr_t *wrt, equ_repeated_power_terms_t *terms)
+{
+    const expr_t *base = NULL;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    size_t power;
+
+    if (!expr || !terms || terms->invalid)
+        return;
+    if (equ_repeated_power_term(expr, wrt, &base, &power)) {
+        if (terms->base && !expr_struct_eq(terms->base, base)) {
+            terms->invalid = true;
+            return;
+        }
+        if (terms->count == terms->capacity) {
+            size_t capacity = terms->capacity ? terms->capacity * 2u : 4u;
+            const expr_t **nodes = realloc(terms->nodes, capacity * sizeof(*nodes));
+            size_t *powers;
+
+            if (!nodes) {
+                terms->invalid = true;
+                return;
+            }
+            terms->nodes = nodes;
+            powers = realloc(terms->powers, capacity * sizeof(*powers));
+            if (!powers) {
+                terms->invalid = true;
+                return;
+            }
+            terms->powers = powers;
+            terms->capacity = capacity;
+        }
+        terms->base = base;
+        terms->nodes[terms->count] = expr;
+        terms->powers[terms->count++] = power;
+        return;
+    }
+    if (expr_child_exprs(expr, &left, &right)) {
+        equ_collect_repeated_power_terms(left, wrt, terms);
+        equ_collect_repeated_power_terms(right, wrt, terms);
+    }
+}
+
+static int equ_exactify_cubic_power_solutions(const expr_t *polynomial, const expr_t *power_variable,
+                                              equation_solutions_t *power_solutions, number_t *real_root_out,
+                                              number_t *quadratic_out, bool *exactified_out)
+{
+    number_t coefficients[4];
+    number_t quadratic[3];
+    number_t exact_root = num_new();
+    bool found = false;
+    int rc = 0;
+
+    *exactified_out = false;
+
+    for (size_t i = 0u; i < 4u; ++i)
+        coefficients[i] = num_new();
+    for (size_t i = 0u; i < 3u; ++i)
+        quadratic[i] = num_new();
+
+    if (!equ_match_polynomial_expr(polynomial, power_variable, 3u, coefficients) || num_is_zero(coefficients[3]))
+        goto cleanup;
+    for (size_t i = 0u; i < 4u; ++i)
+        if (!num_is_exact(coefficients[i]))
+            goto cleanup;
+
+    for (size_t i = 0u; i < power_solutions->count; ++i) {
+        number_t candidate = expr_eval(equ_rhs(power_solutions->solutions[i]));
+
+        if (num_is_real(candidate)) {
+            double approximate = num_to_double(candidate);
+
+            if (isfinite(approximate) && approximate >= (double)LONG_MIN && approximate <= (double)LONG_MAX) {
+                long rounded = lround(approximate);
+                number_t integer = num_create_from_long(rounded);
+                number_t value = num_clone(coefficients[3]);
+
+                for (size_t degree = 3u; degree-- > 0u;) {
+                    number_t product = num_mul(value, integer);
+                    number_t next = num_add(product, coefficients[degree]);
+
+                    num_destroy(&product);
+                    num_destroy(&value);
+                    value = next;
+                }
+                if (num_is_zero(value)) {
+                    num_destroy(&exact_root);
+                    exact_root = integer;
+                    found = true;
+                } else {
+                    num_destroy(&integer);
+                }
+                num_destroy(&value);
+            }
+        }
+        num_destroy(&candidate);
+        if (found)
+            break;
+    }
+    if (!found)
+        goto cleanup;
+
+    num_destroy(&quadratic[2]);
+    quadratic[2] = num_clone(coefficients[3]);
+    {
+        number_t product = num_mul(exact_root, quadratic[2]);
+
+        num_destroy(&quadratic[1]);
+        quadratic[1] = num_add(coefficients[2], product);
+        num_destroy(&product);
+    }
+    {
+        number_t product = num_mul(exact_root, quadratic[1]);
+
+        num_destroy(&quadratic[0]);
+        quadratic[0] = num_add(coefficients[1], product);
+        num_destroy(&product);
+    }
+
+    equ_solutions_clear(power_solutions);
+    equ_solutions_reset(power_solutions);
+    if (equ_append_solution_value(power_variable, exact_root, power_solutions) != 0 ||
+        equ_solve_quadratic_coefficients(quadratic, power_variable, power_solutions) != 0)
+        rc = -1;
+    if (rc == 0) {
+        num_destroy(real_root_out);
+        *real_root_out = num_clone(exact_root);
+        for (size_t i = 0u; i < 3u; ++i) {
+            num_destroy(&quadratic_out[i]);
+            quadratic_out[i] = num_clone(quadratic[i]);
+        }
+        *exactified_out = true;
+    }
+
+cleanup:
+    num_destroy(&exact_root);
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&quadratic[i]);
+    for (size_t i = 0u; i < 4u; ++i)
+        num_destroy(&coefficients[i]);
+    return rc;
+}
+
+static expr_t *equ_logarithmic_power_family_root(const expr_t *base, const expr_t *power_root)
+{
+    expr_t *log_root = power_root ? expr_log(power_root) : NULL;
+    expr_t *two_pi = equ_symbolic_two_pi_expr();
+    expr_t *imaginary = expr_new_named_const(NUM_I, "i");
+    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *imaginary_period = (two_pi && imaginary) ? expr_mul(two_pi, imaginary) : NULL;
+    expr_t *period = (imaginary_period && n) ? expr_mul(imaginary_period, n) : NULL;
+    expr_t *numerator = (log_root && period) ? expr_add(log_root, period) : NULL;
+    expr_t *denominator = base ? expr_log(base) : NULL;
+    expr_t *quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
+    expr_t *root = expr_simplify_owned(quotient);
+
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(period);
+    expr_free(imaginary_period);
+    expr_free(n);
+    expr_free(imaginary);
+    expr_free(two_pi);
+    expr_free(log_root);
+    return root;
+}
+
+static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *power_root, const number_t *quadratic,
+                                          int quadratic_sign)
+{
+    expr_t *log_base = base ? expr_log(base) : NULL;
+    expr_t *real_part = NULL;
+    expr_t *angle = NULL;
+    expr_t *two_pi = equ_symbolic_two_pi_expr();
+    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *period = (two_pi && n) ? expr_mul(two_pi, n) : NULL;
+    expr_t *phase = NULL;
+    expr_t *imaginary_part = NULL;
+    expr_t *imaginary = expr_new_named_const(NUM_I, "i");
+    expr_t *imaginary_term = NULL;
+    expr_t *sum = NULL;
+    expr_t *root = NULL;
+
+    if (quadratic_sign == 0) {
+        expr_t *log_root = power_root ? expr_log(power_root) : NULL;
+        number_t root_value = power_root ? expr_eval(power_root) : num_new();
+        number_t base_value = base ? expr_eval(base) : num_new();
+        number_t log_root_value = num_log(root_value);
+        number_t log_base_value = num_log(base_value);
+        number_t quotient_value = num_div(log_root_value, log_base_value);
+
+        real_part = num_is_integer(quotient_value) ? expr_new_const(quotient_value)
+                                                   : (log_root && log_base
+                                                          ? expr_simplify_owned(expr_div(log_root, log_base))
+                                                          : NULL);
+        num_destroy(&quotient_value);
+        num_destroy(&log_base_value);
+        num_destroy(&log_root_value);
+        num_destroy(&base_value);
+        num_destroy(&root_value);
+        expr_free(log_root);
+    } else {
+        number_t modulus_squared = num_div(quadratic[0], quadratic[2]);
+        number_t discriminant = equ_quadratic_discriminant(quadratic[0], quadratic[1], quadratic[2]);
+        number_t radicand_value = num_neg(discriminant);
+        number_t real_numerator_value = num_neg(quadratic[1]);
+        number_t real_magnitude_value = num_abs(real_numerator_value);
+        expr_t *modulus_squared_expr = expr_new_const(modulus_squared);
+        expr_t *modulus = modulus_squared_expr ? expr_sqrt(modulus_squared_expr) : NULL;
+        expr_t *log_modulus = modulus ? expr_log(modulus) : NULL;
+        expr_t *radicand = expr_new_const(radicand_value);
+        expr_t *surd = radicand ? expr_sqrt(radicand) : NULL;
+        expr_t *real_magnitude = expr_new_const(real_magnitude_value);
+        expr_t *ratio = (surd && real_magnitude) ? expr_div(surd, real_magnitude) : NULL;
+        expr_t *acute = ratio ? expr_atan(ratio) : NULL;
+
+        real_part = (log_modulus && log_base) ? expr_simplify_owned(expr_div(log_modulus, log_base)) : NULL;
+        if (num_sign(real_numerator_value) < 0) {
+            expr_t *pi = equ_symbolic_pi_expr();
+
+            angle = (pi && acute) ? expr_sub(pi, acute) : NULL;
+            expr_free(pi);
+        } else {
+            angle = expr_clone(acute);
+        }
+        if (quadratic_sign < 0) {
+            expr_t *negative = angle ? expr_neg(angle) : NULL;
+
+            expr_free(angle);
+            angle = negative;
+        }
+        expr_free(acute);
+        expr_free(ratio);
+        expr_free(real_magnitude);
+        expr_free(surd);
+        expr_free(radicand);
+        expr_free(log_modulus);
+        expr_free(modulus);
+        expr_free(modulus_squared_expr);
+        num_destroy(&real_magnitude_value);
+        num_destroy(&real_numerator_value);
+        num_destroy(&radicand_value);
+        num_destroy(&discriminant);
+        num_destroy(&modulus_squared);
+    }
+
+    phase = quadratic_sign == 0 ? expr_clone(period) : (angle && period ? expr_add(angle, period) : NULL);
+    imaginary_part = (phase && log_base) ? expr_simplify_owned(expr_div(phase, log_base)) : NULL;
+    imaginary_term = (imaginary && imaginary_part) ? expr_mul(imaginary, imaginary_part) : NULL;
+    sum = (real_part && imaginary_term) ? expr_add(real_part, imaginary_term) : NULL;
+    root = sum;
+    sum = NULL;
+
+    expr_free(imaginary_term);
+    expr_free(imaginary);
+    expr_free(imaginary_part);
+    expr_free(phase);
+    expr_free(period);
+    expr_free(n);
+    expr_free(two_pi);
+    expr_free(angle);
+    expr_free(real_part);
+    expr_free(log_base);
+    return root;
+}
+
+static int equ_try_solve_repeated_power_polynomial(const equation_t *equation, const expr_t *wrt,
+                                                   equation_solutions_t *solutions)
+{
+    equ_repeated_power_terms_t terms = {0};
+    equation_solutions_t power_solutions;
+    expr_t *residual = NULL;
+    expr_t *transformed = NULL;
+    expr_t *power_variable = NULL;
+    expr_t *zero = NULL;
+    equation_t *reduced = NULL;
+    number_t exact_real_root = num_new();
+    number_t exact_quadratic[3] = {num_new(), num_new(), num_new()};
+    bool exactified = false;
+    int rc = 1;
+
+    residual = equ_residual(equation);
+    if (!residual)
+        goto cleanup;
+    equ_collect_repeated_power_terms(residual, wrt, &terms);
+    if (terms.invalid || terms.count < 2u)
+        goto cleanup;
+
+    power_variable = expr_new_named_var(NUM_NAN, "power_value");
+    transformed = expr_clone(residual);
+    if (!power_variable || !transformed) {
+        rc = -1;
+        goto cleanup;
+    }
+    for (size_t i = 0u; i < terms.count; ++i) {
+        equ_repeated_power_terms_t current = {0};
+        expr_t *replacement;
+        expr_t *next;
+
+        equ_collect_repeated_power_terms(transformed, wrt, &current);
+        if (current.invalid || current.count == 0u) {
+            free(current.powers);
+            free(current.nodes);
+            rc = -1;
+            goto cleanup;
+        }
+        replacement = current.powers[0] == 1u ? expr_clone(power_variable)
+                                              : expr_pow_long(power_variable, (long)current.powers[0]);
+        next = replacement ? expr_substitute(transformed, current.nodes[0], replacement) : NULL;
+
+        expr_free(replacement);
+        free(current.powers);
+        free(current.nodes);
+        if (!next) {
+            rc = -1;
+            goto cleanup;
+        }
+        expr_free(transformed);
+        transformed = next;
+    }
+
+    zero = expr_const_zero();
+    reduced = zero ? equ_new(transformed, zero) : NULL;
+    if (!reduced) {
+        rc = -1;
+        goto cleanup;
+    }
+    equ_solutions_reset(&power_solutions);
+    rc = equ_solve_for_into(reduced, power_variable, &power_solutions);
+    if (rc != 0 || power_solutions.count == 0u) {
+        equ_solutions_clear(&power_solutions);
+        rc = rc < 0 ? -1 : 1;
+        goto cleanup;
+    }
+    {
+        expr_t *reduced_polynomial = equ_residual(reduced);
+
+        if (!reduced_polynomial ||
+            equ_exactify_cubic_power_solutions(reduced_polynomial, power_variable, &power_solutions, &exact_real_root,
+                                               exact_quadratic, &exactified) != 0) {
+            expr_free(reduced_polynomial);
+            equ_solutions_clear(&power_solutions);
+            rc = -1;
+            goto cleanup;
+        }
+        expr_free(reduced_polynomial);
+    }
+
+    for (size_t i = 0u; i < power_solutions.count; ++i) {
+        const expr_t *power_root = equ_rhs(power_solutions.solutions[i]);
+        number_t value = expr_eval(power_root);
+        int quadratic_sign = exactified && i > 0u ? (i == 1u ? 1 : -1) : 0;
+        expr_t *family = !num_is_zero(value)
+                             ? (exactified ? equ_cartesian_power_family(terms.base, power_root, exact_quadratic,
+                                                                        quadratic_sign)
+                                           : equ_logarithmic_power_family_root(terms.base, power_root))
+                             : NULL;
+
+        if (!family || equ_append_solution_expr(wrt, family, solutions) != 0)
+            rc = -1;
+        expr_free(family);
+        num_destroy(&value);
+        if (rc < 0)
+            break;
+    }
+    equ_solutions_clear(&power_solutions);
+    if (rc >= 0)
+        rc = solutions->count > 0u ? 0 : 1;
+
+cleanup:
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&exact_quadratic[i]);
+    num_destroy(&exact_real_root);
+    equ_free(reduced);
+    expr_free(zero);
+    expr_free(power_variable);
+    expr_free(transformed);
+    expr_free(residual);
+    free(terms.powers);
+    free(terms.nodes);
+    return rc;
+}
 
 static int equ_try_solve_affine(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
@@ -454,6 +885,37 @@ static number_t equ_quadratic_root(number_t neg_linear, number_t signed_sqrt_dis
     return root;
 }
 
+static expr_t *equ_quadratic_surd_term(number_t discriminant)
+{
+    number_t radicand_value = num_sign(discriminant) < 0 ? num_neg(discriminant) : num_clone(discriminant);
+    expr_t *radicand = expr_new_const(radicand_value);
+    expr_t *root = radicand ? expr_sqrt(radicand) : NULL;
+    expr_t *imaginary_unit = num_sign(discriminant) < 0 ? expr_new_const(NUM_I) : NULL;
+    expr_t *term = imaginary_unit && root ? expr_mul(imaginary_unit, root) : root ? expr_clone(root) : NULL;
+
+    expr_free(imaginary_unit);
+    expr_free(root);
+    expr_free(radicand);
+    num_destroy(&radicand_value);
+    return term;
+}
+
+static expr_t *equ_quadratic_surd_root(number_t neg_linear, number_t discriminant, number_t denominator,
+                                       bool positive)
+{
+    expr_t *linear = expr_new_const(neg_linear);
+    expr_t *surd = equ_quadratic_surd_term(discriminant);
+    expr_t *numerator = linear && surd ? (positive ? expr_add(linear, surd) : expr_sub(linear, surd)) : NULL;
+    expr_t *denominator_expr = expr_new_const(denominator);
+    expr_t *root = numerator && denominator_expr ? expr_div(numerator, denominator_expr) : NULL;
+
+    expr_free(denominator_expr);
+    expr_free(numerator);
+    expr_free(surd);
+    expr_free(linear);
+    return root;
+}
+
 int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions)
 {
     number_t discriminant;
@@ -470,6 +932,26 @@ int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, 
     sqrt_discriminant = num_sqrt(discriminant);
     neg_linear = num_neg(coeffs[1]);
     denominator = num_mul_long(coeffs[2], 2L);
+
+    if (num_is_exact(coeffs[0]) && num_is_exact(coeffs[1]) && num_is_exact(coeffs[2]) &&
+        num_is_real(discriminant) && !num_is_zero(sqrt_discriminant) && !num_is_exact(sqrt_discriminant)) {
+        expr_t *positive_root = equ_quadratic_surd_root(neg_linear, discriminant, denominator, true);
+        expr_t *negative_root = equ_quadratic_surd_root(neg_linear, discriminant, denominator, false);
+
+        if (!positive_root || !negative_root || equ_append_solution_expr(wrt, positive_root, solutions) != 0 ||
+            equ_append_solution_expr(wrt, negative_root, solutions) != 0) {
+            expr_free(negative_root);
+            expr_free(positive_root);
+            goto error;
+        }
+        expr_free(negative_root);
+        expr_free(positive_root);
+        num_destroy(&denominator);
+        num_destroy(&neg_linear);
+        num_destroy(&sqrt_discriminant);
+        num_destroy(&discriminant);
+        return 0;
+    }
 
     root = equ_quadratic_root(neg_linear, sqrt_discriminant, denominator);
     if (equ_append_solution_value(wrt, root, solutions) != 0) {
@@ -1684,6 +2166,7 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
     int unary_periodic_rc;
     int atan_sum_rc;
     int self_power_rc;
+    int repeated_power_rc;
     int affine_rc;
     int zero_product_rc;
     int quadratic_rc;
@@ -1727,6 +2210,12 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
     if (self_power_rc == 0)
         return 0;
     if (self_power_rc < 0)
+        return -1;
+
+    repeated_power_rc = equ_try_solve_repeated_power_polynomial(equation, wrt, solutions);
+    if (repeated_power_rc == 0)
+        return 0;
+    if (repeated_power_rc < 0)
         return -1;
 
     affine_rc = equ_try_solve_affine(equation, wrt, solutions);

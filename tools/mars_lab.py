@@ -14094,6 +14094,8 @@ def format_number_text_for_precision(
             match.group(1), precision, zero_subprecision)
         imag = format_number_text_for_precision(
             match.group(3), precision, zero_subprecision)
+        if zero_subprecision and imag == "0":
+            return real
         return f"{real} {match.group(2)} {imag}i"
 
     try:
@@ -14105,7 +14107,7 @@ def format_number_text_for_precision(
     except (InvalidOperation, ValueError):
         return text
 
-    if zero_subprecision and rounded and rounded.copy_abs().adjusted() < -int(precision):
+    if zero_subprecision and (not rounded or rounded.copy_abs().adjusted() < -int(precision)):
         return "0"
     return _trim_decimal_tail(format(rounded, "g").replace("e", "E"))
 
@@ -14470,7 +14472,14 @@ def equation_lab_numeric_solution_lines(fields: dict[str, str], precision: int) 
         for line in normalize_multiline_display_text(fields.get("numeric") or "").splitlines()
         if line.strip()
     ]
-    formatted_lines = [precision_numeric_tokens(line, precision) for line in lines]
+    formatted_lines: list[str] = []
+    for line in lines:
+        match = re.match(r"^(.*?≈\s*)(.*?)(\s+\([^()]*\))?$", line)
+        if match:
+            value = format_number_text_for_precision(match.group(2), precision, zero_subprecision=True)
+            formatted_lines.append(f"{match.group(1)}{value}{match.group(3) or ''}")
+        else:
+            formatted_lines.append(precision_numeric_tokens(line, precision, zero_subprecision=True))
     return [line for line in formatted_lines if numeric_solution_line_is_finite(line)]
 
 

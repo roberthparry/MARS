@@ -72,7 +72,8 @@ static char *number_precision_text_dup(number_t value, int precision)
 
 static char *expr_TeX_body_dup(const expr_t *expr)
 {
-    char *body = expr_to_TeX_body_wrapped(expr, 110u);
+    /* MARS Lab's result card has room for a complete Cartesian solution family on each row. */
+    char *body = expr_to_TeX_body_wrapped(expr, 280u);
 
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
