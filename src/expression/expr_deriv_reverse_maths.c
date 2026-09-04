@@ -1102,6 +1102,15 @@ void expr_reverse_Ei(const expr_t *dv, const number_t *out_bar, number_t *a_bar,
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
+void expr_reverse_Li(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t log_x = num_log(expr_eval_num_internal(dv->a));
+    number_t factor = num_div(*out_bar, log_x);
+
+    num_destroy(&log_x);
+    expr_reverse_unary(expr_reverse_num_clone(factor), a_bar, b_bar);
+}
+
 void expr_reverse_E1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t neg_x = num_neg(expr_eval_num_internal(dv->a));

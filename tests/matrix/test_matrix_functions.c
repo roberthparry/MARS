@@ -3424,6 +3424,8 @@ static void test_mat_special_unary_extensions(void)
 
         check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_Ei, z1, z2, qc_Ei(z1),
                                          qc_Ei(z2), 1e-24);
+        check_unary_diagonal_2x2_complex("complex Li(diag(z1,z2)) = diag(Li(z1),Li(z2))", mat_Li, z1, z2, qc_Li(z1),
+                                         qc_Li(z2), 1e-24);
     }
 }
 

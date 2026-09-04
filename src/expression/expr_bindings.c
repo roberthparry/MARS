@@ -2142,6 +2142,30 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [167] = {.kw = "atan", .is_binary = false, .ops = &ops_atan},
 };
 
+#define LOGARITHMIC_INTEGRAL_BINDING_FUNC_TABLE_SIZE 11u
+
+static const binding_func_entry_t
+    s_logarithmic_integral_binding_funcs[LOGARITHMIC_INTEGRAL_BINDING_FUNC_TABLE_SIZE] = {
+        [1] = {.kw = "li", .is_binary = false, .ops = &ops_Li},
+        [3] = {.kw = "logarithmic_integral", .is_binary = false, .ops = &ops_Li},
+        [9] = {.kw = "Li", .is_binary = false, .ops = &ops_Li},
+};
+
+static unsigned logarithmic_integral_binding_func_hash(string_view_t kw)
+{
+    const size_t len = string_view_length(kw);
+    unsigned h = 2166136261u;
+
+    for (size_t pos = 0u; pos < len; ++pos) {
+        unsigned char byte = 0u;
+
+        if (!string_view_peek_ascii(kw, pos, &byte))
+            return 0u;
+        h = (h ^ byte) * 16777619u;
+    }
+    return h % LOGARITHMIC_INTEGRAL_BINDING_FUNC_TABLE_SIZE;
+}
+
 static unsigned binding_func_hash_values(string_view_t kw, unsigned seed)
 {
     size_t len = string_view_length(kw);
@@ -2197,6 +2221,10 @@ static const binding_func_entry_t *binding_func_lookup(string_view_t kw)
     slot = (binding_func_slot_hash(kw) + s_binding_func_displacements[bucket]) % BINDING_FUNC_TABLE_SIZE;
     entry = &s_binding_funcs[slot];
 
+    if (binding_func_entry_matches(entry, kw))
+        return entry;
+
+    entry = &s_logarithmic_integral_binding_funcs[logarithmic_integral_binding_func_hash(kw)];
     if (binding_func_entry_matches(entry, kw))
         return entry;
 

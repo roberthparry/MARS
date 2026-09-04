@@ -82,6 +82,50 @@ static char *expr_TeX_body_dup(const expr_t *expr)
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
 
+static char *expr_Ei_derivative_cartesian_TeX_dup(const expr_t *source, const char *wrt_name,
+                                                   const expr_t *derivative)
+{
+    const expr_t *argument = NULL;
+    const expr_t *unused = NULL;
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    char *argument_TeX = NULL;
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *out = NULL;
+    bool has_imaginary = false;
+    size_t length;
+
+    if (!source || !wrt_name || !derivative || !expr_is_unary_pattern_kind(source, EXPR_PATTERN_UNARY_EI) ||
+        !expr_child_exprs(source, &argument, &unused) || !argument ||
+        !expr_cartesian_parts_for_display(derivative, &real, &imaginary, &has_imaginary) || !has_imaginary)
+        goto cleanup;
+
+    argument_TeX = expr_to_TeX_body(argument);
+    real_TeX = expr_to_TeX_body(real);
+    imaginary_TeX = expr_to_TeX_body(imaginary);
+    if (!argument_TeX || !real_TeX || !imaginary_TeX)
+        goto cleanup;
+
+    length = strlen(argument_TeX) + strlen(wrt_name) + strlen(real_TeX) + strlen(imaginary_TeX) + 192u;
+    out = malloc(length);
+    if (out)
+        snprintf(out, length,
+                 "\\begin{aligned}\n"
+                 "\\frac{\\partial}{\\partial %s}\\operatorname{Ei}\\left(%s\\right)&=p+q\\mkern-2mu i,\\\\\n"
+                 "p&=%s,\\\\\n"
+                 "q&=%s\\end{aligned}",
+                 wrt_name, argument_TeX, real_TeX, imaginary_TeX);
+
+cleanup:
+    free(imaginary_TeX);
+    free(real_TeX);
+    free(argument_TeX);
+    expr_free(imaginary);
+    expr_free(real);
+    return out;
+}
+
 static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
                                         const expr_t **imaginary_out, int *imaginary_sign_out);
 
@@ -179,6 +223,55 @@ cleanup:
     return derivative;
 }
 
+static expr_t *expr_derivative_from_unbound_source(const char *source, expr_bindings_t *bindings, const char *wrt_name)
+{
+    const char *bindings_separator = source ? strchr(source, '|') : NULL;
+    char *unbound_source = NULL;
+    string_t *variable_source = NULL;
+    expr_bindings_t *unbound_bindings = NULL;
+    expr_t *unbound_expr = NULL;
+    expr_t *unbound_wrt = NULL;
+    expr_t *derivative = NULL;
+
+    if (!source || !bindings || !wrt_name)
+        return NULL;
+    variable_source = string_new();
+    unbound_source = bindings_separator ? strndup(source, (size_t)(bindings_separator - source)) : strdup(source);
+    if (unbound_source && variable_source) {
+        (void)string_append_cstr(variable_source, unbound_source);
+        (void)string_append_cstr(variable_source, " | ");
+        (void)string_append_cstr(variable_source, wrt_name);
+        (void)string_append_cstr(variable_source, "=NAN");
+        for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+            const char *name = expr_bindings_name_at(bindings, i);
+            expr_t *binding = expr_bindings_expr_at(bindings, i);
+            number_t binding_value = binding ? expr_get_val(binding) : (number_t){0};
+            string_t *value = binding ? num_to_string(binding_value) : NULL;
+
+            if (name && strcmp(name, wrt_name) != 0 && value) {
+                (void)string_append_cstr(variable_source, "; ");
+                (void)string_append_cstr(variable_source, name);
+                (void)string_append_cstr(variable_source, "=");
+                (void)string_append_cstr(variable_source, string_c_str(value));
+            }
+            string_free(value);
+            if (binding)
+                num_destroy(&binding_value);
+        }
+    }
+    unbound_expr = unbound_source && variable_source
+                       ? expr_from_string(string_c_str(variable_source), &unbound_bindings)
+                       : NULL;
+    unbound_wrt = unbound_bindings ? expr_bindings_get(unbound_bindings, wrt_name) : NULL;
+    derivative = unbound_expr && unbound_wrt ? expr_create_deriv(unbound_expr, unbound_wrt) : NULL;
+
+    expr_free(unbound_expr);
+    expr_bindings_free(unbound_bindings);
+    string_free(variable_source);
+    free(unbound_source);
+    return derivative;
+}
+
 static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
 {
     static const expr_pattern_unary_affine_kind_t kinds[] = {
@@ -191,6 +284,7 @@ static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
         EXPR_PATTERN_UNARY_ASEC,    EXPR_PATTERN_UNARY_ACOSEC,  EXPR_PATTERN_UNARY_ACOT,
         EXPR_PATTERN_UNARY_ASINH,   EXPR_PATTERN_UNARY_ACOSH,   EXPR_PATTERN_UNARY_ATANH,
         EXPR_PATTERN_UNARY_ASECH,   EXPR_PATTERN_UNARY_ACOSECH, EXPR_PATTERN_UNARY_ACOTH,
+        EXPR_PATTERN_UNARY_EI,
     };
 
     if (!expr_contains_cartesian_component_symbol(expr) || !expr_contains_imaginary_unit_for_display(expr))
@@ -1994,10 +2088,12 @@ int main(int argc, char **argv)
             derivative_progression_source = expr_create_deriv(weighted_derivative_source, wrt);
             expr_free(weighted_derivative_source);
         }
-        deriv = domain_specialised ? expr_domain_specialised_inverse_power_derivative(expr, bindings, wrt) : NULL;
+        deriv = expr_domain_specialised_inverse_power_derivative(expr, bindings, wrt);
         if (!deriv)
             deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
         used_atan_derivative_form = deriv != NULL;
+        if (!deriv && strstr(raw_input, "..."))
+            deriv = expr_derivative_from_unbound_source(raw_input, bindings, wrt_name);
         if (!deriv)
             deriv = expr_create_deriv(derivative_source, wrt);
         if (!deriv) {
@@ -2031,13 +2127,25 @@ int main(int argc, char **argv)
             deriv_values_text = numeric_root_family_dup(derivative_seed_value, derivative_root_order, precision);
             num_destroy(&derivative_seed_value);
         } else {
+            bool explicit_Ei_cartesian = complex_cartesian &&
+                                         expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_EI);
+            string_t *cartesian_function = explicit_Ei_cartesian
+                                               ? expr_to_text_function_cartesian(display_deriv)
+                                               : NULL;
+
             deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
-            deriv_func_text = expr_text_dup(display_deriv, style_FUNCTION);
+            deriv_func_text = cartesian_function ? xstrdup_local(string_c_str(cartesian_function))
+                                                  : expr_text_dup(display_deriv, style_FUNCTION);
             deriv_TeX_text = derivative_progression_closed_form
                                  ? expr_finite_progression_identity_TeX(derivative_progression_source
                                                                            ? derivative_progression_source
                                                                            : deriv)
-                                 : expr_TeX_body_dup(display_deriv);
+                             : explicit_Ei_cartesian
+                                 ? expr_Ei_derivative_cartesian_TeX_dup(expr, wrt_name, display_deriv)
+                                 : NULL;
+            if (!deriv_TeX_text)
+                deriv_TeX_text = expr_TeX_body_dup(display_deriv);
+            string_free(cartesian_function);
         }
         normalise_double_minus_owned(&deriv_text);
         normalise_double_minus_owned(&deriv_func_text);

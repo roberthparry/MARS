@@ -932,6 +932,12 @@ qcomplex_t qc_Ei(qcomplex_t z)
     return sum;
 }
 
+/* Evaluate the principal logarithmic integral. */
+qcomplex_t qc_Li(qcomplex_t z)
+{
+    return qc_Ei(qc_log(z));
+}
+
 qcomplex_t qc_E1(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))

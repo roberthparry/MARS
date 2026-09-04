@@ -332,6 +332,7 @@ The qfloat layer has no dependency on MPFR.
 **Exponential integrals**
 
 - `qfloat_t qf_Ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
+- `qfloat_t qf_Li(qfloat_t x)` — logarithmic integral Li(x) = Ei(ln(x)), using the principal branch
 - `qfloat_t qf_E1(qfloat_t x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
 
 **Polylogarithms**

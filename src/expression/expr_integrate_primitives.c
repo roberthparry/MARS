@@ -1299,6 +1299,36 @@ expr_t *integrate_Ei_rule(const expr_t *expr, const expr_t *wrt)
     return div_number_owned_consuming(raw, &coeff);
 }
 
+expr_t *integrate_Li_rule(const expr_t *expr, const expr_t *wrt)
+{
+    number_t constant = num_new();
+    number_t coeff = num_new();
+    expr_t *u_Li_u;
+    expr_t *log_u;
+    expr_t *two_log_u;
+    expr_t *Ei_two_log_u;
+    expr_t *raw;
+
+    if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LI, &constant, &coeff)) {
+        num_destroy(&coeff);
+        num_destroy(&constant);
+        return NULL;
+    }
+
+    u_Li_u = expr_mul(expr->a, expr);
+    log_u = expr_log(expr->a);
+    two_log_u = log_u ? expr_mul_num(log_u, &NUM_TWO) : NULL;
+    Ei_two_log_u = two_log_u ? expr_Ei(two_log_u) : NULL;
+    raw = (u_Li_u && Ei_two_log_u) ? expr_sub(u_Li_u, Ei_two_log_u) : NULL;
+
+    expr_free(Ei_two_log_u);
+    expr_free(two_log_u);
+    expr_free(log_u);
+    expr_free(u_Li_u);
+    num_destroy(&constant);
+    return div_number_owned_consuming(raw, &coeff);
+}
+
 expr_t *integrate_E1_rule(const expr_t *expr, const expr_t *wrt)
 {
     number_t constant = num_new();

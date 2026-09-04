@@ -216,6 +216,7 @@ while `qc_acos(2)` is
 | `qc_gammainc_P(s, x)` | regularised lower incomplete gamma P(s,x) = γ(s,x)/Γ(s) |
 | `qc_gammainc_Q(s, x)` | regularised upper incomplete gamma Q(s,x) = Γ(s,x)/Γ(s) |
 | `qc_Ei(z)` | exponential integral Ei(z) |
+| `qc_Li(z)` | logarithmic integral Li(z) = Ei(log(z)), using the principal branch |
 | `qc_E1(z)` | exponential integral E₁(z); satisfies E₁(z) = −Ei(−z) for real z > 0 |
 | `qc_dilog(z)` | principal dilogarithm Li₂(z) |
 | `qc_polylog1(z)` | order-one polylogarithm Li₁(z) = −Log(1−z) on the principal branch |

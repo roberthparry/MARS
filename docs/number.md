@@ -461,6 +461,7 @@ their existing backend-specific precision and representation.
 | `num_gammainc_Q(s, x)` | Evaluates the regularised upper incomplete gamma function. |
 | `num_E1(x)` | Evaluates the exponential integral `E₁(x)`. |
 | `num_Ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
+| `num_Li(x)` | Evaluates the principal logarithmic integral `Li(x) = Ei(log(x))`. |
 | `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
 | `num_polylog1(x)` | Evaluates the order-one polylogarithm `Li₁(x) = −Log(1−x)` on the active backend's principal branch. |
 | `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |

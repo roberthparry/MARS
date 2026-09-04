@@ -1,4 +1,5 @@
 import datetime as py_datetime
+import decimal
 import math
 import re
 import subprocess
@@ -234,6 +235,14 @@ class MobileAccessTests(unittest.TestCase):
 
 
 class EquationResultTests(unittest.TestCase):
+    def test_timeout_error_is_concise_and_hides_internal_command(self) -> None:
+        error = subprocess.TimeoutExpired(["/private/build/equation_lab", "large equation", "78"], 10)
+
+        self.assertEqual(
+            mars_lab.tidy_lab_error_text(error),
+            "This calculation took too long. Try simplifying the input.",
+        )
+
     def test_expression_state_preserves_series_ellipsis(self) -> None:
         source = "1 + 1/2^2 + 1/3^2 + ... + 1/100000000^2"
 
@@ -368,6 +377,14 @@ class EquationResultTests(unittest.TestCase):
             ],
         )
 
+    def test_exact_numeric_solution_uses_equals_and_compact_integer(self) -> None:
+        fields = {"numeric": "u = 1.000000000000000000000000000000000000E+00  (m = 0)"}
+
+        self.assertEqual(
+            mars_lab.equation_lab_numeric_solution_lines(fields, 78),
+            ["u = 1  (m = 0)"],
+        )
+
     def test_solution_pane_recognises_exact_fraction_literals(self) -> None:
         html = mars_lab.INDEX_HTML
 
@@ -436,10 +453,109 @@ class EquationResultTests(unittest.TestCase):
         fields = mars_lab.parse_equation_lab_output(completed.stdout)
         rows = fields["solutions_TeX"].removeprefix(r"\begin{aligned} ").removesuffix(r" \end{aligned}").split(" \\\\\n")
 
-        self.assertEqual(len(rows), 3)
-        self.assertTrue(all(row.startswith("m &=") for row in rows))
-        self.assertTrue(all(" + i" in row for row in rows))
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(row.startswith("m &=") for row in rows[:3]))
+        self.assertTrue(all(" + i" in row for row in rows[:3]))
+        self.assertEqual(rows[3], r"& n \in \mathbb{Z}")
         self.assertNotIn("\\\\\n&{} +", fields["solutions_TeX"])
+        solutions_svg, solutions_error = mars_lab.render_TeX_to_svg(fields["solutions_TeX"])
+        self.assertIsNone(solutions_error)
+        self.assertTrue(solutions_svg)
+
+        real_root_completed = subprocess.run(
+            [str(equation_binary), "3^(3u) - 4*3^(2u) + 3^u + 6 = 0", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        real_root_fields = mars_lab.parse_equation_lab_output(real_root_completed.stdout)
+
+        self.assertIn(r"\frac{\ln(2)}{\ln(3)}", real_root_fields["solutions_TeX"])
+        self.assertIn(r"2\mkern-2mu n + 1", real_root_fields["solutions_TeX"])
+        self.assertNotIn(r"\sqrt{-", real_root_fields["solutions_TeX"])
+        self.assertNotIn("u &= 0 + i", real_root_fields["solutions_TeX"])
+
+        exp_completed = subprocess.run(
+            [str(equation_binary), "e^(3u) - 4*e^(2u) + e^u + 6 = 0", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        exp_fields = mars_lab.parse_equation_lab_output(exp_completed.stdout)
+
+        self.assertEqual(exp_fields["status"], "solved")
+        self.assertEqual(len(exp_fields["solutions"].splitlines()), 3)
+        self.assertIn(r"\ln(2)", exp_fields["solutions_TeX"])
+        self.assertIn(r"\ln(3)", exp_fields["solutions_TeX"])
+        self.assertIn(r"\pi\mkern-2mu i\mkern-2mu \left(2\mkern-2mu n + 1\right)", exp_fields["solutions_TeX"])
+
+        quartic_completed = subprocess.run(
+            [str(equation_binary), "5^(4u) - 8*5^(3u) + 17*5^(2u) + 2*5^u = 24", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        quartic_fields = mars_lab.parse_equation_lab_output(quartic_completed.stdout)
+
+        self.assertEqual(quartic_fields["status"], "solved")
+        self.assertEqual(len(quartic_fields["solutions"].splitlines()), 4)
+        self.assertIn(r"i\mkern-2mu \frac{\pi\mkern-2mu \left(2\mkern-2mu n + 1\right)}{\ln(5)}",
+                      quartic_fields["solutions_TeX"])
+        self.assertNotIn(r"\ln(-1)", quartic_fields["solutions_TeX"])
+
+        shifted_completed = subprocess.run(
+            [str(equation_binary), "5^(4u) - 5^(3u+1) - 2*5^(2u+1) + 16*5^(u+1) = 96", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        shifted_fields = mars_lab.parse_equation_lab_output(shifted_completed.stdout)
+
+        self.assertEqual(shifted_fields["status"], "solved")
+        self.assertEqual(len(shifted_fields["solutions"].splitlines()), 4)
+        self.assertIn(r"\frac{\ln(2)}{\ln(5)}", shifted_fields["solutions_TeX"])
+        self.assertIn(r"\frac{\ln(3)}{\ln(5)}", shifted_fields["solutions_TeX"])
+        self.assertIn(r"\frac{\ln(4)}{\ln(5)}", shifted_fields["solutions_TeX"])
+        self.assertNotIn(r"\ln(-4)", shifted_fields["solutions_TeX"])
+        self.assertEqual(shifted_fields["solutions_TeX"].count(r"n \in \mathbb{Z}"), 1)
+
+        single_family_completed = subprocess.run(
+            [str(equation_binary), "5^(2u) - 10*5^u + 25 = 0", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        single_family_fields = mars_lab.parse_equation_lab_output(single_family_completed.stdout)
+
+        self.assertEqual(single_family_fields["status"], "solved")
+        self.assertEqual(single_family_fields["solutions_TeX"].count(r"n \in \mathbb{Z}"), 1)
+
+        occupied_n_completed = subprocess.run(
+            [str(equation_binary), "{ 5^(2u) - 10*5^u + 25 = 0 | u = NAN; n = 7 }", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        occupied_n_fields = mars_lab.parse_equation_lab_output(occupied_n_completed.stdout)
+
+        self.assertEqual(occupied_n_fields["status"], "solved")
+        self.assertIn(r"m \in \mathbb{Z}", occupied_n_fields["solutions_TeX"])
+        self.assertNotIn(r"n \in \mathbb{Z}", occupied_n_fields["solutions_TeX"])
+        self.assertIn("u = 1  (m = 0)", mars_lab.equation_lab_numeric_solution_lines(occupied_n_fields, 78))
+
+        symbolic_n_completed = subprocess.run(
+            [str(equation_binary), "(5^u-n)(5^u-5)^4 = 0", "256"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        symbolic_n_fields = mars_lab.parse_equation_lab_output(symbolic_n_completed.stdout)
+
+        self.assertEqual(
+            mars_lab.equation_lab_numeric_solution_lines(symbolic_n_fields, 78),
+            ["u = 1  (m = 0)"],
+        )
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
@@ -2877,6 +2993,224 @@ class ExpressionResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
+    def test_unary_function_ellipsis_becomes_a_finite_sum(self) -> None:
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            "Li(x) + Li(2x) + Li(3x) + ... + Li(nx)",
+            64,
+            "x",
+            "evaluate",
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("Σ_(k=1)^n Li(kx)", fields["unbound"])
+        self.assertIn(r"\sum_{k=1}^{n}\operatorname{Li}(k\mkern-2mu x)", fields["tex"])
+        self.assertIn("sum(k, 1, n, li(k.x))", fields["function"])
+
+    def test_large_li_sum_evaluates_at_requested_precision(self) -> None:
+        sources = (
+            "{ Li(x)+Li(2x)+Li(3x)+...+Li(nx) | x=2; n=30000 }",
+            "sum(k, 1, 15000, Li(2k)) + sum(k, 15001, 30000, Li(2k))",
+        )
+        values = []
+        for source in sources:
+            fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                self.expression_binary, source, 116, "x", "evaluate"
+            )
+            self.assertEqual(returncode, 0, raw)
+            self.assertNotIn("value_note", fields)
+            self.assertGreaterEqual(len(fields["value"].replace(".", "")), 115)
+            values.append(decimal.Decimal(fields["value"]))
+        with decimal.localcontext() as context:
+            context.prec = 116
+            self.assertLess(abs(values[0] - values[1]), decimal.Decimal("1e-100"))
+
+    def test_result_cards_preserve_authored_values_after_cartesian_expansion(self) -> None:
+        bindings = mars_lab.expression_card_binding_values(
+            "{ Li(n*x+i*m*y) | x = 1, y = 1, m = 1, n = 7 }",
+            "{ expanded | x = NAN, y = NAN; m = NAN, n = NAN }",
+            "{ expanded | x = NAN, y = NAN; m = NAN, n = NAN }",
+            [],
+            64,
+        )
+
+        self.assertEqual(
+            {binding["name"]: binding["value"] for binding in bindings},
+            {"x": "1", "y": "1", "m": "1", "n": "7"},
+        )
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_complex_logarithmic_integral_has_explicit_cartesian_TeX(self) -> None:
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Li(x+i*y)", 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn(r"&=p+q\mkern-2mu i", fields["tex"])
+        self.assertIn(r"p&=\gamma+\frac{1}{2}\ln", fields["tex"])
+        self.assertIn(r"q&=\operatorname{atan2}", fields["tex"])
+        self.assertNotIn(r"a&=", fields["tex"])
+        self.assertNotIn(r"R&=", fields["tex"])
+        self.assertIn("γ + ½ln(", fields["expression"])
+        self.assertIn("atan2(y, x)", fields["expression"])
+        self.assertIn(")i | x = NAN, y = NAN }", fields["expression"])
+        self.assertIn("v1 = x^2 + y^2.", fields["function"])
+        self.assertIn("v2 = atan2(y, x).", fields["function"])
+        self.assertIn("v3 = ln(v1)/2.", fields["function"])
+        self.assertIn("v6 = v4^(n/2)/(n.factorial(n)).", fields["function"])
+        self.assertIn("v7 = n.v5.", fields["function"])
+        self.assertIn("sum(n, 1, @inf, v6.cos(v7))", fields["function"])
+        self.assertIn("sum(n, 1, @inf, v6.sin(v7))", fields["function"])
+        self.assertEqual(fields["function"].count("n.v5"), 1)
+        self.assertNotIn("complex_series_term", fields["function"])
+        self.assertNotIn("*", fields["function"])
+        self.assertIn("return p + q.i.", fields["function"])
+        self.assertIn("atan2(y, x)", fields["function"])
+
+        occupied_fields, occupied_raw, occupied_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Li(n+i*y)", 64, "n", "evaluate"
+        )
+        self.assertEqual(occupied_returncode, 0, occupied_raw)
+        self.assertIn(r"\sum_{m=1}^{\infty}", occupied_fields["tex"])
+        self.assertIn("sum(m, 1, @inf", occupied_fields["function"])
+
+        scaled_fields, scaled_raw, scaled_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Li(n*x+i*m*y)", 64, "x", "evaluate"
+        )
+        self.assertEqual(scaled_returncode, 0, scaled_raw)
+        self.assertIn("v1 = n.x.", scaled_fields["function"])
+        self.assertEqual(scaled_fields["function"].count("n.x"), 1)
+        self.assertNotIn("nx^{2}", scaled_fields["tex"])
+        self.assertNotIn("my^{2}", scaled_fields["tex"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_complex_exponential_integral_has_explicit_cartesian_TeX(self) -> None:
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Ei(ln(x+i*y))", 64, "x", "evaluate"
+        )
+
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn(r"\operatorname{Ei}", fields["tex"])
+        self.assertIn(r"&=p+q\mkern-2mu i", fields["tex"])
+        self.assertIn(r"p&=\gamma+\frac{1}{2}\ln", fields["tex"])
+        self.assertIn(r"q&=\operatorname{atan2}", fields["tex"])
+        self.assertNotIn(r"a&=", fields["tex"])
+
+        direct_fields, direct_raw, direct_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Ei(x+i*y)", 64, "x", "evaluate"
+        )
+        self.assertEqual(direct_returncode, 0, direct_raw)
+        self.assertIn("γ + ½ln(x² + y²)", direct_fields["expression"])
+        self.assertIn("atan2(y, x)", direct_fields["expression"])
+        self.assertIn(")i | x = NAN, y = NAN }", direct_fields["expression"])
+        self.assertIn("v1 = x^2 + y^2.", direct_fields["function"])
+        self.assertIn("v2 = atan2(y, x).", direct_fields["function"])
+        self.assertIn("v3 = v1^(n/2)/(n.factorial(n)).", direct_fields["function"])
+        self.assertIn("v4 = n.v2.", direct_fields["function"])
+        self.assertIn("sum(n, 1, @inf, v3.cos(v4))", direct_fields["function"])
+        self.assertIn("sum(n, 1, @inf, v3.sin(v4))", direct_fields["function"])
+        self.assertEqual(direct_fields["function"].count("n.v2"), 1)
+        self.assertNotIn("complex_series_term", direct_fields["function"])
+        self.assertNotIn("*", direct_fields["function"])
+        self.assertIn("atan2(y, x)", direct_fields["function"])
+        self.assertIn("return p + q.i.", direct_fields["function"])
+
+        scaled_fields, scaled_raw, scaled_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "Ei(n*x+i*m*y)", 64, "x", "evaluate"
+        )
+        self.assertEqual(scaled_returncode, 0, scaled_raw)
+        self.assertIn(r"\left(n\mkern-2mu x\right)^{2}", scaled_fields["tex"])
+        self.assertIn(r"\left(m\mkern-2mu y\right)^{2}", scaled_fields["tex"])
+        self.assertNotIn("nx²", scaled_fields["expression"])
+        self.assertNotIn("my²", scaled_fields["expression"])
+
+        derivative_fields, derivative_raw, derivative_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            "{ Ei(n*x+i*m*y) | x = 1, y = 1, m = 1, n = 1 }",
+            64,
+            "x",
+            "derivative",
+        )
+        self.assertEqual(derivative_returncode, 0, derivative_raw)
+        self.assertIn("n·exp(nx)/(n²x² + m²y²)·(my·sin(my) + nx·cos(my))", derivative_fields["derivative"])
+        self.assertIn("n·exp(nx)/(n²x² + m²y²)·(nx·sin(my) - my·cos(my))·i", derivative_fields["derivative"])
+        self.assertIn(r"n^{2}\mkern-2mu x^{2} + m^{2}\mkern-2mu y^{2}", derivative_fields["derivative_TeX"])
+        self.assertNotIn(r"n\mkern-2mu x + m\mkern-2mu y\mkern-2mu i", derivative_fields["derivative_TeX"])
+        self.assertIn("v1 = exp(n.x).", derivative_fields["derivative_function"])
+        self.assertEqual(derivative_fields["derivative_function"].count("exp(n.x)"), 1)
+        self.assertNotIn("v1 = n.x.", derivative_fields["derivative_function"])
+        self.assertNotIn("v1 = exp(v", derivative_fields["derivative_function"])
+        self.assertIn(
+            r"\frac{\partial}{\partial x}\operatorname{Ei}",
+            derivative_fields["derivative_TeX"],
+        )
+        self.assertIn(r"&=p+q\mkern-2mu i", derivative_fields["derivative_TeX"])
+        self.assertIn("p = ", derivative_fields["derivative_function"])
+        self.assertIn("q = ", derivative_fields["derivative_function"])
+        self.assertIn("return p + q.i.", derivative_fields["derivative_function"])
+
+        precise_fields, precise_raw, precise_returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary,
+            "{ Ei(x+i*y) | x = 1, y = 1 }",
+            160,
+            "x",
+            "evaluate",
+        )
+        self.assertEqual(precise_returncode, 0, precise_raw)
+        real_text, imaginary_text = precise_fields["value"].removesuffix("i").split(" + ")
+        self.assertGreaterEqual(len(real_text.replace(".", "").replace("-", "")), 160)
+        self.assertGreaterEqual(len(imaginary_text.replace(".", "").replace("-", "")), 160)
+        self.assertTrue(real_text.startswith("1.764625985563854068426738161351237966"), precise_raw)
+        self.assertTrue(imaginary_text.startswith("2.387769851510522419262792089103796064"), precise_raw)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
+    def test_all_complex_analytic_unary_functions_render_as_p_plus_qi(self) -> None:
+        functions = (
+            "erf", "erfc", "lgamma", "erfinv", "erfcinv", "gamma",
+            "digamma", "trigamma", "zeta", "gammainv", "W0", "wm1", "normal_pdf",
+            "normal_cdf", "normal_logpdf", "E1", "dilog", "Li1", "versin", "vercos",
+            "coversin", "covercos", "haversin", "havercos", "hacoversin", "hacovercos",
+            "arcversin", "arcvercos", "arccoversin", "arccovercos", "archaversin",
+            "archavercos", "archacoversin", "archacovercos",
+        )
+
+        for function in functions:
+            with self.subTest(function=function):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, f"{function}(x+i*y)", 32, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertIn(r"&=p+q\mkern-2mu i", fields["tex"])
+                self.assertIn(r"p&=\sum_", fields["tex"])
+                self.assertIn(r"q&=\sum_", fields["tex"])
+                rendered, render_error = mars_lab.render_TeX_to_svg(fields["tex"])
+                self.assertIsNone(render_error)
+                self.assertTrue(rendered)
+
+        for function in ("sqrt", "cubrt"):
+            with self.subTest(function=function):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, f"{function}(x+i*y)", 32, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                if function == "sqrt":
+                    self.assertTrue(fields["unbound"].endswith("·i"), raw)
+                else:
+                    self.assertIn(r"&=p+q\mkern-2mu i", fields["tex"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
+        "release mars_lab helper is not built",
+    )
     def test_function_atomic_negation_omits_redundant_parentheses(self) -> None:
         atomic, atomic_raw, atomic_returncode = mars_lab.run_mars_lab_fields(
             self.expression_binary, "-x", 64, "x", "evaluate"
@@ -3333,6 +3667,24 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertIn("expr.value = displayedExpressionText;", mars_lab.INDEX_HTML)
         self.assertIn(
+            "const enteredBindings = visibleBindingValues();\n"
+            "      commitVisibleBindingInputs();",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertIn(
+            "const enteredExpression = expressionWithVisibleBindings(editorText, enteredBindings);\n"
+            "      const text = options.reuseLastInput && lastEvaluationInputText\n"
+            "        ? lastEvaluationInputText\n"
+            "        : (enteredExpression || editorText);",
+            mars_lab.INDEX_HTML,
+        )
+        self.assertEqual(
+            mars_lab.INDEX_HTML.count(
+                "const text = expressionWithVisibleBindings(currentExpressionText(), enteredBindings);"
+            ),
+            2,
+        )
+        self.assertIn(
             "saveLastExpression(fullExpressionText, {debounce: true});",
             mars_lab.INDEX_HTML,
         )
@@ -3341,12 +3693,19 @@ class ExpressionResultTests(unittest.TestCase):
             mars_lab.INDEX_HTML,
         )
         self.assertIn(
-            "const updatedSource = replaceBindingValueInExpression(\n"
+            "let updatedSource = replaceBindingValueInExpression(\n"
             "          current,\n"
             "          kind,\n"
             "          name,\n"
             "          valueText\n"
             "        );\n"
+            "        if (updatedSource === current)\n"
+            "          updatedSource = replaceBindingValueInExpression(\n"
+            "            current,\n"
+            "            kind === 'constant' ? 'variable' : 'constant',\n"
+            "            name,\n"
+            "            valueText\n"
+            "          );\n"
             "        if (!updatedSource || updatedSource === current)\n"
             "          return;\n"
             "\n"
@@ -3357,7 +3716,7 @@ class ExpressionResultTests(unittest.TestCase):
             "if (data.expression && !data.partial_error)\n"
             "          setExpressionEditor(\n"
             "            editorText || text,\n"
-            "            bindingsWithAuthoredValues(data.binding_values, editorText || text),",
+            "            bindingsWithAuthoredValues(data.binding_values, editorText || text, enteredBindings),",
             mars_lab.INDEX_HTML,
         )
         self.assertIn("lastEvaluationInputText = text;", mars_lab.INDEX_HTML)
@@ -3523,7 +3882,7 @@ class ExpressionResultTests(unittest.TestCase):
 
     def test_expression_binding_display_preserves_authored_constants(self) -> None:
         self.assertIn(
-            "function bindingsWithAuthoredValues(bindings, sourceExpression) {",
+            "function bindingsWithAuthoredValues(bindings, sourceExpression, visibleBindings = []) {",
             mars_lab.INDEX_HTML,
         )
         self.assertIn(
@@ -4649,7 +5008,8 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, fields, irrational_source, 64, False, wrt="x", action="evaluate"
         )
         self.assertIn("Σ_(k=1)^n", payload["full_display_expression"])
-        self.assertNotIn("value", payload)
+        expected = sum(math.isqrt(2 * k * k) for k in range(1, 100001))
+        self.assertEqual(payload["value"], str(expected))
 
         bit_not_source = "{ @Z_(k=1)^n not(kx) | x=2; n=100000 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -4756,7 +5116,7 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, fields, nonlinear_source, 64, False, wrt="x", action="evaluate"
         )
         self.assertIn("Σ_(k=1)^n", payload["full_display_expression"])
-        self.assertNotIn("value", payload)
+        self.assertTrue(math.isfinite(float(payload["value"])))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -5171,12 +5531,11 @@ class ExpressionResultTests(unittest.TestCase):
             "expression expr(x, const n) {\n"
             "    const c1 = n + 1.\n"
             "\n"
-            "    v1 = i.x.\n"
-            "    v2 = exp(v1).\n"
-            "    v3 = 1/v2.\n"
+            "    v1 = exp(i.x).\n"
+            "    v2 = 1/v1.\n"
             "\n"
-            "    return -1/2.(li1(v2) - v2^c1.lerchphi(v2, 1, c1) + "
-            "li1(v3) - v3^c1.lerchphi(v3, 1, c1)).\n"
+            "    return -1/2.(li1(v1) - v1^c1.lerchphi(v1, 1, c1) + "
+            "li1(v2) - v2^c1.lerchphi(v2, 1, c1)).\n"
             "}\n"
             "\n"
             "x = 2.\n"

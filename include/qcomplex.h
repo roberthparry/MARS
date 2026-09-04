@@ -451,6 +451,7 @@ qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x); /**< upper incomplete 
 qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x);     /**< regularised lower gamma */
 qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x);     /**< regularised upper gamma */
 qcomplex_t qc_Ei(qcomplex_t z);                           /**< exponential integral Ei */
+qcomplex_t qc_Li(qcomplex_t z);                           /**< logarithmic integral Li */
 qcomplex_t qc_E1(qcomplex_t z);                           /**< exponential integral E1 */
 /** @} */
 

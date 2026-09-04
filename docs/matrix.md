@@ -1091,6 +1091,7 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_lambert_wm1(A)` | Matrix Lambert W function (-1 branch) |
 | `mat_productlog(A)` | Matrix product logarithm (Lambert W) |
 | `mat_Ei(A)` | Matrix exponential integral Ei |
+| `mat_Li(A)` | Principal matrix logarithmic integral Li(A) = Ei(log(A)) |
 | `mat_E1(A)` | Matrix exponential integral E1 |
 
 ### Power Functions

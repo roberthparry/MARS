@@ -742,6 +742,8 @@ expr_t *expr_pdf(const expr_t *expr);
 expr_t *expr_cdf(const expr_t *expr);
 expr_t *expr_logpdf(const expr_t *expr);
 expr_t *expr_Ei(const expr_t *expr);
+/** @brief Construct the logarithmic integral Li(expr). */
+expr_t *expr_Li(const expr_t *expr);
 expr_t *expr_E1(const expr_t *expr);
 
 /**

@@ -347,6 +347,12 @@ static void test_qf_Ei_E1_identity(void)
     }
 
     printf("\n");
+
+    {
+        qfloat_t x = qf_from_double(2.0);
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_Li(x), qf_Ei(qf_log(x)), 1e-30);
+    }
 }
 
 static void test_Ei_values(void)

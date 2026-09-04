@@ -57,6 +57,7 @@ typedef struct {
 static void expr_series_destroy_numbers(number_t *values, size_t count);
 static bool expr_series_number_to_long(number_t value, long *value_out);
 static int expr_series_append_slice(string_t *output, const char *text, size_t start, size_t end);
+static const char *expr_series_display_index_name(const char *text);
 
 static void expr_series_result_init(expr_series_result_t *result)
 {
@@ -1266,6 +1267,165 @@ cleanup:
     expr_free(endpoint_term);
     expr_free(angle_step);
     expr_free(expanded_first);
+    expr_free(first);
+    free(terms);
+    if (!matched) {
+        string_free(TeX);
+        string_free(output);
+        return string_clone(source);
+    }
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    return output;
+}
+
+static expr_t *expr_series_unary_progression_endpoint(const expr_t *argument, const expr_t *base)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *candidate = NULL;
+    number_t base_value = NUM_NAN;
+    number_t endpoint_value = NUM_NAN;
+    expr_t *endpoint = NULL;
+
+    if (!argument || !base)
+        return NULL;
+    base_value = expr_eval(base);
+    if (num_is_exact(base_value) && num_is_one(base_value)) {
+        candidate = argument;
+    } else if (expr_match_mul_expr(argument, &left, &right) && left && right) {
+        if (expr_series_simplified_equal(left, base))
+            candidate = right;
+        else if (expr_series_simplified_equal(right, base))
+            candidate = left;
+    }
+    if (!candidate || (!expr_is_variable(candidate) && !expr_is_named_const(candidate)))
+        goto cleanup;
+    endpoint_value = expr_eval(candidate);
+    if (num_is_nan(endpoint_value))
+        endpoint = expr_clone(candidate);
+
+cleanup:
+    num_destroy(&endpoint_value);
+    num_destroy(&base_value);
+    return endpoint;
+}
+
+static const char *expr_series_unary_progression_index_name(const expr_t *first, const expr_t *endpoint)
+{
+    static const char *const candidates[] = {"k", "j", "m", "l", "r", "s", "t"};
+    expr_bindings_t *first_bindings = expr_bindings_from_expr_internal(first);
+    expr_bindings_t *endpoint_bindings = expr_bindings_from_expr_internal(endpoint);
+    const char *name = "index";
+
+    if (!first_bindings || !endpoint_bindings)
+        goto cleanup;
+    for (size_t i = 0u; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+        if (!expr_bindings_get(first_bindings, candidates[i]) && !expr_bindings_get(endpoint_bindings, candidates[i])) {
+            name = candidates[i];
+            break;
+        }
+    }
+
+cleanup:
+    expr_bindings_free(endpoint_bindings);
+    expr_bindings_free(first_bindings);
+    return name;
+}
+
+static string_t *expr_series_expand_unary_function_progression(const string_t *source, bool *expanded_out,
+                                                                string_t **display_TeX_out)
+{
+    const char *text = string_c_str(source);
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    size_t ellipsis_index = SIZE_MAX;
+    expr_t *first = NULL;
+    const expr_t *first_argument = NULL;
+    expr_t *endpoint_term = NULL;
+    expr_t *endpoint = NULL;
+    expr_t *index = NULL;
+    expr_t *indexed_argument = NULL;
+    expr_t *indexed_term = NULL;
+    expr_t *lower = NULL;
+    expr_t *summation = NULL;
+    char *summation_text = NULL;
+    char *summation_TeX = NULL;
+    string_t *output = NULL;
+    string_t *TeX = NULL;
+    bool matched = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &term_count))
+        return NULL;
+    for (size_t i = 0u; i < term_count; ++i) {
+        if (expr_series_is_ellipsis(text, terms[i])) {
+            ellipsis_index = i;
+            break;
+        }
+    }
+    if (ellipsis_index == SIZE_MAX || ellipsis_index < 3u || ellipsis_index + 2u != term_count)
+        goto cleanup;
+
+    first = expr_series_parse_term_expression(text, terms[0]);
+    if (!expr_match_reapplicable_unary_function(first, &first_argument) || !first_argument)
+        goto cleanup;
+    for (size_t i = 0u; i < ellipsis_index; ++i) {
+        expr_t *term = expr_series_parse_term_expression(text, terms[i]);
+        const expr_t *term_argument = NULL;
+        long scale = 0L;
+        const bool term_matches = expr_match_same_reapplicable_unary_function(term, first, &term_argument) &&
+                                  term_argument &&
+                                  expr_series_match_positive_long_scale(term_argument, first_argument, &scale) &&
+                                  scale == (long)i + 1L;
+
+        expr_free(term);
+        if (!term_matches)
+            goto cleanup;
+    }
+
+    endpoint_term = expr_series_parse_term_expression(text, terms[ellipsis_index + 1u]);
+    {
+        const expr_t *endpoint_argument = NULL;
+
+        if (!expr_match_same_reapplicable_unary_function(endpoint_term, first, &endpoint_argument) ||
+            !endpoint_argument)
+            goto cleanup;
+        endpoint = expr_series_unary_progression_endpoint(endpoint_argument, first_argument);
+    }
+    if (!endpoint)
+        goto cleanup;
+
+    index = expr_new_named_var(NUM_NAN, expr_series_unary_progression_index_name(first, endpoint));
+    indexed_argument = index ? expr_mul(index, first_argument) : NULL;
+    indexed_term = indexed_argument ? expr_apply_reapplicable_unary_function(first, indexed_argument) : NULL;
+    lower = expr_new_const(NUM_ONE);
+    summation = indexed_term && index && lower ? expr_new_finite_summation_range(indexed_term, index, lower, endpoint)
+                                               : NULL;
+    summation_text = summation ? expr_to_string(summation, style_UNBOUND) : NULL;
+    summation_TeX = summation ? expr_to_TeX_body(summation) : NULL;
+    output = string_new();
+    TeX = string_new();
+    if (!summation_text || !summation_TeX || !output || !TeX ||
+        expr_series_append_slice(output, text, 0u, expr_series_trim(text, terms[0]).start) != 0 ||
+        string_append_cstr(output, summation_text) != 0 ||
+        expr_series_append_slice(output, text, expr_series_trim(text, terms[ellipsis_index + 1u]).end,
+                                 strlen(text)) != 0 ||
+        string_append_cstr(TeX, summation_TeX) != 0)
+        goto cleanup;
+    matched = true;
+
+cleanup:
+    free(summation_TeX);
+    free(summation_text);
+    expr_free(summation);
+    expr_free(lower);
+    expr_free(indexed_term);
+    expr_free(indexed_argument);
+    expr_free(index);
+    expr_free(endpoint);
+    expr_free(endpoint_term);
     expr_free(first);
     free(terms);
     if (!matched) {
@@ -4085,6 +4245,21 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         string_free(next);
 
         next = expr_series_expand_trigonometric_progression(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_unary_function_progression(current, &expanded, &next_display_TeX);
         if (!next) {
             string_free(display_TeX);
             string_free(current);

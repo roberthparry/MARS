@@ -824,6 +824,7 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_normal_cdf(const expr_t *expr)` — standard normal CDF Φ(x)
 - `expr_t *expr_normal_logpdf(const expr_t *expr)` — ln φ(x)
 - `expr_t *expr_Ei(const expr_t *expr)` — Ei(x), exponential integral
+- `expr_t *expr_Li(const expr_t *expr)` — Li(x), logarithmic integral on the principal branch
 - `expr_t *expr_E1(const expr_t *expr)` — E₁(x), exponential integral
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
 - `expr_t *expr_polylog1(const expr_t *expr)` — order-one polylogarithm Li₁(x) = −Log(1−x), with dedicated derivative, reverse-mode and antiderivative operations
