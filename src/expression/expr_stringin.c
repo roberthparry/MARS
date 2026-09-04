@@ -290,94 +290,93 @@ typedef struct {
 } func_entry_t;
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
-    0, 0, 0, 0, 0, 3, 3, 3, 2, 0, 0, 0, 0, 5, 0, 8,
-    2, 0, 0, 0, 1, 0, 0, 6, 0, 0, 1, 0, 21, 0, 6, 1,
-    0, 0, 0, 0, 0, 2, 0, 0, 2, 1, 0, 42, 0, 1, 1, 5,
-    0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 9, 22,
-    2, 0, 20, 0, 0, 52, 0, 3, 0, 0, 8, 0, 0, 0, 0, 0,
-    0, 1, 0, 0, 0, 0, 30, 1, 0, 35, 0, 1, 6, 0, 1, 60,
-    0, 0, 0, 0, 0, 61, 3, 0, 0, 4, 19, 0, 0, 5, 0, 0,
-    0, 0, 0, 2, 0, 2, 2, 0, 85, 0, 0, 7, 2, 1, 1, 9,
-    0, 0, 0, 0, 0, 1, 0, 34, 0, 0, 0, 0, 0, 1, 0, 0,
-    0, 0, 0, 5, 5, 88, 0, 0, 2, 0, 20, 0, 0, 0, 2, 0,
-    0, 0, 1, 3, 0, 7, 0, 0, 0, 0, 0, 92, 0, 20, 0, 39,
-    0, 0, 35, 0, 22, 7, 0, 0, 3, 0, 19, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 47, 4, 0, 1, 0, 0, 2, 2, 0, 0, 0, 54,
-    19, 0, 52, 2, 14, 0, 0, 0, 3, 0, 9, 24, 25, 17, 16, 6
+    0, 0, 0, 0, 0, 3, 3, 3, 2, 0, 0, 0, 0, 7, 0, 16,
+    2, 0, 0, 0, 1, 4, 0, 6, 0, 0, 1, 0, 8, 0, 6, 1,
+    0, 0, 0, 0, 0, 3, 0, 0, 2, 0, 0, 44, 0, 1, 1, 5,
+    0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 14, 24,
+    2, 0, 23, 0, 0, 54, 0, 3, 0, 0, 8, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 0, 0, 31, 1, 0, 35, 0, 1, 6, 0, 1, 6,
+    0, 0, 0, 0, 0, 61, 76, 0, 0, 4, 90, 0, 0, 5, 0, 0,
+    0, 0, 0, 2, 0, 5, 11, 0, 87, 0, 0, 8, 2, 16, 1, 18,
+    0, 0, 0, 0, 0, 10, 0, 36, 0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 5, 10, 113, 0, 0, 2, 0, 20, 0, 0, 0, 2, 0,
+    0, 0, 1, 5, 0, 14, 0, 0, 0, 0, 0, 119, 0, 30, 0, 44,
+    0, 0, 35, 0, 2, 11, 0, 0, 3, 0, 19, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 53, 4, 0, 8, 0, 0, 2, 2, 0, 0, 0, 65,
+    19, 0, 66, 42, 28, 0, 0, 0, 14, 0, 16, 28, 25, 0, 46, 19
 };
 
 // clang-format off
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
-    [0  ] = { .kw = "lnB",                .arity = 2u,       .ops = &ops_logbeta,        .bfn = expr_logbeta },
     [1  ] = { .kw = "dilog",              .arity = 1u,       .ops = &ops_dilog,          .ufn = expr_dilog },
     [2  ] = { .kw = "Γ",                  .arity = 1u,       .ops = &ops_gamma,          .ufn = expr_gamma },
     [3  ] = { .kw = "root",               .arity = 2u,       .ops = &ops_root,           .bfn = expr_root },
     [4  ] = { .kw = "conjugate",          .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
     [5  ] = { .kw = "asec",               .arity = 1u,       .ops = &ops_asec,           .ufn = expr_asec },
     [6  ] = { .kw = "archacoversin",      .arity = 1u,       .ops = &ops_archacoversin,  .ufn = expr_archacoversin },
-    [7  ] = { .kw = "arccot",             .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
+    [7  ] = { .kw = "logarithmic_integral", .arity = 1u,     .ops = &ops_Li,             .ufn = expr_Li },
     [8  ] = { .kw = "lambert_wn",         .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
-    [9  ] = { .kw = "gammainc_Q",         .arity = 2u,       .ops = &ops_gammainc_Q,     .bfn = expr_gammainc_Q },
+    [9  ] = { .kw = "archacovercos",      .arity = 1u,       .ops = &ops_archacovercos,  .ufn = expr_archacovercos },
     [10 ] = { .kw = "wn",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [11 ] = { .kw = "arcsec",             .arity = 1u,       .ops = &ops_asec,           .ufn = expr_asec },
     [12 ] = { .kw = "OR",                 .arity = 2u,       .ops = &ops_bit_or,         .bfn = expr_bit_or },
     [13 ] = { .kw = "sqrt",               .arity = 1u,       .ops = &ops_sqrt,           .ufn = expr_sqrt },
     [14 ] = { .kw = "Li₂",                .arity = 1u,       .ops = &ops_dilog,          .ufn = expr_dilog },
     [15 ] = { .kw = "beta_pdf",           .arity = 3u,                                   .tfn = expr_beta_pdf },
-    [16 ] = { .kw = "ei",                 .arity = 1u,       .ops = &ops_Ei,             .ufn = expr_Ei },
+    [16 ] = { .kw = "arccot",             .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
     [17 ] = { .kw = "w0",                 .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
-    [18 ] = { .kw = "besselj",            .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
+    [18 ] = { .kw = "gammainc_Q",         .arity = 2u,       .ops = &ops_gammainc_Q,     .bfn = expr_gammainc_Q },
     [19 ] = { .kw = "csc",                .arity = 1u,       .ops = &ops_cosec,          .ufn = expr_cosec },
     [20 ] = { .kw = "gammaincq",          .arity = 2u,       .ops = &ops_gammainc_Q,     .bfn = expr_gammainc_Q },
     [21 ] = { .kw = "zatahp",             .arity = 2u,       .ops = &ops_zatahp,         .bfn = expr_zatahp },
     [22 ] = { .kw = "digamma",            .arity = 1u,       .ops = &ops_digamma,        .ufn = expr_digamma },
-    [23 ] = { .kw = "atan2",              .arity = 2u,       .ops = &ops_atan2,          .bfn = expr_atan2 },
+    [23 ] = { .kw = "ei",                 .arity = 1u,       .ops = &ops_Ei,             .ufn = expr_Ei },
     [24 ] = { .kw = "log10",              .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
-    [25 ] = { .kw = "Wₙ",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
+    [25 ] = { .kw = "atan2",              .arity = 2u,       .ops = &ops_atan2,          .bfn = expr_atan2 },
     [26 ] = { .kw = "shl",                .arity = 2u,       .ops = &ops_shl,            .bfn = expr_shl },
-    [27 ] = { .kw = "ψ⁽¹⁾",               .arity = 1u,       .ops = &ops_trigamma,       .ufn = expr_trigamma },
+    [27 ] = { .kw = "Φ",                  .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
     [28 ] = { .kw = "factors",            .arity = 1u,       .ops = &ops_factors,        .ufn = expr_factors },
-    [29 ] = { .kw = "archacovercos",      .arity = 1u,       .ops = &ops_archacovercos,  .ufn = expr_archacovercos },
+    [29 ] = { .kw = "Wₙ",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [30 ] = { .kw = "zetap",              .arity = UINT_MAX, .ops = &ops_zetap,          .ufn = expr_zetap, .vfn = expr_zetap_from_args },
-    [31 ] = { .kw = "harmonic_poly",      .arity = 2u,       .ops = &ops_harmonic_poly,  .bfn = expr_harmonic_poly },
+    [31 ] = { .kw = "erfinv",             .arity = 1u,       .ops = &ops_erfinv,         .ufn = expr_erfinv },
     [32 ] = { .kw = "legendre_chi",       .arity = 2u,       .ops = &ops_legendre_chi,   .bfn = expr_legendre_chi_xp },
-    [33 ] = { .kw = "gammainc_P",         .arity = 2u,       .ops = &ops_gammainc_P,     .bfn = expr_gammainc_P },
-    [34 ] = { .kw = "haversin",           .arity = 1u,       .ops = &ops_haversin,       .ufn = expr_haversin },
+    [33 ] = { .kw = "e1",                 .arity = 1u,       .ops = &ops_E1,             .ufn = expr_E1 },
+    [34 ] = { .kw = "LauricellaF",        .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [35 ] = { .kw = "zeta2p",             .arity = 2u,       .ops = &ops_zatahp,         .bfn = expr_zatahp },
-    [36 ] = { .kw = "gcd",                .arity = 2u,       .ops = &ops_gcd,            .bfn = expr_gcd },
+    [36 ] = { .kw = "Li",                 .arity = 1u,       .ops = &ops_Li,             .ufn = expr_Li },
     [37 ] = { .kw = "productlog",         .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
     [38 ] = { .kw = "chi",                .arity = 2u,       .ops = &ops_legendre_chi,   .bfn = expr_legendre_chi_xp },
-    [39 ] = { .kw = "partition",          .arity = 1u,       .ops = &ops_partition,      .ufn = expr_partition },
+    [39 ] = { .kw = "gcd",                .arity = 2u,       .ops = &ops_gcd,            .bfn = expr_gcd },
     [40 ] = { .kw = "AND",                .arity = 2u,       .ops = &ops_bit_and,        .bfn = expr_bit_and },
     [41 ] = { .kw = "lommels",            .arity = 3u,       .ops = &ops_lommel_s,       .tfn = expr_lommel_s },
-    [42 ] = { .kw = "Ei",                 .arity = 1u,       .ops = &ops_Ei,             .ufn = expr_Ei },
-    [43 ] = { .kw = "HypergeometricpFq",  .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
-    [44 ] = { .kw = "Φ",                  .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
+    [42 ] = { .kw = "gammainc_P",         .arity = 2u,       .ops = &ops_gammainc_P,     .bfn = expr_gammainc_P },
+    [43 ] = { .kw = "partition",          .arity = 1u,       .ops = &ops_partition,      .ufn = expr_partition },
+    [44 ] = { .kw = "binomial",           .arity = 2u,       .ops = NULL,                .bfn = expr_binomial },
     [45 ] = { .kw = "pfq",                .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
     [46 ] = { .kw = "lambertw0",          .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [47 ] = { .kw = "asinh",              .arity = 1u,       .ops = &ops_asinh,          .ufn = expr_asinh },
     [48 ] = { .kw = "atanh",              .arity = 1u,       .ops = &ops_atanh,          .ufn = expr_atanh },
     [49 ] = { .kw = "cdf",                .arity = 1u,       .ops = &ops_cdf,            .ufn = expr_cdf },
-    [50 ] = { .kw = "e1",                 .arity = 1u,       .ops = &ops_E1,             .ufn = expr_E1 },
-    [51 ] = { .kw = "erfinv",             .arity = 1u,       .ops = &ops_erfinv,         .ufn = expr_erfinv },
+    [50 ] = { .kw = "HypergeometricpFq",  .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
+    [51 ] = { .kw = "Ei",                 .arity = 1u,       .ops = &ops_Ei,             .ufn = expr_Ei },
     [52 ] = { .kw = "log",                .arity = 1u,       .ops = &ops_log10,          .ufn = expr_log10 },
     [53 ] = { .kw = "W₋₁",                .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [54 ] = { .kw = "arcvercos",          .arity = 1u,       .ops = &ops_arcvercos,      .ufn = expr_arcvercos },
     [55 ] = { .kw = "arcoth",             .arity = 1u,       .ops = &ops_acoth,          .ufn = expr_acoth },
     [56 ] = { .kw = "w",                  .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
-    [57 ] = { .kw = "binomial",           .arity = 2u,       .ops = NULL,                .bfn = expr_binomial },
-    [58 ] = { .kw = "gammainv",           .arity = 1u,       .ops = &ops_gammainv,       .ufn = expr_gammainv },
+    [57 ] = { .kw = "ψ⁽¹⁾",               .arity = 1u,       .ops = &ops_trigamma,       .ufn = expr_trigamma },
+    [58 ] = { .kw = "besselj",            .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
     [59 ] = { .kw = "hn",                 .arity = 2u,       .ops = &ops_harmonic_poly,  .bfn = expr_harmonic_poly },
     [60 ] = { .kw = "acsch",              .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
     [61 ] = { .kw = "f1",                 .arity = 6u,                                   .sfn = expr_appell_f1 },
     [62 ] = { .kw = "archaversin",        .arity = 1u,       .ops = &ops_archaversin,    .ufn = expr_archaversin },
     [63 ] = { .kw = "arccosec",           .arity = 1u,       .ops = &ops_acosec,         .ufn = expr_acosec },
     [64 ] = { .kw = "Li₁",                .arity = 1u,       .ops = &ops_polylog1,       .ufn = expr_polylog1 },
-    [65 ] = { .kw = "havercos",           .arity = 1u,       .ops = &ops_havercos,       .ufn = expr_havercos },
+    [65 ] = { .kw = "gammainv",           .arity = 1u,       .ops = &ops_gammainv,       .ufn = expr_gammainv },
     [66 ] = { .kw = "gammainclower",      .arity = 2u,       .ops = &ops_gammainc_lower, .bfn = expr_gammainc_lower },
     [67 ] = { .kw = "hypergeometricpfq",  .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
     [68 ] = { .kw = "logbeta",            .arity = 2u,       .ops = &ops_logbeta,        .bfn = expr_logbeta },
-    [69 ] = { .kw = "xor",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
+    [69 ] = { .kw = "havercos",           .arity = 1u,       .ops = &ops_havercos,       .ufn = expr_havercos },
     [70 ] = { .kw = "W_0",                .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [71 ] = { .kw = "is_prime",           .arity = 1u,       .ops = &ops_is_prime,       .ufn = expr_is_prime },
     [72 ] = { .kw = "logpdf",             .arity = 1u,       .ops = &ops_logpdf,         .ufn = expr_logpdf },
@@ -385,26 +384,26 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [74 ] = { .kw = "normalpdf",          .arity = 1u,       .ops = &ops_normal_pdf,     .ufn = expr_normal_pdf },
     [75 ] = { .kw = "logbetapdf",         .arity = 3u,                                   .tfn = expr_logbeta_pdf },
     [76 ] = { .kw = "lcm",                .arity = 2u,       .ops = &ops_lcm,            .bfn = expr_lcm },
-    [77 ] = { .kw = "beta",               .arity = 2u,       .ops = &ops_beta,           .bfn = expr_beta },
+    [77 ] = { .kw = "xor",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
     [78 ] = { .kw = "asech",              .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
-    [79 ] = { .kw = "lauricella_f",       .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
+    [79 ] = { .kw = "beta",               .arity = 2u,       .ops = &ops_beta,           .bfn = expr_beta },
     [80 ] = { .kw = "arccovercos",        .arity = 1u,       .ops = &ops_arccovercos,    .ufn = expr_arccovercos },
     [81 ] = { .kw = "ψq",                 .arity = 2u,       .ops = &ops_qdigamma,       .bfn = expr_qdigamma },
     [82 ] = { .kw = "logbeta_pdf",        .arity = 3u,                                   .tfn = expr_logbeta_pdf },
     [83 ] = { .kw = "lambert_w0",         .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
-    [84 ] = { .kw = "lerchphi",           .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
+    [84 ] = { .kw = "lauricella_f",       .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [85 ] = { .kw = "BesselJ",            .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
-    [86 ] = { .kw = "coversin",           .arity = 1u,       .ops = &ops_coversin,       .ufn = expr_coversin },
+    [86 ] = { .kw = "lerchphi",           .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
     [87 ] = { .kw = "pow",                .arity = 2u,       .ops = &ops_pow,            .bfn = expr_pow_xp },
     [88 ] = { .kw = "cosh",               .arity = 1u,       .ops = &ops_cosh,           .ufn = expr_cosh },
-    [89 ] = { .kw = "and",                .arity = 2u,       .ops = &ops_bit_and,        .bfn = expr_bit_and },
-    [90 ] = { .kw = "floor",              .arity = 1u,       .ops = &ops_floor,          .ufn = expr_floor },
-    [91 ] = { .kw = "next_prime",         .arity = 1u,       .ops = &ops_next_prime,     .ufn = expr_next_prime },
+    [89 ] = { .kw = "coversin",           .arity = 1u,       .ops = &ops_coversin,       .ufn = expr_coversin },
+    [90 ] = { .kw = "next_prime",         .arity = 1u,       .ops = &ops_next_prime,     .ufn = expr_next_prime },
+    [91 ] = { .kw = "and",                .arity = 2u,       .ops = &ops_bit_and,        .bfn = expr_bit_and },
     [92 ] = { .kw = "sinh",               .arity = 1u,       .ops = &ops_sinh,           .ufn = expr_sinh },
-    [93 ] = { .kw = "cos",                .arity = 1u,       .ops = &ops_cos,            .ufn = expr_cos },
-    [94 ] = { .kw = "bessel_j",           .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
+    [93 ] = { .kw = "floor",              .arity = 1u,       .ops = &ops_floor,          .ufn = expr_floor },
+    [94 ] = { .kw = "cos",                .arity = 1u,       .ops = &ops_cos,            .ufn = expr_cos },
     [95 ] = { .kw = "LerchPhi",           .arity = 3u,       .ops = &ops_lerch_phi,      .tfn = expr_lerch_phi },
-    [96 ] = { .kw = "lnΓ",               .arity = 1u,       .ops = &ops_lgamma,         .ufn = expr_lgamma },
+    [96 ] = { .kw = "lnΓ",                .arity = 1u,       .ops = &ops_lgamma,         .ufn = expr_lgamma },
     [97 ] = { .kw = "E1",                 .arity = 1u,       .ops = &ops_E1,             .ufn = expr_E1 },
     [98 ] = { .kw = "acot",               .arity = 1u,       .ops = &ops_acot,           .ufn = expr_acot },
     [99 ] = { .kw = "hacoversin",         .arity = 1u,       .ops = &ops_hacoversin,     .ufn = expr_hacoversin },
@@ -412,10 +411,10 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [101] = { .kw = "normal_logpdf",      .arity = 1u,       .ops = &ops_normal_logpdf,  .ufn = expr_normal_logpdf },
     [102] = { .kw = "lg",                 .arity = 1u,       .ops = &ops_log10,          .ufn = expr_lg },
     [103] = { .kw = "cot",                .arity = 1u,       .ops = &ops_cot,            .ufn = expr_cot },
-    [104] = { .kw = "W-1",                .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
-    [105] = { .kw = "SHR",                .arity = 2u,       .ops = &ops_shr,            .bfn = expr_shr },
-    [106] = { .kw = "lambertwn",          .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
-    [107] = { .kw = "isqrt",              .arity = 1u,       .ops = &ops_isqrt,          .ufn = expr_isqrt },
+    [104] = { .kw = "harmonic_poly",      .arity = 2u,       .ops = &ops_harmonic_poly,  .bfn = expr_harmonic_poly },
+    [105] = { .kw = "haversin",           .arity = 1u,       .ops = &ops_haversin,       .ufn = expr_haversin },
+    [106] = { .kw = "W-1",                .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
+    [107] = { .kw = "SHR",                .arity = 2u,       .ops = &ops_shr,            .bfn = expr_shr },
     [108] = { .kw = "ζ",                  .arity = UINT_MAX, .ops = &ops_zeta,           .ufn = expr_zeta,  .vfn = expr_zeta_from_args },
     [109] = { .kw = "erfc",               .arity = 1u,       .ops = &ops_erfc,           .ufn = expr_erfc },
     [110] = { .kw = "legendrechi",        .arity = 2u,       .ops = &ops_legendre_chi,   .bfn = expr_legendre_chi_xp },
@@ -432,37 +431,41 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [121] = { .kw = "lauricellaf",        .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [122] = { .kw = "ψ⁽⁰⁾",               .arity = 1u,       .ops = &ops_digamma,        .ufn = expr_digamma },
     [123] = { .kw = "appellf1",           .arity = 6u,                                   .sfn = expr_appell_f1 },
-    [124] = { .kw = "hypergeometric_pFq", .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
-    [125] = { .kw = "cubrt",              .arity = 1u,       .ops = &ops_cubrt,          .ufn = expr_cubrt },
-    [126] = { .kw = "acosech",            .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
+    [124] = { .kw = "bessel_j",           .arity = 2u,       .ops = &ops_bessel_j,       .bfn = expr_bessel_j },
+    [125] = { .kw = "hypergeometric_pFq", .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
+    [126] = { .kw = "cubrt",              .arity = 1u,       .ops = &ops_cubrt,          .ufn = expr_cubrt },
     [127] = { .kw = "li2",                .arity = 1u,       .ops = &ops_dilog,          .ufn = expr_dilog },
     [128] = { .kw = "arsech",             .arity = 1u,       .ops = &ops_asech,          .ufn = expr_asech },
     [129] = { .kw = "arccsc",             .arity = 1u,       .ops = &ops_acosec,         .ufn = expr_acosec },
     [130] = { .kw = "gammainc_lower",     .arity = 2u,       .ops = &ops_gammainc_lower, .bfn = expr_gammainc_lower },
-    [131] = { .kw = "hypot",              .arity = 2u,       .ops = &ops_hypot,          .bfn = expr_hypot },
-    [132] = { .kw = "XOR",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
-    [133] = { .kw = "versin",             .arity = 1u,       .ops = &ops_versin,         .ufn = expr_versin },
-    [134] = { .kw = "qdigamma",           .arity = 2u,       .ops = &ops_qdigamma,       .bfn = expr_qdigamma },
+    [131] = { .kw = "lambertwn",          .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
+    [132] = { .kw = "li",                 .arity = 1u,       .ops = &ops_Li,             .ufn = expr_Li },
+    [133] = { .kw = "hypot",              .arity = 2u,       .ops = &ops_hypot,          .bfn = expr_hypot },
+    [134] = { .kw = "isqrt",              .arity = 1u,       .ops = &ops_isqrt,          .ufn = expr_isqrt },
     [135] = { .kw = "LommelS",            .arity = 3u,       .ops = &ops_lommel_s,       .tfn = expr_lommel_s },
-    [136] = { .kw = "shr",                .arity = 2u,       .ops = &ops_shr,            .bfn = expr_shr },
-    [137] = { .kw = "polygamma",          .arity = 2u,       .ops = &ops_polygamma,      .bfn = expr_polygamma_xp },
+    [136] = { .kw = "acosech",            .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
+    [137] = { .kw = "XOR",                .arity = 2u,       .ops = &ops_bit_xor,        .bfn = expr_bit_xor },
     [138] = { .kw = "Wn",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
-    [139] = { .kw = "bessely",            .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
+    [139] = { .kw = "versin",             .arity = 1u,       .ops = &ops_versin,         .ufn = expr_versin },
     [140] = { .kw = "csch",               .arity = 1u,       .ops = &ops_cosech,         .ufn = expr_cosech },
     [141] = { .kw = "pFq",                .arity = UINT_MAX,                             .vfn = expr_hypergeometric_pFq_from_args },
     [142] = { .kw = "arcsch",             .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
-    [143] = { .kw = "ceil",               .arity = 1u,       .ops = &ops_ceil,           .ufn = expr_ceil },
+    [143] = { .kw = "shr",                .arity = 2u,       .ops = &ops_shr,            .bfn = expr_shr },
     [144] = { .kw = "W",                  .arity = 1u,       .ops = &ops_lambert_w,      .ufn = expr_lambert_w },
-    [145] = { .kw = "bessel_y",           .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
+    [145] = { .kw = "qdigamma",           .arity = 2u,       .ops = &ops_qdigamma,       .bfn = expr_qdigamma },
     [146] = { .kw = "acosec",             .arity = 1u,       .ops = &ops_acosec,         .ufn = expr_acosec },
     [147] = { .kw = "cosec",              .arity = 1u,       .ops = &ops_cosec,          .ufn = expr_cosec },
     [148] = { .kw = "hacovercos",         .arity = 1u,       .ops = &ops_hacovercos,     .ufn = expr_hacovercos },
     [149] = { .kw = "harmonicpoly",       .arity = 2u,       .ops = &ops_harmonic_poly,  .bfn = expr_harmonic_poly },
     [150] = { .kw = "arcosech",           .arity = 1u,       .ops = &ops_acosech,        .ufn = expr_acosech },
+    [151] = { .kw = "polygamma",          .arity = 2u,       .ops = &ops_polygamma,      .bfn = expr_polygamma_xp },
     [152] = { .kw = "abs",                .arity = 1u,       .ops = &ops_abs,            .ufn = expr_abs },
+    [153] = { .kw = "bessely",            .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
+    [154] = { .kw = "ceil",               .arity = 1u,       .ops = &ops_ceil,           .ufn = expr_ceil },
     [155] = { .kw = "zeta",               .arity = UINT_MAX, .ops = &ops_zeta,           .ufn = expr_zeta,  .vfn = expr_zeta_from_args },
     [156] = { .kw = "acos",               .arity = 1u,       .ops = &ops_acos,           .ufn = expr_acos },
     [157] = { .kw = "W_-1",               .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
+    [158] = { .kw = "bessel_y",           .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
     [160] = { .kw = "normal_cdf",         .arity = 1u,       .ops = &ops_normal_cdf,     .ufn = expr_normal_cdf },
     [161] = { .kw = "archavercos",        .arity = 1u,       .ops = &ops_archavercos,    .ufn = expr_archavercos },
     [163] = { .kw = "gammaincupper",      .arity = 2u,       .ops = &ops_gammainc_upper, .bfn = expr_gammainc_upper },
@@ -472,7 +475,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [167] = { .kw = "W₀",                 .arity = 1u,       .ops = &ops_lambert_w0,     .ufn = expr_lambert_w0 },
     [168] = { .kw = "vercos",             .arity = 1u,       .ops = &ops_vercos,         .ufn = expr_vercos },
     [169] = { .kw = "not",                .arity = 1u,       .ops = &ops_bit_not,        .ufn = expr_bit_not },
-    [170] = { .kw = "NOT",                .arity = 1u,       .ops = &ops_bit_not,        .ufn = expr_bit_not },
+    [170] = { .kw = "lnB",                .arity = 2u,       .ops = &ops_logbeta,        .bfn = expr_logbeta },
     [171] = { .kw = "fibonacci",          .arity = 1u,       .ops = &ops_fibonacci,      .ufn = expr_fibonacci },
     [172] = { .kw = "covercos",           .arity = 1u,       .ops = &ops_covercos,       .ufn = expr_covercos },
     [173] = { .kw = "sum",                .arity = UINT_MAX,                             .vfn = expr_finite_sum_from_args },
@@ -487,7 +490,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [182] = { .kw = "SHL",                .arity = 2u,       .ops = &ops_shl,            .bfn = expr_shl },
     [183] = { .kw = "prevprime",          .arity = 1u,       .ops = &ops_prev_prime,     .ufn = expr_prev_prime },
     [184] = { .kw = "li1",                .arity = 1u,       .ops = &ops_polylog1,       .ufn = expr_polylog1 },
-    [185] = { .kw = "zetah",              .arity = 2u,       .ops = &ops_zetah,          .bfn = expr_zetah },
+    [185] = { .kw = "NOT",                .arity = 1u,       .ops = &ops_bit_not,        .ufn = expr_bit_not },
     [186] = { .kw = "normallogpdf",       .arity = 1u,       .ops = &ops_normal_logpdf,  .ufn = expr_normal_logpdf },
     [187] = { .kw = "Hn",                 .arity = 2u,       .ops = &ops_harmonic_poly,  .bfn = expr_harmonic_poly },
     [188] = { .kw = "W_n",                .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
@@ -496,27 +499,27 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [191] = { .kw = "gammainc_upper",     .arity = 2u,       .ops = &ops_gammainc_upper, .bfn = expr_gammainc_upper },
     [192] = { .kw = "tan",                .arity = 1u,       .ops = &ops_tan,            .ufn = expr_tan },
     [193] = { .kw = "polylog",            .arity = 2u,       .ops = &ops_polylog,        .bfn = expr_polylog_xp },
-    [194] = { .kw = "BesselY",            .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
+    [194] = { .kw = "zetah",              .arity = 2u,       .ops = &ops_zetah,          .bfn = expr_zetah },
     [195] = { .kw = "prev_prime",         .arity = 1u,       .ops = &ops_prev_prime,     .ufn = expr_prev_prime },
     [196] = { .kw = "factorial",          .arity = 1u,       .ops = &ops_factorial,      .ufn = expr_factorial },
     [197] = { .kw = "normal_pdf",         .arity = 1u,       .ops = &ops_normal_pdf,     .ufn = expr_normal_pdf },
     [198] = { .kw = "lgamma",             .arity = 1u,       .ops = &ops_lgamma,         .ufn = expr_lgamma },
-    [199] = { .kw = "mod",                .arity = 2u,       .ops = &ops_mod,            .bfn = expr_mod },
+    [199] = { .kw = "BesselY",            .arity = 2u,       .ops = &ops_bessel_y,       .bfn = expr_bessel_y },
     [200] = { .kw = "lambertwm1",         .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [201] = { .kw = "cosech",             .arity = 1u,       .ops = &ops_cosech,         .ufn = expr_cosech },
     [202] = { .kw = "conj",               .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
     [203] = { .kw = "sech",               .arity = 1u,       .ops = &ops_sech,           .ufn = expr_sech },
     [204] = { .kw = "exp",                .arity = 1u,       .ops = &ops_exp,            .ufn = expr_exp },
     [205] = { .kw = "F_1",                .arity = 6u,                                   .sfn = expr_appell_f1 },
-    [206] = { .kw = "pdf",                .arity = 1u,       .ops = &ops_pdf,            .ufn = expr_pdf },
+    [206] = { .kw = "mod",                .arity = 2u,       .ops = &ops_mod,            .bfn = expr_mod },
     [207] = { .kw = "arcversin",          .arity = 1u,       .ops = &ops_arcversin,      .ufn = expr_arcversin },
     [208] = { .kw = "acosh",              .arity = 1u,       .ops = &ops_acosh,          .ufn = expr_acosh },
     [209] = { .kw = "sec",                .arity = 1u,       .ops = &ops_sec,            .ufn = expr_sec },
+    [210] = { .kw = "pdf",                .arity = 1u,       .ops = &ops_pdf,            .ufn = expr_pdf },
     [211] = { .kw = "erfcinv",            .arity = 1u,       .ops = &ops_erfcinv,        .ufn = expr_erfcinv },
     [213] = { .kw = "wm1",                .arity = 1u,       .ops = &ops_lambert_wm1,    .ufn = expr_lambert_wm1 },
     [214] = { .kw = "Li1",                .arity = 1u,       .ops = &ops_polylog1,       .ufn = expr_polylog1 },
     [215] = { .kw = "isprime",            .arity = 1u,       .ops = &ops_is_prime,       .ufn = expr_is_prime },
-    [218] = { .kw = "LauricellaF",        .arity = UINT_MAX,                             .vfn = expr_lauricella_f_from_args },
     [219] = { .kw = "arccoversin",        .arity = 1u,       .ops = &ops_arccoversin,    .ufn = expr_arccoversin },
     [221] = { .kw = "lommel_s",           .arity = 3u,       .ops = &ops_lommel_s,       .tfn = expr_lommel_s },
     [222] = { .kw = "atan",               .arity = 1u,       .ops = &ops_atan,           .ufn = expr_atan },
@@ -524,28 +527,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
 };
 // clang-format on
 
-#define LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE 11u
-
-static const func_entry_t s_logarithmic_integral_funcs[LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE] = {
-    [1] = {.kw = "li", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
-    [3] = {.kw = "logarithmic_integral", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
-    [9] = {.kw = "Li", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
-};
-
-static unsigned logarithmic_integral_func_hash(string_view_t kw)
-{
-    const size_t len = string_view_length(kw);
-    unsigned h = 2166136261u;
-
-    for (size_t pos = 0u; pos < len; ++pos) {
-        unsigned char byte = 0u;
-
-        if (!string_view_peek_ascii(kw, pos, &byte))
-            return 0u;
-        h = (h ^ byte) * 16777619u;
-    }
-    return h % LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE;
-}
 
 static void func_hashes(string_view_t kw, unsigned *bucket_out, unsigned *slot_out)
 {
@@ -607,10 +588,6 @@ static const func_entry_t *lookup_func(string_view_t kw)
     if (func_entry_matches(entry, kw))
         return entry;
 
-    entry = &s_logarithmic_integral_funcs[logarithmic_integral_func_hash(kw)];
-    if (func_entry_matches(entry, kw))
-        return entry;
-
     return NULL;
 }
 
@@ -668,23 +645,6 @@ bool expr_stringin_function_hash_is_valid(void)
     for (size_t bucket = 0u; bucket < FUNC_TABLE_SIZE; ++bucket) {
         if (!bucket_used[bucket] && s_func_displacements[bucket] != 0u)
             return false;
-    }
-
-    for (size_t slot = 0u; slot < LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE; ++slot) {
-        const func_entry_t *entry = &s_logarithmic_integral_funcs[slot];
-        string_t *keyword_string;
-
-        if (!entry->kw)
-            continue;
-        keyword_string = string_new_with(entry->kw);
-        if (!keyword_string)
-            return false;
-        if (logarithmic_integral_func_hash(string_view_all(keyword_string)) != slot ||
-            lookup_func(string_view_all(keyword_string)) != entry) {
-            string_free(keyword_string);
-            return false;
-        }
-        string_free(keyword_string);
     }
 
     return true;
