@@ -738,7 +738,7 @@ static bool expr_series_simplified_equal(const expr_t *left, const expr_t *right
 
 static bool expr_series_match_positive_long_scale(const expr_t *expression, const expr_t *base, long *scale_out)
 {
-    number_t scale = num_new();
+    number_t scale;
     const expr_t *scaled_base = NULL;
     bool matched = false;
 
@@ -746,6 +746,7 @@ static bool expr_series_match_positive_long_scale(const expr_t *expression, cons
         *scale_out = 1L;
         return true;
     }
+    scale = num_new();
     if (expr_match_scaled_expr(expression, &scale, &scaled_base) && scaled_base &&
         expr_series_simplified_equal(scaled_base, base) && expr_series_number_to_long(scale, scale_out) &&
         *scale_out > 0L)

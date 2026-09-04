@@ -2215,32 +2215,17 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     const expr_t *upper = expr_integral_upper_bound_expr(f);
     const expr_t *display_integrand = f ? f->a : NULL;
     const expr_t *display_dummy = expr_integral_dummy_expr(f);
-    bool group_upper = upper && expr_is_addsub(upper);
-    bool group_lower = lower && expr_is_addsub(lower);
-    bool group_integrand = expr_is_addsub(display_integrand);
-
-    sbuf_puts(b, "@S^");
-    if (group_upper)
-        sbuf_putc(b, '(');
-    emit_func(upper, b, PREC_LOWEST);
-    if (group_upper)
-        sbuf_putc(b, ')');
+    sbuf_puts(b, "integral(");
     if (lower) {
-        sbuf_putc(b, '_');
-        if (group_lower)
-            sbuf_putc(b, '(');
         emit_func(lower, b, PREC_LOWEST);
-        if (group_lower)
-            sbuf_putc(b, ')');
+        sbuf_puts(b, ", ");
     }
-    sbuf_putc(b, ' ');
-    if (group_integrand)
-        sbuf_putc(b, '(');
+    emit_func(upper, b, PREC_LOWEST);
+    sbuf_puts(b, ", ");
     emit_func(display_integrand, b, PREC_LOWEST);
-    if (group_integrand)
-        sbuf_putc(b, ')');
-    sbuf_puts(b, " d");
+    sbuf_puts(b, ", ");
     emit_func(display_dummy, b, PREC_LOWEST);
+    sbuf_putc(b, ')');
 }
 
 static bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, sbuf_t *b, int parent_prec)

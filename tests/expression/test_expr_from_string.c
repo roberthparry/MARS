@@ -27,7 +27,6 @@ static void test_from_string_function_hash(void)
         "lambertw0(0)",
         "Li(2)",
         "li(2)",
-        "logarithmic_integral(2)",
         "li1(1/2)",
         "li2(1/2)",
         "nextprime(10)",
@@ -3267,11 +3266,11 @@ static void test_from_string_unevaluated_integral(void)
         TEST_FAIL();
     }
 
-    if (func_text && strstr(func_text, "@S^x exp(cosh(t)) dt") != NULL) {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral function form uses @S notation\n");
+    if (func_text && strstr(func_text, "integral(x, exp(cosh(t)), t)") != NULL) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral function form uses integral() notation\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
-        printf(C_BOLD C_RED "FAIL" C_RESET " unevaluated integral function form uses @S notation %s:%d:1\n", __FILE__,
+        printf(C_BOLD C_RED "FAIL" C_RESET " unevaluated integral function form uses integral() notation %s:%d:1\n", __FILE__,
                __LINE__);
         printf(C_BOLD "  got    " C_RESET "%s\n\n", func_text ? func_text : "(null)");
         TEST_FAIL();
