@@ -1006,6 +1006,12 @@ static void test_Ei_E1(void)
     check_bool("Ei monotone on positive real axis", qf_gt(qc_abs(qc_Ei(qcr(2.0))), qc_abs(qc_Ei(qcr(1.0)))));
 
     {
+        qcomplex_t z = qcz(2.0, 0.5);
+
+        check_qc_rel("Li(z) = Ei(log(z))", qc_Li(z), qc_Ei(qc_log(z)), 1e-27);
+    }
+
+    {
         qcomplex_t zc = qcz(1.0, 0.5);
         qcomplex_t e1c = qc_E1(zc);
         check_bool("E1(1+0.5i) is finite", !qc_isnan(e1c) && !qc_isinf(e1c));

@@ -705,6 +705,36 @@ static void test_from_string_series_ellipsis(void)
     }
 
     {
+        static const struct {
+            const char *source;
+            const char *expression_fragment;
+            const char *TeX_fragment;
+        } cases[] = {
+            {"Li(x)+Li(2x)+Li(3x)+Li(4x)+...+Li(nx)", "Σ_(k=1)^n Li(kx)",
+             "\\sum_{k=1}^{n}\\operatorname{Li}(k\\mkern-2mu x)"},
+            {"Ei(x)+Ei(2x)+Ei(3x)+...+Ei(nx)", "Σ_(k=1)^n Ei(kx)",
+             "\\sum_{k=1}^{n}\\operatorname{Ei}(k\\mkern-2mu x)"},
+            {"erf(x)+erf(2x)+erf(3x)+...+erf(nx)", "Σ_(k=1)^n erf(kx)",
+             "\\sum_{k=1}^{n}\\operatorname{erf}(k\\mkern-2mu x)"},
+        };
+
+        for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+            string_t *progression_TeX = NULL;
+            expr_t *progression = expr_from_string_with_derivation_TeX(cases[i].source, NULL, &progression_TeX);
+            char *progression_text = progression ? expr_to_string(progression, style_UNBOUND) : NULL;
+
+            ASSERT_NOT_NULL(progression);
+            ASSERT_NOT_NULL(progression_TeX);
+            ASSERT_NOT_NULL(progression_text);
+            ASSERT_NOT_NULL(strstr(progression_text, cases[i].expression_fragment));
+            ASSERT_NOT_NULL(strstr(string_c_str(progression_TeX), cases[i].TeX_fragment));
+            free(progression_text);
+            expr_free(progression);
+            string_free(progression_TeX);
+        }
+    }
+
+    {
         const char *cosine_progression_source = "cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx)";
         string_t *cosine_progression_derivation_TeX = NULL;
         expr_t *cosine_progression = expr_from_string_with_derivation_TeX(

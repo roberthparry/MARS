@@ -524,6 +524,29 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
 };
 // clang-format on
 
+#define LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE 11u
+
+static const func_entry_t s_logarithmic_integral_funcs[LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE] = {
+    [1] = {.kw = "li", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
+    [3] = {.kw = "logarithmic_integral", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
+    [9] = {.kw = "Li", .arity = 1u, .ops = &ops_Li, .ufn = expr_Li},
+};
+
+static unsigned logarithmic_integral_func_hash(string_view_t kw)
+{
+    const size_t len = string_view_length(kw);
+    unsigned h = 2166136261u;
+
+    for (size_t pos = 0u; pos < len; ++pos) {
+        unsigned char byte = 0u;
+
+        if (!string_view_peek_ascii(kw, pos, &byte))
+            return 0u;
+        h = (h ^ byte) * 16777619u;
+    }
+    return h % LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE;
+}
+
 static void func_hashes(string_view_t kw, unsigned *bucket_out, unsigned *slot_out)
 {
     const size_t byte_len = string_view_length(kw);
@@ -584,6 +607,10 @@ static const func_entry_t *lookup_func(string_view_t kw)
     if (func_entry_matches(entry, kw))
         return entry;
 
+    entry = &s_logarithmic_integral_funcs[logarithmic_integral_func_hash(kw)];
+    if (func_entry_matches(entry, kw))
+        return entry;
+
     return NULL;
 }
 
@@ -641,6 +668,23 @@ bool expr_stringin_function_hash_is_valid(void)
     for (size_t bucket = 0u; bucket < FUNC_TABLE_SIZE; ++bucket) {
         if (!bucket_used[bucket] && s_func_displacements[bucket] != 0u)
             return false;
+    }
+
+    for (size_t slot = 0u; slot < LOGARITHMIC_INTEGRAL_FUNC_TABLE_SIZE; ++slot) {
+        const func_entry_t *entry = &s_logarithmic_integral_funcs[slot];
+        string_t *keyword_string;
+
+        if (!entry->kw)
+            continue;
+        keyword_string = string_new_with(entry->kw);
+        if (!keyword_string)
+            return false;
+        if (logarithmic_integral_func_hash(string_view_all(keyword_string)) != slot ||
+            lookup_func(string_view_all(keyword_string)) != entry) {
+            string_free(keyword_string);
+            return false;
+        }
+        string_free(keyword_string);
     }
 
     return true;

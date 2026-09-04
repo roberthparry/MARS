@@ -120,6 +120,26 @@ bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out)
     return true;
 }
 
+bool expr_match_reapplicable_unary_function(const expr_t *expr, const expr_t **arg_out)
+{
+    if (!expr_match_unary_expr(expr, arg_out) || expr->ops == &ops_neg || !expr->ops->apply_unary)
+        return false;
+    return true;
+}
+
+bool expr_match_same_reapplicable_unary_function(const expr_t *expr, const expr_t *prototype,
+                                                 const expr_t **arg_out)
+{
+    return expr_match_reapplicable_unary_function(expr, arg_out) && prototype && prototype->ops == expr->ops;
+}
+
+expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const expr_t *argument)
+{
+    if (!prototype || !prototype->ops || !prototype->ops->apply_unary || prototype->ops == &ops_neg || !argument)
+        return NULL;
+    return prototype->ops->apply_unary(argument);
+}
+
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out)
 {
     return expr_match_unary_op(expr, EXPR_KIND_EXP, arg_out);

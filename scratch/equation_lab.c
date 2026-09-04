@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -408,6 +409,55 @@ static const equation_t *ordered_solution_at(const equation_solutions_t *solutio
     return equ_solutions_at(solutions, order ? order[index] : index);
 }
 
+static bool text_has_identifier(const char *text, const char *identifier)
+{
+    size_t length;
+
+    if (!text || !identifier || !*identifier)
+        return false;
+    length = strlen(identifier);
+    for (const char *match = strstr(text, identifier); match; match = strstr(match + length, identifier)) {
+        unsigned char before = match == text ? 0u : (unsigned char)match[-1];
+        unsigned char after = (unsigned char)match[length];
+
+        if ((!before || (!isalnum(before) && before != '_')) && (!after || (!isalnum(after) && after != '_')))
+            return true;
+    }
+    return false;
+}
+
+static bool bindings_have_name(const expr_bindings_t *bindings, const char *name)
+{
+    size_t count = expr_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i)
+        if (strcmp(expr_bindings_name_at(bindings, i), name) == 0)
+            return true;
+    return false;
+}
+
+static const char *solutions_integer_branch_parameter(const equation_solutions_t *solutions,
+                                                      const expr_bindings_t *bindings, const size_t *order)
+{
+    static const char *const preferences[] = {"n", "m", "k", "l", "j", "r"};
+    size_t count = equ_solutions_count(solutions);
+
+    for (size_t preference = 0u; preference < sizeof(preferences) / sizeof(preferences[0]); ++preference) {
+        if (bindings_have_name(bindings, preferences[preference]))
+            continue;
+        for (size_t i = 0u; i < count; ++i) {
+            const equation_t *solution = ordered_solution_at(solutions, order, i);
+            char *rhs_text = expr_text_dup(equ_rhs(solution), style_UNBOUND);
+            bool uses_parameter = text_has_identifier(rhs_text, preferences[preference]);
+
+            free(rhs_text);
+            if (uses_parameter)
+                return preferences[preference];
+        }
+    }
+    return NULL;
+}
+
 static void print_solutions(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
     size_t count = equ_solutions_count(solutions);
@@ -461,6 +511,8 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
 
 static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
+    const char *branch_parameter;
+
     if (equ_solutions_count(solutions) == 0u) {
         printf("solutions_TeX \n");
         return;
@@ -468,6 +520,9 @@ static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bind
 
     printf("solutions_TeX \\begin{aligned}");
     print_solution_TeX_rows(solutions, bindings, order, " ");
+    branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
+    if (branch_parameter)
+        printf(" \\\\\n& %s \\in \\mathbb{Z}", branch_parameter);
     printf(" \\end{aligned}\n");
 }
 
@@ -524,49 +579,87 @@ static bool substitute_named_zero_if_present(expr_t **expr_io, const char *name)
     return changed;
 }
 
-static const char *sample_note(bool sampled_k, bool sampled_n)
+static void sample_note(char *out, size_t capacity, bool sampled_k, bool sampled_branch, const char *branch_parameter)
 {
-    if (sampled_k && sampled_n)
-        return "  (k = 0, n = 0)";
-    if (sampled_k)
-        return "  (k = 0)";
-    if (sampled_n)
-        return "  (n = 0)";
-    return "";
+    if (!out || capacity == 0u)
+        return;
+    if (sampled_k && sampled_branch)
+        snprintf(out, capacity, "  (k = 0, %s = 0)", branch_parameter);
+    else if (sampled_k)
+        snprintf(out, capacity, "  (k = 0)");
+    else if (sampled_branch)
+        snprintf(out, capacity, "  (%s = 0)", branch_parameter);
+    else
+        out[0] = '\0';
 }
 
-static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, bool *sampled_k_out, bool *sampled_n_out)
+static bool expr_is_integer_literal(const expr_t *expr)
+{
+    char *text = expr_text_dup(expr, style_UNBOUND);
+    const char *cursor = text;
+    bool is_integer = false;
+
+    if (cursor && (*cursor == '+' || *cursor == '-'))
+        cursor++;
+    if (cursor && *cursor) {
+        is_integer = true;
+        for (; *cursor; ++cursor)
+            if (!isdigit((unsigned char)*cursor)) {
+                is_integer = false;
+                break;
+            }
+    }
+    free(text);
+    return is_integer;
+}
+
+static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, const char *branch_parameter,
+                                                       bool *sampled_k_out, bool *sampled_branch_out,
+                                                       bool *exact_out)
 {
     number_t value;
 
     if (sampled_k_out)
         *sampled_k_out = false;
-    if (sampled_n_out)
-        *sampled_n_out = false;
+    if (sampled_branch_out)
+        *sampled_branch_out = false;
+    if (exact_out)
+        *exact_out = false;
 
     value = expr_eval(rhs);
-    if (num_is_finite(value) && !num_is_nan(value))
+    if (num_is_finite(value) && !num_is_nan(value)) {
+        if (exact_out)
+            *exact_out = num_is_exact(value) || expr_is_integer_literal(rhs);
         return value;
+    }
 
     {
         bool sampled_k = false;
-        bool sampled_n = false;
+        bool sampled_branch = false;
         expr_t *sampled = expr_clone(rhs);
-        expr_t *simplified = sampled ? expr_simplify(sampled) : NULL;
+        expr_t *simplified = sampled ? expr_display_simplified(sampled) : NULL;
         number_t sampled_value = simplified ? expr_eval(simplified) : num_new();
 
-        expr_free(simplified);
         if (num_is_finite(sampled_value) && !num_is_nan(sampled_value)) {
+            if (exact_out)
+                *exact_out = num_is_exact(sampled_value) || expr_is_integer_literal(simplified);
+            expr_free(simplified);
             expr_free(sampled);
             num_destroy(&value);
             return sampled_value;
         }
+        expr_free(simplified);
         num_destroy(&sampled_value);
 
-        sampled_k = substitute_named_zero_if_present(&sampled, "k");
-        sampled_n = substitute_named_zero_if_present(&sampled, "n");
-        simplified = sampled ? expr_simplify(sampled) : NULL;
+        sampled_k = branch_parameter && strcmp(branch_parameter, "k") != 0 &&
+                    substitute_named_zero_if_present(&sampled, "k");
+        sampled_branch = branch_parameter && substitute_named_zero_if_present(&sampled, branch_parameter);
+        simplified = sampled ? expr_display_simplified(sampled) : NULL;
         sampled_value = simplified ? expr_eval(simplified) : num_new();
+
+        if (exact_out)
+            *exact_out = num_is_exact(sampled_value) || num_is_integer(sampled_value) ||
+                         expr_is_integer_literal(simplified);
 
         expr_free(simplified);
         expr_free(sampled);
@@ -575,8 +668,8 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, bool *
             num_destroy(&value);
             if (sampled_k_out)
                 *sampled_k_out = sampled_k;
-            if (sampled_n_out)
-                *sampled_n_out = sampled_n;
+            if (sampled_branch_out)
+                *sampled_branch_out = sampled_branch;
             return sampled_value;
         }
 
@@ -590,6 +683,7 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
                                     const size_t *order, int precision)
 {
     size_t count = equ_solutions_count(solutions);
+    const char *branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
 
     if (count == 0u) {
         printf("numeric     \n");
@@ -602,13 +696,18 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
         bool sampled_k = false;
-        bool sampled_n = false;
-        number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), &sampled_k, &sampled_n);
+        bool sampled_branch = false;
+        bool exact = false;
+        char note[64];
+        number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), branch_parameter, &sampled_k,
+                                                                &sampled_branch, &exact);
         char *value_text = number_precision_text_dup(value, precision);
-        const char *note = sample_note(sampled_k, sampled_n);
+        const char *relation = exact ? "=" : "≈";
+
+        sample_note(note, sizeof(note), sampled_k, sampled_branch, branch_parameter);
 
         if (name && value_text)
-            printf("%s%s ≈ %s%s\n", i == 0u ? "numeric     " : "            ", name, value_text, note);
+            printf("%s%s %s %s%s\n", i == 0u ? "numeric     " : "            ", name, relation, value_text, note);
         else
             printf("%s%s%s\n", i == 0u ? "numeric     " : "            ", value_text ? value_text : "(null)", note);
 

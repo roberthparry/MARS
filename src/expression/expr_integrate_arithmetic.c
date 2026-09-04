@@ -299,6 +299,7 @@ static const expr_integrate_mul_rule_feature_entry_t integrate_mul_rule_feature_
     {.kind = EXPR_KIND_NORMAL_CDF, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
     {.kind = EXPR_KIND_NORMAL_LOGPDF, .features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF},
     {.kind = EXPR_KIND_EI, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
+    {.kind = EXPR_KIND_LI, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
     {.kind = EXPR_KIND_E1, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY}};
 
 static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_table[] = {

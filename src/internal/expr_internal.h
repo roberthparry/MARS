@@ -234,6 +234,10 @@ expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const e
  */
 char *expr_finite_progression_identity_TeX(const expr_t *expr);
 bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
+bool expr_match_reapplicable_unary_function(const expr_t *expr, const expr_t **arg_out);
+bool expr_match_same_reapplicable_unary_function(const expr_t *expr, const expr_t *prototype,
+                                                 const expr_t **arg_out);
+expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const expr_t *argument);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_sin_expr(const expr_t *expr, const expr_t **arg_out);
@@ -330,6 +334,9 @@ string_t *expr_function_temporaries_expression_text(const expr_function_temporar
 
 /* Release a shared function-temporary plan. */
 void expr_function_temporaries_free(expr_function_temporaries_t *plan);
+
+/* Render a Cartesian expression as explicit p and q assignments in function style. */
+string_t *expr_to_text_function_cartesian(const expr_t *expr);
 
 typedef bool (*expr_series_binding_lookup_fn)(void *context, const char *name, number_t *value_out);
 

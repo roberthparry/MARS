@@ -16,6 +16,8 @@ enum {
     NUMBER_BERNOULLI_WORK_COUNT = (2 * NUMBER_BERNOULLI_EVEN_TERM_COUNT) + 1,
     NUMBER_POLYGAMMA_GUARD_BITS = 128,
     NUMBER_POLYGAMMA_TERM_GUARD_BITS = 16,
+    NUMBER_EI_GUARD_BITS = 32,
+    NUMBER_EI_SERIES_MAX_TERMS = 100000,
     NUMBER_POLYLOG_SERIES_MAX_TERMS = 100000,
     NUMBER_APPELL_F1_SERIES_MAX_TERMS = 10000,
     NUMBER_BESSEL_GUARD_BITS = 64,
@@ -5248,6 +5250,65 @@ static int number_mpc_polylog_series_int(mpc_ptr out, int order, mpc_srcptr z, m
     return 0;
 }
 
+static int number_mpc_Ei(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t target_precision = mpc_get_prec(out);
+    mpfr_prec_t work_precision = target_precision + NUMBER_EI_GUARD_BITS;
+    mpc_t work_z;
+    mpc_t sum;
+    mpc_t term;
+    mpfr_t euler;
+    mpfr_t term_magnitude;
+    mpfr_t sum_magnitude;
+
+    mpc_init2(work_z, work_precision);
+    mpc_init2(sum, work_precision);
+    mpc_init2(term, work_precision);
+    mpfr_inits2(work_precision, euler, term_magnitude, sum_magnitude, (mpfr_ptr)0);
+
+    mpc_set(work_z, z, MPC_RNDNN);
+    mpc_log(sum, work_z, MPC_RNDNN);
+    mpfr_const_euler(euler, MPFR_RNDN);
+    mpfr_add(mpc_realref(sum), mpc_realref(sum), euler, MPFR_RNDN);
+    mpc_set(term, work_z, MPC_RNDNN);
+
+    for (unsigned long k = 1ul; k < NUMBER_EI_SERIES_MAX_TERMS; ++k) {
+        unsigned long next = k + 1ul;
+
+        mpc_add(sum, sum, term, MPC_RNDNN);
+        mpc_abs(term_magnitude, term, MPFR_RNDN);
+        mpc_abs(sum_magnitude, sum, MPFR_RNDN);
+        if (number_special_series_converged(term_magnitude, sum_magnitude, target_precision))
+            break;
+
+        mpc_mul_ui(term, term, k, MPC_RNDNN);
+        mpc_mul(term, term, work_z, MPC_RNDNN);
+        mpc_div_ui(term, term, next * next, MPC_RNDNN);
+    }
+
+    mpc_set(out, sum, rnd);
+    mpfr_clears(sum_magnitude, term_magnitude, euler, (mpfr_ptr)0);
+    mpc_clear(term);
+    mpc_clear(sum);
+    mpc_clear(work_z);
+    return 0;
+}
+
+static int number_mpc_E1(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpc_t negative;
+    int status;
+
+    mpc_init2(negative, precision);
+    mpc_neg(negative, z, MPC_RNDNN);
+    status = number_mpc_Ei(out, negative, rnd);
+    if (status == 0)
+        mpc_neg(out, out, rnd);
+    mpc_clear(negative);
+    return status;
+}
+
 static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
     mpfr_prec_t precision = mpc_get_prec(out);
@@ -6197,10 +6258,22 @@ number_t num_gammainc_Q(const number_t a, const number_t b)
 
 number_t num_Ei(const number_t number)
 {
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_Ei, qc_Ei, number_mpfr_Ei_mut, NULL);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_Ei, qc_Ei, number_mpfr_Ei_mut,
+                                                          number_mpc_Ei);
+}
+
+/* Evaluate Li(x) through the public number operations. */
+number_t num_Li(const number_t number)
+{
+    number_t logarithm = num_log(number);
+    number_t result = num_Ei(logarithm);
+
+    num_destroy(&logarithm);
+    return result;
 }
 
 number_t num_E1(const number_t number)
 {
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_E1, qc_E1, number_mpfr_E1_mut, NULL);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_E1, qc_E1, number_mpfr_E1_mut,
+                                                          number_mpc_E1);
 }

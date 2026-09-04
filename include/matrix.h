@@ -1483,6 +1483,8 @@ matrix_t *mat_lambert_w0(const matrix_t *A);
 matrix_t *mat_lambert_wm1(const matrix_t *A);
 matrix_t *mat_productlog(const matrix_t *A);
 matrix_t *mat_Ei(const matrix_t *A);
+/** @brief Evaluate the principal logarithmic integral of a square matrix. */
+matrix_t *mat_Li(const matrix_t *A);
 matrix_t *mat_E1(const matrix_t *A);
 
 /**

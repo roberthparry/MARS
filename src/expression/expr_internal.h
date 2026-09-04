@@ -101,6 +101,7 @@ typedef enum {
     EXPR_KIND_NORMAL_CDF,
     EXPR_KIND_NORMAL_LOGPDF,
     EXPR_KIND_EI,
+    EXPR_KIND_LI,
     EXPR_KIND_E1,
     EXPR_KIND_DILOG,
     EXPR_KIND_POLYLOG1,
@@ -463,6 +464,7 @@ extern const expr_ops_t ops_pdf;
 extern const expr_ops_t ops_cdf;
 extern const expr_ops_t ops_logpdf;
 extern const expr_ops_t ops_Ei;
+extern const expr_ops_t ops_Li;
 extern const expr_ops_t ops_E1;
 extern const expr_ops_t ops_beta;
 extern const expr_ops_t ops_logbeta;
@@ -611,6 +613,7 @@ typedef enum {
     EXPR_PATTERN_UNARY_NORMAL_LOGPDF,
     EXPR_PATTERN_UNARY_EI,
     EXPR_PATTERN_UNARY_E1,
+    EXPR_PATTERN_UNARY_LI,
     EXPR_PATTERN_UNARY_COUNT
 } expr_pattern_unary_affine_kind_t;
 
@@ -882,6 +885,7 @@ void expr_reverse_normal_pdf(const expr_t *dv, const number_t *out_bar, number_t
 void expr_reverse_normal_cdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_normal_logpdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_Ei(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_Li(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_E1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_beta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_logbeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

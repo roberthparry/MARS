@@ -4449,6 +4449,16 @@ matrix_t *mat_Ei(const matrix_t *A)
                            A && A->elem && A->elem->fun ? A->elem->fun->ei : NULL);
 }
 
+/* Evaluate Li(A) through the principal matrix logarithm and Ei. */
+matrix_t *mat_Li(const matrix_t *A)
+{
+    matrix_t *logarithm = mat_log(A);
+    matrix_t *result = logarithm ? mat_Ei(logarithm) : NULL;
+
+    mat_free(logarithm);
+    return result;
+}
+
 matrix_t *mat_E1(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&

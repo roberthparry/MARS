@@ -1008,6 +1008,118 @@ static void test_equation_solves_repeated_exponential_power_polynomial(void)
     equ_free(equation);
 }
 
+static void test_equation_simplifies_real_repeated_power_roots(void)
+{
+    equation_t *equation = equ_from_string("3^(3u) - 4*3^(2u) + 3^u + 6 = 0");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\ln(2)}{\\ln(3)}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "2\\mkern-2mu n + 1"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{-"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "0 + i"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_solves_repeated_exp_polynomial(void)
+{
+    equation_t *equation = equ_from_string("e^(3u) - 4*e^(2u) + e^u + 6 = 0");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 3);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\ln(2)"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\ln(3)"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "2\\mkern-2mu n + 1"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{-"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_simplifies_negative_real_quartic_power_root(void)
+{
+    equation_t *equation = equ_from_string("5^(4u) - 8*5^(3u) + 17*5^(2u) + 2*5^u = 24");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 4);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX,
+        "i\\mkern-2mu \\frac{\\pi\\mkern-2mu \\left(2\\mkern-2mu n + 1\\right)}{\\ln(5)}"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\ln(-1)"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "ln(-1)"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_normalises_shifted_repeated_power_exponents(void)
+{
+    equation_t *equation = equ_from_string("5^(4u) - 5^(3u+1) - 2*5^(2u+1) + 16*5^(u+1) = 96");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 4);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\ln(2)}{\\ln(5)}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\ln(3)}{\\ln(5)}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\ln(4)}{\\ln(5)}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
+        result, style_LATEX,
+        "i\\mkern-2mu \\frac{\\pi\\mkern-2mu \\left(2\\mkern-2mu n + 1\\right)}{\\ln(5)}"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\ln(-4)"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
+static void test_equation_avoids_existing_branch_parameter_name(void)
+{
+    equation_t *equation = equ_from_string("{ 5^(2u) - 10*5^u + 25 = 0 | u = NAN; n = 7 }");
+    expr_t *u;
+    ASSERT_NEW_RESULT(result);
+
+    ASSERT_NOT_NULL(equation);
+    u = equ_binding(equation, "u");
+    ASSERT_NOT_NULL(u);
+
+    ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
+    ASSERT_TRUE(RESULT_IS_SOLVED(result));
+    ASSERT_EQ_INT((int)RESULT_COUNT(result), 1);
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "2πm"));
+    ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_UNBOUND, "2πn"));
+
+    equ_solve_result_free(result);
+    equ_free(equation);
+}
+
 static void test_equation_solves_quadratic_zero_product(void)
 {
     equation_t *equation = equ_from_string("{ (x - 2)*(x + 3) = 0 | x = NAN }");
@@ -1777,6 +1889,11 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_atan_sum_as_branch_valid_surd, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_self_power_with_lambert_w, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_repeated_exponential_power_polynomial, NULL);
+    TEST_RUN_SUBTEST(test_equation_simplifies_real_repeated_power_roots, NULL);
+    TEST_RUN_SUBTEST(test_equation_solves_repeated_exp_polynomial, NULL);
+    TEST_RUN_SUBTEST(test_equation_simplifies_negative_real_quartic_power_root, NULL);
+    TEST_RUN_SUBTEST(test_equation_normalises_shifted_repeated_power_exponents, NULL);
+    TEST_RUN_SUBTEST(test_equation_avoids_existing_branch_parameter_name, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_zero_product, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_zero_product_factors, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_double_root_once, NULL);

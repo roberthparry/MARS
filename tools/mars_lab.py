@@ -6066,16 +6066,38 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return bindingText ? `{ ${body} | ${bindingText} }` : body;
     }
 
-    function bindingsWithAuthoredValues(bindings, sourceExpression) {
+    function visibleBindingValues() {
+      return Array.from(variableValues.querySelectorAll('.binding-value-input'))
+        .map((input) => ({
+          name: String(input.dataset.bindingName || '').trim(),
+          kind: String(input.dataset.bindingKind || 'variable').trim(),
+          value: normalisedBindingInputValue(input),
+          display: normalisedBindingInputValue(input)
+        }))
+        .filter((binding) => binding.name);
+    }
+
+    function expressionWithVisibleBindings(sourceExpression, visibleBindings) {
+      return expressionWithBindings(
+        expressionBodyForEditor(sourceExpression),
+        visibleBindings
+      ) || sourceExpression;
+    }
+
+    function bindingsWithAuthoredValues(bindings, sourceExpression, visibleBindings = []) {
       const discovered = Array.isArray(bindings) ? bindings : [];
       const authored = compactExpressionForEditor(sourceExpression).bindings || [];
       const authoredByName = new Map(
         authored.map((binding) => [String(binding.name || '').trim(), binding])
       );
+      const visibleByName = new Map(
+        (Array.isArray(visibleBindings) ? visibleBindings : [])
+          .map((binding) => [String(binding.name || '').trim(), binding])
+      );
 
       return discovered.map((binding) => {
         const name = String(binding && binding.name || '').trim();
-        const sourceBinding = authoredByName.get(name);
+        const sourceBinding = visibleByName.get(name) || authoredByName.get(name);
         if (!sourceBinding)
           return binding;
         return {
@@ -6403,12 +6425,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const current = currentExpressionText();
 
       if (currentMode() === 'expression') {
-        const updatedSource = replaceBindingValueInExpression(
+        let updatedSource = replaceBindingValueInExpression(
           current,
           kind,
           name,
           valueText
         );
+        if (updatedSource === current)
+          updatedSource = replaceBindingValueInExpression(
+            current,
+            kind === 'constant' ? 'variable' : 'constant',
+            name,
+            valueText
+          );
         if (!updatedSource || updatedSource === current)
           return;
 
@@ -6470,7 +6499,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             const name = input.dataset.bindingName || '';
             const kind = input.dataset.bindingKind || 'variable';
             const valueText = normalisedBindingInputValue(input);
-            updated = replaceBindingValueInExpression(updated, kind, name, valueText);
+            const previous = updated;
+            updated = replaceBindingValueInExpression(previous, kind, name, valueText);
+            if (updated === previous)
+              updated = replaceBindingValueInExpression(
+                previous,
+                kind === 'constant' ? 'variable' : 'constant',
+                name,
+                valueText
+              );
           });
         }
 
@@ -10259,13 +10296,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     async function evaluateExpression(options = {}) {
+      const enteredBindings = visibleBindingValues();
       commitVisibleBindingInputs();
       await pendingExpressionBindingCommit;
       const editorText = currentExpressionText();
       const editorBodyText = String(expr.value || '').trim();
+      const enteredExpression = expressionWithVisibleBindings(editorText, enteredBindings);
       const text = options.reuseLastInput && lastEvaluationInputText
         ? lastEvaluationInputText
-        : editorText;
+        : (enteredExpression || editorText);
       saveLastExpression(editorText || text);
       const nextState = historyStateForMode(currentMode(), text);
       const previousState = !options.skipHistoryUpdate
@@ -10298,7 +10337,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         if (data.expression && !data.partial_error)
           setExpressionEditor(
             editorText || text,
-            bindingsWithAuthoredValues(data.binding_values, editorText || text),
+            bindingsWithAuthoredValues(data.binding_values, editorText || text, enteredBindings),
             editorBodyText || null,
             data.evaluation_ready
           );
@@ -11237,9 +11276,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return;
       }
 
+      const enteredBindings = visibleBindingValues();
       commitVisibleBindingInputs();
       await pendingExpressionBindingCommit;
-      const text = currentExpressionText();
+      const text = expressionWithVisibleBindings(currentExpressionText(), enteredBindings);
       if (!text || !wrt) return;
 
       setActionRunning(actionButton, true);
@@ -11322,9 +11362,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         return;
       }
 
+      const enteredBindings = visibleBindingValues();
       commitVisibleBindingInputs();
       await pendingExpressionBindingCommit;
-      const text = currentExpressionText();
+      const text = expressionWithVisibleBindings(currentExpressionText(), enteredBindings);
       if (!text || !wrt) return;
 
       setActionRunning(actionButton, true);
@@ -14072,6 +14113,8 @@ def _trim_decimal_tail(text: str) -> str:
         mantissa = mantissa.rstrip("0").rstrip(".")
     if mantissa in ("-0", "+0"):
         mantissa = "0"
+    if sep and int(exponent) == 0:
+        return mantissa
     return mantissa + (sep + exponent if sep else "")
 
 
@@ -14154,6 +14197,7 @@ def render_TeX_to_svg(tex: str) -> tuple[str | None, str | None]:
     document = rf"""\documentclass{{article}}
 \pagestyle{{empty}}
 \usepackage{{amsmath}}
+\usepackage{{amssymb}}
 \begin{{document}}
 \[
 {tex}
@@ -14616,12 +14660,7 @@ def binding_syntax_error_details(raw: str) -> tuple[str, str] | None:
 
 def tidy_lab_error_text(error: object) -> str:
     if isinstance(error, subprocess.TimeoutExpired):
-        command = error.cmd if isinstance(error.cmd, list) else []
-        tool = Path(str(command[0])).name if command else "mars_lab"
-        timeout = error.timeout
-        if timeout is None:
-            return f"{tool} timed out"
-        return f"{tool} timed out after {timeout:g} seconds"
+        return "This calculation took too long. Try simplifying the input."
 
     text = str(error or "").strip()
     if not text:
@@ -14630,16 +14669,8 @@ def tidy_lab_error_text(error: object) -> str:
     root_text = str(ROOT)
     text = text.replace(root_text + "/", "")
     text = text.replace(root_text, ".")
-    text = re.sub(
-        r"Command '\[[^\]]*\]' timed out after ([0-9.]+) seconds",
-        r"mars_lab timed out after \1 seconds",
-        text,
-    )
-    text = re.sub(
-        r"Command '\([^)]*\)' timed out after ([0-9.]+) seconds",
-        r"mars_lab timed out after \1 seconds",
-        text,
-    )
+    if re.search(r"Command '(?:\[[^\]]*\]|\([^)]*\))' timed out after [0-9.]+ seconds", text):
+        return "This calculation took too long. Try simplifying the input."
     return text
 
 
@@ -15218,8 +15249,11 @@ def expression_card_binding_values(
     canonical = expression_variable_binding_values(bound_expression, precision)
     bound = mars_binding_values(bound_records)
     authored_by_key = {(item["kind"], item["name"]): item for item in authored}
+    authored_by_name = {item["name"]: item for item in authored}
     canonical_by_key = {(item["kind"], item["name"]): item for item in canonical}
+    canonical_by_name = {item["name"]: item for item in canonical}
     bound_by_key = {(item["kind"], item["name"]): item for item in bound}
+    bound_by_name = {item["name"]: item for item in bound}
     algebraic_keys = [(item["kind"], item["name"]) for item in algebraic]
     ordered_keys = [
         (item["kind"], item["name"])
@@ -15230,7 +15264,18 @@ def expression_card_binding_values(
 
     values: list[dict[str, str]] = []
     for key in ordered_keys:
-        selected = canonical_by_key.get(key) or authored_by_key.get(key) or bound_by_key.get(key) or {
+        canonical_binding = canonical_by_key.get(key) or canonical_by_name.get(key[1])
+        canonical_value = str((canonical_binding or {}).get("value") or "?").strip()
+        selected = (
+            canonical_binding
+            if canonical_binding and canonical_value != "?" and canonical_value.upper() != "NAN"
+            else (
+                authored_by_key.get(key)
+                or authored_by_name.get(key[1])
+                or bound_by_key.get(key)
+                or bound_by_name.get(key[1])
+            )
+        ) or {
             "kind": key[0],
             "name": key[1],
             "value": "?",

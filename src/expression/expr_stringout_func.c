@@ -477,7 +477,34 @@ static void emit_function_temporary_value(sbuf_t *buffer, const function_tempora
         return;
     }
     emit_func_with_temporaries(table->nodes[index], buffer, PREC_LOWEST, table->nodes,
-                               (const char *const *)table->names, table->count, table->nodes[index]);
+                               (const char *const *)table->names, index, table->nodes[index]);
+}
+
+static size_t function_count_uncached_occurrences(const expr_t *node, const expr_t *candidate,
+                                                  const function_temporary_table_t *temporaries)
+{
+    if (!node || !candidate)
+        return 0u;
+    if (node != candidate && function_temporary_table_contains(temporaries, node))
+        return 0u;
+    if (node == candidate || expr_struct_eq(node, candidate))
+        return 1u;
+    return function_count_uncached_occurrences(node->a, candidate, temporaries) +
+           function_count_uncached_occurrences(node->b, candidate, temporaries);
+}
+
+static bool function_temporary_table_caches_exp_of(const function_temporary_table_t *temporaries,
+                                                   const expr_t *argument)
+{
+    if (!temporaries || !argument)
+        return false;
+    for (size_t index = 0u; index < temporaries->count; ++index) {
+        const expr_t *temporary = temporaries->nodes[index];
+
+        if (expr_is_op(temporary, &ops_exp) && temporary->a && expr_struct_eq(temporary->a, argument))
+            return true;
+    }
+    return false;
 }
 
 static bool function_collect_shared_temporaries(const expr_t *node, const expr_t *root,
@@ -491,6 +518,12 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
     if (!node || expr_is_const(node) || expr_is_var(node) || function_temporary_table_contains(temporaries, node))
         return true;
     dag_index = function_dag_table_find(dag, node);
+    if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u && expr_is_op(node, &ops_exp))
+        return function_temporary_table_append(temporaries, node, variables, constants);
+    if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u &&
+        function_temporary_table_caches_exp_of(temporaries, node) &&
+        function_count_uncached_occurrences(root, node, temporaries) < 2u)
+        return true;
     if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u &&
         expr_is_op(node, &ops_neg)) {
         if (node->a && (expr_is_const(node->a) || expr_is_var(node->a)))
@@ -577,6 +610,20 @@ static bool function_append_root_readable_temporaries(const expr_t *root, functi
            function_append_readable_temporaries(root->b, temporaries, variables, constants);
 }
 
+static bool function_root_has_explicit_integral_cartesian_output(const expr_t *root)
+{
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    bool has_imaginary = false;
+    bool explicit_output = root && (expr_is_op(root, &ops_Ei) || expr_is_op(root, &ops_Li)) &&
+                           expr_cartesian_parts_for_display(root->a, &real, &imaginary, &has_imaginary) &&
+                           has_imaginary;
+
+    expr_free(imaginary);
+    expr_free(real);
+    return explicit_output;
+}
+
 static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants)
 {
     function_dag_table_t dag;
@@ -585,6 +632,11 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
 
     function_dag_table_init(&dag);
     function_temporary_table_init(&temporaries);
+
+    if (function_root_has_explicit_integral_cartesian_output(root)) {
+        (void)emit_func_integral_cartesian_body(root, b);
+        return;
+    }
 
     if (function_dag_table_register(&dag, root) == (size_t)-1) {
         function_dag_table_free(&dag);
@@ -779,6 +831,74 @@ void expr_function_temporaries_free(expr_function_temporaries_t *plan)
     free(plan->constants.vars);
     autoname_restore(&plan->autonames);
     free(plan);
+}
+
+/* Serialise a Cartesian result with explicit real and imaginary coefficient assignments. */
+string_t *expr_to_text_function_cartesian(const expr_t *f)
+{
+    const expr_t *roots[2];
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    expr_function_temporaries_t *plan = NULL;
+    string_t *declarations = NULL;
+    string_t *real_text = NULL;
+    string_t *imaginary_text = NULL;
+    sbuf_t b;
+    autoname_table_t vnames;
+    varlist_t vl;
+    varlist_t cl;
+    string_t *out = NULL;
+    bool has_imaginary = false;
+
+    if (!f || !expr_cartesian_parts_for_display(f, &real, &imaginary, &has_imaginary) || !has_imaginary)
+        goto cleanup;
+
+    roots[0] = real;
+    roots[1] = imaginary;
+    plan = expr_function_temporaries_new(roots, 2u);
+    declarations = plan ? expr_function_temporaries_declarations_text(plan) : NULL;
+    real_text = plan ? expr_function_temporaries_expression_text(plan, real) : NULL;
+    imaginary_text = plan ? expr_function_temporaries_expression_text(plan, imaginary) : NULL;
+    if (!declarations || !real_text || !imaginary_text)
+        goto cleanup;
+
+    sbuf_init(&b);
+    autoname_init(&vnames);
+    assign_unnamed_vars_dfs((expr_t *)f, &vnames);
+    varlist_init(&vl);
+    find_vars_dfs(f, &vl);
+    varlist_init(&cl);
+    find_explicit_named_consts_dfs(f, &cl);
+    find_named_consts_dfs(f, &cl);
+
+    sbuf_puts(&b, "expression expr(");
+    emit_function_param_list(&b, &vl, &cl);
+    sbuf_puts(&b, ") {\n");
+    sbuf_puts(&b, string_c_str(declarations));
+    sbuf_puts(&b, "    p = ");
+    sbuf_puts(&b, string_c_str(real_text));
+    sbuf_puts(&b, ".\n    q = ");
+    sbuf_puts(&b, string_c_str(imaginary_text));
+    sbuf_puts(&b, ".\n\n    return p + q.i.\n}\n\n");
+    emit_bindings(&b, &vl, false);
+    emit_bindings(&b, &cl, true);
+    sbuf_puts(&b, "output(expr(");
+    emit_function_output_arg_list(&b, &vl, &cl);
+    sbuf_puts(&b, ")).");
+    out = sbuf_to_string(&b);
+    sbuf_free(&b);
+    free(vl.vars);
+    free(cl.vars);
+    autoname_restore(&vnames);
+
+cleanup:
+    string_free(imaginary_text);
+    string_free(real_text);
+    string_free(declarations);
+    expr_function_temporaries_free(plan);
+    expr_free(imaginary);
+    expr_free(real);
+    return out;
 }
 
 /* Serialise one expression body using the notation accepted in a MARS function. */

@@ -338,6 +338,7 @@ static void test_number_real_special_parity(void)
     number_t p_1_1 = num_gammainc_P(one, one);
     number_t q_1_1 = num_gammainc_Q(one, one);
     number_t ei_one = num_Ei(one);
+    number_t li_two = num_Li(two);
     number_t e1_one = num_E1(one);
 
     assert_number_string("gamma(5)", gamma5, "24");
@@ -366,9 +367,11 @@ static void test_number_real_special_parity(void)
     assert_number_string_prefix("gammainc_P(1, 1)", p_1_1, "0.632120558828557678404476229838539");
     assert_number_string_prefix("gammainc_Q(1, 1)", q_1_1, "0.367879441171442321595523770161460");
     assert_number_string_prefix("ei(1)", ei_one, "1.895117816355936755466520934331634");
+    assert_number_string_prefix("Li(2)", li_two, "1.045163780117492784844588889194613");
     assert_number_string_prefix("e1(1)", e1_one, "0.219383934395520273677163775460121");
 
     num_destroy(&e1_one);
+    num_destroy(&li_two);
     num_destroy(&ei_one);
     num_destroy(&q_1_1);
     num_destroy(&p_1_1);
@@ -605,6 +608,8 @@ static void test_number_complex_special_parity(void)
     number_t w_input = number_text("1 + 1i");
     number_t w = num_productlog(w_input);
     number_t w_roundtrip = num_sub(num_mul(w, num_exp(w)), w_input);
+    number_t ei_input = number_text("1 + 1i");
+    number_t ei_value = num_Ei(ei_input);
 
     assert_number_real_imag_prefix("gamma(1 + 0i)", gamma_one, "1", "0");
     assert_number_real_imag_prefix("erf(1 + 0i)", erf_one, "0.84270079294971486934122063508262", "0");
@@ -615,7 +620,13 @@ static void test_number_complex_special_parity(void)
     assert_number_close_text("gammainc_lower + gammainc_upper - gamma", inc_sum, "0", NUMBER_PARITY_QCOMPLEX_TOL);
     assert_number_close_text("gammainc_P + gammainc_Q - 1", inc_pq, "0", NUMBER_PARITY_QCOMPLEX_TOL);
     assert_number_close_text("productlog(z) * exp(productlog(z)) - z", w_roundtrip, "0", NUMBER_PARITY_QCOMPLEX_TOL);
+    ASSERT_TRUE(num_get_prec_bits(ei_value) >= NUMBER_PARITY_PRECISION);
+    assert_number_real_imag_prefix("Ei(1 + 1i)", ei_value,
+                                   "1.764625985563854068426738161351237966008304411668431454586176601",
+                                   "2.387769851510522419262792089103796064407333845441811107627919345");
 
+    num_destroy(&ei_value);
+    num_destroy(&ei_input);
     num_destroy(&w_roundtrip);
     num_destroy(&w);
     num_destroy(&w_input);

@@ -949,6 +949,10 @@ number_t eval_Ei(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_Ei);
 }
+number_t eval_Li(expr_t *dv)
+{
+    return expr_eval_unary_num(dv, num_Li);
+}
 number_t eval_E1(expr_t *dv)
 {
     return expr_eval_unary_num(dv, num_E1);
@@ -2616,6 +2620,17 @@ expr_t *deriv_Ei(expr_t *dv)
     expr_free(da);
     expr_free(ea);
     expr_free(fac);
+    return out;
+}
+
+expr_t *deriv_Li(expr_t *dv)
+{
+    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *log_a = expr_log(dv->a);
+    expr_t *out = (da && log_a) ? expr_div(da, log_a) : NULL;
+
+    expr_free(log_a);
+    expr_free(da);
     return out;
 }
 

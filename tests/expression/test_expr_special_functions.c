@@ -302,6 +302,48 @@ void test_Ei(void)
     qfloat_t deriv_at_1 = qf_exp(qf_from_double(1.0));
     check_q_at(__FILE__, __LINE__, 1, "ei'(1)=exp(1)/1=e (deriv check)", deriv_at_1,
                qf_div(qf_exp(qf_from_double(1.0)), qf_from_double(1.0)));
+
+    {
+        expr_bindings_t *bindings = NULL;
+        expr_t *li = expr_from_string("Li(x)", &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *derivative = (li && x) ? expr_create_deriv(li, x) : NULL;
+        expr_t *antiderivative = (li && x) ? expr_integrate(li, x) : NULL;
+        expr_t *antiderivative_derivative = antiderivative ? expr_create_deriv(antiderivative, x) : NULL;
+        expr_t *sum = expr_from_string("sum(k,1,3,li(k+1))", NULL);
+        char *expression_text = li ? expr_to_string(li, style_EXPRESSION) : NULL;
+        char *function_text = li ? expr_to_string(li, style_FUNCTION) : NULL;
+        char *TeX_text = li ? expr_to_string(li, style_LATEX) : NULL;
+        qfloat_t expected_sum = qf_add(qf_add(qf_Li(qf_from_double(2.0)), qf_Li(qf_from_double(3.0))),
+                                       qf_Li(qf_from_double(4.0)));
+
+        TEST_ASSERT_NOT_NULL(li);
+        TEST_ASSERT_NOT_NULL(x);
+        TEST_ASSERT_NOT_NULL(derivative);
+        TEST_ASSERT_NOT_NULL(antiderivative);
+        TEST_ASSERT_NOT_NULL(antiderivative_derivative);
+        TEST_ASSERT_NOT_NULL(sum);
+        TEST_ASSERT_TRUE(expression_text && strstr(expression_text, "Li(x)"), "expression style renders Li");
+        TEST_ASSERT_TRUE(function_text && strstr(function_text, "li(x)"), "function style renders li");
+        TEST_ASSERT_TRUE(TeX_text && strstr(TeX_text, "\\operatorname{Li}"), "LaTeX style renders Li");
+        test_expr_set_val_d(x, 2.0);
+        check_q_at(__FILE__, __LINE__, 1, "Li(2) via qfloat_t", expr_eval_qf(li), qf_Li(qf_from_double(2.0)));
+        check_q_at(__FILE__, __LINE__, 1, "Li'(2) = 1/ln(2)", expr_eval_qf(derivative),
+                   qf_div(QF_ONE, qf_log(qf_from_double(2.0))));
+        check_q_at(__FILE__, __LINE__, 1, "the derivative of the Li antiderivative is Li",
+                   expr_eval_qf(antiderivative_derivative), expr_eval_qf(li));
+        check_q_at(__FILE__, __LINE__, 1, "finite sum of Li", expr_eval_qf(sum), expected_sum);
+
+        free(TeX_text);
+        free(function_text);
+        free(expression_text);
+        expr_free(sum);
+        expr_free(antiderivative_derivative);
+        expr_free(antiderivative);
+        expr_free(derivative);
+        expr_free(li);
+        expr_bindings_free(bindings);
+    }
 }
 
 void test_E1(void)

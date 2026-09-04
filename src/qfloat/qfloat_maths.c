@@ -2996,6 +2996,12 @@ qfloat_t qf_Ei(qfloat_t x)
     return qf_Ei_asymp_neg(x);
 }
 
+/* Evaluate Li(x) through its defining Ei(log(x)) identity. */
+qfloat_t qf_Li(qfloat_t x)
+{
+    return qf_Ei(qf_log(x));
+}
+
 /*===============================================================
    E1(x) — SECONDARY ENTRY POINT
    E1(x) = -Ei(-x) for moderate x

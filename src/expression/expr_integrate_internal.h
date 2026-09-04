@@ -192,6 +192,7 @@ expr_t *integrate_normal_pdf_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_normal_cdf_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_normal_logpdf_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_Ei_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_Li_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_E1_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_bessel_j_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_bessel_y_rule(const expr_t *expr, const expr_t *wrt);

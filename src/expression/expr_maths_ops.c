@@ -159,7 +159,7 @@ static bool expr_summation_bound_to_long(const expr_t *bound, long *out)
 /* Report whether a finite summation is too large for direct term-by-term evaluation. */
 bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr)
 {
-    const long maximum_terms = 10000L;
+    const long maximum_terms = 100000L;
     const expr_t *lower = NULL;
     const expr_t *upper = NULL;
     long lower_value = 0L;
@@ -185,6 +185,9 @@ bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr)
 static number_t eval_finite_summation(expr_t *dv)
 {
     const long maximum_terms = 10000L;
+    const long maximum_streamed_terms = 100000L;
+    expr_t *local_index;
+    expr_t *local_term;
     expr_t *simplified_term;
     expr_t *simplified_sum;
     expr_t *index;
@@ -295,23 +298,33 @@ static number_t eval_finite_summation(expr_t *dv)
                 return inverse_value;
             num_destroy(&inverse_value);
         }
-        if (lower_value == 1L)
-            return eval_finite_weighted_hyperbolic(dv, upper_value);
-        return num_clone(NUM_NAN);
+        if (lower_value == 1L) {
+            number_t weighted_value = eval_finite_weighted_hyperbolic(dv, upper_value);
+
+            if (!num_is_nan(weighted_value))
+                return weighted_value;
+            num_destroy(&weighted_value);
+        }
+        if ((unsigned long)upper_value - (unsigned long)lower_value >= maximum_streamed_terms)
+            return num_clone(NUM_NAN);
     }
 
+    /* Reuse one private summand tree; changing its index invalidates cached values without rebuilding it. */
+    local_index = expr_new_var(NUM_ZERO);
+    local_term = local_index ? expr_substitute(dv->a, index, local_index) : NULL;
+    if (!local_term) {
+        expr_free(local_index);
+        return num_clone(NUM_NAN);
+    }
     sum = num_clone(NUM_ZERO);
     for (long value = lower_value; value <= upper_value; ++value) {
         number_t index_value = num_create_from_long(value);
-        expr_t *index_expression = expr_new_const(index_value);
-        expr_t *term_expression = index_expression ? expr_substitute(dv->a, index, index_expression) : NULL;
         number_t term;
         number_t updated;
 
+        expr_set_val(local_index, index_value);
         num_destroy(&index_value);
-        term = term_expression ? expr_eval(term_expression) : num_clone(NUM_NAN);
-        expr_free(term_expression);
-        expr_free(index_expression);
+        term = expr_eval(local_term);
         if (!num_is_finite(term)) {
             num_destroy(&term);
             num_destroy(&sum);
@@ -325,6 +338,8 @@ static number_t eval_finite_summation(expr_t *dv)
         if (value == LONG_MAX)
             break;
     }
+    expr_free(local_term);
+    expr_free(local_index);
     return sum;
 }
 
@@ -4855,6 +4870,19 @@ const expr_ops_t ops_Ei = {.eval = eval_Ei,
                            .integrate = expr_integrate_dispatch_primitive,
                            .simplify = expr_simplify_unary_operator,
                            .fold_const_unary = NULL};
+const expr_ops_t ops_Li = {.eval = eval_Li,
+                           .deriv = deriv_Li,
+                           .reverse = expr_reverse_Li,
+                           .kind = EXPR_KIND_LI,
+                           .arity = EXPR_OP_UNARY,
+                           .expression_name = "Li",
+                           .function_name = "li",
+                           .TeX_name = "\\operatorname{Li}",
+                           .apply_unary = expr_Li,
+                           .apply_binary = NULL,
+                           .integrate = expr_integrate_dispatch_primitive,
+                           .simplify = expr_simplify_unary_operator,
+                           .fold_const_unary = NULL};
 const expr_ops_t ops_E1 = {.eval = eval_E1,
                            .deriv = deriv_E1,
                            .reverse = expr_reverse_E1,
@@ -5292,6 +5320,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
         [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
         [EXPR_KIND_EI] = &ops_Ei,
+        [EXPR_KIND_LI] = &ops_Li,
         [EXPR_KIND_E1] = &ops_E1,
         [EXPR_KIND_FACTORIAL] = &ops_factorial,
         [EXPR_KIND_FIBONACCI] = &ops_fibonacci,
@@ -6045,6 +6074,12 @@ expr_t *expr_logpdf(const expr_t *a)
 expr_t *expr_Ei(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_Ei, a);
+}
+
+/* Construct a logarithmic-integral expression. */
+expr_t *expr_Li(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_Li, a);
 }
 expr_t *expr_E1(const expr_t *a)
 {

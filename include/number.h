@@ -1010,6 +1010,8 @@ number_t num_gammainc_upper(const number_t s, const number_t x);
 number_t num_gammainc_P(const number_t s, const number_t x);
 number_t num_gammainc_Q(const number_t s, const number_t x);
 number_t num_Ei(const number_t number);
+/** @brief Evaluate the logarithmic integral Li(x) = Ei(ln(x)). */
+number_t num_Li(const number_t number);
 number_t num_E1(const number_t number);
 /** @} */
 

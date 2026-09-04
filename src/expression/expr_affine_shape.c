@@ -178,7 +178,7 @@ static bool expr_affine_unary_kind_to_op(expr_pattern_unary_affine_kind_t kind, 
         EXPR_KIND_ASIN,       EXPR_KIND_ACOS,          EXPR_KIND_ATAN,  EXPR_KIND_ASEC,  EXPR_KIND_ACOSEC,
         EXPR_KIND_ACOT,       EXPR_KIND_ASINH,         EXPR_KIND_ACOSH, EXPR_KIND_ATANH, EXPR_KIND_ASECH,
         EXPR_KIND_ACOSECH,    EXPR_KIND_ACOTH,         EXPR_KIND_ERF,   EXPR_KIND_ERFC,  EXPR_KIND_NORMAL_PDF,
-        EXPR_KIND_NORMAL_CDF, EXPR_KIND_NORMAL_LOGPDF, EXPR_KIND_EI,    EXPR_KIND_E1};
+        EXPR_KIND_NORMAL_CDF, EXPR_KIND_NORMAL_LOGPDF, EXPR_KIND_EI,    EXPR_KIND_E1, EXPR_KIND_LI};
 
     if (!op_kind_out)
         return false;

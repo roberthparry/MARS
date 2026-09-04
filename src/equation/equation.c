@@ -388,7 +388,17 @@ static bool equ_expr_is_zero(const expr_t *expr);
 static bool equ_expr_is_one(const expr_t *expr);
 static expr_t *equ_symbolic_pi_expr(void);
 static expr_t *equ_symbolic_two_pi_expr(void);
-static expr_t *equ_exact_tan_sqrt_three_family_expr(void);
+static expr_t *equ_exact_tan_sqrt_three_family_expr(const char *branch_name);
+
+static const char *equ_branch_parameter_name(const equation_t *equation)
+{
+    static const char *const preferences[] = {"n", "m", "k", "l", "j"};
+
+    for (size_t i = 0u; i < sizeof(preferences) / sizeof(preferences[0]); ++i)
+        if (!equ_binding(equation, preferences[i]))
+            return preferences[i];
+    return "r";
+}
 
 static int equ_try_solve_symbolic_affine(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
@@ -400,9 +410,11 @@ static number_t equ_quadratic_discriminant(number_t constant, number_t linear, n
 typedef struct {
     const expr_t **nodes;
     size_t *powers;
+    number_t *offsets;
     size_t count;
     size_t capacity;
     const expr_t *base;
+    bool exponential;
     bool invalid;
 } equ_repeated_power_terms_t;
 
@@ -410,7 +422,7 @@ static bool equ_positive_integer_coefficient(number_t coefficient, size_t *power
 {
     double approximate;
     number_t exact;
-    bool ok;
+    bool ok = false;
 
     if (!power_out || !num_is_real(coefficient) || !num_is_integer(coefficient))
         return false;
@@ -424,19 +436,29 @@ static bool equ_positive_integer_coefficient(number_t coefficient, size_t *power
     return ok;
 }
 
-static bool equ_repeated_power_term(const expr_t *expr, const expr_t *wrt, const expr_t **base_out, size_t *power_out)
+static bool equ_repeated_power_term(const expr_t *expr, const expr_t *wrt, const expr_t **base_out,
+                                    bool *exponential_out, size_t *power_out, number_t *offset_out)
 {
     const expr_t *base = NULL;
     const expr_t *exponent = NULL;
     number_t constant = num_new();
     number_t coefficient = num_new();
-    bool ok;
+    bool ok = false;
 
-    ok = expr_match_pow_expr(expr, &base, &exponent) && base && exponent && !equ_expr_uses_wrt(base, wrt) &&
-         equ_match_affine_linear_expr(exponent, wrt, true, &constant, &coefficient) && num_is_zero(constant) &&
+    *exponential_out = expr_match_exp_expr(expr, &exponent);
+    if (!*exponential_out && !expr_match_pow_expr(expr, &base, &exponent))
+        goto cleanup;
+    ok = exponent && (*exponential_out || (base && !equ_expr_uses_wrt(base, wrt))) &&
+         equ_match_affine_linear_expr(exponent, wrt, true, &constant, &coefficient) &&
          equ_positive_integer_coefficient(coefficient, power_out);
-    if (ok)
+    if (ok && !*exponential_out)
         *base_out = base;
+    if (ok) {
+        num_destroy(offset_out);
+        *offset_out = num_clone(constant);
+    }
+
+cleanup:
     num_destroy(&coefficient);
     num_destroy(&constant);
     return ok;
@@ -448,41 +470,67 @@ static void equ_collect_repeated_power_terms(const expr_t *expr, const expr_t *w
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     size_t power;
+    bool exponential = false;
+    number_t offset = num_new();
 
     if (!expr || !terms || terms->invalid)
-        return;
-    if (equ_repeated_power_term(expr, wrt, &base, &power)) {
-        if (terms->base && !expr_struct_eq(terms->base, base)) {
+        goto cleanup;
+    if (equ_repeated_power_term(expr, wrt, &base, &exponential, &power, &offset)) {
+        if (terms->count > 0u && (terms->exponential != exponential || (!exponential && !expr_struct_eq(terms->base, base)))) {
             terms->invalid = true;
-            return;
+            goto cleanup;
         }
         if (terms->count == terms->capacity) {
             size_t capacity = terms->capacity ? terms->capacity * 2u : 4u;
             const expr_t **nodes = realloc(terms->nodes, capacity * sizeof(*nodes));
             size_t *powers;
+            number_t *offsets;
 
             if (!nodes) {
                 terms->invalid = true;
-                return;
+                goto cleanup;
             }
             terms->nodes = nodes;
             powers = realloc(terms->powers, capacity * sizeof(*powers));
             if (!powers) {
                 terms->invalid = true;
-                return;
+                goto cleanup;
             }
             terms->powers = powers;
+            offsets = realloc(terms->offsets, capacity * sizeof(*offsets));
+            if (!offsets) {
+                terms->invalid = true;
+                goto cleanup;
+            }
+            terms->offsets = offsets;
             terms->capacity = capacity;
         }
         terms->base = base;
+        terms->exponential = exponential;
         terms->nodes[terms->count] = expr;
-        terms->powers[terms->count++] = power;
-        return;
+        terms->powers[terms->count] = power;
+        terms->offsets[terms->count++] = num_clone(offset);
+        goto cleanup;
     }
     if (expr_child_exprs(expr, &left, &right)) {
         equ_collect_repeated_power_terms(left, wrt, terms);
         equ_collect_repeated_power_terms(right, wrt, terms);
     }
+
+cleanup:
+    num_destroy(&offset);
+}
+
+static void equ_repeated_power_terms_clear(equ_repeated_power_terms_t *terms)
+{
+    if (!terms)
+        return;
+    for (size_t i = 0u; i < terms->count; ++i)
+        num_destroy(&terms->offsets[i]);
+    free(terms->offsets);
+    free(terms->powers);
+    free(terms->nodes);
+    memset(terms, 0, sizeof(*terms));
 }
 
 static int equ_exactify_cubic_power_solutions(const expr_t *polynomial, const expr_t *power_variable,
@@ -585,12 +633,12 @@ cleanup:
     return rc;
 }
 
-static expr_t *equ_logarithmic_power_family_root(const expr_t *base, const expr_t *power_root)
+static expr_t *equ_logarithmic_power_family_root(const expr_t *base, const expr_t *power_root, const char *branch_name)
 {
     expr_t *log_root = power_root ? expr_log(power_root) : NULL;
     expr_t *two_pi = equ_symbolic_two_pi_expr();
     expr_t *imaginary = expr_new_named_const(NUM_I, "i");
-    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *n = expr_new_named_var(NUM_NAN, branch_name);
     expr_t *imaginary_period = (two_pi && imaginary) ? expr_mul(two_pi, imaginary) : NULL;
     expr_t *period = (imaginary_period && n) ? expr_mul(imaginary_period, n) : NULL;
     expr_t *numerator = (log_root && period) ? expr_add(log_root, period) : NULL;
@@ -610,13 +658,13 @@ static expr_t *equ_logarithmic_power_family_root(const expr_t *base, const expr_
 }
 
 static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *power_root, const number_t *quadratic,
-                                          int quadratic_sign)
+                                          int quadratic_sign, const char *branch_name)
 {
     expr_t *log_base = base ? expr_log(base) : NULL;
     expr_t *real_part = NULL;
     expr_t *angle = NULL;
     expr_t *two_pi = equ_symbolic_two_pi_expr();
-    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *n = expr_new_named_var(NUM_NAN, branch_name);
     expr_t *period = (two_pi && n) ? expr_mul(two_pi, n) : NULL;
     expr_t *phase = NULL;
     expr_t *imaginary_part = NULL;
@@ -624,12 +672,16 @@ static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *powe
     expr_t *imaginary_term = NULL;
     expr_t *sum = NULL;
     expr_t *root = NULL;
+    number_t power_root_value = power_root ? expr_eval(power_root) : num_new();
+    bool power_root_is_real = num_is_real(power_root_value);
+    bool power_root_is_negative = power_root_is_real && num_sign(power_root_value) < 0;
 
-    if (quadratic_sign == 0) {
-        expr_t *log_root = power_root ? expr_log(power_root) : NULL;
-        number_t root_value = power_root ? expr_eval(power_root) : num_new();
+    if (power_root_is_real) {
+        expr_t *absolute_root = power_root_is_negative ? expr_neg(power_root) : expr_clone(power_root);
+        expr_t *log_root = absolute_root ? expr_log(absolute_root) : NULL;
         number_t base_value = base ? expr_eval(base) : num_new();
-        number_t log_root_value = num_log(root_value);
+        number_t absolute_root_value = num_abs(power_root_value);
+        number_t log_root_value = num_log(absolute_root_value);
         number_t log_base_value = num_log(base_value);
         number_t quotient_value = num_div(log_root_value, log_base_value);
 
@@ -640,9 +692,12 @@ static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *powe
         num_destroy(&quotient_value);
         num_destroy(&log_base_value);
         num_destroy(&log_root_value);
+        num_destroy(&absolute_root_value);
         num_destroy(&base_value);
-        num_destroy(&root_value);
         expr_free(log_root);
+        expr_free(absolute_root);
+        if (power_root_is_negative)
+            angle = equ_symbolic_pi_expr();
     } else {
         number_t modulus_squared = num_div(quadratic[0], quadratic[2]);
         number_t discriminant = equ_quadratic_discriminant(quadratic[0], quadratic[1], quadratic[2]);
@@ -688,10 +743,13 @@ static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *powe
         num_destroy(&modulus_squared);
     }
 
-    phase = quadratic_sign == 0 ? expr_clone(period) : (angle && period ? expr_add(angle, period) : NULL);
+    phase = power_root_is_real && !power_root_is_negative ? expr_clone(period)
+                                                         : (angle && period ? expr_add(angle, period) : NULL);
     imaginary_part = (phase && log_base) ? expr_simplify_owned(expr_div(phase, log_base)) : NULL;
     imaginary_term = (imaginary && imaginary_part) ? expr_mul(imaginary, imaginary_part) : NULL;
-    sum = (real_part && imaginary_term) ? expr_add(real_part, imaginary_term) : NULL;
+    sum = real_part && expr_is_exact_zero(real_part) ? expr_clone(imaginary_term)
+                                                     : (real_part && imaginary_term ? expr_add(real_part, imaginary_term)
+                                                                                    : NULL);
     root = sum;
     sum = NULL;
 
@@ -705,6 +763,7 @@ static expr_t *equ_cartesian_power_family(const expr_t *base, const expr_t *powe
     expr_free(angle);
     expr_free(real_part);
     expr_free(log_base);
+    num_destroy(&power_root_value);
     return root;
 }
 
@@ -716,11 +775,13 @@ static int equ_try_solve_repeated_power_polynomial(const equation_t *equation, c
     expr_t *residual = NULL;
     expr_t *transformed = NULL;
     expr_t *power_variable = NULL;
+    expr_t *family_base = NULL;
     expr_t *zero = NULL;
     equation_t *reduced = NULL;
     number_t exact_real_root = num_new();
     number_t exact_quadratic[3] = {num_new(), num_new(), num_new()};
     bool exactified = false;
+    const char *branch_name;
     int rc = 1;
 
     residual = equ_residual(equation);
@@ -729,6 +790,12 @@ static int equ_try_solve_repeated_power_polynomial(const equation_t *equation, c
     equ_collect_repeated_power_terms(residual, wrt, &terms);
     if (terms.invalid || terms.count < 2u)
         goto cleanup;
+    branch_name = equ_branch_parameter_name(equation);
+    family_base = terms.exponential ? expr_new_named_const(NUM_E, "e") : expr_clone(terms.base);
+    if (!family_base) {
+        rc = -1;
+        goto cleanup;
+    }
 
     power_variable = expr_new_named_var(NUM_NAN, "power_value");
     transformed = expr_clone(residual);
@@ -743,18 +810,27 @@ static int equ_try_solve_repeated_power_polynomial(const equation_t *equation, c
 
         equ_collect_repeated_power_terms(transformed, wrt, &current);
         if (current.invalid || current.count == 0u) {
-            free(current.powers);
-            free(current.nodes);
+            equ_repeated_power_terms_clear(&current);
             rc = -1;
             goto cleanup;
         }
         replacement = current.powers[0] == 1u ? expr_clone(power_variable)
                                               : expr_pow_long(power_variable, (long)current.powers[0]);
+        if (replacement && !num_is_zero(current.offsets[0])) {
+            expr_t *offset = expr_new_const(current.offsets[0]);
+            expr_t *scale = current.exponential ? (offset ? expr_exp(offset) : NULL)
+                                                : (offset ? expr_pow(current.base, &current.offsets[0]) : NULL);
+            expr_t *scaled = scale ? expr_mul(scale, replacement) : NULL;
+
+            expr_free(scale);
+            expr_free(offset);
+            expr_free(replacement);
+            replacement = scaled;
+        }
         next = replacement ? expr_substitute(transformed, current.nodes[0], replacement) : NULL;
 
         expr_free(replacement);
-        free(current.powers);
-        free(current.nodes);
+        equ_repeated_power_terms_clear(&current);
         if (!next) {
             rc = -1;
             goto cleanup;
@@ -795,9 +871,10 @@ static int equ_try_solve_repeated_power_polynomial(const equation_t *equation, c
         number_t value = expr_eval(power_root);
         int quadratic_sign = exactified && i > 0u ? (i == 1u ? 1 : -1) : 0;
         expr_t *family = !num_is_zero(value)
-                             ? (exactified ? equ_cartesian_power_family(terms.base, power_root, exact_quadratic,
-                                                                        quadratic_sign)
-                                           : equ_logarithmic_power_family_root(terms.base, power_root))
+                             ? (exactified || num_is_real(value)
+                                    ? equ_cartesian_power_family(family_base, power_root, exact_quadratic, quadratic_sign,
+                                                                 branch_name)
+                                    : equ_logarithmic_power_family_root(family_base, power_root, branch_name))
                              : NULL;
 
         if (!family || equ_append_solution_expr(wrt, family, solutions) != 0)
@@ -817,11 +894,11 @@ cleanup:
     num_destroy(&exact_real_root);
     equ_free(reduced);
     expr_free(zero);
+    expr_free(family_base);
     expr_free(power_variable);
     expr_free(transformed);
     expr_free(residual);
-    free(terms.powers);
-    free(terms.nodes);
+    equ_repeated_power_terms_clear(&terms);
     return rc;
 }
 
@@ -1008,7 +1085,7 @@ static expr_t *equ_symbolic_two_pi_expr(void)
     return out;
 }
 
-static expr_t *equ_exact_sin_one_family_expr(void)
+static expr_t *equ_exact_sin_one_family_expr(const char *branch_name)
 {
     number_t two_value = num_create_from_long(2L);
     number_t four_value = num_create_from_long(4L);
@@ -1017,7 +1094,7 @@ static expr_t *equ_exact_sin_one_family_expr(void)
     expr_t *two = expr_new_const(two_value);
     expr_t *four = expr_new_const(four_value);
     expr_t *one = expr_new_const(one_value);
-    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *n = expr_new_named_var(NUM_NAN, branch_name);
     expr_t *pi_over_two = (pi && two) ? expr_div(pi, two) : NULL;
     expr_t *four_n = (four && n) ? expr_mul(four, n) : NULL;
     expr_t *affine = (four_n && one) ? expr_add(four_n, one) : NULL;
@@ -1037,7 +1114,7 @@ static expr_t *equ_exact_sin_one_family_expr(void)
     return out;
 }
 
-static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
+static expr_t *equ_exact_tan_sqrt_three_family_expr(const char *branch_name)
 {
     number_t one_value = num_create_from_long(1L);
     number_t three_value = num_create_from_long(3L);
@@ -1045,7 +1122,7 @@ static expr_t *equ_exact_tan_sqrt_three_family_expr(void)
     expr_t *one = expr_new_const(one_value);
     expr_t *three = expr_new_const(three_value);
     expr_t *pi = equ_symbolic_pi_expr();
-    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *n = expr_new_named_var(NUM_NAN, branch_name);
     expr_t *one_third = expr_new_const(one_third_value);
     expr_t *three_n = (three && n) ? expr_mul(three, n) : NULL;
     expr_t *affine = (three_n && one) ? expr_add(three_n, one) : NULL;
@@ -1142,7 +1219,8 @@ cleanup:
 typedef enum { EQU_PERIODIC_TRIG_SIN, EQU_PERIODIC_TRIG_COS, EQU_PERIODIC_TRIG_TAN } equ_periodic_trig_kind_t;
 
 static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind, const expr_t *inner, const expr_t *target,
-                                            const expr_t *wrt, equation_solutions_t *solutions)
+                                            const expr_t *wrt, const char *branch_name,
+                                            equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -1163,14 +1241,14 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind, const
         goto cleanup;
     }
 
-    n = expr_new_named_var(NUM_NAN, "n");
+    n = expr_new_named_var(NUM_NAN, branch_name);
     if (!n)
         goto cleanup;
 
     switch (kind) {
         case EQU_PERIODIC_TRIG_SIN:
             if (equ_expr_is_one(target)) {
-                exact_family = equ_exact_sin_one_family_expr();
+                exact_family = equ_exact_sin_one_family_expr(branch_name);
                 if (!exact_family)
                     goto cleanup;
                 if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
@@ -1234,7 +1312,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind, const
 
             num_destroy(&target_value);
             if (is_sqrt_three) {
-                exact_family = equ_exact_tan_sqrt_three_family_expr();
+                exact_family = equ_exact_tan_sqrt_three_family_expr(branch_name);
                 if (!exact_family)
                     goto cleanup;
                 if (equ_expr_is_zero(constant) && equ_expr_is_one(linear)) {
@@ -1275,7 +1353,7 @@ cleanup:
 }
 
 static int equ_try_solve_unary_periodic_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
-                                             equation_solutions_t *solutions)
+                                             const char *branch_name, equation_solutions_t *solutions)
 {
     const expr_t *inner = NULL;
 
@@ -1285,11 +1363,11 @@ static int equ_try_solve_unary_periodic_side(const expr_t *lhs, const expr_t *rh
         return 1;
 
     if (expr_match_sin_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_SIN, inner, rhs, wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_SIN, inner, rhs, wrt, branch_name, solutions);
     if (expr_match_cos_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_COS, inner, rhs, wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_COS, inner, rhs, wrt, branch_name, solutions);
     if (expr_match_tan_expr(lhs, &inner))
-        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_TAN, inner, rhs, wrt, solutions);
+        return equ_try_solve_periodic_trig_kind(EQU_PERIODIC_TRIG_TAN, inner, rhs, wrt, branch_name, solutions);
 
     return 1;
 }
@@ -1301,10 +1379,12 @@ static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_unary_periodic_side(equation->lhs, equation->rhs, wrt, solutions);
+    rc = equ_try_solve_unary_periodic_side(equation->lhs, equation->rhs, wrt,
+                                           equ_branch_parameter_name(equation), solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs, wrt, solutions);
+    return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs, wrt,
+                                             equ_branch_parameter_name(equation), solutions);
 }
 
 typedef enum { EQU_UNARY_INVERSE_EXP, EQU_UNARY_INVERSE_LOG } equ_unary_inverse_kind_t;
@@ -1379,13 +1459,13 @@ static bool equ_expr_is_self_power(const expr_t *expr, const expr_t *wrt)
     return expr_match_pow_expr(expr, &base, &exponent) && expr_struct_eq(base, wrt) && expr_struct_eq(exponent, wrt);
 }
 
-static expr_t *equ_self_power_log_family_arg(const expr_t *rhs)
+static expr_t *equ_self_power_log_family_arg(const expr_t *rhs, const char *branch_name)
 {
     number_t i_value = num_clone(NUM_I);
     expr_t *log_rhs = rhs ? expr_log(rhs) : NULL;
     expr_t *two_pi = equ_symbolic_two_pi_expr();
     expr_t *i_const = expr_new_named_const(i_value, "i");
-    expr_t *n = expr_new_named_var(NUM_NAN, "n");
+    expr_t *n = expr_new_named_var(NUM_NAN, branch_name);
     expr_t *two_pi_i = (two_pi && i_const) ? expr_mul(two_pi, i_const) : NULL;
     expr_t *period_term = (two_pi_i && n) ? expr_mul(two_pi_i, n) : NULL;
     expr_t *sum = (log_rhs && period_term) ? expr_add(log_rhs, period_term) : NULL;
@@ -1401,9 +1481,9 @@ static expr_t *equ_self_power_log_family_arg(const expr_t *rhs)
     return out;
 }
 
-static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs)
+static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs, const char *branch_name)
 {
-    expr_t *arg = equ_self_power_log_family_arg(rhs);
+    expr_t *arg = equ_self_power_log_family_arg(rhs, branch_name);
     expr_t *k = expr_new_named_var(NUM_NAN, "k");
     expr_t *lambert = (arg && k) ? expr_lambert_wn(k, arg) : NULL;
     expr_t *root = lambert ? expr_exp(lambert) : NULL;
@@ -1495,7 +1575,7 @@ static int equ_append_self_power_root_if_valid(const expr_t *lhs, const expr_t *
 }
 
 static int equ_try_solve_self_power_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
-                                         equation_solutions_t *solutions)
+                                         const char *branch_name, equation_solutions_t *solutions)
 {
     expr_t *family_root = NULL;
     bool appended;
@@ -1508,7 +1588,7 @@ static int equ_try_solve_self_power_side(const expr_t *lhs, const expr_t *rhs, c
     if (!equ_expr_is_self_power(lhs, wrt))
         return 1;
 
-    family_root = equ_self_power_lambert_family_root(rhs);
+    family_root = equ_self_power_lambert_family_root(rhs, branch_name);
     if (equ_append_self_power_root_if_valid(lhs, rhs, wrt, solutions, family_root, &appended) != 0) {
         expr_free(family_root);
         return -1;
@@ -1526,10 +1606,12 @@ static int equ_try_solve_self_power(const equation_t *equation, const expr_t *wr
     if (!equation || !wrt || !solutions)
         return -1;
 
-    rc = equ_try_solve_self_power_side(equation->lhs, equation->rhs, wrt, solutions);
+    rc = equ_try_solve_self_power_side(equation->lhs, equation->rhs, wrt, equ_branch_parameter_name(equation),
+                                       solutions);
     if (rc != 1)
         return rc;
-    return equ_try_solve_self_power_side(equation->rhs, equation->lhs, wrt, solutions);
+    return equ_try_solve_self_power_side(equation->rhs, equation->lhs, wrt, equ_branch_parameter_name(equation),
+                                         solutions);
 }
 
 static int equ_try_solve_symbolic_affine(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions)

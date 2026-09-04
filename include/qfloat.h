@@ -1509,6 +1509,11 @@ qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x);
 qfloat_t qf_Ei(qfloat_t x);
 
 /**
+ * @brief Logarithmic integral Li(x) = Ei(ln(x)).
+ */
+qfloat_t qf_Li(qfloat_t x);
+
+/**
  * @brief Exponential integral E1(x) = ∫_{x}^{∞} (e^{-t} / t) dt,  x > 0
  */
 qfloat_t qf_E1(qfloat_t x);
