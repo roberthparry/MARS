@@ -314,7 +314,6 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [4  ] = { .kw = "conjugate",          .arity = 1u,       .ops = &ops_conj,           .ufn = expr_conj },
     [5  ] = { .kw = "asec",               .arity = 1u,       .ops = &ops_asec,           .ufn = expr_asec },
     [6  ] = { .kw = "archacoversin",      .arity = 1u,       .ops = &ops_archacoversin,  .ufn = expr_archacoversin },
-    [7  ] = { .kw = "logarithmic_integral", .arity = 1u,     .ops = &ops_Li,             .ufn = expr_Li },
     [8  ] = { .kw = "lambert_wn",         .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },
     [9  ] = { .kw = "archacovercos",      .arity = 1u,       .ops = &ops_archacovercos,  .ufn = expr_archacovercos },
     [10 ] = { .kw = "wn",                 .arity = 2u,       .ops = &ops_lambert_wn,     .bfn = expr_lambert_wn_xp },

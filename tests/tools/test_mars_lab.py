@@ -6946,10 +6946,24 @@ class ExpressionResultTests(unittest.TestCase):
             "∫^x exp(cosh(t))·dt",
         )
         self.assertIn(
-            "return @S^x exp(cosh(t)) dt.",
+            "return integral(x, exp(cosh(t)), t).",
             fields["function"],
         )
         self.assertNotIn("integral_meta", completed.stdout)
+
+    def test_function_integrals_use_calls_inside_sums_and_with_bounds(self) -> None:
+        cases = (
+            ("integral(a, x, exp(cosh(t)), t)", "integral(a, x, exp(cosh(t)), t)"),
+            ("sum(k, 1, n, integral(x, Li(k.t), t))", "sum(k, 1, n, integral(x, li(k.t), t))"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 64, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertIn(expected, fields["function"])
+                self.assertNotIn("@S", fields["function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
