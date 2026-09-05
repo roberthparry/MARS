@@ -717,6 +717,8 @@ const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops);
 
 /* Integration and inverse-function simplification helpers. */
 expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt);
+/* Evaluate real affine Li integrals, including removable singularities in their primitive. */
+number_t expr_integrate_Li_definite(const expr_t *expr, const expr_t *wrt, number_t lower, number_t upper);
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
 expr_bindings_t *expr_bindings_merge_internal(const expr_bindings_t *bindings,
                                               const expr_bindings_t *additional_bindings);

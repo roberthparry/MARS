@@ -3411,6 +3411,24 @@ static void test_from_string_unevaluated_integral(void)
     check_parse_val("unevaluated integral explicit bounds evaluate numerically", "{ @S^3_1 1/t dt }", log(3.0),
                     __LINE__);
 
+    check_parse_val("Li integral removable primitive limit at one", "integral(1,2,Li(t),t)",
+                    -0.18411035424411999890, __LINE__);
+    check_parse_val("Li integral continuous primitive limit at zero", "integral(0,1,Li(t),t)", -log(2.0), __LINE__);
+    check_parse_val("Li integral reversed endpoints", "integral(1,0,Li(t),t)", log(2.0), __LINE__);
+    check_parse_val("Li integral scaled argument", "integral(1/2,1,Li(2t),t)",
+                    -0.09205517712205999945, __LINE__);
+    check_parse_val("Li integral shifted argument", "integral(0,1,Li(t+1),t)",
+                    -0.18411035424411999890, __LINE__);
+    check_parse_val("Li integral negative slope", "integral(0,1,Li(2-t),t)",
+                    -0.18411035424411999890, __LINE__);
+    check_parse_val("Li integral crosses singularity", "integral(0,2,Li(t),t)",
+                    -0.18411035424411999890 - log(2.0), __LINE__);
+    check_parse_val("Ei log integral equivalent endpoint limit", "integral(1,2,Ei(ln(t)),t)",
+                    -0.18411035424411999890, __LINE__);
+    check_parse_val("Li integral inside bound finite sum",
+                    "{ sum(k,1,n,integral(1,x,Li(k.t),t))+C | x=2; n=1,C=0 }",
+                    -0.18411035424411999890, __LINE__);
+
     expr = expr_from_string("{ integral(1, 3, 1/t, t) }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {

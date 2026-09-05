@@ -323,6 +323,14 @@ static number_t eval_integral(expr_t *dv)
         return num_clone(NUM_NAN);
     }
 
+    result = expr_integrate_Li_definite(dv->a, dummy_expr, lower, upper);
+    if (num_is_real(result) && num_is_finite(result)) {
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return result;
+    }
+    num_destroy(&result);
+
     ig = intg_new();
     if (!ig) {
         num_destroy(&lower);
