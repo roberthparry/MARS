@@ -1299,22 +1299,22 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size)
 
                 if (!lower_expr && !expr_note_value_is_defined_at(integrand, dummy_expr, NUM_ZERO)) {
                     snprintf(out, out_size,
-                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0, so that definite "
-                             "integral is undefined.",
+                             "Here ∫^%s means ∫₀^%s. The integrand %s is not finite at %s = 0; evaluation "
+                             "requires an improper-integral limit that could not be determined.",
                              upper_text ? upper_text : "?", upper_text ? upper_text : "?",
                              integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t");
                     found = true;
                 } else if (!expr_note_value_is_defined_at(integrand, dummy_expr, lower)) {
                     snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the lower bound makes this definite "
-                             "integral undefined.",
+                             "The integrand %s is not finite at %s = %s; the improper-integral limit at the lower "
+                             "bound could not be determined.",
                              integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t",
                              lower_text ? lower_text : "0");
                     found = true;
                 } else if (!expr_note_value_is_defined_at(integrand, dummy_expr, upper)) {
                     snprintf(out, out_size,
-                             "The integrand %s is not finite at %s = %s, so that the upper bound makes this definite "
-                             "integral undefined.",
+                             "The integrand %s is not finite at %s = %s; the improper-integral limit at the upper "
+                             "bound could not be determined.",
                              integrand_text ? integrand_text : "f(t)", dummy_name ? dummy_name : "t",
                              upper_text ? upper_text : "?");
                     found = true;

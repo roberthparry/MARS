@@ -3007,6 +3007,34 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\sum_{k=1}^{n}\operatorname{Li}(k\mkern-2mu x)", fields["tex"])
         self.assertIn("sum(k, 1, n, li(k.x))", fields["function"])
 
+    def test_li_integral_endpoint_limit_preserves_value_and_precision(self) -> None:
+        reference, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "2Li(2)-Li(4)+ln(2)", 155, "x", "evaluate"
+        )
+        self.assertEqual(returncode, 0, raw)
+        for source in (
+            "{ sum(k,1,n,integral(1,x,Li(k.t),t))+C | x=2; n=1,C=0 }",
+            "integral(1,2,Li(t),t)",
+            "integral(1,2,Ei(ln(t)),t)",
+        ):
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 116, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertNotIn("value_note", fields)
+                self.assertGreaterEqual(len(fields["value"].replace(".", "")), 115)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 116, False, action="evaluate"
+                )
+                self.assertEqual(payload["value"], fields["value"])
+                with decimal.localcontext() as context:
+                    context.prec = 155
+                    self.assertLess(
+                        abs(decimal.Decimal(fields["value"]) - decimal.Decimal(reference["value"])),
+                        decimal.Decimal("1e-110"),
+                    )
+
     def test_large_li_sum_evaluates_at_requested_precision(self) -> None:
         sources = (
             "{ Li(x)+Li(2x)+Li(3x)+...+Li(nx) | x=2; n=30000 }",

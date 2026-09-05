@@ -1299,6 +1299,74 @@ expr_t *integrate_Ei_rule(const expr_t *expr, const expr_t *wrt)
     return div_number_owned_consuming(raw, &coeff);
 }
 
+/* The primitive is continuous at zero and one even though its separate terms are not. */
+static number_t integrate_Li_primitive_value(number_t argument)
+{
+    NUM_SCOPE(scope);
+    number_t result;
+
+    if (num_is_zero(argument))
+        return num_scope_detach(num_clone(NUM_ZERO));
+    if (num_is_one(argument)) {
+        result = num_neg(num_log(NUM_TWO));
+    } else {
+        number_t log_argument = num_log(argument);
+        number_t scaled_Li = num_mul(argument, num_Ei(log_argument));
+        number_t Ei_twice_log = num_Ei(num_mul(NUM_TWO, log_argument));
+
+        result = num_sub(scaled_Li, Ei_twice_log);
+    }
+    return num_scope_detach(result);
+}
+
+/* Use the same real primitive for Li(u) and its equivalent Ei(ln(u)) spelling. */
+number_t expr_integrate_Li_definite(const expr_t *expr, const expr_t *wrt, number_t lower, number_t upper)
+{
+    const expr_t *argument = NULL;
+    expr_t *offset_expr = NULL;
+    expr_t *slope_expr = NULL;
+    number_t offset = NUM_NAN;
+    number_t slope = NUM_NAN;
+    number_t result = NUM_NAN;
+    NUM_SCOPE(scope);
+
+    if (expr_is_op(expr, &ops_Li))
+        argument = expr->a;
+    else if (expr_is_op(expr, &ops_Ei) && expr_is_op(expr->a, &ops_log))
+        argument = expr->a->a;
+    if (!argument || !num_is_finite(lower) || !num_is_finite(upper) ||
+        !match_symbolic_affine_constant_and_coeff(argument, wrt, &offset_expr, &slope_expr))
+        goto cleanup;
+
+    offset = expr_eval(offset_expr);
+    slope = expr_eval(slope_expr);
+
+    if (!num_is_real(offset) || !num_is_finite(offset) || !num_is_real(slope) || !num_is_finite(slope))
+        goto cleanup;
+    number_t lower_argument = num_add(num_mul(slope, lower), offset);
+    number_t upper_argument = num_add(num_mul(slope, upper), offset);
+
+    if (num_lt(lower_argument, NUM_ZERO) || num_lt(upper_argument, NUM_ZERO))
+        goto cleanup;
+    if (num_is_zero(slope)) {
+        result = num_mul(num_sub(upper, lower), num_Li(offset));
+    } else {
+        number_t lower_primitive = integrate_Li_primitive_value(lower_argument);
+        number_t upper_primitive = integrate_Li_primitive_value(upper_argument);
+
+        result = num_div(num_sub(upper_primitive, lower_primitive), slope);
+        num_destroy(&upper_primitive);
+        num_destroy(&lower_primitive);
+    }
+
+cleanup:
+    num_destroy(&slope);
+    num_destroy(&offset);
+    expr_free(slope_expr);
+    expr_free(offset_expr);
+    return num_scope_detach(result);
+}
+
 expr_t *integrate_Li_rule(const expr_t *expr, const expr_t *wrt)
 {
     number_t constant = num_new();
