@@ -1,11 +1,11 @@
 # Literate Comments and Notebook Output
 
-This note records a planned direction for the MARS language and MARS Lab. It is
+This note records a planned direction for the Ophelia language and MARS Lab. It is
 not yet a description of implemented syntax.
 
 ## Aim
 
-MARS source should be able to carry readable mathematical explanation beside
+Ophelia source should be able to carry readable mathematical explanation beside
 executable expressions. Mars Lab should eventually render that explanation,
 rather than treating every comment as disposable text. The same representation
 should also support notebook front ends without requiring a separate language.
@@ -71,8 +71,70 @@ able to translate the same bundle into the host's native display messages withou
 re-evaluating or reparsing the result.
 
 Notebook compatibility also requires persistent execution state, ordered cells,
-independent Markdown cells, executable MARS cells, reproducible cell output and a
+independent Markdown cells, executable Ophelia cells, reproducible cell output and a
 clear distinction between source, rendered explanation and computed value.
+
+## Jupyter Kernel Direction
+
+Jupyter is the proposed next interface after the command-line prototype of the
+[Ophelia language](./expression-language.md). A dedicated Ophelia kernel should adapt
+the same language frontend and execution context to Jupyter, with MARS remaining
+the mathematical engine. This is planned work, not an existing kernel.
+
+Code cells should accept the language directly. They should be able to construct
+expression values, evaluate them with bindings at the selected precision, and
+differentiate or integrate them to produce new expression values. Users should
+not need to translate the language into Python or pass generated Function text
+through a second mathematical implementation.
+
+The kernel adapter owns notebook protocol handling and translates execution
+requests and typed results. Parsing, scope, rebinding and precision semantics
+belong in the shared frontend; algebra and calculus belong in MARS. Notebook
+support must not introduce a competing evaluator or simplifier.
+
+### Persistent State and Reproducibility
+
+Keep definitions and expression values available to subsequent executions in
+the same kernel session. Execution order, rather than a cell's visual position,
+determines the current state. Re-executing a definition follows the frontend's
+rebinding rules and must not silently mutate previously constructed expressions.
+Do not imply automatic dependency tracking or automatic recomputation of later
+cells in the first implementation.
+
+Restarting the kernel clears the execution context. Restarting and running all
+cells in order should reproduce a notebook's results when its inputs, language
+and MARS versions, and precision settings are unchanged. Saved rendered output
+is a record of an execution, not a serialised live expression DAG. Record the
+relevant version and precision information for reproducibility.
+
+### Cell Results and Explanation
+
+Map the typed result bundle to rich notebook output: rendered TeX, copyable
+Expression and Function forms, numerical values at the requested precision,
+and plots when graph support is available. Always provide a plain-text fallback.
+Distinguish unset bindings, unsupported symbolic operations, domain errors and
+resource-limit failures rather than presenting all of them as missing output.
+
+Ordinary notebook Markdown cells provide prose and TeX explanation independently
+of executable source. Retained language documentation comments are complementary,
+not a prerequisite for writing an explanatory notebook. The first kernel can
+provide text and TeX results without waiting for graphing or interactive widgets.
+
+### Interruption and Verification
+
+Provide safe interruption of expensive evaluations and bounded resource use.
+Define whether a failed or interrupted cell preserves earlier completed
+statements; do not leave that behaviour accidental. Cancellation must release
+temporary resources and leave a usable execution context, or explicitly require
+a kernel restart if recovery is not safe. Never report an interrupted operation
+as a completed mathematical result.
+
+After the command-line frontend is stable, implement minimal cell execution and
+plain-text results, then rich output and notebook integration tests. Verify
+cross-cell definitions, rebinding, precision changes, restart-and-run-all,
+diagnostics, interruption and agreement with command-line results. Completion,
+inspection and interactive plotting can follow without changing the underlying
+language semantics.
 
 ## Graphing
 
@@ -102,9 +164,12 @@ The work should be staged as follows:
 2. Preserve documentation comments in a document or cell representation without
    adding them to the mathematical expression DAG.
 3. Define a result-bundle API with owned, typed output fields.
-4. Define structured graph results and a portable SVG rendering path.
-5. Make MARS Lab consume that API and render Markdown, TeX and graphs safely.
-6. Add a notebook adapter over the same result bundle and execution context.
+4. Once the command-line language prototype is stable, add a minimal Jupyter
+   kernel over the shared execution context and text/TeX result bundle.
+5. Define structured graph results and a portable SVG rendering path, then expose
+   them through the same bundle to notebook clients and MARS Lab.
+6. Make MARS Lab consume the shared API and render Markdown, TeX and graphs
+   safely, without duplicating execution semantics in the browser.
 
 The expression DAG should continue to represent mathematics. Literate source
 structure, comments, cell identity and display metadata belong in a layer around
