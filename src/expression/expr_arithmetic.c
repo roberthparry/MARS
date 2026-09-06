@@ -56,13 +56,14 @@ static bool eval_zetap_difference_at_one(const expr_t *riemann, const expr_t *hu
         !expr_struct_eq(riemann->a, hurwitz->a))
         return false;
 
-    parameter = expr_eval_num_internal(riemann->a);
+    /* These locals are released below, so obtain owned values rather than borrowed cache entries. */
+    parameter = expr_eval(riemann->a);
     if (!num_is_real(parameter) || !num_eq(parameter, NUM_ONE)) {
         num_destroy(&parameter);
         return false;
     }
 
-    endpoint = expr_eval_num_internal(hurwitz->b);
+    endpoint = expr_eval(hurwitz->b);
     num_destroy(&parameter);
     if (!num_is_real(endpoint) || !num_gt(endpoint, NUM_ZERO)) {
         num_destroy(&endpoint);

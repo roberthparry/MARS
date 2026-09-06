@@ -7,6 +7,8 @@
 #include "expression.h"
 #include "number.h"
 #include "ustring.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 static char *dup_string(const char *text)
 {
@@ -45,17 +47,17 @@ static char *number_text_dup(number_t value)
     return copy;
 }
 
-static char *number_precision_text_dup(number_t value, int precision)
+static char *number_precision_text_dup(number_t value, int precision, bool scientific)
 {
     char fmt[32];
-    int digits = precision > 0 ? precision - 1 : 0;
+    int digits = precision > 0 ? precision - (scientific ? 1 : 0) : 0;
     int needed;
     char *out;
 
     if (precision <= 0)
         return number_text_dup(value);
 
-    snprintf(fmt, sizeof(fmt), "%%.%dN", digits);
+    snprintf(fmt, sizeof(fmt), "%%.%d%c", digits, scientific ? 'N' : 'n');
     needed = num_sprintf(NULL, 0u, fmt, value);
     if (needed < 0)
         return NULL;
@@ -129,7 +131,60 @@ static void print_aligned_equation_fragment(const char *lhs, const char *rhs)
 
 static char *equation_display_TeX_dup(const equation_t *equation)
 {
-    return equ_to_TeX_body_wrapped(equation, 110u);
+    char *problem = equ_to_TeX_body_wrapped(equation, 110u);
+    const char *body = NULL;
+    size_t body_length = 0u;
+    const expr_t *sides[] = {equ_lhs(equation), equ_rhs(equation)};
+    string_t *annotated = NULL;
+    bool appended = false;
+    bool complete = true;
+
+    if (!TeX_wrapped_aligned_body(problem, &body, &body_length))
+        return problem;
+
+    /* Inspect both sides of the native equation; never replace the authored series with its closed form. */
+    for (size_t i = 0u; i < sizeof(sides) / sizeof(sides[0]); ++i) {
+        expr_t *order = NULL;
+        expr_t *closed = expr_infinite_power_sum_closed_form(sides[i], &order);
+        expr_t *simplified = closed ? expr_display_simplified(closed) : NULL;
+        char *series_TeX = closed ? expr_to_TeX_body(sides[i]) : NULL;
+        char *closed_TeX = simplified ? expr_to_TeX_body(simplified) : NULL;
+        char *order_TeX = order ? expr_to_TeX_body(order) : NULL;
+
+        if (series_TeX && closed_TeX && order_TeX) {
+            if (!annotated) {
+                annotated = string_new_with("\\begin{aligned}[t]\n");
+                if (annotated && string_append_chars(annotated, body, body_length) != 0) {
+                    string_free(annotated);
+                    annotated = NULL;
+                }
+            }
+            if (annotated) {
+                complete = string_append_format(annotated,
+                    " \\\\\n%s &= %s,\\qquad \\operatorname{Re}\\{%s\\}>1",
+                    series_TeX, closed_TeX, order_TeX) >= 0;
+                appended = appended || complete;
+            }
+        }
+        free(order_TeX);
+        free(closed_TeX);
+        free(series_TeX);
+        expr_free(simplified);
+        expr_free(closed);
+        expr_free(order);
+        if (!complete)
+            break;
+    }
+    if (complete && appended && string_append_cstr(annotated, "\n\\end{aligned}") == 0) {
+        char *text = dup_string(string_c_str(annotated));
+
+        if (text) {
+            free(problem);
+            problem = text;
+        }
+    }
+    string_free(annotated);
+    return problem;
 }
 
 static equation_t *display_expanded_equation(const equation_t *equation)
@@ -409,6 +464,76 @@ static const equation_t *ordered_solution_at(const equation_solutions_t *solutio
     return equ_solutions_at(solutions, order ? order[index] : index);
 }
 
+static bool solution_conjugate_pair(const equation_solutions_t *solutions, const size_t *order, size_t index,
+                                    number_t *value_out)
+{
+    const equation_t *first = ordered_solution_at(solutions, order, index);
+    const equation_t *second = index + 1u < equ_solutions_count(solutions)
+        ? ordered_solution_at(solutions, order, index + 1u) : NULL;
+    number_t first_value = NUM_NAN;
+    number_t second_value = NUM_NAN;
+    bool paired = false;
+
+    /* Sorting makes conjugates adjacent. Only literal numbers qualify; do not sample symbolic families. */
+    if (first && second && equ_lhs(first) == equ_lhs(second) &&
+        expr_match_const_value(equ_rhs(first), &first_value) &&
+        expr_match_const_value(equ_rhs(second), &second_value) &&
+        num_is_finite(first_value) && !num_is_real(first_value) && num_is_finite(second_value)) {
+        number_t first_real = num_real_part(first_value);
+        number_t second_real = num_real_part(second_value);
+        number_t first_imaginary = num_imag_part(first_value);
+        number_t second_imaginary = num_imag_part(second_value);
+        number_t negative_imaginary = num_neg(first_imaginary);
+
+        /* num_eq permits a tolerance; component ordering requires identical stored values. */
+        paired = num_cmp(first_real, second_real) == 0 && num_cmp(negative_imaginary, second_imaginary) == 0;
+        num_destroy(&negative_imaginary);
+        num_destroy(&second_imaginary);
+        num_destroy(&first_imaginary);
+        num_destroy(&second_real);
+        num_destroy(&first_real);
+        if (paired)
+            *value_out = num_clone(first_value);
+    }
+    num_destroy(&second_value);
+    num_destroy(&first_value);
+    return paired;
+}
+
+static char *number_TeX_dup(number_t value)
+{
+    expr_t *constant = expr_new_const(value);
+    char *text = constant ? expr_to_TeX_body(constant) : NULL;
+
+    expr_free(constant);
+    return text;
+}
+
+static char *solution_pair_rhs_text(number_t value, int precision, bool use_TeX)
+{
+    number_t real = num_real_part(value);
+    number_t imaginary = num_imag_part(value);
+    number_t magnitude = num_abs(imaginary);
+    char *real_text = use_TeX ? number_TeX_dup(real) : number_precision_text_dup(real, precision, false);
+    char *imaginary_text = use_TeX ? number_TeX_dup(magnitude) : number_precision_text_dup(magnitude, precision, false);
+    char *text = NULL;
+
+    if (real_text && imaginary_text) {
+        size_t size = strlen(real_text) + strlen(imaginary_text) + 32u;
+
+        text = malloc(size);
+        if (text)
+            snprintf(text, size, "%s %s %s%s", real_text, use_TeX ? "\\pm" : "±", imaginary_text,
+                     use_TeX ? "\\mkern-2mu i" : "i");
+    }
+    free(imaginary_text);
+    free(real_text);
+    num_destroy(&magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    return text;
+}
+
 static bool text_has_identifier(const char *text, const char *identifier)
 {
     size_t length;
@@ -458,27 +583,42 @@ static const char *solutions_integer_branch_parameter(const equation_solutions_t
     return NULL;
 }
 
-static void print_solutions(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
+static void print_solutions(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order,
+                            int precision, bool compact)
 {
     size_t count = equ_solutions_count(solutions);
+    const char *heading = compact ? "display_solutions " : "solutions   ";
 
     if (count == 0u) {
-        printf("solutions   \n");
+        printf("%s\n", heading);
         return;
     }
 
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
         const char *name = solution_binding_name(bindings, solution);
+        number_t pair = NUM_NAN;
+        bool paired = compact && name && solution_conjugate_pair(solutions, order, i, &pair);
+        char *pair_text = paired ? solution_pair_rhs_text(pair, precision, false) : NULL;
+
+        if (pair_text) {
+            printf("%s%s %s %s\n", i == 0u ? heading : "            ", name,
+                   num_is_exact(pair) ? "=" : "≈", pair_text);
+            free(pair_text);
+            num_destroy(&pair);
+            ++i;
+            continue;
+        }
+        num_destroy(&pair);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
         char *rhs_text = expr_text_dup(equ_rhs(shown), style_UNBOUND);
         char *text = equ_text_dup(shown, style_UNBOUND);
 
         if (name && rhs_text)
-            printf("%s%s = %s\n", i == 0u ? "solutions   " : "            ", name, rhs_text);
+            printf("%s%s = %s\n", i == 0u ? heading : "            ", name, rhs_text);
         else
-            printf("%s%s\n", i == 0u ? "solutions   " : "            ", text ? text : "(null)");
+            printf("%s%s\n", i == 0u ? heading : "            ", text ? text : "(null)");
         equ_free(display);
         free(text);
         free(rhs_text);
@@ -493,6 +633,19 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
         const char *name = solution_binding_name(bindings, solution);
+        number_t pair = NUM_NAN;
+        bool paired = name && solution_conjugate_pair(solutions, order, i, &pair);
+        char *pair_TeX = paired ? solution_pair_rhs_text(pair, 0, true) : NULL;
+
+        if (pair_TeX) {
+            printf("%s%s &%s %s", i == 0u ? first_separator : " \\\\\n", name,
+                   num_is_exact(pair) ? "=" : "\\approx", pair_TeX);
+            free(pair_TeX);
+            num_destroy(&pair);
+            ++i;
+            continue;
+        }
+        num_destroy(&pair);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
         char *rhs_TeX = expr_TeX_body_dup(equ_rhs(shown));
@@ -514,11 +667,14 @@ static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bind
     const char *branch_parameter;
 
     if (equ_solutions_count(solutions) == 0u) {
+        /* With no solution rows, retain the problem's TeX and report the status in the Solutions card. */
         printf("solutions_TeX \n");
         return;
     }
 
     printf("solutions_TeX \\begin{aligned}");
+    if (equ_solutions_family_note(solutions))
+        printf("&\\text{Non-trivial zeros found} \\\\\n");
     print_solution_TeX_rows(solutions, bindings, order, " ");
     branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
     if (branch_parameter)
@@ -701,7 +857,7 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
         char note[64];
         number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), branch_parameter, &sampled_k,
                                                                 &sampled_branch, &exact);
-        char *value_text = number_precision_text_dup(value, precision);
+        char *value_text = number_precision_text_dup(value, precision, true);
         const char *relation = exact ? "=" : "≈";
 
         sample_note(note, sizeof(note), sampled_k, sampled_branch, branch_parameter);
@@ -741,7 +897,11 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     printf("residual    %s\n", residual_text ? residual_text : "");
     printf("error       %s\n", residual_value_text ? residual_value_text : "");
     printf("status      %s\n", status ? status : "unsolved");
-    print_solutions(solutions, bindings, solution_order);
+    printf("search_note %s\n", equ_solutions_search_note(solutions) ? equ_solutions_search_note(solutions) : "");
+    printf("family_note %s\n", equ_solutions_family_note(solutions) ? equ_solutions_family_note(solutions) : "");
+    printf("interpretation_note %s\n", equ_interpretation_note(equation) ? equ_interpretation_note(equation) : "");
+    print_solutions(solutions, bindings, solution_order, precision, false);
+    print_solutions(solutions, bindings, solution_order, precision, true);
     print_solutions_TeX(solutions, bindings, solution_order);
     print_derivation_TeX(tex, solutions, bindings, solution_order);
     print_solution_numerics(solutions, bindings, solution_order, precision);
@@ -782,6 +942,8 @@ int main(int argc, char **argv)
         rc = 1;
     else if (equ_solutions_count(solutions) > 0u)
         status = "solved";
+    else if (equ_solutions_proven_empty(solutions))
+        status = "no solutions";
 
     if (rc == 0)
         print_equation_fields(equation, solutions, equ_bindings(equation), input, status, precision);

@@ -18,6 +18,7 @@ struct equation_t {
     expr_bindings_t *bindings;
     string_t *lhs_display_TeX;
     string_t *rhs_display_TeX;
+    bool power_series_domain;
 };
 
 static void equ_solutions_reset(equation_solutions_t *solutions)
@@ -27,6 +28,7 @@ static void equ_solutions_reset(equation_solutions_t *solutions)
     solutions->solutions = NULL;
     solutions->count = 0u;
     solutions->status = EQUATION_SOLVE_INVALID;
+    solutions->search_kind = EQUATION_SEARCH_NONE;
 }
 
 static equation_solutions_t *equ_solutions_new(void)
@@ -108,6 +110,20 @@ const string_t *equ_lhs_display_TeX(const equation_t *equation)
 const string_t *equ_rhs_display_TeX(const equation_t *equation)
 {
     return equation ? equation->rhs_display_TeX : NULL;
+}
+
+void equ_set_power_series_domain(equation_t *equation, bool power_series)
+{
+    if (equation)
+        equation->power_series_domain = power_series;
+}
+
+/* Describe the convergence domain retained by an open inverse-power series equation. */
+const char *equ_interpretation_note(const equation_t *equation)
+{
+    return equation && equation->power_series_domain
+        ? "The series requires Re(zeta argument) > 1. Roots outside that domain require analytic continuation."
+        : NULL;
 }
 
 const expr_t *equ_lhs(const equation_t *equation)
@@ -2373,6 +2389,12 @@ equation_solutions_t *equ_derive_solutions(const equation_t *equation)
         goto error;
 
     if (equ_solutions_count(solutions) == 0u && equ_variable_binding_count(bindings) > 0u) {
+        int search_rc = equ_try_search_zeta_roots(equation, solutions);
+
+        if (search_rc < 0)
+            goto error;
+        if (search_rc == 0)
+            return solutions;
         if (equ_default_goal_seek_options(&options) != 0)
             goto error;
         used_numeric = true;
@@ -2397,6 +2419,33 @@ error:
 size_t equ_solutions_count(const equation_solutions_t *solutions)
 {
     return solutions ? solutions->count : 0u;
+}
+
+/* Describe the bounds of a numerical search without claiming completeness. */
+const char *equ_solutions_search_note(const equation_solutions_t *solutions)
+{
+    static const char *const notes[] = {
+        [EQUATION_SEARCH_NONE]              = NULL,
+        [EQUATION_SEARCH_ZETA_VALUE]        = "Bounded Newton search: real part (1, 4], |imaginary part| <= 50. Not exhaustive.",
+        [EQUATION_SEARCH_ZETA_SERIES_EMPTY] = "No solutions: zeta has no zeros in the series convergence domain.",
+        [EQUATION_SEARCH_ZETA_ZEROS]        = "Non-trivial zeros found: up to 40, 0 < Re(s) < 1, |Im(s)| <= 80. Not exhaustive."
+    };
+
+    return solutions ? notes[solutions->search_kind] : NULL;
+}
+
+/* Distinguish a proved empty solution set from an unsuccessful numerical search. */
+bool equ_solutions_proven_empty(const equation_solutions_t *solutions)
+{
+    return solutions && solutions->status == EQUATION_SOLVE_NO_SOLUTIONS;
+}
+
+/* Keep the exact trivial family separate from the numerical non-trivial roots. */
+const char *equ_solutions_family_note(const equation_solutions_t *solutions)
+{
+    return solutions && solutions->search_kind == EQUATION_SEARCH_ZETA_ZEROS
+        ? "Trivial zeros (separate family): -2k, k = 1, 2, 3, ... ."
+        : NULL;
 }
 
 const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t index)

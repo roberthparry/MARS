@@ -625,6 +625,19 @@ preserve the separated `p + qi` structure. The imaginary unit remains the
 final factor of the imaginary term, and an indefinite integration constant is
 always the final addend.
 
+Compositions involving complex `Li` or `Ei` use explicit real series when
+separating the enclosing algebra. TeX defines the shared real and imaginary
+components once beneath the result, rather than inserting a complete identity
+inside an exponent or function argument. Expression output expands those same
+definitions, while Function output shares repeated subexpressions through
+temporary variables and returns the separated real and imaginary coefficients.
+Numerical evaluation continues to use the native functions at the selected
+precision, rather than a fixed truncation of the displayed series.
+
+TeX uses postfix factorial notation only for arguments known to be non-negative
+integers; otherwise it uses gamma notation. Summation and product indices obtain
+this guarantee from their bounds, not from their names or supplied binding values.
+
 ---
 
 ## API Reference
@@ -989,6 +1002,30 @@ no finite value. The endpoint may be supplied through a binding such as
 The direct-power family `Σ(k=1..n) k^p` similarly becomes
 `ζ(-p) - ζ(-p, n + 1)`; non-negative integer exponents evaluate through the
 corresponding Faulhaber polynomial.
+Symbolic exponents accept either a named endpoint or a literal positive-integer
+endpoint. The first unit term may retain its explicit power, including reciprocal
+and negative-exponent spellings. A literal endpoint must follow the supplied
+consecutive prefix; inconsistent exponents, skipped indices and fractional
+endpoints are rejected rather than guessed.
+An open-ended consecutive prefix also accepts an unset symbolic exponent.
+Every supplied term must agree with the inferred consecutive indices. The
+result retains a native sum node and its convergence domain. Evaluation uses
+Riemann zeta for starts at one or two, or Hurwitz zeta for later starts, only
+when the real part of the zeta argument exceeds one. Outside that domain no
+convergent numerical value is supplied, including after bindings change.
+Explicit `sum` and `@Z` forms follow the same rule. Analytic continuation is
+available through an explicit zeta expression, not an implicit reinterpretation
+of the sum.
+Finite prime-power prefixes beginning with the primes two, three and five are
+also recognised, provided every written prime is consecutive and the terminal
+prime lies beyond the prefix. They become native finite sums filtered by the
+existing primality predicate, not ordinary zeta differences. Direct powers,
+reciprocal powers and negative symbolic exponents share this recognition;
+supplied exponent bindings affect only the numerical Value card.
+The endpoint may also be a named prime bound. It remains symbolic in all
+algebraic cards, appears as an input binding, and enables numerical evaluation
+once its value and the exponent are supplied. The dummy summation index is
+chosen independently so it cannot capture the endpoint or exponent binding.
 Writing the inverse-power family with negative exponents, as in `1 + 2^-p +
 3^-p + ... + n^-p`, produces the same sigma form, closed form and calculus
 operations as `1 + 1/2^p + 1/3^p + ... + 1/n^p`.

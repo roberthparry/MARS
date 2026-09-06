@@ -384,6 +384,7 @@ char *expr_to_TeX_body(const expr_t *expr)
 
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit)
 {
+    expr_cartesian_composition_t view;
     autoname_table_t vnames;
     char *body = NULL;
 
@@ -391,6 +392,10 @@ char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit)
         return NULL;
     if (expr->binding_expr && !expr_is_const(expr))
         return expr_to_TeX_body(expr);
+    if (expr_cartesian_composition_init(expr, &view)) {
+        expr_cartesian_composition_clear(&view);
+        return expr_to_TeX_body(expr);
+    }
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)expr, &vnames);

@@ -319,6 +319,42 @@ static void test_from_string_series_ellipsis(void)
     char *function_text;
     expr_bindings_t *bindings = NULL;
 
+    /* Open symbolic powers must validate consecutive indices, including starts other than one. */
+    check_parse_val("open inverse symbolic powers", "{1/2^s+1/3^s+1/4^s+... | s=2}",
+                    0.6449340668482264, __LINE__);
+    check_parse_val("open inverse powers including one", "{1+1/2^s+1/3^s+... | s=2}",
+                    1.6449340668482264, __LINE__);
+    check_parse_val("open shifted inverse powers", "{1/3^s+1/4^s+1/5^s+... | s=2}",
+                    0.3949340668482264, __LINE__);
+    check_parse_val("open negative symbolic powers", "{2^-s+3^-s+4^-s+... | s=2}",
+                    0.6449340668482264, __LINE__);
+    check_parse_val("open direct symbolic powers", "{1^s+2^s+3^s+... | s=-2}",
+                    1.6449340668482264, __LINE__);
+    check_parse_val("scaled direct infinite powers", "{sum(n,1,inf,3*n^s) | s=-2}",
+                    4.934802200544679, __LINE__);
+    check_parse_val("right-scaled direct infinite powers", "{sum(n,1,inf,n^s*3) | s=-2}",
+                    4.934802200544679, __LINE__);
+    {
+        expr_bindings_t *domain_bindings = NULL;
+        expr_t *series = expr_from_string("{1+1/2^s+1/3^s+... | s=2}", &domain_bindings);
+        static const char *const outside_domain[] = {"-2", "0", "1", "0.5+14i", "1+14i"};
+
+        ASSERT_NOT_NULL(series);
+        ASSERT_NOT_NULL(domain_bindings);
+        for (size_t i = 0u; i < sizeof(outside_domain) / sizeof(outside_domain[0]); ++i) {
+            number_t exponent = num_create_from_string(outside_domain[i]);
+            number_t value;
+
+            expr_set_val(expr_bindings_get(domain_bindings, "s"), exponent);
+            value = expr_eval(series);
+            ASSERT_TRUE(num_is_nan(value));
+            num_destroy(&value);
+            num_destroy(&exponent);
+        }
+        expr_free(series);
+        expr_bindings_free(domain_bindings);
+    }
+
     {
         const char *weighted_source =
             "{ sinh(x)+sinh(2x)/2+sinh(3x)/3+sinh(4x)/4+...+sinh(nx)/n+C | x=pi/12; n=100, C=? }";
@@ -1219,6 +1255,25 @@ static void test_from_string_series_ellipsis(void)
                     __LINE__);
     check_parse_val("symbolic direct-power sum evaluates through its Faulhaber specialisation",
                     "{ 1 + 2^p + 3^p + 4^p + ... + n^p | p = 2; n = 100 }", 338350.0, __LINE__);
+    check_parse_val("explicit first power and literal endpoint use the direct-power identity",
+                    "{ 1^s + 2^s + 3^s + ... + 100^s | s = 2 }", 338350.0, __LINE__);
+    check_parse_val("literal reciprocal-power endpoint uses the inverse-power identity",
+                    "{ 1/1^s + 1/2^s + 1/3^s + ... + 1/10^s | s = 2 }", 1.5497677311665408,
+                    __LINE__);
+    check_parse_val("explicit first power also supports a symbolic endpoint",
+                    "{ 1^s + 2^s + 3^s + ... + n^s | s = 2; n = 100 }", 338350.0, __LINE__);
+    check_parse_val("prime reciprocal-power ellipsis includes its terminal prime",
+                    "{ 1/2^s + 1/3^s + 1/5^s + 1/7^s + 1/11^s + 1/13^s + 1/17^s + ... + 1/101^s | s = 2 }",
+                    0.45052681786869314233, __LINE__);
+    check_parse_val("prime power ellipsis supports direct powers",
+                    "{ 2^s + 3^s + 5^s + ... + 11^s | s = 2 }", 208.0, __LINE__);
+    check_parse_val("prime reciprocal-power ellipsis retains a named endpoint",
+                    "{ 1/2^s + 1/3^s + 1/5^s + ... + 1/p^s | s = 2; p = 101 }",
+                    0.45052681786869314233, __LINE__);
+    check_parse_val("prime direct-power ellipsis avoids a named endpoint index collision",
+                    "{ 2^s + 3^s + 5^s + ... + n^s | s = 2; n = 11 }", 208.0, __LINE__);
+    check_parse_val("prime power ellipsis supports negative exponents and avoids index capture",
+                    "{ 2^-n + 3^-n + 5^-n + ... + 7^-n | n = 1 }", 247.0/210.0, __LINE__);
     check_parse_val("symbolic direct-power sum reaches the harmonic specialisation",
                     "{ 1 + 2^p + 3^p + 4^p + ... + n^p | p = -1; n = 100 }", 5.1873775176396203,
                     __LINE__);
@@ -2559,6 +2614,28 @@ static void test_from_expression_string_api(void)
 
     const char *names[] = {"x", "y", "c"};
     expr_t *symbols[] = {x, y, c};
+
+    /* Bound indices are local declarations even when only free symbols are supplied. */
+    {
+        const char *scoped_sources[] = {
+            "sum(k, 1, x, k)", "Σ_(k=1)^x k", "@Z_(k=1)^x k",
+            "product(k, 1, x, k)", "Π_(k=1)^x k", "@P_(k=1)^x k",
+            "sum(x, 1, x, x) + x", "Σ_(x=1)^x x + x",
+            "sum(k, 1, x, sum(k, 1, k, k))",
+            "sum(k, 1, x, sum(j, 1, k, j))",
+            "sum(k, 1, x, product(k, 1, k, k))",
+        };
+        const double expected[] = {6, 6, 6, 6, 6, 6, 9, 9, 10, 10, 9};
+
+        for (size_t i = 0u; i < sizeof(scoped_sources)/sizeof(scoped_sources[0]); ++i) {
+            expr_t *scoped = expr_from_expression_string(scoped_sources[i], names, symbols, 3);
+
+            ASSERT_NOT_NULL(scoped);
+            printf("Scoped parse: %s = %.17g (expected %.17g)\n", scoped_sources[i], expr_eval_d(scoped), expected[i]);
+            ASSERT_TRUE(fabs(expr_eval_d(scoped) - expected[i]) < 1e-12);
+            expr_free(scoped);
+        }
+    }
 
     expr_t *ok = expr_from_expression_string("c*(x + y)", names, symbols, 3);
     if (!ok) {
@@ -3913,8 +3990,42 @@ static void test_from_string_round_trips(void)
     check_roundtrip("l09: [x']^2", make_expr_l09(), __LINE__);
 }
 
+static void test_from_string_infinity_TeX(void)
+{
+    static const struct {
+        const char *input;
+        const char *expected;
+    } cases[] = {
+        {"inf", "\\infty"},
+        {"infinity", "\\infty"},
+        {"@inf", "\\infty"},
+        {"@infinity", "\\infty"},
+        {"∞", "\\infty"},
+        {"-inf", "-\\infty"},
+        {"-@inf", "-\\infty"},
+        {"-∞", "-\\infty"},
+        {"sum(n,1,inf,1/n^s)", "\\sum_{n=1}^{\\infty}"},
+        {"product(n,1,inf,1-1/n^s)", "\\prod_{n=1}^{\\infty}"},
+        {"integral(0,inf,exp(-x),x)", "\\infty"}
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *expr = expr_from_string(cases[i].input, NULL);
+        char *text;
+
+        printf("Infinity TeX input: %s\n", cases[i].input);
+        ASSERT_NOT_NULL(expr);
+        text = expr_to_TeX_body(expr);
+        ASSERT_NOT_NULL(text);
+        ASSERT_NOT_NULL(strstr(text, cases[i].expected));
+        free(text);
+        expr_free(expr);
+    }
+}
+
 void test_expr_t_from_string(void)
 {
+    TEST_RUN_SUBTEST(test_from_string_infinity_TeX, NULL);
     TEST_RUN_SUBTEST(test_from_string_function_hash, NULL);
     TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);

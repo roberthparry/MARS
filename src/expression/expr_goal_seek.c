@@ -544,8 +544,29 @@ cleanup:
     return rc;
 }
 
+static bool goal_newton_in_region(number_t value, const expr_newton_region_t *region)
+{
+    number_t real;
+    number_t imaginary;
+    number_t magnitude;
+    bool inside;
+
+    if (!region)
+        return true;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    magnitude = num_abs(imaginary);
+    inside = num_is_finite(value) && num_ge(real, region->real_min) && num_le(real, region->real_max) &&
+             num_le(magnitude, region->imaginary_magnitude_max);
+    num_destroy(&magnitude);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    return inside;
+}
+
 static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, number_t tolerance, number_t start,
-                                    size_t digits, size_t max_iterations, size_t *iterations_out)
+                                    size_t digits, size_t max_iterations, size_t *iterations_out,
+                                    const expr_newton_region_t *region)
 {
     number_t x = goal_work_value(start, digits);
     number_t best_x = num_clone(x);
@@ -567,7 +588,8 @@ static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, 
         number_t trial_norm;
 
         iterations++;
-        if (goal_eval_derivative_residual(expr, var, target, &value, &residual, &derivative) != 0)
+        if (!goal_newton_in_region(x, region) ||
+            goal_eval_derivative_residual(expr, var, target, &value, &residual, &derivative) != 0)
             goto loop_cleanup;
         num_destroy(&value);
 
@@ -598,6 +620,10 @@ static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, 
 
         if (digits > 0u)
             num_set_prec_digits(&trial, digits);
+        if (!goal_newton_in_region(trial, region)) {
+            num_destroy(&trial);
+            goto loop_cleanup;
+        }
         goal_set_var(var, trial, digits);
         if (goal_eval_residual(expr, target, &trial_value, &trial_residual) != 0) {
             num_destroy(&trial);
@@ -652,6 +678,24 @@ static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, 
     return rc;
 }
 
+/* Reuse the same Newton kernel for bounded native equation searches, including real seeds. */
+int expr_goal_seek_newton_one(expr_t *expr, expr_t *variable, number_t target,
+                              const expr_goal_seek_options_t *options, const expr_newton_region_t *region)
+{
+    size_t digits = goal_work_digits(goal_precision_digits(options));
+    size_t iterations = 0u;
+    number_t tolerance = goal_tolerance(target, options);
+    number_t start = goal_start_value(variable, digits);
+    int rc = expr && variable
+        ? goal_complex_newton_from(expr, variable, target, tolerance, start, digits,
+                                    goal_max_iterations(options), &iterations, region)
+        : -1;
+
+    num_destroy(&start);
+    num_destroy(&tolerance);
+    return rc;
+}
+
 static size_t goal_complex_probe_iteration_limit(size_t max_iterations)
 {
     return max_iterations < 8u ? max_iterations : 8u;
@@ -688,7 +732,7 @@ static int goal_solve_complex_one(expr_t *expr, expr_t *var, number_t target, nu
             size_t attempt_limit = i < 2u ? probe_limit : max_iterations;
 
             rc = goal_complex_newton_from(expr, var, target, tolerance, seeds[i], digits, attempt_limit,
-                                          &attempt_iterations);
+                                          &attempt_iterations, NULL);
             iterations += attempt_iterations;
             if (rc == 0)
                 break;
@@ -697,7 +741,7 @@ static int goal_solve_complex_one(expr_t *expr, expr_t *var, number_t target, nu
         for (size_t i = 0u; i < seed_count; ++i)
             num_destroy(&seeds[i]);
     } else {
-        rc = goal_complex_newton_from(expr, var, target, tolerance, base, digits, max_iterations, &iterations);
+        rc = goal_complex_newton_from(expr, var, target, tolerance, base, digits, max_iterations, &iterations, NULL);
     }
 
     if (iterations_out)

@@ -512,6 +512,7 @@ static bool expr_series_parse_symbolic_power_endpoint(const char *text, expr_ser
 {
     char *term_text;
     expr_t *expression = NULL;
+    expr_t *reciprocal_endpoint = NULL;
     const expr_t *numerator = NULL;
     const expr_t *denominator = NULL;
     const expr_t *endpoint = NULL;
@@ -522,6 +523,7 @@ static bool expr_series_parse_symbolic_power_endpoint(const char *text, expr_ser
     bool direct_power = false;
     bool endpoint_is_positive_infinity = false;
     bool endpoint_is_symbol = false;
+    bool endpoint_is_positive_integer = false;
     bool replaced_literal_infinity = false;
     bool literal_positive_infinity = false;
     bool matched = false;
@@ -599,13 +601,30 @@ static bool expr_series_parse_symbolic_power_endpoint(const char *text, expr_ser
     }
     if (endpoint)
         endpoint_value = expr_eval(endpoint);
+    /* Parsing a literal reciprocal power can produce (1/N)^s instead of 1/(N^s). */
+    if (symbolic_exponent && numerator == EXPR_ONE && num_is_exact(endpoint_value) &&
+        num_is_real(endpoint_value) && num_gt(endpoint_value, NUM_ZERO) && num_lt(endpoint_value, NUM_ONE)) {
+        number_t reciprocal = num_inv(endpoint_value);
+
+        if (num_is_exact(reciprocal) && num_is_integer(reciprocal)) {
+            reciprocal_endpoint = expr_new_const(reciprocal);
+            endpoint = reciprocal_endpoint;
+            num_destroy(&endpoint_value);
+            endpoint_value = num_clone(reciprocal);
+            direct_power = !direct_power;
+        }
+        num_destroy(&reciprocal);
+    }
     endpoint_is_positive_infinity = literal_positive_infinity ||
                                     (num_is_real(endpoint_value) && num_is_inf(endpoint_value) &&
                                      num_get_sign(endpoint_value) > 0);
     endpoint_is_symbol = endpoint && (expr_is_variable(endpoint) || expr_is_named_const(endpoint)) &&
                          num_is_nan(endpoint_value);
+    endpoint_is_positive_integer = symbolic_exponent && endpoint && num_is_exact(endpoint_value) &&
+                                   num_is_real(endpoint_value) && num_is_finite(endpoint_value) &&
+                                   num_is_integer(endpoint_value) && num_gt(endpoint_value, NUM_ZERO);
     if ((!symbolic_exponent && exponent_value == 0) || !endpoint ||
-        (!endpoint_is_symbol && !endpoint_is_positive_infinity))
+        (!endpoint_is_symbol && !endpoint_is_positive_infinity && !endpoint_is_positive_integer))
         goto cleanup;
 
     *numerator_out = expr_clone(numerator);
@@ -626,6 +645,7 @@ static bool expr_series_parse_symbolic_power_endpoint(const char *text, expr_ser
     }
 
 cleanup:
+    expr_free(reciprocal_endpoint);
     num_destroy(&endpoint_value);
     num_destroy(&exponent);
     expr_free(expression);
@@ -1609,8 +1629,8 @@ static bool expr_series_symbolic_power_term_matches(const char *text, expr_serie
     if (!expression)
         return false;
 
-    if (index == 1L) {
-        matched = expr_series_expr_text_equal(expression, numerator);
+    if (index == 1L && expr_series_expr_text_equal(expression, numerator)) {
+        matched = true;
     } else if (direct_power && expr_match_pow_expr(expression, &term_index, &term_exponent)) {
         number_t numerator_value = expr_eval(numerator);
 
@@ -1641,6 +1661,188 @@ static bool expr_series_symbolic_power_term_matches(const char *text, expr_serie
     }
     expr_free(expression);
     return matched;
+}
+
+/* Retain an open power series as a summation, so its convergence domain cannot be discarded. */
+static string_t *expr_series_expand_open_symbolic_power(const string_t *source, bool *expanded_out,
+                                                       string_t **display_TeX_out)
+{
+    const char *text = string_c_str(source);
+    expr_series_span_t *terms = NULL;
+    size_t count = 0u;
+    expr_t *numerator = NULL;
+    expr_t *endpoint = NULL;
+    expr_t *exponent = NULL;
+    expr_t *power = NULL;
+    expr_t *lower = NULL;
+    expr_t *term = NULL;
+    expr_t *result = NULL;
+    expr_t *index = NULL;
+    expr_t *upper = NULL;
+    string_t *output = NULL;
+    char *TeX = NULL;
+    long last = 0L;
+    long first = 0L;
+    int literal_exponent = 0;
+    bool direct = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &count) || count < 4u || count - 2u > LONG_MAX ||
+        !expr_series_is_ellipsis(text, terms[count - 1u]) ||
+        !expr_series_parse_symbolic_power_endpoint(text, terms[count - 2u], &numerator, &endpoint,
+                                                   &exponent, &literal_exponent, &direct) || !exponent ||
+        !expr_series_exact_positive_long(endpoint, &last) || last <= (long)(count - 2u))
+        goto cleanup;
+    first = last - (long)(count - 2u);
+    /* Check every supplied term; irregular and prime prefixes must not become a zeta series. */
+    for (size_t i = 0u; i + 1u < count; ++i)
+        if (!expr_series_symbolic_power_term_matches(text, terms[i], first + (long)i,
+                                                     numerator, exponent, direct))
+            goto cleanup;
+
+    index = expr_new_named_var(NUM_NAN, expr_series_display_index_name(text));
+    power = index ? expr_pow_xp(index, exponent) : NULL;
+    term = power ? (direct ? expr_mul_simplify_owned(expr_clone(numerator), expr_clone(power))
+                           : expr_div(numerator, power)) : NULL;
+    {
+        number_t value = num_create_from_long(first);
+
+        lower = expr_new_const(value);
+        upper = expr_new_const(NUM_INF);
+        num_destroy(&value);
+    }
+    result = term && lower && upper ? expr_new_finite_summation_range(term, index, lower, upper) : NULL;
+    output = result ? expr_to_text(result, style_UNBOUND) : NULL;
+    TeX = result ? expr_to_TeX_body(result) : NULL;
+    if (output && TeX) {
+        *display_TeX_out = string_new_with(TeX);
+        *expanded_out = *display_TeX_out != NULL;
+    }
+
+cleanup:
+    free(TeX);
+    expr_free(result);
+    expr_free(term);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(index);
+    expr_free(power);
+    expr_free(exponent);
+    expr_free(endpoint);
+    expr_free(numerator);
+    free(terms);
+    if (*expanded_out)
+        return output;
+    string_free(output);
+    return string_clone(source);
+}
+
+/* Recognise the prime prefix before lowering it to a native, primality-filtered finite sum. */
+static string_t *expr_series_expand_prime_power_sum(const string_t *source, bool *expanded_out,
+                                                    string_t **display_TeX_out)
+{
+    const char *text = string_c_str(source);
+    expr_series_span_t *terms = NULL;
+    size_t term_count = 0u;
+    size_t ellipsis_index = SIZE_MAX;
+    expr_t *numerator = NULL;
+    expr_t *endpoint = NULL;
+    expr_t *exponent = NULL;
+    expr_t *index = NULL;
+    expr_t *predicate = NULL;
+    expr_t *power = NULL;
+    expr_t *weighted = NULL;
+    expr_t *term = NULL;
+    expr_t *lower = NULL;
+    expr_t *summation = NULL;
+    number_t prime = num_create_from_long(2L);
+    number_t endpoint_value = NUM_NAN;
+    char *summation_text = NULL;
+    char *summation_TeX = NULL;
+    string_t *output = NULL;
+    string_t *TeX = NULL;
+    int literal_exponent = 0;
+    bool direct_power = false;
+    bool symbolic_endpoint = false;
+    bool matched = false;
+
+    *expanded_out = false;
+    *display_TeX_out = NULL;
+    if (!expr_series_split_terms(text, &terms, &term_count))
+        goto cleanup;
+    for (size_t i = 0u; i < term_count; ++i) {
+        if (expr_series_is_ellipsis(text, terms[i])) {
+            ellipsis_index = i;
+            break;
+        }
+    }
+    /* At least 2, 3, 5 distinguishes primes from consecutive integers. */
+    if (ellipsis_index == SIZE_MAX || ellipsis_index < 3u || ellipsis_index + 2u != term_count ||
+        !expr_series_parse_symbolic_power_endpoint(text, terms[ellipsis_index + 1u], &numerator, &endpoint,
+                                                   &exponent, &literal_exponent, &direct_power) || !exponent)
+        goto cleanup;
+    endpoint_value = expr_eval(endpoint);
+    symbolic_endpoint = (expr_is_variable(endpoint) || expr_is_named_const(endpoint)) && num_is_nan(endpoint_value);
+    if (!symbolic_endpoint &&
+        (!num_is_exact(endpoint_value) || !num_is_real(endpoint_value) || !num_is_finite(endpoint_value) ||
+         !num_is_integer(endpoint_value) || !num_is_prime(endpoint_value)))
+        goto cleanup;
+    /* This scan is bounded by the number of explicitly supplied terms, not by the endpoint. */
+    for (size_t i = 0u; i < ellipsis_index; ++i) {
+        long prime_index = 0L;
+        number_t next;
+
+        if (!expr_series_number_to_long(prime, &prime_index) ||
+            !expr_series_symbolic_power_term_matches(text, terms[i], prime_index, numerator, exponent, direct_power))
+            goto cleanup;
+        next = num_next_prime(prime);
+        num_destroy(&prime);
+        prime = next;
+    }
+    if (!symbolic_endpoint && num_lt(endpoint_value, prime))
+        goto cleanup;
+
+    index = expr_new_named_var(NUM_NAN, expr_series_display_index_name(text));
+    predicate = index ? expr_is_prime(index) : NULL;
+    power = index ? expr_pow_xp(index, exponent) : NULL;
+    weighted = predicate ? expr_mul_simplify_owned(expr_clone(numerator), expr_clone(predicate)) : NULL;
+    term = weighted && power ? (direct_power ? expr_mul(weighted, power) : expr_div(weighted, power)) : NULL;
+    lower = expr_from_string("2", NULL);
+    summation = term && index && lower ? expr_new_finite_summation_range(term, index, lower, endpoint) : NULL;
+    summation_text = summation ? expr_to_string(summation, style_UNBOUND) : NULL;
+    summation_TeX = summation ? expr_to_TeX_body(summation) : NULL;
+    output = string_new();
+    TeX = string_new();
+    if (!summation_text || !summation_TeX || !output || !TeX ||
+        string_append_cstr(output, summation_text) != 0 || string_append_cstr(TeX, summation_TeX) != 0)
+        goto cleanup;
+    matched = true;
+
+cleanup:
+    free(summation_text);
+    free(summation_TeX);
+    expr_free(summation);
+    expr_free(lower);
+    expr_free(term);
+    expr_free(weighted);
+    expr_free(power);
+    expr_free(predicate);
+    expr_free(index);
+    expr_free(exponent);
+    expr_free(endpoint);
+    expr_free(numerator);
+    num_destroy(&endpoint_value);
+    num_destroy(&prime);
+    free(terms);
+    if (!matched) {
+        string_free(output);
+        string_free(TeX);
+        return string_clone(source);
+    }
+    *expanded_out = true;
+    *display_TeX_out = TeX;
+    return output;
 }
 
 static bool expr_series_symbolic_power_prefix_matches(const char *text, const expr_series_span_t *terms,
@@ -3950,6 +4152,15 @@ static string_t *expr_series_expand_once(const string_t *side, bool *expanded_ou
                                                        result.symbolic_exponent, result.symbolic_direct_power,
                                                        &series_start))
             goto unsupported;
+        /* A literal endpoint must lie beyond the explicitly supplied consecutive prefix. */
+        number_t endpoint_value = expr_eval(result.symbolic_endpoint);
+        number_t prefix_length = num_create_from_long((long)(ellipsis_index - series_start));
+        bool endpoint_overlaps_prefix = num_is_finite(endpoint_value) && num_le(endpoint_value, prefix_length);
+
+        num_destroy(&prefix_length);
+        num_destroy(&endpoint_value);
+        if (endpoint_overlaps_prefix)
+            goto unsupported;
         result.inverse_index_numerator = expr_clone(symbolic_numerator);
         result.kind = EXPR_SERIES_MODEL_INVERSE_INDEX_POWER;
         last_factor = strdup("");
@@ -4167,7 +4378,7 @@ cleanup:
 
 string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_out,
                                   expr_series_binding_lookup_fn lookup_binding, void *lookup_context,
-                                  bool *domain_specialised_out)
+                                  bool *domain_specialised_out, bool *power_series_out)
 {
     string_t *current = string_from_view(&source);
     string_t *display_TeX = NULL;
@@ -4176,6 +4387,8 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         *display_TeX_out = NULL;
     if (domain_specialised_out)
         *domain_specialised_out = false;
+    if (power_series_out)
+        *power_series_out = false;
 
     if (!current)
         return NULL;
@@ -4261,6 +4474,38 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         string_free(next);
 
         next = expr_series_expand_unary_function_progression(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_prime_power_sum(current, &expanded, &next_display_TeX);
+        if (!next) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
+        if (expanded) {
+            string_free(current);
+            current = next;
+            string_free(display_TeX);
+            display_TeX = next_display_TeX;
+            continue;
+        }
+        string_free(next);
+
+        next = expr_series_expand_open_symbolic_power(current, &expanded, &next_display_TeX);
+        if (expanded && power_series_out)
+            *power_series_out = true;
         if (!next) {
             string_free(display_TeX);
             string_free(current);

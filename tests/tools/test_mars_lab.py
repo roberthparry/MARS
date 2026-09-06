@@ -2,6 +2,7 @@ import datetime as py_datetime
 import decimal
 import math
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,52 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import mars_lab
+
+
+@unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
+class BindingEnvelopeTests(unittest.TestCase):
+    def test_binding_envelopes_are_idempotent_and_recover_nested_copies(self) -> None:
+        names = (
+            "lastIndexOfTopLevel", "indexOfTopLevel", "bindingParts", "expressionForEditor",
+            "expressionBodyForEditor", "expressionWithBindings", "expressionWithVisibleBindings",
+            "compareBindingNames",
+        )
+        functions = "\n".join(
+            "function " + name + "(" + mars_lab.INDEX_HTML.split("    function " + name + "(", 1)[1]
+            .split("\n    function ", 1)[0]
+            for name in names
+        )
+        script = functions + r'''
+            function equal(actual, expected) {
+                if (actual !== expected)
+                    throw new Error(JSON.stringify({actual, expected}));
+            }
+            const body = 'exp(Li(x+iy))';
+            const bindings = [
+                {name: 'x', value: '2', kind: 'variable'},
+                {name: 'y', value: '?', kind: 'constant'},
+            ];
+            const expected = '{ exp(Li(x+iy)) | x = 2; y = ? }';
+            let formatted = body;
+            for (let i = 0; i < 5; ++i) {
+                formatted = expressionWithBindings(formatted, bindings);
+                equal(formatted, expected);
+                equal(expressionWithVisibleBindings(formatted, bindings), expected);
+            }
+            let nested = body;
+            for (let i = 0; i < 5; ++i)
+                nested = `{ ${nested} | x = NAN, y = NAN }`;
+            equal(expressionBodyForEditor(nested), body);
+            equal(expressionWithVisibleBindings(nested, bindings), expected);
+            equal(expressionWithBindings(nested, bindings), expected);
+            equal(expressionWithBindings(expected, []), expected);
+            equal(expressionBodyForEditor('sin(x | y)'), 'sin(x | y)');
+            equal(expressionBodyForEditor('(1 2; 3 4)'), '(1 2; 3 4)');
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 class JurisdictionDefaultTests(unittest.TestCase):
@@ -235,6 +282,355 @@ class MobileAccessTests(unittest.TestCase):
 
 
 class EquationResultTests(unittest.TestCase):
+    def test_zeta_nontrivial_roots_are_labelled_and_reach_the_cards(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        source = "zeta(s) = 0"
+        fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, source, 78)
+        self.assertEqual(returncode, 0, raw)
+        self.assertEqual(fields["status"], "solved", raw)
+        payload = mars_lab.prepare_equation_fields(fields, 78)
+        self.assertEqual(payload["solution_count"], 40)
+        self.assertIn("14.134725141734693790", payload["solutions"])
+        pairs = payload["display_solutions"].splitlines()
+        self.assertEqual(len(pairs), 20)
+        self.assertTrue(all(line.startswith("s ≈ 0.5 ± ") for line in pairs), pairs)
+        self.assertEqual(pairs[0], "s ≈ 0.5 ± "
+                         "14.1347251417346937904572519835624702707842571156992431756855674601499634298093i")
+        self.assertIn("77.144840068874805372", pairs[-1])
+        self.assertEqual(mars_lab.normalize_multiline_display_text(fields["display_solutions"]), "\n".join(pairs))
+        self.assertEqual(payload["solutions_TeX"].count(r"\pm"), 20)
+        self.assertEqual(payload["solutions_TeX"].count(r"s &\approx 0.5"), 20)
+        self.assertIn(r"\pm", payload["display_TeX"])
+        self.assertIn("...", payload["display_TeX"])
+        self.assertNotIn("...", payload["full_display_TeX"])
+        self.assertNotIn("s = -2", payload["solutions"])
+        self.assertIn("Non-trivial zeros", payload["search_note"])
+        self.assertIn("Not exhaustive", payload["search_note"])
+        self.assertIn("Trivial zeros", payload["family_note"])
+        self.assertEqual(payload["interpretation_note"], "")
+        self.assertNotIn("continuation_input", payload)
+        self.assertNotIn("continuation_note", payload)
+        self.assertIn("Non-trivial zeros", payload["solutions_TeX"])
+        self.assertIn("svg", payload, payload.get("render_error"))
+        self.assertIn("data.interpretation_note", mars_lab.INDEX_HTML)
+
+    def test_paired_zeta_roots_respect_a_lower_selected_precision(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, "zeta(z)=0", 32)
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_equation_fields(fields, 32)
+        pairs = payload["display_solutions"].splitlines()
+        self.assertEqual(payload["solution_count"], 40)
+        self.assertEqual(len(pairs), 20)
+        self.assertEqual(pairs[0], "z ≈ 0.5 ± 14.134725141734693790457251983562i")
+        self.assertEqual(payload["solutions_TeX"].count(r"z &\approx 0.5 \pm"), 20)
+        self.assertNotIn("14.1347251417346937904572519835624", payload["full_display_TeX"])
+        self.assertEqual(payload["unbound"], "ζ(z) = 0")
+        self.assertIn("zeta(z) = 0", payload["function"])
+
+    def test_solution_pairing_does_not_invent_a_missing_conjugate(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        for source, count in (("{zeta(s)=0 | s=0.5+14i}", 1), ("x^2-(2-i)*x+7-i=0", 2)):
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, source, 32)
+                self.assertEqual(returncode, 0, raw)
+                payload = mars_lab.prepare_equation_fields(fields, 32)
+                self.assertEqual(payload["solution_count"], count)
+                self.assertEqual(payload["display_solutions"], payload["solutions"])
+                self.assertNotIn("±", payload["display_solutions"])
+                self.assertNotIn(r"\pm", payload["solutions_TeX"])
+
+    @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
+    def test_solutions_card_uses_native_pairs_without_duplicate_numeric_rows(self) -> None:
+        names = ("solutionLineIsNumericLiteral", "equationSolutionText")
+        functions = "\n".join(
+            re.search(r"    (?:async )?function " + name + r"\([\s\S]*?(?=\n    (?:async )?function )",
+                      mars_lab.INDEX_HTML).group(0)
+            for name in names
+        )
+        script = functions + r'''
+            function equal(actual, expected) {
+                if (actual !== expected)
+                    throw new Error(JSON.stringify({actual, expected}));
+            }
+            const pairs = 's ≈ 0.5 ± 14.134725141734693790i\ns ≈ 0.5 ± 21.022039638771554993i';
+            const data = {
+                status: 'solved', display_solutions: pairs,
+                solutions: 's = 0.5 + 14.134725141734693790i\ns = 0.5 - 14.134725141734693790i\n' +
+                           's = 0.5 + 21.022039638771554993i\ns = 0.5 - 21.022039638771554993i',
+                numeric_solutions: ['s ≈ 0.5 + 14.134725141734693790i', 's ≈ 0.5 - 14.134725141734693790i'],
+                search_note: 'Verified roots. Not exhaustive.', family_note: 'Trivial zeros: -2k'
+            };
+            equal(equationSolutionText(data), pairs + '\n\n' + data.search_note + '\n\n' + data.family_note);
+            equal(equationSolutionText({status: 'no solutions', display_solutions: pairs}), 'No solutions');
+            equal(equationSolutionText({solutions: 'x = 2', numeric_solutions: ['x = 2']}), 'x = 2');
+            equal(equationSolutionText({
+                solutions: 'x = sqrt(2)', display_solutions: 'x = sqrt(2)', numeric_solutions: ['x ≈ 1.4142']
+            }), 'x = sqrt(2)\n\nx ≈ 1.4142');
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_infinite_power_series_does_not_acquire_continued_zeros(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        sources = (
+            "0 = 1/1^s+1/2^s+1/3^s+1/4^s+1/5^s+1/6^s+1/7^s+1/8^s+...",
+            "0 = sum(n, 1, inf, 1/n^s)",
+            "0 = @Z_(n=1)^inf 1/n^s",
+            "0 = Σ_(n=1)^∞ 1/n^s",
+            "1/1^s+1/2^s+1/3^s+... = 0",
+            "sum(n, 1, inf, 1/n^s) = 0",
+            "@Z_(n=1)^inf 1/n^s = 0",
+            "Σ_(n=1)^∞ 1/n^s = 0",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, source, 78)
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["status"], "no solutions", raw)
+                payload = mars_lab.prepare_equation_fields(fields, 78)
+                self.assertEqual(payload["solution_count"], 0)
+                self.assertEqual(payload["family_note"], "")
+                self.assertIn("series convergence domain", payload["search_note"])
+                self.assertEqual(payload["solutions_TeX"], "")
+                self.assertEqual(payload["tex"], payload["equation_TeX"])
+                self.assertIn(r"\sum_{n=1}", payload["tex"])
+                self.assertIn(r"\frac{1}{n^{s}}", payload["tex"])
+                self.assertNotIn("No solutions", payload["tex"])
+                self.assertIn(r"\frac{1}{n^{s}} &= \zeta(s)", payload["tex"])
+                self.assertIn(r"\operatorname{Re}\{s\}>1", payload["tex"])
+                self.assertIn(r"^{\infty}", payload["tex"])
+                self.assertIn("svg", payload, payload.get("render_error"))
+                self.assertIn("sum(", payload["function"])
+                self.assertNotIn("zeta(", payload["function"])
+                self.assertNotIn("continuation_input", fields)
+                self.assertNotIn("continuation_input", payload)
+                self.assertNotIn("continuation_note", payload)
+
+    def test_series_identity_uses_the_native_index_order_and_lower_bound(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        cases = (
+            ("sum(k,2,inf,1/k^z)=-1", r"\sum_{k=2}^{\infty}\frac{1}{k^{z}}", r"\zeta(z) - 1"),
+            ("{sum(j,1,inf,1/j^z)=0 | z=0.5+14i}", r"\sum_{j=1}^{\infty}\frac{1}{j^{z}}", r"\zeta(z)"),
+        )
+        for source, series, closed in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, source, 78)
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["status"], "no solutions", raw)
+                self.assertIn(series + " &= " + closed, fields["tex"])
+                self.assertIn(r"\operatorname{Re}\{z\}>1", fields["tex"])
+                self.assertNotIn(r"\zeta(s)", fields["tex"])
+                self.assertNotIn("zeta(", fields["function"])
+
+    def test_finite_sum_does_not_get_an_infinite_series_identity(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, "x=sum(k,1,3,1/k^2)", 78)
+        self.assertEqual(returncode, 0, raw)
+        self.assertNotIn(r"\operatorname{Re}", fields["tex"])
+        self.assertNotIn(r"\zeta", fields["tex"])
+
+    def test_equation_evaluate_reports_no_solutions_without_another_solve(self) -> None:
+        source = "@Z_(n=1)^inf 1/n^z = 0"
+        handler = object.__new__(mars_lab.MarsLabHandler)
+        handler.path = "/equation-eval"
+        body = mars_lab.json.dumps({"equation": source, "precision": 173}).encode("utf-8")
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = mock.Mock()
+        handler.rfile.read.return_value = body
+        handler.request_allowed = mock.Mock(return_value=True)
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(mars_lab, "save_state_data") as save,
+            mock.patch.object(mars_lab, "run_equation_lab_fields", wraps=mars_lab.run_equation_lab_fields) as run,
+        ):
+            handler.do_POST()
+        self.assertEqual(handler.send_json.call_count, 1)
+        status, payload = handler.send_json.call_args.args
+        self.assertEqual(status, 200, payload)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "no solutions")
+        self.assertEqual(payload["solution_count"], 0)
+        self.assertIn("sum(", payload["function"])
+        self.assertNotIn("zeta(", payload["function"])
+        self.assertIn("Σ_", payload["equation"])
+        self.assertEqual(payload["solutions_TeX"], "")
+        self.assertEqual(payload["tex"], payload["equation_TeX"])
+        self.assertIn(r"\sum_{n=1}", payload["tex"])
+        self.assertIn(r"\frac{1}{n^{z}} &= 0", payload["tex"])
+        self.assertIn(r"\frac{1}{n^{z}} &= \zeta(z)", payload["tex"])
+        self.assertIn(r"\operatorname{Re}\{z\}>1", payload["tex"])
+        self.assertNotIn("No solutions", payload["tex"])
+        self.assertEqual(payload["solutions"], "")
+        self.assertEqual(payload["numeric_solutions"], [])
+        self.assertEqual(payload["binding_values"], [])
+        self.assertNotIn("continuation", payload)
+        self.assertNotIn("continuation_input", payload)
+        self.assertNotIn("continuation_note", payload)
+        run.assert_called_once_with(handler.equation_binary, source, 173)
+        save.assert_called_once()
+        self.assertEqual(save.call_args.args[0]["equation"], source)
+
+    @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
+    def test_no_solutions_card_preserves_editor_history_and_original_result(self) -> None:
+        names = ("equationSolutionText", "evaluateEquation")
+        functions = "\n".join(
+            re.search(r"    (?:async )?function " + name + r"\([\s\S]*?(?=\n    (?:async )?function )",
+                      mars_lab.INDEX_HTML).group(0)
+            for name in names
+        )
+        script = r'''
+            function equal(actual, expected) {
+                if (actual !== expected)
+                    throw new Error(JSON.stringify({actual, expected}));
+            }
+            function element() {
+                const state = new Set();
+                return {dataset: {}, textContent: '', classList: {
+                    contains: key => state.has(key),
+                    toggle: (key, on) => on ? state.add(key) : state.delete(key)}};
+            }
+            const rendered = element(), parsed = element(), functionStyle = element();
+            const renderedMore = element(), parsedMore = element(), functionMore = element();
+            const original = '@Z_(n=1)^inf 1/n^z = 0';
+            const expr = {value: original};
+            const modeEditorText = {equation: original};
+            const history = [];
+            const bindings = [{name: 'z', value: '?'}];
+            let mode = 'equation', saved = '', status = '', inputText = '', solutions = '';
+            let lastTex = '', currentVariables = [], currentDifferentiable = true;
+            let fetches = 0;
+            const currentMode = () => mode;
+            const currentExpressionText = () => expr.value;
+            const historyStateForMode = (mode, text) => ({mode, text});
+            const previousModeStateForHistory = () => null;
+            const pushExpressionHistory = state => history.push(state);
+            const commitVisibleBindingInputs = () => {};
+            const showResults = () => {};
+            const setBusy = () => {};
+            const setStatus = text => { status = text; };
+            const clearResultDetails = () => { solutions = ''; };
+            const clearRenderedError = () => {};
+            const setRenderedError = text => { status = text; };
+            const setRenderedContent = () => {};
+            const resetMoreDigitsButton = () => {};
+            const setExpandableText = (element, button, text) => { element.textContent = text; };
+            const parsedExpressionText = () => parsed.textContent;
+            const setResultInputText = text => { inputText = text; };
+            const setValueText = text => { solutions = text; };
+            const solutionLineIsNumericLiteral = () => true;
+            const renderVariableValues = values => equal(values, bindings);
+            const saveLastEquationState = () => { saved = modeEditorText.equation; };
+            const renderDerivativeButtons = () => {};
+            const commitModeState = () => {};
+            const updateHistoryButtons = () => {};
+            const data = {
+                ok: true, equation: original, function: 'sum(n, 1, @inf, 1/n^z)',
+                status: 'no solutions', search_note: 'No solutions in the series convergence domain.',
+                tex: 'native sum and zeta identity, Re{z} > 1',
+                interpretation_note: 'Native domain explanation',
+                binding_values: bindings,
+                continuation: {
+                    ok: true, unbound: 'ζ(z) = 0', solutions: 'z = 0.5 + 14.134725141734693790i',
+                    source_note: 'Native explanation connecting the entered series and its continuation.',
+                    search_note: 'Non-trivial zeros found. Not exhaustive.',
+                    family_note: 'Trivial zeros: -2k'
+                }
+            };
+            const fetchEquationEvaluation = async () => {
+                fetches++;
+                return {response: {ok: true}, data};
+            };
+        ''' + functions + r'''
+            (async () => {
+                await evaluateEquation();
+                equal(status, 'Ready');
+                equal(fetches, 1);
+                equal(expr.value, original);
+                equal(saved, original);
+                equal(modeEditorText.equation, original);
+                equal(history.length, 0);
+                equal(parsed.textContent, original);
+                equal(functionStyle.textContent, data.function);
+                equal(inputText, original);
+                equal(lastTex, data.tex);
+                equal(rendered.dataset.displayTex, data.tex);
+                equal(solutions, 'No solutions');
+                equal(solutions.includes('14.134'), false);
+                equal(solutions.includes('continuation'), false);
+                delete data.continuation;
+                data.status = 'solved';
+                data.solutions = 'z = 2';
+                data.interpretation_note = '';
+                data.search_note = '';
+                await evaluateEquation();
+                equal(solutions, 'z = 2');
+                data.status = 'unsolved';
+                data.solutions = '';
+                await evaluateEquation();
+                equal(solutions, 'unsolved');
+                equal(expr.value, original);
+                equal(saved, original);
+                equal(history.length, 0);
+                console.log('no solutions result passed');
+            })().catch(error => console.error(error));
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("no solutions result passed", result.stdout + result.stderr)
+        self.assertNotIn("continuationCard", mars_lab.INDEX_HTML)
+        self.assertNotIn("continuationResult", mars_lab.INDEX_HTML)
+        self.assertNotIn("setContinuation", mars_lab.INDEX_HTML)
+        self.assertNotIn("continuationText", mars_lab.INDEX_HTML)
+        self.assertNotIn("solveZetaContinuation", mars_lab.INDEX_HTML)
+        self.assertNotIn("Your equation under analytic continuation", mars_lab.INDEX_HTML)
+
+    def test_equation_operation_allows_forty_seconds(self) -> None:
+        completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="status      solved\n", stderr="")
+        with mock.patch.object(mars_lab.subprocess, "run", return_value=completed) as run:
+            mars_lab.run_equation_lab_fields(Path("equation_lab"), "x = 1", 78)
+        self.assertEqual(run.call_args.kwargs["timeout"], 40)
+
+    def test_equation_timeout_response_hides_the_internal_command(self) -> None:
+        handler = object.__new__(mars_lab.MarsLabHandler)
+        handler.path = "/equation-eval"
+        body = b'{"equation":"x = 1","precision":78}'
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = mock.Mock()
+        handler.rfile.read.return_value = body
+        handler.request_allowed = mock.Mock(return_value=True)
+        handler.send_json = mock.Mock()
+        error = subprocess.TimeoutExpired(["/private/equation_lab", "x = 1", "78"], 40)
+        with (
+            mock.patch.object(mars_lab, "save_state_data"),
+            mock.patch.object(mars_lab, "ensure_scratch_binary"),
+            mock.patch.object(mars_lab, "run_equation_lab_fields", side_effect=error),
+        ):
+            handler.do_POST()
+        handler.send_json.assert_called_once_with(
+            422, {"ok": False, "error": "This calculation took too long. Try simplifying the input."}
+        )
+
+    def test_equation_sum_and_product_indices_remain_local(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        cases = (
+            "87 = 2^s+3^s+5^s+...+7^s",
+            "sum(k, 1, 3, k^s) = 14",
+            "Σ_(k=1)^3 k^s = 14",
+            "product(k, 1, 3, k^s) = 36",
+        )
+        for source in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_equation_lab_fields(binary, source, 78)
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["status"], "solved", raw)
+                self.assertEqual(fields["solutions"], "s = 2", raw)
+                self.assertIn("equ(s)", fields["function"])
+
     def test_timeout_error_is_concise_and_hides_internal_command(self) -> None:
         error = subprocess.TimeoutExpired(["/private/build/equation_lab", "large equation", "78"], 10)
 
@@ -398,7 +794,7 @@ class EquationResultTests(unittest.TestCase):
         )[0]
 
         self.assertNotIn("functionStyle.classList.add('equation-function')", equation_handler)
-        self.assertIn("setExpandableText(\n            functionStyle,", equation_handler)
+        self.assertIn("setExpandableText(\n          functionStyle,", equation_handler)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
@@ -436,6 +832,12 @@ class EquationResultTests(unittest.TestCase):
                 "x = 1 - 2i",
             ],
         )
+        self.assertEqual(payload["solution_count"], 9)
+        self.assertEqual(payload["display_solutions"].splitlines(), [
+            "x = -2", "x = -1", "x = 1", "x = 3", "x = 5", "x ≈ 0 ± 1i", "x ≈ 1 ± 2i",
+        ])
+        self.assertEqual(payload["solutions_TeX"].count(r"\pm"), 2)
+        self.assertEqual(payload["solutions_TeX"].count(r"\approx"), 2)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
@@ -454,6 +856,8 @@ class EquationResultTests(unittest.TestCase):
         rows = fields["solutions_TeX"].removeprefix(r"\begin{aligned} ").removesuffix(r" \end{aligned}").split(" \\\\\n")
 
         self.assertEqual(len(rows), 4)
+        self.assertEqual(fields["display_solutions"], fields["solutions"])
+        self.assertNotIn(r"\pm", fields["solutions_TeX"])
         self.assertTrue(all(row.startswith("m &=") for row in rows[:3]))
         self.assertTrue(all(" + i" in row for row in rows[:3]))
         self.assertEqual(rows[3], r"& n \in \mathbb{Z}")
@@ -2989,6 +3393,102 @@ class ExpressionResultTests(unittest.TestCase):
     def expression_binary(self) -> Path:
         return ROOT / "build" / "release" / "scratch" / "mars_lab"
 
+    def test_composed_complex_integrals_have_cartesian_results_and_shared_function_terms(self) -> None:
+        for source in ("exp(Li(x+iy))", "exp(Ei(x+iy))"):
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 64, "x", "derivative"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertNotIn("parse error", raw)
+                self.assertIn("variable\tx\tNAN", fields["derivative_bindings"])
+                self.assertIn("variable\ty\tNAN", fields["derivative_bindings"])
+                for field in ("tex", "derivative_TeX"):
+                    self.assertEqual(fields[field].count(r"\begin{aligned}"), 1)
+                    self.assertNotIn(r"e^{\begin", fields[field])
+                    exponential = r"e^{x + p}" if source == "exp(Ei(x+iy))" and field == "derivative_TeX" else r"e^{p}"
+                    self.assertIn(exponential, fields[field])
+                    self.assertIn("p&=", fields[field])
+                    self.assertIn("q&=", fields[field])
+                    self.assertEqual(fields[field].count(r"\sum_"), 2)
+                    self.assertIn("n!", fields[field])
+                    self.assertNotIn("factorial", fields[field])
+                for field in ("function", "derivative_function"):
+                    function = fields[field]
+                    self.assertIn("return p + q.i.", function)
+                    self.assertEqual(function.count("exp("), 1)
+                    self.assertEqual(function.count("sum("), 2)
+                    self.assertEqual(function.count("atan2(y, x)"), 1)
+                    self.assertNotIn("*", function)
+                    self.assertNotIn("= 1, ∞", function)
+                    self.assertNotIn("n = ?", function)
+                svg, error = mars_lab.render_TeX_to_svg(fields["derivative_TeX"])
+                self.assertIsNone(error)
+                self.assertTrue(svg)
+
+    def test_factorial_TeX_uses_gamma_when_integer_domain_is_unknown(self) -> None:
+        cases = (
+            ("factorial(x)", r"\Gamma(x + 1)"),
+            ("factorial(x)^2", r"\Gamma(x + 1)^{2}"),
+            ("factorial(x)^y", r"\Gamma(x + 1)^{y}"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertEqual(fields["tex"], expected)
+                self.assertNotIn("factorial", fields["tex"])
+
+    def test_factorial_TeX_tracks_nonnegative_integer_summation_indices(self) -> None:
+        cases = (
+            ("sum(k,0,n,factorial(k))", "k!"),
+            ("sum(k,0,n,k!)", "k!"),
+            ("sum(k,0,n,gamma(k+1))", "k!"),
+            ("sum(j,1,n,factorial(j+1))", r"\left(j + 1\right)!"),
+            ("sum(k,0,n,factorial(k)^2)", r"\left(k!\right)^{2}"),
+            ("sum(k,0,n,factorial(k)^(-2))", r"\frac{1}{\left(k!\right)^{2}}"),
+            ("sum(k,0,n,factorial(factorial(k)))", r"\left(k!\right)!"),
+            ("sum(k,-1,n,factorial(k))", r"\Gamma(k + 1)"),
+            ("sum(k,a,n,factorial(k))", r"\Gamma(k + 1)"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "n", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertIn(expected, fields["tex"])
+                self.assertNotIn("factorial", fields["tex"])
+
+    def test_composed_li_derivative_explicit_series_matches_numeric_derivative(self) -> None:
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "exp(Li(x+iy))", 32, "x", "derivative"
+        )
+        self.assertEqual(returncode, 0, raw)
+        body, _, _ = mars_lab.parse_expression_body(fields["derivative"].split(" = ", 1)[1])
+        finite_body = body.replace("^∞", "^80")
+        self.assertNotIn("∞", finite_body)
+        for y in (1, -1):
+            values = []
+            for body in (finite_body, "exp(Li(x+iy))/ln(x+iy)"):
+                result, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, f"{{ {body} | x=2,y={y} }}", 32, "x", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                values.append(complex(result["value"].replace(" ", "").replace("i", "j")))
+            self.assertLess(abs(values[0] - values[1]), 1e-12)
+
+    def test_composed_li_cartesian_aliases_avoid_input_names(self) -> None:
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "exp(Li(p+iq))", 32, "p", "evaluate"
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("p_{1}&=", fields["tex"])
+        self.assertIn("q_{1}&=", fields["tex"])
+        self.assertIn("return p1 + q1.i.", fields["function"])
+
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
@@ -3170,7 +3670,8 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("n·exp(nx)/(n²x² + m²y²)·(nx·sin(my) - my·cos(my))·i", derivative_fields["derivative"])
         self.assertIn(r"n^{2}\mkern-2mu x^{2} + m^{2}\mkern-2mu y^{2}", derivative_fields["derivative_TeX"])
         self.assertNotIn(r"n\mkern-2mu x + m\mkern-2mu y\mkern-2mu i", derivative_fields["derivative_TeX"])
-        self.assertIn("v1 = exp(n.x).", derivative_fields["derivative_function"])
+        # The full repeated coefficient is n.exp(n.x), so its exponential needs no separate alias.
+        self.assertIn("v1 = n.exp(n.x).", derivative_fields["derivative_function"])
         self.assertEqual(derivative_fields["derivative_function"].count("exp(n.x)"), 1)
         self.assertNotIn("v1 = n.x.", derivative_fields["derivative_function"])
         self.assertNotIn("v1 = exp(v", derivative_fields["derivative_function"])
@@ -4155,6 +4656,13 @@ class ExpressionResultTests(unittest.TestCase):
     def test_bound_power_series_keep_generic_algebraic_cards(self) -> None:
         cases = (
             (
+                "1^p+2^p+3^p+...+100^p | p=2",
+                "{ ζ(-p) - ζ(-p, 101) | p = 2 }",
+                r"\sum_{n=1}^{100}n^{p}",
+                r"\zeta(-p) - \zeta(-p, 101)",
+                "zeta(-p) - zetah(-p, 101)",
+            ),
+            (
                 "1+1/2^p+1/3^p+...+1/n^p | p=-2; n=100",
                 "{ ζ(p) - ζ(p, n + 1) | p = -2; n = 100 }",
                 r"\sum_{k=1}^{n}\frac{1}{k^{p}}",
@@ -4187,6 +4695,109 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertNotIn(r"n^{3}", payload["full_display_TeX"])
                 self.assertIn(expected_function, payload["full_display_function"])
                 self.assertEqual(payload["value"], "338350")
+
+    def test_power_ellipsis_accepts_literal_endpoints_and_explicit_first_powers(self) -> None:
+        cases = (
+            ("1^s+2^s+3^s+...+100^s | s=2", 338350.0),
+            ("1^s+2^s+3^s+...+n^s | s=2; n=100", 338350.0),
+            ("1+2^s+3^s+...+100^s | s=2", 338350.0),
+            ("1^s+2^s+3^s+...+100^s | s=-1", sum(1/k for k in range(1, 101))),
+            ("1^s+2^s+3^s+...+100^s | s=0.5", sum(math.sqrt(k) for k in range(1, 101))),
+            ("1/1^s+1/2^s+1/3^s+...+1/100^s | s=2", sum(1/k**2 for k in range(1, 101))),
+            ("1^-s+2^-s+3^-s+...+100^-s | s=2", sum(1/k**2 for k in range(1, 101))),
+            ("1^s+2^s+3^s+...+100^s+7 | s=2", 338357.0),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 270, "s", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertAlmostEqual(float(fields["value"]), expected, delta=abs(expected)*1e-13)
+
+    def test_prime_power_ellipsis_evaluates_native_sum_and_preserves_symbolic_cards(self) -> None:
+        source = "1/2^s+1/3^s+1/5^s+1/7^s+1/11^s+1/13^s+1/17^s+...+1/101^s | s=2"
+        fields, raw, returncode = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 270, "s", "evaluate"
+        )
+        self.assertEqual(returncode, 0, raw)
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 270, False, wrt="s", action="evaluate"
+        )
+        self.assertTrue(payload["value"].startswith("0.450526817868693142327146296848626383377380762230538435"))
+        self.assertGreaterEqual(len(payload["value"].replace(".", "")), 270)
+        self.assertIn("sum(n, 2, 101, isprime(n)/n^s)", payload["full_display_function"])
+        self.assertIn("s = 2.", payload["full_display_function"])
+        self.assertIn("n^{s}", payload["full_display_TeX"])
+        self.assertIn("s = 2", payload["full_display_expression"])
+        svg, error = mars_lab.render_TeX_to_svg(payload["full_display_TeX"])
+        self.assertIsNone(error)
+        self.assertIn("<svg", svg)
+
+    def test_prime_power_ellipsis_retains_symbolic_endpoint_and_binding_values(self) -> None:
+        expression = "1/2^s+1/3^s+1/5^s+1/7^s+1/11^s+1/13^s+1/17^s+...+1/p^s"
+        for bindings in ("s=2", "s=2; p=101"):
+            source = expression + " | " + bindings
+            with self.subTest(bindings=bindings):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 270, "s", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 270, False, wrt="s", action="evaluate"
+                )
+                self.assertIn("sum(n, 2, p, isprime(n)/n^s)", payload["full_display_function"])
+                self.assertIn(r"\sum_{n=2}^{p}", payload["full_display_TeX"])
+                self.assertIn("n^{s}", payload["full_display_TeX"])
+                endpoint = "101" if "p=101" in bindings else "?"
+                self.assertIn(f"p = {endpoint}", payload["full_display_expression"])
+                declaration = "const p" if endpoint == "101" else "p"
+                self.assertIn(f"{declaration} = {endpoint}.", payload["full_display_function"])
+                if endpoint == "101":
+                    self.assertTrue(payload["value"].startswith("0.450526817868693142327146296848626383"))
+                else:
+                    self.assertFalse(payload.get("value"))
+
+    def test_prime_power_ellipsis_variants(self) -> None:
+        cases = (
+            ("2^s+3^s+5^s+...+11^s | s=2", 208.0),
+            ("2^s+3^s+5^s+...+n^s | s=2; n=11", 208.0),
+            ("2^-n+3^-n+5^-n+...+p^-n | n=1; p=7", 247.0/210.0),
+            ("2^-n+3^-n+5^-n+...+7^-n | n=1", 247.0/210.0),
+            ("1/2^s+1/3^s+1/5^s+...+1/7^s | s=0", 4.0),
+            ("1/2^s+1/3^s+1/5^s+...+1/7^s | s=-2", 87.0),
+            ("1/2^s+1/3^s+1/5^s+...+1/7^s | s=0.5", sum(1/math.sqrt(p) for p in (2, 3, 5, 7))),
+            ("1/2^s+1/3^s+1/5^s+...+11^s", None),
+            ("1/2^s+1/3^s+1/7^s+...+1/101^s", None),
+            ("1/2^s+1/3^t+1/5^s+...+1/101^s", None),
+            ("1/2^s+1/3^s+1/5^s+...+1/100^s", None),
+            ("1/2^s+1/3^s+1/5^s+...+1/5^s", None),
+            ("1/2^s+1/3^s+1/7^s+...+1/p^s", None),
+            ("1/2^s+1/3^t+1/5^s+...+1/p^s", None),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "n" if "^-n" in source else "s", "evaluate"
+                )
+                if expected is None:
+                    self.assertNotEqual(returncode, 0, raw)
+                else:
+                    self.assertEqual(returncode, 0, raw)
+                    self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+
+    def test_power_ellipsis_rejects_inconsistent_prefixes_and_literal_endpoints(self) -> None:
+        sources = (
+            "1^s+2^t+3^s+...+100^s", "1^s+2^s+4^s+...+100^s",
+            "1^s+2^s+3^s+...+2^s", "1^s+2^s+3^s+...+100.5^s",
+            "1^s+2^s+3^s+...+(-100)^s",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                _, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "s", "evaluate"
+                )
+                self.assertNotEqual(returncode, 0, raw)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),

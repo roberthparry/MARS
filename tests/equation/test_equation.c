@@ -353,6 +353,39 @@ static void test_equation_from_string_accepts_bare_equation(void)
 
 static void test_equation_expands_algebraic_sequence_ellipsis(void)
 {
+    {
+        const char *scoped_equations[] = {
+            "sum(k, 1, 3, k^s) = 14 | s = 2",
+            "Σ_(k=1)^3 k^s = 14 | s = 2",
+            "product(k, 1, 3, k^s) = 36 | s = 2",
+            "Π_(k=1)^3 k^s = 36 | s = 2",
+            "2^s + 3^s + 5^s + ... + 7^s = 87 | s = 2",
+        };
+
+        for (size_t i = 0u; i < sizeof(scoped_equations)/sizeof(scoped_equations[0]); ++i) {
+            equation_t *equation = equ_from_string(scoped_equations[i]);
+            expr_t *residual;
+            number_t value;
+
+            ASSERT_NOT_NULL(equation);
+            ASSERT_EQ_INT((int)expr_bindings_count(equ_bindings(equation)), 1);
+            residual = equ_residual(equation);
+            ASSERT_NOT_NULL(residual);
+            value = expr_eval(residual);
+            ASSERT_TRUE(num_is_zero(value));
+            num_destroy(&value);
+            expr_free(residual);
+            equ_free(equation);
+        }
+        equation_t *prime_equation = equ_from_string(
+            "0.6243299885435508709929363831008372441796426201805292869735519024956380888551132544624602761955398688691404103940627431"
+            " = 1/2^s + 1/3^s + 1/5^s + 1/7^s + 1/11^s + 1/13^s + 1/17^s + ... + 1/99991^s");
+
+        ASSERT_NOT_NULL(prime_equation);
+        ASSERT_EQ_INT((int)expr_bindings_count(equ_bindings(prime_equation)), 1);
+        ASSERT_NOT_NULL(equ_binding(prime_equation, "s"));
+        equ_free(prime_equation);
+    }
     const char *linear_input = "x + 2x + 3x + ... + 10x = 100";
     const char *arithmetic_inputs[] = {
         "x + 3x + ... + 9x = 25",
@@ -1866,11 +1899,182 @@ static void test_equation_future_keeps_tan_sqrt_three_family_symbolic(void)
     equ_free(equation);
 }
 
+static void test_equation_zeta_nontrivial_search(void)
+{
+    size_t previous_digits = num_get_default_prec_digits();
+    equation_t *equation;
+    equation_solutions_t *solutions;
+    expr_t *s;
+    number_t binding_value;
+    size_t positive_count = 0u;
+    static const double heights[] = {
+        14.134725141734694, 21.022039638771555, 25.010857580145689, 30.424876125859513,
+        32.935061587739190, 37.586178158825671, 40.918719012147495, 43.327073280914999,
+        48.005150881167159, 49.773832477672302, 52.970321477714461, 56.446247697063395,
+        59.347044002602353, 60.831778524609810, 65.112544048081607, 67.079810529494174,
+        69.546401711173979, 72.067157674481908, 75.704690699083933, 77.144840068874805
+    };
+    bool found[sizeof(heights) / sizeof(heights[0])] = {false};
+
+    num_set_default_prec_digits(78u);
+    equation = equ_from_string("0=zeta(s)");
+    ASSERT_NOT_NULL(equation);
+    s = equ_binding(equation, "s");
+    ASSERT_NOT_NULL(s);
+    ASSERT_NULL(equ_interpretation_note(equation));
+    solutions = equ_derive_solutions(equation);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_EQ_INT(equ_solutions_count(solutions), 40);
+    ASSERT_NOT_NULL(equ_solutions_search_note(solutions));
+    ASSERT_NOT_NULL(equ_solutions_family_note(solutions));
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, s, solutions, "1e-70"));
+    ASSERT_TRUE(test_equation_nonreal_solutions_have_conjugates(solutions));
+    ASSERT_FALSE(test_equation_result_contains_long(solutions, -2L));
+    binding_value = expr_eval(s);
+    ASSERT_TRUE(num_is_nan(binding_value));
+    num_destroy(&binding_value);
+    for (size_t i = 0u; i < equ_solutions_count(solutions); ++i) {
+        number_t root = expr_eval(equ_rhs(equ_solutions_at(solutions, i)));
+        number_t real = num_real_part(root);
+        number_t imaginary = num_imag_part(root);
+        double height = num_to_double(imaginary);
+
+        ASSERT_TRUE(num_gt(real, NUM_ZERO) && num_lt(real, NUM_ONE));
+        ASSERT_TRUE(height >= -80.0 && height <= 80.0);
+        if (height > 0.0) {
+            positive_count++;
+            for (size_t j = 0u; j < sizeof(heights) / sizeof(heights[0]); ++j)
+                if (height > heights[j] - 1e-12 && height < heights[j] + 1e-12)
+                    found[j] = true;
+        }
+        num_destroy(&imaginary);
+        num_destroy(&real);
+        num_destroy(&root);
+    }
+    ASSERT_EQ_INT(positive_count, 20);
+    for (size_t j = 0u; j < sizeof(found) / sizeof(found[0]); ++j)
+        ASSERT_TRUE(found[j]);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    num_set_default_prec_digits(previous_digits);
+}
+
+static void test_equation_infinite_series_domain(void)
+{
+    static const struct {
+        const char *source;
+        bool series_on_left;
+    } cases[] = {
+        {"0=1/1^s+1/2^s+1/3^s+1/4^s+1/5^s+1/6^s+1/7^s+1/8^s+...", false},
+        {"0=sum(n,1,inf,1/n^s)", false},
+        {"0=@Z_(n=1)^inf 1/n^s", false},
+        {"0=Σ_(n=1)^∞ 1/n^s", false},
+        {"0=sum(n,1,inf,1/n^z)", false},
+        {"-1=sum(k,2,inf,1/k^[exponent])", false},
+        {"{0=sum(n,1,inf,1/n^s) | s=-2}", false},
+        {"{0=sum(n,1,inf,1/n^s) | s=0.5+14i}", false},
+        {"1/1^s+1/2^s+1/3^s+...=0", true},
+        {"sum(n,1,inf,1/n^s)=0", true},
+        {"@Z_(n=1)^inf 1/n^s=0", true},
+        {"Σ_(n=1)^∞ 1/n^s=0", true},
+        {"sum(n,1,inf,1/n^z)=0", true},
+        {"sum(k,2,inf,1/k^[exponent])=-1", true},
+        {"{sum(n,1,inf,1/n^s)=0 | s=-2}", true},
+        {"{sum(n,1,inf,1/n^s)=0 | s=0.5+14i}", true}
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        equation_t *equation = equ_from_string(cases[i].source);
+        equation_solutions_t *solutions;
+        string_t *function;
+        string_t *original_function;
+        expr_t *unknown;
+        number_t original_value;
+        number_t after_value;
+
+        ASSERT_NOT_NULL(equation);
+        unknown = expr_bindings_expr_at(equ_bindings(equation), 0u);
+        original_value = expr_eval(unknown);
+        original_function = equ_to_text(equation, style_FUNCTION);
+        ASSERT_NOT_NULL(original_function);
+        solutions = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_EQ_INT(equ_solutions_count(solutions), 0);
+        ASSERT_TRUE(equ_solutions_proven_empty(solutions));
+        ASSERT_NULL(equ_solutions_family_note(solutions));
+        function = equ_to_text(equation, style_FUNCTION);
+        ASSERT_NOT_NULL(function);
+        ASSERT_NOT_NULL(strstr(string_c_str(function), "sum("));
+        ASSERT_NULL(strstr(string_c_str(function), "zeta("));
+        ASSERT_TRUE(strcmp(string_c_str(original_function), string_c_str(function)) == 0);
+        after_value = expr_eval(unknown);
+        ASSERT_TRUE(num_eq(original_value, after_value) || (num_is_nan(original_value) && num_is_nan(after_value)));
+        num_destroy(&after_value);
+        num_destroy(&original_value);
+        string_free(original_function);
+        string_free(function);
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+}
+
+static void test_equation_zeta_level_search(void)
+{
+    size_t previous_digits = num_get_default_prec_digits();
+    equation_t *equation;
+    equation_solutions_t *solutions;
+    expr_t *s;
+    number_t value;
+
+    num_set_default_prec_digits(78u);
+    equation = equ_from_string(
+        "0.624329988543550870992936383100837244179642620180529286973551902495638088855113254462460276"
+        "1955398688691404103940627431 = 1/2^s+1/3^s+1/4^s+1/5^s+1/6^s+1/7^s+1/8^s+...");
+    ASSERT_NOT_NULL(equation);
+    s = equ_binding(equation, "s");
+    solutions = equ_derive_solutions(equation);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_EQ_INT(equ_solutions_count(solutions), 9);
+    ASSERT_NULL(equ_solutions_family_note(solutions));
+    ASSERT_NOT_NULL(equ_solutions_search_note(solutions));
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, s, solutions, "1e-70"));
+    ASSERT_TRUE(test_equation_nonreal_solutions_have_conjugates(solutions));
+    for (size_t i = 0u; i < equ_solutions_count(solutions); ++i) {
+        number_t root = expr_eval(equ_rhs(equ_solutions_at(solutions, i)));
+        number_t real = num_real_part(root);
+
+        ASSERT_TRUE(num_gt(real, NUM_ONE));
+        num_destroy(&real);
+        num_destroy(&root);
+    }
+    value = expr_eval(s);
+    ASSERT_TRUE(num_is_nan(value));
+    num_destroy(&value);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+
+    /* Explicit seeds still request a single root and are not replaced by a grid search. */
+    equation = equ_from_string("{zeta(w)=0 | w=0.5+14i}");
+    ASSERT_NOT_NULL(equation);
+    ASSERT_NULL(equ_interpretation_note(equation));
+    solutions = equ_derive_solutions(equation);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_EQ_INT(equ_solutions_count(solutions), 1);
+    ASSERT_NULL(equ_solutions_search_note(solutions));
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, equ_binding(equation, "w"), solutions, "1e-70"));
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    num_set_default_prec_digits(previous_digits);
+}
+
 static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
     TEST_RUN_SUBTEST(test_equation_expands_algebraic_sequence_ellipsis, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_nontrivial_search, NULL);
+    TEST_RUN_SUBTEST(test_equation_infinite_series_domain, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_level_search, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_rejects_unresolved_parameter_residual, NULL);
     TEST_RUN_SUBTEST(test_equation_to_text_round_trips_through_parser, NULL);

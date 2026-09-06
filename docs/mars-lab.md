@@ -534,9 +534,33 @@ colouring does not alter the copyable Function text.
 
 ## Equation mode
 
+Zeta equations with an unset unknown use a bounded multi-start Newton search.
+For a zero target, the cards show up to forty numerically verified non-trivial
+zeros in the critical strip up to imaginary magnitude eighty; the trivial
+negative-even family is labelled separately. Both **Rendered TeX** and
+**Solutions** combine numerical conjugates into one `±` row, so twenty rows
+can show forty roots at the selected precision. The native backend compares
+the actual numbers before pairing; it does not merge rounded display values
+or sampled symbolic families. The search is not exhaustive. A literal
+inverse-power series starting at one retains its convergence domain and, when
+equated to zero, reports no solutions in that domain. It does not acquire
+analytic-continuation zeros. **Solutions** says only **No solutions** for a
+proved empty solution set; an unsuccessful numerical search remains a distinct
+status. With no solution rows, **Rendered TeX** retains the entered equation in
+summation notation. For a recognised infinite inverse-power sum, it also shows
+the native zeta identity with the restriction that the real part of its argument
+exceeds one. The identity uses the actual index, exponent and lower bound.
+The editor, saved input, bindings, history, Equation and Function cards retain
+the original problem. **Evaluate** does not start a separate zeta solve, and
+there is no additional root card.
+The native backend supplies the mathematics; the client only displays it.
+Restart a running Lab server and reload the page after updating the client.
+
 Equation mode tries symbolic isolation first and uses the numeric solver when a
 symbolic result is unavailable. Bindings after `|` distinguish variables from
 constants and supply starting values for numeric solving.
+Equation calculations may run for up to 40 seconds before the Lab reports a
+timeout. Other modes retain their own time limits.
 
 The captured input is `atan(2x) + atan(x) = pi/4`. The exact output is
 `x = (sqrt(17) - 3)/4`, accompanied by its decimal value.

@@ -880,6 +880,44 @@ void test_deriv_trigamma(void)
     }
 
     {
+        static const char *parameters[] = {"-2", "1", "2.5"};
+
+        /* Both the pole shortcut and its fallback must leave owned MPFR binding caches intact. */
+        for (size_t i = 0u; i < sizeof(parameters) / sizeof(parameters[0]); ++i) {
+            number_t parameter = num_create_from_string(parameters[i]);
+            number_t endpoint = num_create_from_long(1001L);
+
+            ASSERT_EQ_INT(num_set_prec_bits(&parameter, 256u), 0);
+            ASSERT_EQ_INT(num_set_prec_bits(&endpoint, 256u), 0);
+            expr_t *s = expr_new_named_var(parameter, "s");
+            expr_t *a = expr_new_named_var(endpoint, "a");
+            expr_t *riemann = expr_zetap(s);
+            expr_t *hurwitz = expr_zatahp(s, a);
+            expr_t *difference = expr_sub(riemann, hurwitz);
+
+            ASSERT_NOT_NULL(difference);
+            for (unsigned repeat = 0u; repeat < 3u; ++repeat) {
+                number_t value = expr_eval(difference);
+                number_t retained_parameter = expr_eval(s);
+                number_t retained_endpoint = expr_eval(a);
+
+                ASSERT_TRUE(num_eq(retained_parameter, parameter));
+                ASSERT_TRUE(num_eq(retained_endpoint, endpoint));
+                num_destroy(&retained_endpoint);
+                num_destroy(&retained_parameter);
+                num_destroy(&value);
+            }
+            expr_free(difference);
+            expr_free(hurwitz);
+            expr_free(riemann);
+            expr_free(a);
+            expr_free(s);
+            num_destroy(&endpoint);
+            num_destroy(&parameter);
+        }
+    }
+
+    {
         expr_t *s = test_expr_new_var_d(2.0);
         expr_t *n = expr_new_named_const(NUM_TEN, "n");
         expr_t *one = expr_new_const(NUM_ONE);
