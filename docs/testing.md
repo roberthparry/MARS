@@ -66,18 +66,55 @@ command is useful when changing only qfloat or qcomplex. It rejects direct
 MPFR/MPC includes, calls and unresolved symbols in those native double-double
 modules.
 
-For memory checks on the expression suite, use the normal release binary under
-Valgrind:
+## Resource-Bounded Memory Checks
 
-```sh
-valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=99 \
-    tests/build/release/expression/test_expression
-```
+Run memory checks only when explicitly requested. Use small, sequential batches
+instead of an uncapped full-suite run. Isolate failing tests through
+`tests/test_config.json`, preserve its original contents, and restore them after
+the checks. Run README examples after the other tests.
 
-The full `test_expression` suite is expected to finish with all heap blocks
-freed and `ERROR SUMMARY: 0 errors from 0 contexts`. If a Valgrind failure needs
-to be narrowed, prefer temporarily filtering cases in `tests/test_config.json`
-over adding diagnostic instrumentation to the code under test.
+On the Ophelia DreamQuest mini PC, use a transient systemd user service with
+enforced per-batch limits: `MemoryMax=512M`, `MemorySwapMax=0`, `CPUQuota=50%`,
+`Nice=15`, `IOWeight=10`, `TasksMax=16`, `RuntimeMaxSec=90`,
+`TimeoutStopSec=5` and `OOMPolicy=kill`. These are per-job limits, not changes to
+the machine's global settings. Verify the effective cgroup memory, swap and CPU
+limits with a lightweight preflight before starting tests. If the limits cannot
+be enforced, do not fall back to an unbounded run. These safeguards limit test
+resource consumption; they do not guarantee protection against unrelated
+machine failures.
+
+If a batch reaches a resource limit, record it as incomplete and reduce its
+scope rather than automatically raising the limits. A timeout or forced stop
+does not establish that the final leak scan passed. Apply the same resource
+discipline to any prerequisite instrumented build.
+
+Use the normal release binary for Valgrind checks, with full leak reporting,
+origin tracking and a non-zero error exit code. Treat definite, indirect and
+possible leaks as errors. AddressSanitizer, LeakSanitizer and
+UndefinedBehaviorSanitizer provide complementary checks in a separate build;
+stop on the first diagnostic. If sandbox restrictions prevent LeakSanitizer's
+final scan, report that check as incomplete rather than disabling leak detection
+and calling the result clean.
+
+### Recorded Check: 6 September 2026
+
+The focused checks against commit `e879c4d` completed as follows:
+
+- Four native Lab sanitizer cases passed: the infinite-series domain case,
+  complex polynomial roots, and bound complex `Ei` and `exp(Li(...))`
+  derivatives. No leaks or memory-access errors were reported in those cases.
+- A focused Valgrind complex-polynomial check completed with zero bytes in use
+  at exit and zero reported errors. Peak service memory was 257.1 MiB, with no
+  swap use.
+- The unset-binding `exp(Li(x+iy))` case stopped on signed integer overflow in
+  `number_special_series_converged`, at `src/number/number_maths.c:237` in that
+  revision. The stack passed through complex `Li`/`Ei` evaluation and the Lab's
+  display inspection. This remains an unresolved undefined-behaviour finding;
+  the aborted case did not complete its final leak scan.
+
+Full-suite memory coverage was not completed. These targeted results are not a
+project-wide guarantee of memory safety. Update this dated record when the
+overflow is fixed and its regression checks have completed.
 
 MARS Lab expression-presentation regressions live in
 `tests/tools/test_mars_lab.py`. They exercise native Cartesian complex
@@ -88,7 +125,9 @@ syntax colouring. Markdown examples are collected in
 ## Notes
 
 - Run commands from the repository root.
-- For now, prefer running test targets sequentially rather than overlapping them. The current codebase and build products are not yet fully thread-safe for concurrent test runs.
+- Always run tests sequentially, with `-j1` for Make test targets. Never overlap
+  test suites or memory-test suites; wait for each to finish before starting
+  the next.
 - The test output is intended to read cleanly in a normal terminal or in the
   Visual Studio Code integrated terminal.
 
