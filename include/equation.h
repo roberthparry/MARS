@@ -79,6 +79,9 @@ void equ_solutions_free(equation_solutions_t *solutions);
  * falls back to numeric goal-seeking across the equation's variable bindings.
  * Any current values already stored on those variable bindings are used as the
  * numeric starting point.
+ * An unseeded real affine zeta equation uses a bounded multi-start search;
+ * consult equ_solutions_search_note() for its bounds and limitations, and
+ * equ_solutions_family_note() for any separate exact family.
  *
  * The caller owns the returned solution set and must release it with
  * equ_solutions_free().
@@ -94,6 +97,28 @@ size_t equ_solutions_count(const equation_solutions_t *solutions);
  * @brief Borrow the solution at @p index, or NULL when out of range.
  */
 const equation_t *equ_solutions_at(const equation_solutions_t *solutions, size_t index);
+
+/**
+ * @brief Borrow a description of the numerical search bounds, or NULL when not applicable.
+ *
+ * A bounded search does not certify that all roots within its bounds have been found.
+ */
+const char *equ_solutions_search_note(const equation_solutions_t *solutions);
+
+/**
+ * @brief Borrow a description of a separate exact solution family, or NULL when absent.
+ */
+const char *equ_solutions_family_note(const equation_solutions_t *solutions);
+
+/**
+ * @brief Borrow a parsed equation's series-domain note, or NULL when not applicable.
+ */
+const char *equ_interpretation_note(const equation_t *equation);
+
+/**
+ * @brief Return true only when the equation has been proved to have no solutions in its domain.
+ */
+bool equ_solutions_proven_empty(const equation_solutions_t *solutions);
 
 /**
  * @brief Serialise @p equation to newly allocated text.

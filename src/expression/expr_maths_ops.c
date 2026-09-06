@@ -182,6 +182,88 @@ bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr)
            expr_finite_summation_exceeds_direct_limit(expr->b);
 }
 
+/* Keep this identity separate from simplification: its convergence restriction is essential. */
+expr_t *expr_infinite_power_sum_closed_form(const expr_t *expr, expr_t **order_out)
+{
+    const expr_t *index;
+    const expr_t *range;
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+    const expr_t *numerator = EXPR_ONE;
+    const expr_t *power;
+    expr_t *order = NULL;
+    expr_t *zeta = NULL;
+    expr_t *result = NULL;
+    number_t upper = NUM_NAN;
+    long lower = 0L;
+    bool inverse;
+    bool uses_index = true;
+    expr_t *variables[1];
+
+    if (order_out)
+        *order_out = NULL;
+    if (!expr || !expr_is_op(expr, &ops_summation) || !expr_is_op(expr->b, &ops_argument_list))
+        return NULL;
+    index = expr->b->a;
+    range = expr->b->b;
+    if (!expr_is_var(index) || !expr_is_op(range, &ops_argument_list) ||
+        !expr_summation_bound_to_long(range->a, &lower) || lower < 1L)
+        return NULL;
+    upper = expr_eval(range->b);
+    if (!num_is_real(upper) || !num_is_inf(upper) || num_get_sign(upper) <= 0)
+        goto cleanup;
+    power = expr->a;
+    inverse = expr_is_div(expr->a);
+    if (inverse) {
+        numerator = expr->a->a;
+        power = expr->a->b;
+    } else if (expr_is_mul(power)) {
+        if (expr_match_pow_expr(power->a, &base, &exponent) && expr_struct_eq(base, index)) {
+            numerator = power->b;
+            power = power->a;
+        } else {
+            numerator = power->a;
+            power = power->b;
+        }
+    }
+    if (!expr_match_pow_expr(power, &base, &exponent) || !expr_struct_eq(base, index))
+        goto cleanup;
+    variables[0] = (expr_t *)index;
+    if (!expr_collect_var_usage(exponent, 1u, variables, &uses_index) || uses_index ||
+        !expr_collect_var_usage(numerator, 1u, variables, &uses_index) || uses_index)
+        goto cleanup;
+    /* Keep live free-variable nodes shared: a deep clone would freeze their current values. */
+    if (inverse || expr_is_neg(exponent)) {
+        order = (expr_t *)(inverse ? exponent : exponent->a);
+        expr_retain(order);
+    } else {
+        order = expr_neg(exponent);
+    }
+    if (order && lower <= 2L) {
+        expr_t *full = expr_zeta(order);
+
+        if (full && lower == 2L) {
+            zeta = expr_sub(full, EXPR_ONE);
+            expr_free(full);
+        } else {
+            zeta = full;
+        }
+    } else if (order) {
+        zeta = expr_zetah(order, range->a);
+    }
+    result = zeta ? expr_mul(numerator, zeta) : NULL;
+    if (result && order_out) {
+        *order_out = order;
+        order = NULL;
+    }
+
+cleanup:
+    expr_free(zeta);
+    expr_free(order);
+    num_destroy(&upper);
+    return result;
+}
+
 static number_t eval_finite_summation(expr_t *dv)
 {
     const long maximum_terms = 10000L;
@@ -199,6 +281,23 @@ static number_t eval_finite_summation(expr_t *dv)
 
     if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
         return num_clone(NUM_NAN);
+    {
+        expr_t *order = NULL;
+        expr_t *closed = expr_infinite_power_sum_closed_form(dv, &order);
+
+        if (closed) {
+            number_t argument = expr_eval(order);
+            number_t real = num_real_part(argument);
+            number_t value = num_is_finite(argument) && num_gt(real, NUM_ONE)
+                ? expr_eval(closed) : num_clone(NUM_NAN);
+
+            num_destroy(&real);
+            num_destroy(&argument);
+            expr_free(order);
+            expr_free(closed);
+            return value;
+        }
+    }
     index = dv->b->a;
     upper = dv->b->b;
     if (expr_is_op(upper, &ops_argument_list)) {

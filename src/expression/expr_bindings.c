@@ -3750,15 +3750,24 @@ static void emit_binding_TeX_number(const expr_binding_expr_t *expr, sbuf_t *b, 
     string_t *clean;
     char *tex;
     binding_simple_rational_t rational = {false, NULL, NULL};
+    const char *literal = expr->u.text ? expr->u.text : "";
+    bool negative = *literal == '-';
 
     (void)parent_prec;
-    if (expr->u.text && strcmp(expr->u.text, "∞") == 0) {
-        sbuf_puts(b, "\\infty");
-        return;
-    }
-    if (expr->u.text && strcmp(expr->u.text, "-∞") == 0) {
-        sbuf_puts(b, "-\\infty");
-        return;
+    if (*literal == '-' || *literal == '+')
+        literal++;
+    if (*literal == '@')
+        literal++;
+    /* All accepted infinity spellings share one mathematical rendering, including in sum and integral bounds. */
+    if (*literal == 'i' || *literal == 'I' || strcmp(literal, "∞") == 0) {
+        number_t value = binding_number_from_text(literal);
+        bool infinite = num_is_inf(value) && num_is_real(value);
+
+        num_destroy(&value);
+        if (infinite) {
+            sbuf_puts(b, negative ? "-\\infty" : "\\infty");
+            return;
+        }
     }
     if (binding_text_is_simple_rational(expr->u.text, &rational)) {
         if (rational.negative)

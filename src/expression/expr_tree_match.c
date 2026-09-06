@@ -569,6 +569,35 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
         return (expr_t *)replacement;
     }
 
+    /* Substitution may change a finite operator's bounds, but must not capture a shadowing index. */
+    if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
+        const expr_t *index = expr_is_op(expr->b, &ops_argument_list) ? expr->b->a : expr->b;
+        const expr_t *limits = expr_is_op(expr->b, &ops_argument_list) ? expr->b->b : NULL;
+        const expr_t *lower = expr_is_op(limits, &ops_argument_list) ? limits->a : NULL;
+        const expr_t *upper = lower ? limits->b : limits;
+        const bool shadowed = index == needle || expr_is_same_named_leaf_for_substitution(index, needle);
+        expr_t *term = shadowed ? expr_clone(expr->a) : expr_substitute(expr->a, needle, replacement);
+        expr_t *lower_copy = lower ? expr_substitute(lower, needle, replacement) : NULL;
+        expr_t *upper_copy = upper ? expr_substitute(upper, needle, replacement) : NULL;
+        const bool sum = expr_is_op(expr, &ops_summation);
+
+        out = NULL;
+        if (term && (!lower || lower_copy) && (!upper || upper_copy)) {
+            if (lower)
+                out = sum ? expr_new_finite_summation_range(term, index, lower_copy, upper_copy)
+                          : expr_new_finite_product_range(term, index, lower_copy, upper_copy);
+            else if (upper)
+                out = sum ? expr_new_finite_summation(term, index, upper_copy)
+                          : expr_new_finite_product_range(term, index, EXPR_ZERO, upper_copy);
+            else
+                out = sum ? expr_new_summation(term, index) : expr_new_product(term, index);
+        }
+        expr_free(upper_copy);
+        expr_free(lower_copy);
+        expr_free(term);
+        return out;
+    }
+
     if (expr_is_formal_derivative(expr)) {
         const expr_t *dependent = expr_formal_derivative_dependent(expr);
 

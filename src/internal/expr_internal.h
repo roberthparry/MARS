@@ -234,6 +234,7 @@ expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const e
  */
 char *expr_finite_progression_identity_TeX(const expr_t *expr);
 bool expr_match_unary_expr(const expr_t *expr, const expr_t **arg_out);
+
 bool expr_match_reapplicable_unary_function(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_same_reapplicable_unary_function(const expr_t *expr, const expr_t *prototype,
                                                  const expr_t **arg_out);
@@ -321,6 +322,19 @@ char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit
 
 #endif /* EXPR_INTERNAL_H */
 
+/* Build an infinite power sum's zeta identity and owning order; valid only for Re(order) > 1. */
+expr_t *expr_infinite_power_sum_closed_form(const expr_t *expr, expr_t **order_out);
+
+typedef struct expr_newton_region {
+    number_t real_min;
+    number_t real_max;
+    number_t imaginary_magnitude_max;
+} expr_newton_region_t;
+
+/* Run one Newton attempt, rejecting excursions outside an optional numerical safety region. */
+int expr_goal_seek_newton_one(expr_t *expr, expr_t *variable, number_t target,
+                              const expr_goal_seek_options_t *options, const expr_newton_region_t *region);
+
 typedef struct expr_function_temporaries expr_function_temporaries_t;
 
 /* Build a shared function-temporary plan for several expression roots. */
@@ -342,7 +356,7 @@ typedef bool (*expr_series_binding_lookup_fn)(void *context, const char *name, n
 
 string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_out,
                                   expr_series_binding_lookup_fn lookup_binding, void *lookup_context,
-                                  bool *domain_specialised_out);
+                                  bool *domain_specialised_out, bool *power_series_out);
 
 expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindings_t **bnd_out,
                                                       string_t **derivation_TeX_out,

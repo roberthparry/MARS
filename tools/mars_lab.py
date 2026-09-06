@@ -40,6 +40,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPRESSION_OPERATION_TIMEOUT_SECONDS = 30
+EQUATION_OPERATION_TIMEOUT_SECONDS = 40
 JURISDICTION_DB_SOURCE_DIR = ROOT / "packaging" / "jurisdiction-db"
 COUNTRY_JURISDICTIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_country_jurisdictions.sql"
 TARGET_SUBDIVISIONS_SQL = JURISDICTION_DB_SOURCE_DIR / "mars_target_subdivisions.sql"
@@ -5850,9 +5851,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function expressionBodyForEditor(fullText) {
-      const text = expressionForEditor(fullText).trim();
-      const parts = bindingParts(text);
-      return parts ? parts.body : text;
+      let text = expressionForEditor(fullText).trim();
+      let parts = bindingParts(text);
+      // Recover repeated editor binding envelopes without changing the expression body.
+      while (parts) {
+        text = parts.body;
+        parts = bindingParts(text);
+      }
+      return text;
     }
 
     function clearExpressionSource() {
@@ -6033,11 +6039,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function expressionWithBindings(bodyText, bindings) {
-      const body = String(bodyText || '').trim();
-      if (!body)
+      const source = String(bodyText || '').trim();
+      if (!source)
         return '';
       if (!Array.isArray(bindings) || !bindings.length)
-        return body;
+        return source;
+      const body = expressionBodyForEditor(source);
 
       const variableAssignments = [];
       const constantAssignments = [];
@@ -10473,6 +10480,45 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       }
     }
 
+    function equationSolutionText(data) {
+      if (data.status === 'no solutions')
+        return 'No solutions';
+      const valueLines = [];
+      const solutionLines = String(data.solutions || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const displaySolutionLines = String(data.display_solutions || data.solutions || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const numericSolutionLines = Array.isArray(data.numeric_solutions)
+        ? data.numeric_solutions.map((line) => String(line).trim()).filter(Boolean)
+        : [];
+      if (data.interpretation_note) {
+        valueLines.push(String(data.interpretation_note));
+        valueLines.push('');
+      }
+      displaySolutionLines.forEach((line) => valueLines.push(line));
+      numericSolutionLines.forEach((line, index) => {
+        if (!solutionLineIsNumericLiteral(solutionLines[index] || '')) {
+          if (valueLines.length && !valueLines.includes(''))
+            valueLines.push('');
+          valueLines.push(line);
+        }
+      });
+      if (!valueLines.length && data.status)
+        valueLines.push(data.status);
+      for (const note of [data.search_note, data.family_note]) {
+        if (!note)
+          continue;
+        if (valueLines.length)
+          valueLines.push('');
+        valueLines.push(String(note));
+      }
+      return valueLines.join('\n');
+    }
+
     async function evaluateEquation(options = {}) {
       commitVisibleBindingInputs();
       const text = String(currentExpressionText() || expr.value || '').trim();
@@ -10521,33 +10567,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.full_display_equation || data.equation || ''
         );
         setResultInputText(parsedExpressionText());
-        {
-          const valueLines = [];
-          const solutionLines = String(data.solutions || '')
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean);
-          const numericSolutionLines = Array.isArray(data.numeric_solutions)
-            ? data.numeric_solutions.map((line) => String(line).trim()).filter(Boolean)
-            : [];
-          setExpandableText(
-            functionStyle,
-            functionMore,
-            data.function || '',
-            data.function || ''
-          );
-          solutionLines.forEach((line) => valueLines.push(line));
-          numericSolutionLines.forEach((line, index) => {
-            if (!solutionLineIsNumericLiteral(solutionLines[index] || '')) {
-              if (valueLines.length && !valueLines.includes(''))
-                valueLines.push('');
-              valueLines.push(line);
-            }
-          });
-          if (!valueLines.length && data.status)
-            valueLines.push(data.status);
-          setValueText(valueLines.join('\n'));
-        }
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          data.function || '',
+          data.function || ''
+        );
+        setValueText(equationSolutionText(data));
         if (Array.isArray(data.binding_values))
           renderVariableValues(data.binding_values);
         else
@@ -13765,9 +13791,13 @@ def parse_equation_lab_output(output: str) -> dict[str, str]:
             "solutions_TeX": r"^solutions_TeX\s*(.*)$",
             "derivation_TeX": r"^derivation_TeX\s*(.*)$",
             "solutions": r"^solutions\s+(.*)$",
+            "display_solutions": r"^display_solutions\s*(.*)$",
             "numeric": r"^numeric\s+(.*)$",
+            "search_note": r"^search_note\s*(.*)$",
+            "family_note": r"^family_note\s*(.*)$",
+            "interpretation_note": r"^interpretation_note\s*(.*)$",
         },
-        {"function", "tex", "solutions_TeX", "derivation_TeX", "solutions", "numeric"},
+        {"function", "tex", "solutions_TeX", "derivation_TeX", "solutions", "display_solutions", "numeric"},
     )
 
 
@@ -14769,7 +14799,7 @@ def run_equation_lab_fields(
         cwd=ROOT,
         text=True,
         capture_output=True,
-        timeout=10,
+        timeout=EQUATION_OPERATION_TIMEOUT_SECONDS,
     )
     raw = completed.stdout
     if completed.stderr:
@@ -15852,7 +15882,7 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
 
     source_equation_text = str(fields.get("input") or "").strip()
     solved_equation_text = str(fields.get("equation") or "").strip()
-    for key in ("equation", "unbound", "tex", "residual", "solutions", "solutions_TeX", "derivation_TeX"):
+    for key in ("equation", "unbound", "tex", "residual", "solutions", "display_solutions", "solutions_TeX", "derivation_TeX"):
         value = str(fields.get(key) or "")
         if not value:
             continue
@@ -15866,6 +15896,11 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
     unbound_text = str(fields.get("unbound") or "").strip()
     solutions_text = replace_source_constant_spellings_in_text(
         normalize_multiline_display_text(fields.get("solutions") or ""),
+        source_equation_text,
+        solved_equation_text,
+    )
+    display_solutions_text = replace_source_constant_spellings_in_text(
+        normalize_multiline_display_text(fields.get("display_solutions") or ""),
         source_equation_text,
         solved_equation_text,
     )
@@ -15914,7 +15949,11 @@ def prepare_equation_fields(fields: dict[str, str], precision: int) -> dict[str,
         "value": numeric_value_for_display(fields.get("value")),
         "status": str(fields.get("status") or "").strip(),
         "solutions": solutions_text,
+        "display_solutions": display_solutions_text,
         "solution_count": len(solution_lines),
+        "search_note": str(fields.get("search_note") or "").strip(),
+        "family_note": str(fields.get("family_note") or "").strip(),
+        "interpretation_note": str(fields.get("interpretation_note") or "").strip(),
         "numeric_solutions": numeric_solution_lines,
         "full_display_equation": expression_for_display(unbound_text or equation_text),
         "display_equation": compact_display_text(expression_for_display(unbound_text or equation_text)),
@@ -17733,7 +17772,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     precision,
                 )
             except Exception as exc:
-                self.send_json(422, {"ok": False, "error": str(exc)})
+                self.send_json(422, {"ok": False, "error": tidy_lab_error_text(exc)})
                 return
 
             if returncode != 0:

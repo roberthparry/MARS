@@ -15,13 +15,22 @@
 typedef enum equation_solve_status {
     EQUATION_SOLVE_INVALID,
     EQUATION_SOLVE_UNSOLVED,
+    EQUATION_SOLVE_NO_SOLUTIONS,
     EQUATION_SOLVE_SOLVED
 } equation_solve_status_t;
+
+typedef enum equation_search_kind {
+    EQUATION_SEARCH_NONE,
+    EQUATION_SEARCH_ZETA_VALUE,
+    EQUATION_SEARCH_ZETA_SERIES_EMPTY,
+    EQUATION_SEARCH_ZETA_ZEROS
+} equation_search_kind_t;
 
 struct equation_solutions {
     equation_t **solutions;
     size_t count;
     equation_solve_status_t status;
+    equation_search_kind_t search_kind;
 };
 
 bool equ_match_affine_linear_expr(const expr_t *expr, const expr_t *wrt, bool require_nonzero_coeff,

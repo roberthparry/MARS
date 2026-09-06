@@ -10,6 +10,20 @@ typedef struct {
     string_t *text;
 } sbuf_t;
 
+/* One Cartesian presentation shared by all output styles for a composed Li or Ei expression. */
+typedef struct {
+    const expr_t *source;
+    expr_t *real_name;
+    expr_t *imaginary_name;
+    expr_t *real_definition;
+    expr_t *imaginary_definition;
+    expr_t *compact;
+    expr_t *expanded;
+} expr_cartesian_composition_t;
+
+bool expr_cartesian_composition_init(const expr_t *expr, expr_cartesian_composition_t *view);
+void expr_cartesian_composition_clear(expr_cartesian_composition_t *view);
+
 /* Allocation helpers. */
 void *expr_tostring_xmalloc(size_t n);
 char *expr_tostring_xstrdup(const char *s);

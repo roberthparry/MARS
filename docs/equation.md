@@ -77,6 +77,39 @@ model, rather than silently extrapolating an inconsistent pattern.
 
 ## Solving Model
 
+Open consecutive power series with a symbolic exponent are recognised natively
+and retained as sums with their convergence domain. Riemann or Hurwitz zeta
+identities are used internally only where the real part of the zeta argument
+exceeds one. Equating the full inverse-power series starting at one to zero
+therefore has no solutions: zeta has no zeros in this convergence domain.
+Neither its trivial nor its non-trivial continued zeros solve that series
+equation. Analytic continuation requires an explicit zeta expression.
+
+For an unseeded real affine equation in the Riemann zeta function, the numerical
+fallback searches several starting points instead of returning the first root
+it encounters. A zero target searches the critical strip up to imaginary
+magnitude eighty, returning up to forty roots, and reports the negative even
+integers as a separate trivial family. A non-zero target searches real parts
+between one and four, with imaginary magnitude at most fifty. Candidates are
+refined at the requested precision,
+checked against the original residual, deduplicated, and paired with verified
+conjugates. The input bindings are restored afterwards. This bounded search
+does not certify completeness or assume the Riemann hypothesis. Explicit
+starting bindings retain the existing single-root behaviour.
+
+The Lab combines verified numerical conjugates into one `±` row in both the
+Rendered TeX and Solutions cards. The native solution set still contains both
+roots; pairing uses the numerical values, not their rounded display text.
+Symbolic solution formulae and parameterised families remain unchanged.
+
+The native search, family and interpretation notes are available through
+`equ_solutions_search_note`, `equ_solutions_family_note` and
+`equ_interpretation_note`; clients should display them alongside numerical
+results. `equ_solutions_proven_empty` distinguishes a proved empty solution set
+from a numerical search that did not find a root.
+The Lab reports a proved empty solution set as **No solutions**. It does not
+start a separate zeta solve or replace the authored equation.
+
 There is one public solve entry point:
 
 ```c
@@ -243,6 +276,12 @@ The call to `num_set_default_prec_digits(64)` sets the working precision to
 about 64 significant decimal digits before the equation is parsed and solved.
 
 ## Output Forms
+
+Summation and product indices are local to their terms, not equation unknowns.
+This applies both to mathematical notation and to function-call notation,
+including finite sums generated from ellipsis sequences. Bounds are parsed in
+the surrounding scope, and a nested index may shadow an outer name without
+replacing its binding.
 
 - `equ_to_text(..., style_EXPRESSION)` produces a parseable wrapper form
 - `equ_to_text(..., style_FUNCTION)` produces an equation-valued callable

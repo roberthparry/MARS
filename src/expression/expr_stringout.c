@@ -3909,7 +3909,82 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     sbuf_free(&tmp);
 }
 
+static _Thread_local unsigned TeX_expression_depth;
+static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec);
+
+typedef struct TeX_index_domain {
+    const expr_t *index;
+    bool nonnegative_integer;
+    const struct TeX_index_domain *outer;
+} TeX_index_domain_t;
+
+static _Thread_local const TeX_index_domain_t *TeX_index_domain;
+
+static bool TeX_known_nonnegative_integer(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    /* The bounded scope stack also records unknown domains, so inner binders shadow outer ones. */
+    for (const TeX_index_domain_t *scope = TeX_index_domain; scope; scope = scope->outer) {
+        if (expr == scope->index || (expr->name && scope->index && scope->index->name &&
+                                    strcmp(expr->name, scope->index->name) == 0))
+            return scope->nonnegative_integer;
+    }
+    if (expr_is_const(expr) && !expr->name &&
+        (!expr->binding_expr || expr_binding_expr_is_numeric_literal(expr->binding_expr)))
+        return num_is_real(expr->c) && num_is_integer(expr->c) && num_ge(expr->c, NUM_ZERO);
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_mul))
+        return TeX_known_nonnegative_integer(expr->a) && TeX_known_nonnegative_integer(expr->b);
+    if (expr_is_op(expr, &ops_pow_d))
+        return TeX_known_nonnegative_integer(expr->a) && num_is_real(expr->c) &&
+               num_is_integer(expr->c) && num_ge(expr->c, NUM_ZERO);
+    if (expr_is_op(expr, &ops_factorial))
+        return TeX_known_nonnegative_integer(expr->a);
+    return false;
+}
+
+static const expr_t *TeX_postfix_factorial_argument(const expr_t *expr)
+{
+    if (expr_is_op(expr, &ops_factorial))
+        return TeX_known_nonnegative_integer(expr->a) ? expr->a : NULL;
+    if (expr_is_op(expr, &ops_gamma) && expr_is_op(expr->a, &ops_add)) {
+        const expr_t *left = expr->a->a;
+        const expr_t *right = expr->a->b;
+
+        if (expr_is_const(right) && !right->name && num_eq(right->c, NUM_ONE) &&
+            TeX_known_nonnegative_integer(left))
+            return left;
+        if (expr_is_const(left) && !left->name && num_eq(left->c, NUM_ONE) &&
+            TeX_known_nonnegative_integer(right))
+            return right;
+    }
+    return NULL;
+}
+
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    expr_cartesian_composition_t view;
+
+    if (TeX_expression_depth++ == 0u && expr_cartesian_composition_init(f, &view)) {
+        sbuf_puts(b, "\\begin{aligned}\n&");
+        emit_TeX_expr(view.compact, b, PREC_LOWEST);
+        sbuf_puts(b, ",\\\\\n");
+        emit_TeX_expr(view.real_name, b, PREC_LOWEST);
+        sbuf_puts(b, "&=");
+        emit_TeX_expr(view.real_definition, b, PREC_LOWEST);
+        sbuf_puts(b, ",\\\\\n");
+        emit_TeX_expr(view.imaginary_name, b, PREC_LOWEST);
+        sbuf_puts(b, "&=");
+        emit_TeX_expr(view.imaginary_definition, b, PREC_LOWEST);
+        sbuf_puts(b, "\\end{aligned}");
+        expr_cartesian_composition_clear(&view);
+    } else {
+        emit_TeX_expr_inner(f, b, parent_prec);
+    }
+    --TeX_expression_depth;
+}
+
+static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
         sbuf_puts(b, "0");
@@ -3966,13 +4041,35 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     if (f->ops->arity == EXPR_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
         const char *name = TeX_unary_name(f);
+        const expr_t *factorial_argument = TeX_postfix_factorial_argument(f);
 
         if (need)
             sbuf_puts(b, "\\left(");
 
-        if (emit_TeX_logarithmic_integral_cartesian(f, b) || emit_TeX_exponential_integral_cartesian(f, b) ||
-            emit_TeX_cube_root_cartesian(f, b) || emit_TeX_analytic_unary_cartesian(f, b)) {
+        if (TeX_expression_depth == 1u &&
+            (emit_TeX_logarithmic_integral_cartesian(f, b) || emit_TeX_exponential_integral_cartesian(f, b) ||
+             emit_TeX_cube_root_cartesian(f, b) || emit_TeX_analytic_unary_cartesian(f, b))) {
             /* The complete Cartesian identity has already been emitted. */
+        } else if (expr_is_op(f, &ops_factorial) || factorial_argument) {
+            if (!factorial_argument) {
+                expr_t *argument = expr_add_long(f->a, 1L);
+
+                sbuf_puts(b, "\\Gamma(");
+                emit_TeX_expr(argument, b, PREC_LOWEST);
+                sbuf_putc(b, ')');
+                expr_free(argument);
+                if (need)
+                    sbuf_puts(b, "\\right)");
+                return;
+            }
+            bool group_argument = factorial_argument->ops->arity != EXPR_OP_ATOM;
+
+            if (group_argument)
+                sbuf_puts(b, "\\left(");
+            emit_TeX_expr(factorial_argument, b, PREC_LOWEST);
+            if (group_argument)
+                sbuf_puts(b, "\\right)");
+            sbuf_putc(b, '!');
         } else if (expr_is_op(f, &ops_abs)) {
             sbuf_puts(b, "\\left|");
             emit_TeX_expr_abs(f->a, b, 0);
@@ -4031,7 +4128,13 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             if (recip_need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{1}{");
+            bool group_factorial = positive_exponent != 1L && TeX_postfix_factorial_argument(f->a);
+
+            if (group_factorial)
+                sbuf_puts(b, "\\left(");
             emit_TeX_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
+            if (group_factorial)
+                sbuf_puts(b, "\\right)");
             if (positive_exponent != 1L) {
                 char buf[64];
 
@@ -4051,7 +4154,9 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 
         const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? TeX_unary_name(f->a) : NULL;
         if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
-            !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !strchr(unary_name ? unary_name : "", '^')) {
+            !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !expr_is_op(f->a, &ops_factorial) &&
+            !TeX_postfix_factorial_argument(f->a) &&
+            !strchr(unary_name ? unary_name : "", '^')) {
             const char *name = unary_name;
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             sbuf_puts(b, "^{");
@@ -4071,7 +4176,7 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_putc(b, ')');
             }
         } else {
-            int base_needs_parens = pow_base_needs_visible_parens(f->a);
+            int base_needs_parens = pow_base_needs_visible_parens(f->a) || TeX_postfix_factorial_argument(f->a);
 
             if (base_needs_parens)
                 sbuf_puts(b, "\\left(");
@@ -4304,7 +4409,8 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             f->a->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
             f->a->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
         int base_needs_parens =
-            pow_base_needs_visible_parens(f->a) || expr_is_op(f->a, &ops_exp) || base_is_composite_binding;
+            pow_base_needs_visible_parens(f->a) || expr_is_op(f->a, &ops_exp) || base_is_composite_binding ||
+            TeX_postfix_factorial_argument(f->a);
 
         if (expr_is_const(f->b) && (!f->b->name || !*f->b->name) &&
             emit_TeX_unit_fraction_power(f->a, f->b->c, b, parent_prec))
@@ -4370,7 +4476,11 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             else
                 sbuf_puts(b, "\\infty");
             sbuf_putc(b, '}');
+            TeX_index_domain_t scope = {index, !lower || TeX_known_nonnegative_integer(lower), TeX_index_domain};
+
+            TeX_index_domain = &scope;
             emit_TeX_expr(f->a, b, PREC_MUL);
+            TeX_index_domain = scope.outer;
             return;
         }
         if (expr_is_op(f, &ops_qdigamma)) {
@@ -4463,7 +4573,23 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     emit_TeX_atom(f, b);
 }
 
+static _Thread_local unsigned expression_output_depth;
+static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec);
+
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    expr_cartesian_composition_t view;
+
+    if (expression_output_depth++ == 0u && expr_cartesian_composition_init(f, &view)) {
+        emit_expr_inner(view.expanded, b, parent_prec);
+        expr_cartesian_composition_clear(&view);
+    } else {
+        emit_expr_inner(f, b, parent_prec);
+    }
+    --expression_output_depth;
+}
+
+static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
         sbuf_puts(b, "0");

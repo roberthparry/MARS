@@ -654,6 +654,7 @@ int expr_get_default_constant_num(const char *name, number_t *value_out);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
 void expr_store_const_num(expr_t *dv, number_t value);
 void expr_store_value_num(expr_t *dv, number_t value);
+/* Return a borrowed cache value; use expr_eval() when the caller needs an owning number. */
 number_t expr_eval_num_internal(const expr_t *dv);
 expr_t *expr_get_dx_internal(const expr_t *dv);
 const expr_t *expr_current_wrt_internal(void);
@@ -1055,6 +1056,7 @@ expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr);
 expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
 expr_t *expr_expand_preserved_for_display(const expr_t *expr);
 expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
+expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
 expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
 bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
                                       bool *has_imaginary_out);

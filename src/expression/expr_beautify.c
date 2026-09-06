@@ -811,6 +811,21 @@ static bool expr_beautify_manifestly_real(const expr_t *expr)
     }
 }
 
+static bool expr_beautify_cartesian_manifestly_real(const expr_t *expr, bool extended);
+
+static bool expr_beautify_cartesian_sum_of_squares(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_op(expr, &ops_add))
+        return expr_beautify_cartesian_sum_of_squares(expr->a) &&
+               expr_beautify_cartesian_sum_of_squares(expr->b);
+    if (expr_is_op(expr, &ops_pow_d) && num_eq(expr->c, NUM_TWO))
+        return expr_beautify_cartesian_manifestly_real(expr->a, true);
+    return expr_is_op(expr, &ops_pow) && expr_is_const(expr->b) && num_eq(expr->b->c, NUM_TWO) &&
+           expr_beautify_cartesian_manifestly_real(expr->a, true);
+}
+
 static bool expr_beautify_cartesian_manifestly_real(const expr_t *expr, bool extended)
 {
     if (!extended)
@@ -834,6 +849,14 @@ static bool expr_beautify_cartesian_manifestly_real(const expr_t *expr, bool ext
 
         case EXPR_KIND_POW_D:
             return expr_beautify_cartesian_manifestly_real(expr->a, true) && num_is_real(expr->c);
+
+        case EXPR_KIND_POW:
+            return (expr_beautify_cartesian_sum_of_squares(expr) ||
+                    (expr_beautify_cartesian_sum_of_squares(expr->a) &&
+                     expr_beautify_cartesian_manifestly_real(expr->b, true)));
+
+        case EXPR_KIND_SUMMATION:
+            return expr_beautify_cartesian_manifestly_real(expr->a, true);
 
         case EXPR_KIND_NEG:
             return expr_beautify_cartesian_manifestly_real(expr->a, true);

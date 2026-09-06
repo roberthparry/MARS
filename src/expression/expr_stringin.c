@@ -873,7 +873,7 @@ static size_t scan_unicode_fraction_len_view(string_view_t view, size_t pos)
 
 static size_t scan_special_number_literal_len_view(string_view_t view, size_t pos)
 {
-    return expr_parse_scan_special_number_len(view, pos, false, true);
+    return expr_parse_scan_special_number_len(view, pos, true, true);
 }
 
 static size_t scan_number_atom_len_view(string_view_t view, size_t pos)
@@ -2527,6 +2527,71 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     return result;
 }
 
+/* A bound index is a declaration, not a lookup in the caller's free-symbol table. */
+static expr_t *parse_finite_index(expr_parse_state_t *p, symtab_t *local_syms)
+{
+    string_t *name;
+    string_t *key;
+    expr_t *index;
+
+    expr_parse_skip_spaces(p);
+    name = read_name_for_syntax_cursor(p->cursor, p->syntax);
+    index = name ? expr_new_named_var_text(NUM_NAN, name) : NULL;
+    key = index ? expr_node_name_as_text(index, name) : NULL;
+    symtab_init(local_syms);
+    if (!key || symtab_clone_borrowed_except_text(local_syms, p->syms, key) != 0 ||
+        symtab_add_borrowed_text(local_syms, key, index) != 0) {
+        symtab_free(local_syms);
+        expr_free(index);
+        index = NULL;
+        set_error(p, "could not declare summation or product index");
+    }
+    string_free(key);
+    string_free(name);
+    return index;
+}
+
+/* Parse sum/product arguments with bounds in the outer scope and the term in the index's scope. */
+static int parse_finite_operator_args(expr_parse_state_t *p, expr_t ***arguments_out, size_t *count_out)
+{
+    expr_t **arguments = calloc(4u, sizeof(*arguments));
+    symtab_t local_syms;
+    symtab_t *outer_syms = p->syms;
+    bool local_ready = false;
+
+    if (!arguments)
+        return 0;
+    arguments[0] = parse_finite_index(p, &local_syms);
+    if (!arguments[0])
+        goto cleanup;
+    local_ready = true;
+    for (size_t i = 1u; i < 4u; ++i) {
+        expr_parse_skip_spaces(p);
+        if (!parse_required_char(p, ',', "expected ',' in sum or product"))
+            goto cleanup;
+        expr_parse_skip_spaces(p);
+        if (i == 3u)
+            p->syms = &local_syms;
+        arguments[i] = parse_addexpr(p);
+        p->syms = outer_syms;
+        if (!arguments[i])
+            goto cleanup;
+    }
+    symtab_free(&local_syms);
+    *arguments_out = arguments;
+    *count_out = 4u;
+    return 1;
+
+cleanup:
+    p->syms = outer_syms;
+    if (local_ready)
+        symtab_free(&local_syms);
+    for (size_t i = 0u; i < 4u; ++i)
+        expr_free(arguments[i]);
+    free(arguments);
+    return 0;
+}
+
 static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematical_notation)
 {
     string_view_t text = expr_parse_text(p);
@@ -2537,6 +2602,8 @@ static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematic
     expr_t *upper = NULL;
     expr_t *term = NULL;
     expr_t *result = NULL;
+    symtab_t local_syms;
+    symtab_t *outer_syms = p->syms;
 
     if (!mathematical_notation &&
         !finite_operator_ascii_standin_starts_view(text, expr_parse_pos(p), &operator_name)) {
@@ -2563,12 +2630,9 @@ static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematic
         parenthesised_lower_bound = expr_parse_consume_char(p, '(');
     }
     expr_parse_skip_spaces(p);
-    index = parse_signed_power_operand(p);
-    if (!index || (!expr_is_var(index) && !expr_is_named_const(index))) {
-        expr_free(index);
-        set_error(p, "expected summation or product index");
+    index = parse_finite_index(p, &local_syms);
+    if (!index)
         return NULL;
-    }
     expr_parse_skip_spaces(p);
     if (!parse_required_char(p, '=', "expected '=' after summation or product index"))
         goto cleanup;
@@ -2592,24 +2656,11 @@ static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematic
             goto cleanup;
     }
     expr_parse_skip_spaces(p);
+    p->syms = &local_syms;
     term = parse_mulexpr(p);
+    p->syms = outer_syms;
     if (!term)
         goto cleanup;
-    if (expr_is_named_const(index)) {
-        const char *index_name = expr_symbol_name(index);
-        expr_t *variable_index = index_name ? expr_new_named_var(NUM_NAN, index_name) : NULL;
-        expr_t *variable_term = variable_index ? expr_substitute(term, index, variable_index) : NULL;
-
-        if (!variable_index || !variable_term) {
-            expr_free(variable_term);
-            expr_free(variable_index);
-            goto cleanup;
-        }
-        expr_free(term);
-        expr_free(index);
-        term = variable_term;
-        index = variable_index;
-    }
     result = operator_name == 'Z' || operator_name == 'z'
                  ? expr_new_finite_summation_range(term, index, lower, upper)
                  : expr_new_finite_product_range(term, index, lower, upper);
@@ -2617,6 +2668,7 @@ static expr_t *parse_finite_operator_atom(expr_parse_state_t *p, bool mathematic
         set_error(p, "could not construct summation or product");
 
 cleanup:
+    symtab_free(&local_syms);
     expr_free(term);
     expr_free(upper);
     expr_free(lower);
@@ -2865,7 +2917,10 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                 expr_t *result;
                 number_t minus_one;
 
-                if (!parse_variadic_args(p, &arguments, &argument_count))
+                const bool binds_index = fe->vfn == expr_finite_sum_from_args || fe->vfn == expr_finite_product_from_args;
+
+                if (!(binds_index ? parse_finite_operator_args(p, &arguments, &argument_count)
+                                 : parse_variadic_args(p, &arguments, &argument_count)))
                     return NULL;
                 if (!parse_required_char(p, ')', "expected ')' after variadic function")) {
                     for (size_t i = 0u; i < argument_count; ++i)
@@ -4110,7 +4165,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
         symtab_t syms;
 
         content_has_top_level_equals = has_top_level_equals(content);
-        expanded_content = expr_expand_series_text(content, series_TeX_out, NULL, NULL, domain_specialised_out);
+        expanded_content = expr_expand_series_text(content, series_TeX_out, NULL, NULL, domain_specialised_out, NULL);
         if (!expanded_content) {
             string_free(errmsg);
             return NULL;
@@ -4224,7 +4279,7 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
     }
 
     expanded_expr = expr_expand_series_text(expr_view, series_TeX_out, expr_series_lookup_binding, &syms,
-                                            domain_specialised_out);
+                                            domain_specialised_out, NULL);
     if (!expanded_expr) {
         symtab_free(&syms);
         string_free(errmsg);

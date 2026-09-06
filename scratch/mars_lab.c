@@ -1699,23 +1699,6 @@ static bool expression_evaluation_ready(const expr_t *expr)
     return expr != NULL;
 }
 
-static void print_expression_bindings(const char *label, const char *expression_text, int precision)
-{
-    expr_bindings_t *bindings = NULL;
-    expr_t *expr;
-
-    if (!expression_text)
-        return;
-
-    expr = expr_from_string(expression_text, &bindings);
-    if (!expr)
-        return;
-
-    print_bindings(label, bindings, precision);
-    expr_free(expr);
-    expr_bindings_free(bindings);
-}
-
 static void print_expression_tree_bindings(const char *label, const expr_t *expr, int precision)
 {
     expr_bindings_t *bindings = expr_bindings_from_expr_internal(expr);
@@ -2154,7 +2137,7 @@ int main(int argc, char **argv)
         printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
         printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
-        print_expression_bindings("derivative_binding", deriv_text, precision);
+        print_expression_tree_bindings("derivative_binding", deriv, precision);
         if (deriv_values_text)
             printf("d values     %s\n", deriv_values_text);
         else {

@@ -253,12 +253,14 @@ equation_t *equ_from_text(const string_t *text)
     expr_t *lhs = NULL;
     expr_t *rhs = NULL;
     equation_t *equation = NULL;
+    bool lhs_power_series = false;
+    bool rhs_power_series = false;
 
     if (!equ_parse_parts(text, &parts))
         return NULL;
 
-    expanded_lhs = expr_expand_series_text(parts.lhs, &lhs_display_TeX, NULL, NULL, NULL);
-    expanded_rhs = expr_expand_series_text(parts.rhs, &rhs_display_TeX, NULL, NULL, NULL);
+    expanded_lhs = expr_expand_series_text(parts.lhs, &lhs_display_TeX, NULL, NULL, NULL, &lhs_power_series);
+    expanded_rhs = expr_expand_series_text(parts.rhs, &rhs_display_TeX, NULL, NULL, NULL, &rhs_power_series);
     if (!expanded_lhs || !expanded_rhs)
         goto cleanup;
     parts.lhs = string_view_all(expanded_lhs);
@@ -292,6 +294,7 @@ equation_t *equ_from_text(const string_t *text)
     if (!equation)
         goto cleanup;
     bindings = NULL;
+    equ_set_power_series_domain(equation, lhs_power_series || rhs_power_series);
     if (equ_set_display_TeX(equation, lhs_display_TeX, rhs_display_TeX) != 0) {
         equ_free(equation);
         equation = NULL;

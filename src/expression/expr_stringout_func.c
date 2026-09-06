@@ -377,6 +377,10 @@ static bool function_temporary_table_append(function_temporary_table_t *table, c
     bool is_constant = function_node_is_constant(node);
     size_t ordinal = 1u;
 
+    /* Bounds and argument packs are syntax metadata, never standalone expressions. */
+    if (expr_is_op(node, &ops_argument_list) || expr_is_op(node, &ops_hypergeometric_pFq_pack))
+        return true;
+
     if (table->count == table->capacity) {
         size_t capacity = table->capacity ? table->capacity * 2u : 16u;
         const expr_t **nodes = realloc(table->nodes, capacity * sizeof(*nodes));
@@ -485,10 +489,10 @@ static size_t function_count_uncached_occurrences(const expr_t *node, const expr
 {
     if (!node || !candidate)
         return 0u;
-    if (node != candidate && function_temporary_table_contains(temporaries, node))
-        return 0u;
     if (node == candidate || expr_struct_eq(node, candidate))
         return 1u;
+    if (function_temporary_table_contains(temporaries, node))
+        return 0u;
     return function_count_uncached_occurrences(node->a, candidate, temporaries) +
            function_count_uncached_occurrences(node->b, candidate, temporaries);
 }
@@ -507,6 +511,52 @@ static bool function_temporary_table_caches_exp_of(const function_temporary_tabl
     return false;
 }
 
+static void function_prune_single_use_temporaries(function_temporary_table_t *table,
+                                                  const expr_t *const *roots, size_t count)
+{
+    for (size_t index = table->count; index-- > 0u;) {
+        const expr_t *candidate = table->nodes[index];
+        size_t uses = 0u;
+        sbuf_t text;
+
+        for (size_t root = 0u; root < count; ++root)
+            uses += function_count_uncached_occurrences(roots[root], candidate, table);
+        for (size_t other = 0u; other < table->count; ++other) {
+            if (other != index) {
+                uses += function_count_uncached_occurrences(table->nodes[other]->a, candidate, table);
+                uses += function_count_uncached_occurrences(table->nodes[other]->b, candidate, table);
+            }
+        }
+        if (uses >= 2u)
+            continue;
+        sbuf_init(&text);
+        emit_func_with_temporaries(candidate, &text, PREC_LOWEST, table->nodes,
+                                   (const char *const *)table->names, table->count, candidate);
+        bool short_value = sbuf_len(&text) <= 64u;
+
+        sbuf_free(&text);
+        if (uses != 0u && !short_value)
+            continue;
+        free(table->names[index]);
+        for (size_t move = index + 1u; move < table->count; ++move) {
+            table->nodes[move - 1u] = table->nodes[move];
+            table->names[move - 1u] = table->names[move];
+            table->constants[move - 1u] = table->constants[move];
+        }
+        --table->count;
+    }
+}
+
+static bool function_small_subtree(const expr_t *node, size_t *budget)
+{
+    if (!node)
+        return true;
+    if (*budget == 0u)
+        return false;
+    --*budget;
+    return function_small_subtree(node->a, budget) && function_small_subtree(node->b, budget);
+}
+
 static bool function_collect_shared_temporaries(const expr_t *node, const expr_t *root,
                                                 const function_dag_table_t *dag,
                                                 function_temporary_table_t *temporaries,
@@ -514,11 +564,13 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
 {
     const expr_t *first_child;
     size_t dag_index;
+    size_t inline_budget = 8u;
 
     if (!node || expr_is_const(node) || expr_is_var(node) || function_temporary_table_contains(temporaries, node))
         return true;
     dag_index = function_dag_table_find(dag, node);
-    if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u && expr_is_op(node, &ops_exp))
+    if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u && expr_is_op(node, &ops_exp) &&
+        function_small_subtree(node->a, &inline_budget))
         return function_temporary_table_append(temporaries, node, variables, constants);
     if (node != root && dag_index != (size_t)-1 && dag->incoming[dag_index] >= 2u &&
         function_temporary_table_caches_exp_of(temporaries, node) &&
@@ -774,7 +826,21 @@ expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *
         expr_function_temporaries_free(plan);
         return NULL;
     }
+    function_prune_single_use_temporaries(&plan->temporaries, roots, count);
     function_temporary_table_group_constants(&plan->temporaries);
+    size_t variable_ordinal = 1u;
+    size_t constant_ordinal = 1u;
+    for (size_t index = 0u; index < plan->temporaries.count; ++index) {
+        char name[48];
+        bool constant = plan->temporaries.constants[index];
+        size_t *ordinal = constant ? &constant_ordinal : &variable_ordinal;
+
+        do {
+            snprintf(name, sizeof(name), "%c%zu", constant ? 'c' : 'v', (*ordinal)++);
+        } while (!function_temporary_name_is_available(name, &plan->variables, &plan->constants));
+        free(plan->temporaries.names[index]);
+        plan->temporaries.names[index] = expr_tostring_xstrdup(name);
+    }
     return plan;
 }
 
@@ -849,9 +915,18 @@ string_t *expr_to_text_function_cartesian(const expr_t *f)
     varlist_t cl;
     string_t *out = NULL;
     bool has_imaginary = false;
+    char real_name[48] = "p";
+    char imaginary_name[48] = "q";
 
-    if (!f || !expr_cartesian_parts_for_display(f, &real, &imaginary, &has_imaginary) || !has_imaginary)
+    /* Preserve already separated series instead of re-simplifying their coefficients independently. */
+    if (f && expr_is_op(f, &ops_add) && expr_is_op(f->b, &ops_mul) &&
+        expr_is_const(f->b->b) && num_eq(f->b->b->c, NUM_I)) {
+        real = expr_clone(f->a);
+        imaginary = expr_clone(f->b->a);
+        has_imaginary = true;
+    } else if (!f || !expr_cartesian_parts_for_display(f, &real, &imaginary, &has_imaginary) || !has_imaginary) {
         goto cleanup;
+    }
 
     roots[0] = real;
     roots[1] = imaginary;
@@ -871,15 +946,28 @@ string_t *expr_to_text_function_cartesian(const expr_t *f)
     find_explicit_named_consts_dfs(f, &cl);
     find_named_consts_dfs(f, &cl);
 
+    for (size_t index = 1u; !function_temporary_name_is_available(real_name, &vl, &cl); ++index)
+        snprintf(real_name, sizeof(real_name), "p%zu", index);
+    for (size_t index = 1u; !function_temporary_name_is_available(imaginary_name, &vl, &cl); ++index)
+        snprintf(imaginary_name, sizeof(imaginary_name), "q%zu", index);
+
     sbuf_puts(&b, "expression expr(");
     emit_function_param_list(&b, &vl, &cl);
     sbuf_puts(&b, ") {\n");
     sbuf_puts(&b, string_c_str(declarations));
-    sbuf_puts(&b, "    p = ");
+    sbuf_puts(&b, "    ");
+    sbuf_puts(&b, real_name);
+    sbuf_puts(&b, " = ");
     sbuf_puts(&b, string_c_str(real_text));
-    sbuf_puts(&b, ".\n    q = ");
+    sbuf_puts(&b, ".\n    ");
+    sbuf_puts(&b, imaginary_name);
+    sbuf_puts(&b, " = ");
     sbuf_puts(&b, string_c_str(imaginary_text));
-    sbuf_puts(&b, ".\n\n    return p + q.i.\n}\n\n");
+    sbuf_puts(&b, ".\n\n    return ");
+    sbuf_puts(&b, real_name);
+    sbuf_puts(&b, " + ");
+    sbuf_puts(&b, imaginary_name);
+    sbuf_puts(&b, ".i.\n}\n\n");
     emit_bindings(&b, &vl, false);
     emit_bindings(&b, &cl, true);
     sbuf_puts(&b, "output(expr(");
@@ -933,6 +1021,7 @@ char *expr_to_function_body(const expr_t *expr)
 
 string_t *expr_to_text_function(const expr_t *f)
 {
+    expr_cartesian_composition_t view;
     sbuf_t b;
     autoname_table_t vnames;
     varlist_t vl;
@@ -940,6 +1029,13 @@ string_t *expr_to_text_function(const expr_t *f)
     const expr_t *g = f;
     const char *fname = "expr";
     string_t *out;
+
+    if (expr_cartesian_composition_init(f, &view)) {
+        out = expr_to_text_function_cartesian(view.expanded);
+        expr_cartesian_composition_clear(&view);
+        if (out)
+            return out;
+    }
 
     sbuf_init(&b);
 
