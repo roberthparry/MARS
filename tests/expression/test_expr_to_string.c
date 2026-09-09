@@ -1856,7 +1856,7 @@ static void test_to_string_function_style_preserves_math_names(void)
                          "\n"
                          "x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.\n"
                          "y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.\n"
-                         "const c₀ = @gamma.\n"
+                         "const c₀ = @eulermascheroni.\n"
                          "output(expr(x, y, c₀)).";
 
     if (str_eq(got, expect))

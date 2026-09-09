@@ -16,15 +16,25 @@ typedef struct expr_default_constant_alias {
 } expr_default_constant_alias_t;
 
 enum {
-    EXPR_DEFAULT_ALIAS_HASH_SIZE = 13,
-    EXPR_DEFAULT_ALIAS_HASH_SEED = 864u,
+    EXPR_DEFAULT_ALIAS_HASH_SIZE = 15,
+    EXPR_DEFAULT_ALIAS_HASH_SEED = 931u,
     EXPR_DEFAULT_ALIAS_HASH_MUL = 2654435761u
 };
 
 static const expr_default_constant_alias_t s_default_constant_aliases[EXPR_DEFAULT_ALIAS_HASH_SIZE] = {
-    [0] = {"π", "@pi"},  [2] = {"@gamma", "@gamma"}, [3] = {"@phi", "@phi"},     [4] = {"τ", "@tau"},
-    [5] = {"pi", "@pi"}, [6] = {"φ", "@phi"},        [7] = {"@tau", "@tau"},     [8] = {"@pi", "@pi"},
-    [9] = {"i", "i"},    [10] = {"phi", "@phi"},     [11] = {"gamma", "@gamma"}, [12] = {"γ", "@gamma"},
+    [0]  = {"@phi",            "@phi"},
+    [1]  = {"@eulermascheroni", "@gamma"},
+    [2]  = {"pi",              "@pi"},
+    [3]  = {"phi",             "@phi"},
+    [4]  = {"@pi",             "@pi"},
+    [5]  = {"i",               "i"},
+    [6]  = {"π",               "@pi"},
+    [7]  = {"@gamma",          "@gamma"},
+    [8]  = {"φ",               "@phi"},
+    [9]  = {"@tau",            "@tau"},
+    [10] = {"τ",               "@tau"},
+    [11] = {"γ",               "@gamma"},
+    [14] = {"gamma",           "@gamma"},
 };
 
 static size_t expr_default_constant_alias_hash(const string_t *name)

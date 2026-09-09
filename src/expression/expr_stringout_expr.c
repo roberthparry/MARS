@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "expr_bindings.h"
 #include "expr_stringout.h"
@@ -86,6 +87,80 @@ string_t *expr_to_text_expr(const expr_t *f)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
+    return out;
+}
+
+static void emit_conditioned_bindings(sbuf_t *buffer, const varlist_t *bindings)
+{
+    for (size_t i = 0u; i < bindings->count; ++i) {
+        const expr_t *binding = bindings->vars[i];
+        char *value = binding_rhs_expr_string_local(binding);
+
+        if (i)
+            sbuf_puts(buffer, ", ");
+        emit_name(buffer, expr_name_or_default(binding, "x"));
+        sbuf_puts(buffer, " = ");
+        sbuf_puts(buffer, value && strcmp(value, "NAN") != 0 ? value : "?");
+        free(value);
+    }
+}
+
+static void emit_conditioned_case(sbuf_t *buffer, const expr_t *body, const expr_t *order,
+                                  const char *comparison, const varlist_t *variables, const varlist_t *constants)
+{
+    sbuf_puts(buffer, "{ ");
+    emit_expr(body, buffer, PREC_LOWEST);
+    sbuf_puts(buffer, " | ");
+    emit_conditioned_bindings(buffer, variables);
+    sbuf_puts(buffer, "; ");
+    emit_conditioned_bindings(buffer, constants);
+    sbuf_puts(buffer, "; ");
+    emit_expr(order, buffer, PREC_LOWEST);
+    sbuf_puts(buffer, comparison);
+    sbuf_puts(buffer, " }");
+}
+
+/* Render finite-series cases for display without changing the parseable source expression. */
+char *expr_conditioned_cases_to_string(const expr_t *expr)
+{
+    const expr_t *order = NULL;
+    const expr_t *endpoint = NULL;
+    expr_t *digamma;
+    expr_t *gamma;
+    expr_t *harmonic;
+    autoname_table_t names;
+    varlist_t variables;
+    varlist_t constants;
+    sbuf_t buffer;
+    char *out;
+
+    if (!expr_series_zeta_difference_parts(expr, &order, &endpoint))
+        return NULL;
+    digamma = expr_digamma(endpoint);
+    gamma = expr_from_string("gamma", NULL);
+    harmonic = digamma && gamma ? expr_add(digamma, gamma) : NULL;
+    expr_free(digamma);
+    expr_free(gamma);
+    if (!harmonic)
+        return NULL;
+
+    autoname_init(&names);
+    assign_unnamed_vars_dfs((expr_t *)expr, &names);
+    varlist_init(&variables);
+    varlist_init(&constants);
+    find_vars_dfs(expr, &variables);
+    find_explicit_named_consts_dfs(expr, &constants);
+    find_named_consts_dfs(expr, &constants);
+    sbuf_init(&buffer);
+    emit_conditioned_case(&buffer, harmonic, order, " = 1", &variables, &constants);
+    sbuf_putc(&buffer, '\n');
+    emit_conditioned_case(&buffer, expr, order, " ≠ 1", &variables, &constants);
+    out = sbuf_to_c_string(&buffer);
+    sbuf_free(&buffer);
+    free(variables.vars);
+    free(constants.vars);
+    autoname_restore(&names);
+    expr_free(harmonic);
     return out;
 }
 

@@ -4400,7 +4400,8 @@ expr_t *expr_from_function_body(const char *source, expr_bindings_t **bnd_out)
     return result;
 }
 
-static bool expr_series_zeta_difference_parts(const expr_t *result, const expr_t **parameter_out,
+/* Borrow the common order and endpoint of a Riemann/Hurwitz zeta difference. */
+bool expr_series_zeta_difference_parts(const expr_t *result, const expr_t **parameter_out,
                                               const expr_t **endpoint_out)
 {
     const expr_t *left = NULL;
@@ -4408,8 +4409,21 @@ static bool expr_series_zeta_difference_parts(const expr_t *result, const expr_t
     bool subtract = false;
 
     if (!result || !parameter_out || !endpoint_out ||
-        !expr_match_add_sub_expr(result, &left, &right, &subtract) || !subtract || !left || !right ||
-        !expr_is_op(left, &ops_zeta) || !expr_is_op(right, &ops_zetah) || !left->a || !right->a || !right->b ||
+        !expr_match_add_sub_expr(result, &left, &right, &subtract) || !left || !right)
+        return false;
+    if (!subtract) {
+        if (expr_is_neg(right)) {
+            right = right->a;
+        } else if (expr_is_neg(left)) {
+            const expr_t *negative = left->a;
+
+            left = right;
+            right = negative;
+        } else {
+            return false;
+        }
+    }
+    if (!expr_is_op(left, &ops_zeta) || !expr_is_op(right, &ops_zetah) || !left->a || !right->a || !right->b ||
         !expr_struct_eq(left->a, right->a)) {
         return false;
     }

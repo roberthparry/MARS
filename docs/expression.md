@@ -967,7 +967,7 @@ expression expr(x, y, const c₀) {
 
 x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.
 y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165.
-const c₀ = @gamma.
+const c₀ = @eulermascheroni.
 output(expr(x, y, c₀)).
 ```
 
@@ -1016,6 +1016,36 @@ convergent numerical value is supplied, including after bindings change.
 Explicit `sum` and `@Z` forms follow the same rule. Analytic continuation is
 available through an explicit zeta expression, not an implicit reinterpretation
 of the sum.
+In Expression mode, the Lab's Rendered TeX card also displays the corresponding
+Riemann or Hurwitz zeta identity with its real-part convergence restriction.
+The Expression card retains the sum. For a recognised infinite power sum at the
+function's root, Function output emits an explicit real-part convergence check:
+the convergent branch returns the zeta closed form, while the other branch returns
+`@nan` with a comment explaining that the series has no convergent value there.
+The check uses the symbolic order, not its supplied binding. This guarded
+representation does not extend the domain used by the Value card. Finite sums
+and unrecognised infinite sums keep their existing Function representations,
+except that a finite Riemann/Hurwitz zeta difference emits its removable-pole
+case explicitly: at order one it returns the endpoint's digamma plus Euler's
+constant, and otherwise returns the zeta difference. This is not an infinite-sum
+convergence restriction; finite power sums do not require real part greater than
+one. The guard remains symbolic even when an order binding is supplied.
+For these finite zeta differences, the Lab's Expression card displays two
+conditioned expressions on separate lines. Each uses the differential-equation
+layout: body, a vertical bar, variable bindings, constant bindings and conditions,
+with semicolons separating the three latter sections. Both lines repeat the
+bindings; the first carries order equal to one and the second order unequal to
+one. The native renderer supplies the entire display. This is currently a
+display-only case listing, not new expression input syntax: the editor and
+Use as input retain the original parseable expression.
+The editable input bindings remain separate from the result-card bindings:
+selecting a special-case result must not remove a parameter from the original
+input's binding boxes.
+Known limitation: a supplied order of one can still select the harmonic-number
+formula before rendering, removing the generic case split from the result cards.
+The TeX identity then omits its required order-one condition. The numerical value
+is unaffected, but preserving the symbolic conditions across this path remains
+outstanding.
 Finite prime-power prefixes beginning with the primes two, three and five are
 also recognised, provided every written prime is consecutive and the terminal
 prime lies beyond the prefix. They become native finite sums filtered by the
@@ -1174,7 +1204,8 @@ bindings.
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
 
   In the no-binding form, the default inference rule is:
-  - constants with built-in values: `e`, `i`, `pi`, `π`, `@pi`, `phi`, `@phi`, `gamma`, and `@gamma`
+  - constants with built-in values: `e`, `i`, `pi`, `π`, `@pi`, `phi`, `@phi`, `gamma`, `@gamma`, and `@eulermascheroni`.
+    Function output uses `@eulermascheroni` for the immortal Euler–Mascheroni constant; the older gamma aliases remain accepted.
   - constant placeholders: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
   - variables: everything else that is a valid symbolic `expr` name, including `x`, `τ`, `@tau`, and bracketed names like `[radius]`
 

@@ -4380,7 +4380,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const expandCardButtons = Array.from(document.querySelectorAll('[data-expand-card]'));
     const zoomButtons = Array.from(document.querySelectorAll('[data-zoom-step], [data-zoom-reset]'));
     const MARS_FUNCTION_KEYWORDS = new Set([
-      'array', 'const', 'equation', 'expression', 'i', 'matrix', 'return'
+      'array', 'const', 'else', 'equation', 'expression', 'i', 'if', 'matrix', 'return'
     ]);
     const MARS_FUNCTION_CONSTANTS = new Set(['NAN', 'e', 'pi', 'π']);
     const RESULT_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
@@ -9779,7 +9779,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           continue;
         }
 
-        const namedConstantMatch = source.slice(index).match(/^@(?:pi|phi|gamma|tau|inf)\b/u);
+        const namedConstantMatch = source.slice(index).match(/^@(?:pi|phi|gamma|eulermascheroni|tau|inf|nan)\b/u);
         if (namedConstantMatch) {
           appendFunctionToken(fragment, namedConstantMatch[0], 'function-token-constant');
           index += namedConstantMatch[0].length;
@@ -13674,6 +13674,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
     patterns = {
         "input": r"^input\s+(.*)$",
         "expression": r"^expression\s{2,}(.*)$",
+        "conditioned_expression": r"^conditioned_expression\s{2,}(.*)$",
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
@@ -13711,6 +13712,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
             "tex",
             "derivation_TeX",
             "root_function",
+            "conditioned_expression",
             "derivative_function",
             "derivative_TeX",
             "integral_function",
@@ -15479,7 +15481,16 @@ def merge_algebraic_expression_fields(
         )
         fields[f"{prefix}_TeX"] = algebraic_fields.get(f"{prefix}_TeX", fields.get(f"{prefix}_TeX", ""))
 
-    return bindings, result_sources
+    # The editable input still contains parameters eliminated by a domain-specific
+    # result. Keep its bindings separate from the simplified result-card bindings.
+    input_bindings = expression_card_binding_values(
+        source_expression,
+        algebraic_fields.get("expression", ""),
+        bound_expression,
+        fields.get("bindings"),
+        precision,
+    )
+    return input_bindings, result_sources
 
 
 def goal_seek_expression(
@@ -15537,7 +15548,7 @@ def prepare_evaluation_fields(
     wrt: str = "x",
     action: str = "",
 ) -> dict[str, object]:
-    card_binding_values: list[dict[str, str]] | None = None
+    input_binding_values: list[dict[str, str]] | None = None
     algebraic_result_sources: dict[str, str] = {}
 
     if action != "binding-edit":
@@ -15555,7 +15566,7 @@ def prepare_evaluation_fields(
             algebraic_fields = {}
             algebraic_returncode = 1
         if algebraic_returncode == 0:
-            card_binding_values, algebraic_result_sources = merge_algebraic_expression_fields(
+            input_binding_values, algebraic_result_sources = merge_algebraic_expression_fields(
                 fields,
                 algebraic_fields,
                 expression,
@@ -15576,7 +15587,7 @@ def prepare_evaluation_fields(
                 if result_returncode == 0 and result_value != "?":
                     fields[f"{prefix}_value"] = result_fields["value"]
             if (
-                not card_binding_values
+                not input_binding_values
                 and fields.get("unbound")
                 and numeric_value_for_display(str(fields.get("value") or "")) == "?"
             ):
@@ -15611,7 +15622,9 @@ def prepare_evaluation_fields(
         save_state_expression(expression_for_editor(expression))
 
     display_expression_source = fields.get("root_expression", "") or fields.get("expression", "") or fields.get("unbound", "")
-    fields["full_display_expression"] = expression_for_display(display_expression_source)
+    fields["full_display_expression"] = (
+        fields.get("conditioned_expression") or expression_for_display(display_expression_source)
+    )
     fields["full_display_TeX"] = TeX_for_display(
         fields.get("derivation_TeX", "") or fields.get("root_TeX", "") or fields.get("tex", "")
     )
@@ -15667,8 +15680,8 @@ def prepare_evaluation_fields(
     symbolic_binding_values = expression_variable_binding_values(str(fields.get("expression") or expression), precision)
     native_binding_values = mars_binding_values(fields.get("bindings"))
     fields["binding_values"] = (
-        card_binding_values
-        if card_binding_values is not None
+        input_binding_values
+        if input_binding_values is not None
         else (authored_binding_values or native_binding_values or symbolic_binding_values)
     )
     fields["derivative_binding_values"] = mars_binding_values(

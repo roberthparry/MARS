@@ -561,7 +561,8 @@ static string_t *read_simple_name(string_cursor_t *cursor, bool allow_plain_lett
 string_t *expr_parse_read_name(string_cursor_t *cursor, bool allow_plain_letters_after_first)
 {
     static const expr_parse_literal_t special_names[] = {
-        {.text = "@pi"}, {.text = "@phi"}, {.text = "@gamma"}, {.text = "@tau"}, {.text = "pi"}};
+        {.text = "@pi"}, {.text = "@phi"}, {.text = "@gamma"}, {.text = "@tau"},
+        {.text = "@eulermascheroni"}, {.text = "pi"}};
     unsigned char b;
 
     if (!cursor)

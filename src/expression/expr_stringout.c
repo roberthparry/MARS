@@ -1386,7 +1386,7 @@ static bool emit_func_exponential_integral_cartesian(const expr_t *f, sbuf_t *b,
     }
     if (parenthesise)
         sbuf_putc(b, '(');
-    sbuf_puts(b, "@gamma + ln(");
+    sbuf_puts(b, "@eulermascheroni + ln(");
     emit_func(real, b, PREC_LOWEST);
     sbuf_puts(b, "^2 + ");
     emit_func(imaginary, b, PREC_LOWEST);
@@ -1662,7 +1662,7 @@ bool emit_func_integral_cartesian_body(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, '.');
     sbuf_puts(b, logarithmic_integral ? log_angle : angle);
     sbuf_puts(b, ".\n");
-    sbuf_puts(b, "    p = @gamma + ln(");
+    sbuf_puts(b, "    p = @eulermascheroni + ln(");
     sbuf_puts(b, logarithmic_integral ? log_radius : radius);
     sbuf_puts(b, ")/2 + sum(");
     sbuf_puts(b, index);
@@ -5229,7 +5229,7 @@ void emit_func_fragment(sbuf_t *b, const char *text)
     } named_constants[] = {
         {"π", "@pi"},
         {"φ", "@phi"},
-        {"γ", "@gamma"},
+        {"γ", "@eulermascheroni"},
         {"τ", "@tau"},
     };
     char *normalised;
@@ -5241,17 +5241,24 @@ void emit_func_fragment(sbuf_t *b, const char *text)
         return;
 
     input_length = strlen(text);
-    if (input_length > ((size_t)-1 - 1u) / 3u) {
+    if (input_length > ((size_t)-1 - 1u) / 9u) {
         sbuf_puts(b, text);
         return;
     }
-    normalised = malloc(input_length * 3u + 1u);
+    normalised = malloc(input_length * 9u + 1u);
     if (!normalised) {
         sbuf_puts(b, text);
         return;
     }
 
     while (text[input_index] != '\0') {
+        if (strncmp(text + input_index, "@gamma", 6u) == 0 &&
+            !isalnum((unsigned char)text[input_index + 6u]) && text[input_index + 6u] != '_') {
+            strcpy(normalised + output_index, "@eulermascheroni");
+            output_index += strlen("@eulermascheroni");
+            input_index += 6u;
+            continue;
+        }
         size_t fraction_width = function_ascii_stacked_fraction(normalised + output_index, text + input_index);
         bool emitted_named_constant = false;
 
@@ -5386,8 +5393,14 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
                 emit_func_fragment(b, text);
                 free(text);
             }
-        } else if (f->name && *f->name)
-            emit_name_func(b, f->name);
+        } else if (f->name && *f->name) {
+            const char *canonical = expr_default_constant_canonical_name(f->name);
+
+            if (canonical && strcmp(canonical, "@gamma") == 0)
+                sbuf_puts(b, "@eulermascheroni");
+            else
+                emit_name_func(b, f->name);
+        }
         else {
             char *text = expr_const_to_string_local(f);
             if (text) {
