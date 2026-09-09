@@ -961,9 +961,9 @@ void print_current_input_matrix(void)
     }
 }
 
-void check_d(const char *label, double got, double expected, double tol)
+void check_d(const char *label, double got, double want, double tol)
 {
-    double err = fabs(got - expected);
+    double err = fabs(got - want);
     int ok = err < tol;
 
     if (!ok)
@@ -973,16 +973,16 @@ void check_d(const char *label, double got, double expected, double tol)
 
     char gbuf[256], ebuf[256];
     d_to_coloured_string(got, gbuf, sizeof(gbuf));
-    d_to_coloured_string(expected, ebuf, sizeof(ebuf));
+    d_to_coloured_string(want, ebuf, sizeof(ebuf));
 
     printf("    got      = %s\n", gbuf);
-    printf("    expected = %s\n", ebuf);
+    printf("    want = %s\n", ebuf);
     printf("    error    = %.16g\n", err);
 }
 
-void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol)
+void check_qf_val(const char *label, qfloat_t got, qfloat_t want, double tol)
 {
-    qfloat_t diff = qf_abs(qf_sub(got, expected));
+    qfloat_t diff = qf_abs(qf_sub(got, want));
     double err = diff.hi;
     int ok = err < tol;
 
@@ -992,18 +992,18 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_mp_real("got      ", got);
-    print_mp_real("expected ", expected);
+    print_mp_real("want ", want);
     printf("    error    = %.16g\n", err);
 }
 
-void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double tol)
+void check_qc_val(const char *label, qcomplex_t got, qcomplex_t want, double tol)
 {
     double got_re = qf_to_double(qc_real(got));
     double got_im = qf_to_double(qc_imag(got));
-    double exp_re = qf_to_double(qc_real(expected));
-    double exp_im = qf_to_double(qc_imag(expected));
+    double exp_re = qf_to_double(qc_real(want));
+    double exp_im = qf_to_double(qc_imag(want));
     int both_nan = isnan(got_re) && isnan(got_im) && isnan(exp_re) && isnan(exp_im);
-    double err = both_nan ? 0.0 : qf_to_double(qc_abs(qc_sub(got, expected)));
+    double err = both_nan ? 0.0 : qf_to_double(qc_abs(qc_sub(got, want)));
     int ok = both_nan || err < tol;
 
     if (!ok)
@@ -1012,7 +1012,7 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_complex("got      ", got);
-    print_complex("expected ", expected);
+    print_complex("want ", want);
     printf("    error    = %.16g\n", err);
 }
 

@@ -313,8 +313,8 @@ static void test_from_string_series_ellipsis(void)
     const char *source = "1 + 1/2^2 + 1/3^2 + 1/4^2 + ... + 1/2000^2";
     string_t *derivation_TeX = NULL;
     expr_t *expression = expr_from_string_with_derivation_TeX(source, NULL, &derivation_TeX);
-    number_t expected = num_clone(NUM_ZERO);
-    number_t actual;
+    number_t want = num_clone(NUM_ZERO);
+    number_t got;
     char *expression_text;
     char *function_text;
     expr_bindings_t *bindings = NULL;
@@ -617,7 +617,7 @@ static void test_from_string_series_ellipsis(void)
         expr_t *product = expr_from_string_with_derivation_TeX(product_source, NULL, &product_derivation_TeX);
         char *product_text;
         number_t product_value;
-        number_t product_expected = num_create_from_string("11/2");
+        number_t product_want = num_create_from_string("11/2");
 
         ASSERT_NOT_NULL(product);
         ASSERT_NOT_NULL(product_derivation_TeX);
@@ -629,8 +629,8 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX), "\\frac{10+1}{2}"));
         product_value = expr_eval(product);
         ASSERT_TRUE(num_is_exact(product_value));
-        ASSERT_TRUE(num_eq(product_value, product_expected));
-        num_destroy(&product_expected);
+        ASSERT_TRUE(num_eq(product_value, product_want));
+        num_destroy(&product_want);
         num_destroy(&product_value);
         free(product_text);
         expr_free(product);
@@ -713,7 +713,7 @@ static void test_from_string_series_ellipsis(void)
         char *sine_progression_text;
         expr_t *bound_sine_progression;
         number_t sine_progression_value;
-        double expected_value = 0.0;
+        double want_value = 0.0;
 
         ASSERT_NOT_NULL(sine_progression);
         ASSERT_NOT_NULL(sine_progression_derivation_TeX);
@@ -735,9 +735,9 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(bound_sine_progression);
         sine_progression_value = expr_eval(bound_sine_progression);
         for (long k = 1L; k <= 4L; ++k)
-            expected_value += sin((double)k);
+            want_value += sin((double)k);
         ASSERT_TRUE(num_is_finite(sine_progression_value));
-        ASSERT_EQ_DOUBLE(num_to_double(sine_progression_value), expected_value, 1e-15);
+        ASSERT_EQ_DOUBLE(num_to_double(sine_progression_value), want_value, 1e-15);
         num_destroy(&sine_progression_value);
         expr_free(bound_sine_progression);
     }
@@ -780,7 +780,7 @@ static void test_from_string_series_ellipsis(void)
         char *cosine_progression_text;
         expr_t *bound_cosine_progression;
         number_t cosine_progression_value;
-        double expected_value = 0.0;
+        double want_value = 0.0;
 
         ASSERT_NOT_NULL(cosine_progression);
         ASSERT_NOT_NULL(cosine_progression_derivation_TeX);
@@ -800,9 +800,9 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(bound_cosine_progression);
         cosine_progression_value = expr_eval(bound_cosine_progression);
         for (long k = 1L; k <= 4L; ++k)
-            expected_value += cos(0.5 * (double)k);
+            want_value += cos(0.5 * (double)k);
         ASSERT_TRUE(num_is_finite(cosine_progression_value));
-        ASSERT_EQ_DOUBLE(num_to_double(cosine_progression_value), expected_value, 1e-15);
+        ASSERT_EQ_DOUBLE(num_to_double(cosine_progression_value), want_value, 1e-15);
         num_destroy(&cosine_progression_value);
         expr_free(bound_cosine_progression);
 
@@ -839,7 +839,7 @@ static void test_from_string_series_ellipsis(void)
             char *hyperbolic_text;
             expr_t *bound_hyperbolic_progression;
             number_t hyperbolic_value;
-            double expected_hyperbolic_value = 0.0;
+            double want_hyperbolic_value = 0.0;
 
             ASSERT_NOT_NULL(hyperbolic_progression);
             ASSERT_NOT_NULL(hyperbolic_derivation_TeX);
@@ -858,10 +858,10 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(bound_hyperbolic_progression);
             hyperbolic_value = expr_eval(bound_hyperbolic_progression);
             for (long k = 1L; k <= 4L; ++k)
-                expected_hyperbolic_value += hyperbolic_kind == 0u ? sinh(0.25 * (double)k)
+                want_hyperbolic_value += hyperbolic_kind == 0u ? sinh(0.25 * (double)k)
                                                                    : cosh(0.25 * (double)k);
             ASSERT_TRUE(num_is_finite(hyperbolic_value));
-            ASSERT_EQ_DOUBLE(num_to_double(hyperbolic_value), expected_hyperbolic_value, 1e-15);
+            ASSERT_EQ_DOUBLE(num_to_double(hyperbolic_value), want_hyperbolic_value, 1e-15);
             num_destroy(&hyperbolic_value);
             expr_free(bound_hyperbolic_progression);
 
@@ -931,21 +931,21 @@ static void test_from_string_series_ellipsis(void)
         number_t index_value = num_create_from_long(index);
         number_t denominator = num_pow_int(index_value, 2);
         number_t term = num_div(NUM_ONE, denominator);
-        number_t updated = num_add(expected, term);
+        number_t updated = num_add(want, term);
 
-        num_destroy(&expected);
-        expected = updated;
+        num_destroy(&want);
+        want = updated;
         num_destroy(&term);
         num_destroy(&denominator);
         num_destroy(&index_value);
     }
 
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_finite(actual));
-    ASSERT_EQ_DOUBLE(num_to_double(actual), num_to_double(expected), 1e-15);
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(got));
+    ASSERT_EQ_DOUBLE(num_to_double(got), num_to_double(want), 1e-15);
 
-    num_destroy(&actual);
-    num_destroy(&expected);
+    num_destroy(&got);
+    num_destroy(&want);
     expr_free(expression);
     string_free(derivation_TeX);
 
@@ -954,15 +954,15 @@ static void test_from_string_series_ellipsis(void)
                                                        &derivation_TeX);
     ASSERT_NOT_NULL(expression);
     ASSERT_NOT_NULL(derivation_TeX);
-    expected = num_create_from_string("11757173/14549535");
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_exact(actual));
-    ASSERT_TRUE(num_eq(actual, expected));
+    want = num_create_from_string("11757173/14549535");
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_exact(got));
+    ASSERT_TRUE(num_eq(got, want));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=0}^{10}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\left(-1\\right)^{n}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "2\\mkern-2mu n + 1"));
-    num_destroy(&actual);
-    num_destroy(&expected);
+    num_destroy(&got);
+    num_destroy(&want);
     expr_free(expression);
     string_free(derivation_TeX);
 
@@ -990,10 +990,10 @@ static void test_from_string_series_ellipsis(void)
     expression = expr_from_string(
         "{ 4 - 4/3 + 4/5 - 4/7 + ... + 4(-1)^n/(2n+1) | n = 10 }", NULL);
     ASSERT_NOT_NULL(expression);
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_finite(actual));
-    ASSERT_EQ_DOUBLE(num_to_double(actual), 3.2323158094055927, 1e-15);
-    num_destroy(&actual);
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(got));
+    ASSERT_EQ_DOUBLE(num_to_double(got), 3.2323158094055927, 1e-15);
+    num_destroy(&got);
     expr_free(expression);
 
     derivation_TeX = NULL;
@@ -1001,11 +1001,11 @@ static void test_from_string_series_ellipsis(void)
         "4 - 4/3 + 4/5 - 4/7 + ... + 4/10000001", NULL, &derivation_TeX);
     ASSERT_NOT_NULL(expression);
     ASSERT_NOT_NULL(derivation_TeX);
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_finite(actual));
-    ASSERT_EQ_DOUBLE(num_to_double(actual), 3.14159285358975323846864338288, 1e-15);
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(got));
+    ASSERT_EQ_DOUBLE(num_to_double(got), 3.14159285358975323846864338288, 1e-15);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=0}^{5000000}"));
-    num_destroy(&actual);
+    num_destroy(&got);
     expr_free(expression);
     string_free(derivation_TeX);
 
@@ -1026,10 +1026,10 @@ static void test_from_string_series_ellipsis(void)
         expression = expr_from_string_with_derivation_TeX(string_c_str(source), NULL, &derivation_TeX);
         ASSERT_NOT_NULL(expression);
         ASSERT_NOT_NULL(derivation_TeX);
-        actual = expr_eval(expression);
-        ASSERT_TRUE(num_is_finite(actual));
+        got = expr_eval(expression);
+        ASSERT_TRUE(num_is_finite(got));
         ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), string_c_str(upper)));
-        num_destroy(&actual);
+        num_destroy(&got);
         expr_free(expression);
         string_free(derivation_TeX);
         string_free(upper);
@@ -1042,11 +1042,11 @@ static void test_from_string_series_ellipsis(void)
         &derivation_TeX);
     ASSERT_NOT_NULL(expression);
     ASSERT_NOT_NULL(derivation_TeX);
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_finite(actual));
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(got));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
                            "\\sum_{n=0}^{50000000000000000000000000000000000000}"));
-    num_destroy(&actual);
+    num_destroy(&got);
     expr_free(expression);
     string_free(derivation_TeX);
 
@@ -1088,11 +1088,11 @@ static void test_from_string_series_ellipsis(void)
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{100000000}\\frac{1}{n^{2}}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{\\pi^{2}}{6} - \\psi^{(1)}(100000001)"));
-    actual = expr_eval(expression);
-    ASSERT_TRUE(num_is_finite(actual));
-    ASSERT_EQ_DOUBLE(num_to_double(actual), 1.6449340568482264, 1e-15);
+    got = expr_eval(expression);
+    ASSERT_TRUE(num_is_finite(got));
+    ASSERT_EQ_DOUBLE(num_to_double(got), 1.6449340568482264, 1e-15);
 
-    num_destroy(&actual);
+    num_destroy(&got);
     expr_free(expression);
     string_free(derivation_TeX);
 
@@ -2217,7 +2217,7 @@ static void test_from_string_simplified_identity_text(void)
         printf(C_BOLD C_RED "FAIL" C_RESET " parsed sin^2(x) + cos^2(x) simplifies explicitly to 1 %s:%d:1\n", __FILE__,
                __LINE__);
         printf("  got:      %s\n", text ? text : "<null>");
-        printf("  expected: 1\n\n");
+        printf("  want: 1\n\n");
         TEST_FAIL();
     } else {
         printf(C_BOLD C_GREEN "PASS" C_RESET " parsed sin^2(x) + cos^2(x) simplifies explicitly to 1\n\n");
@@ -2625,14 +2625,14 @@ static void test_from_expression_string_api(void)
             "sum(k, 1, x, sum(j, 1, k, j))",
             "sum(k, 1, x, product(k, 1, k, k))",
         };
-        const double expected[] = {6, 6, 6, 6, 6, 6, 9, 9, 10, 10, 9};
+        const double want[] = {6, 6, 6, 6, 6, 6, 9, 9, 10, 10, 9};
 
         for (size_t i = 0u; i < sizeof(scoped_sources)/sizeof(scoped_sources[0]); ++i) {
             expr_t *scoped = expr_from_expression_string(scoped_sources[i], names, symbols, 3);
 
             ASSERT_NOT_NULL(scoped);
-            printf("Scoped parse: %s = %.17g (expected %.17g)\n", scoped_sources[i], expr_eval_d(scoped), expected[i]);
-            ASSERT_TRUE(fabs(expr_eval_d(scoped) - expected[i]) < 1e-12);
+            printf("Scoped parse: %s = %.17g (want %.17g)\n", scoped_sources[i], expr_eval_d(scoped), want[i]);
+            ASSERT_TRUE(fabs(expr_eval_d(scoped) - want[i]) < 1e-12);
             expr_free(scoped);
         }
     }
@@ -3994,7 +3994,7 @@ static void test_from_string_infinity_TeX(void)
 {
     static const struct {
         const char *input;
-        const char *expected;
+        const char *want;
     } cases[] = {
         {"inf", "\\infty"},
         {"infinity", "\\infty"},
@@ -4017,7 +4017,7 @@ static void test_from_string_infinity_TeX(void)
         ASSERT_NOT_NULL(expr);
         text = expr_to_TeX_body(expr);
         ASSERT_NOT_NULL(text);
-        ASSERT_NOT_NULL(strstr(text, cases[i].expected));
+        ASSERT_NOT_NULL(strstr(text, cases[i].want));
         free(text);
         expr_free(expr);
     }

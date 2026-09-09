@@ -23,7 +23,7 @@ const json_t *test_config_json_object_get_literal(const json_t *object, const ch
 bool test_config_json_bool_or_default(const json_t *json, bool fallback);
 bool test_config_value_enabled(const json_t *value, bool fallback);
 bool test_config_root_shape_is_supported(const json_t *root, test_config_mode_t mode);
-json_t *test_config_create_pruned_json_object(const json_t *actual, const json_t *seen, bool file_level);
+json_t *test_config_create_pruned_json_object(const json_t *got, const json_t *seen, bool file_level);
 
 void test_config_ensure_leaf(json_t *object, const string_t *name);
 json_t *test_config_ensure_group_path(json_t *object, const string_t *path);

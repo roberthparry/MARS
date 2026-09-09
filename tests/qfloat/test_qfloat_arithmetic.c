@@ -5,13 +5,13 @@
    Arithmetic tests
    ----------------------------------------------------------- */
 
-static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+static int qf_close_value(qfloat_t got, qfloat_t want, double tol)
 {
-    if (qf_close(got, expected, tol))
+    if (qf_close(got, want, tol))
         return 1;
-    if (qf_eq(expected, qf_from_double(0.0)))
+    if (qf_eq(want, qf_from_double(0.0)))
         return 0;
-    return qf_close_rel(got, expected, tol);
+    return qf_close_rel(got, want, tol);
 }
 
 static void test_add()
@@ -25,13 +25,13 @@ static void test_add()
     char buf[64];
     test_qf_to_buffer(got, buf, sizeof(buf));
     char buf_exp[64] = "11.1111111011111102469135782469134";
-    qfloat_t expected = qf_from_string(buf_exp);
+    qfloat_t want = qf_from_string(buf_exp);
 
-    if (qf_close(got, expected, 1e-30)) {
+    if (qf_close(got, want, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567",
                "11.1111111011111102469135782469134", C_RESET);
     } else {
-        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+        TEST_ASSERT_QFLOAT_CLOSE(got, want);
     }
 }
 
@@ -48,17 +48,17 @@ static void test_mul()
     test_qf_to_buffer(r, r_buf, sizeof(r_buf));
 
     char buf_exp[64] = "1.2412731971809253340758239961506";
-    qfloat_t expected = qf_from_string(buf_exp);
+    qfloat_t want = qf_from_string(buf_exp);
 
     char buf_name[256];
     sprintf(buf_name, "%s * %s", a_buf, b_buf);
 
-    if (qf_close(r, expected, 1e-30)) {
+    if (qf_close(r, want, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, buf_name, buf_exp, C_RESET);
         printf("    got      = %s\n", r_buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     } else {
-        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        TEST_ASSERT_QFLOAT_CLOSE(r, want);
     }
 }
 
@@ -72,16 +72,16 @@ static void test_div()
 
     char buf[64];
     char buf_exp[64] = "0.1256789123456789012345678901234567";
-    qfloat_t expected = qf_from_string(buf_exp);
+    qfloat_t want = qf_from_string(buf_exp);
     test_qf_to_buffer(got, buf, sizeof(buf));
 
-    if (qf_close(got, expected, 1e-30)) {
+    if (qf_close(got, want, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2412731971809253340758239961506 / 9.8765431209876543171934981073984",
                "0.1256789123456789012345678901234567", C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     } else {
-        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+        TEST_ASSERT_QFLOAT_CLOSE(got, want);
     }
 }
 
@@ -94,15 +94,15 @@ static void test_sqrt()
 
     char buf[64];
     char buf_exp[64] = "0.707106781186547524400844362104849";
-    qfloat_t expected = qf_from_string(buf_exp);
+    qfloat_t want = qf_from_string(buf_exp);
     test_qf_to_buffer(got, buf, sizeof(buf));
 
-    if (qf_close(got, expected, 1e-30)) {
+    if (qf_close(got, want, 1e-30)) {
         printf(C_GREEN "  OK: sqrt\n" C_RESET);
         print_q("       got", got);
-        printf("  expected = %s\n", buf_exp);
+        printf("  want = %s\n", buf_exp);
     } else {
-        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+        TEST_ASSERT_QFLOAT_CLOSE(got, want);
     }
 }
 
@@ -110,17 +110,17 @@ static void test_exp_log()
 {
     printf(C_CYAN "TEST: exp/log\n" C_RESET);
 
-    qfloat_t expected = qf_from_string("1.2345678912345678912345678912346");
-    qfloat_t e = qf_exp(expected);
+    qfloat_t want = qf_from_string("1.2345678912345678912345678912346");
+    qfloat_t e = qf_exp(want);
     qfloat_t got = qf_log(e);
 
     char buf_exp[64];
-    test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+    test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-    TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+    TEST_ASSERT_QFLOAT_CLOSE(got, want);
     printf(C_GREEN "  OK: exp/log\n" C_RESET);
     print_q("  log(exp(x))", got);
-    printf("  expected    = %s\n", buf_exp);
+    printf("  want    = %s\n", buf_exp);
 }
 
 static void test_qf_exp(void)
@@ -130,7 +130,7 @@ static void test_qf_exp(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } exp_tests[] = {
 
         {{1.0, 0.0}, "exp(1)", qf_from_string("2.71828182845904523536028747135266249775724709369996")},
@@ -164,14 +164,14 @@ static void test_qf_exp(void)
     for (int i = 0; i < N; ++i) {
         qfloat_t got = qf_exp(exp_tests[i].arg);
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(exp_tests[i].expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(exp_tests[i].want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_rel(got, exp_tests[i].expected, 1e-30)) {
+        if (qf_close_rel(got, exp_tests[i].want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, exp_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, exp_tests[i].expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, exp_tests[i].want);
         }
     }
 
@@ -198,7 +198,7 @@ static void test_qf_log(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } log_tests[] = {
 
         {{1.0, 0.0}, "log(1)", qf_from_string("0")},
@@ -222,32 +222,32 @@ static void test_qf_log(void)
     for (int i = 0; i < N; ++i) {
         qfloat_t got = qf_log(log_tests[i].arg);
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(log_tests[i].expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(log_tests[i].want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, log_tests[i].expected, 1e-30)) {
+        if (qf_close_value(got, log_tests[i].want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, log_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
             printf("%s  FAIL: %s%s\n", C_RED, log_tests[i].name, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
 
     {
         qfloat_t got = qf_log10(qf_from_double(1000.0));
-        qfloat_t expected = qf_from_double(3.0);
+        qfloat_t want = qf_from_double(3.0);
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, expected, 1e-30)) {
+        if (qf_close_value(got, want, 1e-30)) {
             printf("%s  OK: log10(1000) = %s%s\n", C_GREEN, buf, C_RESET);
         } else {
             printf("%s  FAIL: log10(1000)%s\n", C_RED, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -292,16 +292,16 @@ static void test_stability()
 
     qfloat_t r = qf_sub(qa, qb);
 
-    double expected = a - b;
+    double want = a - b;
 
-    if (approx_equal(r, expected, 1e-30)) {
+    if (approx_equal(r, want, 1e-30)) {
         printf(C_GREEN "  OK: stable subtraction\n" C_RESET);
         print_q("  got", r);
-        printf("  expected = %.32g\n", expected);
+        printf("  want = %.32g\n", want);
     } else {
         printf(C_RED "  FAIL: stable subtraction\n" C_RESET);
         print_q("  got", r);
-        printf("  expected = %.32g\n", expected);
+        printf("  want = %.32g\n", want);
         TEST_FAIL();
     }
 }

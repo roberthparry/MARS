@@ -58,20 +58,20 @@ static expr_t *test_equation_named_var_d(double value, const char *name)
     return expr;
 }
 
-static bool test_number_equals_long(number_t actual, long expected_value)
+static bool test_number_equals_long(number_t got, long want_value)
 {
-    number_t expected = num_create_from_long(expected_value);
-    bool ok = num_eq(actual, expected);
+    number_t want = num_create_from_long(want_value);
+    bool ok = num_eq(got, want);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     return ok;
 }
 
-static bool test_equation_result_contains_long(const equation_solve_result_t *result, long expected_value)
+static bool test_equation_result_contains_long(const equation_solve_result_t *result, long want_value)
 {
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
         number_t value = expr_eval(equ_rhs(RESULT_SOLUTION(result, i)));
-        bool match = test_number_equals_long(value, expected_value);
+        bool match = test_number_equals_long(value, want_value);
 
         num_destroy(&value);
         if (match)
@@ -81,21 +81,21 @@ static bool test_equation_result_contains_long(const equation_solve_result_t *re
     return false;
 }
 
-static bool test_equation_result_contains_number_text(const equation_solve_result_t *result, const char *expected_text)
+static bool test_equation_result_contains_number_text(const equation_solve_result_t *result, const char *want_text)
 {
-    number_t expected = num_create_from_string(expected_text);
+    number_t want = num_create_from_string(want_text);
     bool found = false;
 
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
         number_t value = expr_eval(equ_rhs(RESULT_SOLUTION(result, i)));
 
-        found = num_eq(value, expected);
+        found = num_eq(value, want);
         num_destroy(&value);
         if (found)
             break;
     }
 
-    num_destroy(&expected);
+    num_destroy(&want);
     return found;
 }
 
@@ -161,7 +161,7 @@ static bool test_equation_nonreal_solutions_have_conjugates(const equation_solve
     return true;
 }
 
-static bool test_equation_rhs_string_equals(const equation_t *equation, const char *expected)
+static bool test_equation_rhs_string_equals(const equation_t *equation, const char *want)
 {
     string_t *text;
     bool ok;
@@ -173,16 +173,16 @@ static bool test_equation_rhs_string_equals(const equation_t *equation, const ch
     if (!text)
         return false;
 
-    ok = strcmp(string_c_str(text), expected) == 0;
+    ok = strcmp(string_c_str(text), want) == 0;
     string_free(text);
     return ok;
 }
 
-static bool test_equation_result_has_rhs_string(const equation_solve_result_t *result, const char *expected)
+static bool test_equation_result_has_rhs_string(const equation_solve_result_t *result, const char *want)
 {
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
         string_t *text = expr_to_text(equ_rhs(RESULT_SOLUTION(result, i)), style_UNBOUND);
-        bool ok = text && strcmp(string_c_str(text), expected) == 0;
+        bool ok = text && strcmp(string_c_str(text), want) == 0;
 
         string_free(text);
         if (ok)
@@ -192,7 +192,7 @@ static bool test_equation_result_has_rhs_string(const equation_solve_result_t *r
     return false;
 }
 
-static bool test_equation_rhs_text_contains(const equation_t *equation, style_t style, const char *expected)
+static bool test_equation_rhs_text_contains(const equation_t *equation, style_t style, const char *want)
 {
     string_t *text;
     bool ok;
@@ -204,16 +204,16 @@ static bool test_equation_rhs_text_contains(const equation_t *equation, style_t 
     if (!text)
         return false;
 
-    ok = strstr(string_c_str(text), expected) != NULL;
+    ok = strstr(string_c_str(text), want) != NULL;
     string_free(text);
     return ok;
 }
 
 static bool test_equation_result_has_rhs_text_containing(const equation_solve_result_t *result, style_t style,
-                                                         const char *expected)
+                                                         const char *want)
 {
     for (size_t i = 0u; i < RESULT_COUNT(result); ++i) {
-        if (test_equation_rhs_text_contains(RESULT_SOLUTION(result, i), style, expected))
+        if (test_equation_rhs_text_contains(RESULT_SOLUTION(result, i), style, want))
             return true;
     }
 

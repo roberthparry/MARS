@@ -79,14 +79,14 @@ static char *datetime_to_iso_date(const datetime_t *dttm)
 
 static bool datetime_matches_iso_date(const datetime_t *dttm, const char *holiday_date)
 {
-    char *actual;
+    char *got;
     bool matches;
 
     if (!dttm || !holiday_date)
         return false;
-    actual = datetime_to_iso_date(dttm);
-    matches = actual && strcmp(actual, holiday_date) == 0;
-    free(actual);
+    got = datetime_to_iso_date(dttm);
+    matches = got && strcmp(got, holiday_date) == 0;
+    free(got);
     return matches;
 }
 
@@ -268,7 +268,7 @@ static bool assert_event_present(const array_t *events, const char *holiday_name
     if (find_event_by_name_and_date(events, holiday_name, holiday_date))
         return true;
     found = describe_events(events);
-    test_set_failure_detailf("expected %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
+    test_set_failure_detailf("want %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
                              holiday_date ? holiday_date : "(null)", found ? found : "(unavailable)");
     free(found);
     return false;
@@ -360,17 +360,17 @@ static void test_ireland_historic_whit_monday_exists_in_1960(void)
 {
     array_t *events = load_events("IE", 1960, DT_January, 1, 1960, DT_December, 31);
     datetime_t *easter = datetime_init_easter(datetime_alloc(), 1960);
-    char expected_whit_monday[16];
+    char want_whit_monday[16];
 
     ASSERT_NOT_NULL(events);
     ASSERT_NOT_NULL(easter);
     print_events_summary("Ireland 1960 holidays", events);
     datetime_add_days(easter, 50);
-    snprintf(expected_whit_monday, sizeof(expected_whit_monday), "%04d-%02d-%02d", datetime_year(easter),
+    snprintf(want_whit_monday, sizeof(want_whit_monday), "%04d-%02d-%02d", datetime_year(easter),
              (int)datetime_month(easter), (int)datetime_day(easter));
 
-    ASSERT_TRUE(assert_event_present(events, "Whit Monday", expected_whit_monday));
-    ASSERT_TRUE(assert_event_absent(events, "June Bank Holiday", expected_whit_monday));
+    ASSERT_TRUE(assert_event_present(events, "Whit Monday", want_whit_monday));
+    ASSERT_TRUE(assert_event_absent(events, "June Bank Holiday", want_whit_monday));
 
     datetime_dealloc(easter);
     array_destroy(events);

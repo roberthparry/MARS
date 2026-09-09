@@ -183,7 +183,7 @@ static int is_multiline(const char *s)
 /* Print aligned multiline blocks */
 static void print_multiline(const char *label, const char *s)
 {
-    /* Pad label to fixed width so got/expected align */
+    /* Pad label to fixed width so got/want align */
     int base_indent = fprintf(stderr, "  %-8s ", label);
 
     if (!s) {
@@ -218,32 +218,32 @@ static void print_multiline(const char *label, const char *s)
 }
 
 /* PASS with optional separator */
-void to_string_pass(const char *msg, const char *got, const char *expected)
+void to_string_pass(const char *msg, const char *got, const char *want)
 {
     fprintf(stderr, C_BOLD C_GREEN "PASS " C_RESET "%s\n" C_RESET, msg);
 
-    int multi = is_multiline(got) || is_multiline(expected);
+    int multi = is_multiline(got) || is_multiline(want);
 
     print_multiline("got", got);
 
     if (multi)
         fprintf(stderr, "  ───────────────────────────────\n");
 
-    print_multiline("expected", expected);
+    print_multiline("want", want);
 }
 
-void to_string_fail(const char *file, int line, int col, const char *msg, const char *got, const char *expected)
+void to_string_fail(const char *file, int line, int col, const char *msg, const char *got, const char *want)
 {
     fprintf(stderr, C_BOLD C_RED "FAIL" C_RESET " %s: " C_RED "%s:%d:%d\n" C_RESET, msg, file, line, col);
 
-    int multi = is_multiline(got) || is_multiline(expected);
+    int multi = is_multiline(got) || is_multiline(want);
 
     print_multiline("got", got);
 
     if (multi)
         fprintf(stderr, "  ───────────────────────────────\n");
 
-    print_multiline("expected", expected);
+    print_multiline("want", want);
     TEST_FAIL();
 }
 
@@ -1318,7 +1318,7 @@ static void test_to_string_polynomial_degree_order_expr(void)
     struct {
         const char *label;
         const char *source;
-        const char *expected;
+        const char *want;
     } cases[] = {{"polynomial terms sort by degree in x then y", "{ y^2+x*y+x^2 | x = NAN, y = NAN }",
                   "{ x² + xy + y² | y = NAN, x = NAN }"},
                  {"polynomial terms sort lexicographically across variables",
@@ -1331,10 +1331,10 @@ static void test_to_string_polynomial_degree_order_expr(void)
         expr_t *f = expr_from_string(cases[i].source, NULL);
         char *got = f ? expr_to_string(f, style_EXPRESSION) : NULL;
 
-        if (got && str_eq(got, cases[i].expected))
-            to_string_pass(cases[i].label, got, cases[i].expected);
+        if (got && str_eq(got, cases[i].want))
+            to_string_pass(cases[i].label, got, cases[i].want);
         else
-            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, got, cases[i].expected);
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label, got, cases[i].want);
 
         free(got);
         expr_free(f);
@@ -1573,13 +1573,13 @@ static void test_to_string_negative_const_power_base_is_grouped(void)
     expr_t *f = expr_from_string("{ (-1)^k | k = NAN }", NULL);
     char *expression = f ? expr_to_string(f, style_EXPRESSION) : NULL;
     char *function = f ? expr_to_string(f, style_FUNCTION) : NULL;
-    const char *expected = "(-1)^k";
+    const char *want = "(-1)^k";
 
-    if (expression && function && strstr(expression, expected) && strstr(function, expected))
-        to_string_pass("negative constant power base is grouped", expression, expected);
+    if (expression && function && strstr(expression, want) && strstr(function, want))
+        to_string_pass("negative constant power base is grouped", expression, want);
     else
         to_string_fail(__FILE__, __LINE__, 1, "negative constant power base is grouped",
-                       expression ? expression : function, expected);
+                       expression ? expression : function, want);
 
     free(function);
     free(expression);
@@ -1874,14 +1874,14 @@ static void test_to_string_function_style_extracts_variable_dependent_dag_nodes(
                                  "+cosh(sin(x))+sinh(sin(x))+tanh(sin(x))+acos(sin(x))+atan(sin(x))",
                                  NULL);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expected_assignment = "    v1 = sin(x).\n";
+    const char *want_assignment = "    v1 = sin(x).\n";
 
-    if (got && !strstr(got, "Intermediate expressions") && strstr(got, expected_assignment) &&
+    if (got && !strstr(got, "Intermediate expressions") && strstr(got, want_assignment) &&
         !strstr(got, "const v1 = sin(x)."))
-        to_string_pass("function style extracts variable-dependent DAG nodes (FUNC)", got, expected_assignment);
+        to_string_pass("function style extracts variable-dependent DAG nodes (FUNC)", got, want_assignment);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style extracts variable-dependent DAG nodes (FUNC)", got,
-                       expected_assignment);
+                       want_assignment);
 
     free(got);
     expr_free(f);
@@ -1891,15 +1891,15 @@ static void test_to_string_function_style_extracts_short_shared_dag_nodes(void)
 {
     expr_t *f = expr_from_string("cos(sin(x))+exp(sin(x))", NULL);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expected_assignment = "    v1 = sin(x).\n";
-    const char *expected_return = "    return cos(v1) + exp(v1).\n";
+    const char *want_assignment = "    v1 = sin(x).\n";
+    const char *want_return = "    return cos(v1) + exp(v1).\n";
 
-    if (got && !strstr(got, "Intermediate expressions") && strstr(got, expected_assignment) &&
-        strstr(got, expected_return))
-        to_string_pass("function style extracts short shared DAG nodes (FUNC)", got, expected_return);
+    if (got && !strstr(got, "Intermediate expressions") && strstr(got, want_assignment) &&
+        strstr(got, want_return))
+        to_string_pass("function style extracts short shared DAG nodes (FUNC)", got, want_return);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style extracts short shared DAG nodes (FUNC)", got,
-                       expected_return);
+                       want_return);
 
     free(got);
     expr_free(f);
@@ -1909,14 +1909,14 @@ static void test_to_string_function_style_extracts_shared_quotient_factor(void)
 {
     expr_t *f = expr_from_string("sin(n*x/2)*cos((n+1)*x/2)/sin(x/2)", NULL);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expected_assignment = "    v1 = x/2.\n";
-    const char *expected_return = "    return sin(n.v1).cos((n + 1).v1)/sin(v1).\n";
+    const char *want_assignment = "    v1 = x/2.\n";
+    const char *want_return = "    return sin(n.v1).cos((n + 1).v1)/sin(v1).\n";
 
-    if (got && strstr(got, expected_assignment) && strstr(got, expected_return))
-        to_string_pass("function style extracts shared quotient factor (FUNC)", got, expected_return);
+    if (got && strstr(got, want_assignment) && strstr(got, want_return))
+        to_string_pass("function style extracts shared quotient factor (FUNC)", got, want_return);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style extracts shared quotient factor (FUNC)", got,
-                       expected_return);
+                       want_return);
 
     free(got);
     expr_free(f);
@@ -2238,7 +2238,7 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
 {
     static const struct {
         const char *source;
-        const char *expected;
+        const char *want;
     } cases[] = {
         {"{ Li1(x) }", "return li1("},
         {"{ Li2(x) }", "return li2("},
@@ -2281,11 +2281,11 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
         char *function = expression ? expr_to_string(expression, style_FUNCTION) : NULL;
 
         ASSERT_NOT_NULL(expression);
-        if (function && strstr(function, cases[index].expected))
-            to_string_pass("canonical lowercase FUNCTION name", function, cases[index].expected);
+        if (function && strstr(function, cases[index].want))
+            to_string_pass("canonical lowercase FUNCTION name", function, cases[index].want);
         else
             to_string_fail(__FILE__, __LINE__, 1, "canonical lowercase FUNCTION name", function,
-                           cases[index].expected);
+                           cases[index].want);
 
         free(function);
         expr_free(expression);
@@ -3306,8 +3306,8 @@ void test_expressions(void)
     struct {
         const char *src;
         expr_t *(*make)(void);
-        const char *expected_expr;
-        const char *expected_func;
+        const char *want_expr;
+        const char *want_func;
         int line; /* NEW: source line of this test entry */
     } tests[] = {
         /* 01 */
@@ -3703,11 +3703,11 @@ void test_expressions(void)
 
         char *got_expr = expr_to_string(simp, style_EXPRESSION);
         char *got_func = expr_to_string(simp, style_FUNCTION);
-        char *expected_func_c = test_legacy_function_expect_to_c(tests[i].expected_func);
-        const char *expected_func = expected_func_c ? expected_func_c : tests[i].expected_func;
+        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
-        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
-        int ok_func = strcmp(got_func, expected_func) == 0;
+        int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
+        int ok_func = strcmp(got_func, want_func) == 0;
 
         /* ---------------- EXPR block ---------------- */
         if (ok_expr) {
@@ -3719,7 +3719,7 @@ void test_expressions(void)
         }
 
         printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
-        printf(C_BOLD "  expected " C_RESET "%s\n", tests[i].expected_expr);
+        printf(C_BOLD "  want " C_RESET "%s\n", tests[i].want_expr);
 
         /* ---------------- FUNC block ---------------- */
         if (ok_func) {
@@ -3745,11 +3745,11 @@ void test_expressions(void)
 
         printf("  ───────────────────────────────\n");
 
-        /* expected block */
+        /* want block */
         {
-            const char *p = expected_func;
+            const char *p = want_func;
             const char *nl;
-            printf(C_BOLD "  expected " C_RESET);
+            printf(C_BOLD "  want " C_RESET);
             while ((nl = strchr(p, '\n'))) {
                 fwrite(p, 1, nl - p, stdout);
                 printf("\n           ");
@@ -3762,7 +3762,7 @@ void test_expressions(void)
 
         free(got_expr);
         free(got_func);
-        free(expected_func_c);
+        free(want_func_c);
         expr_free(simp);
         expr_free(f);
     }
@@ -4031,8 +4031,8 @@ void test_expressions_unnamed(void)
     struct {
         const char *src;
         expr_t *(*make)(void);
-        const char *expected_expr;
-        const char *expected_func;
+        const char *want_expr;
+        const char *want_func;
         int line;
     } tests[] = {
         /* U01 */
@@ -4126,11 +4126,11 @@ void test_expressions_unnamed(void)
 
         char *got_expr = expr_to_string(simp, style_EXPRESSION);
         char *got_func = expr_to_string(simp, style_FUNCTION);
-        char *expected_func_c = test_legacy_function_expect_to_c(tests[i].expected_func);
-        const char *expected_func = expected_func_c ? expected_func_c : tests[i].expected_func;
+        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
-        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
-        int ok_func = strcmp(got_func, expected_func) == 0;
+        int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
+        int ok_func = strcmp(got_func, want_func) == 0;
 
         if (ok_expr) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s (EXPR)\n", tests[i].src);
@@ -4141,7 +4141,7 @@ void test_expressions_unnamed(void)
         }
 
         printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
-        printf(C_BOLD "  expected " C_RESET "%s\n", tests[i].expected_expr);
+        printf(C_BOLD "  want " C_RESET "%s\n", tests[i].want_expr);
 
         if (ok_func) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s (FUNC)\n", tests[i].src);
@@ -4166,9 +4166,9 @@ void test_expressions_unnamed(void)
         printf("  ───────────────────────────────\n");
 
         {
-            const char *p = expected_func;
+            const char *p = want_func;
             const char *nl;
-            printf(C_BOLD "  expected " C_RESET);
+            printf(C_BOLD "  want " C_RESET);
             while ((nl = strchr(p, '\n'))) {
                 fwrite(p, 1, nl - p, stdout);
                 printf("\n           ");
@@ -4181,7 +4181,7 @@ void test_expressions_unnamed(void)
 
         free(got_expr);
         free(got_func);
-        free(expected_func_c);
+        free(want_func_c);
         expr_free(simp);
         expr_free(f);
     }
@@ -4195,8 +4195,8 @@ void test_expressions_longname(void)
     struct {
         const char *src;
         expr_t *(*make)(void);
-        const char *expected_expr;
-        const char *expected_func;
+        const char *want_expr;
+        const char *want_func;
         int line;
     } tests[] = {
         /* L01 */
@@ -4273,11 +4273,11 @@ void test_expressions_longname(void)
 
         char *got_expr = expr_to_string(f, style_EXPRESSION);
         char *got_func = expr_to_string(f, style_FUNCTION);
-        char *expected_func_c = test_legacy_function_expect_to_c(tests[i].expected_func);
-        const char *expected_func = expected_func_c ? expected_func_c : tests[i].expected_func;
+        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
-        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
-        int ok_func = strcmp(got_func, expected_func) == 0;
+        int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
+        int ok_func = strcmp(got_func, want_func) == 0;
 
         if (ok_expr) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s (EXPR)\n", tests[i].src);
@@ -4288,7 +4288,7 @@ void test_expressions_longname(void)
         }
 
         printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
-        printf(C_BOLD "  expected " C_RESET "%s\n", tests[i].expected_expr);
+        printf(C_BOLD "  want " C_RESET "%s\n", tests[i].want_expr);
 
         if (ok_func) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s (FUNC)\n", tests[i].src);
@@ -4313,9 +4313,9 @@ void test_expressions_longname(void)
         printf("  ───────────────────────────────\n");
 
         {
-            const char *p = expected_func;
+            const char *p = want_func;
             const char *nl;
-            printf(C_BOLD "  expected " C_RESET);
+            printf(C_BOLD "  want " C_RESET);
             while ((nl = strchr(p, '\n'))) {
                 fwrite(p, 1, nl - p, stdout);
                 printf("\n           ");
@@ -4328,7 +4328,7 @@ void test_expressions_longname(void)
 
         free(got_expr);
         free(got_func);
-        free(expected_func_c);
+        free(want_func_c);
         expr_free(f);
     }
 }
@@ -4408,7 +4408,7 @@ void check_parse_val(const char *label, const char *s, double expect_d, int line
     expr_free(g);
 }
 
-/* Check that parsing a string returns NULL (expected error path).
+/* Check that parsing a string returns NULL (want error path).
  * Note: expr_from_string prints diagnostics to stderr for error cases. */
 void check_parse_null(const char *label, const char *s, int line)
 {
@@ -4416,13 +4416,13 @@ void check_parse_null(const char *label, const char *s, int line)
     if (!g) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", label);
     } else {
-        printf(C_BOLD C_RED "FAIL" C_RESET " %s (expected NULL) %s:%d:1\n\n", label, __FILE__, line);
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (want NULL) %s:%d:1\n\n", label, __FILE__, line);
         TEST_FAIL();
         expr_free(g);
     }
 }
 
-void check_parse_null_stderr_contains(const char *label, const char *s, const char *expected_substring, int line)
+void check_parse_null_stderr_contains(const char *label, const char *s, const char *want_substring, int line)
 {
     const char *capture_path = NULL;
     int saved_stderr;
@@ -4450,7 +4450,7 @@ void check_parse_null_stderr_contains(const char *label, const char *s, const ch
     }
 
     if (g) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " %s (expected NULL) %s:%d:1\n\n", label, __FILE__, line);
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (want NULL) %s:%d:1\n\n", label, __FILE__, line);
         TEST_FAIL();
         expr_free(g);
         return;
@@ -4490,9 +4490,9 @@ void check_parse_null_stderr_contains(const char *label, const char *s, const ch
     buf[nread] = '\0';
     fclose(f);
 
-    if (expected_substring && *expected_substring && !strstr(buf, expected_substring)) {
+    if (want_substring && *want_substring && !strstr(buf, want_substring)) {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s (missing stderr substring) %s:%d:1\n", label, __FILE__, line);
-        printf(C_BOLD "  expected stderr to contain " C_RESET "%s\n", expected_substring);
+        printf(C_BOLD "  want stderr to contain " C_RESET "%s\n", want_substring);
         printf(C_BOLD "  got stderr             " C_RESET "%s\n\n", buf);
         TEST_FAIL();
         free(buf);
@@ -4500,8 +4500,8 @@ void check_parse_null_stderr_contains(const char *label, const char *s, const ch
     }
 
     printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
-    if (expected_substring && *expected_substring)
-        printf(C_BOLD "  stderr  " C_RESET "contains \"%s\"\n\n", expected_substring);
+    if (want_substring && *want_substring)
+        printf(C_BOLD "  stderr  " C_RESET "contains \"%s\"\n\n", want_substring);
     else
         printf("\n");
     free(buf);

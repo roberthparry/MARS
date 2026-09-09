@@ -49,8 +49,8 @@ static void run_number_exact_rational_construction_tests(void)
     number_t parsed_general = num_create_from_string("355/113");
     number_t parsed_unicode = num_create_from_string("³⁵⁵⁄₁₁₃");
     number_t set_target = num_create_from_double(2.5);
-    number_t expected_neg_three_quarters = num_create_from_frac(-3, 4);
-    number_t expected_two_thirds = num_create_from_frac(2, 3);
+    number_t want_neg_three_quarters = num_create_from_frac(-3, 4);
+    number_t want_two_thirds = num_create_from_frac(2, 3);
 
     assert_number_string("num_create_from_frac(0, 7)", zero, "0");
     assert_number_string("num_create_from_frac(-84, 2)", whole, "-42");
@@ -62,13 +62,13 @@ static void run_number_exact_rational_construction_tests(void)
     ASSERT_TRUE(num_is_exact(frac));
     ASSERT_TRUE(!num_is_integer(frac));
     ASSERT_TRUE(num_eq(parsed_general, parsed_unicode));
-    ASSERT_TRUE(num_eq(frac, expected_neg_three_quarters));
+    ASSERT_TRUE(num_eq(frac, want_neg_three_quarters));
 
     ASSERT_EQ_INT(num_set_frac(&set_target, 14, 21), 0);
     assert_number_string("num_set_frac changes storage to exact rational", set_target, "⅔");
     ASSERT_TRUE(num_is_exact(set_target));
     ASSERT_EQ_INT((int)num_get_prec_bits(set_target), 0);
-    ASSERT_TRUE(num_eq(set_target, expected_two_thirds));
+    ASSERT_TRUE(num_eq(set_target, want_two_thirds));
 
     num_destroy(&zero);
     num_destroy(&whole);
@@ -77,8 +77,8 @@ static void run_number_exact_rational_construction_tests(void)
     num_destroy(&parsed_general);
     num_destroy(&parsed_unicode);
     num_destroy(&set_target);
-    num_destroy(&expected_neg_three_quarters);
-    num_destroy(&expected_two_thirds);
+    num_destroy(&want_neg_three_quarters);
+    num_destroy(&want_two_thirds);
 }
 
 static void run_number_exact_arithmetic_tests(void)
@@ -204,12 +204,12 @@ static void run_number_exact_integer_math_tests(void)
     num_destroy(&bin_large);
 }
 
-static void assert_number_factor(const number_factor_t *factor, const char *expected_prime,
-                                 unsigned long expected_exponent)
+static void assert_number_factor(const number_factor_t *factor, const char *want_prime,
+                                 unsigned long want_exponent)
 {
     ASSERT_NOT_NULL(factor);
-    assert_number_string("factor prime", factor->prime, expected_prime);
-    ASSERT_EQ_LONG((long)factor->exponent, (long)expected_exponent);
+    assert_number_string("factor prime", factor->prime, want_prime);
+    ASSERT_EQ_LONG((long)factor->exponent, (long)want_exponent);
 }
 
 static void run_number_exact_number_theory_tests(void)

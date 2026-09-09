@@ -350,7 +350,7 @@ void test_thread_safety_append(void)
     // Check total size
     ASSERT_EQ_INT(array_size(arr), THREAD_COUNT * PER_THREAD);
 
-    // Check for all expected values (order not guaranteed)
+    // Check for all want values (order not guaranteed)
     int *seen = calloc(THREAD_COUNT * PER_THREAD, sizeof(int));
     for (size_t i = 0; i < array_size(arr); ++i) {
         int v = *(int *)array_get(arr, i);

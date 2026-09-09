@@ -20,7 +20,7 @@ void run_number_public_api_tests(void)
         number_t div_rhs = num_create_from_string("5 - i");
         number_t wide_complex_lhs = num_create_from_string("18446744073709551616 + i");
         number_t wide_complex_rhs = num_create_from_string("18446744073709551616 - i");
-        number_t wide_complex_expected = num_create_from_string("340282366920938463463374607431768211457");
+        number_t wide_complex_want = num_create_from_string("340282366920938463463374607431768211457");
 
         number_t sum = num_add(a, b);
         number_t quot = num_div(a, b);
@@ -58,7 +58,7 @@ void run_number_public_api_tests(void)
         assert_number_string("num_mul(\"5\", \"5/6\")", product, "²⁵⁄₆");
         assert_number_string("num_mul(\"2 + 3i\", \"1 + 8i\")", complex_product, "-22 + 19i");
         assert_number_string("num_div(\"5 + i\", \"5 - i\")", complex_quot, "¹²⁄₁₃ + ⁵⁄₁₃i");
-        ASSERT_NUMBER_EQ(wide_complex_product, wide_complex_expected);
+        ASSERT_NUMBER_EQ(wide_complex_product, wide_complex_want);
         ASSERT_TRUE(num_is_exact(wide_complex_product));
         assert_number_string("num_clone(\"25/6\")", cloned, "²⁵⁄₆");
         assert_number_string("num_log10(1000)", log10_thousand, "3");
@@ -95,7 +95,7 @@ void run_number_public_api_tests(void)
         num_destroy(&div_rhs);
         num_destroy(&wide_complex_lhs);
         num_destroy(&wide_complex_rhs);
-        num_destroy(&wide_complex_expected);
+        num_destroy(&wide_complex_want);
         num_destroy(&sum);
         num_destroy(&quot);
         num_destroy(&product);

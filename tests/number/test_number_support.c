@@ -4,10 +4,10 @@
 
 #include "test_number.h"
 
-static int number_validity_equal(const void *actual, const void *expected, void *ctx)
+static int number_validity_equal(const void *got, const void *want, void *ctx)
 {
     (void)ctx;
-    return num_eq(*(const number_t *)actual, *(const number_t *)expected);
+    return num_eq(*(const number_t *)got, *(const number_t *)want);
 }
 
 static int number_validity_format(const void *value, string_t *out, void *ctx)
@@ -38,27 +38,27 @@ const test_validity_contract_t *number_validity_contract_exact(void)
     return &contract;
 }
 
-void assert_number_string(const char *label, number_t number, const char *expected_text)
+void assert_number_string(const char *label, number_t number, const char *want_text)
 {
     string_t *got;
 
     got = num_to_string(number);
     ASSERT_NOT_NULL(got);
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n", expected_text);
+    printf("    want = %s\n", want_text);
     printf("    got      = %s\n\n", string_c_str(got));
-    ASSERT_TRUE(strcmp(string_c_str(got), expected_text) == 0);
+    ASSERT_TRUE(strcmp(string_c_str(got), want_text) == 0);
     string_free(got);
 }
 
-void assert_number_string_prefix(const char *label, number_t number, const char *expected_prefix)
+void assert_number_string_prefix(const char *label, number_t number, const char *want_prefix)
 {
     char *got;
     size_t prefix_len;
     char format[32];
     int written;
 
-    prefix_len = strlen(expected_prefix);
+    prefix_len = strlen(want_prefix);
     snprintf(format, sizeof(format), "%%.%zun", prefix_len);
     written = num_sprintf(NULL, 0u, format, number);
     ASSERT_TRUE(written >= 0);
@@ -66,8 +66,8 @@ void assert_number_string_prefix(const char *label, number_t number, const char 
     ASSERT_NOT_NULL(got);
     ASSERT_EQ_INT(num_sprintf(got, (size_t)written + 1u, format, number), written);
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    prefix   = %s\n", expected_prefix);
+    printf("    prefix   = %s\n", want_prefix);
     printf("    got      = %s\n\n", got);
-    ASSERT_TRUE(strncmp(got, expected_prefix, prefix_len) == 0);
+    ASSERT_TRUE(strncmp(got, want_prefix, prefix_len) == 0);
     free(got);
 }

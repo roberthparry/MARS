@@ -63,18 +63,18 @@ static char *format_error_for_test_output(const number_t value)
     return out;
 }
 
-static number_t oracle_error_magnitude(const number_t got, const number_t expected)
+static number_t oracle_error_magnitude(const number_t got, const number_t want)
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+    if (num_get_prec_bits(want) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(want)) != 0) {
         test_mark_failure(__FILE__, __LINE__, "num_set_prec_bits(promoted_got) failed");
         num_destroy(&promoted_got);
         return num_create_from_double(NAN);
     }
-    diff = num_sub(promoted_got, expected);
+    diff = num_sub(promoted_got, want);
     num_destroy(&promoted_got);
     if (num_is_real(diff)) {
         error = num_abs(diff);
@@ -93,9 +93,9 @@ static number_t oracle_error_magnitude(const number_t got, const number_t expect
     }
 }
 
-static int number_close_for_qfloat_precision(const number_t got, const number_t expected)
+static int number_close_for_qfloat_precision(const number_t got, const number_t want)
 {
-    number_t error = oracle_error_magnitude(got, expected);
+    number_t error = oracle_error_magnitude(got, want);
     number_t one = num_create_from_double(1.0);
     number_t tolerance;
     int ok;
@@ -114,9 +114,9 @@ static int number_close_for_qfloat_precision(const number_t got, const number_t 
     return ok;
 }
 
-static int number_close_with_tolerance_text(const number_t got, const number_t expected, const char *tolerance_text)
+static int number_close_with_tolerance_text(const number_t got, const number_t want, const char *tolerance_text)
 {
-    number_t error = oracle_error_magnitude(got, expected);
+    number_t error = oracle_error_magnitude(got, want);
     number_t tolerance = num_create_from_string(tolerance_text);
     int ok = num_le(error, tolerance);
 
@@ -125,25 +125,25 @@ static int number_close_with_tolerance_text(const number_t got, const number_t e
     return ok;
 }
 
-static void print_precision_comparison(const char *label, const number_t got, const number_t expected)
+static void print_precision_comparison(const char *label, const number_t got, const number_t want)
 {
-    string_t *expected_text;
+    string_t *want_text;
     string_t *got_text;
     char *error_text = NULL;
-    int show_error = num_is_finite(got) && num_is_finite(expected);
+    int show_error = num_is_finite(got) && num_is_finite(want);
     number_t error;
     int error_live = 0;
 
-    expected_text = format_number_for_test_output(expected);
+    want_text = format_number_for_test_output(want);
     got_text = format_number_for_test_output(got);
     if (show_error) {
-        error = oracle_error_magnitude(got, expected);
+        error = oracle_error_magnitude(got, want);
         error_text = format_error_for_test_output(error);
         error_live = 1;
     }
 
-    if (!expected_text) {
-        test_mark_failure(__FILE__, __LINE__, "format_number_for_test_output(expected) failed");
+    if (!want_text) {
+        test_mark_failure(__FILE__, __LINE__, "format_number_for_test_output(want) failed");
         goto cleanup;
     }
     if (!got_text) {
@@ -161,7 +161,7 @@ static void print_precision_comparison(const char *label, const number_t got, co
     }
 
     printf("    %s\n", label);
-    printf("        expected = %s\n", formatted_number_cstr(expected_text));
+    printf("        want = %s\n", formatted_number_cstr(want_text));
     printf("        got      = %s\n", formatted_number_cstr(got_text));
     if (show_error)
         printf("        error    = %s\n", error_text);
@@ -172,7 +172,7 @@ cleanup:
     if (error_live)
         num_destroy(&error);
     string_free(got_text);
-    string_free(expected_text);
+    string_free(want_text);
 }
 
 typedef expr_t *(*expr_unary_builder_t)(const expr_t *dv);
@@ -252,26 +252,26 @@ static size_t high_precision_compare_bits(size_t value_bits)
     return value_bits / 2u + 64u;
 }
 
-static void assert_same_to_bits(const number_t got, const number_t expected, size_t compare_bits, const char *label)
+static void assert_same_to_bits(const number_t got, const number_t want, size_t compare_bits, const char *label)
 {
     number_t got_cmp = num_clone(got);
-    number_t expected_cmp = num_clone(expected);
+    number_t want_cmp = num_clone(want);
 
     ASSERT_EQ_INT(num_set_prec_bits(&got_cmp, compare_bits), 0);
-    ASSERT_EQ_INT(num_set_prec_bits(&expected_cmp, compare_bits), 0);
-    if (!num_eq(got_cmp, expected_cmp)) {
+    ASSERT_EQ_INT(num_set_prec_bits(&want_cmp, compare_bits), 0);
+    if (!num_eq(got_cmp, want_cmp)) {
         string_t *got_text = format_number_for_test_output(got);
-        string_t *expected_text = format_number_for_test_output(expected);
+        string_t *want_text = format_number_for_test_output(want);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
         printf("    compare precision = %zu bits\n", compare_bits);
-        printf("    expected          = %s\n", formatted_number_cstr(expected_text));
+        printf("    want          = %s\n", formatted_number_cstr(want_text));
         printf("    got               = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
-    num_destroy(&expected_cmp);
+    num_destroy(&want_cmp);
     num_destroy(&got_cmp);
 }
 
@@ -281,23 +281,23 @@ static void check_unary_eval_case(const unary_eval_case_t *tc)
     expr_t *x = expr_new_var(input);
     expr_t *expr = tc->expr_fn(x);
     number_t got = expr_eval(expr);
-    number_t expected = tc->num_fn(input);
+    number_t want = tc->num_fn(input);
     string_t *got_text;
-    string_t *expected_text;
+    string_t *want_text;
 
-    if (!num_eq(got, expected)) {
+    if (!num_eq(got, want)) {
         got_text = format_number_for_test_output(got);
-        expected_text = format_number_for_test_output(expected);
+        want_text = format_number_for_test_output(want);
         printf(C_BOLD C_RED "FAIL" C_RESET " numeric function sweep: %s\n", tc->name);
         printf("    input    = %s\n", tc->input);
-        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    want = %s\n", formatted_number_cstr(want_text));
         printf("    got      = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(expr);
     expr_free(x);
@@ -312,24 +312,24 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
     expr_t *b = expr_new_var(rhs);
     expr_t *expr = tc->expr_fn(a, b);
     number_t got = expr_eval(expr);
-    number_t expected = tc->num_fn(lhs, rhs);
+    number_t want = tc->num_fn(lhs, rhs);
     string_t *got_text;
-    string_t *expected_text;
+    string_t *want_text;
 
-    if (!num_eq(got, expected)) {
+    if (!num_eq(got, want)) {
         got_text = format_number_for_test_output(got);
-        expected_text = format_number_for_test_output(expected);
+        want_text = format_number_for_test_output(want);
         printf(C_BOLD C_RED "FAIL" C_RESET " numeric function sweep: %s\n", tc->name);
         printf("    lhs      = %s\n", tc->lhs);
         printf("    rhs      = %s\n", tc->rhs);
-        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    want = %s\n", formatted_number_cstr(want_text));
         printf("    got      = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(expr);
     expr_free(b);
@@ -345,11 +345,11 @@ static void test_removable_trig_quotient_at_zero_evaluates_to_limit(void)
     number_t value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
     number_t five = num_create_from_long(5);
     number_t nine = num_create_from_long(9);
-    number_t expected = num_div(five, nine);
+    number_t want = num_div(five, nine);
 
-    ASSERT_TRUE(num_eq(value, expected));
+    ASSERT_TRUE(num_eq(value, want));
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&nine);
     num_destroy(&five);
     num_destroy(&value);
@@ -389,12 +389,12 @@ static void check_unary_derivative_case(const unary_eval_case_t *tc)
           (tc->deriv_tol_override ? number_close_with_tolerance_text(deriv_value, grad, tc->deriv_tol_override)
                                   : number_close_for_qfloat_precision(deriv_value, grad)))) {
         string_t *got_text = format_number_for_test_output(deriv_value);
-        string_t *expected_text = format_number_for_test_output(grad);
+        string_t *want_text = format_number_for_test_output(grad);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    want = %s\n", formatted_number_cstr(want_text));
         printf("    got      = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
@@ -430,24 +430,24 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
     snprintf(label, sizeof(label), "numeric derivative sweep d/dx: %s", tc->name);
     if (!(num_eq(got_dx, grads[0]) || number_close_for_qfloat_precision(got_dx, grads[0]))) {
         string_t *got_text = format_number_for_test_output(got_dx);
-        string_t *expected_text = format_number_for_test_output(grads[0]);
+        string_t *want_text = format_number_for_test_output(grads[0]);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    want = %s\n", formatted_number_cstr(want_text));
         printf("    got      = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
     snprintf(label, sizeof(label), "numeric derivative sweep d/dy: %s", tc->name);
     if (!(num_eq(got_dy, grads[1]) || number_close_for_qfloat_precision(got_dy, grads[1]))) {
         string_t *got_text = format_number_for_test_output(got_dy);
-        string_t *expected_text = format_number_for_test_output(grads[1]);
+        string_t *want_text = format_number_for_test_output(grads[1]);
 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s\n", label);
-        printf("    expected = %s\n", formatted_number_cstr(expected_text));
+        printf("    want = %s\n", formatted_number_cstr(want_text));
         printf("    got      = %s\n", formatted_number_cstr(got_text));
-        string_free(expected_text);
+        string_free(want_text);
         string_free(got_text);
         TEST_FAIL();
     }
@@ -475,11 +475,11 @@ static void check_high_precision_unary_value_case(const unary_eval_case_t *tc, s
     expr_t *expr = tc->expr_fn(x);
     expr_t *oracle_expr = tc->expr_fn(oracle_x);
     number_t got = expr_eval(expr);
-    number_t expected = expr_eval(oracle_expr);
+    number_t want = expr_eval(oracle_expr);
 
-    assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got, want, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(oracle_expr);
     expr_free(expr);
@@ -502,11 +502,11 @@ static void check_high_precision_binary_value_case(const binary_eval_case_t *tc,
     expr_t *expr = tc->expr_fn(a, b);
     expr_t *oracle_expr = tc->expr_fn(oracle_a, oracle_b);
     number_t got = expr_eval(expr);
-    number_t expected = expr_eval(oracle_expr);
+    number_t want = expr_eval(oracle_expr);
 
-    assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got, want, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(oracle_expr);
     expr_free(expr);
@@ -532,11 +532,11 @@ static void check_high_precision_unary_derivative_case(const unary_eval_case_t *
     expr_t *deriv = expr_create_deriv(expr, x);
     expr_t *oracle_deriv = expr_create_deriv(oracle_expr, oracle_x);
     number_t got = expr_eval(deriv);
-    number_t expected = expr_eval(oracle_deriv);
+    number_t want = expr_eval(oracle_deriv);
 
-    assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got, want, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(oracle_deriv);
     expr_free(deriv);
@@ -567,14 +567,14 @@ static void check_high_precision_binary_derivative_case(const binary_eval_case_t
     expr_t *oracle_deriv_y = expr_create_deriv(oracle_expr, oracle_y);
     number_t got_dx = expr_eval(deriv_x);
     number_t got_dy = expr_eval(deriv_y);
-    number_t expected_dx = expr_eval(oracle_deriv_x);
-    number_t expected_dy = expr_eval(oracle_deriv_y);
+    number_t want_dx = expr_eval(oracle_deriv_x);
+    number_t want_dy = expr_eval(oracle_deriv_y);
 
-    assert_same_to_bits(got_dx, expected_dx, high_precision_compare_bits(value_bits), tc->name);
-    assert_same_to_bits(got_dy, expected_dy, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got_dx, want_dx, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got_dy, want_dy, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected_dy);
-    num_destroy(&expected_dx);
+    num_destroy(&want_dy);
+    num_destroy(&want_dx);
     num_destroy(&got_dy);
     num_destroy(&got_dx);
     expr_free(oracle_deriv_y);
@@ -603,11 +603,11 @@ static void check_high_precision_complex_unary_value_case(const unary_eval_case_
     expr_t *expr = tc->expr_fn(z);
     expr_t *oracle_expr = tc->expr_fn(oracle_z);
     number_t got = expr_eval(expr);
-    number_t expected = expr_eval(oracle_expr);
+    number_t want = expr_eval(oracle_expr);
 
-    assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got, want, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(oracle_expr);
     expr_free(expr);
@@ -631,11 +631,11 @@ static void check_high_precision_complex_binary_value_case(const binary_eval_cas
     expr_t *expr = tc->expr_fn(a, b);
     expr_t *oracle_expr = tc->expr_fn(oracle_a, oracle_b);
     number_t got = expr_eval(expr);
-    number_t expected = expr_eval(oracle_expr);
+    number_t want = expr_eval(oracle_expr);
 
-    assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
+    assert_same_to_bits(got, want, high_precision_compare_bits(value_bits), tc->name);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(oracle_expr);
     expr_free(expr);
@@ -658,7 +658,7 @@ static void test_cmp_qfloat_precision(void)
     if (cmp < 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " expr_cmp respects qfloat precision\n");
     } else {
-        printf(C_BOLD C_RED "FAIL" C_RESET " expr_cmp lost qfloat precision %s:%d:1 (got %d, expected < 0)\n", __FILE__,
+        printf(C_BOLD C_RED "FAIL" C_RESET " expr_cmp lost qfloat precision %s:%d:1 (got %d, want < 0)\n", __FILE__,
                __LINE__, cmp);
         TEST_FAIL();
     }
@@ -923,14 +923,14 @@ static void test_default_constants_preserve_builtin_precision(void)
 static void test_expr_ln10_singleton(void)
 {
     number_t got = expr_eval(EXPR_LN10);
-    number_t expected = num_const(NUM_LN10);
+    number_t want = num_const(NUM_LN10);
     char *text = expr_to_string(EXPR_LN10, style_EXPRESSION);
 
-    ASSERT_TRUE(num_eq(got, expected));
+    ASSERT_TRUE(num_eq(got, want));
     ASSERT_TRUE(text && strstr(text, "ln10") != NULL);
 
     free(text);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
 }
 
@@ -1045,19 +1045,19 @@ static void test_eval_num_on_expression(void)
 {
     number_t half = num_create_from_string("1/2");
     number_t two = num_create_from_string("2");
-    number_t expected = num_create_from_string("5/2");
+    number_t want = num_create_from_string("5/2");
     expr_t *x = expr_new_var(half);
     expr_t *c = expr_new_const(two);
     expr_t *sum = expr_add(x, c);
     number_t got = expr_eval(sum);
 
-    ASSERT_TRUE(num_eq(got, expected));
+    ASSERT_TRUE(num_eq(got, want));
 
     num_destroy(&got);
     expr_free(sum);
     expr_free(c);
     expr_free(x);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&two);
     num_destroy(&half);
 }
@@ -2674,7 +2674,7 @@ static void test_productlog_small_complex_inverse_uses_principal_branch(void)
 {
     expr_t *expr = expr_from_string("{ productlog(1/13i*exp(1/13i)) }", NULL);
     number_t value = expr ? expr_eval(expr) : NUM_NAN;
-    number_t expected = num_create_from_string("1/13i");
+    number_t want = num_create_from_string("1/13i");
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     const char *expect_text = "1/13i";
 
@@ -2684,10 +2684,10 @@ static void test_productlog_small_complex_inverse_uses_principal_branch(void)
         to_string_fail(__FILE__, __LINE__, 1, "productlog complex principal branch simplifies",
                        expr_text ? expr_text : "(null)", expect_text);
 
-    ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-30"));
+    ASSERT_TRUE(number_close_with_tolerance_text(value, want, "1e-30"));
 
     free(expr_text);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&value);
     expr_free(expr);
 }
@@ -2701,18 +2701,18 @@ static void test_factorial_postfix_lowers_to_differentiable_gamma(void)
     number_t value = expr ? expr_eval(expr) : NUM_NAN;
     number_t deriv_value = deriv ? expr_eval(deriv) : NUM_NAN;
     number_t six = num_create_from_long(6);
-    number_t expected_value = num_create_from_long(120);
+    number_t want_value = num_create_from_long(120);
     number_t gamma_six = num_gamma(six);
     number_t digamma_six = num_digamma(six);
-    number_t expected_deriv = num_mul(gamma_six, digamma_six);
+    number_t want_deriv = num_mul(gamma_six, digamma_six);
 
-    ASSERT_TRUE(num_eq(value, expected_value));
-    ASSERT_TRUE(number_close_with_tolerance_text(deriv_value, expected_deriv, "1e-30"));
+    ASSERT_TRUE(num_eq(value, want_value));
+    ASSERT_TRUE(number_close_with_tolerance_text(deriv_value, want_deriv, "1e-30"));
 
-    num_destroy(&expected_deriv);
+    num_destroy(&want_deriv);
     num_destroy(&digamma_six);
     num_destroy(&gamma_six);
-    num_destroy(&expected_value);
+    num_destroy(&want_value);
     num_destroy(&six);
     num_destroy(&deriv_value);
     num_destroy(&value);
@@ -2833,7 +2833,7 @@ static void test_preserved_reciprocal_constant_derivative_round_trips(void)
         printf(C_RED "  FAIL: preserved reciprocal derivative round-trips safely\n" C_RESET);
         printf("    derivative = %s\n", deriv_text ? deriv_text : "(null)");
         printf("    tex        = %s\n", deriv_TeX ? deriv_TeX : "(null)");
-        printf("    expected   = %s, with TeX keeping sqrt(pi) as a fraction\n", deriv_expect);
+        printf("    want   = %s, with TeX keeping sqrt(pi) as a fraction\n", deriv_expect);
         num_set_default_prec_digits(old_precision);
         TEST_FAIL();
     }
@@ -3019,7 +3019,7 @@ static void test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients(v
     else {
         printf(C_RED "  FAIL: nested symbolic pi derivative keeps coefficients symbolic\n" C_RESET);
         printf("    got      = %s\n", deriv_text ? deriv_text : "(null)");
-        printf("    expected = no 4.712..., 9.424..., or 3.084... coefficients\n");
+        printf("    want = no 4.712..., 9.424..., or 3.084... coefficients\n");
         TEST_FAIL();
     }
 
@@ -3563,7 +3563,7 @@ static void test_tan_poles_display_as_infinity(void)
         if (num_is_inf(value) && num_get_sign(value) == cases[i].inf_sign)
             printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", cases[i].label);
         else {
-            printf(C_BOLD C_RED "FAIL" C_RESET " %s: value was not expected infinity\n\n", cases[i].label);
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s: value was not want infinity\n\n", cases[i].label);
             TEST_FAIL();
         }
 
@@ -3586,15 +3586,15 @@ static void test_tan_poles_display_as_infinity(void)
     }
 }
 
-static void expect_sqrt_negative_text(const char *label, const char *field, const char *got, const char *expected)
+static void expect_sqrt_negative_text(const char *label, const char *field, const char *got, const char *want)
 {
     char full_label[160];
 
     snprintf(full_label, sizeof(full_label), "%s %s", label, field);
-    if (str_eq(got, expected))
-        to_string_pass(full_label, got, expected);
+    if (str_eq(got, want))
+        to_string_pass(full_label, got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, full_label, got ? got : "(null)", expected);
+        to_string_fail(__FILE__, __LINE__, 1, full_label, got ? got : "(null)", want);
 }
 
 static void test_sqrt_negative_exact_evaluates_to_i(void)
@@ -3923,20 +3923,20 @@ static void test_explicit_complex_cube_root_preserves_family_and_evaluates_princ
     expr_t *simplified = expr ? expr_simplify(expr) : NULL;
     char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
     number_t value = expr ? expr_eval(expr) : (number_t){0};
-    number_t expected = num_add(NUM_ONE, NUM_I);
+    number_t want = num_add(NUM_ONE, NUM_I);
     number_t seed = (number_t){0};
     long order = 0L;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(simplified);
     TEST_ASSERT_STR_EQ(text, "(-2 + 2i)^⅓");
-    ASSERT_TRUE(num_eq(value, expected));
+    ASSERT_TRUE(num_eq(value, want));
     ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
     ASSERT_EQ_INT(order, 3L);
-    ASSERT_TRUE(num_eq(seed, expected));
+    ASSERT_TRUE(num_eq(seed, want));
 
     num_destroy(&seed);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&value);
     free(text);
     expr_free(simplified);
@@ -3955,7 +3955,7 @@ static void test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots(
     char *sqrt_text = sqrt_simplified ? expr_to_string(sqrt_simplified, style_UNBOUND) : NULL;
     char *power_text = power_simplified ? expr_to_string(power_simplified, style_UNBOUND) : NULL;
     number_t seed = (number_t){0};
-    number_t expected = num_add(NUM_TWO, NUM_I);
+    number_t want = num_add(NUM_TWO, NUM_I);
     long order = 0L;
 
     ASSERT_NOT_NULL(sqrt_expr);
@@ -3968,9 +3968,9 @@ static void test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots(
     ASSERT_TRUE(expr_explicit_root_order(power_expr, &order));
     ASSERT_EQ_INT(order, 2L);
     ASSERT_TRUE(expr_exact_complex_root_seed(power_expr, &seed, &order));
-    ASSERT_TRUE(num_eq(seed, expected));
+    ASSERT_TRUE(num_eq(seed, want));
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&seed);
     free(power_text);
     free(sqrt_text);
@@ -3987,15 +3987,15 @@ static void test_exact_complex_fifth_root_family_finds_cartesian_seed(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("(-4 + 4i)^(1/5)", &bindings);
     number_t seed = (number_t){0};
-    number_t expected = num_sub(NUM_ONE, NUM_I);
+    number_t want = num_sub(NUM_ONE, NUM_I);
     long order = 0L;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
     ASSERT_EQ_INT(order, 5L);
-    ASSERT_TRUE(num_eq(seed, expected));
+    ASSERT_TRUE(num_eq(seed, want));
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&seed);
     expr_bindings_free(bindings);
     expr_free(expr);
@@ -4010,21 +4010,21 @@ static void test_named_sixth_root_uses_exact_cartesian_principal_value(void)
     expr_t *beautified = simplified ? expr_beautify_presimplified(simplified) : NULL;
     char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
     number_t seed = (number_t){0};
-    number_t expected_seed = num_add(NUM_ONE, num_mul(NUM_TWO, NUM_I));
+    number_t want_seed = num_add(NUM_ONE, num_mul(NUM_TWO, NUM_I));
     long order = 0L;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(simplified);
     ASSERT_TRUE(expr_exact_complex_root_seed(expr, &seed, &order));
     ASSERT_EQ_INT(order, 6L);
-    ASSERT_TRUE(num_eq(seed, expected_seed));
+    ASSERT_TRUE(num_eq(seed, want_seed));
     ASSERT_NOT_NULL(beautified);
     ASSERT_NOT_NULL(text);
     ASSERT_NULL(strstr(text, "root("));
     ASSERT_NOT_NULL(strstr(text, "√(3)"));
     ASSERT_NOT_NULL(strstr(text, "i"));
 
-    num_destroy(&expected_seed);
+    num_destroy(&want_seed);
     num_destroy(&seed);
     free(text);
     expr_free(beautified);
@@ -4087,7 +4087,7 @@ static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
     expr_t *expr = expr_from_string("{ exp(π·√(x)) | x = NAN }", &bindings);
     expr_t *x;
     number_t target = num_create_from_string("262537412640768744");
-    number_t expected = num_create_from_string("163");
+    number_t want = num_create_from_string("163");
     number_t x_value;
     expr_goal_seek_options_t options = {0};
     expr_goal_seek_result_t result;
@@ -4107,11 +4107,11 @@ static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
     ASSERT_TRUE(num_is_real(result.residual));
 
     x_value = expr_get_val(x);
-    ASSERT_TRUE(number_close_with_tolerance_text(x_value, expected, "1e-25"));
+    ASSERT_TRUE(number_close_with_tolerance_text(x_value, want, "1e-25"));
 
     num_destroy(&x_value);
     expr_goal_seek_result_clear(&result);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&target);
     expr_free(expr);
     expr_bindings_free(bindings);
@@ -4130,7 +4130,7 @@ static void test_iterated_symbolic_integration_moves_out_of_lab(void)
     expr_t *result = NULL;
     expr_t *first_antiderivative = NULL;
     number_t value = num_new();
-    number_t expected = num_create_from_string("0.25");
+    number_t want = num_create_from_string("0.25");
     size_t completed_steps = 0u;
 
     ASSERT_NOT_NULL(expr);
@@ -4158,10 +4158,10 @@ static void test_iterated_symbolic_integration_moves_out_of_lab(void)
 
     num_destroy(&value);
     value = expr_eval(result);
-    ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-20"));
+    ASSERT_TRUE(number_close_with_tolerance_text(value, want, "1e-20"));
 
     num_destroy(&value);
-    num_destroy(&expected);
+    num_destroy(&want);
     expr_free(first_antiderivative);
     expr_free(result);
     expr_free(hi[1]);
@@ -4176,9 +4176,9 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ sin(x^2) * y | x = NAN, y = NAN }", &bindings);
-    const char *expected_names[1];
-    expr_t *expected_symbols[1];
-    expr_t *expected = NULL;
+    const char *want_names[1];
+    expr_t *want_symbols[1];
+    expr_t *want = NULL;
     expr_t *x;
     expr_t *y;
     expr_t *vars[2];
@@ -4192,7 +4192,7 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     number_t remaining_hi_num[2];
     expr_t *result = NULL;
     number_t got_value = num_new();
-    number_t expected_value = num_new();
+    number_t want_value = num_new();
     size_t completed_steps = 0u;
     size_t remaining_ndim = 0u;
 
@@ -4203,10 +4203,10 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(y);
 
-    expected_names[0] = "x";
-    expected_symbols[0] = x;
-    expected = expr_from_expression_string("sin(x^2) / 2", expected_names, expected_symbols, 1u);
-    ASSERT_NOT_NULL(expected);
+    want_names[0] = "x";
+    want_symbols[0] = x;
+    want = expr_from_expression_string("sin(x^2) / 2", want_names, want_symbols, 1u);
+    ASSERT_NOT_NULL(want);
 
     vars[0] = x;
     vars[1] = y;
@@ -4240,11 +4240,11 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     test_expr_set_val_d(x, 0.3);
     num_destroy(&got_value);
     got_value = expr_eval(result);
-    num_destroy(&expected_value);
-    expected_value = expr_eval(expected);
-    ASSERT_TRUE(number_close_with_tolerance_text(got_value, expected_value, "1e-20"));
+    num_destroy(&want_value);
+    want_value = expr_eval(want);
+    ASSERT_TRUE(number_close_with_tolerance_text(got_value, want_value, "1e-20"));
 
-    num_destroy(&expected_value);
+    num_destroy(&want_value);
     num_destroy(&got_value);
     expr_free(result);
     num_destroy(&remaining_hi_num[1]);
@@ -4259,7 +4259,7 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     expr_free(hi[0]);
     expr_free(lo[1]);
     expr_free(lo[0]);
-    expr_free(expected);
+    expr_free(want);
     expr_free(expr);
     expr_bindings_free(bindings);
 }

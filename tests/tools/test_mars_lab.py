@@ -31,29 +31,29 @@ class BindingEnvelopeTests(unittest.TestCase):
             for name in names
         )
         script = functions + r'''
-            function equal(actual, expected) {
-                if (actual !== expected)
-                    throw new Error(JSON.stringify({actual, expected}));
+            function equal(got, want) {
+                if (got !== want)
+                    throw new Error(JSON.stringify({got, want}));
             }
             const body = 'exp(Li(x+iy))';
             const bindings = [
                 {name: 'x', value: '2', kind: 'variable'},
                 {name: 'y', value: '?', kind: 'constant'},
             ];
-            const expected = '{ exp(Li(x+iy)) | x = 2; y = ? }';
+            const want = '{ exp(Li(x+iy)) | x = 2; y = ? }';
             let formatted = body;
             for (let i = 0; i < 5; ++i) {
                 formatted = expressionWithBindings(formatted, bindings);
-                equal(formatted, expected);
-                equal(expressionWithVisibleBindings(formatted, bindings), expected);
+                equal(formatted, want);
+                equal(expressionWithVisibleBindings(formatted, bindings), want);
             }
             let nested = body;
             for (let i = 0; i < 5; ++i)
                 nested = `{ ${nested} | x = NAN, y = NAN }`;
             equal(expressionBodyForEditor(nested), body);
-            equal(expressionWithVisibleBindings(nested, bindings), expected);
-            equal(expressionWithBindings(nested, bindings), expected);
-            equal(expressionWithBindings(expected, []), expected);
+            equal(expressionWithVisibleBindings(nested, bindings), want);
+            equal(expressionWithBindings(nested, bindings), want);
+            equal(expressionWithBindings(want, []), want);
             equal(expressionBodyForEditor('sin(x | y)'), 'sin(x | y)');
             equal(expressionBodyForEditor('(1 2; 3 4)'), '(1 2; 3 4)');
         '''
@@ -349,9 +349,9 @@ class EquationResultTests(unittest.TestCase):
             for name in names
         )
         script = functions + r'''
-            function equal(actual, expected) {
-                if (actual !== expected)
-                    throw new Error(JSON.stringify({actual, expected}));
+            function equal(got, want) {
+                if (got !== want)
+                    throw new Error(JSON.stringify({got, want}));
             }
             const pairs = 's ≈ 0.5 ± 14.134725141734693790i\ns ≈ 0.5 ± 21.022039638771554993i';
             const data = {
@@ -482,9 +482,9 @@ class EquationResultTests(unittest.TestCase):
             for name in names
         )
         script = r'''
-            function equal(actual, expected) {
-                if (actual !== expected)
-                    throw new Error(JSON.stringify({actual, expected}));
+            function equal(got, want) {
+                if (got !== want)
+                    throw new Error(JSON.stringify({got, want}));
             }
             function element() {
                 const state = new Set();
@@ -1011,18 +1011,18 @@ class EquationResultTests(unittest.TestCase):
             ("x + 2x + 4x + ... + 64x = 127", "127x = 127", "x = 1", r"\sum_{n=1}^{7}"),
         )
 
-        for source, expected_equation, expected_solution, expected_sum in cases:
+        for source, want_equation, want_solution, want_sum in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_equation_lab_fields(equation_binary, source, 64)
 
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["unbound"], expected_equation)
-                self.assertEqual(fields["solutions"], expected_solution)
-                self.assertIn(expected_sum, fields["tex"])
-                self.assertIn(expected_sum, fields["derivation_TeX"])
+                self.assertEqual(fields["unbound"], want_equation)
+                self.assertEqual(fields["solutions"], want_solution)
+                self.assertIn(want_sum, fields["tex"])
+                self.assertIn(want_sum, fields["derivation_TeX"])
                 self.assertIn("x &=", fields["derivation_TeX"])
                 self.assertLess(
-                    fields["derivation_TeX"].index(expected_sum),
+                    fields["derivation_TeX"].index(want_sum),
                     fields["derivation_TeX"].index("x &=")
                 )
 
@@ -1423,9 +1423,9 @@ class MatrixResultTests(unittest.TestCase):
 
         payload = mars_lab.prepare_matrix_fields(fields, 270)
 
-        expected = r"1.515888050297733\times 10^{-7}"
-        self.assertIn(expected, payload["tex"])
-        self.assertIn(expected, payload["full_TeX"])
+        want = r"1.515888050297733\times 10^{-7}"
+        self.assertIn(want, payload["tex"])
+        self.assertIn(want, payload["full_TeX"])
         self.assertNotIn("E-7", payload["tex"])
         self.assertIn("svg", payload)
 
@@ -1825,12 +1825,12 @@ class MatrixResultTests(unittest.TestCase):
             ("((1 2; 3 4) - lambdaI)^x", "power"),
         )
 
-        for matrix_text, expected_operation in cases:
+        for matrix_text, want_operation in cases:
             with self.subTest(matrix_text=matrix_text):
                 fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 32)
 
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["operation"], expected_operation)
+                self.assertEqual(fields["operation"], want_operation)
                 self.assertTrue(fields["result"])
 
     @unittest.skipUnless(
@@ -1900,13 +1900,13 @@ class MatrixResultTests(unittest.TestCase):
             ("sin(0, 0; 0, 0)", "sin", "(0, 0; 0, 0)"),
         )
 
-        for matrix_text, expected_operation, expected in cases:
-            with self.subTest(operation=expected_operation):
+        for matrix_text, want_operation, want in cases:
+            with self.subTest(operation=want_operation):
                 fields, raw, returncode = mars_lab.run_matrix_lab_fields(matrix_binary, matrix_text, "eval", 64)
 
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["operation"], expected_operation)
-                self.assertEqual(fields["result"], expected)
+                self.assertEqual(fields["operation"], want_operation)
+                self.assertEqual(fields["result"], want)
                 self.assertNotIn("i", fields["result"])
 
     @unittest.skipUnless(
@@ -3558,13 +3558,13 @@ class ExpressionResultTests(unittest.TestCase):
             ("factorial(x)^2", r"\Gamma(x + 1)^{2}"),
             ("factorial(x)^y", r"\Gamma(x + 1)^{y}"),
         )
-        for source, expected in cases:
+        for source, want in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 32, "x", "evaluate"
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["tex"], expected)
+                self.assertEqual(fields["tex"], want)
                 self.assertNotIn("factorial", fields["tex"])
 
     def test_factorial_TeX_tracks_nonnegative_integer_summation_indices(self) -> None:
@@ -3579,13 +3579,13 @@ class ExpressionResultTests(unittest.TestCase):
             ("sum(k,-1,n,factorial(k))", r"\Gamma(k + 1)"),
             ("sum(k,a,n,factorial(k))", r"\Gamma(k + 1)"),
         )
-        for source, expected in cases:
+        for source, want in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 32, "n", "evaluate"
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertIn(expected, fields["tex"])
+                self.assertIn(want, fields["tex"])
                 self.assertNotIn("factorial", fields["tex"])
 
     def test_composed_li_derivative_explicit_series_matches_numeric_derivative(self) -> None:
@@ -4176,7 +4176,7 @@ class ExpressionResultTests(unittest.TestCase):
         "release mars_lab helper is not built",
     )
     def test_elementary_functions_of_symbolic_complex_input_use_cartesian_form(self) -> None:
-        expected_fragments = {
+        want_fragments = {
             "exp": ("exp(x)·cos(y)", "exp(x)·sin(y)·i"),
             "sin": ("sin(x)·cosh(y)", "cos(x)·sinh(y)·i"),
             "cos": ("cos(x)·cosh(y)", "sin(x)·sinh(y)·i"),
@@ -4189,7 +4189,7 @@ class ExpressionResultTests(unittest.TestCase):
             "log10": ("ln(x² + y²)", "atan2(y, x)/ln(10)·i"),
         }
 
-        for function, fragments in expected_fragments.items():
+        for function, fragments in want_fragments.items():
             source = f"{function}(x+i*y)"
             with self.subTest(function=function):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -4707,8 +4707,8 @@ class ExpressionResultTests(unittest.TestCase):
             "evaluate",
         )
         self.assertEqual(small_returncode, 0)
-        expected = sum(math.exp(k * 0.2) * math.sin(k * 0.2) for k in range(1, 6))
-        self.assertAlmostEqual(float(small_fields["value"]), expected, places=14)
+        want = sum(math.exp(k * 0.2) * math.sin(k * 0.2) for k in range(1, 6))
+        self.assertAlmostEqual(float(small_fields["value"]), want, places=14)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4751,7 +4751,7 @@ class ExpressionResultTests(unittest.TestCase):
             "{ zetap(p, a) | p = 2.5; a = 101 }": "-0.0034916196565303381067445584043472",
         }
 
-        for expression, expected in cases.items():
+        for expression, want in cases.items():
             with self.subTest(expression=expression):
                 fields, _, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary,
@@ -4773,7 +4773,7 @@ class ExpressionResultTests(unittest.TestCase):
                 )
 
                 self.assertEqual(payload["evaluation_ready"], "yes")
-                self.assertEqual(payload["value"], expected)
+                self.assertEqual(payload["value"], want)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4804,7 +4804,7 @@ class ExpressionResultTests(unittest.TestCase):
             ),
         )
 
-        for source, expected_expression, expected_sum, expected_formula, expected_function in cases:
+        for source, want_expression, want_sum, want_formula, want_function in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 64, "p", "evaluate"
@@ -4815,14 +4815,14 @@ class ExpressionResultTests(unittest.TestCase):
                     self.expression_binary, fields, source, 64, False, wrt="p", action="evaluate"
                 )
 
-                self.assertEqual(payload["expression"], expected_expression)
+                self.assertEqual(payload["expression"], want_expression)
                 self.assertEqual(
-                    payload["full_display_expression"], fields["conditioned_expression"] or expected_expression
+                    payload["full_display_expression"], fields["conditioned_expression"] or want_expression
                 )
-                self.assertIn(expected_sum, payload["full_display_TeX"])
-                self.assertIn(expected_formula, payload["full_display_TeX"])
+                self.assertIn(want_sum, payload["full_display_TeX"])
+                self.assertIn(want_formula, payload["full_display_TeX"])
                 self.assertNotIn(r"n^{3}", payload["full_display_TeX"])
-                self.assertIn(expected_function, payload["full_display_function"])
+                self.assertIn(want_function, payload["full_display_function"])
                 self.assertEqual(payload["value"], "338350")
 
     def test_power_ellipsis_accepts_literal_endpoints_and_explicit_first_powers(self) -> None:
@@ -4836,13 +4836,13 @@ class ExpressionResultTests(unittest.TestCase):
             ("1^-s+2^-s+3^-s+...+100^-s | s=2", sum(1/k**2 for k in range(1, 101))),
             ("1^s+2^s+3^s+...+100^s+7 | s=2", 338357.0),
         )
-        for source, expected in cases:
+        for source, want in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 270, "s", "evaluate"
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertAlmostEqual(float(fields["value"]), expected, delta=abs(expected)*1e-13)
+                self.assertAlmostEqual(float(fields["value"]), want, delta=abs(want)*1e-13)
 
     def test_prime_power_ellipsis_evaluates_native_sum_and_preserves_symbolic_cards(self) -> None:
         source = "1/2^s+1/3^s+1/5^s+1/7^s+1/11^s+1/13^s+1/17^s+...+1/101^s | s=2"
@@ -4904,16 +4904,16 @@ class ExpressionResultTests(unittest.TestCase):
             ("1/2^s+1/3^s+1/7^s+...+1/p^s", None),
             ("1/2^s+1/3^t+1/5^s+...+1/p^s", None),
         )
-        for source, expected in cases:
+        for source, want in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 32, "n" if "^-n" in source else "s", "evaluate"
                 )
-                if expected is None:
+                if want is None:
                     self.assertNotEqual(returncode, 0, raw)
                 else:
                     self.assertEqual(returncode, 0, raw)
-                    self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+                    self.assertAlmostEqual(float(fields["value"]), want, places=14)
 
     def test_power_ellipsis_rejects_inconsistent_prefixes_and_literal_endpoints(self) -> None:
         sources = (
@@ -4976,8 +4976,8 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(payload["derivative_TeX"], r"\zeta'(p) - \zeta'(p, n + 1)")
         self.assertIn("p = -2.", payload["full_display_derivative_function"])
         self.assertIn("const n = 1000.", payload["full_display_derivative_function"])
-        expected = -sum(k * k * math.log(k) for k in range(1, 1001))
-        self.assertAlmostEqual(float(payload["derivative_value"]), expected, delta=abs(expected) * 1e-14)
+        want = -sum(k * k * math.log(k) for k in range(1, 1001))
+        self.assertAlmostEqual(float(payload["derivative_value"]), want, delta=abs(want) * 1e-14)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -4998,8 +4998,8 @@ class ExpressionResultTests(unittest.TestCase):
             payload["derivative"],
             "d/dp = { ζ'(p) - ζ'(p, n + 1) | p = 1; n = 1000 }",
         )
-        expected = -sum(math.log(k) / k for k in range(1, 1001))
-        self.assertAlmostEqual(float(payload["derivative_value"]), expected, delta=abs(expected) * 1e-14)
+        want = -sum(math.log(k) / k for k in range(1, 1001))
+        self.assertAlmostEqual(float(payload["derivative_value"]), want, delta=abs(want) * 1e-14)
 
         huge_n = "1" + "0" * 57
         huge_source = f"1+1/2^p+1/3^p+1/4^p+...+1/n^p | p=1; n={huge_n}"
@@ -5171,8 +5171,8 @@ class ExpressionResultTests(unittest.TestCase):
         bound_payload = mars_lab.prepare_evaluation_fields(
             self.expression_binary, bound_fields, bound_source, 64, False, wrt="x", action="evaluate"
         )
-        expected = sum(math.cos(k * 0.5) for k in range(1, 5))
-        self.assertAlmostEqual(float(bound_payload["value"]), expected, places=15)
+        want = sum(math.cos(k * 0.5) for k in range(1, 5))
+        self.assertAlmostEqual(float(bound_payload["value"]), want, places=15)
 
         zero_source = "{ cos(x)+cos(2x)+cos(3x)+cos(4x)+...+cos(nx) | x=0; n=4 }"
         zero_fields, zero_raw, zero_returncode = mars_lab.run_mars_lab_fields(
@@ -5417,7 +5417,7 @@ class ExpressionResultTests(unittest.TestCase):
     )
     def test_large_inverse_progression_displays_signed_infinity_at_an_exact_pole(self) -> None:
         # Regression: a known inverse-function pole is a signed infinite Value, not an omitted NaN Value.
-        for function, step, expected in (("acoth", "1", "∞"), ("acoth", "-1", "-∞"),
+        for function, step, want in (("acoth", "1", "∞"), ("acoth", "-1", "-∞"),
                                          ("atanh", "1/2", "∞")):
             with self.subTest(function=function, step=step):
                 source = f"{{ @Z_(k=1)^n {function}(kx) | x={step}; n=1000000000 }}"
@@ -5428,7 +5428,7 @@ class ExpressionResultTests(unittest.TestCase):
                 payload = mars_lab.prepare_evaluation_fields(
                     self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
                 )
-                self.assertEqual(payload["value"], expected)
+                self.assertEqual(payload["value"], want)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -5499,8 +5499,8 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertIn(r"\psi_", payload["display_TeX"])
                 self.assertIn("ψq(", payload["full_display_expression"])
                 self.assertIn("qdigamma(", payload["full_display_function"])
-                expected = sum(numerical_function(k * 0.2) for k in range(1, 6))
-                self.assertAlmostEqual(float(payload["value"].split()[0]), expected, places=14)
+                want = sum(numerical_function(k * 0.2) for k in range(1, 6))
+                self.assertAlmostEqual(float(payload["value"].split()[0]), want, places=14)
 
                 round_trip_source = payload["full_display_expression"]
                 round_trip_fields, round_trip_raw, round_trip_returncode = mars_lab.run_mars_lab_fields(
@@ -5517,7 +5517,7 @@ class ExpressionResultTests(unittest.TestCase):
                     action="evaluate",
                 )
                 self.assertIn(rf"\sum_{{k=1}}^{{n}}{function_TeX}(k\mkern-2mu x) =", round_trip_payload["display_TeX"])
-                self.assertAlmostEqual(float(round_trip_payload["value"].split()[0]), expected, places=14)
+                self.assertAlmostEqual(float(round_trip_payload["value"].split()[0]), want, places=14)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -5642,8 +5642,8 @@ class ExpressionResultTests(unittest.TestCase):
                 )
                 self.assertIn(rf"\sum_{{k=1}}^{{n}}\operatorname{{{function}}}(k\mkern-2mu x) =", payload["display_TeX"])
                 self.assertNotIn("Σ_", payload["full_display_expression"])
-                expected = sum(numerical_function(k * 0.2) for k in range(1, 6))
-                self.assertAlmostEqual(float(payload["value"]), expected, places=14)
+                want = sum(numerical_function(k * 0.2) for k in range(1, 6))
+                self.assertAlmostEqual(float(payload["value"]), want, places=14)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -5715,7 +5715,7 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertEqual(payload["full_display_expression"], "{ x·n/2·(n + 1) | x = 2; n = 100000 }")
                 self.assertEqual(payload["value"], "10000100000")
 
-        for function, expected_value in (("floor", "2999990000"), ("ceil", "3000070000")):
+        for function, want_value in (("floor", "2999990000"), ("ceil", "3000070000")):
             with self.subTest(function=function, rational_step="3/5"):
                 source = f"{{ @Z_(k=1)^n {function}(kx) | x=0.6; n=100000 }}"
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -5734,7 +5734,7 @@ class ExpressionResultTests(unittest.TestCase):
                 self.assertNotIn("sum(k, 1, n", payload["function"])
                 self.assertIn("\\sum_{k=1}^{n}", payload["tex"])
                 self.assertIn(" = ", payload["tex"])
-                self.assertEqual(payload["value"], expected_value)
+                self.assertEqual(payload["value"], want_value)
 
         literal_source = "{ @Z_(k=1)^n floor(0.6k) | n=100000 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -5777,8 +5777,8 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, fields, irrational_source, 64, False, wrt="x", action="evaluate"
         )
         self.assertIn("Σ_(k=1)^n", payload["full_display_expression"])
-        expected = sum(math.isqrt(2 * k * k) for k in range(1, 100001))
-        self.assertEqual(payload["value"], str(expected))
+        want = sum(math.isqrt(2 * k * k) for k in range(1, 100001))
+        self.assertEqual(payload["value"], str(want))
 
         bit_not_source = "{ @Z_(k=1)^n not(kx) | x=2; n=100000 }"
         fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -5997,7 +5997,7 @@ class ExpressionResultTests(unittest.TestCase):
             ),
         )
 
-        for function, expected_expression, expected_formula, expected_at_zero in cases:
+        for function, want_expression, want_formula, want_at_zero in cases:
             with self.subTest(function=function):
                 source = f"{function}(x)+{function}(2x)+{function}(3x)+{function}(4x)+...+{function}(nx)"
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -6007,10 +6007,10 @@ class ExpressionResultTests(unittest.TestCase):
                 payload = mars_lab.prepare_evaluation_fields(
                     self.expression_binary, fields, source, 64, False, wrt="x", action="evaluate"
                 )
-                self.assertEqual(payload["full_display_expression"], expected_expression)
+                self.assertEqual(payload["full_display_expression"], want_expression)
                 self.assertEqual(
                     payload["display_TeX"],
-                    rf"\sum_{{k=1}}^{{n}}\{function}(k\mkern-2mu x) = {expected_formula}",
+                    rf"\sum_{{k=1}}^{{n}}\{function}(k\mkern-2mu x) = {want_formula}",
                 )
                 self.assertIn("v1 = x/2.", payload["full_display_function"])
                 self.assertIn(
@@ -6030,8 +6030,8 @@ class ExpressionResultTests(unittest.TestCase):
                     self.expression_binary, bound_fields, bound_source, 64, False, wrt="x", action="evaluate"
                 )
                 numeric_function = math.sinh if function == "sinh" else math.cosh
-                expected = sum(numeric_function(k * 0.25) for k in range(1, 5))
-                self.assertAlmostEqual(float(bound_payload["value"]), expected, places=15)
+                want = sum(numeric_function(k * 0.25) for k in range(1, 5))
+                self.assertAlmostEqual(float(bound_payload["value"]), want, places=15)
 
                 zero_source = (
                     f"{{ {function}(x)+{function}(2x)+{function}(3x)+{function}(4x)+...+{function}(nx) "
@@ -6044,7 +6044,7 @@ class ExpressionResultTests(unittest.TestCase):
                 zero_payload = mars_lab.prepare_evaluation_fields(
                     self.expression_binary, zero_fields, zero_source, 64, False, wrt="x", action="evaluate"
                 )
-                self.assertEqual(float(zero_payload["value"]), expected_at_zero)
+                self.assertEqual(float(zero_payload["value"]), want_at_zero)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -7725,13 +7725,13 @@ class ExpressionResultTests(unittest.TestCase):
             ("integral(a, x, exp(cosh(t)), t)", "integral(a, x, exp(cosh(t)), t)"),
             ("sum(k, 1, n, integral(x, Li(k.t), t))", "sum(k, 1, n, integral(x, li(k.t), t))"),
         )
-        for source, expected in cases:
+        for source, want in cases:
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
                     self.expression_binary, source, 64, "x", "evaluate"
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertIn(expected, fields["function"])
+                self.assertIn(want, fields["function"])
                 self.assertNotIn("@S", fields["function"])
 
     @unittest.skipUnless(
@@ -7739,7 +7739,7 @@ class ExpressionResultTests(unittest.TestCase):
         "release mars_lab helper is not built",
     )
     def test_expression_integral_budget_meets_requested_precision(self) -> None:
-        expected_prefix = (
+        want_prefix = (
             "3.282019361716804048203463607517520581316512948427583727395760606137631894"
             "015783088440537589426605283721284926282407788662778821709500932676521399"
             "828735288142794080090483179244993998261773966813476082324682815018690186"
@@ -7760,14 +7760,14 @@ class ExpressionResultTests(unittest.TestCase):
         )
         fields = mars_lab.parse_mars_lab_output(completed.stdout)
 
-        self.assertTrue(fields["value"].startswith(expected_prefix))
+        self.assertTrue(fields["value"].startswith(want_prefix))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
         "release mars_lab helper is not built",
     )
     def test_builtin_pi_integral_is_not_an_editable_binding(self) -> None:
-        expected_prefix = (
+        want_prefix = (
             "10392.468738822600980420744462117841678573566419462679673329278087957084"
             "631825897792198285830927860943628524047869766350810032768610623859138947"
             "497641471731730305680684554908473134666515367819801469199656685560045049"
@@ -7796,7 +7796,7 @@ class ExpressionResultTests(unittest.TestCase):
             save_expression=False,
         )
 
-        self.assertTrue(fields["value"].startswith(expected_prefix))
+        self.assertTrue(fields["value"].startswith(want_prefix))
         self.assertEqual(fields["binding_values"], [])
         self.assertNotIn("binding              constant\tπ", completed.stdout)
 
@@ -8084,12 +8084,12 @@ class AlmanacLocationTests(unittest.TestCase):
             "kind": "partial",
             "time": "2026-08-28 05:12:49 GMT+01:00",
         }
-        expected_window = "2026-08-18T22:17:53+00:00|2027-08-18T22:17:53+00:00"
+        want_window = "2026-08-18T22:17:53+00:00|2027-08-18T22:17:53+00:00"
 
         with mock.patch.object(
             mars_lab,
             "generate_upcoming_almanac_events",
-            return_value=([future_event], expected_window),
+            return_value=([future_event], want_window),
         ) as generate:
             payload = mars_lab.prepare_almanac_fields({
                 "date": "2026-08-18",
@@ -8105,7 +8105,7 @@ class AlmanacLocationTests(unittest.TestCase):
 
         generate.assert_called_once()
         self.assertEqual([event["name"] for event in payload["events"]], ["Future lunar eclipse"])
-        self.assertEqual(payload["event_window"], expected_window)
+        self.assertEqual(payload["event_window"], want_window)
         self.assertEqual(
             payload["event_title"],
             "Upcoming eclipses and inner planetary transits through 2027-08-18",
@@ -8426,7 +8426,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(payload["value"], "2999990000")
 
         # README examples: symbolic complex elementary functions use Cartesian output.
-        for source, expected in (
+        for source, want in (
             ("exp(x+i*y)", "exp(x)·cos(y) + exp(x)·sin(y)·i"),
             ("sin(i*y)", "0 + sinh(y)·i"),
         ):
@@ -8439,7 +8439,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
                     "evaluate",
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(expression["unbound"], expected)
+                self.assertEqual(expression["unbound"], want)
 
         equation, raw, returncode = mars_lab.run_equation_lab_fields(
             scratch / "equation_lab",
@@ -8480,13 +8480,13 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
                 "(½·(ax² + 2bx), ½·(cx² + 2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)",
             ),
         )
-        for source, expected in symbolic_matrix_examples:
+        for source, want in symbolic_matrix_examples:
             with self.subTest(matrix_source=source):
                 fields, raw, returncode = mars_lab.run_matrix_lab_fields(
                     scratch / "matrix_lab", source, "eval", 64
                 )
                 self.assertEqual(returncode, 0, raw)
-                self.assertEqual(fields["result"], expected)
+                self.assertEqual(fields["result"], want)
 
         integral, raw, returncode = mars_lab.run_integrator_lab_fields(
             scratch / "integrator_lab",

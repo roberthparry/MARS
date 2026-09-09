@@ -250,13 +250,13 @@ static void test_reverse_gradient_complex_number_t(void)
         const expr_t *root_vars[1] = {x};
         number_t root_value;
         number_t root_gradient;
-        number_t expected_gradient;
+        number_t want_gradient;
 
         ASSERT_EQ_INT(expr_eval_derivatives(sum, 1u, root_vars, &root_value, &root_gradient), 0);
-        expected_gradient = expr_eval(derivative);
-        ASSERT_EXPR_NUMBER_CLOSE(root_gradient, expected_gradient);
+        want_gradient = expr_eval(derivative);
+        ASSERT_EXPR_NUMBER_CLOSE(root_gradient, want_gradient);
 
-        num_destroy(&expected_gradient);
+        num_destroy(&want_gradient);
         num_destroy(&root_gradient);
         num_destroy(&root_value);
         expr_free(derivative);
@@ -281,12 +281,12 @@ static void assert_reverse_matches_symbolic(expr_t *function, size_t variable_co
     ASSERT_EQ_INT(expr_eval_derivatives(function, variable_count, wrt, &value, gradients), 0);
     for (size_t i = 0u; i < variable_count; ++i) {
         expr_t *derivative = expr_create_deriv(function, variables[i]);
-        number_t expected;
+        number_t want;
 
         ASSERT_NOT_NULL(derivative);
-        expected = expr_eval(derivative);
-        ASSERT_EXPR_NUMBER_CLOSE(gradients[i], expected);
-        num_destroy(&expected);
+        want = expr_eval(derivative);
+        ASSERT_EXPR_NUMBER_CLOSE(gradients[i], want);
+        num_destroy(&want);
         expr_free(derivative);
         num_destroy(&gradients[i]);
     }

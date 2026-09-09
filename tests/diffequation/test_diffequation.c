@@ -7,61 +7,61 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
-static bool test_diffequ_expect_text(const char *label, const char *actual, const char *expected, const char *file,
+static bool test_diffequ_expect_text(const char *label, const char *got, const char *want, const char *file,
                                      int line)
 {
     printf("  %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
-           label, expected ? expected : "NULL", actual ? actual : "NULL");
-    return test_assert_cstr_eq(actual, expected, file, line);
+           "    want: %s\n"
+           "    got:   %s\n",
+           label, want ? want : "NULL", got ? got : "NULL");
+    return test_assert_cstr_eq(got, want, file, line);
 }
 
-static bool test_diffequ_expect_pointer(const char *label, const void *actual, bool expected_nonnull, const char *file,
+static bool test_diffequ_expect_pointer(const char *label, const void *got, bool want_nonnull, const char *file,
                                         int line)
 {
-    return test_diffequ_expect_text(label, actual ? "non-NULL" : "NULL", expected_nonnull ? "non-NULL" : "NULL", file,
+    return test_diffequ_expect_text(label, got ? "non-NULL" : "NULL", want_nonnull ? "non-NULL" : "NULL", file,
                                     line);
 }
 
-static bool test_diffequ_expect_long(const char *label, long actual, long expected, const char *file, int line)
+static bool test_diffequ_expect_long(const char *label, long got, long want, const char *file, int line)
 {
     printf("  %s\n"
-           "    expected: %ld\n"
-           "    actual:   %ld\n",
-           label, expected, actual);
-    return test_assert_long_eq(actual, expected, file, line);
+           "    want: %ld\n"
+           "    got:   %ld\n",
+           label, want, got);
+    return test_assert_long_eq(got, want, file, line);
 }
 
-static bool test_diffequ_expect_number(const char *label, number_t actual, number_t expected, const char *file,
+static bool test_diffequ_expect_number(const char *label, number_t got, number_t want, const char *file,
                                        int line)
 {
-    string_t *actual_text = num_to_string(actual);
-    string_t *expected_text = num_to_string(expected);
+    string_t *got_text = num_to_string(got);
+    string_t *want_text = num_to_string(want);
     bool equal;
 
     printf("  %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
-           label, expected_text ? string_c_str(expected_text) : "NULL",
-           actual_text ? string_c_str(actual_text) : "NULL");
-    equal = actual_text && expected_text && num_eq(actual, expected);
-    string_free(expected_text);
-    string_free(actual_text);
+           "    want: %s\n"
+           "    got:   %s\n",
+           label, want_text ? string_c_str(want_text) : "NULL",
+           got_text ? string_c_str(got_text) : "NULL");
+    equal = got_text && want_text && num_eq(got, want);
+    string_free(want_text);
+    string_free(got_text);
     return test_assert_true(equal, file, line, label);
 }
 
-#define EXPECT_TEXT(label, actual, expected)                                                                           \
-    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_text((label), (actual), (expected), __FILE__, __LINE__))
+#define EXPECT_TEXT(label, got, want)                                                                           \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_text((label), (got), (want), __FILE__, __LINE__))
 
-#define EXPECT_POINTER(label, actual, expected_nonnull)                                                                \
-    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_pointer((label), (actual), (expected_nonnull), __FILE__, __LINE__))
+#define EXPECT_POINTER(label, got, want_nonnull)                                                                \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_pointer((label), (got), (want_nonnull), __FILE__, __LINE__))
 
-#define EXPECT_LONG(label, actual, expected)                                                                           \
-    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_long((label), (actual), (expected), __FILE__, __LINE__))
+#define EXPECT_LONG(label, got, want)                                                                           \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_long((label), (got), (want), __FILE__, __LINE__))
 
-#define EXPECT_NUMBER(label, actual, expected)                                                                         \
-    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_number((label), (actual), (expected), __FILE__, __LINE__))
+#define EXPECT_NUMBER(label, got, want)                                                                         \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_number((label), (got), (want), __FILE__, __LINE__))
 
 static void test_diffequ_lifecycle_null_safety(void)
 {
@@ -191,12 +191,12 @@ static void test_diffequ_parses_linear_ode_and_constant(void)
     constant = de_constant(de, "a");
     EXPECT_POINTER("constant a", constant, true);
     if (constant) {
-        number_t expected = num_create_from_long(2L);
+        number_t want = num_create_from_long(2L);
 
         value = expr_eval(constant);
-        EXPECT_NUMBER("constant a value", value, expected);
+        EXPECT_NUMBER("constant a value", value, want);
         num_destroy(&value);
-        num_destroy(&expected);
+        num_destroy(&want);
     }
 
     de_free(de);
@@ -492,11 +492,11 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
 
     printf("  subscript partial-derivative shorthand\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n"
+           "    want: %s\n"
+           "    got:   %s\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n",
            first_source, "Dx(u) + Dy(u) = 0", first_text ? string_c_str(first_text) : "NULL", mixed_source,
            "Dxy(u) = 0", mixed_text ? string_c_str(mixed_text) : "NULL");
     EXPECT_POINTER("parsed first partial derivatives", first, true);
@@ -1235,7 +1235,7 @@ static void test_diffequ_normalizes_bernoulli_arbitrary_constant(void)
 
 static void test_diffequ_solves_derivative_quadratic_problem(void)
 {
-    static const char *expected[] = {"x = ½·(√(8y + 1) - "
+    static const char *want[] = {"x = ½·(√(8y + 1) - "
                                      "ln(|½·(√(8y + 1) + 1)|) + 1) + C",
                                      "x = ½·(1 - √(8y + 1) - "
                                      "ln(|½·(1 - √(8y + 1))|)) + C",
@@ -1265,7 +1265,7 @@ static void test_diffequ_solves_derivative_quadratic_problem(void)
         string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
 
         EXPECT_POINTER("derivative-quadratic solution", solution, true);
-        EXPECT_TEXT("derivative-quadratic solution text", text ? string_c_str(text) : NULL, expected[i]);
+        EXPECT_TEXT("derivative-quadratic solution text", text ? string_c_str(text) : NULL, want[i]);
         string_free(text);
     }
 
@@ -1275,7 +1275,7 @@ static void test_diffequ_solves_derivative_quadratic_problem(void)
 
 static void test_diffequ_linearizes_exact_third_order_problem(void)
 {
-    static const char *expected[] = {"y = 2·ln(|Σ_(n=0)^∞ c_(n)·x^n|)",
+    static const char *want[] = {"y = 2·ln(|Σ_(n=0)^∞ c_(n)·x^n|)",
                                      "c_(0) = C₂",
                                      "c_(1) = C₃",
                                      "c_(-1) = 0",
@@ -1309,7 +1309,7 @@ static void test_diffequ_linearizes_exact_third_order_problem(void)
         string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
 
         EXPECT_POINTER("exact third-order solution", solution, true);
-        EXPECT_TEXT("exact third-order solution text", text ? string_c_str(text) : NULL, expected[i]);
+        EXPECT_TEXT("exact third-order solution text", text ? string_c_str(text) : NULL, want[i]);
         string_free(text);
     }
 
@@ -1354,7 +1354,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     const char *source = "y'' + 3yy' + y^3 = 0";
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
-    const char *expected = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
+    const char *want = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
 
     EXPECT_POINTER("parsed modified-Emden problem", de, true);
     EXPECT_POINTER("modified-Emden solve result", result, true);
@@ -1384,7 +1384,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
         EXPECT_POINTER("modified-Emden solution", solution, true);
         EXPECT_POINTER("modified-Emden solution text", text, true);
         if (text)
-            EXPECT_TEXT("modified-Emden solution text", string_c_str(text), expected);
+            EXPECT_TEXT("modified-Emden solution text", string_c_str(text), want);
         string_free(text);
     }
 
@@ -1522,8 +1522,8 @@ static void test_diffequ_solves_affine_factorized_second_order_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     EXPECT_POINTER("affine-factorized solution text", text, true);
     if (text) {
-        printf("    expected: y = exp(½x²)·(C₁ + C₂·erf(x))\n"
-               "    actual:   %s\n",
+        printf("    want: y = exp(½x²)·(C₁ + C₂·erf(x))\n"
+               "    got:   %s\n",
                string_c_str(text));
         EXPECT_TEXT("affine-factorized solution text", string_c_str(text), "y = exp(½x²)·(C₁ + C₂·erf(x))");
     }
@@ -1560,8 +1560,8 @@ static void test_diffequ_applies_affine_factorized_initial_conditions(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     EXPECT_POINTER("affine-factorized IVP solution text", text, true);
     if (text) {
-        printf("    expected: y = exp(½x²)\n"
-               "    actual:   %s\n",
+        printf("    want: y = exp(½x²)\n"
+               "    got:   %s\n",
                string_c_str(text));
         EXPECT_TEXT("affine-factorized IVP solution text", string_c_str(text), "y = exp(½x²)");
     }
@@ -1975,23 +1975,23 @@ static void test_diffequ_solves_degree_six_characteristic_polynomial(void)
     de_free(de);
 }
 
-static bool test_diffequ_expect_constant_linear_solution(const char *source, const char *expected, const char *file,
+static bool test_diffequ_expect_constant_linear_solution(const char *source, const char *want, const char *file,
                                                          int line)
 {
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    const char *actual = text ? string_c_str(text) : NULL;
+    const char *got = text ? string_c_str(text) : NULL;
     bool valid = de && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
                  de_solve_result_solver(result) == DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR &&
-                 de_solve_result_count(result) == 1u && actual && strcmp(actual, expected) == 0;
+                 de_solve_result_count(result) == 1u && got && strcmp(got, want) == 0;
 
     printf("  differential equation\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
-           source, expected, actual ? actual : "NULL");
+           "    want: %s\n"
+           "    got:   %s\n",
+           source, want, got ? got : "NULL");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1999,8 +1999,8 @@ static bool test_diffequ_expect_constant_linear_solution(const char *source, con
     return test_assert_true(valid, file, line, "constant-coefficient linear solution");
 }
 
-#define EXPECT_CONSTANT_LINEAR_SOLUTION(source, expected)                                                              \
-    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_constant_linear_solution((source), (expected), __FILE__, __LINE__))
+#define EXPECT_CONSTANT_LINEAR_SOLUTION(source, want)                                                              \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_constant_linear_solution((source), (want), __FILE__, __LINE__))
 
 static void test_diffequ_solves_logarithmic_forcing(void)
 {
@@ -2011,9 +2011,9 @@ static void test_diffequ_solves_logarithmic_forcing(void)
 static void test_diffequ_resolves_polynomial_differential_operator(void)
 {
     const char *source = "(Dx^2 + 4Dx + 20)^2(y) = 0";
-    const char *expected_problem = "{ d⁴y/dx⁴ + 8*d³y/dx³ + 56*d²y/dx² + "
+    const char *want_problem = "{ d⁴y/dx⁴ + 8*d³y/dx³ + 56*d²y/dx² + "
                                    "160*dy/dx + 400*y = 0 | x = ?; ;  }";
-    const char *expected_solution = "y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x) + "
+    const char *want_solution = "y = exp(-2x)·(C₁·cos(4x) + C₂·sin(4x) + "
                                     "C₃x·cos(4x) + C₄x·sin(4x))";
     diffequ_t *de = de_from_string(source);
     char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
@@ -2026,14 +2026,14 @@ static void test_diffequ_resolves_polynomial_differential_operator(void)
            "    resolves: %s\n"
            "    solution: %s\n",
            source, problem ? problem : "NULL", solution_text ? string_c_str(solution_text) : "NULL");
-    EXPECT_TEXT("resolved differential equation", problem, expected_problem);
+    EXPECT_TEXT("resolved differential equation", problem, want_problem);
     EXPECT_POINTER("operator solve result", result, true);
     if (result) {
         EXPECT_LONG("operator solve status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
         EXPECT_LONG("operator selected solver", (long)de_solve_result_solver(result),
                     (long)DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR);
     }
-    EXPECT_TEXT("operator solution", solution_text ? string_c_str(solution_text) : NULL, expected_solution);
+    EXPECT_TEXT("operator solution", solution_text ? string_c_str(solution_text) : NULL, want_solution);
 
     string_free(solution_text);
     de_solve_result_free(result);
@@ -2163,16 +2163,16 @@ static void test_diffequ_defaults_bare_differential_operator(void)
         diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
         const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
         string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-        const char *actual_solution = solution_text ? string_c_str(solution_text) : NULL;
+        const char *got_solution = solution_text ? string_c_str(solution_text) : NULL;
         bool case_valid = de && problem && strcmp(problem, cases[i].problem) == 0 && result &&
-                          de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && actual_solution &&
-                          strcmp(actual_solution, cases[i].solution) == 0;
+                          de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && got_solution &&
+                          strcmp(got_solution, cases[i].solution) == 0;
 
         printf("  bare differential operator\n"
                "    input:    %s\n"
                "    resolves: %s\n"
                "    solution: %s\n",
-               cases[i].source, problem ? problem : "NULL", actual_solution ? actual_solution : "NULL");
+               cases[i].source, problem ? problem : "NULL", got_solution ? got_solution : "NULL");
         valid = valid && case_valid;
 
         string_free(solution_text);
@@ -2246,23 +2246,23 @@ static void test_diffequ_general_third_order_forced_solution(void)
     EXPECT_CONSTANT_LINEAR_SOLUTION("Dxxx(y) - Dx(y) = exp(2*x)", "y = ⅙·exp(2x) + C₁·exp(x) + C₂ + C₃·exp(-x)");
 }
 
-static bool test_diffequ_expect_pde_solution(const char *source, const char *expected, de_solver_t expected_solver,
+static bool test_diffequ_expect_pde_solution(const char *source, const char *want, de_solver_t want_solver,
                                              const char *file, int line)
 {
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    const char *actual = text ? string_c_str(text) : NULL;
+    const char *got = text ? string_c_str(text) : NULL;
     bool valid = de && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
-                 de_solve_result_solver(result) == expected_solver && de_solve_result_count(result) == 1u && actual &&
-                 strcmp(actual, expected) == 0;
+                 de_solve_result_solver(result) == want_solver && de_solve_result_count(result) == 1u && got &&
+                 strcmp(got, want) == 0;
 
     printf("  partial differential equation\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
-           source, expected, actual ? actual : "NULL");
+           "    want: %s\n"
+           "    got:   %s\n",
+           source, want, got ? got : "NULL");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2270,17 +2270,17 @@ static bool test_diffequ_expect_pde_solution(const char *source, const char *exp
     return test_assert_true(valid, file, line, "partial differential equation solution");
 }
 
-#define EXPECT_TRANSPORT_SOLUTION(source, expected)                                                                    \
+#define EXPECT_TRANSPORT_SOLUTION(source, want)                                                                    \
     TEST_HARNESS_RETURN_UNLESS(test_diffequ_expect_pde_solution(                                                       \
-        (source), (expected), DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT, __FILE__, __LINE__))
+        (source), (want), DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT, __FILE__, __LINE__))
 
-#define EXPECT_CHARACTERISTIC_SOLUTION(source, expected)                                                               \
+#define EXPECT_CHARACTERISTIC_SOLUTION(source, want)                                                               \
     TEST_HARNESS_RETURN_UNLESS(                                                                                        \
-        test_diffequ_expect_pde_solution((source), (expected), DE_SOLVER_CHARACTERISTICS, __FILE__, __LINE__))
+        test_diffequ_expect_pde_solution((source), (want), DE_SOLVER_CHARACTERISTICS, __FILE__, __LINE__))
 
-#define EXPECT_LAPLACE_SOLUTION(source, expected)                                                                      \
+#define EXPECT_LAPLACE_SOLUTION(source, want)                                                                      \
     TEST_HARNESS_RETURN_UNLESS(                                                                                        \
-        test_diffequ_expect_pde_solution((source), (expected), DE_SOLVER_LAPLACE, __FILE__, __LINE__))
+        test_diffequ_expect_pde_solution((source), (want), DE_SOLVER_LAPLACE, __FILE__, __LINE__))
 
 static void test_diffequ_solves_two_dimensional_laplace_equation(void)
 {
@@ -2296,7 +2296,7 @@ static void test_diffequ_parses_pde_boundary_arguments(void)
 {
     const char *source = "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?;; "
                          "u(x, 0) = x^2 }";
-    const char *expected_problem = "{ 2*∂u/∂x + ∂u/∂y = 0 | x = ?, y = ?; ; "
+    const char *want_problem = "{ 2*∂u/∂x + ∂u/∂y = 0 | x = ?, y = ?; ; "
                                    "u(x, 0) = x^2 }";
     diffequ_t *de = de_from_string(source);
     char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
@@ -2311,7 +2311,7 @@ static void test_diffequ_parses_pde_boundary_arguments(void)
     EXPECT_TEXT("PDE first boundary argument shares x", first == de_independent_at(de, 0u) ? "same" : "different",
                 "same");
     EXPECT_NUMBER("PDE second boundary argument", second_value, zero);
-    EXPECT_TEXT("PDE canonical problem", problem, expected_problem);
+    EXPECT_TEXT("PDE canonical problem", problem, want_problem);
 
     num_destroy(&zero);
     num_destroy(&second_value);
@@ -2546,8 +2546,8 @@ static void test_diffequ_applies_quadratic_characteristic_boundary(void)
 
     printf("  quadratic characteristic boundary problem\n"
            "    input:    %s\n"
-           "    expected: z = 2/(3 - 1/x - 1/y)\n"
-           "    actual:   %s\n",
+           "    want: z = 2/(3 - 1/x - 1/y)\n"
+           "    got:   %s\n",
            source, solution_text ? string_c_str(solution_text) : "NULL");
     EXPECT_LONG("quadratic boundary status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("quadratic boundary selected solver", (long)de_solve_result_solver(result),
@@ -2573,10 +2573,10 @@ static void test_diffequ_solves_dependent_square_characteristic_pde(void)
 
     printf("  dependent-square characteristic reduction\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n"
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "z = √(F(y/x) - x² - y²)", positive_text ? string_c_str(positive_text) : "NULL",
            "z = -√(F(y/x) - x² - y²)", negative_text ? string_c_str(negative_text) : "NULL");
     EXPECT_LONG("dependent-square characteristic status", (long)de_solve_result_status(result),
@@ -2605,8 +2605,8 @@ static void test_diffequ_applies_dependent_square_boundary(void)
 
     printf("  dependent-square characteristic boundary problem\n"
            "    input:    %s\n"
-           "    expected: z = √(1 - xy + x/y)\n"
-           "    actual:   %s\n",
+           "    want: z = √(1 - xy + x/y)\n"
+           "    got:   %s\n",
            source, solution_text ? string_c_str(solution_text) : "NULL");
     EXPECT_LONG("dependent-square boundary status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("dependent-square boundary selected solver", (long)de_solve_result_solver(result),
@@ -2637,10 +2637,10 @@ static void test_diffequ_solves_invariant_forced_square_pde(void)
 
     printf("  invariant-forced dependent-square PDE\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n"
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "z = √(F(y - x) - x² + y²)", positive_text ? string_c_str(positive_text) : "NULL",
            "z = -√(F(y - x) - x² + y²)", negative_text ? string_c_str(negative_text) : "NULL");
     EXPECT_LONG("invariant-forced square status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
@@ -2670,10 +2670,10 @@ static void test_diffequ_solves_reciprocal_forced_square_pde(void)
 
     printf("  reciprocal-forced dependent-square PDE\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n"
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "z = √(F(x² + 2xy - y²) + 2xy)", positive_text ? string_c_str(positive_text) : "NULL",
            "z = -√(F(x² + 2xy - y²) + 2xy)", negative_text ? string_c_str(negative_text) : "NULL");
     EXPECT_LONG("reciprocal-forced square status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
@@ -2756,8 +2756,8 @@ static void test_diffequ_solves_parameter_linear_pde(void)
 
     printf("  parameter-dependent linear PDE\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "z = ½x·(y² - 1) + F(x)·exp(-y²)", text ? string_c_str(text) : "NULL");
     EXPECT_LONG("parameter-linear PDE status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("parameter-linear PDE solver", (long)de_solve_result_solver(result),
@@ -2795,8 +2795,8 @@ static void test_diffequ_parameter_linear_pde_uses_general_rule(void)
 
     printf("  parameter-dependent linear PDE general rule\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "u = x + exp(-t²)·F(x)", text ? string_c_str(text) : "NULL");
     EXPECT_LONG("general parameter-linear PDE status", (long)de_solve_result_status(result),
                 (long)DE_SOLVE_STATUS_SOLVED);
@@ -2827,8 +2827,8 @@ static void test_diffequ_parameter_linear_pde_accepts_parameter_rate(void)
 
     printf("  parameter-dependent PDE with parameter rate\n"
            "    input:    %s\n"
-           "    expected: %s\n"
-           "    actual:   %s\n",
+           "    want: %s\n"
+           "    got:   %s\n",
            source, "z = ¾y/x² - ¾y²/x + ½y³ - ⅜/x³ + F(x)·exp(-2xy)", text ? string_c_str(text) : "NULL");
     EXPECT_LONG("parameter-rate PDE status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
     EXPECT_LONG("parameter-rate PDE solver", (long)de_solve_result_solver(result),
@@ -2856,17 +2856,17 @@ static void test_diffequ_parameter_linear_pde_accepts_parameter_rate(void)
 static void example_diffequation_solving_an_ode(void)
 {
     const char *source = "Dx(y) = x*y; y(0) = 1";
-    const char *expected_problem = "{ dy/dx = x*y | x = ?; ; y(0) = 1 }";
-    const char *expected_solution = "y = exp(½x²)";
+    const char *want_problem = "{ dy/dx = x*y | x = ?; ; y(0) = 1 }";
+    const char *want_solution = "y = exp(½x²)";
     diffequ_t *ode = de_from_string(source);
     diffequ_solve_result_t *result = de_solve(ode);
     const equation_t *solution = de_solve_result_at(result, 0u);
     char *problem_text = de_to_string(ode, style_EXPRESSION);
     string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    bool valid = ode && problem_text && strcmp(problem_text, expected_problem) == 0 &&
+    bool valid = ode && problem_text && strcmp(problem_text, want_problem) == 0 &&
                  de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
                  de_solve_result_solver(result) == DE_SOLVER_SEPARABLE && de_solve_result_count(result) == 1u &&
-                 solution_text && strcmp(string_c_str(solution_text), expected_solution) == 0;
+                 solution_text && strcmp(string_c_str(solution_text), want_solution) == 0;
 
     printf("input = %s\n", source);
     printf("problem = %s\n", problem_text ? problem_text : "NULL");
@@ -2885,8 +2885,8 @@ static void example_diffequation_solving_an_ode(void)
 static void example_diffequation_linearising_a_lie_symmetric_ode(void)
 {
     const char *source = "y'' + 3*y*y' + y^3 = 0";
-    const char *expected_symmetry = "SL(3, ℝ)";
-    const char *expected_steps = "Recognise the modified-Emden rule\n"
+    const char *want_symmetry = "SL(3, ℝ)";
+    const char *want_steps = "Recognise the modified-Emden rule\n"
                                  "      y″ + 3(1)yy′ + (1)²y³ = 0\n"
                                  "Set y = u′/u. Then\n"
                                  "      y″ + 3(1)yy′ + (1)²y³ = u‴/u\n"
@@ -2895,7 +2895,7 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
                                  "      X = x − 1/y\n"
                                  "      Y = x/y − x²/2\n"
                                  "and d²Y/dX² = 0.";
-    const char *expected_solution = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
+    const char *want_solution = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
     diffequ_t *ode = de_from_string(source);
     diffequ_solve_result_t *result = ode ? de_solve_with_options(ode, DE_SOLVE_OPTION_STEPS) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
@@ -2904,9 +2904,9 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
     string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool valid = ode && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
                  de_solve_result_solver(result) == DE_SOLVER_LINEAR_TRANSFORMATION &&
-                 de_solve_result_count(result) == 1u && symmetry && strcmp(symmetry, expected_symmetry) == 0 && steps &&
-                 strcmp(steps, expected_steps) == 0 && solution_text &&
-                 strcmp(string_c_str(solution_text), expected_solution) == 0;
+                 de_solve_result_count(result) == 1u && symmetry && strcmp(symmetry, want_symmetry) == 0 && steps &&
+                 strcmp(steps, want_steps) == 0 && solution_text &&
+                 strcmp(string_c_str(solution_text), want_solution) == 0;
 
     printf("input = %s\n", source);
     printf("symmetry = %s\n", symmetry ? symmetry : "NULL");

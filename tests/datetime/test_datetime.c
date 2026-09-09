@@ -14,7 +14,7 @@
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
-static int datetime_validity_equal(const void *actual, const void *expected, void *ctx);
+static int datetime_validity_equal(const void *got_input, const void *want_input, void *ctx);
 static int datetime_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_datetime_suite_setup(void);
 
@@ -23,17 +23,17 @@ static const test_validity_contract_t datetime_exact_contract =
 
 TEST_SUITE_SETUP(test_datetime_suite_setup);
 
-#define TEST_ASSERT_DATETIME_EQ(actual_ptr, expected_ptr)                                                              \
+#define TEST_ASSERT_DATETIME_EQ(got_ptr, want_ptr)                                                              \
     do {                                                                                                               \
-        const datetime_t *test_datetime_actual__ = (actual_ptr);                                                       \
-        const datetime_t *test_datetime_expected__ = (expected_ptr);                                                   \
-        TEST_ASSERT_VALID_NAMED("datetime-exact", &test_datetime_actual__, &test_datetime_expected__);                 \
+        const datetime_t *test_datetime_got__ = (got_ptr);                                                       \
+        const datetime_t *test_datetime_want__ = (want_ptr);                                                   \
+        TEST_ASSERT_VALID_NAMED("datetime-exact", &test_datetime_got__, &test_datetime_want__);                 \
     } while (0)
 
-static int datetime_validity_equal(const void *actual, const void *expected, void *ctx)
+static int datetime_validity_equal(const void *got_input, const void *want_input, void *ctx)
 {
-    const datetime_t *const *got = (const datetime_t *const *)actual;
-    const datetime_t *const *want = (const datetime_t *const *)expected;
+    const datetime_t *const *got = (const datetime_t *const *)got_input;
+    const datetime_t *const *want = (const datetime_t *const *)want_input;
 
     (void)ctx;
     return datetime_year(*got) == datetime_year(*want) && datetime_month(*got) == datetime_month(*want) &&
@@ -194,10 +194,10 @@ void test_datetime_jd_tt_offsets_civil_jd_by_delta_t(void)
     datetime_t *dt = datetime_init_ymdt(datetime_alloc(), 2000, 1, 1, 12, 0, 0.0);
     double jd = datetime_jd(dt);
     double jd_tt = datetime_jd_tt(dt);
-    double expected = jd + datetime_delta_t_seconds(2000) / 86400.0;
+    double want = jd + datetime_delta_t_seconds(2000) / 86400.0;
 
     ASSERT_EQ_DOUBLE(jd, 2451545.0, 1e-9);
-    ASSERT_EQ_DOUBLE(jd_tt, expected, 1e-12);
+    ASSERT_EQ_DOUBLE(jd_tt, want, 1e-12);
 
     datetime_dealloc(dt);
 }

@@ -16,7 +16,7 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_integrator_suite_setup(void);
-static bool test_assert_integrator_number_close_tol(number_t actual, number_t expected, const char *tol_text,
+static bool test_assert_integrator_number_close_tol(number_t got, number_t want, const char *tol_text,
                                                     const char *file, int line);
 static int test_num_printf_compat(const char *fmt, ...);
 static void test_begin_integral_display(number_t result, number_t err);
@@ -79,25 +79,25 @@ static void test_number_array_4_auto_destroy(number_t (*values)[4])
 static int test_display_sig_digits_override = -1;
 static const size_t test_exact_display_sig_digits = 18u;
 static const char *test_pending_result_fmt = NULL;
-static const char *test_pending_expected_fmt = NULL;
+static const char *test_pending_want_fmt = NULL;
 static number_t test_pending_result;
-static number_t test_pending_expected;
+static number_t test_pending_want;
 static bool test_has_pending_result = false;
-static bool test_has_pending_expected = false;
+static bool test_has_pending_want = false;
 
 /* -----------------------------------------------------------------------
  * Helpers
  * --------------------------------------------------------------------- */
 
-#define TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(actual_value, expected_value)                                              \
+#define TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(got_value, want_value)                                              \
     do {                                                                                                               \
-        if (!test_assert_integrator_number_close_tol((actual_value), (expected_value), "1e-15", __FILE__, __LINE__))   \
+        if (!test_assert_integrator_number_close_tol((got_value), (want_value), "1e-15", __FILE__, __LINE__))   \
             return;                                                                                                    \
     } while (0)
 
-#define TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(actual_value, expected_value, tol_value)                               \
+#define TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(got_value, want_value, tol_value)                               \
     do {                                                                                                               \
-        if (!test_assert_integrator_number_close_tol((actual_value), (expected_value), (tol_value), __FILE__,          \
+        if (!test_assert_integrator_number_close_tol((got_value), (want_value), (tol_value), __FILE__,          \
                                                      __LINE__))                                                        \
             return;                                                                                                    \
     } while (0)
@@ -107,10 +107,10 @@ static bool test_integrator_suite_setup(void)
     return true;
 }
 
-static bool test_assert_integrator_number_close_tol(number_t actual, number_t expected, const char *tol_text,
+static bool test_assert_integrator_number_close_tol(number_t got, number_t want, const char *tol_text,
                                                     const char *file, int line)
 {
-    number_t diff = num_sub(actual, expected);
+    number_t diff = num_sub(got, want);
     number_t abs_diff = num_abs(diff);
     number_t tol = num_create_from_string(tol_text);
     string_t *abs_text = NULL;
@@ -120,7 +120,7 @@ static bool test_assert_integrator_number_close_tol(number_t actual, number_t ex
     if (!ok) {
         abs_text = num_to_string(abs_diff);
         tol_display = num_to_string(tol);
-        test_set_failure_detailf("expected |actual - expected| <= tolerance, got %s > %s",
+        test_set_failure_detailf("want |got - want| <= tolerance, got %s > %s",
                                  abs_text ? string_c_str(abs_text) : "(null)",
                                  tol_display ? string_c_str(tol_display) : "(null)");
         test_mark_failure(file, line, "number tolerance check failed");
@@ -138,11 +138,11 @@ static int test_num_printf_compat(const char *fmt, ...)
 {
     va_list ap;
     int written = 0;
-    bool is_expected_line = strstr(fmt, "expected = ") != NULL;
+    bool is_want_line = strstr(fmt, "want = ") != NULL;
     bool is_error_line = strstr(fmt, "err      = ") != NULL || strstr(fmt, "error estimate") != NULL;
     bool is_result_line = strstr(fmt, "result   = ") != NULL || (strstr(fmt, "≈ %q") != NULL && !is_error_line);
 
-    if (is_expected_line || is_error_line || is_result_line) {
+    if (is_want_line || is_error_line || is_result_line) {
         va_start(ap, fmt);
         {
             number_t value = va_arg(ap, number_t);
@@ -157,14 +157,14 @@ static int test_num_printf_compat(const char *fmt, ...)
                 test_has_pending_result = true;
                 return 0;
             }
-            if (is_expected_line) {
-                if (test_has_pending_expected) {
-                    num_destroy(&test_pending_expected);
-                    test_has_pending_expected = false;
+            if (is_want_line) {
+                if (test_has_pending_want) {
+                    num_destroy(&test_pending_want);
+                    test_has_pending_want = false;
                 }
-                test_pending_expected_fmt = fmt;
-                test_pending_expected = num_clone(value);
-                test_has_pending_expected = true;
+                test_pending_want_fmt = fmt;
+                test_pending_want = num_clone(value);
+                test_has_pending_want = true;
                 return 0;
             }
 
@@ -173,9 +173,9 @@ static int test_num_printf_compat(const char *fmt, ...)
                 written += test_emit_q_line(
                     test_pending_result_fmt, test_pending_result,
                     test_display_sig_digits_override > 0 ? (size_t)test_display_sig_digits_override : 1u);
-                if (test_has_pending_expected) {
+                if (test_has_pending_want) {
                     written += test_emit_q_line(
-                        test_pending_expected_fmt, test_pending_expected,
+                        test_pending_want_fmt, test_pending_want,
                         test_display_sig_digits_override > 0 ? (size_t)test_display_sig_digits_override : 1u);
                 }
                 written += test_emit_q_line(fmt, value, num_is_zero(value) ? 1u : err_digits);
@@ -276,12 +276,12 @@ static void test_clear_pending_integral_display(void)
         num_destroy(&test_pending_result);
         test_has_pending_result = false;
     }
-    if (test_has_pending_expected) {
-        num_destroy(&test_pending_expected);
-        test_has_pending_expected = false;
+    if (test_has_pending_want) {
+        num_destroy(&test_pending_want);
+        test_has_pending_want = false;
     }
     test_pending_result_fmt = NULL;
-    test_pending_expected_fmt = NULL;
+    test_pending_want_fmt = NULL;
 }
 
 static int test_parse_size_digits(const string_t *text, size_t *out)
@@ -565,14 +565,14 @@ void test_polynomial(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("0.33333333333333333333333333333333333333"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("0.33333333333333333333333333333333333333"));
     printf("  ∫₀¹ x² dx\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -589,7 +589,7 @@ void test_single_integral_num_high_precision_log(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO(log_two);
-    TEST_NUMBER_AUTO(expected);
+    TEST_NUMBER_AUTO(want);
     int s = -1;
 
     ASSERT_TRUE(ig);
@@ -617,19 +617,19 @@ void test_single_integral_num_high_precision_log(void)
 
     log_two = num_log(two);
     TEST_NUMBER_AUTO_VALUE(twice_log_two, num_mul_long(log_two, 2L));
-    expected = num_sub(twice_log_two, NUM_ONE);
+    want = num_sub(twice_log_two, NUM_ONE);
 
     printf("  ∫₁² log(x) dx  [multiprecision]\n");
     test_print_number_line("result", result);
-    test_print_number_line("expected", expected);
+    test_print_number_line("want", want);
     test_print_number_line("err", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
 
-    if (!test_assert_integrator_number_close_tol(result, expected, "1e-27", __FILE__, __LINE__))
+    if (!test_assert_integrator_number_close_tol(result, want, "1e-27", __FILE__, __LINE__))
         goto cleanup;
 
 cleanup:
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&log_two);
     num_destroy(&err);
     num_destroy(&result);
@@ -651,14 +651,14 @@ void test_sin(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), NUM_PI, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(2.0));
     printf("  ∫₀^π sin(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -674,14 +674,14 @@ void test_exp(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -702,7 +702,7 @@ void test_arctan(void)
     int s = intg_integral(ig, expr, x, test_num_from_double(-1.0), test_num_from_double(1.0), &result, &err);
     printf("  ∫₋₁¹ 1/(1+x²) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q  (π/2)\n", NUM_PI_2);
+    test_num_printf_compat("  want = %q  (π/2)\n", NUM_PI_2);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
@@ -725,14 +725,14 @@ void test_log(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(1.0), NUM_E, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(1.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(1.0));
     printf("  ∫₁^e ln(x) dx\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -750,14 +750,14 @@ void test_constant(void)
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(upper, test_num_from_double(5.0));
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), upper, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(5.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(5.0));
     printf("  ∫₀^5 1 dx  (rectangle — exact special path)\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -774,14 +774,14 @@ void test_linear(void)
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(upper, test_num_from_double(5.0));
     int s = intg_integral(ig, x, x, test_num_from_double(0.0), upper, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("12.5"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("12.5"));
     printf("  ∫₀^5 x dx  (triangle — exact special path)\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(x);
     intg_free(ig);
 }
@@ -885,14 +885,14 @@ void test_reversed_limits(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(1.0), test_num_from_double(0.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("-0.33333333333333333333333333333333333333"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("-0.33333333333333333333333333333333333333"));
     printf("  ∫₁⁰ x² dx  (reversed limits)\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -913,14 +913,14 @@ void test_expr_sin(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), NUM_PI, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(2.0));
     printf("  ∫₀^π sin(x) dx  [Turán T15/T4]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
 
     expr_free(expr);
     expr_free(x);
@@ -938,14 +938,14 @@ void test_expr_exp(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx  [Turán T15/T4]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-20");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-20");
 
     expr_free(expr);
     expr_free(x);
@@ -968,7 +968,7 @@ void test_expr_arctan(void)
     int s = intg_integral(ig, expr, x, test_num_from_double(-1.0), test_num_from_double(1.0), &result, &err);
     printf("  ∫₋₁¹ 1/(1+x²) dx  [Turán T15/T4]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q  (π/2)\n", NUM_PI_2);
+    test_num_printf_compat("  want = %q  (π/2)\n", NUM_PI_2);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
@@ -1023,14 +1023,14 @@ void test_double_polynomial(void)
     TEST_NUMBER_AUTO(err);
     int s = intg_double_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), y,
                                  test_num_from_double(0.0), test_num_from_double(1.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(0.25));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(0.25));
     printf("  ∫₀¹∫₀¹ x·y dx dy\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-20");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-20");
     expr_free(expr);
     expr_free(y);
     expr_free(x);
@@ -1052,14 +1052,14 @@ void test_double_exp(void)
     int s = intg_double_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), y,
                                  test_num_from_double(0.0), test_num_from_double(1.0), &result, &err);
     TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(em1, em1));
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(em1, em1));
     printf("  ∫₀¹∫₀¹ exp(x+y) dx dy  [(e−1)²]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-20");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-20");
     expr_free(expr);
     expr_free(sum); // free intermediate
     expr_free(y);
@@ -1082,14 +1082,14 @@ void test_double_nonunit_bounds(void)
     TEST_NUMBER_AUTO_VALUE(y_upper, test_num_from_double(3.0));
     int s = intg_double_integral(ig, expr, x, test_num_from_double(0.0), x_upper, y, test_num_from_double(0.0), y_upper,
                                  &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(9.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(9.0));
     printf("  ∫₀²∫₀³ x·y dx dy\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-23");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-23");
     expr_free(expr);
     expr_free(y);
     expr_free(x);
@@ -1135,14 +1135,14 @@ void test_triple_polynomial(void)
     int s = intg_triple_integral(ig, expr, x, test_num_from_double(0.0), test_num_from_double(1.0), y,
                                  test_num_from_double(0.0), test_num_from_double(1.0), z, test_num_from_double(0.0),
                                  test_num_from_double(1.0), &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(0.125));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(0.125));
     printf("  ∫₀¹∫₀¹∫₀¹ x·y·z dx dy dz\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-23");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-23");
     expr_free(expr);
     expr_free(xy); // free intermediate
     expr_free(z);
@@ -1169,14 +1169,14 @@ void test_triple_exp(void)
                                  test_num_from_double(0.0), test_num_from_double(1.0), z, test_num_from_double(0.0),
                                  test_num_from_double(1.0), &result, &err);
     TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(num_mul(em1, em1), em1));
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(num_mul(em1, em1), em1));
     printf("  ∫₀¹∫₀¹∫₀¹ exp(x+y+z) dx dy dz  [(e−1)³]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     expr_free(expr);
     expr_free(xyz); // free intermediate
     expr_free(xy);  // free intermediate
@@ -1230,14 +1230,14 @@ void test_multi_2d(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(1.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(1.0));
     printf("  ∫₀¹∫₀¹ (x+y) dx dy  [double integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(y);
@@ -1263,14 +1263,14 @@ void test_multi_3d(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("1.5"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("1.5"));
     printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z) dx dy dz  [triple integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(xy); // free intermediate
@@ -1299,15 +1299,15 @@ void test_multi_3d_affine_quintic(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("17.25"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("17.25"));
 
     printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z)^5 dx dy dz  [affine quintic]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(sum);
@@ -1339,7 +1339,7 @@ void test_multi_3d_exp_square_product(void)
     TEST_NUMBER_AUTO_VALUE(term_exp, test_num_mul_double(num_exp(test_num_from_double(-1.0)), 2.0));
     TEST_NUMBER_AUTO_VALUE(term_erf, num_mul(test_num_mul_double(num_sqrt(NUM_PI), 2.0), num_erf(NUM_ONE)));
     TEST_NUMBER_AUTO_VALUE(term_E1, num_E1(NUM_ONE));
-    TEST_NUMBER_AUTO_VALUE(expected, num_sub(num_sub(num_sub(num_add(term_exp, term_erf), test_num_from_double(2.0)),
+    TEST_NUMBER_AUTO_VALUE(want, num_sub(num_sub(num_sub(num_add(term_exp, term_erf), test_num_from_double(2.0)),
                                                      NUM_EULER_MASCHERONI),
                                              term_E1));
 
@@ -1350,18 +1350,18 @@ void test_multi_3d_exp_square_product(void)
 
         printf("  ∫₀¹∫₀¹∫₀¹ exp(-x²yz) dx dy dz  [square-product exp]\n");
         test_num_printf_compat("  result   = %q\n", result);
-        test_num_printf_compat("  expected = %q\n", expected);
+        test_num_printf_compat("  want = %q\n", want);
         test_num_printf_compat("  err      = %q\n", err);
         test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
         ASSERT_TRUE(s == 0 || s == 1);
         ASSERT_TRUE(exact != NULL);
         ASSERT_TRUE(exact_text != NULL);
         ASSERT_TRUE(strcmp(string_c_str(exact_text), "2erf(1)·√(π) - γ + (2·exp(-1) - 2) - E1(1)") == 0);
-        TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+        TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
         string_free(exact_text);
     }
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&term_E1);
     num_destroy(&term_erf);
     num_destroy(&term_exp);
@@ -1410,14 +1410,14 @@ void test_multi_nd1(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 1, vars, lo, hi, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_sub(NUM_E, test_num_from_double(1.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_sub(NUM_E, test_num_from_double(1.0)));
     printf("  ∫₀¹ exp(x) dx  [multi ndim=1]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     expr_free(expr);
     expr_free(x);
     intg_free(ig);
@@ -1445,14 +1445,14 @@ void test_multi_4d(void)
 
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_from_double(2.0));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_from_double(2.0));
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ (x+y+z+w) dx dy dz dw  [quadruple integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     expr_free(expr);
     expr_free(zw); // free intermediate
     expr_free(xy); // free intermediate
@@ -1488,14 +1488,14 @@ void test_multi_4d_exp(void)
     int s = intg_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
     TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, test_num_from_double(1.0)));
     TEST_NUMBER_AUTO_VALUE(em1sq, num_mul(em1, em1));
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(em1sq, em1sq));
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(em1sq, em1sq));
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ exp(x+y+z+w) dx dy dz dw  [(e - 1)⁴]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     expr_free(expr);
     expr_free(sum); // free intermediate
     expr_free(zw);  // free intermediate
@@ -1541,15 +1541,15 @@ void test_multi_4d_exp_affine(void)
     TEST_NUMBER_AUTO_VALUE(ez, test_num_mul_double(num_sub(num_exp(test_num_from_double(0.5)), NUM_ONE), 2.0));
     TEST_NUMBER_AUTO_VALUE(ew,
                            num_div(num_sub(num_exp(test_num_from_double(3.0)), NUM_ONE), test_num_from_double(3.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(NUM_E, num_mul(num_mul(ex, ey), num_mul(ez, ew))));
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(NUM_E, num_mul(num_mul(ex, ey), num_mul(ez, ew))));
 
     printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ exp(2x-y+0.5z+3w+1) dx dy dz dw  [affine exp]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(affine);
@@ -1599,15 +1599,15 @@ void test_multi_3d_sinh_affine(void)
     TEST_NUMBER_AUTO_VALUE(iy_n, test_num_mul_double(num_sub(num_exp(test_num_from_double(2.0)), NUM_ONE), 0.5));
     TEST_NUMBER_AUTO_VALUE(iz_n, test_num_mul_double(num_sub(NUM_ONE, num_exp(test_num_from_double(-0.5))), 2.0));
     TEST_NUMBER_AUTO_VALUE(i_neg, num_mul(num_div(NUM_ONE, NUM_E), num_mul(ix_n, num_mul(iy_n, iz_n))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(i_pos, i_neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(i_pos, i_neg), 0.5));
 
     printf("  ∫₀¹∫₀¹∫₀¹ sinh(x-2y+0.5z+1) dx dy dz  [affine sinh]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(affine);
@@ -1655,15 +1655,15 @@ void test_multi_3d_cosh_affine(void)
     TEST_NUMBER_AUTO_VALUE(iy_n, num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E)));
     TEST_NUMBER_AUTO_VALUE(iz_n, num_sub(NUM_E, NUM_ONE));
     TEST_NUMBER_AUTO_VALUE(i_neg, num_mul(num_exp(test_num_from_double(-0.25)), num_mul(ix_n, num_mul(iy_n, iz_n))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(i_pos, i_neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_add(i_pos, i_neg), 0.5));
 
     printf("  ∫₀¹∫₀¹∫₀¹ cosh(1.5x+y-z+0.25) dx dy dz  [affine cosh]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(affine);
@@ -1701,7 +1701,7 @@ void test_multi_3d_sin_affine(void)
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
     TEST_NUMBER_AUTO_VALUE(
-        expected_z,
+        want_z,
         num_mul(
             num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.3))),
             num_mul(
@@ -1711,15 +1711,15 @@ void test_multi_3d_sin_affine(void)
                                 test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))),
                         num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))), NUM_ONE),
                                 test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0)))))));
-    TEST_NUMBER_AUTO_VALUE(expected, num_imag_part(expected_z));
+    TEST_NUMBER_AUTO_VALUE(want, num_imag_part(want_z));
 
     printf("  ∫₀¹∫₀¹∫₀¹ sin(x+2y-z+0.3) dx dy dz  [affine sin]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(affine);
@@ -1758,7 +1758,7 @@ void test_multi_3d_cos_affine(void)
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
     TEST_NUMBER_AUTO_VALUE(
-        expected_z,
+        want_z,
         num_mul(
             num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.2))),
             num_mul(
@@ -1768,15 +1768,15 @@ void test_multi_3d_cos_affine(void)
                                 test_num_make_complex(NUM_ZERO, test_num_from_double(-1.0))),
                         num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(1.5))), NUM_ONE),
                                 test_num_make_complex(NUM_ZERO, test_num_from_double(1.5)))))));
-    TEST_NUMBER_AUTO_VALUE(expected, num_real_part(expected_z));
+    TEST_NUMBER_AUTO_VALUE(want, num_real_part(want_z));
 
     printf("  ∫₀¹∫₀¹∫₀¹ cos(0.5x-y+1.5z-0.2) dx dy dz  [affine cos]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(affine);
@@ -1817,19 +1817,19 @@ void test_multi_3d_scaled_sum_specials(void)
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
     TEST_NUMBER_AUTO_VALUE(em1, num_sub(NUM_E, NUM_ONE));
-    TEST_NUMBER_AUTO_VALUE(term1_expected, test_num_mul_double(num_mul(em1, em1), 2.0));
+    TEST_NUMBER_AUTO_VALUE(term1_want, test_num_mul_double(num_mul(em1, em1), 2.0));
     TEST_NUMBER_AUTO_VALUE(
-        term2_expected,
+        term2_want,
         test_num_mul_double(num_sub(num_sinh(test_num_from_double(1.5)), num_sinh(test_num_from_double(0.5))), 3.0));
-    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_sub(term1_expected, term2_expected), test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_add(num_sub(term1_want, term2_want), test_num_from_double(4.0)));
 
     printf("  ∫ (2exp(x+y)-3cosh(z+0.5)+4) dV  [scaled sum specials]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(partial);
@@ -1871,27 +1871,27 @@ void test_multi_2d_sum_of_specials(void)
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     TEST_NUMBER_AUTO_VALUE(
-        sin_expected_z,
+        sin_want_z,
         num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(0.2))),
                 num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(1.0))), NUM_ONE),
                         test_num_make_complex(NUM_ZERO, test_num_from_double(1.0)))));
-    TEST_NUMBER_AUTO_VALUE(sin_expected, num_imag_part(sin_expected_z));
+    TEST_NUMBER_AUTO_VALUE(sin_want, num_imag_part(sin_want_z));
     TEST_NUMBER_AUTO_VALUE(
-        cos_expected_z,
+        cos_want_z,
         num_mul(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(-0.1))),
                 num_div(num_sub(num_exp(test_num_make_complex(NUM_ZERO, test_num_from_double(2.0))), NUM_ONE),
                         test_num_make_complex(NUM_ZERO, test_num_from_double(2.0)))));
-    TEST_NUMBER_AUTO_VALUE(cos_expected, num_real_part(cos_expected_z));
-    TEST_NUMBER_AUTO_VALUE(exp_expected, num_mul(num_sub(NUM_E, NUM_ONE), num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E))));
-    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_add(sin_expected, cos_expected), exp_expected));
+    TEST_NUMBER_AUTO_VALUE(cos_want, num_real_part(cos_want_z));
+    TEST_NUMBER_AUTO_VALUE(exp_want, num_mul(num_sub(NUM_E, NUM_ONE), num_sub(NUM_ONE, num_div(NUM_ONE, NUM_E))));
+    TEST_NUMBER_AUTO_VALUE(want, num_add(num_add(sin_want, cos_want), exp_want));
 
     printf("  ∫∫ [sin(x+0.2)+cos(2y-0.1)+exp(x-y)] dA  [sum specials]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
 
     expr_free(expr);
     expr_free(sum1);
@@ -1939,15 +1939,15 @@ void test_multi_3d_separable_product(void)
     TEST_NUMBER_AUTO_VALUE(sinh_part,
                            num_sub(num_cosh(test_num_from_double(1.2)), num_cosh(test_num_from_double(0.2))));
     TEST_NUMBER_AUTO_VALUE(left_part, num_mul(exp1_minus_1, cos_part));
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(left_part, sinh_part));
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(left_part, sinh_part));
 
     printf("  ∫ exp(x)cos(2y-0.1)sinh(z+0.2) dV  [separable product]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
 
     expr_free(expr);
     expr_free(prod_xy);
@@ -1985,18 +1985,18 @@ void test_multi_3d_regrouped_separable_product(void)
     TEST_NUMBER_AUTO(err);
     int s = intg_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
 
-    TEST_NUMBER_AUTO_VALUE(expected, num_mul(num_div(test_num_from_double(1.0), test_num_from_double(3.0)),
+    TEST_NUMBER_AUTO_VALUE(want, num_mul(num_div(test_num_from_double(1.0), test_num_from_double(3.0)),
                                              num_mul(num_sin(test_num_from_double(1.0)),
                                                      num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE))));
 
     printf("  ∫ (x*cos(y))*(x*exp(z)) dV  [regrouped separable product]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
 
     expr_free(expr);
     expr_free(right);
@@ -2034,19 +2034,19 @@ void test_multi_2d_sum_of_separable_products(void)
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     TEST_NUMBER_AUTO_VALUE(exp1_minus_1, num_sub(num_exp(test_num_from_double(1.0)), NUM_ONE));
-    TEST_NUMBER_AUTO_VALUE(term1_expected, num_mul(exp1_minus_1, num_sin(test_num_from_double(1.0))));
+    TEST_NUMBER_AUTO_VALUE(term1_want, num_mul(exp1_minus_1, num_sin(test_num_from_double(1.0))));
     TEST_NUMBER_AUTO_VALUE(
-        term2_expected,
+        term2_want,
         num_mul(num_sub(num_cosh(test_num_from_double(1.1)), num_cosh(test_num_from_double(0.1))), exp1_minus_1));
-    TEST_NUMBER_AUTO_VALUE(expected, num_add(term1_expected, term2_expected));
+    TEST_NUMBER_AUTO_VALUE(want, num_add(term1_want, term2_want));
 
     printf("  ∫∫ [exp(x)cos(y)+sinh(x+0.1)exp(y)] dA  [sum separable products]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, expected);
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE(result, want);
 
     expr_free(expr);
     expr_free(term2);
@@ -2077,16 +2077,16 @@ void test_multi_2d_affine_square(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(62.0), test_num_from_double(3.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_div(test_num_from_double(62.0), test_num_from_double(3.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2 dA  [affine square]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2115,16 +2115,16 @@ void test_multi_2d_affine_cube(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(387.0), test_num_from_double(4.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_div(test_num_from_double(387.0), test_num_from_double(4.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3 dA  [affine cube]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2155,16 +2155,16 @@ void test_multi_2d_affine_quartic(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(6916.0), test_num_from_double(15.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_div(test_num_from_double(6916.0), test_num_from_double(15.0)));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4 dA  [affine quartic]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2201,16 +2201,16 @@ void test_multi_2d_affine_poly_deg4(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_div(test_num_from_double(40601.0), test_num_from_double(30.0)));
+    TEST_NUMBER_AUTO_VALUE(want, num_div(test_num_from_double(40601.0), test_num_from_double(30.0)));
     int s = intg_integral_multi(ig, poly, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ [3a^4-2a^2+a+7] dA  [affine poly]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(poly);
@@ -2250,17 +2250,17 @@ void test_multi_2d_affine_times_exp_affine(void)
     TEST_NUMBER_AUTO_VALUE(e4, num_exp(test_num_from_double(4.0)));
     TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
     TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
+    TEST_NUMBER_AUTO_VALUE(want, num_add(num_sub(test_num_mul_double(e6, 2.0), e4),
                                              num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)exp(x+2y+3) dA  [affine*exp(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2296,18 +2296,18 @@ void test_multi_2d_square_affine_times_exp_affine(void)
     TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
     TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
     TEST_NUMBER_AUTO_VALUE(
-        expected, test_num_mul_double(num_add(num_sub(test_num_mul_double(e6, 18.0), test_num_mul_double(e5, 11.0)),
+        want, test_num_mul_double(num_add(num_sub(test_num_mul_double(e6, 18.0), test_num_mul_double(e5, 11.0)),
                                               num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 6.0))),
                                       0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2exp(x+2y+3) dA  [affine^2*exp(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2346,16 +2346,16 @@ void test_multi_2d_affine_times_sin_affine(void)
     TEST_NUMBER_AUTO_VALUE(f4, num_sub(num_neg(num_mul(u4, num_sin(u4))), test_num_mul_double(num_cos(u4), 2.0)));
     TEST_NUMBER_AUTO_VALUE(f5, num_sub(num_neg(num_mul(u5, num_sin(u5))), test_num_mul_double(num_cos(u5), 2.0)));
     TEST_NUMBER_AUTO_VALUE(f6, num_sub(num_neg(num_mul(u6, num_sin(u6))), test_num_mul_double(num_cos(u6), 2.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)sin(x+2y+3) dA  [affine*sin(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2402,16 +2402,16 @@ void test_multi_2d_square_affine_times_sin_affine(void)
     TEST_NUMBER_AUTO_VALUE(f6, num_add(num_neg(num_mul(num_mul(u6, u6), num_sin(u6))),
                                        num_add(test_num_mul_double(num_mul(u6, num_cos(u6)), -4.0),
                                                test_num_mul_double(num_sin(u6), 6.0))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2sin(x+2y+3) dA  [affine^2*sin(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2450,16 +2450,16 @@ void test_multi_2d_affine_times_cos_affine(void)
     TEST_NUMBER_AUTO_VALUE(g4, num_add(num_neg(num_mul(u4, num_cos(u4))), test_num_mul_double(num_sin(u4), 2.0)));
     TEST_NUMBER_AUTO_VALUE(g5, num_add(num_neg(num_mul(u5, num_cos(u5))), test_num_mul_double(num_sin(u5), 2.0)));
     TEST_NUMBER_AUTO_VALUE(g6, num_add(num_neg(num_mul(u6, num_cos(u6))), test_num_mul_double(num_sin(u6), 2.0)));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)cos(x+2y+3) dA  [affine*cos(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2506,16 +2506,16 @@ void test_multi_2d_square_affine_times_cos_affine(void)
     TEST_NUMBER_AUTO_VALUE(g6, num_add(num_neg(num_mul(num_mul(u6, u6), num_cos(u6))),
                                        num_add(test_num_mul_double(num_mul(u6, num_sin(u6)), 4.0),
                                                test_num_mul_double(num_cos(u6), 6.0))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2cos(x+2y+3) dA  [affine^2*cos(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2558,16 +2558,16 @@ void test_multi_2d_affine_times_sinh_affine(void)
                                         num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
     TEST_NUMBER_AUTO_VALUE(minus, num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
                                           num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, minus), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(pos, minus), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)sinh(x+2y+3) dA  [affine*sinh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2614,16 +2614,16 @@ void test_multi_2d_square_affine_times_sinh_affine(void)
         neg, test_num_mul_double(num_add(num_sub(test_num_mul_double(em6, 66.0), test_num_mul_double(em5, 51.0)),
                                          num_sub(test_num_mul_double(em3, 27.0), test_num_mul_double(em4, 38.0))),
                                  0.5));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2sinh(x+2y+3) dA  [affine^2*sinh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2666,16 +2666,16 @@ void test_multi_2d_affine_times_cosh_affine(void)
                                         num_sub(test_num_mul_double(e3, 0.5), test_num_mul_double(e5, 1.5))));
     TEST_NUMBER_AUTO_VALUE(minus, num_add(num_sub(test_num_mul_double(em6, 4.0), test_num_mul_double(em4, 3.0)),
                                           num_sub(test_num_mul_double(em3, 2.5), test_num_mul_double(em5, 3.5))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, minus), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_add(pos, minus), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)cosh(x+2y+3) dA  [affine*cosh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2722,16 +2722,16 @@ void test_multi_2d_square_affine_times_cosh_affine(void)
         neg, test_num_mul_double(num_add(num_sub(test_num_mul_double(em6, 66.0), test_num_mul_double(em5, 51.0)),
                                          num_sub(test_num_mul_double(em3, 27.0), test_num_mul_double(em4, 38.0))),
                                  0.5));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_add(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^2cosh(x+2y+3) dA  [affine^2*cosh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2768,18 +2768,18 @@ void test_multi_2d_cube_affine_times_exp_affine(void)
     TEST_NUMBER_AUTO_VALUE(e5, num_exp(test_num_from_double(5.0)));
     TEST_NUMBER_AUTO_VALUE(e6, num_exp(test_num_from_double(6.0)));
     TEST_NUMBER_AUTO_VALUE(
-        expected, test_num_mul_double(num_add(num_sub(test_num_mul_double(e6, 84.0), test_num_mul_double(e5, 41.0)),
+        want, test_num_mul_double(num_add(num_sub(test_num_mul_double(e6, 84.0), test_num_mul_double(e5, 41.0)),
                                               num_sub(test_num_mul_double(e3, 3.0), test_num_mul_double(e4, 16.0))),
                                       0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3exp(x+2y+3) dA  [affine^3*exp(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2832,16 +2832,16 @@ void test_multi_2d_cube_affine_times_sin_affine(void)
         f6,
         num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))), test_num_mul_double(u6, 18.0)), num_sin(u6)),
                 num_mul(num_add(test_num_mul_double(num_mul(u6, u6), -6.0), test_num_from_double(24.0)), num_cos(u6))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(f6, f4), num_sub(f5, f3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3sin(x+2y+3) dA  [affine^3*sin(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2894,16 +2894,16 @@ void test_multi_2d_cube_affine_times_cos_affine(void)
         g6,
         num_add(num_mul(num_add(num_neg(num_mul(u6, num_mul(u6, u6))), test_num_mul_double(u6, 18.0)), num_cos(u6)),
                 num_mul(num_add(test_num_mul_double(num_mul(u6, u6), 6.0), test_num_from_double(-24.0)), num_sin(u6))));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(num_sub(g6, g4), num_sub(g5, g3)), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3cos(x+2y+3) dA  [affine^3*cos(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -2951,16 +2951,16 @@ void test_multi_2d_cube_affine_times_sinh_affine(void)
         neg, test_num_mul_double(num_add(num_sub(test_num_mul_double(em6, 564.0), test_num_mul_double(em5, 389.0)),
                                          num_sub(test_num_mul_double(em3, 159.0), test_num_mul_double(em4, 256.0))),
                                  0.5));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_sub(pos, neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_sub(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3sinh(x+2y+3) dA  [affine^3*sinh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3009,16 +3009,16 @@ void test_multi_2d_cube_affine_times_cosh_affine(void)
         neg, test_num_mul_double(num_add(num_sub(test_num_mul_double(em6, 564.0), test_num_mul_double(em5, 389.0)),
                                          num_sub(test_num_mul_double(em3, 159.0), test_num_mul_double(em4, 256.0))),
                                  0.5));
-    TEST_NUMBER_AUTO_VALUE(expected, test_num_mul_double(num_add(pos, neg), 0.5));
+    TEST_NUMBER_AUTO_VALUE(want, test_num_mul_double(num_add(pos, neg), 0.5));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^3cosh(x+2y+3) dA  [affine^3*cosh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3052,17 +3052,17 @@ void test_multi_2d_quartic_affine_times_exp_affine(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(
-        expected, num_create_from_string(
+        want, num_create_from_string(
                       "68737.53818332082704696161172519864941330607887958296538908503087525293084452735250637289"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4exp(x+2y+3) dA  [affine^4*exp(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3096,16 +3096,16 @@ void test_multi_2d_quartic_affine_times_sin_affine(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("-381.33814729825575506728041524097607853401008090198"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("-381.33814729825575506728041524097607853401008090198"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4sin(x+2y+3) dA  [affine^4*sin(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3139,16 +3139,16 @@ void test_multi_2d_quartic_affine_times_cos_affine(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("56.617810832398686377797715265898455798291870430519"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("56.617810832398686377797715265898455798291870430519"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4cos(x+2y+3) dA  [affine^4*cos(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3180,16 +3180,16 @@ void test_multi_2d_quartic_affine_times_sinh_affine(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("34366.578859352871623151816024873924373424902707813"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("34366.578859352871623151816024873924373424902707813"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4sinh(x+2y+3) dA  [affine^4*sinh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3223,16 +3223,16 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void)
     TEST_NUMBER_ARRAY_AUTO_2(hi) = {test_num_from_double(1.0), test_num_from_double(1.0)};
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("34370.95932396795542380979570032394"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("34370.95932396795542380979570032394"));
     int s = intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
     printf("  ∫∫ (x+2y+3)^4cosh(x+2y+3) dA  [affine^4*cosh(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3274,7 +3274,7 @@ void test_multi_2d_affine_poly_times_exp_affine_combination(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(
-        expected,
+        want,
         num_add(num_add(test_num_mul_double(num_create_from_string("68737.53818332082704696161172519695"), 3.0),
                         test_num_mul_double(num_create_from_string("2680.920621655793569036410945540741"), -2.0)),
                 num_create_from_string("539.6824667600549348774549946503721")));
@@ -3282,11 +3282,11 @@ void test_multi_2d_affine_poly_times_exp_affine_combination(void)
 
     printf("  ∫∫ (3a^4-2a^2+a)exp(a) dA  [affine poly * exp(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-23");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-23");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3333,7 +3333,7 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void)
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     TEST_NUMBER_AUTO_VALUE(
-        expected,
+        want,
         num_add(num_add(test_num_mul_double(num_create_from_string("-381.3381472982557550672804152409705"), 2.0),
                         num_create_from_string("-16.88885619742372162769129239240872")),
                 test_num_mul_double(num_create_from_string("-3.624508420217032103141223583565993"), -3.0)));
@@ -3341,11 +3341,11 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void)
 
     printf("  ∫∫ (2a^4+a^2-3a)sin(a) dA  [affine poly * sin(affine)]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-27");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1);
 
     expr_free(expr);
@@ -3374,7 +3374,7 @@ static void test_nested_unevaluated_integral_integrand(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(0));
     TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(1));
-    TEST_NUMBER_AUTO_VALUE(expected, num_create_from_string("1/12"));
+    TEST_NUMBER_AUTO_VALUE(want, num_create_from_string("1/12"));
     TEST_NUMBER_AUTO(result);
     TEST_NUMBER_AUTO(err);
     int s;
@@ -3387,16 +3387,16 @@ static void test_nested_unevaluated_integral_integrand(void)
 
     printf("  ∫₀¹ (∫₀ˣ t² dt) dx  [nested unevaluated integral]\n");
     test_num_printf_compat("  result   = %q\n", result);
-    test_num_printf_compat("  expected = %q\n", expected);
+    test_num_printf_compat("  want = %q\n", want);
     test_num_printf_compat("  err      = %q\n", err);
     test_print_integral_status(s, intg_get_interval_count_used(ig), result, err);
     ASSERT_TRUE(s == 0 || s == 1);
-    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, expected, "1e-20");
+    TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-20");
     ASSERT_TRUE(intg_get_interval_count_used(ig) >= 1u);
 
     num_destroy(&err);
     num_destroy(&result);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&hi);
     num_destroy(&lo);
     expr_free(expr);

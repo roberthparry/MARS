@@ -16,16 +16,16 @@ static number_t number_text(const char *text)
     return num_create_from_string(text);
 }
 
-static void assert_number_close_text(const char *label, number_t got, const char *expected_text,
+static void assert_number_close_text(const char *label, number_t got, const char *want_text,
                                      const char *tolerance_text)
 {
-    number_t expected = number_text(expected_text);
+    number_t want = number_text(want_text);
     number_t tolerance = number_text(tolerance_text);
-    number_t error = num_abs(num_sub(got, expected));
+    number_t error = num_abs(num_sub(got, want));
     string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n", expected_text);
+    printf("    want = %s\n", want_text);
     printf("    tol      = %s\n", tolerance_text);
     printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "<format-error>");
     ASSERT_TRUE(num_le(error, tolerance));
@@ -33,7 +33,7 @@ static void assert_number_close_text(const char *label, number_t got, const char
     string_free(error_text);
     num_destroy(&error);
     num_destroy(&tolerance);
-    num_destroy(&expected);
+    num_destroy(&want);
 }
 
 static void assert_number_real_imag_prefix(const char *label, number_t value, const char *real_prefix,

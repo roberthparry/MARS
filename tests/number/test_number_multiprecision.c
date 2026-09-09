@@ -278,7 +278,7 @@ void run_number_multiprecision_tests(void)
         number_t complex_pow_two_exact;
         number_t complex_pow_two_qfloat;
         number_t complex_pow_two_text;
-        number_t complex_pow_two_expected;
+        number_t complex_pow_two_want;
         number_t exp_half;
         number_t exp_quarter;
         number_t exp_eighth;
@@ -307,7 +307,7 @@ void run_number_multiprecision_tests(void)
         number_t sqrt_sqrt_e;
         number_t sqrt_sqrt_sqrt_e;
         number_t i_pi_2;
-        number_t log_i_expected;
+        number_t log_i_want;
         number_t neg_i;
         number_t neg_i_pi_2;
 
@@ -337,7 +337,7 @@ void run_number_multiprecision_tests(void)
         complex_pow_two_exact = num_pow(complex_base, complex_exponent_exact);
         complex_pow_two_qfloat = num_pow(complex_base, complex_exponent_qfloat);
         complex_pow_two_text = num_pow(complex_base, complex_exponent_text);
-        complex_pow_two_expected = num_create_from_string("-3 + 4i");
+        complex_pow_two_want = num_create_from_string("-3 + 4i");
         exp_half = num_exp(NUM_HALF);
         exp_quarter = num_exp(NUM_QUARTER);
         exp_eighth = num_exp(NUM_ONE_EIGHTH);
@@ -366,7 +366,7 @@ void run_number_multiprecision_tests(void)
         sqrt_sqrt_e = num_sqrt(sqrt_e);
         sqrt_sqrt_sqrt_e = num_sqrt(sqrt_sqrt_e);
         i_pi_2 = num_mul(i_768, pi_2_768);
-        log_i_expected = num_mul(NUM_I, NUM_PI_2);
+        log_i_want = num_mul(NUM_I, NUM_PI_2);
         neg_i_pi_2 = num_mul(neg_i, NUM_PI_2);
         exp_i_pi_2 = num_exp(i_pi_2);
 
@@ -382,9 +382,9 @@ void run_number_multiprecision_tests(void)
         ASSERT_NUMBER_EQ(pow_half, sqrt_two);
         ASSERT_NUMBER_EQ(pow_quarter, sqrt_sqrt_two);
         ASSERT_NUMBER_EQ(pow_eighth, sqrt_sqrt_sqrt_two);
-        ASSERT_NUMBER_EQ(complex_pow_two_exact, complex_pow_two_expected);
-        ASSERT_NUMBER_EQ(complex_pow_two_qfloat, complex_pow_two_expected);
-        ASSERT_NUMBER_EQ(complex_pow_two_text, complex_pow_two_expected);
+        ASSERT_NUMBER_EQ(complex_pow_two_exact, complex_pow_two_want);
+        ASSERT_NUMBER_EQ(complex_pow_two_qfloat, complex_pow_two_want);
+        ASSERT_NUMBER_EQ(complex_pow_two_text, complex_pow_two_want);
         ASSERT_NUMBER_EQ(exp_half, sqrt_e);
         ASSERT_NUMBER_EQ(exp_quarter, sqrt_sqrt_e);
         ASSERT_NUMBER_EQ(exp_eighth, sqrt_sqrt_sqrt_e);
@@ -394,7 +394,7 @@ void run_number_multiprecision_tests(void)
         ASSERT_NUMBER_EQ(log_inv_e, NUM_NEG_ONE);
         ASSERT_NUMBER_EQ(log_two, ln2_768);
         ASSERT_NUMBER_EQ(log_half, neg_ln2);
-        ASSERT_NUMBER_EQ(log_i, log_i_expected);
+        ASSERT_NUMBER_EQ(log_i, log_i_want);
         ASSERT_NUMBER_EQ(log_neg_one, i_pi);
         ASSERT_NUMBER_EQ(log_neg_i, neg_i_pi_2);
         assert_number_string("num_pow(2, 3)", pow_three, "8");
@@ -424,7 +424,7 @@ void run_number_multiprecision_tests(void)
         num_destroy(&complex_pow_two_exact);
         num_destroy(&complex_pow_two_qfloat);
         num_destroy(&complex_pow_two_text);
-        num_destroy(&complex_pow_two_expected);
+        num_destroy(&complex_pow_two_want);
         num_destroy(&exp_half);
         num_destroy(&exp_quarter);
         num_destroy(&exp_eighth);
@@ -453,7 +453,7 @@ void run_number_multiprecision_tests(void)
         num_destroy(&sqrt_sqrt_e);
         num_destroy(&sqrt_sqrt_sqrt_e);
         num_destroy(&i_pi_2);
-        num_destroy(&log_i_expected);
+        num_destroy(&log_i_want);
         num_destroy(&neg_i);
         num_destroy(&neg_i_pi_2);
 

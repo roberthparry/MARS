@@ -316,7 +316,7 @@ static void test_arima_smoke(void)
     ts_arima_result_t fit = {0};
     ts_forecast_t fc = {0};
     number_t level = num_create_from_double(0.95);
-    number_t last_actual = NUM_ZERO;
+    number_t last_got = NUM_ZERO;
     number_t first_forecast = NUM_ZERO;
     number_t third_forecast = NUM_ZERO;
     number_t first_lower = NUM_ZERO;
@@ -347,11 +347,11 @@ static void test_arima_smoke(void)
     TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, NULL, 3u, level, &fc) == 0, "arima forecast");
     TEST_ASSERT_NOT_NULL(fc.mean);
     TEST_ASSERT_TRUE(ts_length(fc.mean) == 3u, "arima horizon");
-    TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_actual) == 0, "last actual available");
+    TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_got) == 0, "last got available");
     TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0, "first forecast available");
     TEST_ASSERT_TRUE(ts_get_value(fc.mean, 2u, &third_forecast) == 0, "third forecast available");
     TEST_ASSERT_TRUE(ts_get_value(fc.lower, 0u, &first_lower) == 0, "first lower bound available");
-    last_value = num_to_double(last_actual);
+    last_value = num_to_double(last_got);
     first_value = num_to_double(first_forecast);
     third_value = num_to_double(third_forecast);
     last_fitted_value = num_to_double(last_fitted);
@@ -368,7 +368,7 @@ static void test_arima_smoke(void)
     forecast_date_text = datetime_format(forecast_date, "%dd/%mm/%yyyy");
     TEST_ASSERT_NOT_NULL(forecast_date_text);
     TEST_ASSERT_TRUE(strcmp(forecast_date_text, "31/07/2026") == 0, "monthly forecasts preserve month-end dates");
-    num_destroy(&last_actual);
+    num_destroy(&last_got);
     num_destroy(&first_forecast);
     num_destroy(&third_forecast);
     num_destroy(&first_lower);
@@ -572,7 +572,7 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
     ts_forecast_t fc = {0};
     matrix_t *future_x = NULL;
     number_t level = num_create_from_double(0.95);
-    number_t last_actual = NUM_ZERO;
+    number_t last_got = NUM_ZERO;
     number_t first_forecast = NUM_ZERO;
     string_t *summary = NULL;
     double last_value;
@@ -591,16 +591,16 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
     future_x = test_submatrix_rows_local(x, mat_get_row_count(x) - 12u, 12u);
     TEST_ASSERT_NOT_NULL(future_x);
     TEST_ASSERT_TRUE(ts_arima_forecast(&fit, y, future_x, 12u, level, &fc) == 0, "auto arima forecast");
-    TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_actual) == 0, "last actual available");
+    TEST_ASSERT_TRUE(ts_get_value(y, ts_length(y) - 1u, &last_got) == 0, "last got available");
     TEST_ASSERT_TRUE(ts_get_value(fc.mean, 0u, &first_forecast) == 0, "first auto forecast available");
-    last_value = num_to_double(last_actual);
+    last_value = num_to_double(last_got);
     first_value = num_to_double(first_forecast);
     TEST_ASSERT_TRUE(isfinite(first_value), "auto arima future forecast finite");
     TEST_ASSERT_TRUE(fabs(first_value - last_value) < 100.0,
                      "auto arima future forecast stays on the historical scale");
 
     string_free(summary);
-    num_destroy(&last_actual);
+    num_destroy(&last_got);
     num_destroy(&first_forecast);
     num_destroy(&level);
     mat_free(future_x);

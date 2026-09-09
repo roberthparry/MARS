@@ -4,17 +4,17 @@
 
 #include "test_number.h"
 
-static void assert_number_close_text(const char *label, number_t got, const char *expected_text,
+static void assert_number_close_text(const char *label, number_t got, const char *want_text,
                                      const char *tolerance_text)
 {
-    number_t expected = num_create_from_string(expected_text);
-    number_t diff = num_sub(got, expected);
+    number_t want = num_create_from_string(want_text);
+    number_t diff = num_sub(got, want);
     number_t error = num_abs(diff);
     number_t tolerance = num_create_from_string(tolerance_text);
     string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n", expected_text);
+    printf("    want = %s\n", want_text);
     printf("    tolerance = %s\n", tolerance_text);
     printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
@@ -23,25 +23,25 @@ static void assert_number_close_text(const char *label, number_t got, const char
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
-    num_destroy(&expected);
+    num_destroy(&want);
 }
 
-static void assert_number_close_number(const char *label, number_t got, number_t expected, const char *tolerance_text)
+static void assert_number_close_number(const char *label, number_t got, number_t want, const char *tolerance_text)
 {
-    number_t diff = num_sub(got, expected);
+    number_t diff = num_sub(got, want);
     number_t error = num_abs(diff);
     number_t tolerance = num_create_from_string(tolerance_text);
-    string_t *expected_text = num_to_string(expected);
+    string_t *want_text = num_to_string(want);
     string_t *error_text = num_to_string(error);
 
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
-    printf("    expected = %s\n", expected_text ? string_c_str(expected_text) : "(num_to_string failed)");
+    printf("    want = %s\n", want_text ? string_c_str(want_text) : "(num_to_string failed)");
     printf("    tolerance = %s\n", tolerance_text);
     printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
     ASSERT_TRUE(num_lt(error, tolerance));
 
     string_free(error_text);
-    string_free(expected_text);
+    string_free(want_text);
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
@@ -324,15 +324,15 @@ void run_number_special_function_tests(void)
         number_t sine;
         number_t cosine;
         number_t scaled_cosine;
-        number_t expected_j;
-        number_t expected_y;
+        number_t want_j;
+        number_t want_y;
         number_t got_j;
         number_t got_y;
         number_t zero;
         number_t one;
         number_t lommel;
         number_t j0;
-        number_t expected_lommel;
+        number_t want_lommel;
 
         ASSERT_EQ_INT(num_set_default_prec_bits(384u), 0);
         ASSERT_EQ_INT(num_set_prec_bits(&order, 384u), 0);
@@ -344,32 +344,32 @@ void run_number_special_function_tests(void)
         scale = num_sqrt(quotient);
         sine = num_sin(argument);
         cosine = num_cos(argument);
-        expected_j = num_mul(scale, sine);
+        want_j = num_mul(scale, sine);
         scaled_cosine = num_mul(scale, cosine);
-        expected_y = num_neg(scaled_cosine);
+        want_y = num_neg(scaled_cosine);
         got_j = num_bessel_j(order, argument);
         got_y = num_bessel_y(order, argument);
         zero = num_create_from_long(0);
         one = num_create_from_long(1);
         lommel = num_lommel_s(one, zero, argument);
         j0 = num_bessel_j(zero, argument);
-        expected_lommel = num_sub(one, j0);
+        want_lommel = num_sub(one, j0);
 
-        assert_number_close_number("high-precision num_bessel_j(1/2, x) half-order identity", got_j, expected_j,
+        assert_number_close_number("high-precision num_bessel_j(1/2, x) half-order identity", got_j, want_j,
                                    "1e-100");
-        assert_number_close_number("high-precision num_bessel_y(1/2, x) half-order identity", got_y, expected_y,
+        assert_number_close_number("high-precision num_bessel_y(1/2, x) half-order identity", got_y, want_y,
                                    "1e-100");
-        assert_number_close_number("high-precision num_lommel_s(1, 0, x) = 1 - J0(x)", lommel, expected_lommel,
+        assert_number_close_number("high-precision num_lommel_s(1, 0, x) = 1 - J0(x)", lommel, want_lommel,
                                    "1e-100");
-        num_destroy(&expected_lommel);
+        num_destroy(&want_lommel);
         num_destroy(&j0);
         num_destroy(&lommel);
         num_destroy(&one);
         num_destroy(&zero);
         num_destroy(&got_y);
         num_destroy(&got_j);
-        num_destroy(&expected_y);
-        num_destroy(&expected_j);
+        num_destroy(&want_y);
+        num_destroy(&want_j);
         num_destroy(&scaled_cosine);
         num_destroy(&cosine);
         num_destroy(&sine);
@@ -397,7 +397,7 @@ void run_number_special_function_tests(void)
         number_t log2;
         number_t log2_sq;
         number_t log2_sq_half;
-        number_t dilog_half_expected;
+        number_t dilog_half_want;
         number_t dilog_two;
         number_t dilog_two_real;
         number_t dilog_two_imag;
@@ -418,7 +418,7 @@ void run_number_special_function_tests(void)
         log2 = num_log(two);
         log2_sq = num_mul(log2, log2);
         log2_sq_half = num_div(log2_sq, two);
-        dilog_half_expected = num_sub(pi2_over_12, log2_sq_half);
+        dilog_half_want = num_sub(pi2_over_12, log2_sq_half);
         dilog_half = num_dilog(half);
         polylog2_half = num_polylog(two, half);
         dilog_two = num_dilog(two);
@@ -428,8 +428,8 @@ void run_number_special_function_tests(void)
         pi_log2 = num_mul(pi, log2);
         neg_pi_log2 = num_neg(pi_log2);
 
-        assert_number_close_number("high-precision num_dilog(1/2)", dilog_half, dilog_half_expected, "1e-180");
-        assert_number_close_number("high-precision num_polylog(2, 1/2)", polylog2_half, dilog_half_expected, "1e-180");
+        assert_number_close_number("high-precision num_dilog(1/2)", dilog_half, dilog_half_want, "1e-180");
+        assert_number_close_number("high-precision num_polylog(2, 1/2)", polylog2_half, dilog_half_want, "1e-180");
         ASSERT_TRUE(!num_is_real(dilog_two));
         assert_number_close_number("high-precision Re num_dilog(2) = pi^2/4", dilog_two_real, pi2_over_4, "1e-180");
         assert_number_close_number("high-precision Im num_dilog(2) = -pi ln 2", dilog_two_imag, neg_pi_log2, "1e-180");
@@ -442,7 +442,7 @@ void run_number_special_function_tests(void)
         num_destroy(&dilog_two);
         num_destroy(&polylog2_half);
         num_destroy(&dilog_half);
-        num_destroy(&dilog_half_expected);
+        num_destroy(&dilog_half_want);
         num_destroy(&log2_sq_half);
         num_destroy(&log2_sq);
         num_destroy(&log2);
@@ -566,33 +566,33 @@ void run_number_special_function_tests(void)
     {
         number_t z = num_create_from_string("0.2 + 0.1i");
         number_t hypergeometric = num_hypergeometric_pFq(NULL, 0u, NULL, 0u, z);
-        number_t expected_hypergeometric = num_exp(z);
+        number_t want_hypergeometric = num_exp(z);
         number_t a = num_create_from_string("1.25");
         number_t b[] = {num_create_from_string("0.5"), num_create_from_string("1.5"), num_create_from_string("2")};
         number_t c = num_clone(a);
         number_t variables[] = {num_create_from_string("0.1"), num_create_from_string("0.2"),
                                 num_create_from_string("0.15")};
         number_t lauricella = num_lauricella_f(a, b, c, variables, 3u);
-        number_t expected_lauricella = num_create_from_long(1);
+        number_t want_lauricella = num_create_from_long(1);
 
         for (size_t i = 0u; i < 3u; ++i) {
             number_t one_minus = num_sub(NUM_ONE, variables[i]);
             number_t negative_b = num_neg(b[i]);
             number_t factor = num_pow(one_minus, negative_b);
-            number_t next = num_mul(expected_lauricella, factor);
+            number_t next = num_mul(want_lauricella, factor);
 
-            num_destroy(&expected_lauricella);
-            expected_lauricella = next;
+            num_destroy(&want_lauricella);
+            want_lauricella = next;
             num_destroy(&factor);
             num_destroy(&negative_b);
             num_destroy(&one_minus);
         }
 
-        assert_number_close_number("num 0F0(z) = exp(z)", hypergeometric, expected_hypergeometric, "1e-27");
-        assert_number_close_number("general num Lauricella FD product identity", lauricella, expected_lauricella,
+        assert_number_close_number("num 0F0(z) = exp(z)", hypergeometric, want_hypergeometric, "1e-27");
+        assert_number_close_number("general num Lauricella FD product identity", lauricella, want_lauricella,
                                    "1e-26");
 
-        num_destroy(&expected_lauricella);
+        num_destroy(&want_lauricella);
         num_destroy(&lauricella);
         for (size_t i = 0u; i < 3u; ++i) {
             num_destroy(&variables[i]);
@@ -600,7 +600,7 @@ void run_number_special_function_tests(void)
         }
         num_destroy(&c);
         num_destroy(&a);
-        num_destroy(&expected_hypergeometric);
+        num_destroy(&want_hypergeometric);
         num_destroy(&hypergeometric);
         num_destroy(&z);
     }

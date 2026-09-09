@@ -8,7 +8,7 @@ static void test_qf_lambert_w0(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected W0(x) as qfloat_t string */
+        const char *want; /* want W0(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -34,7 +34,7 @@ static void test_qf_lambert_w0(void)
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_lambert_w0(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -42,7 +42,7 @@ static void test_qf_lambert_w0(void)
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: W0(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -56,7 +56,7 @@ static void test_qf_lambert_wm1(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected Wm1(x) as qfloat_t string */
+        const char *want; /* want Wm1(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -76,7 +76,7 @@ static void test_qf_lambert_wm1(void)
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_lambert_wm1(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -84,7 +84,7 @@ static void test_qf_lambert_wm1(void)
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: Wm1(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -174,13 +174,13 @@ static void test_qf_beta_special_cases(void)
         qfloat_t a = qf_from_double(vals[i]);
 
         qfloat_t B1b = qf_beta(qf_from_double(1.0), b);
-        qfloat_t B1b_expected = qf_div(qf_from_double(1.0), b);
+        qfloat_t B1b_want = qf_div(qf_from_double(1.0), b);
 
         qfloat_t Ba1 = qf_beta(a, qf_from_double(1.0));
-        qfloat_t Ba1_expected = qf_div(qf_from_double(1.0), a);
+        qfloat_t Ba1_want = qf_div(qf_from_double(1.0), a);
 
-        TEST_ASSERT_QFLOAT_CLOSE(B1b, B1b_expected);
-        TEST_ASSERT_QFLOAT_CLOSE(Ba1, Ba1_expected);
+        TEST_ASSERT_QFLOAT_CLOSE(B1b, B1b_want);
+        TEST_ASSERT_QFLOAT_CLOSE(Ba1, Ba1_want);
         printf(C_GREEN "  OK: B(1,%g) and B(%g,1)\n" C_RESET, vals[i], vals[i]);
     }
 
@@ -250,9 +250,9 @@ static void test_qf_logbeta_consistency(void)
 
             qfloat_t logB = qf_logbeta(a, b);
             qfloat_t B = qf_beta(a, b);
-            qfloat_t logB_expected = qf_log(B);
+            qfloat_t logB_want = qf_log(B);
 
-            TEST_ASSERT_QFLOAT_CLOSE(logB, logB_expected);
+            TEST_ASSERT_QFLOAT_CLOSE(logB, logB_want);
             printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET, as[i], bs[j]);
         }
     }
@@ -303,13 +303,13 @@ static void test_qf_logbeta_special_cases(void)
         qfloat_t v = qf_from_double(vals[i]);
 
         qfloat_t logB1v = qf_logbeta(qf_from_double(1.0), v);
-        qfloat_t logB1v_expected = qf_neg(qf_log(v));
+        qfloat_t logB1v_want = qf_neg(qf_log(v));
 
         qfloat_t logBv1 = qf_logbeta(v, qf_from_double(1.0));
-        qfloat_t logBv1_expected = qf_neg(qf_log(v));
+        qfloat_t logBv1_want = qf_neg(qf_log(v));
 
-        TEST_ASSERT_QFLOAT_CLOSE(logB1v, logB1v_expected);
-        TEST_ASSERT_QFLOAT_CLOSE(logBv1, logBv1_expected);
+        TEST_ASSERT_QFLOAT_CLOSE(logB1v, logB1v_want);
+        TEST_ASSERT_QFLOAT_CLOSE(logBv1, logBv1_want);
         printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET, vals[i], vals[i]);
     }
 
@@ -767,16 +767,16 @@ static void test_qf_normal_pdf_at_zero(void)
     printf(C_CYAN "TEST: qf_normal_pdf at x=0\n" C_RESET);
 
     qfloat_t pdf0 = qf_normal_pdf(qf_from_double(0.0));
-    qfloat_t expected = qf_from_string("0.3989422804014326779399460599343819");
+    qfloat_t want = qf_from_string("0.3989422804014326779399460599343819");
 
-    int ok = qf_close_rel(pdf0, expected, 1e-30);
+    int ok = qf_close_rel(pdf0, want, 1e-30);
 
     if (ok) {
         printf(C_GREEN "  OK: φ(0)\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("φ(0)", pdf0);
-        print_qf("expected", expected);
+        print_qf("want", want);
         TEST_FAIL();
     }
 
@@ -913,16 +913,16 @@ static void test_qf_normal_cdf_known_values(void)
     printf(C_CYAN "TEST: qf_normal_cdf known values\n" C_RESET);
 
     qfloat_t F0 = qf_normal_cdf(qf_from_double(0.0));
-    qfloat_t expected = qf_from_double(0.5);
+    qfloat_t want = qf_from_double(0.5);
 
-    int ok = qf_close_rel(F0, expected, 1e-30);
+    int ok = qf_close_rel(F0, want, 1e-30);
 
     if (ok) {
         printf(C_GREEN "  OK: Φ(0) = 0.5\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: Φ(0)\n" C_RESET);
         print_qf("Φ(0)", F0);
-        print_qf("expected", expected);
+        print_qf("want", want);
         TEST_FAIL();
     }
 
@@ -1122,16 +1122,16 @@ static void test_qf_normal_logpdf_at_zero(void)
     printf(C_CYAN "TEST: qf_normal_logpdf at x=0\n" C_RESET);
 
     qfloat_t logpdf0 = qf_normal_logpdf(qf_from_double(0.0));
-    qfloat_t expected = qf_neg(qf_mul(qf_from_double(0.5), QF_LN_2PI));
+    qfloat_t want = qf_neg(qf_mul(qf_from_double(0.5), QF_LN_2PI));
 
-    int ok = qf_close_rel(logpdf0, expected, 1e-30);
+    int ok = qf_close_rel(logpdf0, want, 1e-30);
 
     if (ok) {
         printf(C_GREEN "  OK: log φ(0)\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: log φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("log φ(0)", logpdf0);
-        print_qf("expected", expected);
+        print_qf("want", want);
         TEST_FAIL();
     }
 

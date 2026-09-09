@@ -1,10 +1,10 @@
 #include "test_expr.h"
 
 static bool test_expr_suite_setup(void);
-static int expr_number_exact_equal(const void *actual, const void *expected, void *ctx);
-static int expr_number_close_equal(const void *actual, const void *expected, void *ctx);
+static int expr_number_exact_equal(const void *got, const void *want, void *ctx);
+static int expr_number_close_equal(const void *got_input, const void *want_input, void *ctx);
 static int expr_number_format(const void *value, string_t *out, void *ctx);
-static number_t expr_error_magnitude(number_t got, number_t expected);
+static number_t expr_error_magnitude(number_t got, number_t want);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 TEST_SUITE_SETUP(test_expr_suite_setup);
@@ -18,23 +18,23 @@ static bool test_expr_suite_setup(void)
     return TEST_REQUIRE_VALIDITY_CHECKER("expr-number-exact") && TEST_REQUIRE_VALIDITY_CHECKER("expr-number-close");
 }
 
-static int expr_number_exact_equal(const void *actual, const void *expected, void *ctx)
+static int expr_number_exact_equal(const void *got, const void *want, void *ctx)
 {
     (void)ctx;
-    return num_eq(*(const number_t *)actual, *(const number_t *)expected);
+    return num_eq(*(const number_t *)got, *(const number_t *)want);
 }
 
-static number_t expr_error_magnitude(number_t got, number_t expected)
+static number_t expr_error_magnitude(number_t got, number_t want)
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+    if (num_get_prec_bits(want) > 0u && num_set_prec_bits(&promoted_got, num_get_prec_bits(want)) != 0) {
         num_destroy(&promoted_got);
         return num_create_from_double(NAN);
     }
-    diff = num_sub(promoted_got, expected);
+    diff = num_sub(promoted_got, want);
     num_destroy(&promoted_got);
     if (num_is_real(diff)) {
         error = num_abs(diff);
@@ -53,10 +53,10 @@ static number_t expr_error_magnitude(number_t got, number_t expected)
     }
 }
 
-static int expr_number_close_equal(const void *actual, const void *expected, void *ctx)
+static int expr_number_close_equal(const void *got_input, const void *want_input, void *ctx)
 {
-    number_t got = *(const number_t *)actual;
-    number_t want = *(const number_t *)expected;
+    number_t got = *(const number_t *)got_input;
+    number_t want = *(const number_t *)want_input;
     number_t error;
     number_t one;
     number_t tolerance;

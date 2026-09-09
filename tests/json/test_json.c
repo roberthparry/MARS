@@ -21,14 +21,14 @@ static const json_t *object_get_literal(const json_t *object, const char *key_te
     return value;
 }
 
-static bool json_number_equals(const json_t *json, number_t expected)
+static bool json_number_equals(const json_t *json, number_t want)
 {
-    number_t actual = NUM_NAN;
-    bool ok = json_number_value(json, &actual);
-    bool equal = ok && (num_is_nan(expected) ? num_is_nan(actual) : num_eq(actual, expected));
+    number_t got = NUM_NAN;
+    bool ok = json_number_value(json, &got);
+    bool equal = ok && (num_is_nan(want) ? num_is_nan(got) : num_eq(got, want));
 
     if (ok)
-        num_destroy(&actual);
+        num_destroy(&got);
     return equal;
 }
 
@@ -69,12 +69,12 @@ static void test_parse_object_array_and_escapes(void)
     TEST_ASSERT_STR_EQ(string_c_str(json_number_text(number)), "-4.5e+6");
     {
         number_t numeric = NUM_NAN;
-        number_t expected = num_create_from_long(-4500000);
+        number_t want = num_create_from_long(-4500000);
         bool parsed = json_number_value(number, &numeric);
-        bool equal = parsed && num_eq(numeric, expected);
+        bool equal = parsed && num_eq(numeric, want);
 
         num_destroy(&numeric);
-        num_destroy(&expected);
+        num_destroy(&want);
         TEST_ASSERT_TRUE(equal, "JSON number converts to number_t");
     }
 

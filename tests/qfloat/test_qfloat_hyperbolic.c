@@ -7,7 +7,7 @@ static void test_qf_sinh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } sinh_tests[] = {
         {{0.0, 0.0}, "sinh(0)", {0.0, 0.0}},
 
@@ -28,18 +28,18 @@ static void test_qf_sinh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = sinh_tests[i].arg;
-        qfloat_t expected = sinh_tests[i].expected;
+        qfloat_t want = sinh_tests[i].want;
         qfloat_t got = qf_sinh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, sinh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 }
@@ -49,7 +49,7 @@ static void test_qf_cosh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } cosh_tests[] = {
         {{0.0, 0.0}, "cosh(0)", {1.0, 0.0}},
 
@@ -70,18 +70,18 @@ static void test_qf_cosh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = cosh_tests[i].arg;
-        qfloat_t expected = cosh_tests[i].expected;
+        qfloat_t want = cosh_tests[i].want;
         qfloat_t got = qf_cosh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, cosh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 }
@@ -91,7 +91,7 @@ static void test_qf_tanh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } tanh_tests[] = {
         {{0.0, 0.0}, "tanh(0)", {0.0, 0.0}},
 
@@ -118,18 +118,18 @@ static void test_qf_tanh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = tanh_tests[i].arg;
-        qfloat_t expected = tanh_tests[i].expected;
+        qfloat_t want = tanh_tests[i].want;
         qfloat_t got = qf_tanh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, tanh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 }
@@ -156,7 +156,7 @@ static void test_qf_asinh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } asinh_tests[] = {
         {{0.0, 0.0}, "asinh(0)", {0.0, 0.0}},
 
@@ -177,18 +177,18 @@ static void test_qf_asinh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = asinh_tests[i].arg;
-        qfloat_t expected = asinh_tests[i].expected;
+        qfloat_t want = asinh_tests[i].want;
         qfloat_t got = qf_asinh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, asinh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 }
@@ -198,7 +198,7 @@ static void test_qf_acosh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } acosh_tests[] = {
         /* acosh(1) = 0 */
         {{1.0, 0.0}, "acosh(1)", {0.0, 0.0}},
@@ -217,18 +217,18 @@ static void test_qf_acosh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = acosh_tests[i].arg;
-        qfloat_t expected = acosh_tests[i].expected;
+        qfloat_t want = acosh_tests[i].want;
         qfloat_t got = qf_acosh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, acosh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 
@@ -260,7 +260,7 @@ static void test_qf_atanh(void)
     struct {
         qfloat_t arg;
         const char *name;
-        qfloat_t expected;
+        qfloat_t want;
     } atanh_tests[] = {
         {{0.0, 0.0}, "atanh(0)", {0.0, 0.0}},
 
@@ -281,18 +281,18 @@ static void test_qf_atanh(void)
 
     for (int i = 0; i < N; ++i) {
         qfloat_t x = atanh_tests[i].arg;
-        qfloat_t expected = atanh_tests[i].expected;
+        qfloat_t want = atanh_tests[i].want;
         qfloat_t got = qf_atanh(x);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
-        test_qf_to_buffer(expected, buf_exp, sizeof(buf_exp));
+        test_qf_to_buffer(want, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, expected, 1e-30)) {
+        if (qf_close(got, want, 1e-30)) {
             printf("%s  OK: %s = %s%s\n", C_GREEN, atanh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
-            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+            TEST_ASSERT_QFLOAT_CLOSE(got, want);
         }
     }
 

@@ -1,12 +1,12 @@
 #include "test_qfloat.h"
 
-static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+static int qf_close_value(qfloat_t got, qfloat_t want, double tol)
 {
-    if (qf_close(got, expected, tol))
+    if (qf_close(got, want, tol))
         return 1;
-    if (qf_eq(expected, qf_from_double(0.0)))
+    if (qf_eq(want, qf_from_double(0.0)))
         return 0;
-    return qf_close_rel(got, expected, tol);
+    return qf_close_rel(got, want, tol);
 }
 
 static void test_qf_productlog_definition(void)
@@ -198,14 +198,14 @@ static void test_qf_gammainc_special_s1(void)
         qfloat_t s = qf_from_double(1.0);
 
         qfloat_t e_minus_x = qf_exp(qf_neg(x));
-        qfloat_t expected_lower = qf_sub(qf_from_double(1.0), e_minus_x);
-        qfloat_t expected_upper = e_minus_x;
+        qfloat_t want_lower = qf_sub(qf_from_double(1.0), e_minus_x);
+        qfloat_t want_upper = e_minus_x;
 
         qfloat_t gl = qf_gammainc_lower(s, x);
         qfloat_t gu = qf_gammainc_upper(s, x);
 
-        TEST_ASSERT_QFLOAT_CLOSE(gl, expected_lower);
-        TEST_ASSERT_QFLOAT_CLOSE(gu, expected_upper);
+        TEST_ASSERT_QFLOAT_CLOSE(gl, want_lower);
+        TEST_ASSERT_QFLOAT_CLOSE(gu, want_upper);
         printf(C_GREEN "  OK: γ(1,%g) and Γ(1,%g)\n" C_RESET, xs[j], xs[j]);
     }
 
@@ -418,7 +418,7 @@ static void test_Ei_values(void)
         qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", ad);
 
         printf("    x        = %s\n", buf_x);
-        printf("    expected = %s\n", buf_ref);
+        printf("    want = %s\n", buf_ref);
         printf("    got      = %s\n", buf_got);
         printf("    error    = %s\n", buf_err);
     }
@@ -442,7 +442,7 @@ static void test_qf_add_double(void)
     struct {
         const char *xs;
         double y;
-        const char *expected;
+        const char *want;
     } tests[] = {{"1", 0.5, "1.5"}, {"0", 1.0, "1"},
                  {"-3", 3.0, "0"},  {"1.23456789012345678", 1e-15, "1.23456789012345778"},
                  {"0", 0.0, "0"},   {NULL, 0.0, NULL}};
@@ -450,7 +450,7 @@ static void test_qf_add_double(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_add_double(x, tests[i].y);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, 1e-30)) {
@@ -459,7 +459,7 @@ static void test_qf_add_double(void)
             printf("%s  FAIL: add_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__,
                    __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -474,14 +474,14 @@ static void test_qf_mul_double(void)
     struct {
         const char *xs;
         double y;
-        const char *expected;
+        const char *want;
     } tests[] = {{"2", 3.0, "6"},   {"0", 5.0, "0"},   {"-1", 4.0, "-4"},
                  {"1", 0.5, "0.5"}, {"3", -2.0, "-6"}, {NULL, 0.0, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_double(x, tests[i].y);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, 1e-30)) {
@@ -490,7 +490,7 @@ static void test_qf_mul_double(void)
             printf("%s  FAIL: mul_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__,
                    __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -534,14 +534,14 @@ static void test_qf_floor(void)
 
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
     } tests[] = {{"2.9", "2"}, {"2.0", "2"},   {"-2.1", "-3"}, {"-2.0", "-2"},
                  {"0.5", "0"}, {"-0.5", "-1"}, {NULL, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_floor(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close(got, exp, 1e-30)) {
@@ -549,7 +549,7 @@ static void test_qf_floor(void)
         } else {
             printf("%s  FAIL: floor(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -564,13 +564,13 @@ static void test_qf_ldexp(void)
     struct {
         const char *xs;
         int k;
-        const char *expected;
+        const char *want;
     } tests[] = {{"1", 3, "8"}, {"1", -1, "0.5"}, {"3", 2, "12"}, {"1", 0, "1"}, {"-5", 1, "-10"}, {NULL, 0, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_ldexp(x, tests[i].k);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close(got, exp, 1e-30)) {
@@ -578,7 +578,7 @@ static void test_qf_ldexp(void)
         } else {
             printf("%s  FAIL: ldexp(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -592,13 +592,13 @@ static void test_qf_sqr(void)
 
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
     } tests[] = {{"3", "9"}, {"-4", "16"}, {"0.5", "0.25"}, {"0", "0"}, {"1", "1"}, {NULL, NULL}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_sqr(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         qfloat_t ref = qf_mul(x, x);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -607,7 +607,7 @@ static void test_qf_sqr(void)
         } else {
             printf("%s  FAIL: sqr(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -622,7 +622,7 @@ static void test_qf_mul_pow10(void)
     struct {
         const char *xs;
         int k;
-        const char *expected;
+        const char *want;
         double tol;
     } tests[] = {{"1", 3, "1000", 1e-30},  {"1", -3, "0.001", 1e-15}, /* non-exact binary fraction */
                  {"2.5", 2, "250", 1e-30}, {"3", 0, "3", 1e-30},      {"-7", 1, "-70", 1e-30}, {NULL, 0, NULL, 0.0}};
@@ -630,7 +630,7 @@ static void test_qf_mul_pow10(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_mul_pow10(x, tests[i].k);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
@@ -639,7 +639,7 @@ static void test_qf_mul_pow10(void)
             printf("%s  FAIL: mul_pow10(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__,
                    __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -652,16 +652,16 @@ static void test_qf_signbit(void)
 
     struct {
         const char *xs;
-        int expected;
+        int want;
     } tests[] = {{"1", 0}, {"-1", 1}, {"0", 0}, {"1e30", 0}, {"-1e30", 1}, {NULL, 0}};
 
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         int got = qf_signbit(x);
-        if (got == tests[i].expected) {
+        if (got == tests[i].want) {
             printf("%s  OK: signbit(%s) = %d%s\n", C_GREEN, tests[i].xs, got, C_RESET);
         } else {
-            printf("%s  FAIL: signbit(%s): got %d want %d%s  [%s:%d]\n", C_RED, tests[i].xs, got, tests[i].expected,
+            printf("%s  FAIL: signbit(%s): got %d want %d%s  [%s:%d]\n", C_RED, tests[i].xs, got, tests[i].want,
                    C_RESET, __FILE__, __LINE__);
             TEST_FAIL();
         }
@@ -681,7 +681,7 @@ static void test_qf_isinf(void)
     struct {
         const char *label;
         qfloat_t x;
-        bool expected;
+        bool want;
     } tests[] = {
         {"+INF", pos_inf, true},
         {"-INF", neg_inf, true},
@@ -692,11 +692,11 @@ static void test_qf_isinf(void)
     int n = (int)(sizeof(tests) / sizeof(tests[0]));
     for (int i = 0; i < n; i++) {
         bool got = qf_isinf(tests[i].x);
-        if (got == tests[i].expected) {
+        if (got == tests[i].want) {
             printf("%s  OK: isinf(%s) = %s%s\n", C_GREEN, tests[i].label, got ? "true" : "false", C_RESET);
         } else {
             printf("%s  FAIL: isinf(%s): got %s want %s%s  [%s:%d]\n", C_RED, tests[i].label, got ? "true" : "false",
-                   tests[i].expected ? "true" : "false", C_RESET, __FILE__, __LINE__);
+                   tests[i].want ? "true" : "false", C_RESET, __FILE__, __LINE__);
             TEST_FAIL();
         }
     }
@@ -738,14 +738,14 @@ static void test_qf_vsprintf(void)
     qf_sprintf(buf, sizeof(buf), "val=%q!", x);
     char inner[256];
     qf_sprintf(inner, sizeof(inner), "%q", x);
-    char expected[512];
-    snprintf(expected, sizeof(expected), "val=%s!", inner);
-    if (strcmp(buf, expected) == 0) {
+    char want[512];
+    snprintf(want, sizeof(want), "val=%s!", inner);
+    if (strcmp(buf, want) == 0) {
         printf("%s  OK: vsprintf surrounding text%s\n", C_GREEN, C_RESET);
     } else {
         printf("%s  FAIL: vsprintf surrounding text%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", expected);
+        printf("    want = %s\n", want);
         TEST_FAIL();
     }
     printf("\n");
@@ -761,7 +761,7 @@ void test_qf_trigamma(void)
     /* ψ₁(n) = π²/6 - sum_{k=1}^{n-1} 1/k²; ψ₁(1/2) = π²/2 */
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
         double tol;
     } tests[] = {/* ψ₁(1) = π²/6 */
                  {"1", "1.6449340668482264364724151666460251892189499012068", 1e-30},
@@ -776,17 +776,17 @@ void test_qf_trigamma(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_trigamma(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: trigamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
             printf("%s  FAIL: trigamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -802,7 +802,7 @@ void test_qf_tetragamma(void)
        ψ''(1) = -2ζ(3) = -2 * 1.2020569031595942853997... = -2.4041138063191885707994... */
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
         double tol;
     } tests[] = {/* ψ''(1) = -2ζ(3) */
                  {"1", "-2.4041138063191885707994763230228999815299725846810", 1e-30},
@@ -815,17 +815,17 @@ void test_qf_tetragamma(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_tetragamma(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
         if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: tetragamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         } else {
             printf("%s  FAIL: tetragamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
             TEST_FAIL();
         }
     }
@@ -883,10 +883,10 @@ void test_qf_polygamma(void)
     {
         qfloat_t s = qf_from_string("2.5");
         qfloat_t a = qf_from_double(101.0);
-        qfloat_t expected = qf_from_string("0.000661687499453171542062211501479711744239330816315948606222019329");
+        qfloat_t want = qf_from_string("0.000661687499453171542062211501479711744239330816315948606222019329");
         qfloat_t recurrence = qf_add(qf_pow(a, qf_neg(s)), qf_zetah(s, qf_add(a, QF_ONE)));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), expected, 1e-31);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), want, 1e-31);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), recurrence, 1e-30);
     }
 
@@ -901,9 +901,9 @@ void test_qf_polylog(void)
         qfloat_t q = qf_from_double(0.5);
         qfloat_t psi_one = qf_qdigamma(q, QF_ONE);
         qfloat_t psi_two = qf_qdigamma(q, qf_from_double(2.0));
-        qfloat_t expected_one = qf_from_string("-0.4205290343560457797847369304069241");
+        qfloat_t want_one = qf_from_string("-0.4205290343560457797847369304069241");
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi_one, expected_one, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi_one, want_one, 1e-30);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_sub(psi_two, psi_one), qf_neg(qf_log(q)), 1e-30);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_qdigamma(QF_ONE, qf_from_double(2.5)), qf_digamma(qf_from_double(2.5)),
                                      1e-30);
@@ -956,12 +956,12 @@ void test_qf_polylog(void)
         qfloat_t c = a;
         qfloat_t b[] = {qf_from_string("0.5"), qf_from_string("1.5"), qf_from_string("2.0")};
         qfloat_t variables[] = {qf_from_string("0.1"), qf_from_string("0.2"), qf_from_string("0.15")};
-        qfloat_t expected = QF_ONE;
+        qfloat_t want = QF_ONE;
 
         for (size_t i = 0u; i < 3u; ++i) {
-            expected = qf_mul(expected, qf_pow(qf_sub(QF_ONE, variables[i]), qf_neg(b[i])));
+            want = qf_mul(want, qf_pow(qf_sub(QF_ONE, variables[i]), qf_neg(b[i])));
         }
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 3u), expected, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 3u), want, 1e-27);
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 2u),
                                      qf_appell_f1(a, b[0], b[1], c, variables[0], variables[1]), 1e-29);
     }
@@ -970,9 +970,9 @@ void test_qf_polylog(void)
         qfloat_t a = qf_from_string("1.25");
         qfloat_t b = qf_from_string("0.5");
         qfloat_t variable = qf_from_string("0.96");
-        qfloat_t expected = qf_pow(qf_sub(QF_ONE, variable), qf_neg(b));
+        qfloat_t want = qf_pow(qf_sub(QF_ONE, variable), qf_neg(b));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, &b, a, &variable, 1u), expected, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, &b, a, &variable, 1u), want, 1e-27);
     }
 
     printf("%s  OK: polylogarithmic and hypergeometric identities%s\n\n", C_GREEN, C_RESET);
@@ -1008,13 +1008,13 @@ static void test_qf_bessel_half_order_identities(void)
     qfloat_t negative_half = qf_neg(half);
     qfloat_t x = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(qf_from_double(2.0), qf_mul(QF_PI, x)));
-    qfloat_t expected_j_half = qf_mul(scale, qf_sin(x));
-    qfloat_t expected_j_negative_half = qf_mul(scale, qf_cos(x));
-    qfloat_t expected_y_half = qf_neg(expected_j_negative_half);
+    qfloat_t want_j_half = qf_mul(scale, qf_sin(x));
+    qfloat_t want_j_negative_half = qf_mul(scale, qf_cos(x));
+    qfloat_t want_y_half = qf_neg(want_j_negative_half);
 
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x), expected_j_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x), expected_j_negative_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x), expected_y_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x), want_j_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x), want_j_negative_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x), want_y_half, 1e-28);
 }
 
 static void test_qf_bessel_order_recurrence(void)
@@ -1023,9 +1023,9 @@ static void test_qf_bessel_order_recurrence(void)
     qfloat_t argument = qf_from_string("2.25");
     qfloat_t lower = qf_bessel_j(qf_sub(order, QF_ONE), argument);
     qfloat_t upper = qf_bessel_j(qf_add(order, QF_ONE), argument);
-    qfloat_t expected = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order), argument), qf_bessel_j(order, argument));
+    qfloat_t want = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order), argument), qf_bessel_j(order, argument));
 
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_add(lower, upper), expected, 1e-27);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_add(lower, upper), want, 1e-27);
 }
 
 static void test_qf_bessel_integer_order_values(void)
@@ -1051,8 +1051,8 @@ void test_bessel_functions(void)
     {
         qfloat_t argument = qf_from_double(1.25);
         qfloat_t got = qf_lommel_s(QF_ONE, QF_ZERO, argument);
-        qfloat_t expected = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
+        qfloat_t want = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expected, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, want, 1e-28);
     }
 }

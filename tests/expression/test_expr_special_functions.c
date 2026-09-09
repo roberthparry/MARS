@@ -314,7 +314,7 @@ void test_Ei(void)
         char *expression_text = li ? expr_to_string(li, style_EXPRESSION) : NULL;
         char *function_text = li ? expr_to_string(li, style_FUNCTION) : NULL;
         char *TeX_text = li ? expr_to_string(li, style_LATEX) : NULL;
-        qfloat_t expected_sum = qf_add(qf_add(qf_Li(qf_from_double(2.0)), qf_Li(qf_from_double(3.0))),
+        qfloat_t want_sum = qf_add(qf_add(qf_Li(qf_from_double(2.0)), qf_Li(qf_from_double(3.0))),
                                        qf_Li(qf_from_double(4.0)));
 
         TEST_ASSERT_NOT_NULL(li);
@@ -332,7 +332,7 @@ void test_Ei(void)
                    qf_div(QF_ONE, qf_log(qf_from_double(2.0))));
         check_q_at(__FILE__, __LINE__, 1, "the derivative of the Li antiderivative is Li",
                    expr_eval_qf(antiderivative_derivative), expr_eval_qf(li));
-        check_q_at(__FILE__, __LINE__, 1, "finite sum of Li", expr_eval_qf(sum), expected_sum);
+        check_q_at(__FILE__, __LINE__, 1, "finite sum of Li", expr_eval_qf(sum), want_sum);
 
         free(TeX_text);
         free(function_text);
@@ -628,12 +628,12 @@ void test_dilog_polylog(void)
         expr_t *x = test_expr_new_named_var_d(0.2, "x");
         expr_t *hypergeometric = expr_hypergeometric_pFq(0u, NULL, 0u, NULL, x);
         const expr_t *derivative = expr_get_deriv(hypergeometric, x);
-        qfloat_t expected = qf_exp(qf_from_string("0.2"));
+        qfloat_t want = qf_exp(qf_from_string("0.2"));
 
         ASSERT_NOT_NULL(hypergeometric);
         ASSERT_NOT_NULL(derivative);
-        check_q_at(__FILE__, __LINE__, 1, "0F0(x) = exp(x)", expr_eval_qf(hypergeometric), expected);
-        check_q_at(__FILE__, __LINE__, 1, "d 0F0(x)/dx = 0F0(x)", expr_eval_qf(derivative), expected);
+        check_q_at(__FILE__, __LINE__, 1, "0F0(x) = exp(x)", expr_eval_qf(hypergeometric), want);
+        check_q_at(__FILE__, __LINE__, 1, "d 0F0(x)/dx = 0F0(x)", expr_eval_qf(derivative), want);
 
         expr_free(hypergeometric);
         expr_free(x);
@@ -649,12 +649,12 @@ void test_dilog_polylog(void)
         const expr_t *derivative = expr_get_deriv(lauricella, variables[0]);
         qfloat_t shifted_b[] = {qf_from_string("1.5"), qf_from_string("1.5")};
         qfloat_t shifted_x[] = {qf_from_string("0.1"), qf_from_string("0.2")};
-        qfloat_t expected = qf_mul(qf_from_string("0.3125"), qf_lauricella_f(qf_from_string("2.25"), shifted_b,
+        qfloat_t want = qf_mul(qf_from_string("0.3125"), qf_lauricella_f(qf_from_string("2.25"), shifted_b,
                                                                              qf_from_string("3.0"), shifted_x, 2u));
 
         ASSERT_NOT_NULL(lauricella);
         ASSERT_NOT_NULL(derivative);
-        check_q_at(__FILE__, __LINE__, 1, "Lauricella FD derivative rule", expr_eval_qf(derivative), expected);
+        check_q_at(__FILE__, __LINE__, 1, "Lauricella FD derivative rule", expr_eval_qf(derivative), want);
 
         expr_free(lauricella);
         expr_free(variables[1]);
@@ -675,9 +675,9 @@ void test_bessel(void)
     const expr_t *dj = expr_get_deriv(j, x);
     qfloat_t argument = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(qf_from_double(2.0), qf_mul(QF_PI, argument)));
-    qfloat_t expected_j = qf_mul(scale, qf_sin(argument));
-    qfloat_t expected_y = qf_neg(qf_mul(scale, qf_cos(argument)));
-    qfloat_t expected_dj = qf_mul(qf_from_double(0.5), qf_sub(qf_bessel_j(qf_from_double(-0.5), argument),
+    qfloat_t want_j = qf_mul(scale, qf_sin(argument));
+    qfloat_t want_y = qf_neg(qf_mul(scale, qf_cos(argument)));
+    qfloat_t want_dj = qf_mul(qf_from_double(0.5), qf_sub(qf_bessel_j(qf_from_double(-0.5), argument),
                                                               qf_bessel_j(qf_from_double(1.5), argument)));
     char *tex = expr_to_TeX_body(j);
 
@@ -685,8 +685,8 @@ void test_bessel(void)
     ASSERT_NOT_NULL(y);
     ASSERT_NOT_NULL(dj);
     ASSERT_NOT_NULL(tex);
-    check_q_at(__FILE__, __LINE__, 1, "J_(1/2) half-order identity", expr_eval_qf(j), expected_j);
-    check_q_at(__FILE__, __LINE__, 1, "Y_(1/2) half-order identity", expr_eval_qf(y), expected_y);
+    check_q_at(__FILE__, __LINE__, 1, "J_(1/2) half-order identity", expr_eval_qf(j), want_j);
+    check_q_at(__FILE__, __LINE__, 1, "Y_(1/2) half-order identity", expr_eval_qf(y), want_y);
     {
         static const char *const spellings[] = {"BesselJ", "BesselY", "bessel_j", "bessel_y"};
 
@@ -696,7 +696,7 @@ void test_bessel(void)
             char description[96];
             expr_t *parsed;
             expr_t *bound;
-            qfloat_t expected = (i & 1u) ? expected_y : expected_j;
+            qfloat_t want = (i & 1u) ? want_y : want_j;
 
             snprintf(input, sizeof(input), "{ %s(1/2, x) | x = 1.25 }", spellings[i]);
             snprintf(binding, sizeof(binding), "{ x | x = %s(1/2, 1.25) }", spellings[i]);
@@ -706,15 +706,15 @@ void test_bessel(void)
             ASSERT_NOT_NULL(parsed);
             ASSERT_NOT_NULL(bound);
             snprintf(description, sizeof(description), "%s parses", spellings[i]);
-            check_q_at(__FILE__, __LINE__, 1, description, expr_eval_qf(parsed), expected);
+            check_q_at(__FILE__, __LINE__, 1, description, expr_eval_qf(parsed), want);
             snprintf(description, sizeof(description), "%s works in a binding", spellings[i]);
-            check_q_at(__FILE__, __LINE__, 1, description, expr_eval_qf(bound), expected);
+            check_q_at(__FILE__, __LINE__, 1, description, expr_eval_qf(bound), want);
 
             expr_free(bound);
             expr_free(parsed);
         }
     }
-    check_q_at(__FILE__, __LINE__, 1, "BesselJ argument derivative recurrence", expr_eval_qf(dj), expected_dj);
+    check_q_at(__FILE__, __LINE__, 1, "BesselJ argument derivative recurrence", expr_eval_qf(dj), want_dj);
     ASSERT_NOT_NULL(strstr(tex, "J_{"));
 
     {
@@ -722,8 +722,8 @@ void test_bessel(void)
         expr_t *nu = test_expr_new_const_d(0.0);
         expr_t *lommel = expr_lommel_s(mu, nu, x);
         const expr_t *dlommel = expr_get_deriv(lommel, x);
-        qfloat_t expected_lommel = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
-        qfloat_t expected_derivative = qf_bessel_j(QF_ONE, argument);
+        qfloat_t want_lommel = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
+        qfloat_t want_derivative = qf_bessel_j(QF_ONE, argument);
         char *lommel_TeX = expr_to_TeX_body(lommel);
         char *dlommel_text = dlommel ? expr_to_string(dlommel, style_UNBOUND) : NULL;
 
@@ -731,9 +731,9 @@ void test_bessel(void)
         ASSERT_NOT_NULL(dlommel);
         ASSERT_NOT_NULL(lommel_TeX);
         ASSERT_NOT_NULL(dlommel_text);
-        check_q_at(__FILE__, __LINE__, 1, "Lommel s_(1,0) = 1 - J0", expr_eval_qf(lommel), expected_lommel);
+        check_q_at(__FILE__, __LINE__, 1, "Lommel s_(1,0) = 1 - J0", expr_eval_qf(lommel), want_lommel);
         check_q_at(__FILE__, __LINE__, 1, "Lommel argument derivative recurrence", expr_eval_qf(dlommel),
-                   expected_derivative);
+                   want_derivative);
         ASSERT_NOT_NULL(strstr(lommel_TeX, "s_{"));
         ASSERT_NULL(strstr(dlommel_text, "Prime"));
         ASSERT_NULL(strstr(dlommel_text, "derivative"));
@@ -753,9 +753,9 @@ void test_bessel(void)
                 bound = expr_from_string(binding, NULL);
                 ASSERT_NOT_NULL(parsed);
                 ASSERT_NOT_NULL(bound);
-                check_q_at(__FILE__, __LINE__, 1, "Lommel spelling parses", expr_eval_qf(parsed), expected_lommel);
+                check_q_at(__FILE__, __LINE__, 1, "Lommel spelling parses", expr_eval_qf(parsed), want_lommel);
                 check_q_at(__FILE__, __LINE__, 1, "Lommel spelling works in a binding", expr_eval_qf(bound),
-                           expected_lommel);
+                           want_lommel);
                 expr_free(bound);
                 expr_free(parsed);
             }
@@ -858,18 +858,18 @@ void test_deriv_trigamma(void)
         expr_t *finite_sum = expr_sub(riemann, hurwitz);
         const expr_t *finite_sum_derivative = expr_get_deriv(finite_sum, s);
         expr_t *simplified_derivative = finite_sum_derivative ? expr_simplify(finite_sum_derivative) : NULL;
-        qfloat_t expected = QF_ZERO;
+        qfloat_t want = QF_ZERO;
 
         for (unsigned int k = 1u; k <= 1000u; ++k) {
             qfloat_t base = qf_from_double((double)k);
 
-            expected = qf_sub(expected, qf_div(qf_log(base), base));
+            want = qf_sub(want, qf_div(qf_log(base), base));
         }
 
         ASSERT_NOT_NULL(finite_sum_derivative);
         ASSERT_NOT_NULL(simplified_derivative);
         check_q_at(__FILE__, __LINE__, 1, "AD of zeta(s) - zetah(s,a) cancels the shared pole at s=1",
-                   expr_eval_qf(simplified_derivative), expected);
+                   expr_eval_qf(simplified_derivative), want);
 
         expr_free(simplified_derivative);
         expr_free(finite_sum);
@@ -958,17 +958,17 @@ void test_deriv_trigamma(void)
         expr_t *hurwitz = expr_zetah(s, a);
         const expr_t *hurwitz_derivative = expr_get_deriv(hurwitz, a);
         expr_t *hurwitz_antiderivative = expr_integrate(hurwitz, a);
-        qfloat_t expected_derivative =
+        qfloat_t want_derivative =
             qf_neg(qf_mul(qf_from_double(2.5), qf_zetah(qf_from_double(3.5), qf_from_double(3.0))));
-        qfloat_t expected_antiderivative =
+        qfloat_t want_antiderivative =
             qf_div(qf_zetah(qf_from_double(1.5), qf_from_double(3.0)), qf_from_double(-1.5));
 
         ASSERT_NOT_NULL(hurwitz_derivative);
         ASSERT_NOT_NULL(hurwitz_antiderivative);
         check_q_at(__FILE__, __LINE__, 1, "d/da{zetah(s,a)} = -s zetah(s+1,a)",
-                   expr_eval_qf(hurwitz_derivative), expected_derivative);
+                   expr_eval_qf(hurwitz_derivative), want_derivative);
         check_q_at(__FILE__, __LINE__, 1, "integral over a of zetah(s,a)", expr_eval_qf(hurwitz_antiderivative),
-                   expected_antiderivative);
+                   want_antiderivative);
 
         expr_free(hurwitz_antiderivative);
         expr_free(hurwitz);
@@ -987,7 +987,7 @@ void test_second_deriv_digamma(void)
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{ψ(x)} = ψ''(x) = tetragamma(x); at x=2: ψ''(2) = ψ''(1) - 2
-     * ψ''(1) = -2ζ(3) so we just use qf_tetragamma to get the expected value */
+     * ψ''(1) = -2ζ(3) so we just use qf_tetragamma to get the want value */
     qfloat_t expect = qf_tetragamma(qf_from_double(2.0));
     check_q_at(__FILE__, __LINE__, 1, "d²/dx²{digamma(x)} | x=2", expr_eval_qf(ddf), expect);
     print_expr_of(ddf);

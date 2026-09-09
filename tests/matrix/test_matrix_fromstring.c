@@ -2,10 +2,10 @@
 
 #include "test_matrix.h"
 
-static void check_matrix_fromstring_expr_double(const char *label, const expr_t *dv, double expected, double tol)
+static void check_matrix_fromstring_expr_double(const char *label, const expr_t *dv, double want_value, double tol)
 {
     number_t got = expr_eval(dv);
-    number_t want = num_create_from_double(expected);
+    number_t want = num_create_from_double(want_value);
     number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
     double err = num_to_double(mag);
@@ -18,10 +18,10 @@ static void check_matrix_fromstring_expr_double(const char *label, const expr_t 
     num_destroy(&got);
 }
 
-static void check_matrix_fromstring_expr_num(const char *label, const expr_t *dv, number_t expected, double tol)
+static void check_matrix_fromstring_expr_num(const char *label, const expr_t *dv, number_t want, double tol)
 {
     number_t got = expr_eval(dv);
-    number_t diff = num_sub(got, expected);
+    number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
     double err = num_to_double(mag);
 
@@ -32,9 +32,9 @@ static void check_matrix_fromstring_expr_num(const char *label, const expr_t *dv
     num_destroy(&got);
 }
 
-static void check_matrix_fromstring_num(const char *label, number_t got, number_t expected, double tol)
+static void check_matrix_fromstring_num(const char *label, number_t got, number_t want, double tol)
 {
-    number_t diff = num_sub(got, expected);
+    number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
     double err = num_to_double(mag);
 
@@ -48,7 +48,7 @@ static void test_mat_from_string_numeric_num_real(void)
 {
     matrix_t *A = mat_from_string("(1/2, 2; 3, 4.5)");
     number_t x = NUM_ZERO;
-    number_t expected = num_create_from_string("3");
+    number_t want = num_create_from_string("3");
     number_t half = num_create_from_string("1/2");
 
     check_bool("mat_from_string number matrix non-null", A != NULL);
@@ -60,11 +60,11 @@ static void test_mat_from_string_numeric_num_real(void)
         check_bool("mat_from_string rational A[0,0]", num_eq(x, half));
         num_destroy(&x);
         x = mat_get_num(A, 1, 0);
-        check_bool("mat_from_string number A[1,0]", num_eq(x, expected));
+        check_bool("mat_from_string number A[1,0]", num_eq(x, want));
     }
 
     num_destroy(&half);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&x);
     mat_free(A);
 }
@@ -73,44 +73,44 @@ static void test_mat_from_string_numeric_num_complex(void)
 {
     matrix_t *A = mat_from_string("(1 + 1i, 3i - 1; 1/2 - 3/2i, 5 - 6i; 3, 4 + 2i)");
     number_t z = NUM_ZERO;
-    number_t expected = NUM_ZERO;
+    number_t want = NUM_ZERO;
 
     check_bool("mat_from_string complex number matrix non-null", A != NULL);
     check_bool("mat_from_string complex number matrix type",
                A && (mat_typeof(A) == MAT_TYPE_NUMBER || mat_typeof(A) == MAT_TYPE_EXPR));
     if (A) {
-        expected = num_create_from_string("1 + 1i");
+        want = num_create_from_string("1 + 1i");
         z = mat_get_num(A, 0, 0);
-        check_bool("mat_from_string number A[0,0]", num_eq(z, expected));
+        check_bool("mat_from_string number A[0,0]", num_eq(z, want));
         num_destroy(&z);
-        num_destroy(&expected);
+        num_destroy(&want);
 
-        expected = num_create_from_string("1/2 - 3/2i");
+        want = num_create_from_string("1/2 - 3/2i");
         z = mat_get_num(A, 1, 0);
-        check_bool("mat_from_string rational complex A[1,0]", num_eq(z, expected));
+        check_bool("mat_from_string rational complex A[1,0]", num_eq(z, want));
         num_destroy(&z);
-        num_destroy(&expected);
+        num_destroy(&want);
 
-        expected = num_create_from_string("5 - 6i");
+        want = num_create_from_string("5 - 6i");
         z = mat_get_num(A, 1, 1);
-        check_bool("mat_from_string number A[1,1]", num_eq(z, expected));
+        check_bool("mat_from_string number A[1,1]", num_eq(z, want));
         num_destroy(&z);
-        num_destroy(&expected);
+        num_destroy(&want);
 
-        expected = num_create_from_string("4 + 2i");
+        want = num_create_from_string("4 + 2i");
         z = mat_get_num(A, 2, 1);
-        check_bool("mat_from_string number A[2,1]", num_eq(z, expected));
+        check_bool("mat_from_string number A[2,1]", num_eq(z, want));
     }
 
     num_destroy(&z);
-    num_destroy(&expected);
+    num_destroy(&want);
     mat_free(A);
 }
 
 static void test_mat_from_string_compact_columns(void)
 {
     matrix_t *A = mat_from_string("(1 2; 4 5)");
-    number_t expected = num_create_from_string("4");
+    number_t want = num_create_from_string("4");
     number_t got = NUM_ZERO;
 
     check_bool("mat_from_string compact matrix non-null", A != NULL);
@@ -118,11 +118,11 @@ static void test_mat_from_string_compact_columns(void)
     check_bool("mat_from_string compact matrix columns", A && mat_get_col_count(A) == 2u);
     if (A) {
         got = mat_get_num(A, 1u, 0u);
-        check_bool("mat_from_string compact matrix A[1,0]", num_eq(got, expected));
+        check_bool("mat_from_string compact matrix A[1,0]", num_eq(got, want));
     }
 
     num_destroy(&got);
-    num_destroy(&expected);
+    num_destroy(&want);
     mat_free(A);
 }
 
@@ -134,13 +134,13 @@ static void test_mat_from_text_constructors(void)
     mat_bindings_t *bindings = NULL;
     matrix_t *symbolic = mat_from_text_expr(symbolic_text, &bindings);
     number_t got = NUM_ZERO;
-    number_t expected = num_create_from_string("1/3");
+    number_t want = num_create_from_string("1/3");
 
     check_bool("mat_from_text numeric non-null", numeric != NULL);
     check_bool("mat_from_text numeric type", numeric && mat_typeof(numeric) == MAT_TYPE_NUMBER);
     if (numeric) {
         got = mat_get_num(numeric, 0, 0);
-        check_bool("mat_from_text numeric preserves rational", num_eq(got, expected));
+        check_bool("mat_from_text numeric preserves rational", num_eq(got, want));
     }
 
     check_bool("mat_from_text_expr symbolic non-null", symbolic != NULL);
@@ -149,7 +149,7 @@ static void test_mat_from_text_constructors(void)
     check_bool("mat_from_text_expr bracketed binding present",
                bindings && mat_bindings_get(bindings, "[radius]") != NULL);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&got);
     mat_bindings_free(bindings);
     mat_free(symbolic);
@@ -427,7 +427,7 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     number_t five = num_create_from_long(5);
     number_t sqrt_five = num_sqrt(five);
     number_t phi_sum = num_add(NUM_ONE, sqrt_five);
-    number_t phi_expected = num_div(phi_sum, NUM_TWO);
+    number_t phi_want = num_div(phi_sum, NUM_TWO);
 
     check_bool("mat_from_string mathematical-convention symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string mathematical-convention symbolic matrix type", A && mat_typeof(A) == MAT_TYPE_EXPR);
@@ -461,12 +461,12 @@ static void test_mat_from_string_symbolic_math_conventions(void)
         mat_get(A, 1, 0, &dv);
         check_matrix_fromstring_expr_num("mathematical-convention matrix π entry", dv, NUM_PI, 1e-30);
         mat_get(A, 2, 0, &dv);
-        check_matrix_fromstring_expr_num("mathematical-convention matrix φ entry", dv, phi_expected, 1e-30);
+        check_matrix_fromstring_expr_num("mathematical-convention matrix φ entry", dv, phi_want, 1e-30);
         mat_get(A, 2, 1, &dv);
         check_matrix_fromstring_expr_num("mathematical-convention matrix γ entry", dv, NUM_EULER_MASCHERONI, 1e-30);
     }
 
-    num_destroy(&phi_expected);
+    num_destroy(&phi_want);
     num_destroy(&phi_sum);
     num_destroy(&sqrt_five);
     num_destroy(&five);
@@ -521,7 +521,7 @@ static void test_mat_from_string_symbolic_builtin_constants(void)
     number_t five = num_create_from_long(5);
     number_t sqrt_five = num_sqrt(five);
     number_t phi_sum = num_add(NUM_ONE, sqrt_five);
-    number_t phi_expected = num_div(phi_sum, NUM_TWO);
+    number_t phi_want = num_div(phi_sum, NUM_TWO);
 
     check_bool("mat_from_string symbolic built-ins return non-null", A != NULL);
     check_bool("mat_from_string symbolic built-ins return number matrix", A && mat_typeof(A) == MAT_TYPE_NUMBER);
@@ -534,11 +534,11 @@ static void test_mat_from_string_symbolic_builtin_constants(void)
 
         check_matrix_fromstring_num("mat_from_string built-in pi resolves", a00, NUM_PI, 1e-30);
         check_matrix_fromstring_num("mat_from_string built-in e resolves", a01, NUM_E, 1e-30);
-        check_matrix_fromstring_num("mat_from_string built-in phi resolves", a10, phi_expected, 1e-30);
+        check_matrix_fromstring_num("mat_from_string built-in phi resolves", a10, phi_want, 1e-30);
         check_matrix_fromstring_num("mat_from_string built-in gamma resolves", a11, NUM_EULER_MASCHERONI, 1e-30);
     }
 
-    num_destroy(&phi_expected);
+    num_destroy(&phi_want);
     num_destroy(&phi_sum);
     num_destroy(&sqrt_five);
     num_destroy(&five);
@@ -582,9 +582,9 @@ static void test_mat_expression_from_string(void)
     const char *second_derivative_operation = NULL;
     mat_bindings_t *derivative_bindings = NULL;
     mat_bindings_t *second_derivative_bindings = NULL;
-    matrix_t *actual = mat_expression_from_string("exp(-(.1 2; 4 5))", NULL, &exp_operation);
+    matrix_t *got = mat_expression_from_string("exp(-(.1 2; 4 5))", NULL, &exp_operation);
     matrix_t *negative = mat_from_string("(-.1 -2; -4 -5)");
-    matrix_t *expected = mat_exp(negative);
+    matrix_t *want = mat_exp(negative);
     matrix_t *product = mat_expression_from_string("(1 2; 3 4).(5; 6)", NULL, &product_operation);
     matrix_t *derivative =
         mat_expression_from_string("Dx(exp(-(1+x 2; 4 5)))", &derivative_bindings, &derivative_operation);
@@ -593,24 +593,24 @@ static void test_mat_expression_from_string(void)
     expr_t *x_binding = mat_bindings_get(derivative_bindings, "x");
     expr_t *second_derivative_x = mat_bindings_get(second_derivative_bindings, "x");
     expr_t *derivative_entry = NULL;
-    number_t actual_value = NUM_ZERO;
-    number_t expected_value = NUM_ZERO;
+    number_t got_value = NUM_ZERO;
+    number_t want_value = NUM_ZERO;
     number_t seventeen = num_create_from_long(17);
     number_t thirty_nine = num_create_from_long(39);
 
-    check_bool("complete matrix expression exp parses in MARSlib", actual != NULL);
+    check_bool("complete matrix expression exp parses in MARSlib", got != NULL);
     check_bool("complete matrix expression exp reports operation", exp_operation && strcmp(exp_operation, "exp") == 0);
-    check_bool("complete matrix expression explicit comparison parses", expected != NULL);
+    check_bool("complete matrix expression explicit comparison parses", want != NULL);
 
-    if (actual && expected) {
+    if (got && want) {
         for (size_t row = 0u; row < 2u; ++row) {
             for (size_t col = 0u; col < 2u; ++col) {
-                actual_value = mat_get_num(actual, row, col);
-                expected_value = mat_get_num(expected, row, col);
-                check_matrix_fromstring_num("grouped unary matrix exponential matches explicit negation", actual_value,
-                                            expected_value, 1e-18);
-                num_destroy(&expected_value);
-                num_destroy(&actual_value);
+                got_value = mat_get_num(got, row, col);
+                want_value = mat_get_num(want, row, col);
+                check_matrix_fromstring_num("grouped unary matrix exponential matches explicit negation", got_value,
+                                            want_value, 1e-18);
+                num_destroy(&want_value);
+                num_destroy(&got_value);
             }
         }
     }
@@ -619,12 +619,12 @@ static void test_mat_expression_from_string(void)
     check_bool("complete matrix expression product reports operation",
                product_operation && strcmp(product_operation, "multiply") == 0);
     if (product) {
-        actual_value = mat_get_num(product, 0u, 0u);
-        check_matrix_fromstring_num("complete matrix expression product first entry", actual_value, seventeen, 1e-18);
-        num_destroy(&actual_value);
-        actual_value = mat_get_num(product, 1u, 0u);
-        check_matrix_fromstring_num("complete matrix expression product second entry", actual_value, thirty_nine, 1e-18);
-        num_destroy(&actual_value);
+        got_value = mat_get_num(product, 0u, 0u);
+        check_matrix_fromstring_num("complete matrix expression product first entry", got_value, seventeen, 1e-18);
+        num_destroy(&got_value);
+        got_value = mat_get_num(product, 1u, 0u);
+        check_matrix_fromstring_num("complete matrix expression product second entry", got_value, thirty_nine, 1e-18);
+        num_destroy(&got_value);
     }
 
     check_bool("matrix calculus accepts a nested matrix function", derivative != NULL);
@@ -633,9 +633,9 @@ static void test_mat_expression_from_string(void)
     if (derivative && x_binding) {
         mat_get(derivative, 0u, 0u, &derivative_entry);
         test_expr_set_val_d(x_binding, 0.0);
-        actual_value = derivative_entry ? expr_eval(derivative_entry) : num_clone(NUM_NAN);
-        check_bool("nested matrix-function derivative evaluates", !num_is_nan(actual_value));
-        num_destroy(&actual_value);
+        got_value = derivative_entry ? expr_eval(derivative_entry) : num_clone(NUM_NAN);
+        check_bool("nested matrix-function derivative evaluates", !num_is_nan(got_value));
+        num_destroy(&got_value);
     }
 
     check_bool("matrix calculus accepts a repeated derivative suffix", second_derivative != NULL);
@@ -643,14 +643,14 @@ static void test_mat_expression_from_string(void)
                second_derivative_operation && strcmp(second_derivative_operation, "eval") == 0);
     check_bool("repeated matrix calculus preserves the differentiation binding", second_derivative_x != NULL);
     if (second_derivative && second_derivative_x) {
-        static const double expected_second_derivative[2][2] = {{0.0, 2.0}, {0.0, 0.0}};
+        static const double want_second_derivative[2][2] = {{0.0, 2.0}, {0.0, 0.0}};
 
         test_expr_set_val_d(second_derivative_x, 0.0);
         for (size_t row = 0u; row < 2u; ++row) {
             for (size_t col = 0u; col < 2u; ++col) {
                 mat_get(second_derivative, row, col, &derivative_entry);
                 check_matrix_fromstring_expr_double("repeated matrix derivative entry", derivative_entry,
-                                                    expected_second_derivative[row][col], 1e-18);
+                                                    want_second_derivative[row][col], 1e-18);
             }
         }
     }
@@ -662,9 +662,9 @@ static void test_mat_expression_from_string(void)
     mat_bindings_free(derivative_bindings);
     mat_free(derivative);
     mat_free(product);
-    mat_free(expected);
+    mat_free(want);
     mat_free(negative);
-    mat_free(actual);
+    mat_free(got);
 }
 
 static void test_mat_expression_scalar_determinant(void)
@@ -801,9 +801,9 @@ static void test_mat_expression_matrix_integer_power(void)
     const char *inv_alias_operation = NULL;
     matrix_t *inv_alias = mat_expression_from_string("inv(1, 2; 3, 4)", NULL, &inv_alias_operation);
     matrix_t *product = mat_expression_from_string("(1, 2; 3, 4)^2.(1; 0)", NULL, &product_operation);
-    static const double expected_square[2][2] = {{7.0, 10.0}, {15.0, 22.0}};
-    static const double expected_identity[2][2] = {{1.0, 0.0}, {0.0, 1.0}};
-    static const double expected_inverse[2][2] = {{-2.0, 1.0}, {1.5, -0.5}};
+    static const double want_square[2][2] = {{7.0, 10.0}, {15.0, 22.0}};
+    static const double want_identity[2][2] = {{1.0, 0.0}, {0.0, 1.0}};
+    static const double want_inverse[2][2] = {{-2.0, 1.0}, {1.5, -0.5}};
 
     check_bool("complete matrix expression accepts a positive integer power", square != NULL);
     check_bool("positive integer matrix power reports its operation", square_operation && strcmp(square_operation, "power") == 0);
@@ -823,17 +823,17 @@ static void test_mat_expression_matrix_integer_power(void)
             number_t identity_value = identity ? mat_get_num(identity, row, col) : num_clone(NUM_NAN);
             number_t inverse_value = inverse ? mat_get_num(inverse, row, col) : num_clone(NUM_NAN);
             number_t inv_alias_value = inv_alias ? mat_get_num(inv_alias, row, col) : num_clone(NUM_NAN);
-            number_t expected_square_value = num_create_from_double(expected_square[row][col]);
-            number_t expected_identity_value = num_create_from_double(expected_identity[row][col]);
-            number_t expected_inverse_value = num_create_from_double(expected_inverse[row][col]);
+            number_t want_square_value = num_create_from_double(want_square[row][col]);
+            number_t want_identity_value = num_create_from_double(want_identity[row][col]);
+            number_t want_inverse_value = num_create_from_double(want_inverse[row][col]);
 
-            check_matrix_fromstring_num("positive integer matrix power entry", square_value, expected_square_value, 1e-18);
-            check_matrix_fromstring_num("zero matrix power entry", identity_value, expected_identity_value, 1e-18);
-            check_matrix_fromstring_num("negative integer matrix power entry", inverse_value, expected_inverse_value, 1e-18);
-            check_matrix_fromstring_num("inv alias entry", inv_alias_value, expected_inverse_value, 1e-18);
-            num_destroy(&expected_inverse_value);
-            num_destroy(&expected_identity_value);
-            num_destroy(&expected_square_value);
+            check_matrix_fromstring_num("positive integer matrix power entry", square_value, want_square_value, 1e-18);
+            check_matrix_fromstring_num("zero matrix power entry", identity_value, want_identity_value, 1e-18);
+            check_matrix_fromstring_num("negative integer matrix power entry", inverse_value, want_inverse_value, 1e-18);
+            check_matrix_fromstring_num("inv alias entry", inv_alias_value, want_inverse_value, 1e-18);
+            num_destroy(&want_inverse_value);
+            num_destroy(&want_identity_value);
+            num_destroy(&want_square_value);
             num_destroy(&inverse_value);
             num_destroy(&inv_alias_value);
             num_destroy(&identity_value);
@@ -882,7 +882,7 @@ static void test_mat_expression_matrix_number_power(void)
         mat_expression_from_string("(1 2; 3 4)^2 - (1 2; 3 4)^2.001", NULL, &power_difference_operation);
     matrix_t *evaluated_root = general_root ? mat_evaluate(general_root) : NULL;
     matrix_t *reconstructed = evaluated_root ? mat_mul(evaluated_root, evaluated_root) : NULL;
-    static const double expected_root[2][2] = {{2.0, 0.0}, {0.0, 3.0}};
+    static const double want_root[2][2] = {{2.0, 0.0}, {0.0, 3.0}};
     static const double original[2][2] = {{1.0, 2.0}, {3.0, 4.0}};
     number_t two = num_create_from_long(2);
     number_t sqrt_two = num_sqrt(two);
@@ -922,24 +922,24 @@ static void test_mat_expression_matrix_number_power(void)
             number_t general_irrational_value =
                 general_irrational ? mat_get_num(general_irrational, row, col) : num_clone(NUM_NAN);
             number_t reconstructed_value = reconstructed ? mat_get_num(reconstructed, row, col) : num_clone(NUM_NAN);
-            number_t expected_root_value = num_create_from_double(expected_root[row][col]);
+            number_t want_root_value = num_create_from_double(want_root[row][col]);
             number_t original_value = num_create_from_double(original[row][col]);
             number_t diagonal_base = num_create_from_long(row == 0u ? 4L : 9L);
-            number_t expected_irrational = row == col ? num_pow(diagonal_base, sqrt_two) : num_clone(NUM_ZERO);
-            number_t expected_complex = row == col ? num_pow(diagonal_base, complex_exponent) : num_clone(NUM_ZERO);
-            check_matrix_fromstring_num("fractional matrix power entry", fractional_value, expected_root_value, 1e-12);
+            number_t want_irrational = row == col ? num_pow(diagonal_base, sqrt_two) : num_clone(NUM_ZERO);
+            number_t want_complex = row == col ? num_pow(diagonal_base, complex_exponent) : num_clone(NUM_ZERO);
+            check_matrix_fromstring_num("fractional matrix power entry", fractional_value, want_root_value, 1e-12);
             check_matrix_fromstring_num("Unicode fractional matrix power entry", unicode_fraction_value,
-                                        expected_root_value, 1e-12);
-            check_matrix_fromstring_num("irrational matrix power entry", irrational_value, expected_irrational, 1e-12);
-            check_matrix_fromstring_num("complex matrix power entry", complex_value, expected_complex, 1e-12);
+                                        want_root_value, 1e-12);
+            check_matrix_fromstring_num("irrational matrix power entry", irrational_value, want_irrational, 1e-12);
+            check_matrix_fromstring_num("complex matrix power entry", complex_value, want_complex, 1e-12);
             check_bool("irrational matrix power with a negative eigenvalue is finite", num_is_finite(general_irrational_value));
             check_matrix_fromstring_num("complex principal square root reconstructs its source", reconstructed_value,
                                         original_value, 1e-12);
-            num_destroy(&expected_complex);
-            num_destroy(&expected_irrational);
+            num_destroy(&want_complex);
+            num_destroy(&want_irrational);
             num_destroy(&diagonal_base);
             num_destroy(&original_value);
-            num_destroy(&expected_root_value);
+            num_destroy(&want_root_value);
             num_destroy(&reconstructed_value);
             num_destroy(&general_irrational_value);
             num_destroy(&complex_value);
@@ -980,7 +980,7 @@ static void test_mat_expression_symbolic_matrix_power(void)
                                                      &composite_bindings, NULL);
     matrix_t *bound_composite = mat_expression_from_string(
         "{ ((1, 2; 3, 4) - (lambda, 0; 0, lambda))^x | λ = 3, x = 2 }", &bound_composite_bindings, NULL);
-    matrix_t *expected = mat_expression_from_string("(1, 2; 3, 4)^2", NULL, NULL);
+    matrix_t *want = mat_expression_from_string("(1, 2; 3, 4)^2", NULL, NULL);
 
     check_bool("symbolic matrix power uses the exact spectral-projector rule", symbolic && mat_typeof(symbolic) == MAT_TYPE_EXPR);
     check_bool("symbolic matrix power reports its operation", operation && strcmp(operation, "power") == 0);
@@ -988,26 +988,26 @@ static void test_mat_expression_symbolic_matrix_power(void)
     check_bool("bound symbolic matrix power evaluates numerically", bound && mat_typeof(bound) == MAT_TYPE_NUMBER);
     check_bool("bound symbolic matrix power reports its operation", bound_operation && strcmp(bound_operation, "power") == 0);
     check_bool("bound symbolic matrix power retains its exponent binding", mat_bindings_get(bound_bindings, "x") != NULL);
-    check_bool("bound symbolic matrix power has the expected dimensions",
+    check_bool("bound symbolic matrix power has the want dimensions",
                bound && mat_get_row_count(bound) == 2u && mat_get_col_count(bound) == 2u);
     check_bool("symbolic matrix power accepts a composite symbolic base", composite != NULL);
     check_bool("composite symbolic matrix power exposes its base binding", mat_bindings_get(composite_bindings, "λ") != NULL);
     check_bool("composite symbolic matrix power exposes its exponent binding", mat_bindings_get(composite_bindings, "x") != NULL);
     check_bool("bound composite symbolic matrix power parses", bound_composite != NULL);
-    if (bound && expected) {
+    if (bound && want) {
         for (size_t row = 0u; row < 2u; ++row) {
             for (size_t col = 0u; col < 2u; ++col) {
-                number_t actual_value = mat_get_num(bound, row, col);
-                number_t expected_value = mat_get_num(expected, row, col);
+                number_t got_value = mat_get_num(bound, row, col);
+                number_t want_value = mat_get_num(want, row, col);
 
                 check_matrix_fromstring_num("bound symbolic matrix power equals the corresponding integer power",
-                                            actual_value, expected_value, 1e-18);
-                num_destroy(&expected_value);
-                num_destroy(&actual_value);
+                                            got_value, want_value, 1e-18);
+                num_destroy(&want_value);
+                num_destroy(&got_value);
             }
         }
     }
-    mat_free(expected);
+    mat_free(want);
     mat_free(bound_composite);
     mat_free(composite);
     mat_free(bound);
