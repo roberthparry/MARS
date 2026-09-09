@@ -201,7 +201,7 @@ class MobileAccessTests(unittest.TestCase):
         self.assertIn("source.startsWith('$[', index)", html)
         self.assertIn("appendFunctionToken(fragment, source.slice(index, next), 'function-token-variable');", html)
         self.assertIn("source[index] === '[' || source[index] === ']'", html)
-        self.assertIn("'array', 'const', 'equation', 'expression', 'i', 'matrix', 'return'", html)
+        self.assertIn("'array', 'const', 'else', 'equation', 'expression', 'i', 'if', 'matrix', 'return'", html)
         self.assertIn("(?:equation|expression|matrix)", html)
         self.assertIn("const numberMatch = source.slice(index).match", html)
 
@@ -3389,6 +3389,132 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_specialised_sum_keeps_original_input_bindings_editable(self) -> None:
+        for value in ("1", "5", "1"):
+            source = f"{{1+1/2^s+1/3^s+1/4^s+...+1/n^s | s={value}; n=100}}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, source, 32, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            payload = mars_lab.prepare_evaluation_fields(
+                self.expression_binary, fields, source, 32, False, wrt="s", action="evaluate"
+            )
+            self.assertEqual(
+                [(binding["name"], binding["value"]) for binding in payload["binding_values"]],
+                [("s", value), ("n", "100")],
+            )
+
+    def test_euler_mascheroni_function_constant_and_keywords(self) -> None:
+        html = mars_lab.INDEX_HTML
+        self.assertIn("'else'", html)
+        self.assertIn("'if'", html)
+        self.assertIn("MARS_FUNCTION_KEYWORDS.has(identifier)", html)
+        self.assertIn("gamma|eulermascheroni|tau|inf|nan", html)
+        for source in (
+            "@eulermascheroni", "@eulermascheroni-@gamma", "x+@eulermascheroni",
+            "{x+c0 | x=?; c0=gamma}", "{x+c0 | x=?; c0=@eulermascheroni}",
+        ):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "x", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                if source == "@eulermascheroni-@gamma":
+                    self.assertEqual(fields["value"], "0")
+                else:
+                    self.assertIn("@eulermascheroni", fields["function"])
+                    if source == "@eulermascheroni":
+                        self.assertTrue(fields["value"].startswith("0.577215664901532"), fields["value"])
+
+    def test_finite_series_expression_card_has_two_conditioned_cases(self) -> None:
+        for source, value in (
+            ("1+1/2^s+1/3^s+...+1/n^s", "?"),
+            ("{1+1/2^s+1/3^s+...+1/n^s | s=5}", "5"),
+            ("{1+1/2^s+1/3^s+...+1/n^s | s=pi}", "π"),
+        ):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "s", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                cases = fields["conditioned_expression"]
+                rows = cases.splitlines()
+                self.assertEqual(len(rows), 2)
+                self.assertIn("ψ", rows[0])
+                self.assertIn("γ", rows[0])
+                self.assertIn("ζ", rows[1])
+                for row, condition in zip(rows, ("s = 1", "s ≠ 1")):
+                    self.assertIn(f"s = {value}", row)
+                    self.assertIn("n = ?", row)
+                    self.assertTrue(row.endswith(f"; {condition} }}"), row)
+                    self.assertEqual(row.count(";"), 2)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 32, False, wrt="s", action="evaluate"
+                )
+                self.assertEqual(payload["full_display_expression"], cases)
+                self.assertNotIn("≠", payload["editor_expression"])
+                self.assertNotIn("\n", payload["editor_expression"])
+
+    def test_finite_power_sum_function_preserves_order_one_case(self) -> None:
+        for source, order in (
+            ("1+1/2^s+1/3^s+1/4^s+...+1/n^s", "s"),
+            ("{1+1/2^s+1/3^s+...+1/n^s | s=5}", "s"),
+            ("1+2^s+3^s+...+n^s", "-s"),
+            ("zeta(s)-zetah(s,n+1)", "s"),
+        ):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "s", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                function = fields["function"]
+                self.assertIn(f"if ({order} == 1)", function)
+                self.assertIn("return digamma(n + 1) + @eulermascheroni.", function)
+                self.assertIn("} else {", function)
+                self.assertIn(f"return zeta({order}) - zetah({order}, n + 1).", function)
+                self.assertNotIn("return @nan", function)
+                self.assertNotIn("realpart(", function)
+
+    def test_infinite_power_sum_TeX_preserves_conditional_zeta_identity(self) -> None:
+        sources = (
+            "1+1/2^s+1/3^s+1/4^s+...",
+            "sum(n,1,inf,1/n^s)",
+            "@Z_(n=1)^inf 1/n^s",
+            "sum(n,2,inf,1/n^s)",
+            "sum(k,3,inf,1/k^s)",
+            "{sum(k,3,inf,1/k^(s+1)) | s=2}",
+            "sum(k,1,inf,k^s)",
+            "{sum(n,1,inf,1/n^s) | s=2}",
+            "{sum(n,1,inf,1/n^s) | s=-2}",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                fields, raw, returncode = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 32, "s", "evaluate"
+                )
+                self.assertEqual(returncode, 0, raw)
+                self.assertIn(r"\sum", fields["tex"])
+                self.assertIn(r"\zeta", fields["tex"])
+                self.assertIn(r"\operatorname{Re}\{", fields["tex"])
+                self.assertIn(r"\}>1", fields["tex"])
+                self.assertNotIn("sum(", fields["function"])
+                self.assertIn("zetah(" if "k,3" in source else "zeta(", fields["function"])
+                self.assertNotIn("return 1.", fields["function"])
+                self.assertIn("if (realpart(", fields["function"])
+                self.assertIn(") > 1) {", fields["function"])
+                self.assertIn("} else {", fields["function"])
+                self.assertIn("return @nan.", fields["function"])
+                self.assertNotIn("ζ", fields["expression"])
+                if "k^s)" in source and "1/k" not in source:
+                    self.assertIn(r"\operatorname{Re}\{-s\}>1", fields["tex"])
+                elif "s+1" not in source:
+                    self.assertIn(r"\operatorname{Re}\{s\}>1", fields["tex"])
+                    self.assertIn("if (realpart(s) > 1)", fields["function"])
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 32, False, wrt="s", action="evaluate"
+                )
+                self.assertIn(r"\zeta", payload["full_display_TeX"])
+
     @property
     def expression_binary(self) -> Path:
         return ROOT / "build" / "release" / "scratch" / "mars_lab"
@@ -3948,7 +4074,7 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["expression"], "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }")
-        self.assertIn("return digamma(N + 1) + @gamma.", fields["function"])
+        self.assertIn("return digamma(N + 1) + @eulermascheroni.", fields["function"])
         self.assertIn(r"\sum_{n=1}^{N}\frac{1}{n}", fields["derivation_TeX"])
         self.assertIn(r"\psi^{(0)}(N + 1) + \gamma", fields["derivation_TeX"])
         self.assertEqual(fields["value"], "NAN")
@@ -4689,7 +4815,10 @@ class ExpressionResultTests(unittest.TestCase):
                     self.expression_binary, fields, source, 64, False, wrt="p", action="evaluate"
                 )
 
-                self.assertEqual(payload["full_display_expression"], expected_expression)
+                self.assertEqual(payload["expression"], expected_expression)
+                self.assertEqual(
+                    payload["full_display_expression"], fields["conditioned_expression"] or expected_expression
+                )
                 self.assertIn(expected_sum, payload["full_display_TeX"])
                 self.assertIn(expected_formula, payload["full_display_TeX"])
                 self.assertNotIn(r"n^{3}", payload["full_display_TeX"])
@@ -4903,11 +5032,12 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\psi^{(0)}(n + 1) + \gamma", rendered)
         self.assertNotIn(r"\zeta", rendered)
         self.assertEqual(payload["full_display_expression"], "{ ψ⁽⁰⁾(n + 1) + γ | ; n = 100 }")
-        self.assertIn("return digamma(n + 1) + @gamma.", payload["full_display_function"])
+        self.assertIn("return digamma(n + 1) + @eulermascheroni.", payload["full_display_function"])
         self.assertNotIn("zeta(", payload["full_display_function"])
         self.assertEqual(
             payload["binding_values"],
             [
+                {"name": "p", "value": "1", "display": "1", "kind": "variable"},
                 {"name": "n", "value": "100", "display": "100", "kind": "constant"},
             ],
         )

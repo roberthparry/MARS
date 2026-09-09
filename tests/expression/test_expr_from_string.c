@@ -1105,7 +1105,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text, "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }");
-    ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + @gamma."));
+    ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + @eulermascheroni."));
     free(function_text);
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{N}\\frac{1}{n}"));

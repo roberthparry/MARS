@@ -681,6 +681,38 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
     function_dag_table_t dag;
     function_temporary_table_t temporaries;
     sbuf_t direct;
+    expr_t *order = NULL;
+    expr_t *closed = expr_infinite_power_sum_closed_form(root, &order);
+
+    if (closed && order) {
+        expr_t *display_closed = expr_display_simplified(closed);
+
+        sbuf_puts(b, "    if (realpart(");
+        emit_func(order, b, PREC_LOWEST);
+        sbuf_puts(b, ") > 1) {\n        return ");
+        emit_func(display_closed ? display_closed : closed, b, PREC_LOWEST);
+        sbuf_puts(b, ".\n    } else {\n        `` No convergent series value outside this domain.\n"
+                     "        return @nan.\n    }\n");
+        expr_free(closed);
+        expr_free(display_closed);
+        expr_free(order);
+        return;
+    }
+    expr_free(closed);
+    expr_free(order);
+
+    const expr_t *finite_order = NULL;
+    const expr_t *finite_endpoint = NULL;
+    if (expr_series_zeta_difference_parts(root, &finite_order, &finite_endpoint)) {
+        sbuf_puts(b, "    if (");
+        emit_func(finite_order, b, PREC_LOWEST);
+        sbuf_puts(b, " == 1) {\n        return digamma(");
+        emit_func(finite_endpoint, b, PREC_LOWEST);
+        sbuf_puts(b, ") + @eulermascheroni.\n    } else {\n        return ");
+        emit_func(root, b, PREC_LOWEST);
+        sbuf_puts(b, ".\n    }\n");
+        return;
+    }
 
     function_dag_table_init(&dag);
     function_temporary_table_init(&temporaries);

@@ -325,6 +325,12 @@ char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit
 /* Build an infinite power sum's zeta identity and owning order; valid only for Re(order) > 1. */
 expr_t *expr_infinite_power_sum_closed_form(const expr_t *expr, expr_t **order_out);
 
+/** @brief Borrow the matching order and endpoint of a Riemann/Hurwitz zeta difference. */
+bool expr_series_zeta_difference_parts(const expr_t *expr, const expr_t **order_out, const expr_t **endpoint_out);
+
+/** @brief Return owned display-only conditioned cases, or NULL when no case split is recognised. */
+char *expr_conditioned_cases_to_string(const expr_t *expr);
+
 typedef struct expr_newton_region {
     number_t real_min;
     number_t real_max;

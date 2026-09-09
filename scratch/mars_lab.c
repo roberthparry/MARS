@@ -82,6 +82,38 @@ static char *expr_TeX_body_dup(const expr_t *expr)
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
 
+/* Annotate a complete result without inserting an equality into a nested expression. */
+static char *expr_result_TeX_dup(const expr_t *expr)
+{
+    expr_t *order = NULL;
+    expr_t *closed = expr_infinite_power_sum_closed_form(expr, &order);
+    expr_t *simplified = closed ? expr_display_simplified(closed) : NULL;
+    const char *order_name = order ? expr_symbol_name(order) : NULL;
+    expr_t *display_order = order_name ? expr_new_named_var(NUM_NAN, order_name)
+                                      : order ? expr_display_simplified(order) : NULL;
+    char *series_TeX = closed ? expr_to_TeX_body(expr) : NULL;
+    char *closed_TeX = simplified ? expr_to_TeX_body(simplified) : NULL;
+    char *order_TeX = display_order ? expr_to_TeX_body(display_order) : NULL;
+    char *result = NULL;
+
+    if (series_TeX && closed_TeX && order_TeX) {
+        size_t length = strlen(series_TeX) + strlen(closed_TeX) + strlen(order_TeX) + 80u;
+
+        result = malloc(length);
+        if (result)
+            snprintf(result, length, "%s = %s,\\qquad \\operatorname{Re}\\{%s\\}>1",
+                     series_TeX, closed_TeX, order_TeX);
+    }
+    free(series_TeX);
+    free(closed_TeX);
+    free(order_TeX);
+    expr_free(simplified);
+    expr_free(display_order);
+    expr_free(closed);
+    expr_free(order);
+    return result ? result : expr_TeX_body_dup(expr);
+}
+
 static char *expr_Ei_derivative_cartesian_TeX_dup(const expr_t *source, const char *wrt_name,
                                                    const expr_t *derivative)
 {
@@ -1868,7 +1900,7 @@ static int run_goal_seek(int argc, char **argv)
     expr_text = expr_text_dup(result.expr, style_EXPRESSION);
     unbound_text = expr_text_dup(result.expr, style_UNBOUND);
     func_text = expr_text_dup(result.expr, style_FUNCTION);
-    TeX_text = expr_TeX_body_dup(result.expr);
+    TeX_text = expr_result_TeX_dup(result.expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -2001,6 +2033,14 @@ int main(int argc, char **argv)
     if (!display_expr)
         display_expr = expr;
 
+    /* The complete native identity supersedes the parser's bare ellipsis preview. */
+    expr_t *infinite_closed = expr_infinite_power_sum_closed_form(display_expr, NULL);
+    if (infinite_closed) {
+        string_free(derivation_TeX);
+        derivation_TeX = NULL;
+        expr_free(infinite_closed);
+    }
+
     expr_text = expr_text_dup(display_expr, style_EXPRESSION);
     unbound_text = expr_text_dup(display_expr, style_UNBOUND);
     func_text = expr_text_dup(display_expr, style_FUNCTION);
@@ -2009,7 +2049,7 @@ int main(int argc, char **argv)
     TeX_text = progression_closed_form
                    ? expr_finite_progression_identity_TeX(qdigamma_progression_source ? qdigamma_progression_source
                                                                                      : expr)
-                   : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_TeX_body_dup(display_expr);
+                   : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_result_TeX_dup(display_expr);
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
@@ -2017,6 +2057,9 @@ int main(int argc, char **argv)
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
+    char *conditioned_expression = expr_conditioned_cases_to_string(display_expr);
+    printf("conditioned_expression  %s\n", conditioned_expression ? conditioned_expression : "");
+    free(conditioned_expression);
     printf("algebraic_specialisation  %s\n", domain_specialised ? "domain-required" : "none");
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
@@ -2127,7 +2170,7 @@ int main(int argc, char **argv)
                                  ? expr_Ei_derivative_cartesian_TeX_dup(expr, wrt_name, display_deriv)
                                  : NULL;
             if (!deriv_TeX_text)
-                deriv_TeX_text = expr_TeX_body_dup(display_deriv);
+                deriv_TeX_text = expr_result_TeX_dup(display_deriv);
             string_free(cartesian_function);
         }
         normalise_double_minus_owned(&deriv_text);
@@ -2191,7 +2234,7 @@ int main(int argc, char **argv)
                 }
                 integral_text = expr_text_dup(display_integral, style_EXPRESSION);
                 integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
-                integral_TeX_text = expr_TeX_body_dup(display_integral);
+                integral_TeX_text = expr_result_TeX_dup(display_integral);
                 normalise_double_minus_owned(&integral_text);
                 normalise_double_minus_owned(&integral_func_text);
                 normalise_double_minus_owned(&integral_TeX_text);
