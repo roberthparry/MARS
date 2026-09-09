@@ -50,7 +50,7 @@ void run_number_parse_tests(void)
         text = num_to_string(direct);
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "num_create_from_double(1.25)" C_RESET "\n");
-        printf("    expected = 1.25\n");
+        printf("    want = 1.25\n");
         printf("    got      = %s\n\n", text ? string_c_str(text) : "(null)");
         ASSERT_TRUE(strcmp(string_c_str(text), "1.25") == 0);
         string_free(text);

@@ -660,7 +660,7 @@ static void test_sort_by_value(void)
 
     /* Check dictionary_get_entry_sorted(SORT_BY_VALUE) yields keys in
      * value order, i.e. banana, date, apple, cherry, elderberry */
-    const char *expected_key_order[] = {"banana", "date", "apple", "cherry", "elderberry"};
+    const char *want_key_order[] = {"banana", "date", "apple", "cherry", "elderberry"};
     ok = true;
     for (size_t i = 0; i < 5; ++i) {
         dictionary_entry_t *e;
@@ -669,7 +669,7 @@ static void test_sort_by_value(void)
             break;
         }
         const char *k = *(const char **)dictionary_entry_key(e);
-        if (strcmp(k, expected_key_order[i]) != 0) {
+        if (strcmp(k, want_key_order[i]) != 0) {
             ok = false;
             break;
         }

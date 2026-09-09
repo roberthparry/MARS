@@ -434,10 +434,10 @@ static int test_format_value_fallback(const void *value, string_t *out)
     return string_append_format(out, "%p", value);
 }
 
-static int test_int_equal(const void *actual, const void *expected, void *ctx)
+static int test_int_equal(const void *got, const void *want, void *ctx)
 {
     (void)ctx;
-    return *(const int *)actual == *(const int *)expected;
+    return *(const int *)got == *(const int *)want;
 }
 
 static int test_int_format(const void *value, string_t *out, void *ctx)
@@ -446,10 +446,10 @@ static int test_int_format(const void *value, string_t *out, void *ctx)
     return string_append_format(out, "%d", *(const int *)value);
 }
 
-static int test_long_equal(const void *actual, const void *expected, void *ctx)
+static int test_long_equal(const void *got, const void *want, void *ctx)
 {
     (void)ctx;
-    return *(const long *)actual == *(const long *)expected;
+    return *(const long *)got == *(const long *)want;
 }
 
 static int test_long_format(const void *value, string_t *out, void *ctx)
@@ -458,17 +458,17 @@ static int test_long_format(const void *value, string_t *out, void *ctx)
     return string_append_format(out, "%ld", *(const long *)value);
 }
 
-static int test_cstr_equal(const void *actual, const void *expected, void *ctx)
+static int test_cstr_equal(const void *got, const void *want, void *ctx)
 {
-    const char *const *actual_text = (const char *const *)actual;
-    const char *const *expected_text = (const char *const *)expected;
+    const char *const *got_text = (const char *const *)got;
+    const char *const *want_text = (const char *const *)want;
     (void)ctx;
 
-    if (!*actual_text && !*expected_text)
+    if (!*got_text && !*want_text)
         return 1;
-    if (!*actual_text || !*expected_text)
+    if (!*got_text || !*want_text)
         return 0;
-    return test_boundary_text_equals(*actual_text, *expected_text);
+    return test_boundary_text_equals(*got_text, *want_text);
 }
 
 static int test_cstr_format(const void *value, string_t *out, void *ctx)
@@ -873,8 +873,8 @@ bool test_assert_true(bool expr, const char *file, int line, const char *detail)
     if (expr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "expected true");
-    test_set_failure_detailf("%s", detail ? detail : "expected true");
+    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "want true");
+    test_set_failure_detailf("%s", detail ? detail : "want true");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
@@ -886,48 +886,48 @@ bool test_assert_false(bool expr, const char *file, int line, const char *detail
     if (!expr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "expected false");
-    test_set_failure_detailf("%s", detail ? detail : "expected false");
+    string_printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, file, line, detail ? detail : "want false");
+    test_set_failure_detailf("%s", detail ? detail : "want false");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
     return false;
 }
 
-bool test_assert_int_eq(int actual, int expected, const char *file, int line)
+bool test_assert_int_eq(int got, int want, const char *file, int line)
 {
-    if (actual == expected)
+    if (got == want)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected %d, got %d\n" C_RESET, file, line, expected, actual);
-    test_set_failure_detailf("expected %d, got %d", expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: want %d, got %d\n" C_RESET, file, line, want, got);
+    test_set_failure_detailf("want %d, got %d", want, got);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
     return false;
 }
 
-bool test_assert_long_eq(long actual, long expected, const char *file, int line)
+bool test_assert_long_eq(long got, long want, const char *file, int line)
 {
-    if (actual == expected)
+    if (got == want)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected %ld, got %ld\n" C_RESET, file, line, expected, actual);
-    test_set_failure_detailf("expected %ld, got %ld", expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: want %ld, got %ld\n" C_RESET, file, line, want, got);
+    test_set_failure_detailf("want %ld, got %ld", want, got);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
     return false;
 }
 
-bool test_assert_double_eq(double actual, double expected, double eps, const char *file, int line)
+bool test_assert_double_eq(double got, double want, double eps, const char *file, int line)
 {
-    if (fabs(actual - expected) <= eps)
+    if (fabs(got - want) <= eps)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected %.12f, got %.12f\n" C_RESET, file, line, expected,
-                  actual);
-    test_set_failure_detailf("expected %.12f, got %.12f", expected, actual);
+    string_printf(C_RED "    Assertion failed at %s:%d: want %.12f, got %.12f\n" C_RESET, file, line, want,
+                  got);
+    test_set_failure_detailf("want %.12f, got %.12f", want, got);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
@@ -939,8 +939,8 @@ bool test_assert_not_null(const void *ptr, const char *file, int line)
     if (ptr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected non-null pointer\n" C_RESET, file, line);
-    test_set_failure_detailf("expected non-null pointer");
+    string_printf(C_RED "    Assertion failed at %s:%d: want non-null pointer\n" C_RESET, file, line);
+    test_set_failure_detailf("want non-null pointer");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
@@ -952,19 +952,19 @@ bool test_assert_null(const void *ptr, const char *file, int line)
     if (!ptr)
         return true;
 
-    string_printf(C_RED "    Assertion failed at %s:%d: expected NULL pointer\n" C_RESET, file, line);
-    test_set_failure_detailf("expected NULL pointer");
+    string_printf(C_RED "    Assertion failed at %s:%d: want NULL pointer\n" C_RESET, file, line);
+    test_set_failure_detailf("want NULL pointer");
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
     return false;
 }
 
-bool test_assert_validity(const test_validity_contract_t *contract, const void *actual, const void *expected,
+bool test_assert_validity(const test_validity_contract_t *contract, const void *got, const void *want,
                           const char *file, int line)
 {
-    string_t *actual_text = NULL;
-    string_t *expected_text = NULL;
+    string_t *got_text = NULL;
+    string_t *want_text = NULL;
     const char *contract_name;
     int ok;
 
@@ -977,15 +977,15 @@ bool test_assert_validity(const test_validity_contract_t *contract, const void *
         return false;
     }
 
-    ok = contract->equal(actual, expected, contract->ctx);
+    ok = contract->equal(got, want, contract->ctx);
     if (ok)
         return true;
 
-    actual_text = string_new();
-    expected_text = string_new();
-    if (!actual_text || !expected_text) {
-        string_free(actual_text);
-        string_free(expected_text);
+    got_text = string_new();
+    want_text = string_new();
+    if (!got_text || !want_text) {
+        string_free(got_text);
+        string_free(want_text);
         string_printf(C_RED "    Assertion failed at %s:%d: out of memory formatting validity failure\n" C_RESET, file,
                       line);
         test_set_failure_detailf("out of memory formatting validity failure");
@@ -996,18 +996,18 @@ bool test_assert_validity(const test_validity_contract_t *contract, const void *
     }
 
     if (contract->format) {
-        if (contract->format(expected, expected_text, contract->ctx) < 0) {
-            string_clear(expected_text);
-            (void)test_format_value_fallback(expected, expected_text);
+        if (contract->format(want, want_text, contract->ctx) < 0) {
+            string_clear(want_text);
+            (void)test_format_value_fallback(want, want_text);
         }
-        if (contract->format(actual, actual_text, contract->ctx) < 0) {
-            string_clear(actual_text);
-            (void)test_format_value_fallback(actual, actual_text);
+        if (contract->format(got, got_text, contract->ctx) < 0) {
+            string_clear(got_text);
+            (void)test_format_value_fallback(got, got_text);
         }
-    } else if (test_format_value_fallback(expected, expected_text) != 0 ||
-               test_format_value_fallback(actual, actual_text) != 0) {
-        string_free(actual_text);
-        string_free(expected_text);
+    } else if (test_format_value_fallback(want, want_text) != 0 ||
+               test_format_value_fallback(got, got_text) != 0) {
+        string_free(got_text);
+        string_free(want_text);
         string_printf(C_RED "    Assertion failed at %s:%d: out of memory formatting validity failure\n" C_RESET, file,
                       line);
         test_set_failure_detailf("out of memory formatting validity failure");
@@ -1019,18 +1019,18 @@ bool test_assert_validity(const test_validity_contract_t *contract, const void *
 
     contract_name = (contract->name && *contract->name) ? contract->name : "validity";
 
-    string_printf(C_RED "    Assertion failed at %s:%d [%s]: expected %S, got %S\n" C_RESET, file, line, contract_name,
-                  expected_text, actual_text);
-    test_set_failure_detailf("[%s] expected %S, got %S", contract_name, expected_text, actual_text);
-    string_free(actual_text);
-    string_free(expected_text);
+    string_printf(C_RED "    Assertion failed at %s:%d [%s]: want %S, got %S\n" C_RESET, file, line, contract_name,
+                  want_text, got_text);
+    test_set_failure_detailf("[%s] want %S, got %S", contract_name, want_text, got_text);
+    string_free(got_text);
+    string_free(want_text);
     g_test_failure_count++;
     test_string_replace_boundary(&g_test_last_fail_file, file);
     g_test_last_fail_line = line;
     return false;
 }
 
-bool test_assert_validity_named(const char *name, const void *actual, const void *expected, const char *file, int line)
+bool test_assert_validity_named(const char *name, const void *got, const void *want, const char *file, int line)
 {
     const test_validity_contract_t *contract = test_find_validity_checker(name);
 
@@ -1044,15 +1044,15 @@ bool test_assert_validity_named(const char *name, const void *actual, const void
         return false;
     }
 
-    return test_assert_validity(contract, actual, expected, file, line);
+    return test_assert_validity(contract, got, want, file, line);
 }
 
-bool test_assert_cstr_eq(const char *actual, const char *expected, const char *file, int line)
+bool test_assert_cstr_eq(const char *got, const char *want, const char *file, int line)
 {
-    const char *actual_text = actual;
-    const char *expected_text = expected;
+    const char *got_text = got;
+    const char *want_text = want;
 
-    return test_assert_validity(TEST_VALID_CSTR(), &actual_text, &expected_text, file, line);
+    return test_assert_validity(TEST_VALID_CSTR(), &got_text, &want_text, file, line);
 }
 
 void test_run_case(const char *file, int line, const char *name, const char *tags, test_fn fn)

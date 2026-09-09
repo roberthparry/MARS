@@ -26,7 +26,7 @@ static void test_goal_seek_real_one_variable(void)
                                         .tolerance = tolerance};
     expr_goal_seek_result_t result;
     number_t x_value;
-    number_t expected;
+    number_t want;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(bindings);
@@ -38,9 +38,9 @@ static void test_goal_seek_real_one_variable(void)
     x = expr_bindings_get(bindings, "x");
     ASSERT_NOT_NULL(x);
     x_value = expr_eval(x);
-    expected = num_create_from_long(3L);
-    ASSERT_EXPR_NUMBER_CLOSE(x_value, expected);
-    num_destroy(&expected);
+    want = num_create_from_long(3L);
+    ASSERT_EXPR_NUMBER_CLOSE(x_value, want);
+    num_destroy(&want);
     num_destroy(&x_value);
 
     expr_goal_seek_result_clear(&result);

@@ -9,14 +9,14 @@
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
-static int qcomplex_validity_equal(const void *actual, const void *expected, void *ctx);
-static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static int qcomplex_validity_equal(const void *got_input, const void *want_input, void *ctx);
+static int qfloat_validity_equal(const void *got_input, const void *want_input, void *ctx);
 static int qcomplex_validity_format(const void *value, string_t *out, void *ctx);
 static int qfloat_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_qcomplex_suite_setup(void);
-static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t actual, qcomplex_t expected, double tol,
+static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t got, qcomplex_t want, double tol,
                                            int relative_mode, const char *file, int line);
-static bool test_assert_qfloat_close_tol(const char *label, qfloat_t actual, qfloat_t expected, double tol,
+static bool test_assert_qfloat_close_tol(const char *label, qfloat_t got, qfloat_t want, double tol,
                                          const char *file, int line);
 
 static const double qcomplex_default_tol = 1e-28;
@@ -38,10 +38,10 @@ static void print_qc(const char *label, qcomplex_t z)
     fflush(stdout);
 }
 
-static int qcomplex_validity_equal(const void *actual, const void *expected, void *ctx)
+static int qcomplex_validity_equal(const void *got_input, const void *want_input, void *ctx)
 {
-    const qcomplex_t *got = (const qcomplex_t *)actual;
-    const qcomplex_t *want = (const qcomplex_t *)expected;
+    const qcomplex_t *got = (const qcomplex_t *)got_input;
+    const qcomplex_t *want = (const qcomplex_t *)want_input;
     const double *ctx_values = (const double *)ctx;
     const double tol = ctx_values ? ctx_values[0] : 1e-28;
     const int relative_mode = ctx_values ? ((int)ctx_values[1] != 0) : 0;
@@ -57,10 +57,10 @@ static int qcomplex_validity_equal(const void *actual, const void *expected, voi
     return qf_to_double(qc_abs(qc_sub(*got, *want))) < tol;
 }
 
-static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx)
+static int qfloat_validity_equal(const void *got_input, const void *want_input, void *ctx)
 {
-    const qfloat_t *got = (const qfloat_t *)actual;
-    const qfloat_t *want = (const qfloat_t *)expected;
+    const qfloat_t *got = (const qfloat_t *)got_input;
+    const qfloat_t *want = (const qfloat_t *)want_input;
     const double tol = ctx ? *(const double *)ctx : 1e-28;
 
     return qf_eq(*got, *want) || qf_to_double(qf_abs(qf_sub(*got, *want))) < tol;
@@ -127,7 +127,7 @@ static bool test_qcomplex_suite_setup(void)
     return TEST_REQUIRE_VALIDITY_CHECKER("qcomplex-close") && TEST_REQUIRE_VALIDITY_CHECKER("qcomplex-qfloat-close");
 }
 
-static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t actual, qcomplex_t expected, double tol,
+static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t got, qcomplex_t want, double tol,
                                            int relative_mode, const char *file, int line)
 {
     const double ctx_values[2] = {tol, (double)relative_mode};
@@ -135,7 +135,7 @@ static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t actual,
         TEST_VALIDITY_CONTRACT(relative_mode ? "qcomplex-rel-close" : "qcomplex-close", qcomplex_validity_equal,
                                qcomplex_validity_format, (void *)ctx_values);
 
-    if (test_assert_validity(&contract, &actual, &expected, file, line))
+    if (test_assert_validity(&contract, &got, &want, file, line))
         return true;
 
     if (label)
@@ -143,13 +143,13 @@ static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t actual,
     return false;
 }
 
-static bool test_assert_qfloat_close_tol(const char *label, qfloat_t actual, qfloat_t expected, double tol,
+static bool test_assert_qfloat_close_tol(const char *label, qfloat_t got, qfloat_t want, double tol,
                                          const char *file, int line)
 {
     const test_validity_contract_t contract =
         TEST_VALIDITY_CONTRACT("qcomplex-qfloat-close", qfloat_validity_equal, qfloat_validity_format, &tol);
 
-    if (test_assert_validity(&contract, &actual, &expected, file, line))
+    if (test_assert_validity(&contract, &got, &want, file, line))
         return true;
 
     if (label)
@@ -164,29 +164,29 @@ static void check_bool(const char *label, int cond)
     printf(cond ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
 }
 
-#define check_qc(label, got_value, expected_value, tol_value)                                                          \
+#define check_qc(label, got_value, want_value, tol_value)                                                          \
     do {                                                                                                               \
         qcomplex_t test_qc_got__ = (got_value);                                                                        \
-        qcomplex_t test_qc_expected__ = (expected_value);                                                              \
-        if (!test_assert_qcomplex_close_tol((label), test_qc_got__, test_qc_expected__, (tol_value), 0, __FILE__,      \
+        qcomplex_t test_qc_want__ = (want_value);                                                              \
+        if (!test_assert_qcomplex_close_tol((label), test_qc_got__, test_qc_want__, (tol_value), 0, __FILE__,      \
                                             __LINE__))                                                                 \
             return;                                                                                                    \
     } while (0)
 
-#define check_qc_rel(label, got_value, expected_value, tol_value)                                                      \
+#define check_qc_rel(label, got_value, want_value, tol_value)                                                      \
     do {                                                                                                               \
         qcomplex_t test_qc_got__ = (got_value);                                                                        \
-        qcomplex_t test_qc_expected__ = (expected_value);                                                              \
-        if (!test_assert_qcomplex_close_tol((label), test_qc_got__, test_qc_expected__, (tol_value), 1, __FILE__,      \
+        qcomplex_t test_qc_want__ = (want_value);                                                              \
+        if (!test_assert_qcomplex_close_tol((label), test_qc_got__, test_qc_want__, (tol_value), 1, __FILE__,      \
                                             __LINE__))                                                                 \
             return;                                                                                                    \
     } while (0)
 
-#define check_qf(label, got_value, expected_value, tol_value)                                                          \
+#define check_qf(label, got_value, want_value, tol_value)                                                          \
     do {                                                                                                               \
         qfloat_t test_qf_got__ = (got_value);                                                                          \
-        qfloat_t test_qf_expected__ = (expected_value);                                                                \
-        if (!test_assert_qfloat_close_tol((label), test_qf_got__, test_qf_expected__, (tol_value), __FILE__,           \
+        qfloat_t test_qf_want__ = (want_value);                                                                \
+        if (!test_assert_qfloat_close_tol((label), test_qf_got__, test_qf_want__, (tol_value), __FILE__,           \
                                           __LINE__))                                                                   \
             return;                                                                                                    \
     } while (0)
@@ -308,8 +308,8 @@ static void test_exp(void)
         qcomplex_t z = qczs("1.0", "0.78539816339744830961566084581988");
         qfloat_t e_over_sqrt2 = qf_div(qf_from_string("2.71828182845904523536028747135266"),
                                        qf_from_string("1.41421356237309504880168872420969"));
-        qcomplex_t expected = qc_make(e_over_sqrt2, e_over_sqrt2);
-        check_qc_rel("exp(1+iπ/4) = e/√2 * (1+i)", qc_exp(z), expected, 1e-26);
+        qcomplex_t want = qc_make(e_over_sqrt2, e_over_sqrt2);
+        check_qc_rel("exp(1+iπ/4) = e/√2 * (1+i)", qc_exp(z), want, 1e-26);
     }
 
     {
@@ -693,10 +693,10 @@ static void test_digamma(void)
 
     {
         qcomplex_t z = qcz(2.0, 3.0);
-        qcomplex_t expected = qc_make(qf_from_string("0.798021985146275720622294500724813"),
+        qcomplex_t want = qc_make(qf_from_string("0.798021985146275720622294500724813"),
                                       qf_from_string("-0.113744308052938500215913365857315"));
 
-        check_qc("ζ(2+3i)", qc_zeta(z), expected, 1e-29);
+        check_qc("ζ(2+3i)", qc_zeta(z), want, 1e-29);
         check_qc("ζ(3) real bridge", qc_zeta(qcr(3.0)),
                  qcrs("1.2020569031595942853997381615114499907649862923405"), 1e-30);
     }
@@ -756,13 +756,13 @@ static void test_polylog(void)
         qcomplex_t upper = qcz(1.25, -0.2);
         qcomplex_t b[] = {qcz(0.5, 0.1), qcr(1.5)};
         qcomplex_t variables[] = {qcz(0.1, 0.05), qcr(0.2)};
-        qcomplex_t expected = QC_ONE;
+        qcomplex_t want = QC_ONE;
 
         check_qc("0F0(z) = exp(z)", qc_hypergeometric_pFq(NULL, 0u, NULL, 0u, z), qc_exp(z), 1e-27);
         for (size_t i = 0u; i < 2u; ++i) {
-            expected = qc_mul(expected, qc_pow(qc_sub(QC_ONE, variables[i]), qc_neg(b[i])));
+            want = qc_mul(want, qc_pow(qc_sub(QC_ONE, variables[i]), qc_neg(b[i])));
         }
-        check_qc("Lauricella FD(a;b;a;x) product identity", qc_lauricella_f(upper, b, upper, variables, 2u), expected,
+        check_qc("Lauricella FD(a;b;a;x) product identity", qc_lauricella_f(upper, b, upper, variables, 2u), want,
                  1e-26);
         check_qc("Appell F1 is Lauricella FD in two variables",
                  qc_appell_f1(upper, b[0], b[1], upper, variables[0], variables[1]),
@@ -773,9 +773,9 @@ static void test_polylog(void)
         qcomplex_t a = qcr(1.25);
         qcomplex_t b = qcr(0.5);
         qcomplex_t variable = qcr(0.96);
-        qcomplex_t expected = qc_pow(qc_sub(QC_ONE, variable), qc_neg(b));
+        qcomplex_t want = qc_pow(qc_sub(QC_ONE, variable), qc_neg(b));
 
-        check_qc("Lauricella dynamically converges near |x| = 1", qc_lauricella_f(a, &b, a, &variable, 1u), expected,
+        check_qc("Lauricella dynamically converges near |x| = 1", qc_lauricella_f(a, &b, a, &variable, 1u), want,
                  1e-26);
     }
 }
@@ -1163,15 +1163,15 @@ static void test_polar(void)
    printf (qc_sprintf / qc_vsprintf)
    ==================================================================== */
 
-static void check_str(const char *label, const char *got, const char *expected)
+static void check_str(const char *label, const char *got, const char *want)
 {
-    int ok = (strcmp(got, expected) == 0);
+    int ok = (strcmp(got, want) == 0);
     if (!ok)
         test_mark_failure(__FILE__, __LINE__, label);
     if (ok)
         printf(C_GREEN "  OK: %s\n" C_RESET, label);
     else
-        printf(C_RED "  FAIL: %s\n    got      = \"%s\"\n    expected = \"%s\"\n" C_RESET, label, got, expected);
+        printf(C_RED "  FAIL: %s\n    got      = \"%s\"\n    want = \"%s\"\n" C_RESET, label, got, want);
 }
 
 static void test_printf(void)
@@ -1372,10 +1372,10 @@ static void test_from_string(void)
         /* Scientific a + bj */
         {__FILE__, __LINE__, "scientific a + bj", "-1.0e-3 + 1.0e2j", "-1.0e-3", "1.0e2", 1e-60, 0},
 
-        /* Polar r*exp(theta i) — expected computed dynamically */
+        /* Polar r*exp(theta i) — want computed dynamically */
         {__FILE__, __LINE__, "polar: r*exp(theta i)", "1.732*exp(2.2i)", NULL, NULL, 1e-30, 0},
 
-        /* Full complex exponent r*exp(a+bi) — expected computed dynamically */
+        /* Full complex exponent r*exp(a+bi) — want computed dynamically */
         {__FILE__, __LINE__, "polar: r*exp(a+bi)", "1.732*exp(1.1+2.2i)", NULL, NULL, 1e-30, 0},
 
         /* Whitespace */
@@ -1424,7 +1424,7 @@ static void test_from_string(void)
             printf(ok ? C_GREEN "  OK\n" C_RESET : C_RED "  FAIL\n" C_RESET);
 
             print_qc("    got     ", z);
-            print_qc("    expected", qc_make(QF_NAN, QF_NAN));
+            print_qc("    want", qc_make(QF_NAN, QF_NAN));
             print_qc("    error   ", qc_make(QF_NAN, QF_NAN));
             // printf("\n");
             continue;
@@ -1432,28 +1432,28 @@ static void test_from_string(void)
 
         /* Success cases */
 
-        qcomplex_t expected;
+        qcomplex_t want;
 
-        /* Polar cases: compute expected dynamically */
+        /* Polar cases: compute want dynamically */
         if (cases[i].re_exp == NULL && cases[i].im_exp == NULL && strstr(desc, "polar: r*exp(theta i)") == desc) {
 
             qfloat_t r = qf_from_string("1.732");
             qfloat_t t = qf_from_string("2.2");
-            expected = qc_make(qf_mul(r, qf_cos(t)), qf_mul(r, qf_sin(t)));
+            want = qc_make(qf_mul(r, qf_cos(t)), qf_mul(r, qf_sin(t)));
 
         } else if (cases[i].re_exp == NULL && cases[i].im_exp == NULL && strstr(desc, "polar: r*exp(a+bi)") == desc) {
 
             qfloat_t r = qf_from_string("1.732");
             qcomplex_t e = qc_exp(qc_make(qf_from_string("1.1"), qf_from_string("2.2")));
-            expected = qc_mul(qc_make(r, qf_from_double(0.0)), e);
+            want = qc_mul(qc_make(r, qf_from_double(0.0)), e);
 
         } else {
             qfloat_t re_exp = qf_from_string(cases[i].re_exp);
             qfloat_t im_exp = qf_from_string(cases[i].im_exp);
-            expected = qc_make(re_exp, im_exp);
+            want = qc_make(re_exp, im_exp);
         }
 
-        qcomplex_t diff = qc_sub(z, expected);
+        qcomplex_t diff = qc_sub(z, want);
         double err = qf_to_double(qc_abs(diff));
 
         int ok = err < tol;
@@ -1463,7 +1463,7 @@ static void test_from_string(void)
         printf(ok ? C_GREEN "  OK\n" C_RESET : C_RED "  FAIL\n" C_RESET);
 
         print_qc("    got     ", z);
-        print_qc("    expected", expected);
+        print_qc("    want", want);
         print_qc("    error   ", diff);
     }
 }

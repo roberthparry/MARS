@@ -2,7 +2,7 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
-static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static int qfloat_validity_equal(const void *got, const void *want, void *ctx);
 static int qfloat_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_qfloat_suite_setup(void);
 
@@ -59,18 +59,18 @@ const test_validity_contract_t *qfloat_validity_contract_close(void)
     return &qfloat_close_contract;
 }
 
-bool test_assert_qfloat_close_tol(qfloat_t actual, qfloat_t expected, double rel_tol, const char *file, int line)
+bool test_assert_qfloat_close_tol(qfloat_t got, qfloat_t want, double rel_tol, const char *file, int line)
 {
     const test_validity_contract_t contract =
         TEST_VALIDITY_CONTRACT("qfloat-close", qfloat_validity_equal, qfloat_validity_format, &rel_tol);
 
-    return test_assert_validity(&contract, &actual, &expected, file, line);
+    return test_assert_validity(&contract, &got, &want, file, line);
 }
 
-static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx)
+static int qfloat_validity_equal(const void *got, const void *want, void *ctx)
 {
-    const qfloat_t *a = (const qfloat_t *)actual;
-    const qfloat_t *b = (const qfloat_t *)expected;
+    const qfloat_t *a = (const qfloat_t *)got;
+    const qfloat_t *b = (const qfloat_t *)want;
     const double rel = ctx ? *(const double *)ctx : 1e-28;
 
     return qf_eq(*a, *b) || qf_close(*a, *b, rel) || qf_close_rel(*a, *b, rel);

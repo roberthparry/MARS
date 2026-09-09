@@ -122,7 +122,7 @@ static void assert_string_antiderivative_round_trips(const char *input)
     expr_bindings_free(bindings);
 }
 
-static void assert_iterated_derivatives_integrate_back(const char *input, const char *const expected_derivatives[4],
+static void assert_iterated_derivatives_integrate_back(const char *input, const char *const want_derivatives[4],
                                                        const double *points, size_t npoints)
 {
     expr_bindings_t *bindings = NULL;
@@ -144,11 +144,11 @@ static void assert_iterated_derivatives_integrate_back(const char *input, const 
         snprintf(label, sizeof(label), "%s derivative %zu", input, order);
         ASSERT_NOT_NULL(deriv);
         ASSERT_NOT_NULL(deriv_text);
-        if (expected_derivatives && expected_derivatives[order - 1u]) {
-            if (str_eq(deriv_text, expected_derivatives[order - 1u]))
-                to_string_pass(label, deriv_text, expected_derivatives[order - 1u]);
+        if (want_derivatives && want_derivatives[order - 1u]) {
+            if (str_eq(deriv_text, want_derivatives[order - 1u]))
+                to_string_pass(label, deriv_text, want_derivatives[order - 1u]);
             else
-                to_string_fail(__FILE__, __LINE__, 1, label, deriv_text, expected_derivatives[order - 1u]);
+                to_string_fail(__FILE__, __LINE__, 1, label, deriv_text, want_derivatives[order - 1u]);
         }
         ASSERT_NOT_NULL(anti);
         ASSERT_NOT_NULL(anti_deriv);
@@ -232,7 +232,7 @@ static void assert_nth_derivative_integrates_back(const char *input, size_t orde
     expr_bindings_free(bindings);
 }
 
-static void assert_string_antiderivative_contains(const char *input, const char *expected)
+static void assert_string_antiderivative_contains(const char *input, const char *want)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
@@ -246,7 +246,7 @@ static void assert_string_antiderivative_contains(const char *input, const char 
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(text);
     print_antiderivative_text(input, text);
-    ASSERT_TRUE(strstr(text, expected) != NULL);
+    ASSERT_TRUE(strstr(text, want) != NULL);
 
     free(text);
     expr_free(anti);
@@ -283,80 +283,80 @@ static void assert_string_antiderivative_matches_with_a(const char *input, doubl
 {
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *anti_bindings = NULL;
-    expr_bindings_t *expected_bindings = NULL;
+    expr_bindings_t *want_bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
     expr_t *simplified = expr ? expr_simplify(expr) : NULL;
     expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
     char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    char *want_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
     size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
-    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    size_t want_input_len = want_text ? strlen(want_text) + 5u : 0u;
     char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
-    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    char *want_input = want_text ? malloc(want_input_len) : NULL;
     expr_t *anti_eval = NULL;
     expr_t *deriv_eval = NULL;
-    expr_t *expected_eval = NULL;
+    expr_t *want_eval = NULL;
     expr_t *anti_x = NULL;
     expr_t *deriv_x = NULL;
-    expr_t *expected_x = NULL;
+    expr_t *want_x = NULL;
     expr_t *anti_a = NULL;
     expr_t *deriv_a = NULL;
-    expr_t *expected_a = NULL;
+    expr_t *want_a = NULL;
 
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
-    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(want_text);
     ASSERT_NOT_NULL(anti_input);
-    ASSERT_NOT_NULL(expected_input);
+    ASSERT_NOT_NULL(want_input);
     print_antiderivative_text(input, anti_text);
 
     snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
-    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+    snprintf(want_input, want_input_len, "{ %s }", want_text);
 
     anti_eval = expr_from_string(anti_input, &anti_bindings);
-    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    want_eval = expr_from_string(want_input, &want_bindings);
     anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
     anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
     deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
     deriv_x = anti_x;
     deriv_a = anti_a;
-    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
-    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
+    want_x = want_bindings ? expr_bindings_get(want_bindings, "x") : NULL;
+    want_a = want_bindings ? expr_bindings_get(want_bindings, "a") : NULL;
 
     ASSERT_NOT_NULL(anti_eval);
     ASSERT_NOT_NULL(deriv_eval);
-    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(want_eval);
     ASSERT_NOT_NULL(anti_x);
     ASSERT_NOT_NULL(anti_a);
     ASSERT_NOT_NULL(deriv_x);
-    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(want_x);
     ASSERT_NOT_NULL(deriv_a);
-    ASSERT_NOT_NULL(expected_a);
+    ASSERT_NOT_NULL(want_a);
 
     test_expr_set_val_d(a, a_value);
     test_expr_set_val_d(deriv_a, a_value);
-    test_expr_set_val_d(expected_a, a_value);
+    test_expr_set_val_d(want_a, a_value);
     for (size_t i = 0; i < npoints; ++i) {
         char point_label[160];
 
         test_expr_set_val_d(x, points[i]);
         test_expr_set_val_d(deriv_x, points[i]);
-        test_expr_set_val_d(expected_x, points[i]);
+        test_expr_set_val_d(want_x, points[i]);
         snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g", input, points[i], a_value);
-        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
+        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(want_eval));
     }
 
-    free(expected_input);
+    free(want_input);
     free(anti_input);
-    free(expected_text);
+    free(want_text);
     free(anti_text);
-    expr_free(expected_eval);
-    expr_bindings_free(expected_bindings);
+    expr_free(want_eval);
+    expr_bindings_free(want_bindings);
     expr_free(deriv_eval);
     expr_free(anti_eval);
     expr_bindings_free(anti_bindings);
@@ -371,7 +371,7 @@ static void assert_string_antiderivative_matches_with_ab(const char *input, doub
 {
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *anti_bindings = NULL;
-    expr_bindings_t *expected_bindings = NULL;
+    expr_bindings_t *want_bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
@@ -379,20 +379,20 @@ static void assert_string_antiderivative_matches_with_ab(const char *input, doub
     expr_t *simplified = expr ? expr_simplify(expr) : NULL;
     expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
     char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    char *want_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
     size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
-    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    size_t want_input_len = want_text ? strlen(want_text) + 5u : 0u;
     char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
-    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    char *want_input = want_text ? malloc(want_input_len) : NULL;
     expr_t *anti_eval = NULL;
     expr_t *deriv_eval = NULL;
-    expr_t *expected_eval = NULL;
+    expr_t *want_eval = NULL;
     expr_t *anti_x = NULL;
-    expr_t *expected_x = NULL;
+    expr_t *want_x = NULL;
     expr_t *anti_a = NULL;
-    expr_t *expected_a = NULL;
+    expr_t *want_a = NULL;
     expr_t *anti_b = NULL;
-    expr_t *expected_b = NULL;
+    expr_t *want_b = NULL;
 
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(x);
@@ -400,56 +400,56 @@ static void assert_string_antiderivative_matches_with_ab(const char *input, doub
     ASSERT_NOT_NULL(b);
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
-    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(want_text);
     ASSERT_NOT_NULL(anti_input);
-    ASSERT_NOT_NULL(expected_input);
+    ASSERT_NOT_NULL(want_input);
     print_antiderivative_text(input, anti_text);
 
     snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
-    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+    snprintf(want_input, want_input_len, "{ %s }", want_text);
 
     anti_eval = expr_from_string(anti_input, &anti_bindings);
-    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    want_eval = expr_from_string(want_input, &want_bindings);
     anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
     anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
     anti_b = anti_bindings ? expr_bindings_get(anti_bindings, "b") : NULL;
     deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
-    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
-    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
-    expected_b = expected_bindings ? expr_bindings_get(expected_bindings, "b") : NULL;
+    want_x = want_bindings ? expr_bindings_get(want_bindings, "x") : NULL;
+    want_a = want_bindings ? expr_bindings_get(want_bindings, "a") : NULL;
+    want_b = want_bindings ? expr_bindings_get(want_bindings, "b") : NULL;
 
     ASSERT_NOT_NULL(anti_eval);
     ASSERT_NOT_NULL(deriv_eval);
-    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(want_eval);
     ASSERT_NOT_NULL(anti_x);
-    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(want_x);
     ASSERT_NOT_NULL(anti_a);
-    ASSERT_NOT_NULL(expected_a);
+    ASSERT_NOT_NULL(want_a);
     ASSERT_NOT_NULL(anti_b);
-    ASSERT_NOT_NULL(expected_b);
+    ASSERT_NOT_NULL(want_b);
 
     test_expr_set_val_d(a, a_value);
     test_expr_set_val_d(b, b_value);
     test_expr_set_val_d(anti_a, a_value);
-    test_expr_set_val_d(expected_a, a_value);
+    test_expr_set_val_d(want_a, a_value);
     test_expr_set_val_d(anti_b, b_value);
-    test_expr_set_val_d(expected_b, b_value);
+    test_expr_set_val_d(want_b, b_value);
     for (size_t i = 0; i < npoints; ++i) {
         char point_label[160];
 
         test_expr_set_val_d(x, points[i]);
         test_expr_set_val_d(anti_x, points[i]);
-        test_expr_set_val_d(expected_x, points[i]);
+        test_expr_set_val_d(want_x, points[i]);
         snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g, b=%g", input, points[i], a_value, b_value);
-        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
+        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(want_eval));
     }
 
-    free(expected_input);
+    free(want_input);
     free(anti_input);
-    free(expected_text);
+    free(want_text);
     free(anti_text);
-    expr_free(expected_eval);
-    expr_bindings_free(expected_bindings);
+    expr_free(want_eval);
+    expr_bindings_free(want_bindings);
     expr_free(deriv_eval);
     expr_free(anti_eval);
     expr_bindings_free(anti_bindings);
@@ -464,7 +464,7 @@ static void assert_string_antiderivative_matches_with_abc(const char *input, dou
 {
     expr_bindings_t *bindings = NULL;
     expr_bindings_t *anti_bindings = NULL;
-    expr_bindings_t *expected_bindings = NULL;
+    expr_bindings_t *want_bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
@@ -473,22 +473,22 @@ static void assert_string_antiderivative_matches_with_abc(const char *input, dou
     expr_t *simplified = expr ? expr_simplify(expr) : NULL;
     expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
     char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
-    char *expected_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    char *want_text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
     size_t anti_input_len = anti_text ? strlen(anti_text) + 5u : 0u;
-    size_t expected_input_len = expected_text ? strlen(expected_text) + 5u : 0u;
+    size_t want_input_len = want_text ? strlen(want_text) + 5u : 0u;
     char *anti_input = anti_text ? malloc(anti_input_len) : NULL;
-    char *expected_input = expected_text ? malloc(expected_input_len) : NULL;
+    char *want_input = want_text ? malloc(want_input_len) : NULL;
     expr_t *anti_eval = NULL;
     expr_t *deriv_eval = NULL;
-    expr_t *expected_eval = NULL;
+    expr_t *want_eval = NULL;
     expr_t *anti_x = NULL;
-    expr_t *expected_x = NULL;
+    expr_t *want_x = NULL;
     expr_t *anti_a = NULL;
-    expr_t *expected_a = NULL;
+    expr_t *want_a = NULL;
     expr_t *anti_b = NULL;
-    expr_t *expected_b = NULL;
+    expr_t *want_b = NULL;
     expr_t *anti_c = NULL;
-    expr_t *expected_c = NULL;
+    expr_t *want_c = NULL;
 
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(x);
@@ -497,64 +497,64 @@ static void assert_string_antiderivative_matches_with_abc(const char *input, dou
     ASSERT_NOT_NULL(c);
     ASSERT_NOT_NULL(anti);
     ASSERT_NOT_NULL(anti_text);
-    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(want_text);
     ASSERT_NOT_NULL(anti_input);
-    ASSERT_NOT_NULL(expected_input);
+    ASSERT_NOT_NULL(want_input);
     print_antiderivative_text(input, anti_text);
 
     snprintf(anti_input, anti_input_len, "{ %s }", anti_text);
-    snprintf(expected_input, expected_input_len, "{ %s }", expected_text);
+    snprintf(want_input, want_input_len, "{ %s }", want_text);
 
     anti_eval = expr_from_string(anti_input, &anti_bindings);
-    expected_eval = expr_from_string(expected_input, &expected_bindings);
+    want_eval = expr_from_string(want_input, &want_bindings);
     anti_x = anti_bindings ? expr_bindings_get(anti_bindings, "x") : NULL;
     anti_a = anti_bindings ? expr_bindings_get(anti_bindings, "a") : NULL;
     anti_b = anti_bindings ? expr_bindings_get(anti_bindings, "b") : NULL;
     anti_c = anti_bindings ? expr_bindings_get(anti_bindings, "c") : NULL;
     deriv_eval = anti_eval && anti_x ? expr_create_deriv(anti_eval, anti_x) : NULL;
-    expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
-    expected_a = expected_bindings ? expr_bindings_get(expected_bindings, "a") : NULL;
-    expected_b = expected_bindings ? expr_bindings_get(expected_bindings, "b") : NULL;
-    expected_c = expected_bindings ? expr_bindings_get(expected_bindings, "c") : NULL;
+    want_x = want_bindings ? expr_bindings_get(want_bindings, "x") : NULL;
+    want_a = want_bindings ? expr_bindings_get(want_bindings, "a") : NULL;
+    want_b = want_bindings ? expr_bindings_get(want_bindings, "b") : NULL;
+    want_c = want_bindings ? expr_bindings_get(want_bindings, "c") : NULL;
 
     ASSERT_NOT_NULL(anti_eval);
     ASSERT_NOT_NULL(deriv_eval);
-    ASSERT_NOT_NULL(expected_eval);
+    ASSERT_NOT_NULL(want_eval);
     ASSERT_NOT_NULL(anti_x);
-    ASSERT_NOT_NULL(expected_x);
+    ASSERT_NOT_NULL(want_x);
     ASSERT_NOT_NULL(anti_a);
-    ASSERT_NOT_NULL(expected_a);
+    ASSERT_NOT_NULL(want_a);
     ASSERT_NOT_NULL(anti_b);
-    ASSERT_NOT_NULL(expected_b);
+    ASSERT_NOT_NULL(want_b);
     ASSERT_NOT_NULL(anti_c);
-    ASSERT_NOT_NULL(expected_c);
+    ASSERT_NOT_NULL(want_c);
 
     test_expr_set_val_d(a, a_value);
     test_expr_set_val_d(b, b_value);
     test_expr_set_val_d(c, c_value);
     test_expr_set_val_d(anti_a, a_value);
-    test_expr_set_val_d(expected_a, a_value);
+    test_expr_set_val_d(want_a, a_value);
     test_expr_set_val_d(anti_b, b_value);
-    test_expr_set_val_d(expected_b, b_value);
+    test_expr_set_val_d(want_b, b_value);
     test_expr_set_val_d(anti_c, c_value);
-    test_expr_set_val_d(expected_c, c_value);
+    test_expr_set_val_d(want_c, c_value);
     for (size_t i = 0; i < npoints; ++i) {
         char point_label[192];
 
         test_expr_set_val_d(x, points[i]);
         test_expr_set_val_d(anti_x, points[i]);
-        test_expr_set_val_d(expected_x, points[i]);
+        test_expr_set_val_d(want_x, points[i]);
         snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g, b=%g, c=%g", input, points[i], a_value, b_value,
                  c_value);
-        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(expected_eval));
+        check_q_at(__FILE__, __LINE__, 1, point_label, expr_eval_qf(deriv_eval), expr_eval_qf(want_eval));
     }
 
-    free(expected_input);
+    free(want_input);
     free(anti_input);
-    free(expected_text);
+    free(want_text);
     free(anti_text);
-    expr_free(expected_eval);
-    expr_bindings_free(expected_bindings);
+    expr_free(want_eval);
+    expr_bindings_free(want_bindings);
     expr_free(deriv_eval);
     expr_free(anti_eval);
     expr_bindings_free(anti_bindings);
@@ -2855,21 +2855,21 @@ static void test_integrate_unevaluated_integral_constant_upper(void)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ ∫^3 sin(t) dt }", &bindings);
-    expr_t *expected = expr_from_string("{ 1 - cos(3) }", NULL);
+    expr_t *want = expr_from_string("{ 1 - cos(3) }", NULL);
     expr_t *z = bindings ? expr_bindings_get(bindings, "z") : NULL;
     expr_t *t = bindings ? expr_bindings_get(bindings, "t") : NULL;
     char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
 
     ASSERT_NOT_NULL(expr);
-    ASSERT_NOT_NULL(expected);
+    ASSERT_NOT_NULL(want);
     ASSERT_TRUE(z == NULL);
     ASSERT_TRUE(t == NULL);
     ASSERT_NOT_NULL(text);
     ASSERT_TRUE(strstr(text, "∫^3 sin(t)·dt") != NULL);
-    check_q_at(__FILE__, __LINE__, 1, "integral to 3 of sin(t)", expr_eval_qf(expr), expr_eval_qf(expected));
+    check_q_at(__FILE__, __LINE__, 1, "integral to 3 of sin(t)", expr_eval_qf(expr), expr_eval_qf(want));
 
     free(text);
-    expr_free(expected);
+    expr_free(want);
     expr_bindings_free(bindings);
     expr_free(expr);
 }
@@ -2878,24 +2878,24 @@ static void test_integrate_unevaluated_integral_chain_rule_upper(void)
 {
     static const double points[] = {-1.0, -0.25, 0.5, 1.25};
     expr_bindings_t *bindings = NULL;
-    expr_bindings_t *expected_deriv_bindings = NULL;
-    expr_bindings_t *expected_value_bindings = NULL;
+    expr_bindings_t *want_deriv_bindings = NULL;
+    expr_bindings_t *want_value_bindings = NULL;
     expr_t *expr = expr_from_string("{ ∫^(x+1) sin(t) dt | x = NAN }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    expr_t *expected_deriv = expr_from_string("{ sin(x + 1) | x = NAN }", &expected_deriv_bindings);
-    expr_t *expected_value = expr_from_string("{ 1 - cos(x + 1) | x = NAN }", &expected_value_bindings);
-    expr_t *expected_deriv_x = expected_deriv_bindings ? expr_bindings_get(expected_deriv_bindings, "x") : NULL;
-    expr_t *expected_value_x = expected_value_bindings ? expr_bindings_get(expected_value_bindings, "x") : NULL;
+    expr_t *want_deriv = expr_from_string("{ sin(x + 1) | x = NAN }", &want_deriv_bindings);
+    expr_t *want_value = expr_from_string("{ 1 - cos(x + 1) | x = NAN }", &want_value_bindings);
+    expr_t *want_deriv_x = want_deriv_bindings ? expr_bindings_get(want_deriv_bindings, "x") : NULL;
+    expr_t *want_value_x = want_value_bindings ? expr_bindings_get(want_value_bindings, "x") : NULL;
     char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(deriv);
-    ASSERT_NOT_NULL(expected_deriv);
-    ASSERT_NOT_NULL(expected_value);
-    ASSERT_NOT_NULL(expected_deriv_x);
-    ASSERT_NOT_NULL(expected_value_x);
+    ASSERT_NOT_NULL(want_deriv);
+    ASSERT_NOT_NULL(want_value);
+    ASSERT_NOT_NULL(want_deriv_x);
+    ASSERT_NOT_NULL(want_value_x);
     ASSERT_NOT_NULL(text);
     ASSERT_TRUE(strstr(text, "∫^(x + 1) sin(t)·dt") != NULL);
 
@@ -2903,20 +2903,20 @@ static void test_integrate_unevaluated_integral_chain_rule_upper(void)
         char label[160];
 
         test_expr_set_val_d(x, points[i]);
-        test_expr_set_val_d(expected_deriv_x, points[i]);
-        test_expr_set_val_d(expected_value_x, points[i]);
+        test_expr_set_val_d(want_deriv_x, points[i]);
+        test_expr_set_val_d(want_value_x, points[i]);
         snprintf(label, sizeof(label), "d/dx integral to x+1 at x=%g", points[i]);
-        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(deriv), expr_eval_qf(expected_deriv));
+        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(deriv), expr_eval_qf(want_deriv));
 
         snprintf(label, sizeof(label), "integral to x+1 at x=%g", points[i]);
-        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), expr_eval_qf(expected_value));
+        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), expr_eval_qf(want_value));
     }
 
     free(text);
-    expr_free(expected_value);
-    expr_bindings_free(expected_value_bindings);
-    expr_free(expected_deriv);
-    expr_bindings_free(expected_deriv_bindings);
+    expr_free(want_value);
+    expr_bindings_free(want_value_bindings);
+    expr_free(want_deriv);
+    expr_bindings_free(want_deriv_bindings);
     expr_free(deriv);
     expr_bindings_free(bindings);
     expr_free(expr);
@@ -2926,19 +2926,19 @@ static void test_integrate_unevaluated_integral_explicit_bounds(void)
 {
     static const double points[] = {-1.0, -0.25, 0.5, 1.25};
     expr_bindings_t *bindings = NULL;
-    expr_bindings_t *expected_deriv_bindings = NULL;
+    expr_bindings_t *want_deriv_bindings = NULL;
     expr_t *expr = expr_from_string("{ ∫^x_1 t² dt | x = NAN }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-    expr_t *expected_deriv = expr_from_string("{ x² | x = NAN }", &expected_deriv_bindings);
-    expr_t *expected_deriv_x = expected_deriv_bindings ? expr_bindings_get(expected_deriv_bindings, "x") : NULL;
+    expr_t *want_deriv = expr_from_string("{ x² | x = NAN }", &want_deriv_bindings);
+    expr_t *want_deriv_x = want_deriv_bindings ? expr_bindings_get(want_deriv_bindings, "x") : NULL;
     char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(x);
     ASSERT_NOT_NULL(deriv);
-    ASSERT_NOT_NULL(expected_deriv);
-    ASSERT_NOT_NULL(expected_deriv_x);
+    ASSERT_NOT_NULL(want_deriv);
+    ASSERT_NOT_NULL(want_deriv_x);
     ASSERT_NOT_NULL(text);
     ASSERT_TRUE(strstr(text, "∫^x_1 t²·dt") != NULL);
 
@@ -2946,24 +2946,24 @@ static void test_integrate_unevaluated_integral_explicit_bounds(void)
         char label[160];
 
         test_expr_set_val_d(x, points[i]);
-        test_expr_set_val_d(expected_deriv_x, points[i]);
+        test_expr_set_val_d(want_deriv_x, points[i]);
         snprintf(label, sizeof(label), "d/dx integral from 1 to x at x=%g", points[i]);
-        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(deriv), expr_eval_qf(expected_deriv));
+        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(deriv), expr_eval_qf(want_deriv));
     }
 
     for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
         char label[160];
         double x_value = points[i];
-        qfloat_t expected = qf_from_double((x_value * x_value * x_value - 1.0) / 3.0);
+        qfloat_t want = qf_from_double((x_value * x_value * x_value - 1.0) / 3.0);
 
         test_expr_set_val_d(x, x_value);
         snprintf(label, sizeof(label), "integral from 1 to x at x=%g", x_value);
-        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), expected);
+        check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), want);
     }
 
     free(text);
-    expr_free(expected_deriv);
-    expr_bindings_free(expected_deriv_bindings);
+    expr_free(want_deriv);
+    expr_bindings_free(want_deriv_bindings);
     expr_free(deriv);
     expr_bindings_free(bindings);
     expr_free(expr);
@@ -3040,7 +3040,7 @@ static void test_integrate_unevaluated_integral_display_symbolic_result(void)
 
 static void test_integrate_symbolic_improper_endpoint_value(void)
 {
-    const qfloat_t expected = qf_from_string("0."
+    const qfloat_t want = qf_from_string("0."
                                              "9530826542768191111486074290113740766671921043717468940128832979402964267"
                                              "9413097217556799413057238923482062905166545");
     expr_bindings_t *bound_bindings = NULL;
@@ -3049,8 +3049,8 @@ static void test_integrate_symbolic_improper_endpoint_value(void)
 
     ASSERT_NOT_NULL(bound);
     ASSERT_NOT_NULL(constant);
-    check_q_at(__FILE__, __LINE__, 1, "symbolic improper endpoint integral to t=pi/6", expr_eval_qf(bound), expected);
-    check_q_at(__FILE__, __LINE__, 1, "symbolic improper endpoint integral to pi/6", expr_eval_qf(constant), expected);
+    check_q_at(__FILE__, __LINE__, 1, "symbolic improper endpoint integral to t=pi/6", expr_eval_qf(bound), want);
+    check_q_at(__FILE__, __LINE__, 1, "symbolic improper endpoint integral to pi/6", expr_eval_qf(constant), want);
 
     expr_free(constant);
     expr_bindings_free(bound_bindings);
@@ -3485,26 +3485,26 @@ static void test_harmonic_poly_calculus(void)
         ASSERT_NOT_NULL(derivative);
         for (size_t point = 0u; point < sizeof(points) / sizeof(points[0]); ++point) {
             double value = points[point];
-            double expected;
+            double want;
             char label[128];
 
             switch (order) {
                 case 1u:
-                    expected = 1.0 + value + value * value + value * value * value;
+                    want = 1.0 + value + value * value + value * value * value;
                     break;
                 case 2u:
-                    expected = 1.0 + 2.0 * value + 3.0 * value * value;
+                    want = 1.0 + 2.0 * value + 3.0 * value * value;
                     break;
                 case 3u:
-                    expected = 2.0 + 6.0 * value;
+                    want = 2.0 + 6.0 * value;
                     break;
                 default:
-                    expected = 6.0;
+                    want = 6.0;
                     break;
             }
             test_expr_set_val_d(x, value);
             snprintf(label, sizeof(label), "Hn fourth-degree derivative %zu at x=%g", order, value);
-            check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(derivative), qf_from_double(expected));
+            check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(derivative), qf_from_double(want));
             check_q_at(__FILE__, __LINE__, 1, "Hn antiderivative differentiates back", expr_eval_qf(round_trip),
                        expr_eval_qf(function));
         }

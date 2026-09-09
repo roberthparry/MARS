@@ -17,11 +17,11 @@ void run_number_promotion_tests(void)
         number_t exact_sqrt = num_sqrt(exact_two);
         number_t exact_exp = num_exp(exact_two);
         number_t exact_inv = num_inv(exact_two);
-        number_t expected_half = num_create_from_string("1/2");
+        number_t want_half = num_create_from_string("1/2");
         number_t exact_two_double = num_create_from_double(2.0);
         number_t conj_z = num_create_from_qcomplex(qc_from_string("1 - 2i"));
         number_t product = num_mul(z, conj_z);
-        number_t expected_five = num_create_from_string("5");
+        number_t want_five = num_create_from_string("5");
 
         ASSERT_TRUE(!num_is_exact(mixed_real));
         ASSERT_TRUE(num_is_real(mixed_real));
@@ -33,15 +33,15 @@ void run_number_promotion_tests(void)
         ASSERT_TRUE(num_is_real(exact_log));
         ASSERT_TRUE(num_is_real(exact_sqrt));
         ASSERT_TRUE(num_is_real(exact_exp));
-        ASSERT_NUMBER_EQ(exact_inv, expected_half);
+        ASSERT_NUMBER_EQ(exact_inv, want_half);
         ASSERT_TRUE(num_is_real(product));
-        ASSERT_NUMBER_EQ(product, expected_five);
+        ASSERT_NUMBER_EQ(product, want_five);
         ASSERT_NUMBER_EQ(exact_two, exact_two_double);
-        ASSERT_TRUE(num_lt(expected_half, exact_two));
-        ASSERT_TRUE(num_gt(exact_two, expected_half));
+        ASSERT_TRUE(num_lt(want_half, exact_two));
+        ASSERT_TRUE(num_gt(exact_two, want_half));
         ASSERT_TRUE(!num_lt(z, exact_three));
         ASSERT_TRUE(!num_gt(z, exact_three));
-        ASSERT_EQ_INT(num_cmp(expected_half, exact_two), -1);
+        ASSERT_EQ_INT(num_cmp(want_half, exact_two), -1);
         ASSERT_EQ_INT(num_cmp(z, exact_three), 0);
 
         num_destroy(&exact_two);
@@ -54,10 +54,10 @@ void run_number_promotion_tests(void)
         num_destroy(&exact_sqrt);
         num_destroy(&exact_exp);
         num_destroy(&exact_inv);
-        num_destroy(&expected_half);
+        num_destroy(&want_half);
         num_destroy(&exact_two_double);
         num_destroy(&conj_z);
         num_destroy(&product);
-        num_destroy(&expected_five);
+        num_destroy(&want_five);
     }
 }

@@ -9,7 +9,7 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_LOCAL);
 
-static int int_validity_equal(const void *actual, const void *expected, void *ctx);
+static int int_validity_equal(const void *got, const void *want, void *ctx);
 static int int_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_fixture_setup_impl(void);
 static bool test_fixture_teardown_impl(void);
@@ -132,10 +132,10 @@ static bool file_contains_text(const char *path, const char *needle)
     return found;
 }
 
-static int int_validity_equal(const void *actual, const void *expected, void *ctx)
+static int int_validity_equal(const void *got, const void *want, void *ctx)
 {
     (void)ctx;
-    return *(const int *)actual == *(const int *)expected;
+    return *(const int *)got == *(const int *)want;
 }
 
 static int int_validity_format(const void *value, string_t *out, void *ctx)
@@ -359,10 +359,10 @@ static void test_invalid_parent_name_is_rejected(void)
 
 static void test_validity_contract_success(void)
 {
-    int expected = 42;
-    int actual = 42;
+    int want = 42;
+    int got = 42;
 
-    TEST_ASSERT_VALID_NAMED("int-equality", &actual, &expected);
+    TEST_ASSERT_VALID_NAMED("int-equality", &got, &want);
 }
 
 static void test_builtin_string_validity_contract_success(void)
@@ -403,8 +403,8 @@ static void test_json_string_escapes_are_written(void)
 {
     const char *name = "json_escape_\"quote\\slash\nline\t tab🙂";
     const char *reader_name = "json_reader_\"quote\\slash\nline\t tab🙂";
-    const char *expected_json_key = "\"json_escape_\\\"quote\\\\slash\\nline\\t tab🙂\"";
-    const char *expected_nul_key = "\"json_nul_\\u0000_key\"";
+    const char *want_json_key = "\"json_escape_\\\"quote\\\\slash\\nline\\t tab🙂\"";
+    const char *want_nul_key = "\"json_nul_\\u0000_key\"";
     string_t *file_text = string_new_with(__FILE__);
     string_t *name_text = string_new_with(name);
     string_t *reader_name_text = string_new_with(reader_name);
@@ -423,9 +423,9 @@ static void test_json_string_escapes_are_written(void)
     test_config_save();
     test_config_set_prune_enabled(true);
 
-    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), expected_json_key),
+    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), want_json_key),
                      "regenerated config should JSON-escape special string keys");
-    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), expected_nul_key),
+    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), want_nul_key),
                      "regenerated config should preserve JSON NUL escapes");
 }
 

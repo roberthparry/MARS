@@ -258,7 +258,7 @@ static void test_number_matrix_arithmetic(void)
     matrix_t *C;
     matrix_t *Q;
     matrix_t *M;
-    number_t expected;
+    number_t want;
 
     avals[0] = num_create_from_long(1);
     avals[1] = num_create_from_long(2);
@@ -276,28 +276,28 @@ static void test_number_matrix_arithmetic(void)
     check_bool("number + number -> MAT_TYPE_NUMBER", C != NULL && mat_typeof(C) == MAT_TYPE_NUMBER);
 
     got = mat_get_num(C, 0, 0);
-    expected = num_create_from_long(6);
-    check_bool("number add [0,0] = 6", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_long(6);
+    check_bool("number add [0,0] = 6", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
     got = mat_get_num(C, 1, 1);
-    expected = num_create_from_long(12);
-    check_bool("number add [1,1] = 12", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_long(12);
+    check_bool("number add [1,1] = 12", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
     mat_free(C);
 
     C = mat_mul(A, B);
     check_bool("number * number -> MAT_TYPE_NUMBER", C != NULL && mat_typeof(C) == MAT_TYPE_NUMBER);
     got = mat_get_num(C, 0, 0);
-    expected = num_create_from_long(19);
-    check_bool("number mul [0,0] = 19", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_long(19);
+    check_bool("number mul [0,0] = 19", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
     got = mat_get_num(C, 1, 1);
-    expected = num_create_from_long(50);
-    check_bool("number mul [1,1] = 50", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_long(50);
+    check_bool("number mul [1,1] = 50", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
     mat_free(C);
 
@@ -312,9 +312,9 @@ static void test_number_matrix_arithmetic(void)
     C = mat_scalar_div(B, &scalar);
     check_bool("mat_scalar_div non-null", C != NULL);
     got = mat_get_num(C, 0, 0);
-    expected = num_create_from_long(10);
-    check_bool("scalar div number by half", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_long(10);
+    check_bool("scalar div number by half", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
     mat_free(C);
     num_destroy(&scalar);
@@ -327,9 +327,9 @@ static void test_number_matrix_arithmetic(void)
     M = mat_add(A, Q);
     check_bool("number + number(decimal) stays number", M != NULL && mat_typeof(M) == MAT_TYPE_NUMBER);
     got = mat_get_num(M, 0, 0);
-    expected = num_create_from_string("1.5");
-    check_bool("number + decimal value", num_eq(got, expected));
-    num_destroy(&expected);
+    want = num_create_from_string("1.5");
+    check_bool("number + decimal value", num_eq(got, want));
+    num_destroy(&want);
     num_destroy(&got);
 
     mat_free(M);
@@ -410,15 +410,15 @@ static char *format_matrix_core_num_error(const number_t value)
     return out;
 }
 
-static number_t matrix_core_num_error_magnitude(const number_t got, const number_t expected)
+static number_t matrix_core_num_error_magnitude(const number_t got, const number_t want)
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u)
-        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected));
-    diff = num_sub(promoted_got, expected);
+    if (num_get_prec_bits(want) > 0u)
+        num_set_prec_bits(&promoted_got, num_get_prec_bits(want));
+    diff = num_sub(promoted_got, want);
     num_destroy(&promoted_got);
 
     if (num_is_real(diff)) {
@@ -439,15 +439,15 @@ static number_t matrix_core_num_error_magnitude(const number_t got, const number
     }
 }
 
-static void print_matrix_core_num_comparison(const char *label, const number_t got, const number_t expected)
+static void print_matrix_core_num_comparison(const char *label, const number_t got, const number_t want)
 {
-    char *expected_text = format_matrix_core_num_at_own_precision(expected);
+    char *want_text = format_matrix_core_num_at_own_precision(want);
     char *got_text = format_matrix_core_num_at_own_precision(got);
-    number_t error = matrix_core_num_error_magnitude(got, expected);
+    number_t error = matrix_core_num_error_magnitude(got, want);
     char *error_text = format_matrix_core_num_error(error);
 
     printf("    %s\n", label);
-    printf("        expected = %s\n", expected_text ? expected_text : "(unavailable)");
+    printf("        want = %s\n", want_text ? want_text : "(unavailable)");
     printf("        got      = %s\n", got_text ? got_text : "(unavailable)");
     printf("        error    = %s\n", error_text ? error_text : "(unavailable)");
     printf("        precision: %zu bits, %zu significant digits\n", num_get_prec_bits(got), num_get_prec_digits(got));
@@ -455,27 +455,27 @@ static void print_matrix_core_num_comparison(const char *label, const number_t g
     free(error_text);
     num_destroy(&error);
     free(got_text);
-    free(expected_text);
+    free(want_text);
 }
 
-static void check_matrix_core_num_value(const char *label, const number_t got, const number_t expected, double tol)
+static void check_matrix_core_num_value(const char *label, const number_t got, const number_t want, double tol)
 {
-    number_t error = matrix_core_num_error_magnitude(got, expected);
+    number_t error = matrix_core_num_error_magnitude(got, want);
     double err = num_to_double(error);
 
     check_bool(label, err < tol);
     if (!(err < tol))
-        print_matrix_core_num_comparison(label, got, expected);
+        print_matrix_core_num_comparison(label, got, want);
 
     num_destroy(&error);
 }
 
-static void check_matrix_core_num_value_double(const char *label, const number_t got, double expected, double tol)
+static void check_matrix_core_num_value_double(const char *label, const number_t got, double want, double tol)
 {
-    number_t expected_num = num_create_from_double(expected);
+    number_t want_num = num_create_from_double(want);
 
-    check_matrix_core_num_value(label, got, expected_num, tol);
-    num_destroy(&expected_num);
+    check_matrix_core_num_value(label, got, want_num, tol);
+    num_destroy(&want_num);
 }
 
 static void test_number_det_and_inverse(void)
@@ -486,7 +486,7 @@ static void test_number_det_and_inverse(void)
         number_t diag[2];
         number_t det;
         number_t got;
-        number_t expected;
+        number_t want;
         matrix_t *A;
         matrix_t *Ai;
 
@@ -496,9 +496,9 @@ static void test_number_det_and_inverse(void)
         det = NUM_ZERO;
         check_bool("mat_create_diagonal_num(exact) non-null", A != NULL);
         check_bool("mat_det(number exact diagonal) rc = 0", A && mat_det(A, &det) == 0);
-        expected = num_create_from_long(3);
-        check_bool("mat_det(number exact diagonal) stays exact", num_eq(det, expected));
-        num_destroy(&expected);
+        want = num_create_from_long(3);
+        check_bool("mat_det(number exact diagonal) stays exact", num_eq(det, want));
+        num_destroy(&want);
         num_destroy(&det);
 
         Ai = mat_inverse(A);
@@ -507,15 +507,15 @@ static void test_number_det_and_inverse(void)
                    Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
 
         got = mat_get_num(Ai, 0, 0);
-        expected = num_create_from_string("1/2");
-        check_bool("inverse exact [0,0] = 1/2", num_eq(got, expected));
-        num_destroy(&expected);
+        want = num_create_from_string("1/2");
+        check_bool("inverse exact [0,0] = 1/2", num_eq(got, want));
+        num_destroy(&want);
         num_destroy(&got);
 
         got = mat_get_num(Ai, 1, 1);
-        expected = num_create_from_string("2/3");
-        check_bool("inverse exact [1,1] = 2/3", num_eq(got, expected));
-        num_destroy(&expected);
+        want = num_create_from_string("2/3");
+        check_bool("inverse exact [1,1] = 2/3", num_eq(got, want));
+        num_destroy(&want);
         num_destroy(&got);
 
         mat_free(Ai);
@@ -527,7 +527,7 @@ static void test_number_det_and_inverse(void)
     {
         number_t diag[2];
         number_t det = NUM_ZERO;
-        number_t expected;
+        number_t want;
         number_t got;
         matrix_t *A;
         matrix_t *Ai;
@@ -539,13 +539,13 @@ static void test_number_det_and_inverse(void)
         A = mat_create_diagonal_num(2, diag);
 
         check_bool("mat_det(number mp diagonal) rc = 0", A && mat_det(A, &det) == 0);
-        expected = num_mul(diag[0], diag[1]);
-        check_bool("mat_det(number mp diagonal) matches", num_eq(det, expected));
+        want = num_mul(diag[0], diag[1]);
+        check_bool("mat_det(number mp diagonal) matches", num_eq(det, want));
         check_bool("mat_det(number mp diagonal) does not lose precision",
                    num_get_prec_bits(det) >= num_get_prec_bits(diag[0]) &&
                        num_get_prec_bits(det) >= num_get_prec_bits(diag[1]));
-        print_matrix_core_num_comparison("det(number diagonal)", det, expected);
-        num_destroy(&expected);
+        print_matrix_core_num_comparison("det(number diagonal)", det, want);
+        num_destroy(&want);
         num_destroy(&det);
 
         Ai = mat_inverse(A);
@@ -554,11 +554,11 @@ static void test_number_det_and_inverse(void)
                    Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
 
         got = mat_get_num(Ai, 0, 0);
-        expected = num_inv(diag[0]);
-        check_bool("mat_inverse(number mp diagonal)[0,0] matches", num_eq(got, expected));
+        want = num_inv(diag[0]);
+        check_bool("mat_inverse(number mp diagonal)[0,0] matches", num_eq(got, want));
         check_bool("mat_inverse(number mp diagonal)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_core_num_comparison("inverse(number diagonal)[0,0]", got, expected);
-        num_destroy(&expected);
+        print_matrix_core_num_comparison("inverse(number diagonal)[0,0]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
 
         mat_free(Ai);
@@ -574,7 +574,7 @@ static void test_mixed_number_backend_matrices(void)
 
     {
         number_t vals[4];
-        number_t doubled_expected;
+        number_t doubled_want;
         number_t got;
         matrix_t *A;
         matrix_t *B;
@@ -613,32 +613,32 @@ static void test_mixed_number_backend_matrices(void)
         check_bool("mixed number matrix add type", B != NULL && mat_typeof(B) == MAT_TYPE_NUMBER);
 
         got = mat_get_num(B, 0, 0);
-        doubled_expected = num_add(vals[0], vals[0]);
-        check_bool("mixed number add integer entry", num_eq(got, doubled_expected));
-        num_destroy(&doubled_expected);
+        doubled_want = num_add(vals[0], vals[0]);
+        check_bool("mixed number add integer entry", num_eq(got, doubled_want));
+        num_destroy(&doubled_want);
         num_destroy(&got);
 
         got = mat_get_num(B, 0, 1);
-        doubled_expected = num_add(vals[1], vals[1]);
-        check_bool("mixed number add rational entry", num_eq(got, doubled_expected));
-        num_destroy(&doubled_expected);
+        doubled_want = num_add(vals[1], vals[1]);
+        check_bool("mixed number add rational entry", num_eq(got, doubled_want));
+        num_destroy(&doubled_want);
         num_destroy(&got);
 
         got = mat_get_num(B, 1, 0);
-        doubled_expected = num_add(vals[2], vals[2]);
-        check_bool("mixed number add mpfr entry", num_eq(got, doubled_expected));
+        doubled_want = num_add(vals[2], vals[2]);
+        check_bool("mixed number add mpfr entry", num_eq(got, doubled_want));
         check_bool("mixed number add mpfr precision does not shrink",
                    num_get_prec_bits(got) >= num_get_prec_bits(vals[2]));
-        print_matrix_core_num_comparison("mixed add [1,0]", got, doubled_expected);
-        num_destroy(&doubled_expected);
+        print_matrix_core_num_comparison("mixed add [1,0]", got, doubled_want);
+        num_destroy(&doubled_want);
         num_destroy(&got);
 
         got = mat_get_num(B, 1, 1);
-        doubled_expected = num_add(vals[3], vals[3]);
-        check_bool("mixed number add complex entry", num_eq(got, doubled_expected));
+        doubled_want = num_add(vals[3], vals[3]);
+        check_bool("mixed number add complex entry", num_eq(got, doubled_want));
         check_bool("mixed number add complex stays exact", num_get_prec_bits(got) == 0u);
-        print_matrix_core_num_comparison("mixed add [1,1]", got, doubled_expected);
-        num_destroy(&doubled_expected);
+        print_matrix_core_num_comparison("mixed add [1,1]", got, doubled_want);
+        num_destroy(&doubled_want);
         num_destroy(&got);
 
         mat_free(B);
@@ -650,7 +650,7 @@ static void test_mixed_number_backend_matrices(void)
     {
         number_t diag[4];
         number_t det = NUM_ZERO;
-        number_t expected;
+        number_t want;
         number_t got;
         matrix_t *A;
         matrix_t *Ai;
@@ -670,16 +670,16 @@ static void test_mixed_number_backend_matrices(void)
             number_t left = num_mul(diag[0], diag[1]);
             number_t right = num_mul(diag[2], diag[3]);
 
-            expected = num_mul(left, right);
+            want = num_mul(left, right);
             num_destroy(&left);
             num_destroy(&right);
         }
-        check_bool("mixed diagonal det matches", num_eq(det, expected));
+        check_bool("mixed diagonal det matches", num_eq(det, want));
         check_bool("mixed diagonal det precision does not shrink",
                    num_get_prec_bits(det) >= num_get_prec_bits(diag[2]) &&
                        num_get_prec_bits(det) >= num_get_prec_bits(diag[3]));
-        print_matrix_core_num_comparison("mixed det(diagonal)", det, expected);
-        num_destroy(&expected);
+        print_matrix_core_num_comparison("mixed det(diagonal)", det, want);
+        num_destroy(&want);
         num_destroy(&det);
 
         Ai = mat_inverse(A);
@@ -687,25 +687,25 @@ static void test_mixed_number_backend_matrices(void)
         check_bool("mixed diagonal inverse type", Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
 
         got = mat_get_num(Ai, 1, 1);
-        expected = num_inv(diag[1]);
-        check_bool("mixed diagonal inverse rational entry", num_eq(got, expected));
-        num_destroy(&expected);
+        want = num_inv(diag[1]);
+        check_bool("mixed diagonal inverse rational entry", num_eq(got, want));
+        num_destroy(&want);
         num_destroy(&got);
 
         got = mat_get_num(Ai, 2, 2);
-        expected = num_inv(diag[2]);
-        check_bool("mixed diagonal inverse mpfr entry", num_eq(got, expected));
+        want = num_inv(diag[2]);
+        check_bool("mixed diagonal inverse mpfr entry", num_eq(got, want));
         check_bool("mixed diagonal inverse mpfr precision", num_get_prec_bits(got) == 512u);
-        print_matrix_core_num_comparison("mixed inverse [2,2]", got, expected);
-        num_destroy(&expected);
+        print_matrix_core_num_comparison("mixed inverse [2,2]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
 
         got = mat_get_num(Ai, 3, 3);
-        expected = num_inv(diag[3]);
-        check_bool("mixed diagonal inverse complex entry", num_eq(got, expected));
+        want = num_inv(diag[3]);
+        check_bool("mixed diagonal inverse complex entry", num_eq(got, want));
         check_bool("mixed diagonal inverse complex stays exact", num_get_prec_bits(got) == 0u);
-        print_matrix_core_num_comparison("mixed inverse [3,3]", got, expected);
-        num_destroy(&expected);
+        print_matrix_core_num_comparison("mixed inverse [3,3]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
 
         mat_free(Ai);
@@ -934,17 +934,17 @@ static void test_transpose_conjugate(void)
     print_mnum("conj(C)", K);
 
     number_t zv;
-    number_t expected;
+    number_t want;
     mat_get(K, 0, 0, &zv);
-    expected = num_conj(z1);
-    check_bool("conj C[0,0]", num_eq(zv, expected));
-    num_destroy(&expected);
+    want = num_conj(z1);
+    check_bool("conj C[0,0]", num_eq(zv, want));
+    num_destroy(&want);
     num_destroy(&zv);
 
     mat_get(K, 1, 1, &zv);
-    expected = num_conj(z2);
-    check_bool("conj C[1,1]", num_eq(zv, expected));
-    num_destroy(&expected);
+    want = num_conj(z2);
+    check_bool("conj C[1,1]", num_eq(zv, want));
+    num_destroy(&want);
     num_destroy(&zv);
 
     num_destroy(&z2);
@@ -1154,7 +1154,7 @@ static void test_sparse_support(void)
         double zero = 0.0, five = 5.0, minus_two = -2.0;
         double got = 0.0;
         matrix_t *D = NULL;
-        matrix_t *Expected = NULL;
+        matrix_t *Want = NULL;
 
         check_bool("mat_new_sparse_d non-null", S != NULL);
         check_bool("new sparse matrix reports sparse", mat_is_sparse(S));
@@ -1174,20 +1174,20 @@ static void test_sparse_support(void)
         check_d("removed sparse entry reads as zero", got, 0.0, 1e-12);
 
         D = mat_to_dense(S);
-        Expected = test_mat_create_d(3, 3, (double[9]){0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.0});
+        Want = test_mat_create_d(3, 3, (double[9]){0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.0});
         check_bool("mat_to_dense(sparse) not NULL", D != NULL);
         if (D) {
-            bool ok = test_assert_matrix_d_close(D, Expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(D, Want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(D);
-                mat_free(Expected);
+                mat_free(Want);
                 mat_free(S);
                 return;
             }
         }
 
         mat_free(D);
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(S);
     }
 
@@ -1196,7 +1196,7 @@ static void test_sparse_support(void)
         matrix_t *S = mat_to_sparse(A);
         matrix_t *B = test_mat_create_d(3, 1, (double[3]){4.0, 5.0, 6.0});
         matrix_t *SB = NULL;
-        matrix_t *Expected = test_mat_create_d(3, 1, (double[3]){4.0, 12.0, 18.0});
+        matrix_t *Want = test_mat_create_d(3, 1, (double[3]){4.0, 12.0, 18.0});
         matrix_t *Back = NULL;
 
         print_md("A", A);
@@ -1212,7 +1212,7 @@ static void test_sparse_support(void)
                 if (!ok) {
                     mat_free(Back);
                     mat_free(SB);
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(B);
                     mat_free(S);
                     mat_free(A);
@@ -1223,11 +1223,11 @@ static void test_sparse_support(void)
             SB = mat_mul(S, B);
             check_bool("sparse * dense vector not NULL", SB != NULL);
             if (SB) {
-                bool ok = test_assert_matrix_d_close(SB, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(SB, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(Back);
                     mat_free(SB);
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(B);
                     mat_free(S);
                     mat_free(A);
@@ -1238,7 +1238,7 @@ static void test_sparse_support(void)
 
         mat_free(Back);
         mat_free(SB);
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(B);
         mat_free(S);
         mat_free(A);
@@ -1250,8 +1250,8 @@ static void test_sparse_support(void)
         matrix_t *Sum = NULL;
         matrix_t *Diff = NULL;
         matrix_t *Prod = NULL;
-        matrix_t *ExpectedSum = NULL;
-        matrix_t *ExpectedProd = NULL;
+        matrix_t *WantSum = NULL;
+        matrix_t *WantProd = NULL;
         double a00 = 1.0, a12 = 2.0, b00 = -1.0, b21 = 3.0, b22 = 4.0;
 
         check_bool("sparse add/sub inputs non-null", A != NULL && B != NULL);
@@ -1266,16 +1266,16 @@ static void test_sparse_support(void)
             Diff = mat_sub(A, A);
             Prod = mat_mul(A, B);
 
-            ExpectedSum = test_mat_create_d(3, 3, (double[9]){0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 3.0, 4.0});
-            ExpectedProd = test_mat_create_d(3, 3, (double[9]){-1.0, 0.0, 0.0, 0.0, 6.0, 8.0, 0.0, 0.0, 0.0});
+            WantSum = test_mat_create_d(3, 3, (double[9]){0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 3.0, 4.0});
+            WantProd = test_mat_create_d(3, 3, (double[9]){-1.0, 0.0, 0.0, 0.0, 6.0, 8.0, 0.0, 0.0, 0.0});
 
             check_bool("sparse + sparse not NULL", Sum != NULL);
             check_bool("sparse + sparse stays sparse", Sum && mat_is_sparse(Sum));
             if (Sum) {
-                bool ok = test_assert_matrix_d_close(Sum, ExpectedSum, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(Sum, WantSum, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(ExpectedProd);
-                    mat_free(ExpectedSum);
+                    mat_free(WantProd);
+                    mat_free(WantSum);
                     mat_free(Prod);
                     mat_free(Diff);
                     mat_free(Sum);
@@ -1292,10 +1292,10 @@ static void test_sparse_support(void)
             check_bool("sparse * sparse not NULL", Prod != NULL);
             check_bool("sparse * sparse stays sparse", Prod && mat_is_sparse(Prod));
             if (Prod) {
-                bool ok = test_assert_matrix_d_close(Prod, ExpectedProd, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(Prod, WantProd, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(ExpectedProd);
-                    mat_free(ExpectedSum);
+                    mat_free(WantProd);
+                    mat_free(WantSum);
                     mat_free(Prod);
                     mat_free(Diff);
                     mat_free(Sum);
@@ -1306,8 +1306,8 @@ static void test_sparse_support(void)
             }
         }
 
-        mat_free(ExpectedProd);
-        mat_free(ExpectedSum);
+        mat_free(WantProd);
+        mat_free(WantSum);
         mat_free(Prod);
         mat_free(Diff);
         mat_free(Sum);
@@ -1320,14 +1320,14 @@ static void test_sparse_support(void)
         matrix_t *S = test_mat_sparse_d(3, 3);
         matrix_t *L = NULL;
         matrix_t *R = NULL;
-        matrix_t *Expected = NULL;
+        matrix_t *Want = NULL;
         double s01 = 2.0, s22 = -5.0;
 
         check_bool("identity and sparse inputs non-null", I != NULL && S != NULL);
         if (I && S) {
             mat_set(S, 0, 1, &s01);
             mat_set(S, 2, 2, &s22);
-            Expected = test_mat_create_d(3, 3, (double[9]){0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -5.0});
+            Want = test_mat_create_d(3, 3, (double[9]){0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -5.0});
 
             L = mat_mul(I, S);
             R = mat_mul(S, I);
@@ -1335,9 +1335,9 @@ static void test_sparse_support(void)
             check_bool("identity * sparse not NULL", L != NULL);
             check_bool("identity * sparse stays sparse", L && mat_is_sparse(L));
             if (L) {
-                bool ok = test_assert_matrix_d_close(L, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(L, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(R);
                     mat_free(L);
                     mat_free(S);
@@ -1349,9 +1349,9 @@ static void test_sparse_support(void)
             check_bool("sparse * identity not NULL", R != NULL);
             check_bool("sparse * identity stays sparse", R && mat_is_sparse(R));
             if (R) {
-                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(R, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(R);
                     mat_free(L);
                     mat_free(S);
@@ -1361,7 +1361,7 @@ static void test_sparse_support(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(R);
         mat_free(L);
         mat_free(S);
@@ -1373,7 +1373,7 @@ static void test_sparse_support(void)
         number_t zero = NUM_ZERO;
         matrix_t *S = mat_new_sparse_num(2, 2);
         matrix_t *D = NULL;
-        matrix_t *Expected = mat_create_num(2, 2, vals);
+        matrix_t *Want = mat_create_num(2, 2, vals);
 
         check_bool("mat_new_sparse_num non-null", S != NULL);
         if (S) {
@@ -1384,10 +1384,10 @@ static void test_sparse_support(void)
             D = mat_to_dense(S);
             check_bool("dense(complex sparse) not NULL", D != NULL);
             if (D) {
-                bool ok = test_assert_matrix_complex_close(D, Expected, 1e-18, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_complex_close(D, Want, 1e-18, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(D);
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(S);
                     num_destroy(&vals[1]);
                     return;
@@ -1396,7 +1396,7 @@ static void test_sparse_support(void)
         }
 
         mat_free(D);
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(S);
         num_destroy(&vals[1]);
     }
@@ -1484,11 +1484,11 @@ static void test_layout_policy_regressions(void)
         matrix_t *S = test_mat_sparse_d(2, 2);
         matrix_t *D = test_mat_create_d(2, 2, (double[4]){10.0, 20.0, 30.0, 40.0});
         matrix_t *R = NULL;
-        matrix_t *Expected = test_mat_create_d(2, 2, (double[4]){11.0, 20.0, 30.0, 38.0});
+        matrix_t *Want = test_mat_create_d(2, 2, (double[4]){11.0, 20.0, 30.0, 38.0});
         double one = 1.0, minus_two = -2.0;
 
-        check_bool("dense+sparse inputs allocated", S != NULL && D != NULL && Expected != NULL);
-        if (S && D && Expected) {
+        check_bool("dense+sparse inputs allocated", S != NULL && D != NULL && Want != NULL);
+        if (S && D && Want) {
             mat_set(S, 0, 0, &one);
             mat_set(S, 1, 1, &minus_two);
 
@@ -1496,9 +1496,9 @@ static void test_layout_policy_regressions(void)
             check_bool("dense + sparse not NULL", R != NULL);
             check_bool("dense + sparse falls back to dense", R && !mat_is_sparse(R));
             if (R) {
-                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(R, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(R);
                     mat_free(D);
                     mat_free(S);
@@ -1507,7 +1507,7 @@ static void test_layout_policy_regressions(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(R);
         mat_free(D);
         mat_free(S);
@@ -1517,11 +1517,11 @@ static void test_layout_policy_regressions(void)
         matrix_t *I = test_mat_identity_d(3);
         matrix_t *S = test_mat_sparse_d(3, 3);
         matrix_t *R = NULL;
-        matrix_t *Expected = test_mat_create_d(3, 3, (double[9]){1.0, 0.0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 0.5});
+        matrix_t *Want = test_mat_create_d(3, 3, (double[9]){1.0, 0.0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 0.5});
         double three = 3.0, half = 0.5;
 
-        check_bool("identity-sparse subtraction inputs allocated", I != NULL && S != NULL && Expected != NULL);
-        if (I && S && Expected) {
+        check_bool("identity-sparse subtraction inputs allocated", I != NULL && S != NULL && Want != NULL);
+        if (I && S && Want) {
             mat_set(S, 1, 1, &three);
             mat_set(S, 2, 2, &half);
 
@@ -1529,9 +1529,9 @@ static void test_layout_policy_regressions(void)
             check_bool("identity - sparse not NULL", R != NULL);
             check_bool("identity - sparse stays sparse-like", R && mat_is_sparse(R));
             if (R) {
-                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(R, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(R);
                     mat_free(S);
                     mat_free(I);
@@ -1540,7 +1540,7 @@ static void test_layout_policy_regressions(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(R);
         mat_free(S);
         mat_free(I);
@@ -1549,17 +1549,17 @@ static void test_layout_policy_regressions(void)
     {
         matrix_t *I = test_mat_identity_d(3);
         matrix_t *N = NULL;
-        matrix_t *Expected = test_mat_create_d(3, 3, (double[9]){-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0});
+        matrix_t *Want = test_mat_create_d(3, 3, (double[9]){-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0});
 
-        check_bool("identity negation input allocated", I != NULL && Expected != NULL);
-        if (I && Expected) {
+        check_bool("identity negation input allocated", I != NULL && Want != NULL);
+        if (I && Want) {
             N = mat_neg(I);
             check_bool("mat_neg(identity) not NULL", N != NULL);
             check_bool("mat_neg(identity) preserves diagonal structure", N && mat_is_diagonal(N));
             if (N) {
-                bool ok = test_assert_matrix_d_close(N, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(N, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(N);
                     mat_free(I);
                     return;
@@ -1567,7 +1567,7 @@ static void test_layout_policy_regressions(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(N);
         mat_free(I);
     }
@@ -1575,27 +1575,27 @@ static void test_layout_policy_regressions(void)
     {
         matrix_t *S = test_mat_sparse_d(2, 3);
         matrix_t *R = NULL;
-        matrix_t *Expected = NULL;
+        matrix_t *Want = NULL;
         double three = 3.0;
         double two = 2.0, minus_four = -4.0;
 
         check_bool("sparse scalar-multiply input allocated", S != NULL);
         if (S) {
-            number_t expected_vals[6];
+            number_t want_vals[6];
 
-            expected_vals[0] = num_create_from_long(0);
-            expected_vals[1] = num_create_from_long(-4);
-            expected_vals[2] = num_create_from_long(0);
-            expected_vals[3] = num_create_from_long(8);
-            expected_vals[4] = num_create_from_long(0);
-            expected_vals[5] = num_create_from_long(-6);
-            Expected = mat_create_num(2, 3, expected_vals);
+            want_vals[0] = num_create_from_long(0);
+            want_vals[1] = num_create_from_long(-4);
+            want_vals[2] = num_create_from_long(0);
+            want_vals[3] = num_create_from_long(8);
+            want_vals[4] = num_create_from_long(0);
+            want_vals[5] = num_create_from_long(-6);
+            Want = mat_create_num(2, 3, want_vals);
             for (size_t idx = 0; idx < 6; ++idx)
-                num_destroy(&expected_vals[idx]);
+                num_destroy(&want_vals[idx]);
 
-            check_bool("sparse scalar-multiply expected allocated", Expected != NULL);
+            check_bool("sparse scalar-multiply want allocated", Want != NULL);
         }
-        if (S && Expected) {
+        if (S && Want) {
             mat_set(S, 0, 1, &two);
             mat_set(S, 1, 0, &minus_four);
             mat_set(S, 1, 2, &three);
@@ -1614,7 +1614,7 @@ static void test_layout_policy_regressions(void)
                 for (size_t i = 0; i < 2 && matches; ++i)
                     for (size_t j = 0; j < 3; ++j) {
                         number_t got = mat_get_num(R, i, j);
-                        number_t want = mat_get_num(Expected, i, j);
+                        number_t want = mat_get_num(Want, i, j);
 
                         if (!num_eq(got, want))
                             matches = 0;
@@ -1624,11 +1624,11 @@ static void test_layout_policy_regressions(void)
                             break;
                     }
 
-                check_bool("scalar multiply of sparse matches expected", matches);
+                check_bool("scalar multiply of sparse matches want", matches);
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(R);
         mat_free(S);
     }
@@ -1636,11 +1636,11 @@ static void test_layout_policy_regressions(void)
     {
         matrix_t *S = test_mat_sparse_d(2, 3);
         matrix_t *T = NULL;
-        matrix_t *Expected = test_mat_create_d(3, 2, (double[6]){0.0, 4.0, 5.0, 0.0, 0.0, 0.0});
+        matrix_t *Want = test_mat_create_d(3, 2, (double[6]){0.0, 4.0, 5.0, 0.0, 0.0, 0.0});
         double five = 5.0, four = 4.0;
 
-        check_bool("sparse transpose inputs allocated", S != NULL && Expected != NULL);
-        if (S && Expected) {
+        check_bool("sparse transpose inputs allocated", S != NULL && Want != NULL);
+        if (S && Want) {
             mat_set(S, 0, 1, &five);
             mat_set(S, 1, 0, &four);
 
@@ -1648,9 +1648,9 @@ static void test_layout_policy_regressions(void)
             check_bool("transpose of sparse not NULL", T != NULL);
             check_bool("transpose of sparse stays sparse-like", T && mat_is_sparse(T));
             if (T) {
-                bool ok = test_assert_matrix_d_close(T, Expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(T, Want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(T);
                     mat_free(S);
                     return;
@@ -1658,7 +1658,7 @@ static void test_layout_policy_regressions(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(T);
         mat_free(S);
     }
@@ -1666,17 +1666,17 @@ static void test_layout_policy_regressions(void)
     {
         matrix_t *I = mat_create_identity_num(2);
         matrix_t *C = NULL;
-        matrix_t *Expected = mat_create_identity_num(2);
+        matrix_t *Want = mat_create_identity_num(2);
 
-        check_bool("identity conjugate inputs allocated", I != NULL && Expected != NULL);
-        if (I && Expected) {
+        check_bool("identity conjugate inputs allocated", I != NULL && Want != NULL);
+        if (I && Want) {
             C = mat_conj(I);
             check_bool("conjugate of identity not NULL", C != NULL);
             check_bool("conjugate of identity preserves diagonal structure", C && mat_is_diagonal(C));
             if (C) {
-                bool ok = test_assert_matrix_complex_close(C, Expected, 1e-25, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_complex_close(C, Want, 1e-25, __FILE__, __LINE__);
                 if (!ok) {
-                    mat_free(Expected);
+                    mat_free(Want);
                     mat_free(C);
                     mat_free(I);
                     return;
@@ -1684,7 +1684,7 @@ static void test_layout_policy_regressions(void)
             }
         }
 
-        mat_free(Expected);
+        mat_free(Want);
         mat_free(C);
         mat_free(I);
     }
@@ -1754,11 +1754,11 @@ static void test_add_sub_num_real(void)
     mat_get_data_num(C, c_vals);
 
     for (size_t k = 0; k < 6; k++) {
-        number_t expected = num_add(a_vals[k], b_vals[k]);
+        number_t want = num_add(a_vals[k], b_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "number add[%zu,%zu]", k / 3, k % 3);
-        check_bool(label, num_eq(c_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(c_vals[k], want));
+        num_destroy(&want);
     }
 
     matrix_t *D = mat_sub(A, B);
@@ -1768,11 +1768,11 @@ static void test_add_sub_num_real(void)
     mat_get_data_num(D, d_vals);
 
     for (size_t k = 0; k < 6; k++) {
-        number_t expected = num_sub(a_vals[k], b_vals[k]);
+        number_t want = num_sub(a_vals[k], b_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "number sub[%zu,%zu]", k / 3, k % 3);
-        check_bool(label, num_eq(d_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(d_vals[k], want));
+        num_destroy(&want);
     }
 
     for (size_t k = 0; k < 6; k++) {
@@ -1809,11 +1809,11 @@ static void test_add_sub_num_complex(void)
     number_t C_vals[3] = {NUM_ZERO, NUM_ZERO, NUM_ZERO};
     mat_get_data_num(C, C_vals);
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_add(a_vals[j], b_vals[j]);
+        number_t want = num_add(a_vals[j], b_vals[j]);
         char label[64];
         snprintf(label, sizeof(label), "complex-number add[0,%zu]", j);
-        check_bool(label, num_eq(C_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[j], want));
+        num_destroy(&want);
     }
 
     matrix_t *D = mat_sub(A, B);
@@ -1822,11 +1822,11 @@ static void test_add_sub_num_complex(void)
     number_t D_vals[3] = {NUM_ZERO, NUM_ZERO, NUM_ZERO};
     mat_get_data_num(D, D_vals);
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_sub(a_vals[j], b_vals[j]);
+        number_t want = num_sub(a_vals[j], b_vals[j]);
         char label[64];
         snprintf(label, sizeof(label), "complex-number sub[0,%zu]", j);
-        check_bool(label, num_eq(D_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(D_vals[j], want));
+        num_destroy(&want);
     }
 
     for (size_t j = 0; j < 3; j++) {
@@ -1865,25 +1865,25 @@ static void test_multiply_num_real(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected;
+        number_t want;
         char label[64];
         switch (k) {
             case 0:
-                expected = num_create_from_long(58);
+                want = num_create_from_long(58);
                 break;
             case 1:
-                expected = num_create_from_long(64);
+                want = num_create_from_long(64);
                 break;
             case 2:
-                expected = num_create_from_long(139);
+                want = num_create_from_long(139);
                 break;
             default:
-                expected = num_create_from_long(154);
+                want = num_create_from_long(154);
                 break;
         }
         snprintf(label, sizeof(label), "number mul[%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(C_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[k], want));
+        num_destroy(&want);
     }
 
     for (size_t k = 0; k < 4; ++k)
@@ -1925,11 +1925,11 @@ static void test_multiply_num_complex(void)
     for (size_t i = 0; i < 3; i++)
         for (size_t j = 0; j < 4; j++) {
             size_t k = i * 4 + j;
-            number_t expected = num_mul(a_vals[i], b_vals[j]);
+            number_t want = num_mul(a_vals[i], b_vals[j]);
             char label[64];
             snprintf(label, sizeof(label), "complex-number mul[%zu,%zu]", i, j);
-            check_bool(label, num_eq(C_vals[k], expected));
-            num_destroy(&expected);
+            check_bool(label, num_eq(C_vals[k], want));
+            num_destroy(&want);
         }
 
     for (size_t k = 0; k < 12; ++k)
@@ -1967,11 +1967,11 @@ static void test_add_mixed_num_real(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_add(a_vals[k], b_vals[k]);
+        number_t want = num_add(a_vals[k], b_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "mixed add real+num [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(C_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[k], want));
+        num_destroy(&want);
     }
 
     for (size_t k = 0; k < 4; ++k) {
@@ -2007,11 +2007,11 @@ static void test_add_mixed_num_complex(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_add(a_vals[j], b_vals[j]);
+        number_t want = num_add(a_vals[j], b_vals[j]);
         char label[64];
         snprintf(label, sizeof(label), "mixed add real+complex [%zu,0]", j);
-        check_bool(label, num_eq(C_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[j], want));
+        num_destroy(&want);
     }
 
     for (size_t j = 0; j < 3; ++j) {
@@ -2047,11 +2047,11 @@ static void test_add_mixed_num_num_complex(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++) {
-        number_t expected = num_add(a_vals[i], b_vals[i]);
+        number_t want = num_add(a_vals[i], b_vals[i]);
         char label[64];
         snprintf(label, sizeof(label), "mixed add decimal+complex [%zu,0]", i);
-        check_bool(label, num_eq(C_vals[i], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[i], want));
+        num_destroy(&want);
     }
 
     for (size_t i = 0; i < 2; ++i) {
@@ -2088,11 +2088,11 @@ static void test_sub_mixed_num_real(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_sub(a_vals[k], b_vals[k]);
+        number_t want = num_sub(a_vals[k], b_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "mixed sub real-num [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(C_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[k], want));
+        num_destroy(&want);
     }
 
     for (size_t k = 0; k < 4; ++k) {
@@ -2128,11 +2128,11 @@ static void test_sub_mixed_num_complex(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_sub(a_vals[j], b_vals[j]);
+        number_t want = num_sub(a_vals[j], b_vals[j]);
         char label[64];
         snprintf(label, sizeof(label), "mixed sub real-complex [%zu,0]", j);
-        check_bool(label, num_eq(C_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[j], want));
+        num_destroy(&want);
     }
 
     for (size_t j = 0; j < 3; ++j) {
@@ -2169,11 +2169,11 @@ static void test_sub_mixed_num_num_complex(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++) {
-        number_t expected = num_sub(a_vals[i], b_vals[i]);
+        number_t want = num_sub(a_vals[i], b_vals[i]);
         char label[64];
         snprintf(label, sizeof(label), "mixed sub decimal-complex [%zu,0]", i);
-        check_bool(label, num_eq(C_vals[i], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[i], want));
+        num_destroy(&want);
     }
 
     for (size_t i = 0; i < 2; ++i) {
@@ -2213,18 +2213,18 @@ static void test_multiply_mixed_num_real(void)
     for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < 2; j++) {
             size_t k = i * 2 + j;
-            number_t expected = num_create_from_long(0);
+            number_t want = num_create_from_long(0);
             for (size_t t = 0; t < 3; t++) {
                 number_t term = num_mul(a_vals[i * 3 + t], b_vals[t * 2 + j]);
-                number_t next = num_add(expected, term);
+                number_t next = num_add(want, term);
                 num_destroy(&term);
-                num_destroy(&expected);
-                expected = next;
+                num_destroy(&want);
+                want = next;
             }
             char label[64];
             snprintf(label, sizeof(label), "mixed mul real-num [%zu,%zu]", i, j);
-            check_bool(label, num_eq(C_vals[k], expected));
-            num_destroy(&expected);
+            check_bool(label, num_eq(C_vals[k], want));
+            num_destroy(&want);
         }
 
     for (size_t k = 0; k < 4; ++k)
@@ -2262,18 +2262,18 @@ static void test_multiply_mixed_num_complex(void)
     mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 2; j++) {
-        number_t expected = num_create_from_long(0);
+        number_t want = num_create_from_long(0);
         for (size_t t = 0; t < 3; t++) {
             number_t term = num_mul(a_vals[t], b_vals[t * 2 + j]);
-            number_t next = num_add(expected, term);
+            number_t next = num_add(want, term);
             num_destroy(&term);
-            num_destroy(&expected);
-            expected = next;
+            num_destroy(&want);
+            want = next;
         }
         char label[64];
         snprintf(label, sizeof(label), "mixed mul real-complex [%zu,0]", j);
-        check_bool(label, num_eq(C_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(C_vals[j], want));
+        num_destroy(&want);
     }
 
     for (size_t j = 0; j < 2; ++j)
@@ -2314,11 +2314,11 @@ static void test_multiply_mixed_num_num_complex(void)
     for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < 3; j++) {
             size_t k = i * 3 + j;
-            number_t expected = num_mul(a_vals[i], b_vals[j]);
+            number_t want = num_mul(a_vals[i], b_vals[j]);
             char label[64];
             snprintf(label, sizeof(label), "mixed mul decimal-complex [%zu,%zu]", i, j);
-            check_bool(label, num_eq(C_vals[k], expected));
-            num_destroy(&expected);
+            check_bool(label, num_eq(C_vals[k], want));
+            num_destroy(&want);
         }
 
     for (size_t k = 0; k < 6; ++k)
@@ -2351,11 +2351,11 @@ static void test_scalar_mul_d_d(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_create_from_double(alpha * A_vals[k]);
+        number_t want = num_create_from_double(alpha * A_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "scalar mul d*d [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
     }
 
@@ -2384,11 +2384,11 @@ static void test_scalar_mul_num_real(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_mul(alpha_num, A_vals[k]);
+        number_t want = num_mul(alpha_num, A_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "scalar mul num-real [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         num_destroy(&A_vals[k]);
     }
@@ -2418,11 +2418,11 @@ static void test_scalar_mul_num_complex(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_mul(alpha_num, A_vals[j]);
+        number_t want = num_mul(alpha_num, A_vals[j]);
         char label[64];
         snprintf(label, sizeof(label), "scalar mul num-complex [0,%zu]", j);
-        check_bool(label, num_eq(B_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[j], want));
+        num_destroy(&want);
         num_destroy(&B_vals[j]);
         num_destroy(&A_vals[j]);
     }
@@ -2452,11 +2452,11 @@ static void test_scalar_mul_decimal_num(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 6; k++) {
-        number_t expected = num_mul(alpha_num, A_vals[k]);
+        number_t want = num_mul(alpha_num, A_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "scalar mul decimal-num [%zu,%zu]", k / 3, k % 3);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         num_destroy(&A_vals[k]);
     }
@@ -2486,11 +2486,11 @@ static void test_scalar_mul_complex_complex(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_mul(alpha_num, A_vals[k]);
+        number_t want = num_mul(alpha_num, A_vals[k]);
         char label[64];
         snprintf(label, sizeof(label), "scalar mul complex-complex [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         if (k != 0)
             num_destroy(&A_vals[k]);
@@ -2518,26 +2518,26 @@ static void test_identity_arith_d(void)
     matrix_t *ApI = mat_add(A, I);
     print_md("A + I", ApI);
 
-    double expected_add[4] = {2, 2, 3, 5};
+    double want_add[4] = {2, 2, 3, 5};
     double got_add[4];
     mat_get_data(ApI, got_add);
     for (size_t k = 0; k < 4; k++) {
         char label[64];
         snprintf(label, sizeof(label), "d: A+I [%zu,%zu]", k / 2, k % 2);
-        check_d(label, got_add[k], expected_add[k], 1e-12);
+        check_d(label, got_add[k], want_add[k], 1e-12);
     }
 
     /* A - I */
     matrix_t *AmI = mat_sub(A, I);
     print_md("A - I", AmI);
 
-    double expected_sub[4] = {0, 2, 3, 3};
+    double want_sub[4] = {0, 2, 3, 3};
     double got_sub[4];
     mat_get_data(AmI, got_sub);
     for (size_t k = 0; k < 4; k++) {
         char label[64];
         snprintf(label, sizeof(label), "d: A-I [%zu,%zu]", k / 2, k % 2);
-        check_d(label, got_sub[k], expected_sub[k], 1e-12);
+        check_d(label, got_sub[k], want_sub[k], 1e-12);
     }
 
     /* A * I */
@@ -2606,21 +2606,21 @@ static void test_identity_arith_num_real(void)
     mat_get_data_num(I_times_A, got_ia);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
-        number_t expected_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t want_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t want_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
         char label[64];
 
         snprintf(label, sizeof(label), "num real: A+I [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(got_add[k], expected_add));
+        check_bool(label, num_eq(got_add[k], want_add));
         snprintf(label, sizeof(label), "num real: A-I [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(got_sub[k], expected_sub));
+        check_bool(label, num_eq(got_sub[k], want_sub));
         snprintf(label, sizeof(label), "num real: A*I [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(got_ai[k], vals[k]));
         snprintf(label, sizeof(label), "num real: I*A [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(got_ia[k], vals[k]));
 
-        num_destroy(&expected_add);
-        num_destroy(&expected_sub);
+        num_destroy(&want_add);
+        num_destroy(&want_sub);
         num_destroy(&got_add[k]);
         num_destroy(&got_sub[k]);
         num_destroy(&got_ai[k]);
@@ -2670,21 +2670,21 @@ static void test_identity_arith_num_complex(void)
     mat_get_data_num(I_times_A, got_ia);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
-        number_t expected_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t want_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t want_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
         char label[64];
 
         snprintf(label, sizeof(label), "num complex: A+I [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(got_add[k], expected_add));
+        check_bool(label, num_eq(got_add[k], want_add));
         snprintf(label, sizeof(label), "num complex: A-I [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(got_sub[k], expected_sub));
+        check_bool(label, num_eq(got_sub[k], want_sub));
         snprintf(label, sizeof(label), "num complex: A*I [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(got_ai[k], vals[k]));
         snprintf(label, sizeof(label), "num complex: I*A [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(got_ia[k], vals[k]));
 
-        num_destroy(&expected_add);
-        num_destroy(&expected_sub);
+        num_destroy(&want_add);
+        num_destroy(&want_sub);
         num_destroy(&got_add[k]);
         num_destroy(&got_sub[k]);
         num_destroy(&got_ai[k]);
@@ -2719,11 +2719,11 @@ static void test_scalar_div_d_d(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_create_from_double(A_vals[k] / alpha);
+        number_t want = num_create_from_double(A_vals[k] / alpha);
         char label[64];
         snprintf(label, sizeof(label), "scalar div d/d [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
     }
 
@@ -2751,11 +2751,11 @@ static void test_scalar_div_num_real(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_div(A_vals[k], alpha_num);
+        number_t want = num_div(A_vals[k], alpha_num);
         char label[64];
         snprintf(label, sizeof(label), "scalar div num-real [%zu,%zu]", k / 2, k % 2);
-        check_matrix_core_num_value(label, B_vals[k], expected, 1e-24);
-        num_destroy(&expected);
+        check_matrix_core_num_value(label, B_vals[k], want, 1e-24);
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         num_destroy(&A_vals[k]);
     }
@@ -2783,11 +2783,11 @@ static void test_scalar_div_num_complex(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        number_t expected = num_div(A_vals[j], alpha_num);
+        number_t want = num_div(A_vals[j], alpha_num);
         char label[64];
         snprintf(label, sizeof(label), "scalar div num-complex [0,%zu]", j);
-        check_bool(label, num_eq(B_vals[j], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[j], want));
+        num_destroy(&want);
         num_destroy(&B_vals[j]);
         if (j != 0)
             num_destroy(&A_vals[j]);
@@ -2818,11 +2818,11 @@ static void test_scalar_div_numeric_real(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++) {
-        number_t expected = num_div(A_vals[k], alpha_num);
+        number_t want = num_div(A_vals[k], alpha_num);
         char label[64];
         snprintf(label, sizeof(label), "scalar div numeric-real [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         num_destroy(&A_vals[k]);
     }
@@ -2852,11 +2852,11 @@ static void test_scalar_div_real_numeric(void)
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 6; k++) {
-        number_t expected = num_div(A_vals[k], alpha_num);
+        number_t want = num_div(A_vals[k], alpha_num);
         char label[64];
         snprintf(label, sizeof(label), "scalar div real-numeric [%zu,%zu]", k / 3, k % 3);
-        check_bool(label, num_eq(B_vals[k], expected));
-        num_destroy(&expected);
+        check_bool(label, num_eq(B_vals[k], want));
+        num_destroy(&want);
         num_destroy(&B_vals[k]);
         num_destroy(&A_vals[k]);
     }
@@ -2959,11 +2959,11 @@ static void test_det_qfloat(void)
 
     number_t lhs = num_mul(vals[0], vals[3]);
     number_t rhs = num_mul(vals[1], vals[2]);
-    number_t expected = num_sub(lhs, rhs);
+    number_t want = num_sub(lhs, rhs);
 
-    check_matrix_core_num_value("det number real 2x2", det, expected, 1e-24);
+    check_matrix_core_num_value("det number real 2x2", det, want, 1e-24);
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&rhs);
     num_destroy(&lhs);
     num_destroy(&det);
@@ -2989,11 +2989,11 @@ static void test_det_qcomplex(void)
 
     number_t lhs = num_mul(vals[0], vals[3]);
     number_t rhs = num_mul(vals[1], vals[2]);
-    number_t expected = num_sub(lhs, rhs);
+    number_t want = num_sub(lhs, rhs);
 
-    check_bool("det number complex 2x2", num_eq(det, expected));
+    check_bool("det number complex 2x2", num_eq(det, want));
 
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&rhs);
     num_destroy(&lhs);
     num_destroy(&det);
@@ -3149,9 +3149,9 @@ static void test_deriv(void)
         expr_t *vars[2] = {x, EXPR_ONE};
         matrix_t *A = test_mat_create_d(2, 2, vals);
         matrix_t *B = test_mat_create_d(2, 1, rhs_vals);
-        matrix_t *Expected2 = test_mat_create_d(2, 2, (double[4]){0.0, 0.0, 0.0, 0.0});
-        matrix_t *Expected21 = test_mat_create_d(2, 1, (double[2]){0.0, 0.0});
-        matrix_t *ExpectedJ = mat_create_expr(
+        matrix_t *Want2 = test_mat_create_d(2, 2, (double[4]){0.0, 0.0, 0.0, 0.0});
+        matrix_t *Want21 = test_mat_create_d(2, 1, (double[2]){0.0, 0.0});
+        matrix_t *WantJ = mat_create_expr(
             4, 2,
             (expr_t *[8]){EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO});
         matrix_t *dA = mat_deriv(A, x);
@@ -3173,7 +3173,7 @@ static void test_deriv(void)
         check_bool("numeric mat_jacobian(A, vars, 2) not NULL", J != NULL);
 
         if (dA) {
-            bool ok = test_assert_matrix_d_close(dA, Expected2, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(dA, Want2, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(J);
                 mat_free(dXb);
@@ -3183,9 +3183,9 @@ static void test_deriv(void)
                 expr_free(ddet);
                 expr_free(dtr);
                 mat_free(dA);
-                mat_free(ExpectedJ);
-                mat_free(Expected21);
-                mat_free(Expected2);
+                mat_free(WantJ);
+                mat_free(Want21);
+                mat_free(Want2);
                 mat_free(B);
                 mat_free(A);
                 expr_free(x);
@@ -3197,7 +3197,7 @@ static void test_deriv(void)
         if (ddet)
             check_d("numeric mat_deriv_det(A, x) = 0", expr_eval_d(ddet), 0.0, 1e-12);
         if (dAi) {
-            bool ok = test_assert_matrix_d_close(dAi, Expected2, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(dAi, Want2, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(J);
                 mat_free(dXb);
@@ -3207,9 +3207,9 @@ static void test_deriv(void)
                 expr_free(ddet);
                 expr_free(dtr);
                 mat_free(dA);
-                mat_free(ExpectedJ);
-                mat_free(Expected21);
-                mat_free(Expected2);
+                mat_free(WantJ);
+                mat_free(Want21);
+                mat_free(Want2);
                 mat_free(B);
                 mat_free(A);
                 expr_free(x);
@@ -3217,7 +3217,7 @@ static void test_deriv(void)
             }
         }
         if (dAbi) {
-            bool ok = test_assert_matrix_d_close(dAbi, Expected2, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(dAbi, Want2, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(J);
                 mat_free(dXb);
@@ -3227,9 +3227,9 @@ static void test_deriv(void)
                 expr_free(ddet);
                 expr_free(dtr);
                 mat_free(dA);
-                mat_free(ExpectedJ);
-                mat_free(Expected21);
-                mat_free(Expected2);
+                mat_free(WantJ);
+                mat_free(Want21);
+                mat_free(Want2);
                 mat_free(B);
                 mat_free(A);
                 expr_free(x);
@@ -3237,7 +3237,7 @@ static void test_deriv(void)
             }
         }
         if (dX) {
-            bool ok = test_assert_matrix_d_close(dX, Expected21, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(dX, Want21, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(J);
                 mat_free(dXb);
@@ -3247,9 +3247,9 @@ static void test_deriv(void)
                 expr_free(ddet);
                 expr_free(dtr);
                 mat_free(dA);
-                mat_free(ExpectedJ);
-                mat_free(Expected21);
-                mat_free(Expected2);
+                mat_free(WantJ);
+                mat_free(Want21);
+                mat_free(Want2);
                 mat_free(B);
                 mat_free(A);
                 expr_free(x);
@@ -3257,7 +3257,7 @@ static void test_deriv(void)
             }
         }
         if (dXb) {
-            bool ok = test_assert_matrix_d_close(dXb, Expected21, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(dXb, Want21, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(J);
                 mat_free(dXb);
@@ -3267,9 +3267,9 @@ static void test_deriv(void)
                 expr_free(ddet);
                 expr_free(dtr);
                 mat_free(dA);
-                mat_free(ExpectedJ);
-                mat_free(Expected21);
-                mat_free(Expected2);
+                mat_free(WantJ);
+                mat_free(Want21);
+                mat_free(Want2);
                 mat_free(B);
                 mat_free(A);
                 expr_free(x);
@@ -3288,8 +3288,8 @@ static void test_deriv(void)
             }
             check_bool("numeric Jacobian shape is 4x2", mat_get_row_count(J) == 4 && mat_get_col_count(J) == 2);
             check_bool("numeric Jacobian matches symbolic zero matrix shape",
-                       ExpectedJ != NULL && mat_get_row_count(ExpectedJ) == mat_get_row_count(J) &&
-                           mat_get_col_count(ExpectedJ) == mat_get_col_count(J));
+                       WantJ != NULL && mat_get_row_count(WantJ) == mat_get_row_count(J) &&
+                           mat_get_col_count(WantJ) == mat_get_col_count(J));
         }
 
         mat_free(J);
@@ -3300,9 +3300,9 @@ static void test_deriv(void)
         expr_free(ddet);
         expr_free(dtr);
         mat_free(dA);
-        mat_free(ExpectedJ);
-        mat_free(Expected21);
-        mat_free(Expected2);
+        mat_free(WantJ);
+        mat_free(Want21);
+        mat_free(Want2);
         mat_free(B);
         mat_free(A);
         expr_free(x);
@@ -3427,7 +3427,7 @@ static void test_deriv_solve(void)
         matrix_t *B = mat_create_expr(2, 1, B_vals);
         matrix_t *X = mat_solve(A, B);
         matrix_t *dX = mat_deriv_solve(A, B, x);
-        matrix_t *dX_expected = NULL;
+        matrix_t *dX_want = NULL;
         matrix_t *dA = NULL;
         matrix_t *dB = NULL;
         matrix_t *AXd = NULL;
@@ -3442,9 +3442,9 @@ static void test_deriv_solve(void)
         check_bool("mat_deriv_solve(A,B,x) not NULL", dX != NULL);
 
         if (X)
-            dX_expected = mat_deriv(X, x);
+            dX_want = mat_deriv(X, x);
 
-        check_bool("mat_deriv(mat_solve(A,B),x) not NULL", dX_expected != NULL);
+        check_bool("mat_deriv(mat_solve(A,B),x) not NULL", dX_want != NULL);
 
         if (dX) {
             print_mdv("d/dx solve(A,B)", dX);
@@ -3455,11 +3455,11 @@ static void test_deriv_solve(void)
             check_d("d/dx solve(A,B)[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
         }
 
-        if (dX && dX_expected) {
+        if (dX && dX_want) {
             for (size_t i = 0; i < 2; ++i) {
                 char label[64];
                 mat_get(dX, i, 0, &v);
-                mat_get(dX_expected, i, 0, &w);
+                mat_get(dX_want, i, 0, &w);
                 snprintf(label, sizeof(label), "d/dx solve(A,B)[%zu,0] matches direct derivative", i);
                 check_d(label, expr_eval_d(v), expr_eval_d(w), 1e-12);
             }
@@ -3492,9 +3492,9 @@ static void test_deriv_solve(void)
 
         test_expr_set_val_d(x, 5.0);
         test_expr_set_val_d(y, 8.0);
-        if (dX && dX_expected) {
+        if (dX && dX_want) {
             mat_get(dX, 0, 0, &v);
-            mat_get(dX_expected, 0, 0, &w);
+            mat_get(dX_want, 0, 0, &w);
             check_d("d/dx solve(A,B)[0,0] tracks updates", expr_eval_d(v), expr_eval_d(w), 1e-12);
             mat_get(dX, 1, 0, &v);
             check_d("d/dx solve(A,B)[1,0] stays zero after updates", expr_eval_d(v), 0.0, 1e-12);
@@ -3505,7 +3505,7 @@ static void test_deriv_solve(void)
         mat_free(AXd);
         mat_free(dB);
         mat_free(dA);
-        mat_free(dX_expected);
+        mat_free(dX_want);
         mat_free(dX);
         mat_free(X);
         mat_free(B);
@@ -4237,7 +4237,7 @@ static void test_inverse_qcomplex(void)
     {
         matrix_t *I = test_mat_identity_d(2);
 
-        check_bool("complex identity expected non-null", I != NULL);
+        check_bool("complex identity want non-null", I != NULL);
         if (I) {
             bool ok = test_assert_matrix_complex_close(P, I, 1e-12, __FILE__, __LINE__);
             if (!ok) {
@@ -5075,11 +5075,11 @@ static void test_solve_and_lstsq(void)
     /* Solve with pivoting and multiple RHSs. */
     {
         double A_vals[4] = {0.0, 2.0, 1.0, 3.0};
-        double X_expected_vals[4] = {1.0, -1.0, 2.0, 4.0};
+        double X_want_vals[4] = {1.0, -1.0, 2.0, 4.0};
         double B_vals[4] = {4.0, 8.0, 7.0, 11.0};
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
         matrix_t *B = test_mat_create_d(2, 2, B_vals);
-        matrix_t *X_expected = test_mat_create_d(2, 2, X_expected_vals);
+        matrix_t *X_want = test_mat_create_d(2, 2, X_want_vals);
 
         print_mnum("A", A);
         print_mnum("B", B);
@@ -5087,11 +5087,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(double) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(A);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5099,18 +5099,18 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
     /* Lower-triangular direct solve. */
     {
         double L_vals[9] = {2.0, 0.0, 0.0, 3.0, 1.0, 0.0, 1.0, -2.0, 4.0};
-        double X_expected_vals[3] = {1.0, 2.0, -1.0};
+        double X_want_vals[3] = {1.0, 2.0, -1.0};
         double B_vals[3] = {2.0, 5.0, -7.0};
         matrix_t *L = test_mat_create_d(3, 3, L_vals);
         matrix_t *B = test_mat_create_d(3, 1, B_vals);
-        matrix_t *X_expected = test_mat_create_d(3, 1, X_expected_vals);
+        matrix_t *X_want = test_mat_create_d(3, 1, X_want_vals);
 
         print_md("L (lower triangular)", L);
         print_md("B", B);
@@ -5118,11 +5118,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(L, B);
         check_bool("mat_solve(lower triangular) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(L);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5130,18 +5130,18 @@ static void test_solve_and_lstsq(void)
 
         mat_free(L);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
     /* Upper-triangular direct solve. */
     {
         double U_vals[9] = {2.0, 1.0, -1.0, 0.0, 3.0, 2.0, 0.0, 0.0, 4.0};
-        double X_expected_vals[3] = {1.0, -2.0, 0.5};
+        double X_want_vals[3] = {1.0, -2.0, 0.5};
         double B_vals[3] = {-0.5, -5.0, 2.0};
         matrix_t *U = test_mat_create_d(3, 3, U_vals);
         matrix_t *B = test_mat_create_d(3, 1, B_vals);
-        matrix_t *X_expected = test_mat_create_d(3, 1, X_expected_vals);
+        matrix_t *X_want = test_mat_create_d(3, 1, X_want_vals);
 
         print_md("U (upper triangular)", U);
         print_md("B", B);
@@ -5149,11 +5149,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(U, B);
         check_bool("mat_solve(upper triangular) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(U);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5161,7 +5161,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(U);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5169,14 +5169,14 @@ static void test_solve_and_lstsq(void)
     {
         matrix_t *L = test_mat_sparse_d(3, 3);
         matrix_t *B = test_mat_create_d(3, 1, (double[]){4.0, 5.0, 7.0});
-        matrix_t *X_expected = test_mat_create_d(3, 1, (double[]){2.0, 0.75, 1.125});
+        matrix_t *X_want = test_mat_create_d(3, 1, (double[]){2.0, 0.75, 1.125});
         double v;
 
-        check_bool("sparse lower-triangular input allocated", L != NULL && B != NULL && X_expected != NULL);
-        if (!L || !B || !X_expected) {
+        check_bool("sparse lower-triangular input allocated", L != NULL && B != NULL && X_want != NULL);
+        if (!L || !B || !X_want) {
             mat_free(L);
             mat_free(B);
-            mat_free(X_expected);
+            mat_free(X_want);
             return;
         }
 
@@ -5200,11 +5200,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(L, B);
         check_bool("mat_solve(sparse lower triangular) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(L);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5212,7 +5212,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(L);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5220,14 +5220,14 @@ static void test_solve_and_lstsq(void)
     {
         matrix_t *D = test_mat_diagonal_d(3, (double[]){2.0, 4.0, 8.0});
         matrix_t *B = test_mat_sparse_d(3, 3);
-        matrix_t *X_expected = test_mat_sparse_d(3, 3);
+        matrix_t *X_want = test_mat_sparse_d(3, 3);
         double v;
 
-        check_bool("diagonal solve inputs allocated", D != NULL && B != NULL && X_expected != NULL);
-        if (!D || !B || !X_expected) {
+        check_bool("diagonal solve inputs allocated", D != NULL && B != NULL && X_want != NULL);
+        if (!D || !B || !X_want) {
             mat_free(D);
             mat_free(B);
-            mat_free(X_expected);
+            mat_free(X_want);
             return;
         }
 
@@ -5239,11 +5239,11 @@ static void test_solve_and_lstsq(void)
         mat_set(B, 2, 1, &v);
 
         v = 2.0;
-        mat_set(X_expected, 0, 0, &v);
+        mat_set(X_want, 0, 0, &v);
         v = 3.0;
-        mat_set(X_expected, 1, 2, &v);
+        mat_set(X_want, 1, 2, &v);
         v = 2.0;
-        mat_set(X_expected, 2, 1, &v);
+        mat_set(X_want, 2, 1, &v);
 
         print_md("D (diagonal)", D);
         print_md("B (sparse right-hand side)", B);
@@ -5253,11 +5253,11 @@ static void test_solve_and_lstsq(void)
         if (X) {
             check_bool("diagonal solve preserves sparse layout of RHS", mat_is_sparse(X));
             {
-                bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+                bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(D);
                     mat_free(B);
-                    mat_free(X_expected);
+                    mat_free(X_want);
                     mat_free(X);
                     return;
                 }
@@ -5266,7 +5266,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(D);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5274,14 +5274,14 @@ static void test_solve_and_lstsq(void)
     {
         matrix_t *A = test_mat_sparse_d(3, 3);
         matrix_t *B = test_mat_create_d(3, 1, (double[]){7.0, 8.0, 3.0});
-        matrix_t *X_expected = test_mat_create_d(3, 1, (double[]){7.0 / 3.0, 2.0 / 3.0, 3.0});
+        matrix_t *X_want = test_mat_create_d(3, 1, (double[]){7.0 / 3.0, 2.0 / 3.0, 3.0});
         double v;
 
-        check_bool("general sparse solve inputs allocated", A != NULL && B != NULL && X_expected != NULL);
-        if (!A || !B || !X_expected) {
+        check_bool("general sparse solve inputs allocated", A != NULL && B != NULL && X_want != NULL);
+        if (!A || !B || !X_want) {
             mat_free(A);
             mat_free(B);
-            mat_free(X_expected);
+            mat_free(X_want);
             return;
         }
 
@@ -5304,11 +5304,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(general sparse) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(A);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5316,7 +5316,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5324,14 +5324,14 @@ static void test_solve_and_lstsq(void)
     {
         matrix_t *A = test_mat_sparse_d(3, 3);
         matrix_t *B = test_mat_create_d(3, 1, (double[]){4.0, 11.0, 2.0});
-        matrix_t *X_expected = test_mat_create_d(3, 1, (double[]){1.0, 2.0, 2.0});
+        matrix_t *X_want = test_mat_create_d(3, 1, (double[]){1.0, 2.0, 2.0});
         double v;
 
-        check_bool("general sparse pivoting solve inputs allocated", A != NULL && B != NULL && X_expected != NULL);
-        if (!A || !B || !X_expected) {
+        check_bool("general sparse pivoting solve inputs allocated", A != NULL && B != NULL && X_want != NULL);
+        if (!A || !B || !X_want) {
             mat_free(A);
             mat_free(B);
-            mat_free(X_expected);
+            mat_free(X_want);
             return;
         }
 
@@ -5352,11 +5352,11 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(general sparse with pivoting) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_d_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(A);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 return;
             }
@@ -5364,7 +5364,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5373,17 +5373,17 @@ static void test_solve_and_lstsq(void)
         number_t A_vals[6] = {num_create_from_long(1), num_create_from_long(0), num_create_from_long(2),
                               num_create_from_long(0), num_create_from_long(3), num_create_from_long(0)};
         number_t B_vals[3] = {num_create_from_long(1), num_create_from_long(2), num_create_from_long(3)};
-        number_t X_expected_vals[2] = {num_create_from_long(1), num_create_from_long(0)};
+        number_t X_want_vals[2] = {num_create_from_long(1), num_create_from_long(0)};
         matrix_t *A = mat_create_num(3, 2, A_vals);
         matrix_t *B = mat_create_num(3, 1, B_vals);
-        matrix_t *X_expected = mat_create_num(2, 1, X_expected_vals);
+        matrix_t *X_want = mat_create_num(2, 1, X_want_vals);
 
         for (size_t i = 0; i < 6; ++i)
             num_destroy(&A_vals[i]);
         for (size_t i = 0; i < 3; ++i)
             num_destroy(&B_vals[i]);
         for (size_t i = 0; i < 2; ++i)
-            num_destroy(&X_expected_vals[i]);
+            num_destroy(&X_want_vals[i]);
 
         print_mnum("A", A);
         print_mnum("B", B);
@@ -5392,7 +5392,7 @@ static void test_solve_and_lstsq(void)
         check_bool("mat_least_squares(rank-deficient) not NULL", X != NULL);
         if (X) {
             matrix_t *Xq = test_mat_evaluate_complex(X);
-            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_want);
             check_bool("mat_least_squares(rank-deficient) -> MAT_TYPE_NUMBER", mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq) {
                 bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-10, __FILE__, __LINE__);
@@ -5401,7 +5401,7 @@ static void test_solve_and_lstsq(void)
                     mat_free(Xeq);
                     mat_free(A);
                     mat_free(B);
-                    mat_free(X_expected);
+                    mat_free(X_want);
                     mat_free(X);
                     return;
                 }
@@ -5412,7 +5412,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5421,17 +5421,17 @@ static void test_solve_and_lstsq(void)
         number_t A_vals[6] = {num_create_from_long(1), num_create_from_long(0), num_create_from_long(0),
                               num_create_from_long(0), num_create_from_long(1), num_create_from_long(0)};
         number_t B_vals[2] = {num_create_from_long(2), num_create_from_long(3)};
-        number_t X_expected_vals[3] = {num_create_from_long(2), num_create_from_long(3), num_create_from_long(0)};
+        number_t X_want_vals[3] = {num_create_from_long(2), num_create_from_long(3), num_create_from_long(0)};
         matrix_t *A = mat_create_num(2, 3, A_vals);
         matrix_t *B = mat_create_num(2, 1, B_vals);
-        matrix_t *X_expected = mat_create_num(3, 1, X_expected_vals);
+        matrix_t *X_want = mat_create_num(3, 1, X_want_vals);
 
         for (size_t i = 0; i < 6; ++i)
             num_destroy(&A_vals[i]);
         for (size_t i = 0; i < 2; ++i)
             num_destroy(&B_vals[i]);
         for (size_t i = 0; i < 3; ++i)
-            num_destroy(&X_expected_vals[i]);
+            num_destroy(&X_want_vals[i]);
 
         print_mnum("A", A);
         print_mnum("B", B);
@@ -5440,7 +5440,7 @@ static void test_solve_and_lstsq(void)
         check_bool("mat_least_squares(underdetermined) not NULL", X != NULL);
         if (X) {
             matrix_t *Xq = test_mat_evaluate_complex(X);
-            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_want);
             check_bool("mat_least_squares(underdetermined) -> MAT_TYPE_NUMBER", mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq) {
                 bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-10, __FILE__, __LINE__);
@@ -5449,7 +5449,7 @@ static void test_solve_and_lstsq(void)
                     mat_free(Xeq);
                     mat_free(A);
                     mat_free(B);
-                    mat_free(X_expected);
+                    mat_free(X_want);
                     mat_free(X);
                     return;
                 }
@@ -5460,7 +5460,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5468,18 +5468,18 @@ static void test_solve_and_lstsq(void)
     {
         number_t A_vals[6] = {num_create_from_long(1), num_create_from_long(0), num_create_from_long(1),
                               num_create_from_long(1), num_create_from_long(1), num_create_from_long(2)};
-        number_t X_expected_vals[2] = {num_create_from_long(2), num_create_from_long(-1)};
+        number_t X_want_vals[2] = {num_create_from_long(2), num_create_from_long(-1)};
         number_t B_vals[3] = {num_create_from_long(2), num_create_from_long(1), num_create_from_long(0)};
         matrix_t *A = mat_create_num(3, 2, A_vals);
         matrix_t *B = mat_create_num(3, 1, B_vals);
-        matrix_t *X_expected = mat_create_num(2, 1, X_expected_vals);
+        matrix_t *X_want = mat_create_num(2, 1, X_want_vals);
 
         for (size_t i = 0; i < 6; ++i)
             num_destroy(&A_vals[i]);
         for (size_t i = 0; i < 3; ++i)
             num_destroy(&B_vals[i]);
         for (size_t i = 0; i < 2; ++i)
-            num_destroy(&X_expected_vals[i]);
+            num_destroy(&X_want_vals[i]);
 
         print_mnum("A", A);
         print_md("B", B);
@@ -5488,7 +5488,7 @@ static void test_solve_and_lstsq(void)
         check_bool("mat_least_squares(double) not NULL", X != NULL);
         if (X) {
             matrix_t *Xq = test_mat_evaluate_complex(X);
-            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_want);
             check_bool("mat_least_squares(double) -> MAT_TYPE_NUMBER", mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq) {
                 bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-12, __FILE__, __LINE__);
@@ -5497,7 +5497,7 @@ static void test_solve_and_lstsq(void)
                     mat_free(Xeq);
                     mat_free(A);
                     mat_free(B);
-                    mat_free(X_expected);
+                    mat_free(X_want);
                     mat_free(X);
                     return;
                 }
@@ -5508,7 +5508,7 @@ static void test_solve_and_lstsq(void)
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
     }
 
@@ -5521,8 +5521,8 @@ static void test_solve_and_lstsq(void)
         expr_t *A_vals[6] = {p, EXPR_ZERO, EXPR_ZERO, q, EXPR_ONE, EXPR_ONE};
         expr_t *X_vals[2] = {u, two};
         matrix_t *A = mat_create_expr(3, 2, A_vals);
-        matrix_t *X_expected = mat_create_expr(2, 1, X_vals);
-        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X_want = mat_create_expr(2, 1, X_vals);
+        matrix_t *B = mat_mul(A, X_want);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
@@ -5561,7 +5561,7 @@ static void test_solve_and_lstsq(void)
         }
 
         mat_free(A);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(B);
         mat_free(X);
         mat_free(AX);
@@ -5575,10 +5575,10 @@ static void test_solve_and_lstsq(void)
     {
         expr_t *p = test_expr_new_named_var_d(3.0, "p");
         expr_t *A_vals[6] = {p, p, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, EXPR_ZERO};
-        expr_t *X_expected_vals[2] = {EXPR_ONE, EXPR_ONE};
+        expr_t *X_want_vals[2] = {EXPR_ONE, EXPR_ONE};
         matrix_t *A = mat_create_expr(3, 2, A_vals);
-        matrix_t *X_expected = mat_create_expr(2, 1, X_expected_vals);
-        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X_want = mat_create_expr(2, 1, X_want_vals);
+        matrix_t *B = mat_mul(A, X_want);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
@@ -5616,7 +5616,7 @@ static void test_solve_and_lstsq(void)
         }
 
         mat_free(A);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(B);
         mat_free(X);
         mat_free(AX);
@@ -5627,10 +5627,10 @@ static void test_solve_and_lstsq(void)
     {
         number_t A_vals[4] = {num_create_from_string("1 + i"), num_create_from_string("2.0"),
                               num_create_from_string("i"), num_create_from_string("3 - i")};
-        number_t X_expected_vals[2] = {num_create_from_string("1 - i"), num_create_from_string("2 + 0.5i")};
+        number_t X_want_vals[2] = {num_create_from_string("1 - i"), num_create_from_string("2 + 0.5i")};
         matrix_t *A = mat_create_num(2, 2, A_vals);
-        matrix_t *X_expected = mat_create_num(2, 1, X_expected_vals);
-        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X_want = mat_create_num(2, 1, X_want_vals);
+        matrix_t *B = mat_mul(A, X_want);
 
         print_mnum("A", A);
         print_mnum("B", B);
@@ -5638,28 +5638,28 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(complex number) not NULL", X != NULL);
         if (X) {
-            bool ok = test_assert_matrix_complex_close(X, X_expected, 1e-12, __FILE__, __LINE__);
+            bool ok = test_assert_matrix_complex_close(X, X_want, 1e-12, __FILE__, __LINE__);
             if (!ok) {
                 mat_free(A);
                 mat_free(B);
-                mat_free(X_expected);
+                mat_free(X_want);
                 mat_free(X);
                 for (size_t k = 0; k < 4; ++k)
                     num_destroy(&A_vals[k]);
                 for (size_t k = 0; k < 2; ++k)
-                    num_destroy(&X_expected_vals[k]);
+                    num_destroy(&X_want_vals[k]);
                 return;
             }
         }
 
         mat_free(A);
         mat_free(B);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(X);
         for (size_t k = 0; k < 4; ++k)
             num_destroy(&A_vals[k]);
         for (size_t k = 0; k < 2; ++k)
-            num_destroy(&X_expected_vals[k]);
+            num_destroy(&X_want_vals[k]);
     }
 
     /* Symbolic lower-triangular solve. */
@@ -5674,13 +5674,13 @@ static void test_solve_and_lstsq(void)
         expr_t *X_vals[3] = {s, two, one};
         expr_t *L_vals[9] = {x, EXPR_ZERO, EXPR_ZERO, one, y, EXPR_ZERO, two, three, z};
         matrix_t *L = mat_create_expr(3, 3, L_vals);
-        matrix_t *X_expected = mat_create_expr(3, 1, X_vals);
-        matrix_t *B = mat_mul(L, X_expected);
+        matrix_t *X_want = mat_create_expr(3, 1, X_vals);
+        matrix_t *B = mat_mul(L, X_want);
         matrix_t *X = NULL;
         matrix_t *LB = NULL;
 
         print_mdv("L (lower triangular expr)", L);
-        print_mdv("X expected", X_expected);
+        print_mdv("X want", X_want);
         print_mdv("B = L*X", B);
 
         X = mat_solve(L, B);
@@ -5722,7 +5722,7 @@ static void test_solve_and_lstsq(void)
         }
 
         mat_free(L);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(B);
         mat_free(X);
         mat_free(LB);
@@ -5749,13 +5749,13 @@ static void test_solve_and_lstsq(void)
         expr_t *A_vals[9] = {a, one, EXPR_ZERO, one, b, one, EXPR_ZERO, one, c};
         expr_t *X_vals[6] = {u, one, two, v, three, four};
         matrix_t *A = mat_create_expr(3, 3, A_vals);
-        matrix_t *X_expected = mat_create_expr(3, 2, X_vals);
-        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X_want = mat_create_expr(3, 2, X_vals);
+        matrix_t *B = mat_mul(A, X_want);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
         print_mdv("A (dense expr)", A);
-        print_mdv("X expected", X_expected);
+        print_mdv("X want", X_want);
         print_mdv("B = A*X", B);
 
         X = mat_solve(A, B);
@@ -5799,7 +5799,7 @@ static void test_solve_and_lstsq(void)
         }
 
         mat_free(A);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(B);
         mat_free(X);
         mat_free(AX);
@@ -5898,8 +5898,8 @@ static void test_solve_and_lstsq(void)
                               EXPR_ZERO, two,       one,       f};
         expr_t *X_vals[12] = {u, one, two, v, three, four, four, five, five, six, six, seven};
         matrix_t *A = mat_create_expr(6, 6, A_vals);
-        matrix_t *X_expected = mat_create_expr(6, 2, X_vals);
-        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X_want = mat_create_expr(6, 2, X_vals);
+        matrix_t *B = mat_mul(A, X_want);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
@@ -5946,7 +5946,7 @@ static void test_solve_and_lstsq(void)
         }
 
         mat_free(A);
-        mat_free(X_expected);
+        mat_free(X_want);
         mat_free(B);
         mat_free(X);
         mat_free(AX);
@@ -6825,7 +6825,7 @@ static void test_rank_pinv_nullspace(void)
                                  num_create_from_string("1/2"), num_create_from_string("1/2"), num_create_from_long(0),
                                  num_create_from_long(0),       num_create_from_string("1/2")};
         matrix_t *A = mat_create_num(2, 4, A_vals);
-        matrix_t *A_pinv_expected = mat_create_num(4, 2, pinv_vals);
+        matrix_t *A_pinv_want = mat_create_num(4, 2, pinv_vals);
         matrix_t *A_pinv = NULL;
         matrix_t *N = NULL;
         matrix_t *AN = NULL;
@@ -6844,7 +6844,7 @@ static void test_rank_pinv_nullspace(void)
         check_bool("mat_pseudoinverse(A) not NULL", A_pinv != NULL);
         if (A_pinv) {
             matrix_t *Apq = test_mat_evaluate_complex(A_pinv);
-            matrix_t *Apeq = test_mat_evaluate_complex(A_pinv_expected);
+            matrix_t *Apeq = test_mat_evaluate_complex(A_pinv_want);
             matrix_t *AApAq = NULL, *Aq = test_mat_evaluate_complex(A);
             matrix_t *ApAApq = NULL;
             print_mnum("pinv(A)", A_pinv);
@@ -6864,7 +6864,7 @@ static void test_rank_pinv_nullspace(void)
                     mat_free(ApA);
                     mat_free(ApAAp);
                     mat_free(A_pinv);
-                    mat_free(A_pinv_expected);
+                    mat_free(A_pinv_want);
                     mat_free(A);
                     return;
                 }
@@ -6893,7 +6893,7 @@ static void test_rank_pinv_nullspace(void)
                     mat_free(ApA);
                     mat_free(ApAAp);
                     mat_free(A_pinv);
-                    mat_free(A_pinv_expected);
+                    mat_free(A_pinv_want);
                     mat_free(A);
                     return;
                 }
@@ -6913,7 +6913,7 @@ static void test_rank_pinv_nullspace(void)
                     mat_free(ApA);
                     mat_free(ApAAp);
                     mat_free(A_pinv);
-                    mat_free(A_pinv_expected);
+                    mat_free(A_pinv_want);
                     mat_free(A);
                     return;
                 }
@@ -6953,7 +6953,7 @@ static void test_rank_pinv_nullspace(void)
                         mat_free(ApA);
                         mat_free(ApAAp);
                         mat_free(A_pinv);
-                        mat_free(A_pinv_expected);
+                        mat_free(A_pinv_want);
                         mat_free(A);
                         return;
                     }
@@ -6971,7 +6971,7 @@ static void test_rank_pinv_nullspace(void)
         mat_free(ApA);
         mat_free(ApAAp);
         mat_free(A_pinv);
-        mat_free(A_pinv_expected);
+        mat_free(A_pinv_want);
         mat_free(A);
     }
 
@@ -7313,32 +7313,32 @@ static void test_hermitian_op(void)
         print_mnum("A^† (complex number)", H);
 
         number_t got = NUM_ZERO;
-        number_t expected = num_conj(z11);
+        number_t want = num_conj(z11);
         mat_get(H, 0, 0, &got);
-        check_bool("H[0,0] = conj(1+2i)", num_eq(got, expected));
+        check_bool("H[0,0] = conj(1+2i)", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = NUM_ZERO;
-        expected = num_conj(z22);
+        want = num_conj(z22);
         mat_get(H, 1, 1, &got);
-        check_bool("H[1,1] = conj(-2)", num_eq(got, expected));
+        check_bool("H[1,1] = conj(-2)", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = NUM_ZERO;
-        expected = num_conj(z12);
+        want = num_conj(z12);
         mat_get(H, 1, 0, &got);
-        check_bool("H[1,0] = conj(A[0,1])", num_eq(got, expected));
+        check_bool("H[1,0] = conj(A[0,1])", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = NUM_ZERO;
-        expected = num_conj(z21);
+        want = num_conj(z21);
         mat_get(H, 0, 1, &got);
-        check_bool("H[0,1] = conj(A[1,0])", num_eq(got, expected));
+        check_bool("H[0,1] = conj(A[1,0])", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         mat_free(A);
         mat_free(H);

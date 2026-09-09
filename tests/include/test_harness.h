@@ -17,7 +17,7 @@ typedef bool (*test_fixture_teardown_fn)(void);
 
 typedef void (*test_post_summary_fn)(void);
 
-typedef int (*test_validity_equal_fn)(const void *actual, const void *expected, void *ctx);
+typedef int (*test_validity_equal_fn)(const void *got, const void *want, void *ctx);
 
 typedef int (*test_validity_format_fn)(const void *value, string_t *out, void *ctx);
 
@@ -67,7 +67,7 @@ extern test_post_summary_fn test_post_summary_hook;
  *    checks such as validity registration.
  * 8. Prefer removing suite-local comparison engines once the harness-backed
  *    validity path is established. Helpers that remain should be thin wrappers
- *    for expected-value construction, labelling, or other domain-specific
+ *    for want-value construction, labelling, or other domain-specific
  *    setup, not parallel assertion subsystems.
  */
 
@@ -121,13 +121,13 @@ bool test_assert_true(bool expr, const char *file, int line, const char *detail)
 bool test_assert_false(bool expr, const char *file, int line, const char *detail);
 
 /** Record a failure unless two int values are equal. */
-bool test_assert_int_eq(int actual, int expected, const char *file, int line);
+bool test_assert_int_eq(int got, int want, const char *file, int line);
 
 /** Record a failure unless two long values are equal. */
-bool test_assert_long_eq(long actual, long expected, const char *file, int line);
+bool test_assert_long_eq(long got, long want, const char *file, int line);
 
 /** Record a failure unless two double values differ by no more than @p eps. */
-bool test_assert_double_eq(double actual, double expected, double eps, const char *file, int line);
+bool test_assert_double_eq(double got, double want, double eps, const char *file, int line);
 
 /** Record a failure unless @p ptr is non-null. */
 bool test_assert_not_null(const void *ptr, const char *file, int line);
@@ -135,15 +135,15 @@ bool test_assert_not_null(const void *ptr, const char *file, int line);
 /** Record a failure unless @p ptr is null. */
 bool test_assert_null(const void *ptr, const char *file, int line);
 
-/** Record a failure unless @p actual and @p expected satisfy @p contract. */
-bool test_assert_validity(const test_validity_contract_t *contract, const void *actual, const void *expected,
+/** Record a failure unless @p got and @p want satisfy @p contract. */
+bool test_assert_validity(const test_validity_contract_t *contract, const void *got, const void *want,
                           const char *file, int line);
 
 /** Record a validity failure using a checker registered by name. */
-bool test_assert_validity_named(const char *name, const void *actual, const void *expected, const char *file, int line);
+bool test_assert_validity_named(const char *name, const void *got, const void *want, const char *file, int line);
 
 /** Record a failure unless two C-string boundary values are equal. */
-bool test_assert_cstr_eq(const char *actual, const char *expected, const char *file, int line);
+bool test_assert_cstr_eq(const char *got, const char *want, const char *file, int line);
 
 /** Register a named semantic validity checker for later assertions. */
 void test_register_validity_checker(const char *name, const test_validity_contract_t *contract);
@@ -234,14 +234,14 @@ int tests_main(void);
 #define TEST_ASSERT_FALSE(expr, detail)                                                                                \
     TEST_HARNESS_RETURN_UNLESS(test_assert_false((expr), __FILE__, __LINE__, (detail)))
 
-#define TEST_ASSERT_INT_EQ(actual, expected)                                                                           \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_int_eq((actual), (expected), __FILE__, __LINE__))
+#define TEST_ASSERT_INT_EQ(got, want)                                                                           \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_int_eq((got), (want), __FILE__, __LINE__))
 
-#define TEST_ASSERT_LONG_EQ(actual, expected)                                                                          \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_long_eq((actual), (expected), __FILE__, __LINE__))
+#define TEST_ASSERT_LONG_EQ(got, want)                                                                          \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_long_eq((got), (want), __FILE__, __LINE__))
 
-#define TEST_ASSERT_DOUBLE_EQ(actual, expected, eps)                                                                   \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_double_eq((actual), (expected), (eps), __FILE__, __LINE__))
+#define TEST_ASSERT_DOUBLE_EQ(got, want, eps)                                                                   \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_double_eq((got), (want), (eps), __FILE__, __LINE__))
 
 #define TEST_ASSERT_NOT_NULL(ptr) TEST_HARNESS_RETURN_UNLESS(test_assert_not_null((ptr), __FILE__, __LINE__))
 
@@ -256,14 +256,14 @@ int tests_main(void);
 
 #define TEST_VALID_CSTR() test_validity_contract_cstr()
 
-#define TEST_ASSERT_VALID(contract_ptr, actual_ptr, expected_ptr)                                                      \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_validity((contract_ptr), (actual_ptr), (expected_ptr), __FILE__, __LINE__))
+#define TEST_ASSERT_VALID(contract_ptr, got_ptr, want_ptr)                                                      \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_validity((contract_ptr), (got_ptr), (want_ptr), __FILE__, __LINE__))
 
-#define TEST_ASSERT_VALID_NAMED(name, actual_ptr, expected_ptr)                                                        \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_validity_named((name), (actual_ptr), (expected_ptr), __FILE__, __LINE__))
+#define TEST_ASSERT_VALID_NAMED(name, got_ptr, want_ptr)                                                        \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_validity_named((name), (got_ptr), (want_ptr), __FILE__, __LINE__))
 
-#define TEST_ASSERT_STR_EQ(actual_cstr, expected_cstr)                                                                 \
-    TEST_HARNESS_RETURN_UNLESS(test_assert_cstr_eq((actual_cstr), (expected_cstr), __FILE__, __LINE__))
+#define TEST_ASSERT_STR_EQ(got_cstr, want_cstr)                                                                 \
+    TEST_HARNESS_RETURN_UNLESS(test_assert_cstr_eq((got_cstr), (want_cstr), __FILE__, __LINE__))
 
 #define TEST_FAIL() test_fail(__FILE__, __LINE__)
 
@@ -300,11 +300,11 @@ int tests_main(void);
 
 #define ASSERT_FALSE(expr) TEST_ASSERT_FALSE((expr), #expr)
 
-#define ASSERT_EQ_INT(actual, expected) TEST_ASSERT_INT_EQ((actual), (expected))
+#define ASSERT_EQ_INT(got, want) TEST_ASSERT_INT_EQ((got), (want))
 
-#define ASSERT_EQ_LONG(actual, expected) TEST_ASSERT_LONG_EQ((actual), (expected))
+#define ASSERT_EQ_LONG(got, want) TEST_ASSERT_LONG_EQ((got), (want))
 
-#define ASSERT_EQ_DOUBLE(actual, expected, eps) TEST_ASSERT_DOUBLE_EQ((actual), (expected), (eps))
+#define ASSERT_EQ_DOUBLE(got, want, eps) TEST_ASSERT_DOUBLE_EQ((got), (want), (eps))
 
 #define ASSERT_NOT_NULL(ptr) TEST_ASSERT_NOT_NULL((ptr))
 

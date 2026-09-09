@@ -9,11 +9,11 @@ static void test_qf_lgamma(void);
 static void test_qf_digamma(void);
 static void test_qf_gammainv(void);
 
-static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+static int qf_close_value(qfloat_t got, qfloat_t want, double tol)
 {
-    if (qf_eq(expected, qf_from_double(0.0)))
-        return qf_close(got, expected, tol);
-    return qf_close_rel(got, expected, tol);
+    if (qf_eq(want, qf_from_double(0.0)))
+        return qf_close(got, want, tol);
+    return qf_close_rel(got, want, tol);
 }
 
 static void test_qf_hypot(void)
@@ -60,11 +60,11 @@ static void test_qf_hypot(void)
         if (qf_close_rel(got, ref, 1e-31)) {
             printf("%s  OK: %s%s\n", C_GREEN, precise[i].label, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_ref);
+            printf("    want = %s\n", buf_ref);
         } else {
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, precise[i].label, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_ref);
+            printf("    want = %s\n", buf_ref);
             TEST_FAIL();
         }
     }
@@ -157,11 +157,11 @@ static void test_qf_gamma(void)
     char buf[256], buf_exp[256];
 
     /* ------------------------------------------------------------
-       1. High-precision expected values (fill these in yourself)
+       1. High-precision want values (fill these in yourself)
        ------------------------------------------------------------ */
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected gamma(x) as qfloat_t string */
+        const char *want; /* want gamma(x) as qfloat_t string */
         double tol;
     } tests[] = {
 
@@ -199,13 +199,13 @@ static void test_qf_gamma(void)
     };
 
     /* ------------------------------------------------------------
-       2. Compare qf_gamma(x) against expected
+       2. Compare qf_gamma(x) against want
        ------------------------------------------------------------ */
     for (int i = 0; tests[i].xs != NULL; i++) {
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_gamma(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -213,7 +213,7 @@ static void test_qf_gamma(void)
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: gamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     /* ------------------------------------------------------------
@@ -262,11 +262,11 @@ static void test_qf_erf(void)
     char buf[256], buf_exp[256];
 
     /* ------------------------------------------------------------
-       1. Expected values (fill these in yourself)
+       1. Want values (fill these in yourself)
        ------------------------------------------------------------ */
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erf(x) as qfloat_t string */
+        const char *want; /* want erf(x) as qfloat_t string */
     } tests[] = {
 
         /* Basic values */
@@ -308,7 +308,7 @@ static void test_qf_erf(void)
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_erf(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -316,7 +316,7 @@ static void test_qf_erf(void)
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: erf(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -330,7 +330,7 @@ static void test_qf_erfc(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfc(x) as qfloat_t string */
+        const char *want; /* want erfc(x) as qfloat_t string */
     } tests[] = {
 
         /* Basic values */
@@ -372,7 +372,7 @@ static void test_qf_erfc(void)
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_erfc(x);
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -380,7 +380,7 @@ static void test_qf_erfc(void)
         TEST_ASSERT_QFLOAT_CLOSE(got, exp);
         printf("%s  OK: erfc(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -394,7 +394,7 @@ static void test_qf_erfinv(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfc(x) as qfloat_t string */
+        const char *want; /* want erfc(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -434,17 +434,17 @@ static void test_qf_erfinv(void)
 
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_erfinv(x);
-        if (strcmp(tests[i].expected, "NAN") == 0) {
+        if (strcmp(tests[i].want, "NAN") == 0) {
             if (qf_isnan(got)) {
                 printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
                 printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-                printf("    expected = NAN\n");
+                printf("    want = NAN\n");
                 TEST_FAIL();
             }
             continue;
         } else {
-            qfloat_t exp = qf_from_string(tests[i].expected);
+            qfloat_t exp = qf_from_string(tests[i].want);
 
             test_qf_to_buffer(got, buf, sizeof(buf));
             test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -452,7 +452,7 @@ static void test_qf_erfinv(void)
             TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
             printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
+            printf("    want = %s\n", buf_exp);
         }
     }
 
@@ -467,7 +467,7 @@ static void test_qf_erfcinv(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfcinv(x) as qfloat_t string */
+        const char *want; /* want erfcinv(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -509,30 +509,30 @@ static void test_qf_erfcinv(void)
         qfloat_t got = qf_erfcinv(x);
 
         /* Handle infinities */
-        if (strcmp(tests[i].expected, "POSINF") == 0) {
+        if (strcmp(tests[i].want, "POSINF") == 0) {
             if (qf_isposinf(got)) {
                 printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
                 printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-                printf("    expected = +INF\n");
+                printf("    want = +INF\n");
                 TEST_FAIL();
             }
             continue;
         }
 
-        if (strcmp(tests[i].expected, "NEGINF") == 0) {
+        if (strcmp(tests[i].want, "NEGINF") == 0) {
             if (qf_isneginf(got)) {
                 printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
                 printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-                printf("    expected = -INF\n");
+                printf("    want = -INF\n");
                 TEST_FAIL();
             }
             continue;
         }
 
         /* Normal numeric case */
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -540,7 +540,7 @@ static void test_qf_erfcinv(void)
         TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
         printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -554,7 +554,7 @@ static void test_qf_lgamma(void)
 
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
         double acceptable_error;
     } tests[] = {
 
@@ -595,12 +595,12 @@ static void test_qf_lgamma(void)
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_lgamma(x);
 
-        if (strcmp(tests[i].expected, "NAN") == 0) {
+        if (strcmp(tests[i].want, "NAN") == 0) {
             if (qf_isnan(got)) {
                 printf(C_GREEN "  OK: lgamma(%s)\n" C_RESET, tests[i].xs);
             } else {
                 printf(C_RED "  FAIL: lgamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
-                printf("    expected = NAN\n");
+                printf("    want = NAN\n");
                 test_qf_to_buffer(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
                 TEST_FAIL();
@@ -608,7 +608,7 @@ static void test_qf_lgamma(void)
             continue;
         }
 
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -621,7 +621,7 @@ static void test_qf_lgamma(void)
         }
 
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -635,7 +635,7 @@ static void test_qf_digamma(void)
 
     struct {
         const char *xs;
-        const char *expected;
+        const char *want;
         double acceptable_error;
     } tests[] = {
 
@@ -675,12 +675,12 @@ static void test_qf_digamma(void)
         qfloat_t x = qf_from_string(tests[i].xs);
         qfloat_t got = qf_digamma(x);
 
-        if (strcmp(tests[i].expected, "NAN") == 0) {
+        if (strcmp(tests[i].want, "NAN") == 0) {
             if (qf_isnan(got)) {
                 printf(C_GREEN "  OK: digamma(%s)\n" C_RESET, tests[i].xs);
             } else {
                 printf(C_RED "  FAIL: digamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
-                printf("    expected = NAN\n");
+                printf("    want = NAN\n");
                 test_qf_to_buffer(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
                 TEST_FAIL();
@@ -688,7 +688,7 @@ static void test_qf_digamma(void)
             continue;
         }
 
-        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
         test_qf_to_buffer(exp, buf_exp, sizeof(buf_exp));
@@ -701,7 +701,7 @@ static void test_qf_digamma(void)
         }
 
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -742,7 +742,7 @@ static void test_qf_gammainv(void)
         }
 
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
+        printf("    want = %s\n", buf_exp);
     }
 
     printf("\n");

@@ -98,7 +98,7 @@ static void test_mat_sprintf_number_precision(void)
     number_t vals[4];
     matrix_t *A;
     char buf[4096];
-    string_t *expected = NULL;
+    string_t *want = NULL;
 
     vals[0] = num_create_from_string("1.25");
     check_bool("mat_sprintf number precision set", num_set_prec_bits(&vals[0], 512u) == 0);
@@ -106,12 +106,12 @@ static void test_mat_sprintf_number_precision(void)
     vals[2] = num_create_from_long(3);
     vals[3] = num_create_from_long(4);
     A = mat_create(2, 2, vals);
-    expected = num_to_string(vals[1]);
+    want = num_to_string(vals[1]);
 
     check_bool("mat_sprintf number returns non-negative", mat_sprintf(buf, sizeof(buf), "%m", A) >= 0);
-    check_bool("mat_sprintf number preserves rational text", expected && strstr(buf, string_c_str(expected)) != NULL);
+    check_bool("mat_sprintf number preserves rational text", want && strstr(buf, string_c_str(want)) != NULL);
 
-    string_free(expected);
+    string_free(want);
     mat_free(A);
     for (size_t i = 0; i < 4u; ++i)
         num_destroy(&vals[i]);

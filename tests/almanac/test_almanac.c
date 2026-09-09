@@ -18,9 +18,9 @@ TEST_SUITE_SETUP(test_almanac_suite_setup);
 static const double ARC_SECOND_DEGREES = 1.0 / 3600.0;
 static const long NAVIGATION_GRADE_ARCSECONDS = 6;
 
-static double angular_delta_degrees(double observed, double expected)
+static double angular_delta_degrees(double observed, double want)
 {
-    double delta = fmod(observed - expected + 180.0, 360.0);
+    double delta = fmod(observed - want + 180.0, 360.0);
 
     if (delta < 0.0)
         delta += 360.0;
@@ -45,12 +45,12 @@ static datetime_t *datetime_from_event_time(const almanac_event_time_t *event_ti
     return dttm;
 }
 
-static void print_oracle_axis(const char *label, double expected, double got, double error_degrees,
+static void print_oracle_axis(const char *label, double want, double got, double error_degrees,
                               long rounded_arcseconds)
 {
     const char *grade = (rounded_arcseconds <= NAVIGATION_GRADE_ARCSECONDS) ? "PASS" : "FAIL";
 
-    printf("    %-8s expected = % .9f\n", label, expected);
+    printf("    %-8s want = % .9f\n", label, want);
     printf("    %-8s got      = % .9f\n", label, got);
     printf("    %-8s error    = %.2f arcsec (rounded %ld, navigation grade %s <= %ld)\n", label,
            error_degrees / ARC_SECOND_DEGREES, rounded_arcseconds, grade, NAVIGATION_GRADE_ARCSECONDS);
@@ -394,7 +394,7 @@ static void assert_phase_details_case(void)
                      "Jupiter illuminated fraction is in range");
     TEST_ASSERT_TRUE(jupiter_phase.phase_class == ALMANAC_PHASE_GIBBOUS ||
                          jupiter_phase.phase_class == ALMANAC_PHASE_FULL,
-                     "Jupiter phase class is near full as expected for an outer planet");
+                     "Jupiter phase class is near full as want for an outer planet");
 
     almanac_close(almanac);
     almanac_entry_dealloc(jupiter);
@@ -683,7 +683,7 @@ static void test_almanac_2027_totality_seed_uses_the_towns_local_maximum(void)
     TEST_ASSERT_NOT_NULL(datetime_init_ymdt(end, 2027, DT_August, 4, 0, 0, 0.0));
     events = almanac_find_solar_eclipses(almanac, &london, start, end);
     TEST_ASSERT_NOT_NULL(events);
-    TEST_ASSERT_TRUE(array_size(events) == 1u, "August 2027 window contains the expected solar eclipse");
+    TEST_ASSERT_TRUE(array_size(events) == 1u, "August 2027 window contains the want solar eclipse");
     event = array_get(events, 0u);
     TEST_ASSERT_NOT_NULL(event);
     TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_seed_score(almanac, &malaga, event, &score_degrees),
@@ -925,7 +925,7 @@ static void assert_spice_oracle_cases(void)
     TEST_ASSERT_NOT_NULL(almanac);
 
     for (i = 0; i < ALMANAC_SPICE_ORACLE_CASE_COUNT; ++i) {
-        const almanac_spice_oracle_case_t *expected = &ALMANAC_SPICE_ORACLE_CASES[i];
+        const almanac_spice_oracle_case_t *want = &ALMANAC_SPICE_ORACLE_CASES[i];
         datetime_t *moment;
         almanac_entry_t *entry;
         double sha_error;
@@ -937,41 +937,41 @@ static void assert_spice_oracle_cases(void)
 
         moment = datetime_alloc();
         TEST_ASSERT_NOT_NULL(moment);
-        TEST_ASSERT_NOT_NULL(datetime_init_ymdt(moment, (short)expected->year, (month_t)expected->month,
-                                                (uint8_t)expected->day, (uint8_t)expected->hour,
-                                                (uint8_t)expected->minute, expected->second));
-        entry = almanac_new_body_entry(almanac, expected->body_id, moment);
+        TEST_ASSERT_NOT_NULL(datetime_init_ymdt(moment, (short)want->year, (month_t)want->month,
+                                                (uint8_t)want->day, (uint8_t)want->hour,
+                                                (uint8_t)want->minute, want->second));
+        entry = almanac_new_body_entry(almanac, want->body_id, moment);
         TEST_ASSERT_TRUE(entry != NULL, almanac_last_error(almanac));
 
-        sha_error = fabs(angular_delta_degrees(almanac_entry_sha_degrees(entry), expected->sha_degrees));
-        dec_error = fabs(almanac_entry_declination_degrees(entry) - expected->declination_degrees);
+        sha_error = fabs(angular_delta_degrees(almanac_entry_sha_degrees(entry), want->sha_degrees));
+        dec_error = fabs(almanac_entry_declination_degrees(entry) - want->declination_degrees);
         sha_error_rounded = rounded_arcsecond_error(sha_error);
         dec_error_rounded = rounded_arcsecond_error(dec_error);
         navigation_grade =
             (sha_error_rounded <= NAVIGATION_GRADE_ARCSECONDS && dec_error_rounded <= NAVIGATION_GRADE_ARCSECONDS);
-        printf("ORACLE %-7s %04d-%02d-%02d %02d:%02d:%05.2f local [%s]\n", expected->body_code, expected->year,
-               expected->month, expected->day, expected->hour, expected->minute, expected->second,
+        printf("ORACLE %-7s %04d-%02d-%02d %02d:%02d:%05.2f local [%s]\n", want->body_code, want->year,
+               want->month, want->day, want->hour, want->minute, want->second,
                navigation_grade ? "PASS" : "FAIL");
-        print_oracle_axis("SHA", expected->sha_degrees, almanac_entry_sha_degrees(entry), sha_error, sha_error_rounded);
-        print_oracle_axis("Dec", expected->declination_degrees, almanac_entry_declination_degrees(entry), dec_error,
+        print_oracle_axis("SHA", want->sha_degrees, almanac_entry_sha_degrees(entry), sha_error, sha_error_rounded);
+        print_oracle_axis("Dec", want->declination_degrees, almanac_entry_declination_degrees(entry), dec_error,
                           dec_error_rounded);
-        printf("    distance expected = %.12f AU\n", expected->geocentric_distance_au);
+        printf("    distance want = %.12f AU\n", want->geocentric_distance_au);
         printf("    distance got      = %.12f AU\n", almanac_entry_geocentric_distance_au(entry));
         printf("    navigation grade  = %s\n", navigation_grade ? "PASS" : "FAIL");
         snprintf(
             message, sizeof(message),
             "%s %04d-%02d-%02d SHA error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit %ld arcsec",
-            expected->body_code, expected->year, expected->month, expected->day, sha_error / ARC_SECOND_DEGREES,
+            want->body_code, want->year, want->month, want->day, sha_error / ARC_SECOND_DEGREES,
             sha_error_rounded, NAVIGATION_GRADE_ARCSECONDS);
         TEST_ASSERT_TRUE(sha_error_rounded <= NAVIGATION_GRADE_ARCSECONDS, message);
         snprintf(message, sizeof(message),
                  "%s %04d-%02d-%02d declination error %.2f arcsec rounds to %ld arcsec, above navigation-grade limit "
                  "%ld arcsec",
-                 expected->body_code, expected->year, expected->month, expected->day, dec_error / ARC_SECOND_DEGREES,
+                 want->body_code, want->year, want->month, want->day, dec_error / ARC_SECOND_DEGREES,
                  dec_error_rounded, NAVIGATION_GRADE_ARCSECONDS);
         TEST_ASSERT_TRUE(dec_error_rounded <= NAVIGATION_GRADE_ARCSECONDS, message);
 
-        TEST_ASSERT_TRUE(fabs(almanac_entry_geocentric_distance_au(entry) - expected->geocentric_distance_au) < 0.02,
+        TEST_ASSERT_TRUE(fabs(almanac_entry_geocentric_distance_au(entry) - want->geocentric_distance_au) < 0.02,
                          "geocentric distance is broadly consistent with SPICE");
         almanac_entry_dealloc(entry);
         datetime_dealloc(moment);
@@ -1027,11 +1027,11 @@ static void example_almanac_shrewsbury_eclipse_watch(void)
     event = array_get(events, 0u);
     TEST_ASSERT_NOT_NULL(event);
     TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest),
-                     "Expected greatest eclipse time");
+                     "Want greatest eclipse time");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FIRST_CONTACT, &first),
-                     "Expected first contact time");
+                     "Want first contact time");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FOURTH_CONTACT, &fourth),
-                     "Expected fourth contact time");
+                     "Want fourth contact time");
     greatest_time = datetime_from_event_time(&greatest);
     first_time = datetime_from_event_time(&first);
     fourth_time = datetime_from_event_time(&fourth);

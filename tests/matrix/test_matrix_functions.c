@@ -13,9 +13,9 @@
 #define EXPR_ZERO ((expr_t *)EXPR_ZERO)
 #define EXPR_ONE ((expr_t *)EXPR_ONE)
 
-static void check_num_close_local(const char *label, number_t got, number_t expected, double tol)
+static void check_num_close_local(const char *label, number_t got, number_t want, double tol)
 {
-    number_t diff = num_sub(got, expected);
+    number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
     check_bool(label, fabs(num_to_double(mag)) <= tol);
     num_destroy(&mag);
@@ -73,7 +73,7 @@ static void test_number_function_matrix_parity(void)
     printf(C_CYAN "TEST: Number analytic functions are available as matrix functions\n" C_RESET);
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         number_t input = num_create_from_double(cases[i].input);
-        number_t expected = cases[i].number_function(input);
+        number_t want = cases[i].number_function(input);
         matrix_t *A = mat_create(1u, 1u, &input);
         matrix_t *result = cases[i].matrix_function(A);
         char label[128];
@@ -84,13 +84,13 @@ static void test_number_function_matrix_parity(void)
             number_t got = mat_get_num(result, 0u, 0u);
 
             snprintf(label, sizeof(label), "mat_%s(1x1) matches num_%s", cases[i].name, cases[i].name);
-            check_num_close_local(label, got, expected, 1e-12);
+            check_num_close_local(label, got, want, 1e-12);
             num_destroy(&got);
         }
 
         mat_free(result);
         mat_free(A);
-        num_destroy(&expected);
+        num_destroy(&want);
         num_destroy(&input);
     }
 }
@@ -106,17 +106,17 @@ static void test_mat_harmonic_poly(void)
     printf(C_CYAN "TEST: harmonic matrix polynomial\n" C_RESET);
     ASSERT_NOT_NULL(result);
     if (result) {
-        number_t expected = num_create_from_string("3/2");
+        number_t want = num_create_from_string("3/2");
 
         value = mat_get_num(result, 0u, 0u);
-        check_bool("H_2(A)[0,0] = 3/2", num_eq(value, expected));
+        check_bool("H_2(A)[0,0] = 3/2", num_eq(value, want));
         num_destroy(&value);
-        num_destroy(&expected);
-        expected = num_create_from_long(4L);
+        num_destroy(&want);
+        want = num_create_from_long(4L);
         value = mat_get_num(result, 1u, 1u);
-        check_bool("H_2(A)[1,1] = 4", num_eq(value, expected));
+        check_bool("H_2(A)[1,1] = 4", num_eq(value, want));
         num_destroy(&value);
-        num_destroy(&expected);
+        num_destroy(&want);
     }
 
     mat_free(result);
@@ -131,8 +131,8 @@ static void test_mat_harmonic_poly(void)
         matrix_t *Z = mat_create(1u, 1u, &half);
         matrix_t *phi = mat_lerch_phi(Z, &two, &one);
         number_t got = phi ? mat_get_num(phi, 0u, 0u) : num_clone(NUM_NAN);
-        number_t expected = number_lerch_phi(half, two, one);
-        number_t delta = num_sub(got, expected);
+        number_t want = number_lerch_phi(half, two, one);
+        number_t delta = num_sub(got, want);
         number_t error = num_abs(delta);
         number_t tolerance = num_create_from_string("1e-28");
 
@@ -140,7 +140,7 @@ static void test_mat_harmonic_poly(void)
         check_bool("matrix Lerch phi agrees with its scalar value", num_lt(error, tolerance));
         num_destroy(&error);
         num_destroy(&delta);
-        num_destroy(&expected);
+        num_destroy(&want);
         num_destroy(&got);
         mat_free(phi);
         mat_free(Z);
@@ -218,11 +218,11 @@ static void test_eigen_d(void)
                     Av_ik = next;
                 }
 
-                number_t expected = num_mul(ev2[k], vik);
+                number_t want = num_mul(ev2[k], vik);
                 char label[64];
                 snprintf(label, sizeof(label), "d: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
-                check_num_close_local(label, Av_ik, expected, 1e-10);
-                num_destroy(&expected);
+                check_num_close_local(label, Av_ik, want, 1e-10);
+                num_destroy(&want);
                 num_destroy(&vik);
                 num_destroy(&Av_ik);
             }
@@ -300,11 +300,11 @@ static void test_eigen_mp_real(void)
                     num_destroy(&Av_ik);
                     Av_ik = next;
                 }
-                number_t expected = num_mul(ev2[k], vik);
+                number_t want = num_mul(ev2[k], vik);
                 char label[64];
                 snprintf(label, sizeof(label), "mp-real: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
-                check_num_close_local(label, Av_ik, expected, 1e-25);
-                num_destroy(&expected);
+                check_num_close_local(label, Av_ik, want, 1e-25);
+                num_destroy(&want);
                 num_destroy(&vik);
                 num_destroy(&Av_ik);
             }
@@ -384,11 +384,11 @@ static void test_eigen_complex(void)
                     num_destroy(&Av_ik);
                     Av_ik = next;
                 }
-                number_t expected = num_mul(ev2[k], vik);
+                number_t want = num_mul(ev2[k], vik);
                 char label[64];
                 snprintf(label, sizeof(label), "complex: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
-                check_num_close_local(label, Av_ik, expected, 1e-25);
-                num_destroy(&expected);
+                check_num_close_local(label, Av_ik, want, 1e-25);
+                num_destroy(&want);
                 num_destroy(&vik);
                 num_destroy(&Av_ik);
             }
@@ -470,11 +470,11 @@ static void test_eigen_num_hermitian(void)
                     Av_ik = next;
                 }
 
-                number_t expected = num_mul(ev2[k], vik);
+                number_t want = num_mul(ev2[k], vik);
                 char label[80];
                 snprintf(label, sizeof(label), "number Hermitian: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
-                check_num_close_local(label, Av_ik, expected, 1e-25);
-                num_destroy(&expected);
+                check_num_close_local(label, Av_ik, want, 1e-25);
+                num_destroy(&want);
                 num_destroy(&vik);
                 num_destroy(&Av_ik);
             }
@@ -557,11 +557,11 @@ static void test_eigen_num_hermitian_high_precision(void)
                     Av_ik = next;
                 }
 
-                number_t expected = num_mul(ev2[k], vik);
+                number_t want = num_mul(ev2[k], vik);
                 char label[96];
                 snprintf(label, sizeof(label), "high-precision Hermitian: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
-                check_num_close_local(label, Av_ik, expected, 1e-27);
-                num_destroy(&expected);
+                check_num_close_local(label, Av_ik, want, 1e-27);
+                num_destroy(&want);
                 num_destroy(&vik);
                 num_destroy(&Av_ik);
             }
@@ -825,13 +825,13 @@ static void check_expr_jordan_chain_relation(const char *label_prefix, const mat
 
             for (size_t i = 0; i < rows; ++i) {
                 qfloat_t got;
-                qfloat_t expected;
+                qfloat_t want;
                 char label[128];
 
                 mat_get(SCq, i, 0, &got);
-                mat_get(Prevq, i, 0, &expected);
+                mat_get(Prevq, i, 0, &want);
                 snprintf(label, sizeof(label), "%s: (A-LI)v%zu[%zu]=v%zu[%zu]", label_prefix, j + 1, i, j, i);
-                check_qf_val(label, got, expected, tol);
+                check_qf_val(label, got, want, tol);
             }
         }
 
@@ -1412,14 +1412,14 @@ static void test_mat_exp_singular(void)
     /* singular diagonal: exp(diag(0,2)) = diag(1,e^2) */
     {
         double A_vals[4] = {0.0, 0.0, 0.0, 2.0};
-        double expected_vals[4] = {1.0, 0.0, 0.0, exp(2.0)};
+        double want_vals[4] = {1.0, 0.0, 0.0, exp(2.0)};
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
-        matrix_t *E_expected = test_mat_create_d(2, 2, expected_vals);
+        matrix_t *E_want = test_mat_create_d(2, 2, want_vals);
         check_bool("singular diagonal allocated", A != NULL);
-        check_bool("singular diagonal expected allocated", E_expected != NULL);
-        if (!A || !E_expected) {
+        check_bool("singular diagonal want allocated", E_want != NULL);
+        if (!A || !E_want) {
             mat_free(A);
-            mat_free(E_expected);
+            mat_free(E_want);
             return;
         }
 
@@ -1428,30 +1428,30 @@ static void test_mat_exp_singular(void)
         check_bool("mat_exp(singular diagonal) not NULL", E != NULL);
         if (E) {
             check_bool("exp(diag(0,2)) preserves diagonal structure", mat_is_diagonal(E));
-            if (!test_assert_matrix_d_close(E, E_expected, 1e-12, __FILE__, __LINE__)) {
+            if (!test_assert_matrix_d_close(E, E_want, 1e-12, __FILE__, __LINE__)) {
                 mat_free(A);
                 mat_free(E);
-                mat_free(E_expected);
+                mat_free(E_want);
                 return;
             }
         }
 
         mat_free(A);
         mat_free(E);
-        mat_free(E_expected);
+        mat_free(E_want);
     }
 
     /* singular nilpotent Jordan block: exp(N) = I + N */
     {
         double N_vals[4] = {0.0, 1.0, 0.0, 0.0};
-        double expected_vals[4] = {1.0, 1.0, 0.0, 1.0};
+        double want_vals[4] = {1.0, 1.0, 0.0, 1.0};
         matrix_t *N = test_mat_create_d(2, 2, N_vals);
-        matrix_t *E_expected = test_mat_create_d(2, 2, expected_vals);
+        matrix_t *E_want = test_mat_create_d(2, 2, want_vals);
         check_bool("singular nilpotent allocated", N != NULL);
-        check_bool("singular nilpotent expected allocated", E_expected != NULL);
-        if (!N || !E_expected) {
+        check_bool("singular nilpotent want allocated", E_want != NULL);
+        if (!N || !E_want) {
             mat_free(N);
-            mat_free(E_expected);
+            mat_free(E_want);
             return;
         }
 
@@ -1460,17 +1460,17 @@ static void test_mat_exp_singular(void)
         check_bool("mat_exp(singular nilpotent) not NULL", E != NULL);
         if (E) {
             check_bool("exp(N) preserves upper-triangular structure", mat_is_upper_triangular(E));
-            if (!test_assert_matrix_d_close(E, E_expected, 1e-12, __FILE__, __LINE__)) {
+            if (!test_assert_matrix_d_close(E, E_want, 1e-12, __FILE__, __LINE__)) {
                 mat_free(N);
                 mat_free(E);
-                mat_free(E_expected);
+                mat_free(E_want);
                 return;
             }
         }
 
         mat_free(N);
         mat_free(E);
-        mat_free(E_expected);
+        mat_free(E_want);
     }
 }
 
@@ -1576,8 +1576,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_sin(N);
             check_bool("mat_sin(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1593,8 +1593,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_cos(N);
             check_bool("mat_cos(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {1.0, 0.0, 0.0, 1.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1610,8 +1610,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_sinh(N);
             check_bool("mat_sinh(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1627,8 +1627,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_cosh(N);
             check_bool("mat_cosh(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {1.0, 0.0, 0.0, 1.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1644,8 +1644,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_tan(N);
             check_bool("mat_tan(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1661,8 +1661,8 @@ static void test_mat_fun_singular_entire_d(void)
             matrix_t *R = mat_tanh(N);
             check_bool("mat_tanh(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1679,8 +1679,8 @@ static void test_mat_fun_singular_entire_d(void)
             double c = 2.0 / sqrt(M_PI);
             check_bool("mat_erf(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {0.0, c, 0.0, 0.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {0.0, c, 0.0, 0.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -1697,8 +1697,8 @@ static void test_mat_fun_singular_entire_d(void)
             double c = 2.0 / sqrt(M_PI);
             check_bool("mat_erfc(N) not NULL", R != NULL);
             if (R) {
-                double expected_vals[4] = {1.0, -c, 0.0, 1.0};
-                matrix_t *E = test_mat_create_d(2, 2, expected_vals);
+                double want_vals[4] = {1.0, -c, 0.0, 1.0};
+                matrix_t *E = test_mat_create_d(2, 2, want_vals);
                 if (!test_assert_matrix_d_close(R, E, 1e-12, __FILE__, __LINE__)) {
                     mat_free(E);
                     mat_free(R);
@@ -3051,10 +3051,10 @@ typedef struct {
     int complex_mode;
 } matrix_validity_ctx_t;
 
-static int matrix_validity_equal(const void *actual, const void *expected, void *ctx)
+static int matrix_validity_equal(const void *got_input, const void *want_input, void *ctx)
 {
-    const matrix_t *got = actual;
-    const matrix_t *want = expected;
+    const matrix_t *got = got_input;
+    const matrix_t *want = want_input;
     const matrix_validity_ctx_t *cfg = ctx;
     double tol = cfg ? cfg->tol : 1e-12;
     size_t rows, cols;
@@ -3136,28 +3136,28 @@ const test_validity_contract_t *matrix_validity_contract_complex_default(void)
     return &matrix_complex_default_contract;
 }
 
-bool test_assert_matrix_d_close(matrix_t *got, matrix_t *expected, double tol, const char *file, int line)
+bool test_assert_matrix_d_close(matrix_t *got, matrix_t *want, double tol, const char *file, int line)
 {
     matrix_validity_ctx_t ctx = {tol, 0};
     test_validity_contract_t contract =
         TEST_VALIDITY_CONTRACT("matrix-double-close", matrix_validity_equal, matrix_validity_format, &ctx);
-    return test_assert_validity(&contract, got, expected, file, line);
+    return test_assert_validity(&contract, got, want, file, line);
 }
 
-bool test_assert_matrix_mp_real_close(matrix_t *got, matrix_t *expected, double tol, const char *file, int line)
+bool test_assert_matrix_mp_real_close(matrix_t *got, matrix_t *want, double tol, const char *file, int line)
 {
     matrix_validity_ctx_t ctx = {tol, 0};
     test_validity_contract_t contract =
         TEST_VALIDITY_CONTRACT("matrix-mp-real-close", matrix_validity_equal, matrix_validity_format, &ctx);
-    return test_assert_validity(&contract, got, expected, file, line);
+    return test_assert_validity(&contract, got, want, file, line);
 }
 
-bool test_assert_matrix_complex_close(matrix_t *got, matrix_t *expected, double tol, const char *file, int line)
+bool test_assert_matrix_complex_close(matrix_t *got, matrix_t *want, double tol, const char *file, int line)
 {
     matrix_validity_ctx_t ctx = {tol, 1};
     test_validity_contract_t contract =
         TEST_VALIDITY_CONTRACT("matrix-complex-close", matrix_validity_equal, matrix_validity_format, &ctx);
-    return test_assert_validity(&contract, got, expected, file, line);
+    return test_assert_validity(&contract, got, want, file, line);
 }
 
 bool test_assert_matrix_d_identity(matrix_t *got, size_t n, double tol, const char *file, int line)
@@ -3212,7 +3212,7 @@ static void check_mat2x2_d(const char *label, matrix_t *R, double e00, double e0
     double ev[4] = {e00, e01, e10, e11};
     matrix_t *E = test_mat_create_d(2, 2, ev);
     if (!E) {
-        test_mark_failure(__FILE__, __LINE__, label ? label : "check_mat2x2_d expected allocation failed");
+        test_mark_failure(__FILE__, __LINE__, label ? label : "check_mat2x2_d want allocation failed");
         return;
     }
     (void)test_assert_matrix_d_close(R, E, tol, __FILE__, __LINE__);
@@ -3244,7 +3244,7 @@ static void check_unary_jordan_2x2_mp_real(const char *label, matrix_t *(*fun)(c
     num_destroy(&evals[3]);
 
     check_bool("2x2 qfloat Jordan input allocated", A != NULL);
-    check_bool("2x2 qfloat Jordan expected allocated", E != NULL);
+    check_bool("2x2 qfloat Jordan want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3271,7 +3271,7 @@ static void check_unary_diagonal_2x2_d(const char *label, matrix_t *(*fun)(const
     matrix_t *E = test_mat_create_d(2, 2, evals);
 
     check_bool("2x2 diagonal input allocated", A != NULL);
-    check_bool("2x2 diagonal expected allocated", E != NULL);
+    check_bool("2x2 diagonal want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3302,7 +3302,7 @@ static void check_unary_diagonal_2x2_mp_real(const char *label, matrix_t *(*fun)
     num_destroy(&evals[3]);
 
     check_bool("2x2 qfloat diagonal input allocated", A != NULL);
-    check_bool("2x2 qfloat diagonal expected allocated", E != NULL);
+    check_bool("2x2 qfloat diagonal want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3438,7 +3438,7 @@ static void check_unary_jordan_2x2_d(const char *label, matrix_t *(*fun)(const m
     matrix_t *E = test_mat_create_d(2, 2, evals);
 
     check_bool("2x2 Jordan input allocated", A != NULL);
-    check_bool("2x2 Jordan expected allocated", E != NULL);
+    check_bool("2x2 Jordan want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3465,7 +3465,7 @@ static void check_unary_diagonal_2x2_complex(const char *label, matrix_t *(*fun)
     matrix_t *E = test_mat_create_complex(2, 2, evals);
 
     check_bool("2x2 qcomplex diagonal input allocated", A != NULL);
-    check_bool("2x2 qcomplex diagonal expected allocated", E != NULL);
+    check_bool("2x2 qcomplex diagonal want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3492,7 +3492,7 @@ static void check_unary_jordan_3x3_d(const char *label, matrix_t *(*fun)(const m
     matrix_t *E = test_mat_create_d(3, 3, evals);
 
     check_bool("3x3 Jordan input allocated", A != NULL);
-    check_bool("3x3 Jordan expected allocated", E != NULL);
+    check_bool("3x3 Jordan want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3520,7 +3520,7 @@ static void check_unary_diagonal_3x3_complex(const char *label, matrix_t *(*fun)
     matrix_t *E = test_mat_create_complex(3, 3, evals);
 
     check_bool("3x3 qcomplex diagonal input allocated", A != NULL);
-    check_bool("3x3 qcomplex diagonal expected allocated", E != NULL);
+    check_bool("3x3 qcomplex diagonal want allocated", E != NULL);
     if (!A || !E) {
         mat_free(A);
         mat_free(E);
@@ -3707,7 +3707,7 @@ static void test_mat_neg_convenience(void)
     matrix_t *A = test_mat_create_d(2, 2, exprs);
     matrix_t *E = test_mat_create_d(2, 2, dexp);
     check_bool("double neg input allocated", A != NULL);
-    check_bool("double neg expected allocated", E != NULL);
+    check_bool("double neg want allocated", E != NULL);
     if (A && E) {
         print_md("A", A);
         matrix_t *N = mat_neg(A);
@@ -3732,7 +3732,7 @@ static void test_mat_neg_convenience(void)
     matrix_t *Q = test_mat_create_complex(1, 2, qvals);
     matrix_t *QE = test_mat_create_complex(1, 2, qexp);
     check_bool("qcomplex neg input allocated", Q != NULL);
-    check_bool("qcomplex neg expected allocated", QE != NULL);
+    check_bool("qcomplex neg want allocated", QE != NULL);
     if (Q && QE) {
         print_mqc("Q", Q);
         matrix_t *QN = mat_neg(Q);
@@ -4559,15 +4559,15 @@ static char *format_matrix_error_for_test_output(const number_t value)
     return out;
 }
 
-static number_t matrix_number_error_magnitude(const number_t got, const number_t expected)
+static number_t matrix_number_error_magnitude(const number_t got, const number_t want)
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u)
-        (void)num_set_prec_bits(&promoted_got, num_get_prec_bits(expected));
-    diff = num_sub(promoted_got, expected);
+    if (num_get_prec_bits(want) > 0u)
+        (void)num_set_prec_bits(&promoted_got, num_get_prec_bits(want));
+    diff = num_sub(promoted_got, want);
     num_destroy(&promoted_got);
 
     if (num_is_real(diff)) {
@@ -4598,24 +4598,24 @@ static number_t matrix_number_error_magnitude(const number_t got, const number_t
     }
 }
 
-static void print_matrix_precision_comparison(const char *label, const number_t got, const number_t expected)
+static void print_matrix_precision_comparison(const char *label, const number_t got, const number_t want)
 {
-    char *expected_text = NULL;
+    char *want_text = NULL;
     char *got_text = NULL;
     char *error_text = NULL;
     number_t error;
 
-    expected_text = format_matrix_number_for_test_output(expected);
+    want_text = format_matrix_number_for_test_output(want);
     got_text = format_matrix_number_for_test_output(got);
-    error = matrix_number_error_magnitude(got, expected);
+    error = matrix_number_error_magnitude(got, want);
     error_text = format_matrix_error_for_test_output(error);
 
-    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(want_text);
     ASSERT_NOT_NULL(got_text);
     ASSERT_NOT_NULL(error_text);
 
     printf("    %s\n", label);
-    printf("        expected = %s\n", expected_text);
+    printf("        want = %s\n", want_text);
     printf("        got      = %s\n", got_text);
     printf("        error    = %s\n", error_text);
     printf("        precision: %zu bits, %zu significant digits\n", num_get_prec_bits(got), num_get_prec_digits(got));
@@ -4623,7 +4623,7 @@ static void print_matrix_precision_comparison(const char *label, const number_t 
     free(error_text);
     num_destroy(&error);
     free(got_text);
-    free(expected_text);
+    free(want_text);
 }
 
 static void check_number_upper_jordan_from_expr(const char *label, matrix_t *(*mat_fun)(const matrix_t *),
@@ -4637,8 +4637,8 @@ static void check_number_upper_jordan_from_expr(const char *label, matrix_t *(*m
     expr_t *expr = NULL;
     expr_t *deriv = NULL;
     number_t lambda;
-    number_t expected_diag;
-    number_t expected_offdiag;
+    number_t want_diag;
+    number_t want_offdiag;
     number_t got;
     number_t err;
     number_t tol;
@@ -4663,29 +4663,29 @@ static void check_number_upper_jordan_from_expr(const char *label, matrix_t *(*m
 
     if (R && expr && deriv) {
         tol = num_create_from_string(tol_text);
-        expected_diag = expr_eval(expr);
-        expected_offdiag = expr_eval(deriv);
+        want_diag = expr_eval(expr);
+        want_offdiag = expr_eval(deriv);
 
         got = mat_get_num(R, 0, 0);
-        err = matrix_number_error_magnitude(got, expected_diag);
+        err = matrix_number_error_magnitude(got, want_diag);
         check_bool("number upper Jordan [0,0] matches scalar value", num_le(err, tol));
         check_bool("number upper Jordan [0,0] preserves precision", num_get_prec_bits(got) >= prec_bits);
-        print_matrix_precision_comparison(label, got, expected_diag);
+        print_matrix_precision_comparison(label, got, want_diag);
         num_destroy(&err);
         num_destroy(&got);
 
         got = mat_get_num(R, 0, 1);
-        err = matrix_number_error_magnitude(got, expected_offdiag);
+        err = matrix_number_error_magnitude(got, want_offdiag);
         check_bool("number upper Jordan [0,1] matches scalar derivative", num_le(err, tol));
         check_bool("number upper Jordan [0,1] preserves precision", num_get_prec_bits(got) >= prec_bits);
-        print_matrix_precision_comparison("    derivative entry", got, expected_offdiag);
+        print_matrix_precision_comparison("    derivative entry", got, want_offdiag);
         num_destroy(&err);
         num_destroy(&got);
 
         check_bool("number upper Jordan preserves upper-triangular structure", mat_is_upper_triangular(R));
 
-        num_destroy(&expected_offdiag);
-        num_destroy(&expected_diag);
+        num_destroy(&want_offdiag);
+        num_destroy(&want_diag);
         num_destroy(&tol);
     }
 
@@ -4718,7 +4718,7 @@ static void test_number_matrix_functions(void)
     number_t jordan_acosh_data[4];
     number_t jordan_atan_data[4];
     number_t jordan_atanh_data[4];
-    number_t expected;
+    number_t want;
     number_t got;
     matrix_t *A_real = NULL;
     matrix_t *A_complex = NULL;
@@ -4767,8 +4767,8 @@ static void test_number_matrix_functions(void)
         number_t pinv_diag[2] = {num_create_from_string("2"), num_create_from_string("4")};
         matrix_t *A_pinv = mat_create_diagonal_num(2, pinv_diag);
         matrix_t *P = mat_pseudoinverse(A_pinv);
-        number_t expected00 = num_create_from_string("0.5");
-        number_t expected11 = num_create_from_string("0.25");
+        number_t want00 = num_create_from_string("0.5");
+        number_t want11 = num_create_from_string("0.25");
 
         check_bool("mat_pseudoinverse(number diagonal) not NULL", P != NULL);
         check_bool("mat_pseudoinverse(number diagonal) -> MAT_TYPE_NUMBER",
@@ -4776,14 +4776,14 @@ static void test_number_matrix_functions(void)
         if (P) {
             number_t got00 = mat_get_num(P, 0, 0);
             number_t got11 = mat_get_num(P, 1, 1);
-            check_bool("mat_pseudoinverse(number diagonal)[0,0] = 1/2", num_eq(got00, expected00));
-            check_bool("mat_pseudoinverse(number diagonal)[1,1] = 1/4", num_eq(got11, expected11));
+            check_bool("mat_pseudoinverse(number diagonal)[0,0] = 1/2", num_eq(got00, want00));
+            check_bool("mat_pseudoinverse(number diagonal)[1,1] = 1/4", num_eq(got11, want11));
             num_destroy(&got00);
             num_destroy(&got11);
         }
 
-        num_destroy(&expected00);
-        num_destroy(&expected11);
+        num_destroy(&want00);
+        num_destroy(&want11);
         mat_free(P);
         mat_free(A_pinv);
         num_destroy(&pinv_diag[0]);
@@ -4800,31 +4800,31 @@ static void test_number_matrix_functions(void)
 
     if (E) {
         got = mat_get_num(E, 0, 0);
-        expected = num_exp(diag_real[0]);
-        check_bool("mat_exp(number diagonal)[0,0] matches num_exp", num_eq(got, expected));
+        want = num_exp(diag_real[0]);
+        check_bool("mat_exp(number diagonal)[0,0] matches num_exp", num_eq(got, want));
         check_bool("mat_exp(number diagonal)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("exp(diag_real)[0,0]", got, expected);
-        num_destroy(&expected);
+        print_matrix_precision_comparison("exp(diag_real)[0,0]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
     }
 
     if (L) {
         got = mat_get_num(L, 1, 1);
-        expected = num_log(diag_real[1]);
-        check_bool("mat_log(number diagonal)[1,1] matches num_log", num_eq(got, expected));
+        want = num_log(diag_real[1]);
+        check_bool("mat_log(number diagonal)[1,1] matches num_log", num_eq(got, want));
         check_bool("mat_log(number diagonal)[1,1] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("log(diag_real)[1,1]", got, expected);
-        num_destroy(&expected);
+        print_matrix_precision_comparison("log(diag_real)[1,1]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
     }
 
     if (R) {
         got = mat_get_num(R, 0, 0);
-        expected = num_sqrt(diag_real[0]);
-        check_bool("mat_sqrt(number diagonal)[0,0] matches num_sqrt", num_eq(got, expected));
+        want = num_sqrt(diag_real[0]);
+        check_bool("mat_sqrt(number diagonal)[0,0] matches num_sqrt", num_eq(got, want));
         check_bool("mat_sqrt(number diagonal)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("sqrt(diag_real)[0,0]", got, expected);
-        num_destroy(&expected);
+        print_matrix_precision_comparison("sqrt(diag_real)[0,0]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
     }
 
@@ -4837,12 +4837,12 @@ static void test_number_matrix_functions(void)
                J_confluent_exp != NULL && mat_typeof(J_confluent_exp) == MAT_TYPE_NUMBER);
 
     if (J_confluent_exp) {
-        qcomplex_t expected00 = qc_make(QF_ONE, QF_ZERO);
-        qcomplex_t expected11 = qc_make(qf_from_double(exp(2.0)), QF_ZERO);
-        qcomplex_t expected22 = qc_make(QF_ONE, QF_ZERO);
-        qcomplex_t expected01 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
-        qcomplex_t expected12 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
-        qcomplex_t expected02 = qc_make(qf_from_double((exp(2.0) + 1.0) / 4.0), QF_ZERO);
+        qcomplex_t want00 = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t want11 = qc_make(qf_from_double(exp(2.0)), QF_ZERO);
+        qcomplex_t want22 = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t want01 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
+        qcomplex_t want12 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
+        qcomplex_t want02 = qc_make(qf_from_double((exp(2.0) + 1.0) / 4.0), QF_ZERO);
         number_t got00, got11, got22, got01, got12, got02;
 
         got00 = mat_get_num(J_confluent_exp, 0, 0);
@@ -4852,12 +4852,12 @@ static void test_number_matrix_functions(void)
         got12 = mat_get_num(J_confluent_exp, 1, 2);
         got02 = mat_get_num(J_confluent_exp, 0, 2);
 
-        check_qc_val("exp(confluent upper triangular)[0,0] = 1", num_to_qcomplex(got00), expected00, 1e-10);
-        check_qc_val("exp(confluent upper triangular)[1,1] = exp(2)", num_to_qcomplex(got11), expected11, 1e-10);
-        check_qc_val("exp(confluent upper triangular)[2,2] = 1", num_to_qcomplex(got22), expected22, 1e-10);
-        check_qc_val("exp(confluent upper triangular)[0,1]", num_to_qcomplex(got01), expected01, 1e-10);
-        check_qc_val("exp(confluent upper triangular)[1,2]", num_to_qcomplex(got12), expected12, 1e-10);
-        check_qc_val("exp(confluent upper triangular)[0,2]", num_to_qcomplex(got02), expected02, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[0,0] = 1", num_to_qcomplex(got00), want00, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[1,1] = exp(2)", num_to_qcomplex(got11), want11, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[2,2] = 1", num_to_qcomplex(got22), want22, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[0,1]", num_to_qcomplex(got01), want01, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[1,2]", num_to_qcomplex(got12), want12, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[0,2]", num_to_qcomplex(got02), want02, 1e-10);
 
         num_destroy(&got00);
         num_destroy(&got11);
@@ -4879,11 +4879,11 @@ static void test_number_matrix_functions(void)
 
     if (S) {
         got = mat_get_num(S, 0, 0);
-        expected = num_sin(diag_complex[0]);
-        check_bool("mat_sin(number complex diagonal)[0,0] matches num_sin", num_eq(got, expected));
+        want = num_sin(diag_complex[0]);
+        check_bool("mat_sin(number complex diagonal)[0,0] matches num_sin", num_eq(got, want));
         check_bool("mat_sin(number complex diagonal)[0,0] preserves precision", num_get_prec_bits(got) == 384u);
-        print_matrix_precision_comparison("sin(diag_complex)[0,0]", got, expected);
-        num_destroy(&expected);
+        print_matrix_precision_comparison("sin(diag_complex)[0,0]", got, want);
+        num_destroy(&want);
         num_destroy(&got);
     }
 
@@ -4931,19 +4931,19 @@ static void test_number_matrix_functions(void)
     check_bool("mat_exp(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
                Jexp != NULL && mat_typeof(Jexp) == MAT_TYPE_NUMBER);
     if (Jexp) {
-        expected = num_exp(jordan_upper_data[0]);
+        want = num_exp(jordan_upper_data[0]);
         got = mat_get_num(Jexp, 0, 0);
-        check_bool("exp(number upper Jordan)[0,0] matches exp(lambda)", num_eq(got, expected));
+        check_bool("exp(number upper Jordan)[0,0] matches exp(lambda)", num_eq(got, want));
         check_bool("exp(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("exp(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("exp(number upper Jordan)[0,0]", got, want);
         num_destroy(&got);
 
         got = mat_get_num(Jexp, 0, 1);
-        check_bool("exp(number upper Jordan)[0,1] matches exp(lambda)", num_eq(got, expected));
+        check_bool("exp(number upper Jordan)[0,1] matches exp(lambda)", num_eq(got, want));
         check_bool("exp(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("exp(number upper Jordan)[0,1]", got, expected);
+        print_matrix_precision_comparison("exp(number upper Jordan)[0,1]", got, want);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
         check_bool("exp(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(Jexp));
     }
     mat_free(Jexp);
@@ -4965,13 +4965,13 @@ static void test_number_matrix_functions(void)
     check_bool("mat_exp(number lower Jordan high precision) -> MAT_TYPE_NUMBER",
                Jexp != NULL && mat_typeof(Jexp) == MAT_TYPE_NUMBER);
     if (Jexp) {
-        expected = num_exp(jordan_lower_data[0]);
+        want = num_exp(jordan_lower_data[0]);
         got = mat_get_num(Jexp, 1, 0);
-        check_bool("exp(number lower Jordan)[1,0] matches exp(lambda)", num_eq(got, expected));
+        check_bool("exp(number lower Jordan)[1,0] matches exp(lambda)", num_eq(got, want));
         check_bool("exp(number lower Jordan)[1,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("exp(number lower Jordan)[1,0]", got, expected);
+        print_matrix_precision_comparison("exp(number lower Jordan)[1,0]", got, want);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
         check_bool("exp(number lower Jordan) preserves lower-triangular structure", mat_is_lower_triangular(Jexp));
     }
     mat_free(L);
@@ -4991,21 +4991,21 @@ static void test_number_matrix_functions(void)
     check_bool("mat_log(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
                L != NULL && mat_typeof(L) == MAT_TYPE_NUMBER);
     if (L) {
-        expected = num_log(jordan_log_data[0]);
+        want = num_log(jordan_log_data[0]);
         got = mat_get_num(L, 0, 0);
-        check_bool("log(number upper Jordan)[0,0] matches log(lambda)", num_eq(got, expected));
+        check_bool("log(number upper Jordan)[0,0] matches log(lambda)", num_eq(got, want));
         check_bool("log(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("log(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("log(number upper Jordan)[0,0]", got, want);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
-        expected = num_inv(jordan_log_data[0]);
+        want = num_inv(jordan_log_data[0]);
         got = mat_get_num(L, 0, 1);
-        check_bool("log(number upper Jordan)[0,1] matches 1/lambda", num_eq(got, expected));
+        check_bool("log(number upper Jordan)[0,1] matches 1/lambda", num_eq(got, want));
         check_bool("log(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("log(number upper Jordan)[0,1]", got, expected);
+        print_matrix_precision_comparison("log(number upper Jordan)[0,1]", got, want);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
         check_bool("log(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(L));
     }
 
@@ -5023,33 +5023,33 @@ static void test_number_matrix_functions(void)
     if (R) {
         number_t two = num_create_from_long(2);
 
-        expected = num_sqrt(jordan_sqrt_data[0]);
+        want = num_sqrt(jordan_sqrt_data[0]);
         got = mat_get_num(R, 0, 0);
-        check_bool("sqrt(number upper Jordan)[0,0] matches sqrt(lambda)", num_eq(got, expected));
+        check_bool("sqrt(number upper Jordan)[0,0] matches sqrt(lambda)", num_eq(got, want));
         check_bool("sqrt(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) == 512u);
-        print_matrix_precision_comparison("sqrt(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("sqrt(number upper Jordan)[0,0]", got, want);
         num_destroy(&got);
 
         {
-            number_t denom = num_mul(two, expected);
-            number_t offdiag_expected = num_inv(denom);
+            number_t denom = num_mul(two, want);
+            number_t offdiag_want = num_inv(denom);
             number_t offdiag_error;
             number_t offdiag_tolerance = num_create_from_string("1e-150");
 
             got = mat_get_num(R, 0, 1);
-            offdiag_error = matrix_number_error_magnitude(got, offdiag_expected);
+            offdiag_error = matrix_number_error_magnitude(got, offdiag_want);
             check_bool("sqrt(number upper Jordan)[0,1] matches 1/(2*sqrt(lambda))",
                        num_le(offdiag_error, offdiag_tolerance));
             check_bool("sqrt(number upper Jordan)[0,1] does not lose precision", num_get_prec_bits(got) >= 512u);
-            print_matrix_precision_comparison("sqrt(number upper Jordan)[0,1]", got, offdiag_expected);
+            print_matrix_precision_comparison("sqrt(number upper Jordan)[0,1]", got, offdiag_want);
             num_destroy(&offdiag_tolerance);
             num_destroy(&offdiag_error);
             num_destroy(&got);
-            num_destroy(&offdiag_expected);
+            num_destroy(&offdiag_want);
             num_destroy(&denom);
         }
 
-        num_destroy(&expected);
+        num_destroy(&want);
         num_destroy(&two);
         check_bool("sqrt(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(R));
     }
@@ -5237,19 +5237,19 @@ static void test_number_matrix_functions(void)
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t inside = num_sub(NUM_ONE, lambda_sq);
         number_t root = num_sqrt(inside);
-        number_t deriv_expected = num_inv(root);
+        number_t deriv_want = num_inv(root);
         number_t err;
 
         num_destroy(&root);
 
-        expected = num_asin(lambda);
+        want = num_asin(lambda);
         got = mat_get_num(ASN, 0, 0);
         {
             number_t got_real = num_real_part(got);
             number_t got_imag = num_imag_part(got);
             number_t imag_err = num_abs(got_imag);
 
-            err = matrix_number_error_magnitude(got_real, expected);
+            err = matrix_number_error_magnitude(got_real, want);
             check_bool("asin(number upper Jordan)[0,0] has negligible imaginary part", num_le(imag_err, imag_tol));
             num_destroy(&imag_err);
             num_destroy(&got_imag);
@@ -5257,16 +5257,16 @@ static void test_number_matrix_functions(void)
         }
         check_bool("asin(number upper Jordan)[0,0] matches asin(lambda)", num_le(err, tol));
         check_bool("asin(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("asin(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("asin(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(ASN, 0, 1);
-        err = matrix_number_error_magnitude(got, deriv_expected);
+        err = matrix_number_error_magnitude(got, deriv_want);
         check_bool("asin(number upper Jordan)[0,1] matches 1/sqrt(1-lambda^2)", num_le(err, tol));
         check_bool("asin(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("asin(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("asin(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("asin(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(ASN));
@@ -5276,7 +5276,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lambda_sq);
         num_destroy(&inside);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     jordan_acos_data[0] = num_create_from_string("0.25");
@@ -5298,20 +5298,20 @@ static void test_number_matrix_functions(void)
         number_t inside = num_sub(NUM_ONE, lambda_sq);
         number_t root = num_sqrt(inside);
         number_t inverse = num_inv(root);
-        number_t deriv_expected = num_neg(inverse);
+        number_t deriv_want = num_neg(inverse);
         number_t err;
 
         num_destroy(&inverse);
         num_destroy(&root);
 
-        expected = num_acos(lambda);
+        want = num_acos(lambda);
         got = mat_get_num(ACS, 0, 0);
         {
             number_t got_real = num_real_part(got);
             number_t got_imag = num_imag_part(got);
             number_t imag_err = num_abs(got_imag);
 
-            err = matrix_number_error_magnitude(got_real, expected);
+            err = matrix_number_error_magnitude(got_real, want);
             check_bool("acos(number upper Jordan)[0,0] has negligible imaginary part", num_le(imag_err, imag_tol));
             num_destroy(&imag_err);
             num_destroy(&got_imag);
@@ -5319,16 +5319,16 @@ static void test_number_matrix_functions(void)
         }
         check_bool("acos(number upper Jordan)[0,0] matches acos(lambda)", num_le(err, tol));
         check_bool("acos(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("acos(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("acos(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(ACS, 0, 1);
-        err = matrix_number_error_magnitude(got, deriv_expected);
+        err = matrix_number_error_magnitude(got, deriv_want);
         check_bool("acos(number upper Jordan)[0,1] matches -1/sqrt(1-lambda^2)", num_le(err, tol));
         check_bool("acos(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("acos(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("acos(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("acos(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(ACS));
@@ -5338,7 +5338,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lambda_sq);
         num_destroy(&inside);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     jordan_asinh_data[0] = num_create_from_string("1.25");
@@ -5358,26 +5358,26 @@ static void test_number_matrix_functions(void)
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t inside = num_add(lambda_sq, NUM_ONE);
         number_t root = num_sqrt(inside);
-        number_t deriv_expected = num_inv(root);
+        number_t deriv_want = num_inv(root);
         number_t err;
 
         num_destroy(&root);
 
-        expected = num_asinh(lambda);
+        want = num_asinh(lambda);
         got = mat_get_num(ASH, 0, 0);
-        err = matrix_number_error_magnitude(got, expected);
+        err = matrix_number_error_magnitude(got, want);
         check_bool("asinh(number upper Jordan)[0,0] matches asinh(lambda)", num_le(err, tol));
         check_bool("asinh(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("asinh(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("asinh(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(ASH, 0, 1);
-        err = matrix_number_error_magnitude(got, deriv_expected);
+        err = matrix_number_error_magnitude(got, deriv_want);
         check_bool("asinh(number upper Jordan)[0,1] matches 1/sqrt(1+lambda^2)", num_le(err, tol));
         check_bool("asinh(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("asinh(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("asinh(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("asinh(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(ASH));
@@ -5386,7 +5386,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lambda_sq);
         num_destroy(&inside);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     jordan_acosh_data[0] = num_create_from_string("1.25");
@@ -5408,28 +5408,28 @@ static void test_number_matrix_functions(void)
         number_t left_root = num_sqrt(lm1);
         number_t right_root = num_sqrt(lp1);
         number_t root_product = num_mul(left_root, right_root);
-        number_t deriv_expected = num_inv(root_product);
+        number_t deriv_want = num_inv(root_product);
         number_t err;
 
         num_destroy(&root_product);
         num_destroy(&right_root);
         num_destroy(&left_root);
 
-        expected = num_acosh(lambda);
+        want = num_acosh(lambda);
         got = mat_get_num(ACH, 0, 0);
-        err = matrix_number_error_magnitude(got, expected);
+        err = matrix_number_error_magnitude(got, want);
         check_bool("acosh(number upper Jordan)[0,0] matches acosh(lambda)", num_le(err, tol));
         check_bool("acosh(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("acosh(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("acosh(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(ACH, 0, 1);
-        err = matrix_number_error_magnitude(got, deriv_expected);
+        err = matrix_number_error_magnitude(got, deriv_want);
         check_bool("acosh(number upper Jordan)[0,1] matches 1/(sqrt(lambda-1)*sqrt(lambda+1))", num_le(err, tol));
         check_bool("acosh(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("acosh(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("acosh(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("acosh(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(ACH));
@@ -5438,7 +5438,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lm1);
         num_destroy(&lp1);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     jordan_atan_data[0] = num_create_from_string("0.25");
@@ -5457,18 +5457,18 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_atan_data[0]);
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t denom = num_add(NUM_ONE, lambda_sq);
-        number_t deriv_expected = num_inv(denom);
+        number_t deriv_want = num_inv(denom);
         number_t err;
 
-        expected = num_atan(lambda);
+        want = num_atan(lambda);
         got = mat_get_num(AT, 0, 0);
-        err = matrix_number_error_magnitude(got, expected);
+        err = matrix_number_error_magnitude(got, want);
         check_bool("atan(number upper Jordan)[0,0] matches atan(lambda)", num_le(err, tol));
         check_bool("atan(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("atan(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("atan(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(AT, 0, 1);
         {
@@ -5476,7 +5476,7 @@ static void test_number_matrix_functions(void)
             number_t got_imag = num_imag_part(got);
             number_t imag_err = num_abs(got_imag);
 
-            err = matrix_number_error_magnitude(got_real, deriv_expected);
+            err = matrix_number_error_magnitude(got_real, deriv_want);
             check_bool("atan(number upper Jordan)[0,1] has negligible imaginary part", num_le(imag_err, tol));
             num_destroy(&imag_err);
             num_destroy(&got_imag);
@@ -5484,7 +5484,7 @@ static void test_number_matrix_functions(void)
         }
         check_bool("atan(number upper Jordan)[0,1] matches 1/(1+lambda^2)", num_le(err, tol));
         check_bool("atan(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("atan(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("atan(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("atan(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(AT));
@@ -5493,7 +5493,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lambda_sq);
         num_destroy(&denom);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     jordan_atanh_data[0] = num_create_from_string("0.25");
@@ -5512,24 +5512,24 @@ static void test_number_matrix_functions(void)
         number_t lambda = num_clone(jordan_atanh_data[0]);
         number_t lambda_sq = num_mul(lambda, lambda);
         number_t denom = num_sub(NUM_ONE, lambda_sq);
-        number_t deriv_expected = num_inv(denom);
+        number_t deriv_want = num_inv(denom);
         number_t err;
 
-        expected = num_atanh(lambda);
+        want = num_atanh(lambda);
         got = mat_get_num(ATH, 0, 0);
-        err = matrix_number_error_magnitude(got, expected);
+        err = matrix_number_error_magnitude(got, want);
         check_bool("atanh(number upper Jordan)[0,0] matches atanh(lambda)", num_le(err, tol));
         check_bool("atanh(number upper Jordan)[0,0] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("atanh(number upper Jordan)[0,0]", got, expected);
+        print_matrix_precision_comparison("atanh(number upper Jordan)[0,0]", got, want);
         num_destroy(&err);
         num_destroy(&got);
-        num_destroy(&expected);
+        num_destroy(&want);
 
         got = mat_get_num(ATH, 0, 1);
-        err = matrix_number_error_magnitude(got, deriv_expected);
+        err = matrix_number_error_magnitude(got, deriv_want);
         check_bool("atanh(number upper Jordan)[0,1] matches 1/(1-lambda^2)", num_le(err, tol));
         check_bool("atanh(number upper Jordan)[0,1] preserves precision", num_get_prec_bits(got) >= 512u);
-        print_matrix_precision_comparison("atanh(number upper Jordan)[0,1]", got, deriv_expected);
+        print_matrix_precision_comparison("atanh(number upper Jordan)[0,1]", got, deriv_want);
         num_destroy(&err);
         num_destroy(&got);
         check_bool("atanh(number upper Jordan) preserves upper-triangular structure", mat_is_upper_triangular(ATH));
@@ -5538,7 +5538,7 @@ static void test_number_matrix_functions(void)
         num_destroy(&lambda);
         num_destroy(&lambda_sq);
         num_destroy(&denom);
-        num_destroy(&deriv_expected);
+        num_destroy(&deriv_want);
     }
 
     check_number_upper_jordan_from_expr("gamma(number upper Jordan)[0,0]", mat_gamma, expr_gamma, "2.5", 512u, "1e-90");
@@ -6184,9 +6184,9 @@ static void test_expr_matrix_functions_extended(void)
         matrix_t *S = NULL;
         matrix_t *Aqc = NULL;
         matrix_t *Eqc = NULL;
-        matrix_t *Eqc_expected = NULL;
+        matrix_t *Eqc_want = NULL;
         matrix_t *Sqc = NULL;
-        matrix_t *Sqc_expected = NULL;
+        matrix_t *Sqc_want = NULL;
         expr_t *v = NULL;
 
         check_bool("dense expr biquadratic quartic 4x4 input not NULL", A != NULL);
@@ -6203,21 +6203,21 @@ static void test_expr_matrix_functions_extended(void)
             Aqc = test_mat_evaluate_complex(A);
             Eqc = test_mat_evaluate_complex(E);
             Sqc = test_mat_evaluate_complex(S);
-            Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
-            Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
+            Eqc_want = Aqc ? mat_exp(Aqc) : NULL;
+            Sqc_want = Aqc ? mat_sin(Aqc) : NULL;
 
             check_bool("dense expr biquadratic quartic 4x4 evaluated exp not NULL", Eqc != NULL);
             check_bool("dense expr biquadratic quartic 4x4 evaluated sin not NULL", Sqc != NULL);
-            check_bool("dense expr biquadratic quartic 4x4 numeric exp baseline not NULL", Eqc_expected != NULL);
-            check_bool("dense expr biquadratic quartic 4x4 numeric sin baseline not NULL", Sqc_expected != NULL);
-            if (Eqc && Eqc_expected) {
-                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_expected, 1e-12, __FILE__, __LINE__);
+            check_bool("dense expr biquadratic quartic 4x4 numeric exp baseline not NULL", Eqc_want != NULL);
+            check_bool("dense expr biquadratic quartic 4x4 numeric sin baseline not NULL", Sqc_want != NULL);
+            if (Eqc && Eqc_want) {
+                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(Aqc);
                     mat_free(Eqc);
-                    mat_free(Eqc_expected);
+                    mat_free(Eqc_want);
                     mat_free(Sqc);
-                    mat_free(Sqc_expected);
+                    mat_free(Sqc_want);
                     mat_free(A);
                     mat_free(E);
                     mat_free(S);
@@ -6225,14 +6225,14 @@ static void test_expr_matrix_functions_extended(void)
                     return;
                 }
             }
-            if (Sqc && Sqc_expected) {
-                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_expected, 1e-12, __FILE__, __LINE__);
+            if (Sqc && Sqc_want) {
+                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(Aqc);
                     mat_free(Eqc);
-                    mat_free(Eqc_expected);
+                    mat_free(Eqc_want);
                     mat_free(Sqc);
-                    mat_free(Sqc_expected);
+                    mat_free(Sqc_want);
                     mat_free(A);
                     mat_free(E);
                     mat_free(S);
@@ -6253,14 +6253,14 @@ static void test_expr_matrix_functions_extended(void)
 
         mat_free(Aqc);
         mat_free(Eqc);
-        mat_free(Eqc_expected);
+        mat_free(Eqc_want);
         mat_free(Sqc);
-        mat_free(Sqc_expected);
+        mat_free(Sqc_want);
         Aqc = NULL;
         Eqc = NULL;
-        Eqc_expected = NULL;
+        Eqc_want = NULL;
         Sqc = NULL;
-        Sqc_expected = NULL;
+        Sqc_want = NULL;
 
         if (bindings) {
             check_bool("dense expr biquadratic quartic 4x4 update x", test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
@@ -6270,17 +6270,17 @@ static void test_expr_matrix_functions_extended(void)
             Aqc = test_mat_evaluate_complex(A);
             Eqc = test_mat_evaluate_complex(E);
             Sqc = test_mat_evaluate_complex(S);
-            Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
-            Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
+            Eqc_want = Aqc ? mat_exp(Aqc) : NULL;
+            Sqc_want = Aqc ? mat_sin(Aqc) : NULL;
 
-            if (Eqc && Eqc_expected) {
-                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_expected, 1e-12, __FILE__, __LINE__);
+            if (Eqc && Eqc_want) {
+                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(Aqc);
                     mat_free(Eqc);
-                    mat_free(Eqc_expected);
+                    mat_free(Eqc_want);
                     mat_free(Sqc);
-                    mat_free(Sqc_expected);
+                    mat_free(Sqc_want);
                     mat_free(A);
                     mat_free(E);
                     mat_free(S);
@@ -6288,14 +6288,14 @@ static void test_expr_matrix_functions_extended(void)
                     return;
                 }
             }
-            if (Sqc && Sqc_expected) {
-                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_expected, 1e-12, __FILE__, __LINE__);
+            if (Sqc && Sqc_want) {
+                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_want, 1e-12, __FILE__, __LINE__);
                 if (!ok) {
                     mat_free(Aqc);
                     mat_free(Eqc);
-                    mat_free(Eqc_expected);
+                    mat_free(Eqc_want);
                     mat_free(Sqc);
-                    mat_free(Sqc_expected);
+                    mat_free(Sqc_want);
                     mat_free(A);
                     mat_free(E);
                     mat_free(S);
@@ -6307,9 +6307,9 @@ static void test_expr_matrix_functions_extended(void)
 
         mat_free(Aqc);
         mat_free(Eqc);
-        mat_free(Eqc_expected);
+        mat_free(Eqc_want);
         mat_free(Sqc);
-        mat_free(Sqc_expected);
+        mat_free(Sqc_want);
         mat_free(A);
         mat_free(E);
         mat_free(S);

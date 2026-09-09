@@ -300,17 +300,17 @@ static void prune_unseen_entries(void)
     for (size_t i = 0u; i < json_object_size(g_seen_root); ++i) {
         const string_t *file_key = json_object_key_at(g_seen_root, i);
         const json_t *seen_file = json_object_value_at(g_seen_root, i);
-        const json_t *actual_file;
+        const json_t *got_file;
         json_t *pruned;
 
         if (!file_key || !seen_file)
             continue;
 
-        actual_file = json_object_get(g_root, file_key);
-        if (!actual_file || json_type(actual_file) != JSON_OBJECT)
+        got_file = json_object_get(g_root, file_key);
+        if (!got_file || json_type(got_file) != JSON_OBJECT)
             continue;
 
-        pruned = test_config_create_pruned_json_object(actual_file, seen_file, true);
+        pruned = test_config_create_pruned_json_object(got_file, seen_file, true);
         (void)test_config_json_object_set_key(g_root, file_key, pruned);
         json_free(pruned);
     }

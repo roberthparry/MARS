@@ -9,22 +9,22 @@ static void test_qd_sprintf_basic(void)
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%Q", x);
 
-    char expected[256];
-    test_qf_to_buffer(x, expected, sizeof(expected));
+    char want[256];
+    test_qf_to_buffer(x, want, sizeof(want));
 
     /* %Q uses uppercase E */
-    char *e = strchr(expected, 'e');
+    char *e = strchr(want, 'e');
     if (e)
         *e = 'E';
 
-    if (strcmp(buf, expected) == 0) {
+    if (strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: basic %%Q\n" C_RESET);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
     } else {
         printf(C_RED "  FAIL: basic %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
         TEST_FAIL();
     }
 }
@@ -51,17 +51,17 @@ static void test_qd_sprintf_multiple(void)
     if (e2)
         *e2 = 'E';
 
-    char expected[256];
-    snprintf(expected, sizeof(expected), "A=%s B=%s", ea, eb);
+    char want[256];
+    snprintf(want, sizeof(want), "A=%s B=%s", ea, eb);
 
-    if (strcmp(buf, expected) == 0) {
+    if (strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: multiple %%Q\n" C_RESET);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
     } else {
         printf(C_RED "  FAIL: multiple %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
         TEST_FAIL();
     }
 }
@@ -75,17 +75,17 @@ static void test_qd_sprintf_mixed(void)
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", x, 42, "hello");
 
-    char expected[256];
-    snprintf(expected, sizeof(expected), "x=2.500000000000000000000000000000000E+0 int=42 str=hello");
+    char want[256];
+    snprintf(want, sizeof(want), "x=2.500000000000000000000000000000000E+0 int=42 str=hello");
 
-    if (strcmp(buf, expected) == 0) {
+    if (strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: mixed specifiers\n" C_RESET);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
     } else {
         printf(C_RED "  FAIL: mixed specifiers  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
         TEST_FAIL();
     }
 }
@@ -159,16 +159,16 @@ static void test_qd_sprintf_q_precision(void)
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%.10q", x);
 
-    const char *expected = "3.1415926536";
+    const char *want = "3.1415926536";
 
-    if (strcmp(buf, expected) == 0) {
+    if (strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: precision %%.10q\n" C_RESET);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", expected);
+        printf("    want = %s\n", want);
     } else {
         printf(C_RED "  FAIL: precision %%.10q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", expected);
+        printf("    want = %s\n", want);
         TEST_FAIL();
     }
 }
@@ -182,14 +182,14 @@ static void test_qd_sprintf_q_zero_precision(void)
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%.0q", x);
 
-    const char *expected = "3";
+    const char *want = "3";
 
-    if (strcmp(buf, expected) == 0) {
+    if (strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: %%.0q\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: %%.0q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf("  want = %s\n", want);
         TEST_FAIL();
     }
 }
@@ -304,7 +304,7 @@ static void test_qf_sprintf_q_concise(void)
 
     struct {
         char *input;
-        char *expected;
+        char *want;
         double tolerance;
     } tests[] = {
 
@@ -358,7 +358,7 @@ static void test_qf_sprintf_q_concise(void)
         qfloat_t y = qf_from_string(buf);
 
         printf("  input     = %s\n", tests[i].input);
-        printf("  expected  = %s\n", tests[i].expected);
+        printf("  want  = %s\n", tests[i].want);
         printf("  got       = %s\n", buf);
 
         /* reparsed value */
@@ -369,7 +369,7 @@ static void test_qf_sprintf_q_concise(void)
         qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1, 0}));
         printf("  rel error = %.17g\n", err.hi);
 
-        if (strcmp(buf, tests[i].expected) == 0 &&
+        if (strcmp(buf, tests[i].want) == 0 &&
             (qf_close_rel(x, y, tests[i].tolerance) || qf_close(x, y, tests[i].tolerance) || qf_eq(x, y))) {
             printf(C_GREEN "    OK\n" C_RESET);
         } else {
@@ -391,10 +391,10 @@ static void test_qf_sprintf_null_safe_new(void)
     char core[128];
     test_qf_to_buffer(x, core, sizeof(core)); /* produces ...e+0 */
 
-    char expected[160];
-    strcpy(expected, "x=");
-    strcat(expected, core);
-    char *e = strchr(expected, 'e');
+    char want[160];
+    strcpy(want, "x=");
+    strcat(want, core);
+    char *e = strchr(want, 'e');
     if (e)
         *e = 'E';
 
@@ -403,13 +403,13 @@ static void test_qf_sprintf_null_safe_new(void)
     char *buf = malloc((size_t)needed + 1);
     int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
 
-    if (written == needed && strcmp(buf, expected) == 0) {
+    if (written == needed && strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: NULL‑safe sizing\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: NULL‑safe sizing  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
-        printf("expected = %s\n", expected);
+        printf("want = %s\n", want);
         TEST_FAIL();
     }
 
@@ -422,14 +422,14 @@ static void test_qf_sprintf_two_pass_new(void)
 
     qfloat_t x = qf_from_string("9.9999999999999999999999999999999");
 
-    /* Canonical expected string via qf_to_string + 'E' */
+    /* Canonical want string via qf_to_string + 'E' */
     char core[128];
     test_qf_to_buffer(x, core, sizeof(core));
 
-    char expected[160];
-    strcpy(expected, "x=");
-    strcat(expected, core);
-    char *e = strchr(expected, 'e');
+    char want[160];
+    strcpy(want, "x=");
+    strcat(want, core);
+    char *e = strchr(want, 'e');
     if (e)
         *e = 'E';
 
@@ -438,13 +438,13 @@ static void test_qf_sprintf_two_pass_new(void)
     char *buf = malloc((size_t)needed + 1);
     int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
 
-    if (written == needed && strcmp(buf, expected) == 0) {
+    if (written == needed && strcmp(buf, want) == 0) {
         printf(C_GREEN "  OK: two‑pass\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: two‑pass  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
-        printf("expected = %s\n", expected);
+        printf("want = %s\n", want);
         TEST_FAIL();
     }
 
@@ -458,7 +458,7 @@ static void test_qf_printf_stdout(void)
     FILE *in;
     char buf[256];
     char *p;
-    const char *expected = "value=1.500000000000000000000000000000000E+0\n";
+    const char *want = "value=1.500000000000000000000000000000000E+0\n";
 
     printf(C_CYAN "TEST: qf_printf (stdout)\n" C_RESET);
 
@@ -476,11 +476,11 @@ static void test_qf_printf_stdout(void)
     p = fgets(buf, sizeof(buf), in);
     fclose(in);
     TEST_ASSERT_NOT_NULL(p);
-    TEST_ASSERT_STR_EQ(buf, expected);
-    TEST_ASSERT_INT_EQ(n, (int)strlen(expected));
+    TEST_ASSERT_STR_EQ(buf, want);
+    TEST_ASSERT_INT_EQ(n, (int)strlen(want));
 
     printf(C_GREEN "  OK: qf_printf\n" C_RESET);
-    printf("    expected = %s", expected);
+    printf("    want = %s", want);
     printf("    got      = %s", buf);
     printf("    n        = %d\n", n);
 }

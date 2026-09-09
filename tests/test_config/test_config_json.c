@@ -118,7 +118,7 @@ bool test_config_root_shape_is_supported(const json_t *root, test_config_mode_t 
     return true;
 }
 
-json_t *test_config_create_pruned_json_object(const json_t *actual, const json_t *seen, bool file_level)
+json_t *test_config_create_pruned_json_object(const json_t *got, const json_t *seen, bool file_level)
 {
     json_t *pruned;
 
@@ -130,7 +130,7 @@ json_t *test_config_create_pruned_json_object(const json_t *actual, const json_t
         return NULL;
 
     if (!file_level) {
-        bool enabled = test_config_value_enabled(actual, true);
+        bool enabled = test_config_value_enabled(got, true);
         json_t *enabled_value = json_new_bool(enabled);
 
         if (!enabled_value)
@@ -145,19 +145,19 @@ json_t *test_config_create_pruned_json_object(const json_t *actual, const json_t
     for (size_t i = 0u; i < json_object_size(seen); ++i) {
         const string_t *key = json_object_key_at(seen, i);
         const json_t *seen_value = json_object_value_at(seen, i);
-        const json_t *actual_value;
+        const json_t *got_value;
         json_t *preserved;
 
         if (!key || !seen_value || string_view_equals_literal(string_view_all(key), "enabled"))
             continue;
 
-        actual_value = actual && json_type(actual) == JSON_OBJECT ? json_object_get(actual, key) : NULL;
+        got_value = got && json_type(got) == JSON_OBJECT ? json_object_get(got, key) : NULL;
 
         if (json_type(seen_value) == JSON_OBJECT) {
             preserved = test_config_create_pruned_json_object(
-                (actual_value && json_type(actual_value) == JSON_OBJECT) ? actual_value : NULL, seen_value, false);
+                (got_value && json_type(got_value) == JSON_OBJECT) ? got_value : NULL, seen_value, false);
         } else {
-            bool enabled = actual_value ? test_config_value_enabled(actual_value,
+            bool enabled = got_value ? test_config_value_enabled(got_value,
                                                                     test_config_json_bool_or_default(seen_value, true))
                                         : test_config_json_bool_or_default(seen_value, true);
 

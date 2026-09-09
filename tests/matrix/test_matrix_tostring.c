@@ -173,10 +173,10 @@ static void matrix_TeX_preview_cleanup(void)
     g_matrix_TeX_preview_cap = 0u;
 }
 
-static void check_matrix_tostring_expr_double(const char *label, const expr_t *dv, double expected, double tol)
+static void check_matrix_tostring_expr_double(const char *label, const expr_t *dv, double want_value, double tol)
 {
     number_t got = expr_eval(dv);
-    number_t want = num_create_from_double(expected);
+    number_t want = num_create_from_double(want_value);
     number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
     double err = num_to_double(mag);
@@ -342,8 +342,8 @@ static void test_mat_to_string_number_precision(void)
     matrix_t *A;
     char *inline_pretty;
     char *layout_scientific;
-    char *expected_pretty;
-    char *expected_scientific;
+    char *want_pretty;
+    char *want_scientific;
 
     vals[0] = num_create_from_string("1.25");
     vals[1] = num_create_from_string("1 + 2i");
@@ -354,15 +354,15 @@ static void test_mat_to_string_number_precision(void)
     A = mat_create(2, 2, vals);
     inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     layout_scientific = mat_to_string(A, MAT_STRING_LAYOUT_SCIENTIFIC);
-    expected_pretty = format_matrix_test_num_at_own_precision(vals[0], 0);
-    expected_scientific = format_matrix_test_num_at_own_precision(vals[1], 1);
+    want_pretty = format_matrix_test_num_at_own_precision(vals[0], 0);
+    want_scientific = format_matrix_test_num_at_own_precision(vals[1], 1);
 
     check_bool("mat_to_string number inline string non-null", inline_pretty != NULL);
     check_bool("mat_to_string number layout string non-null", layout_scientific != NULL);
     check_bool("mat_to_string number inline keeps full precision text",
-               inline_pretty && expected_pretty && strstr(inline_pretty, expected_pretty) != NULL);
+               inline_pretty && want_pretty && strstr(inline_pretty, want_pretty) != NULL);
     check_bool("mat_to_string number layout keeps scientific precision text",
-               layout_scientific && expected_scientific && strstr(layout_scientific, expected_scientific) != NULL);
+               layout_scientific && want_scientific && strstr(layout_scientific, want_scientific) != NULL);
     check_bool("mat_to_string number inline preserves rational syntax",
                inline_pretty && strstr(inline_pretty, "½") != NULL);
     check_bool("mat_to_string number layout preserves rational syntax",
@@ -373,24 +373,24 @@ static void test_mat_to_string_number_precision(void)
                layout_scientific && strstr(layout_scientific, "3") != NULL);
 
     printf("    number matrix pretty [0,0]\n");
-    printf("        expected = %s\n", expected_pretty ? expected_pretty : "(unavailable)");
+    printf("        want = %s\n", want_pretty ? want_pretty : "(unavailable)");
     printf("        got      = %s\n", inline_pretty ? inline_pretty : "(unavailable)");
     printf("        error    = %s\n",
-           inline_pretty && expected_pretty && strstr(inline_pretty, expected_pretty) ? "0.000000E+0" : "(mismatch)");
+           inline_pretty && want_pretty && strstr(inline_pretty, want_pretty) ? "0.000000E+0" : "(mismatch)");
     printf("        precision: %zu bits, %zu significant digits\n", num_get_prec_bits(vals[0]),
            num_get_prec_digits(vals[0]));
 
     printf("    number matrix scientific [0,1]\n");
-    printf("        expected = %s\n", expected_scientific ? expected_scientific : "(unavailable)");
+    printf("        want = %s\n", want_scientific ? want_scientific : "(unavailable)");
     printf("        got      = %s\n", layout_scientific ? layout_scientific : "(unavailable)");
     printf("        error    = %s\n",
-           layout_scientific && expected_scientific && strstr(layout_scientific, expected_scientific) ? "0.000000E+0"
+           layout_scientific && want_scientific && strstr(layout_scientific, want_scientific) ? "0.000000E+0"
                                                                                                       : "(mismatch)");
     printf("        precision: %zu bits, %zu significant digits\n", num_get_prec_bits(vals[1]),
            num_get_prec_digits(vals[1]));
 
-    free(expected_scientific);
-    free(expected_pretty);
+    free(want_scientific);
+    free(want_pretty);
     free(layout_scientific);
     free(inline_pretty);
     mat_free(A);

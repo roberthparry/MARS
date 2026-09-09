@@ -36,13 +36,13 @@ void test_tan(void)
     expr_free(c);
 }
 
-static void check_expr_string_qf(const char *label, const char *input, qfloat_t expected)
+static void check_expr_string_qf(const char *label, const char *input, qfloat_t want)
 {
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(input, &bindings);
 
     ASSERT_NOT_NULL(expr);
-    check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), expected);
+    check_q_at(__FILE__, __LINE__, 1, label, expr_eval_qf(expr), want);
 
     expr_free(expr);
     expr_bindings_free(bindings);
@@ -284,18 +284,18 @@ void test_pow_d(void)
 void test_pow_d_complex(void)
 {
     number_t z0 = num_create_from_string("1 + 2i");
-    number_t expected = num_create_from_string("-3 + 4i");
+    number_t want = num_create_from_string("-3 + 4i");
     expr_t *base = expr_new_var(z0);
     expr_t *f = expr_pow_d(base, 2.0);
     number_t got = expr_eval(f);
 
-    ASSERT_EXPR_NUMBER_EQ(got, expected);
+    ASSERT_EXPR_NUMBER_EQ(got, want);
     print_expr_of(f);
 
     num_destroy(&got);
     expr_free(f);
     expr_free(base);
-    num_destroy(&expected);
+    num_destroy(&want);
     num_destroy(&z0);
 }
 

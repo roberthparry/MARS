@@ -10,21 +10,21 @@ static void number_readme_rational_basic(void)
     number_t a = num_create_from_frac(2, 3);
     number_t b = num_create_from_string("5/4");
     number_t product = num_mul(a, b);
-    number_t expected = num_create_from_frac(5, 6);
+    number_t want = num_create_from_frac(5, 6);
     string_t *text = num_to_string(product);
 
     if (!text) {
         test_mark_failure(__FILE__, __LINE__, "failed to format rational README example");
     } else {
         printf("(2/3) * (5/4) = %s\n", string_c_str(text));
-        ASSERT_TRUE(num_eq(product, expected));
+        ASSERT_TRUE(num_eq(product, want));
     }
 
     string_free(text);
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&product);
-    num_destroy(&expected);
+    num_destroy(&want);
 }
 
 static void number_readme_binomial_cardinality(void)
@@ -32,26 +32,26 @@ static void number_readme_binomial_cardinality(void)
     number_t n = num_create_from_long(52);
     number_t k = num_create_from_long(5);
     number_t c = num_binomial(n, k);
-    number_t expected = num_create_from_long(2598960);
+    number_t want = num_create_from_long(2598960);
     string_t *text = num_to_string(c);
 
     if (!text) {
         test_mark_failure(__FILE__, __LINE__, "failed to format binomial README example");
     } else {
         printf("C(52, 5) = %s\n", string_c_str(text));
-        ASSERT_TRUE(num_eq(c, expected));
+        ASSERT_TRUE(num_eq(c, want));
     }
 
     string_free(text);
     num_destroy(&n);
     num_destroy(&k);
     num_destroy(&c);
-    num_destroy(&expected);
+    num_destroy(&want);
 }
 
 void run_number_readme_mersenne_prime_search(void)
 {
-    static const unsigned expected_exponents[] = {2,   3,   5,   7,   13,   17,   19,   31,   61,   89,
+    static const unsigned want_exponents[] = {2,   3,   5,   7,   13,   17,   19,   31,   61,   89,
                                                   107, 127, 521, 607, 1279, 2203, 2281, 3217, 4253, 4423};
     number_t two = num_create_from_long(2);
     number_t one = num_create_from_long(1);
@@ -65,8 +65,8 @@ void run_number_readme_mersenne_prime_search(void)
             number_t mersenne = num_sub(mersenne_base, one);
 
             if (num_is_prime(mersenne)) {
-                ASSERT_TRUE(found < (sizeof(expected_exponents) / sizeof(expected_exponents[0])));
-                ASSERT_EQ_INT((int)p, (int)expected_exponents[found]);
+                ASSERT_TRUE(found < (sizeof(want_exponents) / sizeof(want_exponents[0])));
+                ASSERT_EQ_INT((int)p, (int)want_exponents[found]);
                 if ((found % 4u) == 3u)
                     printf("M_%-4u is prime\n", p);
                 else
@@ -81,7 +81,7 @@ void run_number_readme_mersenne_prime_search(void)
         num_destroy(&exponent);
     }
 
-    ASSERT_EQ_INT((int)found, (int)(sizeof(expected_exponents) / sizeof(expected_exponents[0])));
+    ASSERT_EQ_INT((int)found, (int)(sizeof(want_exponents) / sizeof(want_exponents[0])));
 
     num_destroy(&two);
     num_destroy(&one);

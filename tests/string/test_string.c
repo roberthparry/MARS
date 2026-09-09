@@ -299,7 +299,7 @@ static void test_text_character_api(void)
 static void test_string_view(void)
 {
     string_t *s = string_new_with("Hello Universe");
-    string_t *expected = string_new_with("Universe");
+    string_t *want = string_new_with("Universe");
     string_t *lower_prefix = string_new_with("uni");
     string_t *exact_prefix = string_new_with("Uni");
 
@@ -307,13 +307,13 @@ static void test_string_view(void)
     string_reverse(s); /* restore */
 
     string_view_t v = string_view(s, 6, 8);
-    string_view_t expected_view = string_view_all(expected);
+    string_view_t want_view = string_view_all(want);
     string_view_t lower_prefix_view = string_view_all(lower_prefix);
     string_t *sub = string_from_view(&v);
 
     ASSERT_STREQ(string_c_str(sub), "Universe");
 
-    ASSERT_TRUE(string_view_equals_view(v, expected_view));
+    ASSERT_TRUE(string_view_equals_view(v, want_view));
     ASSERT_TRUE(string_view_starts_with(v, exact_prefix, false));
     ASSERT_FALSE(string_view_starts_with(v, lower_prefix, false));
     ASSERT_TRUE(string_view_starts_with(v, lower_prefix, true));
@@ -321,7 +321,7 @@ static void test_string_view(void)
 
     string_free(exact_prefix);
     string_free(lower_prefix);
-    string_free(expected);
+    string_free(want);
     string_free(s);
     string_free(sub);
 }
