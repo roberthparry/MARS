@@ -294,7 +294,7 @@ void to_string_fail(const char *file, int line, int col, const char *msg, const 
 #define expr_pow_d test_expr_pow_d
 #define expr_pow_qc test_expr_pow_qc
 
-void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t expect);
+void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t want);
 void print_expr_of(const expr_t *f);
 const test_validity_contract_t *expr_validity_contract_number_exact(void);
 const test_validity_contract_t *expr_validity_contract_number_close(void);
@@ -364,7 +364,7 @@ void test_deriv_trigamma(void);
 void test_second_deriv_digamma(void);
 
 void check_roundtrip(const char *label, expr_t *f, int line);
-void check_parse_val(const char *label, const char *s, double expect_d, int line);
+void check_parse_val(const char *label, const char *s, double want_d, int line);
 void check_parse_null(const char *label, const char *s, int line);
 void check_parse_null_stderr_contains(const char *label, const char *s, const char *want_substring, int line);
 

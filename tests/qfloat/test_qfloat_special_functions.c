@@ -855,16 +855,16 @@ void test_qf_polygamma(void)
 
     {
         qfloat_t psi3_2 = qf_polygamma(3, qf_from_double(2.0));
-        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
+        qfloat_t want = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_2, expect, 1e-23);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_2, want, 1e-23);
     }
 
     {
         qfloat_t psi3_neg_half = qf_polygamma(3, qf_from_string("-0.5"));
-        qfloat_t expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+        qfloat_t want = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_neg_half, expect, 1e-22);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_neg_half, want, 1e-22);
     }
 
     {
@@ -912,12 +912,12 @@ void test_qf_polylog(void)
     {
         qfloat_t half = qf_from_double(0.5);
         qfloat_t log2 = qf_log(qf_from_double(2.0));
-        qfloat_t expect =
+        qfloat_t want =
             qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(half), expect, 1e-27);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half), expect, 1e-27);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lerch_phi(half, qf_from_double(2.0), QF_ONE), qf_mul_double(expect, 2.0),
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(half), want, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), half), want, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lerch_phi(half, qf_from_double(2.0), QF_ONE), qf_mul_double(want, 2.0),
                                      1e-27);
     }
 
@@ -936,10 +936,10 @@ void test_qf_polylog(void)
     {
         qfloat_t got =
             qf_appell_f1(QF_ONE, QF_ONE, QF_ONE, qf_from_double(2.0), qf_from_string("0.1"), qf_from_string("0.2"));
-        qfloat_t expect =
+        qfloat_t want =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, expect, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, want, 1e-28);
     }
 
     {

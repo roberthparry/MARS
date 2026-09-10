@@ -5551,11 +5551,11 @@ static void test_solve_and_lstsq(void)
             AX = mat_mul(A, X);
             check_bool("A*lstsq(A,B) not NULL", AX != NULL);
             if (AX) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(AX, i, 0, &got);
-                    mat_get(B, i, 0, &expect);
-                    check_d("expr least-squares residual entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                    mat_get(B, i, 0, &want);
+                    check_d("expr least-squares residual entry", expr_eval_d(got), expr_eval_d(want), 1e-10);
                 }
             }
         }
@@ -5605,11 +5605,11 @@ static void test_solve_and_lstsq(void)
             AX = mat_mul(A, X);
             check_bool("A*lstsq(A,B) for rank-deficient expr not NULL", AX != NULL);
             if (AX) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(AX, i, 0, &got);
-                    mat_get(B, i, 0, &expect);
-                    check_d("rank-deficient expr least-squares residual entry", expr_eval_d(got), expr_eval_d(expect),
+                    mat_get(B, i, 0, &want);
+                    check_d("rank-deficient expr least-squares residual entry", expr_eval_d(got), expr_eval_d(want),
                             1e-10);
                 }
             }
@@ -5710,11 +5710,11 @@ static void test_solve_and_lstsq(void)
             LB = mat_mul(L, X);
             check_bool("L*solve(L,B) not NULL", LB != NULL);
             if (LB) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(LB, i, 0, &got);
-                    mat_get(B, i, 0, &expect);
-                    check_d("lower triangular expr residual row", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                    mat_get(B, i, 0, &want);
+                    check_d("lower triangular expr residual row", expr_eval_d(got), expr_eval_d(want), 1e-10);
                 }
             }
 
@@ -5787,12 +5787,12 @@ static void test_solve_and_lstsq(void)
             AX = mat_mul(A, X);
             check_bool("A*solve(A,B) not NULL", AX != NULL);
             if (AX) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(AX, i, j, &got);
-                        mat_get(B, i, j, &expect);
-                        check_d("dense expr residual entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                        mat_get(B, i, j, &want);
+                        check_d("dense expr residual entry", expr_eval_d(got), expr_eval_d(want), 1e-10);
                     }
                 }
             }
@@ -5934,12 +5934,12 @@ static void test_solve_and_lstsq(void)
             AX = mat_mul(A, X);
             check_bool("A*solve(A,B) 6x6 not NULL", AX != NULL);
             if (AX) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 6; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(AX, i, j, &got);
-                        mat_get(B, i, j, &expect);
-                        check_d("dense 6x6 expr solve residual entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                        mat_get(B, i, j, &want);
+                        check_d("dense 6x6 expr solve residual entry", expr_eval_d(got), expr_eval_d(want), 1e-10);
                     }
                 }
             }
@@ -7009,29 +7009,29 @@ static void test_rank_pinv_nullspace(void)
                 expr_t *got = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
-                        double expect = (i == j) ? 1.0 : 0.0;
+                        double want = (i == j) ? 1.0 : 0.0;
                         mat_get(AAp, i, j, &got);
-                        check_d("wide expr A*A+ identity entry", expr_eval_d(got), expect, 1e-10);
+                        check_d("wide expr A*A+ identity entry", expr_eval_d(got), want, 1e-10);
                     }
                 }
             }
             if (AApA) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
                         mat_get(AApA, i, j, &got);
-                        mat_get(A, i, j, &expect);
-                        check_d("wide expr A*A+*A = A entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                        mat_get(A, i, j, &want);
+                        check_d("wide expr A*A+*A = A entry", expr_eval_d(got), expr_eval_d(want), 1e-10);
                     }
                 }
             }
             if (ApAAp) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(ApAAp, i, j, &got);
-                        mat_get(A_pinv, i, j, &expect);
-                        check_d("wide expr A+*A*A+ = A+ entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
+                        mat_get(A_pinv, i, j, &want);
+                        check_d("wide expr A+*A*A+ = A+ entry", expr_eval_d(got), expr_eval_d(want), 1e-10);
                     }
                 }
             }
@@ -7043,9 +7043,9 @@ static void test_rank_pinv_nullspace(void)
                 expr_t *got = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
-                        double expect = (i == j) ? 1.0 : 0.0;
+                        double want = (i == j) ? 1.0 : 0.0;
                         mat_get(AAp, i, j, &got);
-                        check_d("wide expr A*A+ identity entry tracks updates", expr_eval_d(got), expect, 1e-10);
+                        check_d("wide expr A*A+ identity entry tracks updates", expr_eval_d(got), want, 1e-10);
                     }
                 }
             }
@@ -7095,23 +7095,23 @@ static void test_rank_pinv_nullspace(void)
             check_bool("rank-deficient expr A*A+*A not NULL", AApA != NULL);
             check_bool("rank-deficient expr A+*A*A+ not NULL", ApAAp != NULL);
             if (AApA) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
                         mat_get(AApA, i, j, &got);
-                        mat_get(A, i, j, &expect);
-                        check_d("rank-deficient wide expr A*A+*A = A entry", expr_eval_d(got), expr_eval_d(expect),
+                        mat_get(A, i, j, &want);
+                        check_d("rank-deficient wide expr A*A+*A = A entry", expr_eval_d(got), expr_eval_d(want),
                                 1e-10);
                     }
                 }
             }
             if (ApAAp) {
-                expr_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *want = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(ApAAp, i, j, &got);
-                        mat_get(A_pinv, i, j, &expect);
-                        check_d("rank-deficient wide expr A+*A*A+ = A+ entry", expr_eval_d(got), expr_eval_d(expect),
+                        mat_get(A_pinv, i, j, &want);
+                        check_d("rank-deficient wide expr A+*A*A+ = A+ entry", expr_eval_d(got), expr_eval_d(want),
                                 1e-10);
                     }
                 }

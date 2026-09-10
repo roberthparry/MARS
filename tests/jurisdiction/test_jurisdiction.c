@@ -281,7 +281,7 @@ static bool assert_event_absent(const array_t *events, const char *holiday_name,
     if (!find_event_by_name_and_date(events, holiday_name, holiday_date))
         return true;
     found = describe_events(events);
-    test_set_failure_detailf("did not expect %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
+    test_set_failure_detailf("did not want %s on %s; found: %s", holiday_name ? holiday_name : "(null)",
                              holiday_date ? holiday_date : "(null)", found ? found : "(unavailable)");
     free(found);
     return false;

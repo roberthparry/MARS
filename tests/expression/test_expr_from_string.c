@@ -3,10 +3,10 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-static void check_parse_num(const char *label, const char *s, const char *expect_text, int line);
-static void check_parse_expr(const char *label, const char *s, const char *expect_expr, int line);
-static void check_parse_TeX(const char *label, const char *s, const char *expect_TeX, int line);
-static void check_parse_simplified_expr(const char *label, const char *s, const char *expect_expr, int line);
+static void check_parse_num(const char *label, const char *s, const char *want_text, int line);
+static void check_parse_expr(const char *label, const char *s, const char *want_expr, int line);
+static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line);
+static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line);
 
 static void test_from_string_function_hash(void)
 {
@@ -2253,12 +2253,12 @@ static void test_from_string_ascii_alternatives(void)
  */
 
 /* Inline comparison helper for the derivative checks below. */
-static void check_expr_d(const char *label, const expr_t *node, double expect, int line)
+static void check_expr_d(const char *label, const expr_t *node, double want, int line)
 {
     qfloat_t qval = expr_eval_qf(node);
     double got = qf_to_double(qval);
-    double err = fabs(got - expect);
-    double rel = (fabs(expect) > 0.0) ? err / fabs(expect) : err;
+    double err = fabs(got - want);
+    double rel = (fabs(want) > 0.0) ? err / fabs(want) : err;
     const double TOL = 2e-14;
     char *expr = expr_to_string(node, style_EXPRESSION);
     if (err < TOL || rel < TOL) {
@@ -2269,17 +2269,17 @@ static void check_expr_d(const char *label, const expr_t *node, double expect, i
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr ? expr : "(null)");
         qf_printf(C_BOLD "  got    " C_RESET "%.34q\n", qval);
-        printf(C_BOLD "  expect " C_RESET "%.17g\n\n", expect);
+        printf(C_BOLD "  want " C_RESET "%.17g\n\n", want);
         TEST_FAIL();
     }
     free(expr);
 }
 
-static void check_parse_num(const char *label, const char *s, const char *expect_text, int line)
+static void check_parse_num(const char *label, const char *s, const char *want_text, int line)
 {
     expr_t *expr = expr_from_string(s, NULL);
     number_t got;
-    number_t expect;
+    number_t want;
     char *expr_text;
 
     if (!expr) {
@@ -2291,14 +2291,14 @@ static void check_parse_num(const char *label, const char *s, const char *expect
     }
 
     got = expr_eval(expr);
-    expect = num_create_from_string(expect_text);
+    want = num_create_from_string(want_text);
     expr_text = expr_to_string(expr, style_EXPRESSION);
 
-    if (num_eq(got, expect)) {
+    if (num_eq(got, want)) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
-        printf(C_BOLD "  value  " C_RESET "%s\n\n", expect_text);
+        printf(C_BOLD "  value  " C_RESET "%s\n\n", want_text);
     } else {
         string_t *got_text = num_to_string(got);
 
@@ -2306,18 +2306,18 @@ static void check_parse_num(const char *label, const char *s, const char *expect
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
         printf(C_BOLD "  got    " C_RESET "%s\n", got_text ? string_c_str(got_text) : "(null)");
-        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_text);
+        printf(C_BOLD "  want " C_RESET "%s\n\n", want_text);
         string_free(got_text);
         TEST_FAIL();
     }
 
     free(expr_text);
-    num_destroy(&expect);
+    num_destroy(&want);
     num_destroy(&got);
     expr_free(expr);
 }
 
-static void check_parse_expr(const char *label, const char *s, const char *expect_expr, int line)
+static void check_parse_expr(const char *label, const char *s, const char *want_expr, int line)
 {
     expr_t *expr = expr_from_string(s, NULL);
     char *expr_text;
@@ -2331,7 +2331,7 @@ static void check_parse_expr(const char *label, const char *s, const char *expec
     }
 
     expr_text = expr_to_string(expr, style_EXPRESSION);
-    if (expr_text && strcmp(expr_text, expect_expr) == 0) {
+    if (expr_text && strcmp(expr_text, want_expr) == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", expr_text);
@@ -2339,7 +2339,7 @@ static void check_parse_expr(const char *label, const char *s, const char *expec
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  got    " C_RESET "%s\n", expr_text ? expr_text : "(null)");
-        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_expr);
+        printf(C_BOLD "  want " C_RESET "%s\n\n", want_expr);
         TEST_FAIL();
     }
 
@@ -2347,7 +2347,7 @@ static void check_parse_expr(const char *label, const char *s, const char *expec
     expr_free(expr);
 }
 
-static void check_parse_TeX(const char *label, const char *s, const char *expect_TeX, int line)
+static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line)
 {
     expr_t *expr = expr_from_string(s, NULL);
     char *TeX_text;
@@ -2361,7 +2361,7 @@ static void check_parse_TeX(const char *label, const char *s, const char *expect
     }
 
     TeX_text = expr_to_string(expr, style_LATEX);
-    if (TeX_text && strcmp(TeX_text, expect_TeX) == 0) {
+    if (TeX_text && strcmp(TeX_text, want_TeX) == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  tex    " C_RESET "%s\n\n", TeX_text);
@@ -2369,7 +2369,7 @@ static void check_parse_TeX(const char *label, const char *s, const char *expect
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  got    " C_RESET "%s\n", TeX_text ? TeX_text : "(null)");
-        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_TeX);
+        printf(C_BOLD "  want " C_RESET "%s\n\n", want_TeX);
         TEST_FAIL();
     }
 
@@ -2377,7 +2377,7 @@ static void check_parse_TeX(const char *label, const char *s, const char *expect
     expr_free(expr);
 }
 
-static void check_parse_simplified_expr(const char *label, const char *s, const char *expect_expr, int line)
+static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line)
 {
     expr_t *expr = expr_from_string(s, NULL);
     expr_t *simp = expr ? expr_simplify(expr) : NULL;
@@ -2394,7 +2394,7 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
     }
 
     expr_text = expr_to_string(simp, style_EXPRESSION);
-    if (expr_text && strcmp(expr_text, expect_expr) == 0) {
+    if (expr_text && strcmp(expr_text, want_expr) == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", expr_text);
@@ -2402,7 +2402,7 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  input  " C_RESET "%s\n", s);
         printf(C_BOLD "  got    " C_RESET "%s\n", expr_text ? expr_text : "(null)");
-        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_expr);
+        printf(C_BOLD "  want " C_RESET "%s\n\n", want_expr);
         TEST_FAIL();
     }
 
@@ -2643,14 +2643,14 @@ static void test_from_expression_string_api(void)
         TEST_FAIL();
     } else {
         double got = expr_eval_d(ok);
-        double expect = 14.0;
-        double err = fabs(got - expect);
+        double want = 14.0;
+        double err = fabs(got - want);
         if (err < 2e-14) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " bare expression parse API\n\n");
         } else {
             printf(C_BOLD C_RED "FAIL" C_RESET " bare expression parse API %s:%d:1\n", __FILE__, __LINE__);
             printf(C_BOLD "  got     " C_RESET "%.17g\n", got);
-            printf(C_BOLD "  expect  " C_RESET "%.17g\n\n", expect);
+            printf(C_BOLD "  want  " C_RESET "%.17g\n\n", want);
             TEST_FAIL();
         }
         expr_free(ok);
@@ -2845,14 +2845,14 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ exp(pi*sqrt(x)) | x = 163 }", &bindings);
     char *got = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *expect = "{ exp(π·√(x)) | x = 163 }";
+    const char *want = "{ exp(π·√(x)) | x = 163 }";
 
-    if (expr && got && str_eq(got, expect) && expr_bindings_count(bindings) == 1u &&
+    if (expr && got && str_eq(got, want) && expr_bindings_count(bindings) == 1u &&
         expr_bindings_get(bindings, "x") != NULL && expr_bindings_get(bindings, "@pi") == NULL)
-        to_string_pass("bindings keep implicit pi constant inference", got, expect);
+        to_string_pass("bindings keep implicit pi constant inference", got, want);
     else
         to_string_fail(__FILE__, __LINE__, 1, "bindings keep implicit pi constant inference", got ? got : "(null)",
-                       expect);
+                       want);
 
     free(got);
     expr_bindings_free(bindings);
@@ -2861,11 +2861,11 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     bindings = NULL;
     expr = expr_from_string("{ exp(pi*sqrt(x)) | x = 163/1 }", &bindings);
     got = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (expr && got && str_eq(got, expect))
-        to_string_pass("bindings suppress denominator-one fractions", got, expect);
+    if (expr && got && str_eq(got, want))
+        to_string_pass("bindings suppress denominator-one fractions", got, want);
     else
         to_string_fail(__FILE__, __LINE__, 1, "bindings suppress denominator-one fractions", got ? got : "(null)",
-                       expect);
+                       want);
 
     free(got);
     expr_bindings_free(bindings);
@@ -3051,7 +3051,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
             printf(C_BOLD C_RED "FAIL" C_RESET " derivative at symbolic pi/2 evaluates exactly to zero %s:%d:1\n",
                    __FILE__, __LINE__);
             printf(C_BOLD "  got    " C_RESET "%s\n", got ? string_c_str(got) : "(null)");
-            printf(C_BOLD "  expect " C_RESET "0\n\n");
+            printf(C_BOLD "  want " C_RESET "0\n\n");
             string_free(got);
             TEST_FAIL();
         }
