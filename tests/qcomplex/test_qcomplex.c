@@ -681,13 +681,13 @@ static void test_digamma(void)
     }
 
     {
-        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
-        check_qc("ψ₃(2) real bridge", qc_polygamma(3, qcr(2.0)), qc_make(expect, QF_ZERO), 1e-23);
+        qfloat_t want = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
+        check_qc("ψ₃(2) real bridge", qc_polygamma(3, qcr(2.0)), qc_make(want, QF_ZERO), 1e-23);
     }
 
     {
-        qfloat_t expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
-        check_qc("ψ₃(-1/2) real bridge", qc_polygamma(3, qcr(-0.5)), qc_make(expect, QF_ZERO), 1e-22);
+        qfloat_t want = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+        check_qc("ψ₃(-1/2) real bridge", qc_polygamma(3, qcr(-0.5)), qc_make(want, QF_ZERO), 1e-22);
     }
 
 
@@ -718,13 +718,13 @@ static void test_polylog(void)
 
     {
         qfloat_t log2 = qf_log(qf_from_double(2.0));
-        qfloat_t expect =
+        qfloat_t want =
             qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));
 
-        check_qc("Li₂(1/2) = pi²/12 - log(2)²/2", qc_dilog(qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
-        check_qc("polylog(2, 1/2) = Li₂(1/2)", qc_polylog(qcr(2.0), qcr(0.5)), qc_make(expect, QF_ZERO), 1e-27);
+        check_qc("Li₂(1/2) = pi²/12 - log(2)²/2", qc_dilog(qcr(0.5)), qc_make(want, QF_ZERO), 1e-27);
+        check_qc("polylog(2, 1/2) = Li₂(1/2)", qc_polylog(qcr(2.0), qcr(0.5)), qc_make(want, QF_ZERO), 1e-27);
         check_qc("LerchPhi(1/2,2,1) = 2 Li₂(1/2)", qc_lerch_phi(qcr(0.5), qcr(2.0), QC_ONE),
-                 qc_make(qf_mul_double(expect, 2.0), QF_ZERO), 1e-27);
+                 qc_make(qf_mul_double(want, 2.0), QF_ZERO), 1e-27);
         check_qc("q-digamma recurrence", qc_sub(qc_qdigamma(qcr(0.5), qcr(2.0)),
                                                   qc_qdigamma(qcr(0.5), QC_ONE)),
                  qcrs("0.69314718055994530941723212145817656807550013436026"), 1e-29);
@@ -744,11 +744,11 @@ static void test_polylog(void)
     {
         qcomplex_t got = qc_appell_f1(QC_ONE, QC_ONE, QC_ONE, qcr(2.0), qc_make(qf_from_string("0.1"), QF_ZERO),
                                       qc_make(qf_from_string("0.2"), QF_ZERO));
-        qcomplex_t expect =
+        qcomplex_t want =
             qc_make(qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379"),
                     QF_ZERO);
 
-        check_qc("appell_f1(1,1,1,2,0.1,0.2)", got, expect, 1e-27);
+        check_qc("appell_f1(1,1,1,2,0.1,0.2)", got, want, 1e-27);
     }
 
     {
@@ -1314,7 +1314,7 @@ static void test_from_string(void)
         const char *re_exp; /* NULL => special handling (polar) */
         const char *im_exp;
         double tol;
-        int expect_nan;
+        int want_nan;
     } cases[] = {
 
         /* PURE REAL */
@@ -1408,15 +1408,15 @@ static void test_from_string(void)
         const char *file = cases[i].file;
         int line = cases[i].line;
         double tol = cases[i].tol;
-        int expect_nan = cases[i].expect_nan;
+        int want_nan = cases[i].want_nan;
 
         qcomplex_t z = qc_from_string(input);
 
         printf(C_YELLOW "TEST: %s (%s:%d)\n" C_RESET, desc, file, line);
         printf("    input    = \"%s\"\n", input);
 
-        /* Failure cases: expect NaN */
-        if (expect_nan) {
+        /* Failure cases: want NaN */
+        if (want_nan) {
             int ok = qc_isnan(z);
             if (!ok)
                 test_mark_failure(file, line, desc);

@@ -1216,7 +1216,7 @@ void test_triple_null_safety(void)
 
 void test_multi_2d(void)
 {
-    /* ∫₀¹ ∫₀¹ (x+y) dx dy = 1 — linear; expect exact symbolic evaluation */
+    /* ∫₀¹ ∫₀¹ (x+y) dx dy = 1 — linear; want exact symbolic evaluation */
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *y = test_expr_new_var_num(test_num_from_double(0.0));
@@ -1247,7 +1247,7 @@ void test_multi_2d(void)
 
 void test_multi_3d(void)
 {
-    /* ∫₀¹ ∫₀¹ ∫₀¹ (x+y+z) dx dy dz = 1.5 — linear; expect exact symbolic evaluation */
+    /* ∫₀¹ ∫₀¹ ∫₀¹ (x+y+z) dx dy dz = 1.5 — linear; want exact symbolic evaluation */
     integrator_t *ig = intg_new();
     expr_t *x = test_expr_new_var_num(test_num_from_double(0.0));
     expr_t *y = test_expr_new_var_num(test_num_from_double(0.0));

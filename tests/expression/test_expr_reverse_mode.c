@@ -12,22 +12,22 @@ static void test_reverse_gradient_polynomial(void)
     const expr_t *vars[2] = {x, y};
     number_t value;
     number_t grads[2];
-    number_t expect;
+    number_t want;
 
     if (expr_eval_derivatives(f, 2, vars, &value, grads) != 0) {
         printf(C_BOLD C_RED "FAIL" C_RESET " reverse polynomial gradient returned error\n");
         TEST_FAIL();
     }
 
-    expect = num_create_from_string("7");
-    ASSERT_EXPR_NUMBER_EQ(value, expect);
-    num_destroy(&expect);
-    expect = num_create_from_string("4");
-    ASSERT_EXPR_NUMBER_EQ(grads[0], expect);
-    num_destroy(&expect);
-    expect = num_create_from_string("5");
-    ASSERT_EXPR_NUMBER_EQ(grads[1], expect);
-    num_destroy(&expect);
+    want = num_create_from_string("7");
+    ASSERT_EXPR_NUMBER_EQ(value, want);
+    num_destroy(&want);
+    want = num_create_from_string("4");
+    ASSERT_EXPR_NUMBER_EQ(grads[0], want);
+    num_destroy(&want);
+    want = num_create_from_string("5");
+    ASSERT_EXPR_NUMBER_EQ(grads[1], want);
+    num_destroy(&want);
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);
@@ -50,20 +50,20 @@ static void test_reverse_gradient_shared_subexpression(void)
     const expr_t *vars[2] = {x, y};
     number_t value;
     number_t grads[2];
-    number_t expect;
+    number_t want;
 
     if (expr_eval_derivatives(f, 2, vars, &value, grads) != 0) {
         printf(C_BOLD C_RED "FAIL" C_RESET " reverse shared-subexpression gradient returned error\n");
         TEST_FAIL();
     }
 
-    expect = num_create_from_string("1");
-    ASSERT_EXPR_NUMBER_EQ(value, expect);
-    num_destroy(&expect);
-    expect = num_create_from_string("2");
-    ASSERT_EXPR_NUMBER_EQ(grads[0], expect);
-    ASSERT_EXPR_NUMBER_EQ(grads[1], expect);
-    num_destroy(&expect);
+    want = num_create_from_string("1");
+    ASSERT_EXPR_NUMBER_EQ(value, want);
+    num_destroy(&want);
+    want = num_create_from_string("2");
+    ASSERT_EXPR_NUMBER_EQ(grads[0], want);
+    ASSERT_EXPR_NUMBER_EQ(grads[1], want);
+    num_destroy(&want);
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);
@@ -89,22 +89,22 @@ static void test_reverse_matches_symbolic_composite(void)
     number_t value;
     expr_t *df_dx = expr_create_deriv(f, x);
     expr_t *df_dy = expr_create_deriv(f, y);
-    number_t expect;
+    number_t want;
 
     if (expr_eval_derivatives(f, 2, vars, &value, grads) != 0) {
         printf(C_BOLD C_RED "FAIL" C_RESET " reverse composite gradient returned error\n");
         TEST_FAIL();
     }
 
-    expect = expr_eval(f);
-    ASSERT_EXPR_NUMBER_EQ(value, expect);
-    num_destroy(&expect);
-    expect = expr_eval(df_dx);
-    ASSERT_EXPR_NUMBER_CLOSE(grads[0], expect);
-    num_destroy(&expect);
-    expect = expr_eval(df_dy);
-    ASSERT_EXPR_NUMBER_CLOSE(grads[1], expect);
-    num_destroy(&expect);
+    want = expr_eval(f);
+    ASSERT_EXPR_NUMBER_EQ(value, want);
+    num_destroy(&want);
+    want = expr_eval(df_dx);
+    ASSERT_EXPR_NUMBER_CLOSE(grads[0], want);
+    num_destroy(&want);
+    want = expr_eval(df_dy);
+    ASSERT_EXPR_NUMBER_CLOSE(grads[1], want);
+    num_destroy(&want);
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);
@@ -128,16 +128,16 @@ static void test_reverse_gradient_missing_variable(void)
     expr_t *f = expr_mul_d(x, 4.0);
     const expr_t *vars[2] = {x, z};
     number_t grads[2];
-    number_t expect;
+    number_t want;
 
     if (expr_eval_derivatives(f, 2, vars, NULL, grads) != 0) {
         printf(C_BOLD C_RED "FAIL" C_RESET " reverse missing-variable gradient returned error\n");
         TEST_FAIL();
     }
 
-    expect = num_create_from_string("4");
-    ASSERT_EXPR_NUMBER_EQ(grads[0], expect);
-    num_destroy(&expect);
+    want = num_create_from_string("4");
+    ASSERT_EXPR_NUMBER_EQ(grads[0], want);
+    num_destroy(&want);
     ASSERT_EXPR_NUMBER_EQ(grads[1], NUM_ZERO);
 
     num_destroy(&grads[1]);
@@ -152,7 +152,7 @@ static void test_reverse_gradient_polynomial_num(void)
     size_t old_prec_bits = num_get_default_prec_bits();
     number_t x0;
     number_t y0;
-    number_t expect;
+    number_t want;
     expr_t *x;
     expr_t *y;
     expr_t *x2;
@@ -180,15 +180,15 @@ static void test_reverse_gradient_polynomial_num(void)
     vars[1] = y;
 
     ASSERT_EQ_INT(expr_eval_derivatives(f, 2u, vars, &value, grads), 0);
-    expect = num_create_from_string("7");
-    ASSERT_EXPR_NUMBER_EQ(value, expect);
-    num_destroy(&expect);
-    expect = num_create_from_string("4");
-    ASSERT_EXPR_NUMBER_EQ(grads[0], expect);
-    num_destroy(&expect);
-    expect = num_create_from_string("5");
-    ASSERT_EXPR_NUMBER_EQ(grads[1], expect);
-    num_destroy(&expect);
+    want = num_create_from_string("7");
+    ASSERT_EXPR_NUMBER_EQ(value, want);
+    num_destroy(&want);
+    want = num_create_from_string("4");
+    ASSERT_EXPR_NUMBER_EQ(grads[0], want);
+    num_destroy(&want);
+    want = num_create_from_string("5");
+    ASSERT_EXPR_NUMBER_EQ(grads[1], want);
+    num_destroy(&want);
     ASSERT_EQ_INT((int)num_get_prec_bits(value), 384);
     ASSERT_EQ_INT((int)num_get_prec_bits(grads[0]), 53);
     ASSERT_EQ_INT((int)num_get_prec_bits(grads[1]), 53);
@@ -217,20 +217,20 @@ static void test_reverse_gradient_complex_number_t(void)
     const expr_t *vars[1] = {z};
     number_t value;
     number_t grad;
-    number_t expect_value;
-    number_t expect_grad;
+    number_t want_value;
+    number_t want_grad;
 
     ASSERT_EQ_INT(expr_eval_derivatives(f, 1u, vars, &value, &grad), 0);
-    expect_value = expr_eval(f);
-    expect_grad = expr_eval(df_dz);
+    want_value = expr_eval(f);
+    want_grad = expr_eval(df_dz);
 
-    ASSERT_EXPR_NUMBER_CLOSE(value, expect_value);
-    ASSERT_EXPR_NUMBER_CLOSE(grad, expect_grad);
+    ASSERT_EXPR_NUMBER_CLOSE(value, want_value);
+    ASSERT_EXPR_NUMBER_CLOSE(grad, want_grad);
     ASSERT_TRUE(!num_is_real(value));
     ASSERT_TRUE(!num_is_real(grad));
 
-    num_destroy(&expect_grad);
-    num_destroy(&expect_value);
+    num_destroy(&want_grad);
+    num_destroy(&want_value);
     num_destroy(&grad);
     num_destroy(&value);
     expr_free(df_dz);

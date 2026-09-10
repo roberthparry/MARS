@@ -75,8 +75,8 @@ void run_number_special_function_tests(void)
         number_t ninety_six = num_create_from_long(96);
         number_t pi4 = num_pow_int(NUM_PI, 4);
         number_t pi4_over_15 = num_div(pi4, fifteen);
-        number_t polygamma3_2_expect = num_sub(pi4_over_15, six);
-        number_t polygamma3_neg_half_expect = num_add(pi4, ninety_six);
+        number_t polygamma3_2_want = num_sub(pi4_over_15, six);
+        number_t polygamma3_neg_half_want = num_add(pi4, ninety_six);
         number_t erf1 = num_erf(one);
         number_t erfc1 = num_erfc(one);
         number_t w0_1 = num_lambert_w0(one);
@@ -137,10 +137,10 @@ void run_number_special_function_tests(void)
                                  "-0.577215664901532860606512090082", "1e-30");
         assert_number_close_text("num_polygamma(1, 1) = num_trigamma(1)", polygamma1_1,
                                  "1.644934066848226436472415166646", "1e-30");
-        assert_number_close_number("num_polygamma(3, 2) = pi^4/15 - 6", polygamma3_2, polygamma3_2_expect, "1e-25");
+        assert_number_close_number("num_polygamma(3, 2) = pi^4/15 - 6", polygamma3_2, polygamma3_2_want, "1e-25");
         assert_number_string("num_polygamma(3, inf)", polygamma3_inf, "0");
         assert_number_close_number("num_polygamma(3, -1/2) = pi^4 + 96", polygamma3_neg_half,
-                                   polygamma3_neg_half_expect, "1e-25");
+                                   polygamma3_neg_half_want, "1e-25");
         assert_number_string_prefix("num_erf(1)", erf1, "0.842700792949714869341220635082");
         assert_number_string_prefix("num_erfc(1)", erfc1, "0.157299207050285130658779364917");
         assert_number_string_prefix("num_lambert_w0(1)", w0_1, "0.567143290409783872999968662210");
@@ -215,8 +215,8 @@ void run_number_special_function_tests(void)
         num_destroy(&ninety_six);
         num_destroy(&pi4);
         num_destroy(&pi4_over_15);
-        num_destroy(&polygamma3_2_expect);
-        num_destroy(&polygamma3_neg_half_expect);
+        num_destroy(&polygamma3_2_want);
+        num_destroy(&polygamma3_neg_half_want);
         num_destroy(&erf1);
         num_destroy(&erfc1);
         num_destroy(&w0_1);

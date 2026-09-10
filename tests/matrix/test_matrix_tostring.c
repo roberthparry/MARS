@@ -456,14 +456,14 @@ static void test_mat_to_string_symbolic_TeX_exact(void)
     matrix_t *A = mat_from_string_expr("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_LATEX);
 
-    const char *expect = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
+    const char *want = "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
                          "x_{0} = 2; c_{1} = 5 \\right\\}";
 
     matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix exact with bindings (TEX)", tex);
 
     check_bool("mat_to_string symbolic tex exact non-null", tex != NULL);
-    check_bool("mat_to_string symbolic tex exact string", tex && strcmp(tex, expect) == 0);
+    check_bool("mat_to_string symbolic tex exact string", tex && strcmp(tex, want) == 0);
 
     free(tex);
     mat_bindings_free(bindings);
@@ -475,7 +475,7 @@ static void test_mat_to_string_symbolic_TeX_no_bindings_exact(void)
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(sin(x0), exp(c1); ln(x0), c1^2)", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_LATEX);
-    const char *expect = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
+    const char *want = "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\[10pt] "
                          "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix}";
 
     matrix_TeX_preview_emit_case(__FILE__, "symbolic matrix exact without bindings (TEX)", tex);
@@ -483,7 +483,7 @@ static void test_mat_to_string_symbolic_TeX_no_bindings_exact(void)
     check_bool("mat_to_string symbolic tex no-bindings non-null", tex != NULL);
     check_bool("mat_to_string symbolic tex no-bindings omits wrapper",
                tex && strstr(tex, "\\left\\{") == NULL && strstr(tex, "\\middle|") == NULL);
-    check_bool("mat_to_string symbolic tex no-bindings exact string", tex && strcmp(tex, expect) == 0);
+    check_bool("mat_to_string symbolic tex no-bindings exact string", tex && strcmp(tex, want) == 0);
 
     free(tex);
     mat_bindings_free(bindings);

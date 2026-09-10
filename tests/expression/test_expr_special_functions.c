@@ -215,8 +215,8 @@ void test_normal_pdf(void)
     /* phi(0) = 1/sqrt(2π) exactly */
     expr_t *c = test_expr_new_var_d(0.0);
     expr_t *f = expr_normal_pdf(c);
-    qfloat_t expect = qf_div(qf_from_double(1.0), qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI)));
-    check_q_at(__FILE__, __LINE__, 1, "normal_pdf(0) = 1/sqrt(2pi)", expr_eval_qf(f), expect);
+    qfloat_t want = qf_div(qf_from_double(1.0), qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI)));
+    check_q_at(__FILE__, __LINE__, 1, "normal_pdf(0) = 1/sqrt(2pi)", expr_eval_qf(f), want);
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
@@ -259,10 +259,10 @@ void test_normal_cdf(void)
 void test_normal_logpdf(void)
 {
     /* log phi(0) = -0.5*log(2pi) */
-    qfloat_t expect = qf_neg(qf_mul(qf_from_double(0.5), qf_log(qf_mul(qf_from_double(2.0), QF_PI))));
+    qfloat_t want = qf_neg(qf_mul(qf_from_double(0.5), qf_log(qf_mul(qf_from_double(2.0), QF_PI))));
     expr_t *c = test_expr_new_var_d(0.0);
     expr_t *f = expr_normal_logpdf(c);
-    check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0) = -log(2pi)/2", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0) = -log(2pi)/2", expr_eval_qf(f), want);
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
@@ -366,8 +366,8 @@ void test_E1(void)
 
     /* E₁'(1) = -exp(-1)/1 = -1/e */
     qfloat_t deriv_E1_at_1 = qf_neg(qf_div(qf_exp(qf_neg(qf_from_double(1.0))), qf_from_double(1.0)));
-    qfloat_t expect = qf_neg(qf_exp(qf_neg(qf_from_double(1.0))));
-    check_q_at(__FILE__, __LINE__, 1, "e1'(1) = -exp(-1)/1 = -1/e", deriv_E1_at_1, expect);
+    qfloat_t want = qf_neg(qf_exp(qf_neg(qf_from_double(1.0))));
+    check_q_at(__FILE__, __LINE__, 1, "e1'(1) = -exp(-1)/1 = -1/e", deriv_E1_at_1, want);
 }
 
 void test_beta(void)
@@ -472,9 +472,9 @@ void test_beta_pdf(void)
     expr_t *a = test_expr_new_const_d(2.0);
     expr_t *b = test_expr_new_const_d(3.0);
     expr_t *f = expr_beta_pdf(x, a, b);
-    qfloat_t expect = qf_from_double(1.5);
+    qfloat_t want = qf_from_double(1.5);
 
-    check_q_at(__FILE__, __LINE__, 1, "beta_pdf(0.5,2,3) = 1.5", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "beta_pdf(0.5,2,3) = 1.5", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -489,9 +489,9 @@ void test_logbeta_pdf(void)
     expr_t *a = test_expr_new_const_d(2.0);
     expr_t *b = test_expr_new_const_d(3.0);
     expr_t *f = expr_logbeta_pdf(x, a, b);
-    qfloat_t expect = qf_log(qf_from_double(1.5));
+    qfloat_t want = qf_log(qf_from_double(1.5));
 
-    check_q_at(__FILE__, __LINE__, 1, "logbeta_pdf(0.5,2,3) = log(1.5)", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "logbeta_pdf(0.5,2,3) = log(1.5)", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -519,8 +519,8 @@ void test_trigamma(void)
     /* ψ'(1) = π²/6  — exact, classical result */
     expr_t *c = test_expr_new_var_d(1.0);
     expr_t *f = expr_trigamma(c);
-    qfloat_t expect = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(1) = pi^2/6", expr_eval_qf(f), expect);
+    qfloat_t want = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(1) = pi^2/6", expr_eval_qf(f), want);
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
@@ -528,8 +528,8 @@ void test_trigamma(void)
     /* ψ'(2) = π²/6 - 1  (recurrence ψ'(2) = ψ'(1) - 1/1²) */
     c = test_expr_new_var_d(2.0);
     f = expr_trigamma(c);
-    expect = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(2) = pi^2/6 - 1", expr_eval_qf(f), expect);
+    want = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(2) = pi^2/6 - 1", expr_eval_qf(f), want);
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
@@ -537,8 +537,8 @@ void test_trigamma(void)
     /* ψ'(1/2) = π²/2  — exact, reflection formula */
     c = test_expr_new_const_d(0.5);
     f = expr_trigamma(c);
-    expect = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(2.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(1/2) = pi^2/2", expr_eval_qf(f), expect);
+    want = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(1/2) = pi^2/2", expr_eval_qf(f), want);
     print_expr_of(f);
     expr_free(f);
     expr_free(c);
@@ -554,9 +554,9 @@ void test_polygamma(void)
 {
     expr_t *c = test_expr_new_var_d(2.0);
     expr_t *f = expr_polygamma(3u, c);
-    qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
+    qfloat_t want = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)), qf_from_double(6.0));
 
-    check_q_at(__FILE__, __LINE__, 1, "polygamma(3, 2) = pi^4/15 - 6", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "polygamma(3, 2) = pi^4/15 - 6", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -564,8 +564,8 @@ void test_polygamma(void)
 
     c = test_expr_new_var_qf(qf_from_string("-0.5"));
     f = expr_polygamma(3u, c);
-    expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
-    check_q_at(__FILE__, __LINE__, 1, "polygamma(3, -1/2) = pi^4 + 96", expr_eval_qf(f), expect);
+    want = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+    check_q_at(__FILE__, __LINE__, 1, "polygamma(3, -1/2) = pi^4 + 96", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -577,9 +577,9 @@ void test_dilog_polylog(void)
     expr_t *c = test_expr_new_var_d(0.5);
     expr_t *f = expr_dilog(c);
     qfloat_t log2 = qf_log(qf_from_double(2.0));
-    qfloat_t expect = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));
+    qfloat_t want = qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));
 
-    check_q_at(__FILE__, __LINE__, 1, "dilog(1/2) = pi^2/12 - log(2)^2/2", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "dilog(1/2) = pi^2/12 - log(2)^2/2", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -595,7 +595,7 @@ void test_dilog_polylog(void)
 
     c = test_expr_new_var_d(0.5);
     f = expr_polylog(2u, c);
-    check_q_at(__FILE__, __LINE__, 1, "polylog(2, 1/2) = dilog(1/2)", expr_eval_qf(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "polylog(2, 1/2) = dilog(1/2)", expr_eval_qf(f), want);
     print_expr_of(f);
 
     expr_free(f);
@@ -608,11 +608,11 @@ void test_dilog_polylog(void)
         expr_t *cc = test_expr_new_const_d(2.0);
         expr_t *x = test_expr_new_const_d(0.1);
         expr_t *y = test_expr_new_const_d(0.2);
-        qfloat_t appell_expect =
+        qfloat_t appell_want =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 
         f = expr_appell_f1(a, b1, b2, cc, x, y);
-        check_q_at(__FILE__, __LINE__, 1, "appell_f1(1;1,1;2;0.1,0.2)", expr_eval_qf(f), appell_expect);
+        check_q_at(__FILE__, __LINE__, 1, "appell_f1(1;1,1;2;0.1,0.2)", expr_eval_qf(f), appell_want);
         print_expr_of(f);
 
         expr_free(f);
@@ -800,14 +800,14 @@ void test_deriv_trigamma(void)
     const expr_t *df = expr_get_deriv(f, x);
 
     /* d/dx{ψ'(x)} = ψ''(x) (tetragamma) — verify via qf_tetragamma */
-    qfloat_t expect = qf_tetragamma(qf_from_double(3.0));
-    check_q_at(__FILE__, __LINE__, 1, "d/dx{trigamma(x)} | x=3", expr_eval_qf(df), expect);
+    qfloat_t want = qf_tetragamma(qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{trigamma(x)} | x=3", expr_eval_qf(df), want);
     print_expr_of(df);
 
     /* Cross-check against recurrence: ψ''(3) = ψ''(4) - 2/27 */
     qfloat_t tet4 = qf_tetragamma(qf_from_double(4.0));
     qfloat_t via_recurrence = qf_sub(tet4, qf_div(qf_from_double(2.0), qf_from_double(27.0)));
-    check_q_at(__FILE__, __LINE__, 1, "ψ''(3) = ψ''(4) - 2/27 (recurrence)", expect, via_recurrence);
+    check_q_at(__FILE__, __LINE__, 1, "ψ''(3) = ψ''(4) - 2/27 (recurrence)", want, via_recurrence);
 
     expr_free(f);
     expr_free(x);
@@ -988,14 +988,14 @@ void test_second_deriv_digamma(void)
 
     /* d²/dx²{ψ(x)} = ψ''(x) = tetragamma(x); at x=2: ψ''(2) = ψ''(1) - 2
      * ψ''(1) = -2ζ(3) so we just use qf_tetragamma to get the want value */
-    qfloat_t expect = qf_tetragamma(qf_from_double(2.0));
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{digamma(x)} | x=2", expr_eval_qf(ddf), expect);
+    qfloat_t want = qf_tetragamma(qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{digamma(x)} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     /* Cross-check via recurrence: ψ''(2) = ψ''(3) - 2/8 */
     qfloat_t via_recurrence =
         qf_sub(qf_tetragamma(qf_from_double(3.0)), qf_div(qf_from_double(2.0), qf_from_double(8.0)));
-    check_q_at(__FILE__, __LINE__, 1, "ψ''(2) = ψ''(3) - 1/4 (recurrence)", expect, via_recurrence);
+    check_q_at(__FILE__, __LINE__, 1, "ψ''(2) = ψ''(3) - 1/4 (recurrence)", want, via_recurrence);
 
     expr_free(df);
     expr_free(f);

@@ -119,11 +119,11 @@ const test_validity_contract_t *expr_validity_contract_number_close(void)
 /* Compact qfloat_t comparison (kept exactly as-is, but using harness colours) */
 /* ------------------------------------------------------------------------- */
 
-void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t expect)
+void check_q_at(const char *file, int line, int col, const char *label, qfloat_t got, qfloat_t want)
 {
-    qfloat_t diff = qf_sub(got, expect);
+    qfloat_t diff = qf_sub(got, want);
     double abs_err = fabs(qf_to_double(diff));
-    double exp_d = fabs(qf_to_double(expect));
+    double exp_d = fabs(qf_to_double(want));
 
     double rel_err = (exp_d > 0) ? abs_err / exp_d : abs_err;
 
@@ -142,8 +142,8 @@ void check_q_at(const char *file, int line, int col, const char *label, qfloat_t
 
     qf_printf("%.34q", got);
 
-    printf(" expect=");
-    qf_printf("%.34q", expect);
+    printf(" want=");
+    qf_printf("%.34q", want);
 
     printf(" diff=");
     qf_printf("%.34q", diff);

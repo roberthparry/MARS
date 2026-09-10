@@ -497,7 +497,7 @@ static int test_emit_c_variable_bindings(test_sbuf_t *out, const char *args, con
     return 1;
 }
 
-static char *test_legacy_function_expect_to_c(const char *legacy)
+static char *test_legacy_function_want_to_c(const char *legacy)
 {
     test_legacy_binding_t bindings[64];
     size_t nbindings = 0u;
@@ -580,12 +580,12 @@ static void test_to_string_basic_const_expr(void)
     expr_t *c = test_expr_new_const_d(3.5);
     char *got = expr_to_string(c, style_EXPRESSION);
 
-    const char *expect = "3.5";
+    const char *want = "3.5";
 
-    if (str_eq(got, expect))
-        to_string_pass("basic const (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("basic const (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic const (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic const (EXPR)", got, want);
 
     free(got);
     expr_free(c);
@@ -596,16 +596,16 @@ static void test_to_string_basic_const_func(void)
     expr_t *c = test_expr_new_const_d(3.5);
     char *got = expr_to_string(c, style_FUNCTION);
 
-    const char *expect = "expression expr() {\n"
+    const char *want = "expression expr() {\n"
                          "    return 3.5.\n"
                          "}\n"
                          "\n"
                          "output(expr()).";
 
-    if (str_eq(got, expect))
-        to_string_pass("basic const (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("basic const (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic const (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic const (FUNC)", got, want);
 
     free(got);
     expr_free(c);
@@ -626,12 +626,12 @@ static void test_to_string_basic_var_expr(void)
     expr_t *x = test_expr_new_named_var_d(42.0, "x");
     char *got = expr_to_string(x, style_EXPRESSION);
 
-    const char *expect = "{ x | x = 42 }";
+    const char *want = "{ x | x = 42 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("basic var (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("basic var (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -644,28 +644,28 @@ static void test_to_string_basic_var_func(void)
     char *got = expr_to_string(x, style_FUNCTION);
     char *unknown_got = expr_to_string(unknown, style_FUNCTION);
 
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return x.\n"
                          "}\n"
                          "\n"
                          "x = 42.\n"
                          "output(expr(x)).";
-    const char *unknown_expect = "expression expr(x) {\n"
+    const char *unknown_want = "expression expr(x) {\n"
                                  "    return x.\n"
                                  "}\n"
                                  "\n"
                                  "x = ?.\n"
                                  "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("basic var (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("basic var (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", got, want);
 
-    if (str_eq(unknown_got, unknown_expect))
-        to_string_pass("unknown basic var (FUNC)", unknown_got, unknown_expect);
+    if (str_eq(unknown_got, unknown_want))
+        to_string_pass("unknown basic var (FUNC)", unknown_got, unknown_want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unknown basic var (FUNC)", unknown_got, unknown_expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unknown basic var (FUNC)", unknown_got, unknown_want);
 
     free(unknown_got);
     free(got);
@@ -684,14 +684,14 @@ static void test_to_string_basic_var_TeX(void)
     expr_t *x = test_expr_new_named_var_d(42.0, "x0");
     char *got = expr_to_string(x, style_LATEX);
 
-    const char *expect = "\\left\\{ x_{0} \\;\\middle|\\; x_{0} = 42 \\right\\}";
+    const char *want = "\\left\\{ x_{0} \\;\\middle|\\; x_{0} = 42 \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "basic var (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("basic var (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("basic var (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (TEX)", got, want);
 
     free(got);
     expr_free(x);
@@ -709,15 +709,15 @@ static void test_to_string_nested_transcendental_TeX(void)
     expr_t *f = expr_add(exp_term, x_log_y);
     char *got = expr_to_string(f, style_LATEX);
 
-    const char *expect = "\\left\\{ e^{\\sin(x_{0}\\mkern-2mu y_{1})} + x_{0}\\mkern-2mu \\ln(y_{1}) "
+    const char *want = "\\left\\{ e^{\\sin(x_{0}\\mkern-2mu y_{1})} + x_{0}\\mkern-2mu \\ln(y_{1}) "
                          "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("nested transcendental (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("nested transcendental (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested transcendental (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested transcendental (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -735,12 +735,12 @@ static void test_to_string_atan_TeX(void)
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *f = expr_atan(x);
     char *got = expr_to_TeX_body(f);
-    const char *expect = "\\arctan(x)";
+    const char *want = "\\arctan(x)";
 
-    if (str_eq(got, expect))
-        to_string_pass("arctan (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("arctan (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "arctan (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "arctan (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -759,15 +759,15 @@ static void test_to_string_nested_quotient_pow_TeX(void)
     expr_t *f = expr_log(frac);
     char *got = expr_to_string(f, style_LATEX);
 
-    const char *expect = "\\left\\{ \\ln(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
+    const char *want = "\\left\\{ \\ln(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
                          "\\;\\middle|\\; x_{0} = 2, y_{1} = 3 \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "nested quotient pow (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("nested quotient pow (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("nested quotient pow (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested quotient pow (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested quotient pow (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -788,9 +788,9 @@ static void test_to_string_log10_TeX(void)
     char *got_expression = expr_to_string(f, style_EXPRESSION);
     char *got_function = expr_to_string(f, style_FUNCTION);
 
-    const char *expect_TeX = "\\left\\{ \\lg(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
-    const char *expect_expression = "{ lg(x₀) | x₀ = 100 }";
-    const char *expect_function = "expression expr(x₀) {\n"
+    const char *want_TeX = "\\left\\{ \\lg(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
+    const char *want_expression = "{ lg(x₀) | x₀ = 100 }";
+    const char *want_function = "expression expr(x₀) {\n"
                                   "    return lg(x₀).\n"
                                   "}\n"
                                   "\n"
@@ -799,20 +799,20 @@ static void test_to_string_log10_TeX(void)
 
     TeX_preview_emit_case(__FILE__, "log10 (TEX)", got_TeX);
 
-    if (str_eq(got_TeX, expect_TeX))
-        to_string_pass("log10 canonical lg name (TEX)", got_TeX, expect_TeX);
+    if (str_eq(got_TeX, want_TeX))
+        to_string_pass("log10 canonical lg name (TEX)", got_TeX, want_TeX);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (TEX)", got_TeX, expect_TeX);
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (TEX)", got_TeX, want_TeX);
 
-    if (str_eq(got_expression, expect_expression))
-        to_string_pass("log10 canonical lg name (EXPR)", got_expression, expect_expression);
+    if (str_eq(got_expression, want_expression))
+        to_string_pass("log10 canonical lg name (EXPR)", got_expression, want_expression);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (EXPR)", got_expression, expect_expression);
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (EXPR)", got_expression, want_expression);
 
-    if (str_eq(got_function, expect_function))
-        to_string_pass("log10 canonical lg name (FUNC)", got_function, expect_function);
+    if (str_eq(got_function, want_function))
+        to_string_pass("log10 canonical lg name (FUNC)", got_function, want_function);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (FUNC)", got_function, expect_function);
+        to_string_fail(__FILE__, __LINE__, 1, "log10 canonical lg name (FUNC)", got_function, want_function);
 
     free(got_function);
     free(got_expression);
@@ -826,12 +826,12 @@ static void test_to_string_exp_unit_fraction_root_TeX(void)
     expr_t *eighth = expr_new_const(NUM_ONE_EIGHTH);
     expr_t *f = expr_exp(eighth);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "\\sqrt[8]{e}";
+    const char *want = "\\sqrt[8]{e}";
 
-    if (str_eq(got, expect))
-        to_string_pass("exp unit fraction renders as TeX root", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("exp unit fraction renders as TeX root", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "exp unit fraction renders as TeX root", got ? got : "(null)", expect);
+        to_string_fail(__FILE__, __LINE__, 1, "exp unit fraction renders as TeX root", got ? got : "(null)", want);
 
     free(got);
     expr_free(f);
@@ -842,13 +842,13 @@ static void test_to_string_parsed_exp_unit_fraction_root_TeX(void)
 {
     expr_t *f = expr_from_string("{ exp(1/8) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "\\sqrt[8]{e}";
+    const char *want = "\\sqrt[8]{e}";
 
-    if (str_eq(got, expect))
-        to_string_pass("parsed exp unit fraction renders as TeX root", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("parsed exp unit fraction renders as TeX root", got, want);
     else
         to_string_fail(__FILE__, __LINE__, 1, "parsed exp unit fraction renders as TeX root", got ? got : "(null)",
-                       expect);
+                       want);
 
     free(got);
     expr_free(f);
@@ -858,13 +858,13 @@ static void test_to_string_numeric_factor_before_fractional_power_TeX(void)
 {
     expr_t *f = expr_from_string("{ 5*5^(1/3) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "5 \\times 5^{\\frac{1}{3}}";
+    const char *want = "5 \\times 5^{\\frac{1}{3}}";
 
-    if (str_eq(got, expect))
-        to_string_pass("numeric factor before fractional power is unambiguous (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("numeric factor before fractional power is unambiguous (TEX)", got, want);
     else
         to_string_fail(__FILE__, __LINE__, 1, "numeric factor before fractional power is unambiguous (TEX)",
-                       got ? got : "(null)", expect);
+                       got ? got : "(null)", want);
 
     free(got);
     expr_free(f);
@@ -875,15 +875,15 @@ static void test_to_string_symbolic_constants_TeX(void)
     expr_t *f = expr_from_string("{ exp(@pi*i*3/2*x) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
-    const char *expect = "\\left\\{ e^{\\pi\\mkern-2mu i\\mkern-2mu \\frac{3}{2}\\mkern-2mu x} "
+    const char *want = "\\left\\{ e^{\\pi\\mkern-2mu i\\mkern-2mu \\frac{3}{2}\\mkern-2mu x} "
                          "\\;\\middle|\\; x = NAN \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("symbolic constants (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("symbolic constants (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "symbolic constants (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "symbolic constants (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -894,14 +894,14 @@ static void test_to_string_symbolic_constant_quotient_TeX(void)
     expr_t *f = expr_from_string("{ 1/pi }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
-    const char *expect = "\\frac{1}{\\pi}";
+    const char *want = "\\frac{1}{\\pi}";
 
     TeX_preview_emit_case(__FILE__, "symbolic constant quotient (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("symbolic constant quotient (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("symbolic constant quotient (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "symbolic constant quotient (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "symbolic constant quotient (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -916,21 +916,21 @@ static void test_to_string_lambert_w_TeX(void)
     char *got_w0 = expr_to_string(w0, style_LATEX);
     char *got_wm1 = expr_to_string(wm1, style_LATEX);
 
-    const char *expect_w0 = "\\left\\{ W_{0}(x_{0}) \\;\\middle|\\; x_{0} = 1 \\right\\}";
-    const char *expect_wm1 = "\\left\\{ W_{-1}(x_{1}) \\;\\middle|\\; x_{1} = -0.2 \\right\\}";
+    const char *want_w0 = "\\left\\{ W_{0}(x_{0}) \\;\\middle|\\; x_{0} = 1 \\right\\}";
+    const char *want_wm1 = "\\left\\{ W_{-1}(x_{1}) \\;\\middle|\\; x_{1} = -0.2 \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "lambert W0 (TEX)", got_w0);
     TeX_preview_emit_case(__FILE__, "lambert W-1 (TEX)", got_wm1);
 
-    if (str_eq(got_w0, expect_w0))
-        to_string_pass("lambert W0 (TEX)", got_w0, expect_w0);
+    if (str_eq(got_w0, want_w0))
+        to_string_pass("lambert W0 (TEX)", got_w0, want_w0);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "lambert W0 (TEX)", got_w0, expect_w0);
+        to_string_fail(__FILE__, __LINE__, 1, "lambert W0 (TEX)", got_w0, want_w0);
 
-    if (str_eq(got_wm1, expect_wm1))
-        to_string_pass("lambert W-1 (TEX)", got_wm1, expect_wm1);
+    if (str_eq(got_wm1, want_wm1))
+        to_string_pass("lambert W-1 (TEX)", got_wm1, want_wm1);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "lambert W-1 (TEX)", got_wm1, expect_wm1);
+        to_string_fail(__FILE__, __LINE__, 1, "lambert W-1 (TEX)", got_wm1, want_wm1);
 
     free(got_w0);
     free(got_wm1);
@@ -945,15 +945,15 @@ static void test_to_string_gammainv_TeX(void)
     expr_t *f = expr_from_string("{ lgamma(x) - ln(5) | x = gammainv(5) }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
-    const char *expect = "\\left\\{ \\ln\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
+    const char *want = "\\left\\{ \\ln\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
                          "x = \\Gamma^{-1}(5) \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "gammainv inverse gamma (TEX)", got);
 
-    if (str_eq(got, expect))
-        to_string_pass("gammainv inverse gamma (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("gammainv inverse gamma (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gammainv inverse gamma (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "gammainv inverse gamma (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -968,38 +968,38 @@ static void test_to_string_gamma_polygamma_standard_names(void)
     char *got_func = f ? expr_to_string(f, style_FUNCTION) : NULL;
     char *got_second_TeX = second ? expr_to_string(second, style_LATEX) : NULL;
 
-    const char *expect_expr = "{ Γ(x) + ψ⁽⁰⁾(x) + ψ⁽¹⁾(x) + ψ⁽²⁾(x) | x = 3 }";
-    const char *expect_TeX = "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
+    const char *want_expr = "{ Γ(x) + ψ⁽⁰⁾(x) + ψ⁽¹⁾(x) + ψ⁽²⁾(x) | x = 3 }";
+    const char *want_TeX = "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
                              "\\;\\middle|\\; x = 3 \\right\\}";
-    const char *expect_func = "expression expr(x) {\n"
+    const char *want_func = "expression expr(x) {\n"
                               "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x).\n"
                               "}\n"
                               "\n"
                               "x = 3.\n"
                               "output(expr(x)).";
-    const char *expect_second_TeX = "\\left\\{ \\Gamma(x)\\mkern-2mu \\left(\\psi^{(1)}(x) + "
+    const char *want_second_TeX = "\\left\\{ \\Gamma(x)\\mkern-2mu \\left(\\psi^{(1)}(x) + "
                                     "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
 
-    if (str_eq(got_expr, expect_expr))
-        to_string_pass("gamma/polygamma standard names (EXPR)", got_expr, expect_expr);
+    if (str_eq(got_expr, want_expr))
+        to_string_pass("gamma/polygamma standard names (EXPR)", got_expr, want_expr);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (EXPR)", got_expr, expect_expr);
+        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (EXPR)", got_expr, want_expr);
 
-    if (str_eq(got_TeX, expect_TeX))
-        to_string_pass("gamma/polygamma standard names (TEX)", got_TeX, expect_TeX);
+    if (str_eq(got_TeX, want_TeX))
+        to_string_pass("gamma/polygamma standard names (TEX)", got_TeX, want_TeX);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (TEX)", got_TeX, expect_TeX);
+        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (TEX)", got_TeX, want_TeX);
 
-    if (str_eq(got_func, expect_func))
-        to_string_pass("gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
+    if (str_eq(got_func, want_func))
+        to_string_pass("gamma/polygamma standard names (FUNCTION)", got_func, want_func);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
+        to_string_fail(__FILE__, __LINE__, 1, "gamma/polygamma standard names (FUNCTION)", got_func, want_func);
 
-    if (str_eq(got_second_TeX, expect_second_TeX))
-        to_string_pass("gamma second derivative polygamma power (TEX)", got_second_TeX, expect_second_TeX);
+    if (str_eq(got_second_TeX, want_second_TeX))
+        to_string_pass("gamma second derivative polygamma power (TEX)", got_second_TeX, want_second_TeX);
     else
         to_string_fail(__FILE__, __LINE__, 1, "gamma second derivative polygamma power (TEX)", got_second_TeX,
-                       expect_second_TeX);
+                       want_second_TeX);
 
     free(got_expr);
     free(got_TeX);
@@ -1014,12 +1014,12 @@ static void test_to_string_non_simple_var_bracketed_expr(void)
     expr_t *v = test_expr_new_named_var_d(42.0, "a0b0");
     char *got = expr_to_string(v, style_EXPRESSION);
 
-    const char *expect = "{ [a0b₀] | [a0b₀] = 42 }";
+    const char *want = "{ [a0b₀] | [a0b₀] = 42 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("non-simple var bracketed (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("non-simple var bracketed (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (EXPR)", got, want);
 
     free(got);
     expr_free(v);
@@ -1030,17 +1030,17 @@ static void test_to_string_non_simple_var_bracketed_func(void)
     expr_t *v = test_expr_new_named_var_d(42.0, "a0b0");
     char *got = expr_to_string(v, style_FUNCTION);
 
-    const char *expect = "expression expr([a0b₀]) {\n"
+    const char *want = "expression expr([a0b₀]) {\n"
                          "    return [a0b₀].\n"
                          "}\n"
                          "\n"
                          "[a0b₀] = 42.\n"
                          "output(expr([a0b₀])).";
 
-    if (str_eq(got, expect))
-        to_string_pass("non-simple var bracketed (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("non-simple var bracketed (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (FUNC)", got, want);
 
     free(got);
     expr_free(v);
@@ -1063,12 +1063,12 @@ static void test_to_string_addition_expr(void)
     expr_t *f = expr_add(x, y);
 
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ x + y | x = 1, y = 2 }";
+    const char *want = "{ x + y | x = 1, y = 2 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("addition (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("addition (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "addition (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "addition (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1083,7 +1083,7 @@ static void test_to_string_addition_func(void)
     expr_t *f = expr_add(x, y);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x, y) {\n"
+    const char *want = "expression expr(x, y) {\n"
                          "    return x + y.\n"
                          "}\n"
                          "\n"
@@ -1091,10 +1091,10 @@ static void test_to_string_addition_func(void)
                          "y = 2.\n"
                          "output(expr(x, y)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("addition (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("addition (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "addition (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "addition (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1117,13 +1117,13 @@ static void test_to_string_wrapped_TeX_aligned_subtraction(void)
     expr_t *x_minus_y = expr_add(x, neg_y);
     expr_t *f = expr_add(x_minus_y, z);
     char *got = expr_to_TeX_body_wrapped(f, 1u);
-    const char *expect = "aligned wrapped TeX with subtraction, not + -";
+    const char *want = "aligned wrapped TeX with subtraction, not + -";
 
     if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "\\\\") && strstr(got, "{} - y") &&
         !strstr(got, "+ -"))
-        to_string_pass("wrapped TeX aligned subtraction", got, expect);
+        to_string_pass("wrapped TeX aligned subtraction", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "wrapped TeX aligned subtraction", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "wrapped TeX aligned subtraction", got, want);
 
     free(got);
     expr_free(f);
@@ -1145,14 +1145,14 @@ static void test_to_string_wrapped_TeX_distributes_scale(void)
     expr_t *sum = expr_add(x_minus_y, z);
     expr_t *f = expr_mul(k, sum);
     char *got = expr_to_TeX_body_wrapped(f, 1u);
-    const char *expect = "scaled wrapped TeX distributes factor without tall delimiters";
+    const char *want = "scaled wrapped TeX distributes factor without tall delimiters";
 
     if (got && strstr(got, "\\begin{aligned}[t]") && strstr(got, "k\\mkern-2mu x") &&
         strstr(got, "{} - k\\mkern-2mu y") && strstr(got, "{} + k\\mkern-2mu z") &&
         !strstr(got, "\\left(\\begin{aligned}"))
-        to_string_pass("wrapped TeX distributes scale", got, expect);
+        to_string_pass("wrapped TeX distributes scale", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "wrapped TeX distributes scale", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "wrapped TeX distributes scale", got, want);
 
     free(got);
     expr_free(f);
@@ -1174,12 +1174,12 @@ static void test_to_string_negative_rhs_expr(void)
     expr_t *frac = expr_div(neg_y, z);
     expr_t *f = expr_sub(x, frac);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ x + y/z | x = 2, y = 3, z = 4 }";
+    const char *want = "{ x + y/z | x = 2, y = 3, z = 4 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("negative rhs quotient (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("negative rhs quotient (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "negative rhs quotient (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "negative rhs quotient (EXPR)", got, want);
 
     free(got);
     expr_free(neg_y);
@@ -1197,12 +1197,12 @@ static void test_to_string_double_negative_expr(void)
     expr_t *neg_y = expr_neg(y);
     expr_t *f = expr_sub(x, neg_y);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ x + y | x = 2, y = 3 }";
+    const char *want = "{ x + y | x = 2, y = 3 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("double negative rhs (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("double negative rhs (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "double negative rhs (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "double negative rhs (EXPR)", got, want);
 
     free(got);
     expr_free(neg_y);
@@ -1226,12 +1226,12 @@ static void test_to_string_nested_negative_rhs_expr(void)
     expr_t *lhs = expr_div(minus_two, a);
     expr_t *f = expr_sub(lhs, rhs);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ -2/a + (1 - 2/a)/a/b | a = 5, b = 6 }";
+    const char *want = "{ -2/a + (1 - 2/a)/a/b | a = 5, b = 6 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("nested negative rhs quotient (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("nested negative rhs quotient (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested negative rhs quotient (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested negative rhs quotient (EXPR)", got, want);
 
     free(got);
     expr_free(f);
@@ -1263,12 +1263,12 @@ static void test_to_string_nested_mul_add_expr(void)
     expr_t *simp = expr_simplify(f);
 
     char *got = expr_to_string(simp, style_EXPRESSION);
-    const char *expect = "{ xy + z | z = 4, x = 2, y = 3 }";
+    const char *want = "{ xy + z | z = 4, x = 2, y = 3 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("nested mul+add (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("nested mul+add (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", got, want);
 
     free(got);
     expr_free(simp);
@@ -1290,7 +1290,7 @@ static void test_to_string_nested_mul_add_func(void)
     expr_t *simp = expr_simplify(f);
 
     char *got = expr_to_string(simp, style_FUNCTION);
-    const char *expect = "expression expr(z, x, y) {\n"
+    const char *want = "expression expr(z, x, y) {\n"
                          "    return z + x.y.\n"
                          "}\n"
                          "\n"
@@ -1299,10 +1299,10 @@ static void test_to_string_nested_mul_add_func(void)
                          "y = 3.\n"
                          "output(expr(z, x, y)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("nested mul+add (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("nested mul+add (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", got, want);
 
     free(got);
     expr_free(simp);
@@ -1356,12 +1356,12 @@ static void test_to_string_atan2_expr(void)
     expr_t *f = expr_atan2(x, y);
 
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ atan2(x, y) | x = 2, y = 3 }";
+    const char *want = "{ atan2(x, y) | x = 2, y = 3 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("atan2 (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("atan2 (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1377,7 +1377,7 @@ static void test_to_string_atan2_func(void)
     expr_t *f = expr_atan2(x, y);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x, y) {\n"
+    const char *want = "expression expr(x, y) {\n"
                          "    return atan2(x, y).\n"
                          "}\n"
                          "\n"
@@ -1385,10 +1385,10 @@ static void test_to_string_atan2_func(void)
                          "y = 3.\n"
                          "output(expr(x, y)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("atan2 (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("atan2 (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1412,12 +1412,12 @@ static void test_to_string_pow_superscript_expr(void)
     expr_t *f = expr_pow_d(x, 3);
 
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ x³ | x = 2 }";
+    const char *want = "{ x³ | x = 2 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("pow superscript (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("pow superscript (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1430,17 +1430,17 @@ static void test_to_string_pow_superscript_func(void)
     expr_t *f = expr_pow_d(x, 3);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return x^3.\n"
                          "}\n"
                          "\n"
                          "x = 2.\n"
                          "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("pow superscript (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("pow superscript (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1454,12 +1454,12 @@ static void test_to_string_complex_const_pow_expr(void)
     expr_t *pow = expr_pow_d(base, 6.0);
     expr_t *f = expr_add_d(pow, 1.0);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "(1 + 2i)⁶ + 1";
+    const char *want = "(1 + 2i)⁶ + 1";
 
-    if (str_eq(got, expect))
-        to_string_pass("complex const power base (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("complex const power base (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (EXPR)", got, want);
 
     free(got);
     expr_free(f);
@@ -1475,16 +1475,16 @@ static void test_to_string_complex_const_pow_func(void)
     expr_t *pow = expr_pow_d(base, 6.0);
     expr_t *f = expr_add_d(pow, 1.0);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr() {\n"
+    const char *want = "expression expr() {\n"
                          "    return (1 + 2i)^6 + 1.\n"
                          "}\n"
                          "\n"
                          "output(expr()).";
 
-    if (str_eq(got, expect))
-        to_string_pass("complex const power base (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("complex const power base (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (FUNC)", got, want);
 
     free(got);
     expr_free(f);
@@ -1500,12 +1500,12 @@ static void test_to_string_complex_const_pow_TeX(void)
     expr_t *pow = expr_pow_d(base, 6.0);
     expr_t *f = expr_add_d(pow, 1.0);
     char *got = expr_to_string(f, style_LATEX);
-    const char *expect = "\\left(1 + 2i\\right)^{6} + 1";
+    const char *want = "\\left(1 + 2i\\right)^{6} + 1";
 
-    if (str_eq(got, expect))
-        to_string_pass("complex const power base (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("complex const power base (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -1518,12 +1518,12 @@ static void test_to_string_parsed_complex_const_pow_TeX(void)
 {
     expr_t *f = expr_from_string("{ (1 + 2i)^6 + 1 }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "118 + 44\\mkern-2mu i";
+    const char *want = "118 + 44\\mkern-2mu i";
 
-    if (str_eq(got, expect))
-        to_string_pass("parsed complex const power base (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("parsed complex const power base (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -1533,12 +1533,12 @@ static void test_to_string_parsed_complex_const_pow_expr(void)
 {
     expr_t *f = expr_from_string("{ (1 + 2i)^6 + 1 }", NULL);
     char *got = f ? expr_to_string(f, style_EXPRESSION) : NULL;
-    const char *expect = "118 + 44i";
+    const char *want = "118 + 44i";
 
-    if (str_eq(got, expect))
-        to_string_pass("parsed complex const power base (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("parsed complex const power base (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (EXPR)", got, want);
 
     free(got);
     expr_free(f);
@@ -1552,13 +1552,13 @@ static void test_to_string_power_base_is_grouped_TeX(void)
     expr_t *inner = expr_pow_xp(a, neg_x);
     expr_t *f = expr_pow(inner, &NUM_TWO);
     char *got = expr_to_string(f, style_LATEX);
-    const char *expect = "\\left\\{ \\left(a^{-x}\\right)^{2} \\;\\middle|\\; "
+    const char *want = "\\left\\{ \\left(a^{-x}\\right)^{2} \\;\\middle|\\; "
                          "a = 2, x = 3 \\right\\}";
 
-    if (str_eq(got, expect))
-        to_string_pass("power base is grouped (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("power base is grouped (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "power base is grouped (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "power base is grouped (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -1591,12 +1591,12 @@ static void test_to_string_power_of_power_simplifies_expr(void)
     expr_t *f = expr_from_string("{ (a^(-x))² | x = NAN; a = NAN }", NULL);
     expr_t *simp = f ? expr_simplify(f) : NULL;
     char *got = simp ? expr_to_string(simp, style_EXPRESSION) : NULL;
-    const char *expect = "{ a^(-2x) | x = NAN; a = NAN }";
+    const char *want = "{ a^(-2x) | x = NAN; a = NAN }";
 
-    if (str_eq(got, expect))
-        to_string_pass("power of power simplifies (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("power of power simplifies (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "power of power simplifies (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "power of power simplifies (EXPR)", got, want);
 
     free(got);
     expr_free(simp);
@@ -1607,13 +1607,13 @@ static void test_to_string_powered_exponent_TeX(void)
 {
     expr_t *f = expr_from_string("{ a^(x^2) | x = NAN; a = NAN }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
-    const char *expect = "\\left\\{ a^{x^{2}} \\;\\middle|\\; "
+    const char *want = "\\left\\{ a^{x^{2}} \\;\\middle|\\; "
                          "x = NAN; a = NAN \\right\\}";
 
-    if (str_eq(got, expect))
-        to_string_pass("powered exponent renders without double superscript (TEX)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("powered exponent renders without double superscript (TEX)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "powered exponent renders without double superscript (TEX)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "powered exponent renders without double superscript (TEX)", got, want);
 
     free(got);
     expr_free(f);
@@ -1644,12 +1644,12 @@ static void test_to_string_unary_sin_expr(void)
     expr_t *f = expr_sin(x);
 
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ sin(x) | x = 0.5 }";
+    const char *want = "{ sin(x) | x = 0.5 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("unary sin (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("unary sin (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sin (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sin (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1662,17 +1662,17 @@ static void test_to_string_unary_sin_func(void)
     expr_t *f = expr_sin(x);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return sin(x).\n"
                          "}\n"
                          "\n"
                          "x = 0.5.\n"
                          "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("unary sin (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("unary sin (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sin (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sin (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1690,12 +1690,12 @@ static void test_to_string_unary_sqrt_expr(void)
     expr_t *x = test_expr_new_named_var_d(4.0, "x");
     expr_t *f = expr_sqrt(x);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ √(x) | x = 4 }";
+    const char *want = "{ √(x) | x = 4 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("unary sqrt (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("unary sqrt (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1707,17 +1707,17 @@ static void test_to_string_unary_sqrt_func(void)
     expr_t *x = test_expr_new_named_var_d(4.0, "x");
     expr_t *f = expr_sqrt(x);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return sqrt(x).\n"
                          "}\n"
                          "\n"
                          "x = 4.\n"
                          "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("unary sqrt (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("unary sqrt (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1739,12 +1739,12 @@ static void test_to_string_function_style_expr(void)
     expr_t *x = test_expr_new_named_var_d(10, "x");
     char *got = expr_to_string(x, style_EXPRESSION);
 
-    const char *expect = "{ x | x = 10 }";
+    const char *want = "{ x | x = 10 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("function style identity (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("function style identity (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style identity (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style identity (EXPR)", got, want);
 
     free(got);
     expr_free(x);
@@ -1755,17 +1755,17 @@ static void test_to_string_function_style_func(void)
     expr_t *x = test_expr_new_named_var_d(10, "x");
     char *got = expr_to_string(x, style_FUNCTION);
 
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return x.\n"
                          "}\n"
                          "\n"
                          "x = 10.\n"
                          "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("function style identity (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("function style identity (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style identity (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style identity (FUNC)", got, want);
 
     free(got);
     expr_free(x);
@@ -1785,17 +1785,17 @@ static void test_to_string_function_style_signed_sum(void)
     expr_t *simp = expr_simplify(f);
     char *got = expr_to_string(simp, style_FUNCTION);
 
-    const char *expect = "expression expr(x) {\n"
+    const char *want = "expression expr(x) {\n"
                          "    return exp(sin(x)) + 3.x^2 - 7.\n"
                          "}\n"
                          "\n"
                          "x = 1.\n"
                          "output(expr(x)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("function style signed sum (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("function style signed sum (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style signed sum (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style signed sum (FUNC)", got, want);
 
     free(got);
     expr_free(simp);
@@ -1819,7 +1819,7 @@ static void test_to_string_function_style_sub_negative_product(void)
     expr_t *f = expr_sub(E, ecc_sin_E);
     char *got = expr_to_string(f, style_FUNCTION);
 
-    const char *expect = "expression expr(E, e) {\n"
+    const char *want = "expression expr(E, e) {\n"
                          "    return E - e.sin(E).\n"
                          "}\n"
                          "\n"
@@ -1827,10 +1827,10 @@ static void test_to_string_function_style_sub_negative_product(void)
                          "e = 0.01669999999999999956701302039618894.\n"
                          "output(expr(E, e)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("function style negative product rhs (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("function style negative product rhs (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style negative product rhs (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style negative product rhs (FUNC)", got, want);
 
     free(got);
     expr_free(f);
@@ -1850,7 +1850,7 @@ static void test_to_string_function_style_preserves_math_names(void)
         NULL);
     char *got = expr_to_string(f, style_FUNCTION);
 
-    const char *expect = "expression expr(x, y, const c₀) {\n"
+    const char *want = "expression expr(x, y, const c₀) {\n"
                          "    return tan(c₀.x.y/2).\n"
                          "}\n"
                          "\n"
@@ -1859,10 +1859,10 @@ static void test_to_string_function_style_preserves_math_names(void)
                          "const c₀ = @eulermascheroni.\n"
                          "output(expr(x, y, c₀)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("function style preserves mathematical names (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("function style preserves mathematical names (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style preserves mathematical names (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style preserves mathematical names (FUNC)", got, want);
 
     free(got);
     expr_free(f);
@@ -1942,12 +1942,12 @@ static void test_to_string_floor_ceil_expr(void)
     expr_t *ceil_y = expr_ceil(y);
     expr_t *f = expr_add(floor_x, ceil_y);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *expect = "{ ⌊x⌋ + ⌈y⌉ | x = 1.5, y = -1.5 }";
+    const char *want = "{ ⌊x⌋ + ⌈y⌉ | x = 1.5, y = -1.5 }";
 
-    if (str_eq(got, expect))
-        to_string_pass("floor/ceil mathematical notation (EXPR)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("floor/ceil mathematical notation (EXPR)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil mathematical notation (EXPR)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil mathematical notation (EXPR)", got, want);
 
     free(got);
     expr_free(f);
@@ -1965,7 +1965,7 @@ static void test_to_string_floor_ceil_func(void)
     expr_t *ceil_y = expr_ceil(y);
     expr_t *f = expr_add(floor_x, ceil_y);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "expression expr(x, y) {\n"
+    const char *want = "expression expr(x, y) {\n"
                          "    return floor(x) + ceil(y).\n"
                          "}\n"
                          "\n"
@@ -1973,10 +1973,10 @@ static void test_to_string_floor_ceil_func(void)
                          "y = -1.5.\n"
                          "output(expr(x, y)).";
 
-    if (str_eq(got, expect))
-        to_string_pass("floor/ceil function notation (FUNC)", got, expect);
+    if (str_eq(got, want))
+        to_string_pass("floor/ceil function notation (FUNC)", got, want);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil function notation (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil function notation (FUNC)", got, want);
 
     free(got);
     expr_free(f);
@@ -2203,9 +2203,9 @@ static void test_to_string_appell_f1(void)
 {
     static const char *const inputs[] = {"{ appell_f1(1, 1, 1, 2, x, y) }", "{ F1(1, 1, 1, 2, x, y) }",
                                          "{ F_1(1, 1, 1, 2, x, y) }", "{ F₁(1, 1, 1, 2, x, y) }", NULL};
-    const char *expect_expr = "F₁(1; 1, 1; 2; x, y)";
-    const char *expect_func = "appellf1(1, 1, 1, 2, x, y)";
-    const char *expect_TeX = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
+    const char *want_expr = "F₁(1; 1, 1; 2; x, y)";
+    const char *want_func = "appellf1(1, 1, 1, 2, x, y)";
+    const char *want_TeX = "F_{1}\\left(1; 1, 1; 2; x, y\\right)";
 
     for (size_t i = 0u; inputs[i]; ++i) {
         expr_t *f = expr_from_string(inputs[i], NULL);
@@ -2215,17 +2215,17 @@ static void test_to_string_appell_f1(void)
 
         ASSERT_NOT_NULL(f);
         if (got_expr)
-            to_string_pass("appell_f1 alias (EXPR)", got_expr, expect_expr);
+            to_string_pass("appell_f1 alias (EXPR)", got_expr, want_expr);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (EXPR)", "(null)", expect_expr);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (EXPR)", "(null)", want_expr);
         if (got_func)
-            to_string_pass("appell_f1 alias (FUNCTION)", got_func, expect_func);
+            to_string_pass("appell_f1 alias (FUNCTION)", got_func, want_func);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (FUNCTION)", "(null)", expect_func);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (FUNCTION)", "(null)", want_func);
         if (got_TeX)
-            to_string_pass("appell_f1 alias (TEX)", got_TeX, expect_TeX);
+            to_string_pass("appell_f1 alias (TEX)", got_TeX, want_TeX);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (TEX)", "(null)", expect_TeX);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (TEX)", "(null)", want_TeX);
 
         free(got_TeX);
         free(got_func);
@@ -3703,7 +3703,7 @@ void test_expressions(void)
 
         char *got_expr = expr_to_string(simp, style_EXPRESSION);
         char *got_func = expr_to_string(simp, style_FUNCTION);
-        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        char *want_func_c = test_legacy_function_want_to_c(tests[i].want_func);
         const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
         int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
@@ -4126,7 +4126,7 @@ void test_expressions_unnamed(void)
 
         char *got_expr = expr_to_string(simp, style_EXPRESSION);
         char *got_func = expr_to_string(simp, style_FUNCTION);
-        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        char *want_func_c = test_legacy_function_want_to_c(tests[i].want_func);
         const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
         int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
@@ -4273,7 +4273,7 @@ void test_expressions_longname(void)
 
         char *got_expr = expr_to_string(f, style_EXPRESSION);
         char *got_func = expr_to_string(f, style_FUNCTION);
-        char *want_func_c = test_legacy_function_expect_to_c(tests[i].want_func);
+        char *want_func_c = test_legacy_function_want_to_c(tests[i].want_func);
         const char *want_func = want_func_c ? want_func_c : tests[i].want_func;
 
         int ok_expr = strcmp(got_expr, tests[i].want_expr) == 0;
@@ -4353,11 +4353,11 @@ void check_roundtrip(const char *label, expr_t *f, int line)
         return;
     }
 
-    qfloat_t expect = expr_eval_qf(f);
+    qfloat_t want = expr_eval_qf(f);
     qfloat_t got = expr_eval_qf(g);
-    qfloat_t diff = qf_sub(got, expect);
+    qfloat_t diff = qf_sub(got, want);
     double abs_err = fabs(qf_to_double(diff));
-    double exp_d = fabs(qf_to_double(expect));
+    double exp_d = fabs(qf_to_double(want));
     double rel_err = (exp_d > 0) ? abs_err / exp_d : abs_err;
 
     const double TOL = 2e-14; /* round-trip through double in binding values */
@@ -4368,7 +4368,7 @@ void check_roundtrip(const char *label, expr_t *f, int line)
         printf(C_BOLD C_RED "FAIL" C_RESET " %s value mismatch %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  string  " C_RESET "%s\n", s);
         qf_printf(C_BOLD "  got     " C_RESET "%.34q\n", got);
-        qf_printf(C_BOLD "  expect  " C_RESET "%.34q\n", expect);
+        qf_printf(C_BOLD "  want  " C_RESET "%.34q\n", want);
         printf("\n");
         TEST_FAIL();
     }
@@ -4379,7 +4379,7 @@ void check_roundtrip(const char *label, expr_t *f, int line)
 }
 
 /* Check that parsing an explicit string gives a specific evaluated value. */
-void check_parse_val(const char *label, const char *s, double expect_d, int line)
+void check_parse_val(const char *label, const char *s, double want_d, int line)
 {
     expr_t *g = expr_from_string(s, NULL);
     if (!g) {
@@ -4388,8 +4388,8 @@ void check_parse_val(const char *label, const char *s, double expect_d, int line
         return;
     }
     double got = expr_eval_d(g);
-    double err = fabs(got - expect_d);
-    double rel = (fabs(expect_d) > 0) ? err / fabs(expect_d) : err;
+    double err = fabs(got - want_d);
+    double rel = (fabs(want_d) > 0) ? err / fabs(want_d) : err;
     const double TOL = 2e-14;
     if (err < TOL || rel < TOL) {
         char *parsed = expr_to_string(g, style_EXPRESSION);
@@ -4401,7 +4401,7 @@ void check_parse_val(const char *label, const char *s, double expect_d, int line
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  string  " C_RESET "%s\n", s);
         printf(C_BOLD "  got     " C_RESET "%.17g\n", got);
-        printf(C_BOLD "  expect  " C_RESET "%.17g\n", expect_d);
+        printf(C_BOLD "  want  " C_RESET "%.17g\n", want_d);
         printf("\n");
         TEST_FAIL();
     }

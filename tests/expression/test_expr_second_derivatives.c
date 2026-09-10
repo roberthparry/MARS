@@ -6,9 +6,9 @@ void test_second_deriv_var(void)
     expr_t *df = expr_create_deriv(x, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(x);
@@ -22,9 +22,9 @@ void test_second_deriv_neg(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{-x} | x=3", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{-x} | x=3", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -39,9 +39,9 @@ void test_second_deriv_add_d(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x+5} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x+5} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -56,9 +56,9 @@ void test_second_deriv_mul_d(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{7x} | x=4", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{7x} | x=4", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -73,9 +73,9 @@ void test_second_deriv_div_d(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x/3} | x=9", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x/3} | x=9", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -90,9 +90,9 @@ void test_second_deriv_x2(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(2.0);
+    qfloat_t want = qf_from_double(2.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^2} | x=3", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^2} | x=3", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -107,9 +107,9 @@ void test_second_deriv_x3(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_from_double(12.0);
+    qfloat_t want = qf_from_double(12.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^3} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^3} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -145,9 +145,9 @@ void test_second_deriv_pow_xy(void)
 
     qfloat_t poly = qf_add(qf_add(term1, term2), qf_add(term3, term4));
 
-    qfloat_t expect = qf_mul(fx, poly);
+    qfloat_t want = qf_mul(fx, poly);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^(x^2+1)} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^(x^2+1)} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -165,9 +165,9 @@ void test_second_deriv_sin(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_neg(qf_sin(qf_from_double(0.5)));
+    qfloat_t want = qf_neg(qf_sin(qf_from_double(0.5)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -182,9 +182,9 @@ void test_second_deriv_cos(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_neg(qf_cos(qf_from_double(0.5)));
+    qfloat_t want = qf_neg(qf_cos(qf_from_double(0.5)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{cos(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{cos(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -201,9 +201,9 @@ void test_second_deriv_tan(void)
 
     qfloat_t X = qf_from_double(0.5);
     qfloat_t sec2 = qf_div(qf_from_double(1.0), qf_mul(qf_cos(X), qf_cos(X)));
-    qfloat_t expect = qf_mul(qf_from_double(2.0), qf_mul(sec2, qf_tan(X)));
+    qfloat_t want = qf_mul(qf_from_double(2.0), qf_mul(sec2, qf_tan(X)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{tan(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{tan(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -218,9 +218,9 @@ void test_second_deriv_sinh(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_sinh(qf_from_double(0.5));
+    qfloat_t want = qf_sinh(qf_from_double(0.5));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sinh(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sinh(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -235,9 +235,9 @@ void test_second_deriv_cosh(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect = qf_cosh(qf_from_double(0.5));
+    qfloat_t want = qf_cosh(qf_from_double(0.5));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{cosh(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{cosh(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -255,9 +255,9 @@ void test_second_deriv_tanh(void)
     qfloat_t X = qf_from_double(0.5);
     qfloat_t t = qf_tanh(X);
 
-    qfloat_t expect = qf_mul(qf_from_double(-2.0), qf_mul(t, qf_sub(qf_from_double(1.0), qf_mul(t, t))));
+    qfloat_t want = qf_mul(qf_from_double(-2.0), qf_mul(t, qf_sub(qf_from_double(1.0), qf_mul(t, t))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{tanh(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{tanh(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -275,9 +275,9 @@ void test_second_deriv_asin(void)
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X)));
 
-    qfloat_t expect = qf_div(X, qf_mul(denom, qf_mul(denom, denom)));
+    qfloat_t want = qf_div(X, qf_mul(denom, qf_mul(denom, denom)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{asin(x)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{asin(x)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -295,9 +295,9 @@ void test_second_deriv_acos(void)
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X)));
 
-    qfloat_t expect = qf_mul(qf_from_double(-1.0), qf_div(X, qf_mul(denom, qf_mul(denom, denom))));
+    qfloat_t want = qf_mul(qf_from_double(-1.0), qf_div(X, qf_mul(denom, qf_mul(denom, denom))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{acos(x)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{acos(x)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -315,9 +315,9 @@ void test_second_deriv_atan(void)
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_add(qf_from_double(1.0), qf_mul(X, X));
 
-    qfloat_t expect = qf_mul(qf_from_double(-2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
+    qfloat_t want = qf_mul(qf_from_double(-2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan(x)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan(x)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -337,9 +337,9 @@ void test_second_deriv_atan2(void)
 
     qfloat_t denom = qf_add(qf_from_double(1.0), qf_mul(X, X));
 
-    qfloat_t expect = qf_mul(qf_from_double(-2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
+    qfloat_t want = qf_mul(qf_from_double(-2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan2(x,1)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan2(x,1)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -359,10 +359,10 @@ void test_second_deriv_asinh(void)
 
     qfloat_t denom = qf_sqrt(qf_add(qf_from_double(1.0), qf_mul(X, X)));
 
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_from_double(-1.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, qf_mul(denom, denom)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{asinh(x)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{asinh(x)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -384,10 +384,10 @@ void test_second_deriv_acosh(void)
 
     qfloat_t denom = qf_mul(denom1, denom2);
 
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_from_double(-1.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, qf_mul(denom, denom)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{acosh(x)} | x=1.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{acosh(x)} | x=1.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -406,9 +406,9 @@ void test_second_deriv_atanh(void)
 
     qfloat_t denom = qf_sub(qf_from_double(1.0), qf_mul(X, X));
 
-    qfloat_t expect = qf_mul(qf_from_double(2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
+    qfloat_t want = qf_mul(qf_from_double(2.0), qf_mul(X, qf_div(qf_from_double(1.0), qf_mul(denom, denom))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atanh(x)} | x=0.25", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atanh(x)} | x=0.25", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -424,9 +424,9 @@ void test_second_deriv_exp(void)
     const expr_t *ddf = expr_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(1.5);
-    qfloat_t expect = qf_exp(X);
+    qfloat_t want = qf_exp(X);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{exp(x)} | x=1.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{exp(x)} | x=1.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -441,10 +441,10 @@ void test_second_deriv_log(void)
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_from_double(-1.0), qf_div(qf_from_double(1.0), qf_mul(qf_from_double(2.0), qf_from_double(2.0))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log(x)} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log(x)} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -462,11 +462,11 @@ void test_second_deriv_sqrt(void)
     qfloat_t X = qf_from_double(4.0);
 
     qfloat_t sqrtX = qf_sqrt(X);
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_from_double(-1.0),
                qf_div(qf_from_double(1.0), qf_mul(qf_from_double(4.0), qf_mul(sqrtX, qf_mul(sqrtX, sqrtX)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sqrt(x)} | x=4", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sqrt(x)} | x=4", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -485,11 +485,11 @@ void test_second_deriv_composite(void)
 
     qfloat_t X = qf_from_double(1.0);
 
-    qfloat_t expect = qf_add(
+    qfloat_t want = qf_add(
         qf_mul(qf_neg(qf_sin(X)), qf_exp(X)),
         qf_add(qf_mul(qf_cos(X), qf_exp(X)), qf_add(qf_mul(qf_cos(X), qf_exp(X)), qf_mul(qf_sin(X), qf_exp(X)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)*exp(x)} | x=1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)*exp(x)} | x=1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(sx);
@@ -510,13 +510,13 @@ void test_second_deriv_sin_log(void)
 
     qfloat_t X = qf_from_string("1.3");
 
-    qfloat_t expect = qf_add(
+    qfloat_t want = qf_add(
         qf_mul(qf_neg(qf_sin(X)), qf_log(X)),
         qf_add(qf_mul(qf_cos(X), qf_div(qf_from_double(1.0), X)),
                qf_add(qf_mul(qf_cos(X), qf_div(qf_from_double(1.0), X)),
                       qf_mul(qf_sin(X), qf_mul(qf_from_double(-1.0), qf_div(qf_from_double(1.0), qf_mul(X, X)))))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)*log(x)} | x=1.3", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sin(x)*log(x)} | x=1.3", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(sx);
@@ -538,12 +538,12 @@ void test_second_deriv_exp_tanh(void)
     qfloat_t X = qf_from_string("0.7");
     qfloat_t t = qf_tanh(X);
 
-    qfloat_t expect = qf_add(
+    qfloat_t want = qf_add(
         qf_mul(qf_exp(X), t),
         qf_add(qf_mul(qf_from_double(2.0), qf_mul(qf_exp(X), qf_sub(qf_from_double(1.0), qf_mul(t, t)))),
                qf_mul(qf_exp(X), qf_mul(qf_from_double(-2.0), qf_mul(t, qf_sub(qf_from_double(1.0), qf_mul(t, t)))))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{exp(x)*tanh(x)} | x=0.7", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{exp(x)*tanh(x)} | x=0.7", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(ex);
@@ -583,9 +583,9 @@ void test_second_deriv_sqrt_sin_x2(void)
     qfloat_t term3 = qf_mul(
         sqrtX, qf_add(qf_mul(qf_from_double(2.0), qf_cos(X2)), qf_mul(qf_from_double(-4.0), qf_mul(X2, qf_sin(X2)))));
 
-    qfloat_t expect = qf_add(qf_add(term1, term2), term3);
+    qfloat_t want = qf_add(qf_add(term1, term2), term3);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sqrt(x)*sin(x^2)} | x=1.1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{sqrt(x)*sin(x^2)} | x=1.1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(sqx);
@@ -608,9 +608,9 @@ void test_second_deriv_log_cosh(void)
 
     /* d²/dx²{log(cosh(x))} = sech²(x) = 1 - tanh²(x) */
     qfloat_t t = qf_tanh(X);
-    qfloat_t expect = qf_sub(qf_from_double(1.0), qf_mul(t, t));
+    qfloat_t want = qf_sub(qf_from_double(1.0), qf_mul(t, t));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log(cosh(x))} | x=0.9", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log(cosh(x))} | x=0.9", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(cx);
@@ -633,9 +633,9 @@ void test_second_deriv_x2_exp_negx(void)
     qfloat_t e_mx = qf_exp(qf_neg(X));
 
     /* d²/dx²{x²·e^{-x}} = e^{-x}·(x² - 4x + 2) */
-    qfloat_t expect = qf_mul(e_mx, qf_add(qf_mul(X, X), qf_add(qf_mul(qf_from_double(-4.0), X), qf_from_double(2.0))));
+    qfloat_t want = qf_mul(e_mx, qf_add(qf_mul(X, X), qf_add(qf_mul(qf_from_double(-4.0), X), qf_from_double(2.0))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^2*exp(-x)} | x=1.7", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^2*exp(-x)} | x=1.7", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -671,9 +671,9 @@ void test_second_deriv_atan_x_over_sqrt(void)
     qfloat_t sqrtX_ = qf_sqrt(one_p_x2);
     qfloat_t numer = qf_neg(qf_mul(X, five_p_6x2));
     qfloat_t denom = qf_mul(qf_mul(sqrtX_, one_p_x2), qf_mul(one_p_2x2, one_p_2x2));
-    qfloat_t expect = qf_div(numer, denom);
+    qfloat_t want = qf_div(numer, denom);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan(x/sqrt(1+x^2))} | x=0.8", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan(x/sqrt(1+x^2))} | x=0.8", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(sum);
@@ -697,9 +697,9 @@ void test_second_deriv_abs(void)
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{|x|} = 0 for x != 0 */
-    qfloat_t expect = qf_from_double(0.0);
+    qfloat_t want = qf_from_double(0.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{|x|} | x=0.8", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{|x|} | x=0.8", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -719,9 +719,9 @@ void test_second_deriv_hypot(void)
     qfloat_t X = qf_from_double(3.0);
     qfloat_t Y = qf_from_double(4.0);
     qfloat_t h = qf_hypot(X, Y);
-    qfloat_t expect = qf_div(qf_mul(Y, Y), qf_mul(h, qf_mul(h, h)));
+    qfloat_t want = qf_div(qf_mul(Y, Y), qf_mul(h, qf_mul(h, h)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{hypot(x,4)} | x=3", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{hypot(x,4)} | x=3", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -739,9 +739,9 @@ void test_second_deriv_erf(void)
 
     /* d²/dx²{erf(x)} = -4x/sqrt(pi) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
-    qfloat_t expect = qf_mul(qf_div(qf_from_double(-4.0), qf_sqrt(QF_PI)), qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
+    qfloat_t want = qf_mul(qf_div(qf_from_double(-4.0), qf_sqrt(QF_PI)), qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erf(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erf(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -758,9 +758,9 @@ void test_second_deriv_erfc(void)
 
     /* d²/dx²{erfc(x)} = 4x/sqrt(pi) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
-    qfloat_t expect = qf_mul(qf_div(qf_from_double(4.0), qf_sqrt(QF_PI)), qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
+    qfloat_t want = qf_mul(qf_div(qf_from_double(4.0), qf_sqrt(QF_PI)), qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfc(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfc(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -781,9 +781,9 @@ void test_second_deriv_gamma(void)
     qfloat_t g = qf_gamma(X);
     qfloat_t d = qf_digamma(X);
     qfloat_t t = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
-    qfloat_t expect = qf_mul(g, qf_add(qf_mul(d, d), t));
+    qfloat_t want = qf_mul(g, qf_add(qf_mul(d, d), t));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gamma(x)} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gamma(x)} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -799,9 +799,9 @@ void test_second_deriv_lgamma(void)
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{lgamma(x)} = trigamma(x); trigamma(2) = pi^2/6 - 1 */
-    qfloat_t expect = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
+    qfloat_t want = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{lgamma(x)} | x=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{lgamma(x)} | x=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -818,9 +818,9 @@ void test_second_deriv_normal_pdf(void)
 
     /* d²/dx²{phi(x)} = (x^2 - 1) * phi(x) */
     qfloat_t X = qf_from_double(0.5);
-    qfloat_t expect = qf_mul(qf_sub(qf_mul(X, X), qf_from_double(1.0)), qf_normal_pdf(X));
+    qfloat_t want = qf_mul(qf_sub(qf_mul(X, X), qf_from_double(1.0)), qf_normal_pdf(X));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{phi(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{phi(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -837,9 +837,9 @@ void test_second_deriv_normal_cdf(void)
 
     /* d²/dx²{Phi(x)} = -x * phi(x) */
     qfloat_t X = qf_from_double(0.5);
-    qfloat_t expect = qf_neg(qf_mul(X, qf_normal_pdf(X)));
+    qfloat_t want = qf_neg(qf_mul(X, qf_normal_pdf(X)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Phi(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Phi(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -855,9 +855,9 @@ void test_second_deriv_normal_logpdf(void)
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{log phi(x)} = -1 */
-    qfloat_t expect = qf_from_double(-1.0);
+    qfloat_t want = qf_from_double(-1.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log phi(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log phi(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -874,9 +874,9 @@ void test_second_deriv_Ei(void)
 
     /* d²/dx²{Ei(x)} = exp(x)*(x-1)/x^2; at x=1: 0 */
     qfloat_t X = qf_from_double(1.0);
-    qfloat_t expect = qf_div(qf_mul(qf_exp(X), qf_sub(X, qf_from_double(1.0))), qf_mul(X, X));
+    qfloat_t want = qf_div(qf_mul(qf_exp(X), qf_sub(X, qf_from_double(1.0))), qf_mul(X, X));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Ei(x)} | x=1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Ei(x)} | x=1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -893,9 +893,9 @@ void test_second_deriv_E1(void)
 
     /* d²/dx²{E1(x)} = exp(-x)*(x+1)/x^2; at x=1: 2/e */
     qfloat_t X = qf_from_double(1.0);
-    qfloat_t expect = qf_div(qf_mul(qf_exp(qf_neg(X)), qf_add(X, qf_from_double(1.0))), qf_mul(X, X));
+    qfloat_t want = qf_div(qf_mul(qf_exp(qf_neg(X)), qf_add(X, qf_from_double(1.0))), qf_mul(X, X));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{E1(x)} | x=1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{E1(x)} | x=1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -913,10 +913,10 @@ void test_second_deriv_erfinv(void)
     /* d²/dx²{erfinv(x)} = (π/2) * erfinv(x) * exp(2*erfinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
     qfloat_t u = qf_erfinv(X);
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_mul(QF_PI, qf_from_double(0.5)), qf_mul(u, qf_exp(qf_mul(qf_from_double(2.0), qf_mul(u, u)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfinv(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfinv(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -934,10 +934,10 @@ void test_second_deriv_erfcinv(void)
     /* d²/dx²{erfcinv(x)} = (π/2) * erfcinv(x) * exp(2*erfcinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
     qfloat_t v = qf_erfcinv(X);
-    qfloat_t expect =
+    qfloat_t want =
         qf_mul(qf_mul(QF_PI, qf_from_double(0.5)), qf_mul(v, qf_exp(qf_mul(qf_from_double(2.0), qf_mul(v, v)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfcinv(x)} | x=0.5", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfcinv(x)} | x=0.5", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -957,9 +957,9 @@ void test_second_deriv_lambert_w0(void)
     qfloat_t W = qf_lambert_w0(X);
     qfloat_t W1 = qf_add(qf_from_double(1.0), W);
     qfloat_t W2 = qf_add(qf_from_double(2.0), W);
-    qfloat_t expect = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));
+    qfloat_t want = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{W0(x)} | x=1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{W0(x)} | x=1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -981,9 +981,9 @@ void test_second_deriv_gammainv(void)
     qfloat_t psi1 = qf_trigamma(y);
     qfloat_t numer = qf_add(psi1, qf_mul(psi, psi));
     qfloat_t denom = qf_mul(qf_mul(X, X), qf_mul(psi, qf_mul(psi, psi)));
-    qfloat_t expect = qf_neg(qf_div(numer, denom));
+    qfloat_t want = qf_neg(qf_div(numer, denom));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gammainv(x)} | x=gamma(2.5)", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gammainv(x)} | x=gamma(2.5)", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -1003,9 +1003,9 @@ void test_second_deriv_lambert_wm1(void)
     qfloat_t W = qf_lambert_wm1(X);
     qfloat_t W1 = qf_add(qf_from_double(1.0), W);
     qfloat_t W2 = qf_add(qf_from_double(2.0), W);
-    qfloat_t expect = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));
+    qfloat_t want = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Wm1(x)} | x=-0.1", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Wm1(x)} | x=-0.1", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -1027,9 +1027,9 @@ void test_second_deriv_beta(void)
     qfloat_t ApB = qf_add(A, B);
     qfloat_t d_a = qf_sub(qf_digamma(A), qf_digamma(ApB));
     qfloat_t t_a = qf_sub(qf_trigamma(A), qf_trigamma(ApB));
-    qfloat_t expect = qf_mul(qf_beta(A, B), qf_add(qf_mul(d_a, d_a), t_a));
+    qfloat_t want = qf_mul(qf_beta(A, B), qf_add(qf_mul(d_a, d_a), t_a));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/da²{beta(a,3)} | a=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/da²{beta(a,3)} | a=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);
@@ -1049,9 +1049,9 @@ void test_second_deriv_logbeta(void)
     /* d²/da²{logbeta(a,b)} = ψ'(a) - ψ'(a+b) */
     qfloat_t A = qf_from_double(2.0);
     qfloat_t B = qf_from_double(3.0);
-    qfloat_t expect = qf_sub(qf_trigamma(A), qf_trigamma(qf_add(A, B)));
+    qfloat_t want = qf_sub(qf_trigamma(A), qf_trigamma(qf_add(A, B)));
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/da²{logbeta(a,3)} | a=2", expr_eval_qf(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/da²{logbeta(a,3)} | a=2", expr_eval_qf(ddf), want);
     print_expr_of(ddf);
 
     expr_free(df);

@@ -167,7 +167,7 @@ static void test_mat_from_string_symbolic_number_bindings(void)
     expr_t *z_binding;
     expr_t *c_binding;
     number_t got = NUM_ZERO;
-    number_t expect = NUM_ZERO;
+    number_t want = NUM_ZERO;
 
     check_bool("mat_from_string symbolic number bindings non-null", A != NULL);
     check_bool("mat_from_string symbolic number bindings type", A && mat_typeof(A) == MAT_TYPE_EXPR);
@@ -180,30 +180,30 @@ static void test_mat_from_string_symbolic_number_bindings(void)
 
     if (x_binding) {
         got = expr_eval(x_binding);
-        expect = num_create_from_string("1/2");
-        check_bool("symbolic number binding x exact", num_eq(got, expect));
+        want = num_create_from_string("1/2");
+        check_bool("symbolic number binding x exact", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expect);
+        num_destroy(&want);
     }
 
     if (A) {
         mat_get(A, 0, 1, &dv);
         got = expr_eval(dv);
-        expect = num_create_from_string("1/2 - 3/2i");
-        check_bool("symbolic number binding z matrix entry", num_eq(got, expect));
+        want = num_create_from_string("1/2 - 3/2i");
+        check_bool("symbolic number binding z matrix entry", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expect);
+        num_destroy(&want);
 
         mat_get(A, 1, 1, &dv);
         got = expr_eval(dv);
-        expect = num_create_from_string("5/2");
-        check_bool("symbolic number binding c₁ exact", num_eq(got, expect));
+        want = num_create_from_string("5/2");
+        check_bool("symbolic number binding c₁ exact", num_eq(got, want));
         num_destroy(&got);
-        num_destroy(&expect);
+        num_destroy(&want);
     }
 
     num_destroy(&got);
-    num_destroy(&expect);
+    num_destroy(&want);
     mat_bindings_free(bindings);
     mat_free(A);
 }
@@ -480,20 +480,20 @@ static void test_mat_from_string_symbolic_numeric_fallback(void)
     matrix_t *A = mat_from_string("{ (x, y; y, x) | x = 2; y = 3/2 }");
     number_t a00 = NUM_ZERO;
     number_t a01 = NUM_ZERO;
-    number_t expect_2 = num_create_from_long(2);
-    number_t expect_3_over_2 = num_create_from_string("3/2");
+    number_t want_2 = num_create_from_long(2);
+    number_t want_3_over_2 = num_create_from_string("3/2");
 
     check_bool("mat_from_string symbolic fallback returns non-null", A != NULL);
     check_bool("mat_from_string symbolic fallback returns number matrix", A && mat_typeof(A) == MAT_TYPE_NUMBER);
     if (A) {
         a00 = mat_get_num(A, 0, 0);
         a01 = mat_get_num(A, 0, 1);
-        check_bool("mat_from_string symbolic fallback A[0,0]=2", num_eq(a00, expect_2));
-        check_bool("mat_from_string symbolic fallback A[0,1]=3/2", num_eq(a01, expect_3_over_2));
+        check_bool("mat_from_string symbolic fallback A[0,0]=2", num_eq(a00, want_2));
+        check_bool("mat_from_string symbolic fallback A[0,1]=3/2", num_eq(a01, want_3_over_2));
     }
 
-    num_destroy(&expect_3_over_2);
-    num_destroy(&expect_2);
+    num_destroy(&want_3_over_2);
+    num_destroy(&want_2);
     num_destroy(&a01);
     num_destroy(&a00);
     mat_free(A);
