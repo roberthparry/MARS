@@ -555,6 +555,41 @@ bool expr_is_arbitrary_function(const expr_t *expr)
     return expr && expr->ops == &ops_arbitrary_function;
 }
 
+/* Share the operand DAG, but not the root whose derivative cache will own this result. */
+static expr_t *formal_derivative_snapshot(const expr_t *dependent)
+{
+    expr_t *out;
+
+    if (dependent->ops->arity == EXPR_OP_ATOM) {
+        expr_retain(dependent);
+        return (expr_t *)dependent;
+    }
+
+    out = expr_alloc(dependent->ops);
+    out->a = dependent->a;
+    out->b = dependent->b;
+    expr_retain(out->a);
+    expr_retain(out->b);
+    expr_store_const_num(out, num_clone(dependent->c));
+    if (dependent->name)
+        expr_set_name(out, dependent->name);
+    if (dependent->binding_expr)
+        out->binding_expr = expr_binding_expr_clone(dependent->binding_expr);
+    if (dependent->formal_wrt_count) {
+        out->formal_wrts = calloc(dependent->formal_wrt_count, sizeof(*out->formal_wrts));
+        if (!out->formal_wrts) {
+            expr_free(out);
+            return NULL;
+        }
+        out->formal_wrt_count = dependent->formal_wrt_count;
+        for (size_t i = 0u; i < out->formal_wrt_count; ++i) {
+            out->formal_wrts[i] = dependent->formal_wrts[i];
+            expr_retain(out->formal_wrts[i]);
+        }
+    }
+    return out;
+}
+
 expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts)
 {
     expr_t *expr;
@@ -572,8 +607,11 @@ expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, ex
     }
     expr->formal_wrt_count = wrt_count;
 
-    expr->a = (expr_t *)dependent;
-    expr_retain(expr->a);
+    expr->a = formal_derivative_snapshot(dependent);
+    if (!expr->a) {
+        expr_free(expr);
+        return NULL;
+    }
     for (size_t i = 0u; i < wrt_count; ++i) {
         if (!wrts[i]) {
             expr_free(expr);

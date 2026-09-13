@@ -447,7 +447,8 @@
         "test_deriv_var": true,
         "test_deriv_wrt_const_is_nan": true,
         "test_deriv_x2": true,
-        "test_deriv_x2_exp_negx": true
+        "test_deriv_x2_exp_negx": true,
+        "test_formal_derivative_cache_ownership": true
       }
     }
   },

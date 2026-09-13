@@ -1033,12 +1033,60 @@ void test_deriv_binomial(void)
     expr_free(n);
 }
 
+static void test_formal_derivative_cache_ownership(void)
+{
+    /* Exercise both release orders and every special-function rule with formal partials. */
+    for (size_t release_source_first = 0u; release_source_first < 2u; ++release_source_first) {
+        expr_t *x = test_expr_new_named_var_d(0.5, "x");
+        expr_t *y = test_expr_new_named_var_d(2.0, "y");
+        expr_t *z = test_expr_new_named_var_d(0.25, "z");
+        expr_t *functions[] = {expr_qdigamma(x, y), expr_zetap(x), expr_zatahp(x, y), expr_lerch_phi(z, x, y)};
+
+        for (size_t i = 0u; i < sizeof(functions) / sizeof(functions[0]); ++i) {
+            expr_t *f = functions[i];
+            const expr_t *cached = expr_get_deriv(f, x);
+            expr_t *owned;
+            expr_t *second;
+            char *text;
+
+            ASSERT_NOT_NULL(cached);
+            ASSERT_TRUE(cached == expr_get_deriv(f, x));
+            owned = expr_create_deriv(f, x);
+            ASSERT_NOT_NULL(owned);
+            ASSERT_TRUE(cached == expr_get_deriv(f, x));
+            if (release_source_first)
+                expr_free(f);
+
+            test_expr_set_val_d(x, 7.0);
+            text = expr_to_string(owned, style_EXPRESSION);
+            ASSERT_NOT_NULL(text);
+            ASSERT_TRUE(text && strstr(text, "x = 7"));
+            free(text);
+
+            second = expr_create_deriv(owned, x);
+            ASSERT_NOT_NULL(second);
+            expr_free(owned);
+            text = expr_to_string(second, style_UNBOUND);
+            ASSERT_NOT_NULL(text);
+            free(text);
+            expr_free(second);
+            if (!release_source_first)
+                expr_free(f);
+            test_expr_set_val_d(x, 0.5);
+        }
+        expr_free(z);
+        expr_free(y);
+        expr_free(x);
+    }
+}
+
 /* ------------------------------------------------------------------------- */
-/* Second derivative tests                                                    */
+/* First derivative tests                                                     */
 /* ------------------------------------------------------------------------- */
 
 void test_first_derivatives(void)
 {
+    TEST_RUN_SUBTEST(test_formal_derivative_cache_ownership, NULL);
     TEST_RUN_SUBTEST(test_deriv_const, NULL);
     TEST_RUN_SUBTEST(test_deriv_var, NULL);
     TEST_RUN_SUBTEST(test_deriv_wrt_const_is_nan, NULL);
