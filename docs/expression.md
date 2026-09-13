@@ -593,6 +593,13 @@ retain their children (increment their refcounts) but do not steal ownership.
 `expr_free()` decrements the refcount and recursively frees when it reaches zero.
 `expr_get_deriv(expr, wrt)` returns a *borrowed* pointer — do not free it.
 
+Formal derivatives retain a cache-free copy of their dependent operation's
+root, while sharing its operand DAG and binding nodes. This prevents an owning
+cycle between an expression's derivative cache and a formal derivative that
+refers back to that expression. Cached derivatives remain reusable, and an
+owning derivative can outlive the original expression without losing binding
+updates.
+
 ### Evaluation
 
 `expr_eval()` walks the DAG bottom-up, caching the `number_t` result in each

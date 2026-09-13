@@ -2068,6 +2068,7 @@ void test_to_string_special_functions(void)
         char *dq_text = dq ? expr_to_string(dq, style_UNBOUND) : NULL;
         char *dz_text = dz ? expr_to_string(dz, style_UNBOUND) : NULL;
 
+        expr_retain(f); /* check_roundtrip consumes its input; retain our local owner. */
         check_roundtrip("to_string: qdigamma(q,z)", f, __LINE__);
         ASSERT_NOT_NULL(dq_text);
         ASSERT_NOT_NULL(dz_text);
