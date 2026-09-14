@@ -80,18 +80,28 @@ static void print_solution_field(const char *key, const diffequ_solve_result_t *
     }
 }
 
-static void print_solution_TeX(const char *key, const diffequ_solve_result_t *result, size_t line_limit)
+static void print_result_TeX(const char *key, const diffequ_solve_result_t *result, const char *problem_TeX,
+                             size_t line_limit)
 {
     size_t count = de_solve_result_count(result);
+    bool has_problem = problem_TeX && *problem_TeX;
 
-    if (!key || count == 0u)
+    if (!key)
         return;
+    if (count == 0u) {
+        if (has_problem)
+            printf("%s %s\n", key, problem_TeX);
+        return;
+    }
 
     /* Preserve the conventional factored Bessel basis in responsive output. */
     if (de_solve_result_solver(result) == DE_SOLVER_POWER_LAW_BESSEL)
         line_limit = SIZE_MAX;
 
-    printf("%s \\begin{aligned}[t]\n", key);
+    printf("%s ", key);
+    if (has_problem)
+        printf("\\begin{aligned}[t]\n&%s \\\\[1em]\n&", problem_TeX);
+    printf("\\begin{aligned}[t]\n");
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
         char *lhs = solution ? expr_to_TeX_body_wrapped(equ_lhs(solution), line_limit) : NULL;
@@ -102,6 +112,8 @@ static void print_solution_TeX(const char *key, const diffequ_solve_result_t *re
         free(lhs);
     }
     printf("\\end{aligned}\n");
+    if (has_problem)
+        printf("\\end{aligned}\n");
 }
 
 static void print_solver_steps(const diffequ_solve_result_t *result)
@@ -157,8 +169,10 @@ int main(int argc, char **argv)
         printf("symmetry %s\n", de_solve_result_symmetry(result));
     print_solver_steps(result);
     print_solution_field("solutions", result, style_UNBOUND);
-    print_solution_TeX("solutions_TeX", result, SIZE_MAX);
-    print_solution_TeX("solutions_wrapped_TeX", result, 1u);
+    print_result_TeX("solutions_TeX", result, NULL, SIZE_MAX);
+    print_result_TeX("solutions_wrapped_TeX", result, NULL, 1u);
+    print_result_TeX("display_TeX", result, problem_TeX, SIZE_MAX);
+    print_result_TeX("display_wrapped_TeX", result, problem_TeX, 1u);
 
     free(problem_TeX);
     free(problem);

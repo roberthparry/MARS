@@ -594,7 +594,7 @@ static bool de_homogeneous_algebraic_log_solutions(const expr_t *independent, co
                                        : de_simplify_unary_owned(scaled_constant, expr_neg);
     quadratic_constant = NULL;
     scaled_constant = NULL;
-    b_squared = expr_pow_long(linear, 2L);
+    b_squared = expr_mul(linear, linear);
     a_times_c = constant_term ? expr_mul_simplify_owned(expr_clone(quadratic), expr_clone(constant_term)) : NULL;
     four_a_c = a_times_c ? expr_mul_simplify_owned(expr_const_long(4L), a_times_c) : NULL;
     a_times_c = NULL;

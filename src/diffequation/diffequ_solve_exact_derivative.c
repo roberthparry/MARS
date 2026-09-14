@@ -141,7 +141,7 @@ de_attempt_t de_attempt_exact_derivative_linearization(const diffequ_t *de, cons
         log_auxiliary = NULL;
     }
 
-    leading_square = expr_pow_long(leading, 2L);
+    leading_square = expr_mul(leading, leading);
     linear_scale_denominator = leading_square ? expr_mul_long(leading_square, 2L) : NULL;
     linear_scale =
         linear_scale_denominator ? expr_div_simplify_owned(expr_clone(mixed_scale), linear_scale_denominator) : NULL;

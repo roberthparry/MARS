@@ -2271,6 +2271,61 @@ class MatrixResultTests(unittest.TestCase):
 
 
 class DiffequationResultTests(unittest.TestCase):
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_weighted_cyclic_pde_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "(y-z)z_x - (z-x)z_y = x-y"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "F(x - y + z, x² - y² + z²) = 0")
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_rendered_pde_precedes_both_solution_branches(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "xzz_x + yzz_y = xy"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solutions_TeX"].count("z &="), 2)
+        for key in ("display_TeX", "display_wrapped_TeX"):
+            self.assertEqual(payload[key], fields[key])
+            self.assertIn(payload["problem_TeX"], payload[key])
+            self.assertIn(payload["solutions_TeX"], payload[key])
+            self.assertLess(payload[key].index(payload["problem_TeX"]), payload[key].index("z &="))
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    def test_rendered_unsolved_problem_has_no_empty_solution_row(self) -> None:
+        with mock.patch.object(mars_lab, "render_TeX_to_svg", return_value=("<svg/>", None)) as render:
+            payload = mars_lab.prepare_diffequation_fields({"problem_TeX": "x = y", "status": "unsupported"})
+        self.assertEqual(payload["display_TeX"], "x = y")
+        self.assertEqual(payload["display_wrapped_TeX"], "x = y")
+        render.assert_called_once_with("x = y")
+
     def test_help_documents_native_differential_equation_syntax(self) -> None:
         help_html = mars_lab.INDEX_HTML
 
@@ -2364,6 +2419,12 @@ class DiffequationResultTests(unittest.TestCase):
         )
         self.assertIsNone(cartesian_steps_error)
         self.assertTrue(cartesian_steps_svg)
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
 
         renamed_completed = subprocess.run(
             [
@@ -2577,13 +2638,19 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertTrue(payload.get("svg"))
         self.assertTrue(payload.get("wrapped_svg"))
 
+        self.assertIn(payload["problem_TeX"], payload["display_wrapped_TeX"])
+        self.assertIn(payload["solutions_wrapped_TeX"], payload["display_wrapped_TeX"])
+        for key in ("display_TeX", "display_wrapped_TeX"):
+            self.assertEqual(payload[key], fields[key])
+
     def test_solution_wrapping_uses_the_available_card_width(self) -> None:
         html = mars_lab.INDEX_HTML
 
         self.assertIn("function fitRenderedTeXToCard()", html)
         self.assertIn("compactWidth > renderedContentWidth() + 1", html)
         self.assertIn("new ResizeObserver", html)
-        self.assertIn("data.solutions_wrapped_TeX || lastTex", html)
+        self.assertIn("lastTex = data.display_TeX ||", html)
+        self.assertIn("data.display_wrapped_TeX || lastTex", html)
         self.assertIn("data.wrapped_svg || ''", html)
 
     @unittest.skipUnless(
@@ -2950,11 +3017,13 @@ solutions y = final
             text=True,
         )
 
-        payload = mars_lab.prepare_diffequation_fields(
-            mars_lab.parse_diffequation_lab_output(completed.stdout)
-        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
 
         self.assertEqual(payload["status"], "unsupported")
+        for key in ("display_TeX", "display_wrapped_TeX"):
+            self.assertEqual(fields[key], fields["problem_TeX"])
+            self.assertEqual(payload[key], fields[key])
         self.assertEqual(payload["solver"], "none")
         self.assertEqual(
             payload["diagnostic"],

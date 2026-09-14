@@ -2704,6 +2704,35 @@ static void test_diffequ_solves_cyclic_lagrange_pde(void)
                                    "F(x² + y² + z², xyz) = 0");
 }
 
+static void test_diffequ_solves_weighted_cyclic_lagrange_pde(void)
+{
+    WANT_CHARACTERISTIC_SOLUTION("(y-z)z_x - (z-x)z_y = x-y", "F(x - y + z, x² - y² + z²) = 0");
+    WANT_CHARACTERISTIC_SOLUTION("(y-z)*Dx(z) + (x-z)*Dy(z) = x-y", "F(x - y + z, x² - y² + z²) = 0");
+    WANT_CHARACTERISTIC_SOLUTION("-3(y-z)z_x + 3(z-x)z_y = -3(x-y)", "F(x - y + z, x² - y² + z²) = 0");
+    WANT_CHARACTERISTIC_SOLUTION("(b-u)u_a - (u-a)u_b = a-b", "F(a - b + u, a² - b² + u²) = 0");
+    WANT_CHARACTERISTIC_SOLUTION("(y-z)z_x + (z-x)z_y = x-y", "F(x + y + z, x² + y² + z²) = 0");
+    WANT_CHARACTERISTIC_SOLUTION("6(y-z)z_x - 3(z-x)z_y = 2(x-y)", "F(x - 2y + 3z, x² - 2y² + 3z²) = 0");
+}
+
+static void test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions(void)
+{
+    const char *sources[] = {
+        "(y-z)z_x - (z-x)z_y = x-y+1",
+        "(y-z)z_x - (z-x)z_y = x-y; z(x,0) = x",
+    };
+
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        bool rejected = result && de_solve_result_status(result) == DE_SOLVE_STATUS_UNSUPPORTED &&
+                        de_solve_result_count(result) == 0u;
+
+        de_solve_result_free(result);
+        de_free(de);
+        ASSERT_TRUE(rejected);
+    }
+}
+
 static void test_diffequ_solves_monomial_linear_characteristic_pde(void)
 {
     const char *source = "x^2*Dx(@psi) - x*y*Dy(@psi) + y*@psi = 0";
@@ -2919,6 +2948,24 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
     ASSERT_TRUE(valid);
 }
 
+/* README example from docs/diffequation.md: weighted cyclic characteristics. */
+static void example_diffequation_weighted_cyclic_pde(void)
+{
+    const char *source = "(y-z)z_x - (z-x)z_y = x-y";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
+                 strcmp(string_c_str(text), "F(x - y + z, x² - y² + z²) = 0") == 0;
+
+    printf("input = %s\n%s\n", source, text ? string_c_str(text) : "NULL");
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+    ASSERT_TRUE(valid);
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_diffequ_lifecycle_null_safety);
@@ -3024,6 +3071,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_reciprocal_forced_square_pde);
     RUN_TEST_CASE(test_diffequ_solves_rotating_characteristic_pde);
     RUN_TEST_CASE(test_diffequ_solves_cyclic_lagrange_pde);
+    RUN_TEST_CASE(test_diffequ_solves_weighted_cyclic_lagrange_pde);
+    RUN_TEST_CASE(test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions);
     RUN_TEST_CASE(test_diffequ_solves_monomial_linear_characteristic_pde);
     RUN_TEST_CASE(test_diffequ_solves_forced_monomial_characteristic_pde);
     RUN_TEST_CASE(test_diffequ_solves_forced_radial_characteristic_pde);
@@ -3037,6 +3086,8 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_solving_an_ode, readme_examples, "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_linearising_a_lie_symmetric_ode, readme_examples,
                                   "diffequation,readme,output,lie-symmetry");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_weighted_cyclic_pde, readme_examples,
+                                  "diffequation,readme,output");
 
     return TESTS_EXIT_CODE();
 }

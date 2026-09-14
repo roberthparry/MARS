@@ -223,8 +223,8 @@ static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t
     int condition_sign = num_is_finite(condition_number) ? num_sign(condition_number) : 0;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
-    independent_square = expr_pow_long(independent, 2L);
-    dependent_square = expr_pow_long(dependent, 2L);
+    independent_square = expr_mul(independent, independent);
+    dependent_square = expr_mul(dependent, dependent);
     radius_square = independent_square && dependent_square
                         ? expr_add_simplify_owned(independent_square, dependent_square)
                         : NULL;
@@ -253,8 +253,8 @@ static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t
 
     attempt = DE_ATTEMPT_FAILED;
     if (has_initial_condition) {
-        point_square = expr_pow_long(condition_point, 2L);
-        value_square = expr_pow_long(condition_value, 2L);
+        point_square = expr_mul(condition_point, condition_point);
+        value_square = expr_mul(condition_value, condition_value);
         condition_radius_square = point_square && value_square
                                       ? expr_add_simplify_owned(point_square, value_square)
                                       : NULL;
@@ -294,7 +294,7 @@ static de_attempt_t de_attempt_radial_log_form(const diffequ_t *de, const expr_t
         attempt = DE_ATTEMPT_SOLVED;
         goto cleanup;
     }
-    constant_square = constant ? expr_pow_long(constant, 2L) : NULL;
+    constant_square = constant ? expr_mul(constant, constant) : NULL;
     constant_times_independent = constant
                                      ? expr_mul_simplify_owned(expr_clone(constant), expr_clone(independent))
                                      : NULL;
