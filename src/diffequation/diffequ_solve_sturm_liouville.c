@@ -556,7 +556,7 @@ static bool de_affine_riccati_basis(const expr_t *potential, const expr_t *indep
     num_destroy(&square_root_slope);
     square_root_slope = num_sqrt(slope);
 
-    independent_squared = expr_pow_long(independent, 2L);
+    independent_squared = expr_mul(independent, independent);
     quadratic_exponent =
         independent_squared ? expr_mul_simplify_owned(expr_new_const(half_slope), independent_squared) : NULL;
     if (independent_squared)
@@ -850,7 +850,7 @@ static expr_t *de_power_law_bessel_solution(const diffequ_t *de, const expr_t *i
         lommel_power =
             expr_div_simplify_owned(expr_const_long(2L * forcing_degree_long + 3L), expr_const_long(degree_plus_two));
         half_degree = expr_div_simplify_owned(expr_const_long(degree_plus_two), expr_const_long(2L));
-        half_degree_squared = half_degree ? expr_pow_long(half_degree, 2L) : NULL;
+        half_degree_squared = half_degree ? expr_mul(half_degree, half_degree) : NULL;
         forcing_root = num_eq(coefficients[degree], NUM_ONE)
                            ? expr_const_one()
                            : de_simplify_unary_owned(expr_new_const(coefficients[degree]), expr_sqrt);
@@ -984,7 +984,7 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
     if (solution)
         goto make_solution;
 
-    first_squared = expr_pow_long(form.first, 2L);
+    first_squared = expr_mul(form.first, form.first);
     leading_dependent = expr_mul_simplify_owned(expr_clone(form.leading), expr_clone(form.dependent));
     four_leading_dependent = leading_dependent ? expr_mul_simplify_owned(expr_const_long(4L), leading_dependent) : NULL;
     if (leading_dependent)

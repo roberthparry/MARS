@@ -969,7 +969,7 @@ static expr_t *de_trigonometric_particular_solution(const de_constant_linear_for
         num_destroy(&odd_squared);
         num_destroy(&even_squared);
     } else {
-        denominator = even && odd ? expr_add_simplify_owned(expr_pow_long(even, 2L), expr_pow_long(odd, 2L)) : NULL;
+        denominator = even && odd ? expr_add_simplify_owned(expr_mul(even, even), expr_mul(odd, odd)) : NULL;
     }
     if (!denominator || expr_is_exact_zero(denominator))
         goto cleanup;

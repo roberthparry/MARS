@@ -528,6 +528,29 @@ first integrals `x^n+y^n+z^n` and `x*y*z`. The general integral is therefore
 emitted as the implicit arbitrary relation
 `F(x^n+y^n+z^n, x*y*z) = 0`.
 
+Weighted linear cyclic fields
+`(a*(y-z), b*(z-x), c*(x-y))`, with nonzero constant weights, also have
+two first integrals: `x+(a/b)*y+(a/c)*z` and
+`x^2+(a/b)*y^2+(a/c)*z^2`. Mars derives candidate weights from the
+characteristic coefficients and verifies both integrals by exact symbolic
+differentiation against the original field. Without boundary conditions,
+it returns an implicit relation between these integrals, with `F` an
+arbitrary function of two arguments. This describes local solution surfaces
+where the integrals are independent and the relation defines the dependent
+variable.
+
+For example:
+
+```text
+(y-z)z_x - (z-x)z_y = x-y
+```
+
+Output:
+
+```text
+F(x - y + z, x² - y² + z²) = 0
+```
+
 For a separable field `a(x)*u_x + b(y)*u_y`, Mars integrates the coordinate
 potentials `A'(x) = 1/a(x)` and `B'(y) = 1/b(y)`. Their difference `B-A` is a
 characteristic invariant. Each potential, and the resulting particular term,

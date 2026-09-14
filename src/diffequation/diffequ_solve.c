@@ -475,7 +475,7 @@ static de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de,
     three_leading = three ? expr_mul_simplify_owned(expr_clone(three), expr_clone(leading)) : NULL;
     scale = three_leading ? expr_div_simplify_owned(expr_clone(mixed_coefficient), three_leading) : NULL;
     three_leading = NULL;
-    scale_squared = scale ? expr_pow_long(scale, 2L) : NULL;
+    scale_squared = scale ? expr_mul(scale, scale) : NULL;
     expected_cubic = scale_squared ? expr_mul_simplify_owned(scale_squared, expr_clone(leading)) : NULL;
     scale_squared = NULL;
     coefficient_difference =
@@ -491,7 +491,7 @@ static de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de,
     two = expr_const_long(2L);
     two_x = two ? expr_mul(two, independent) : NULL;
     numerator = two_x ? expr_add(two_x, constant_1) : NULL;
-    x_squared = expr_pow_long(independent, 2L);
+    x_squared = expr_mul(independent, independent);
     constant_1_x = constant_1 ? expr_mul(constant_1, independent) : NULL;
     denominator_sum = x_squared && constant_1_x ? expr_add(x_squared, constant_1_x) : NULL;
     denominator = denominator_sum && constant_2 ? expr_add(denominator_sum, constant_2) : NULL;

@@ -172,7 +172,8 @@
     "readme_examples": {
       "enabled": true,
       "example_diffequation_linearising_a_lie_symmetric_ode": true,
-      "example_diffequation_solving_an_ode": true
+      "example_diffequation_solving_an_ode": true,
+      "example_diffequation_weighted_cyclic_pde": true
     },
     "test_diffequ_applies_affine_factorized_initial_conditions": true,
     "test_diffequ_applies_dependent_square_boundary": true,
@@ -282,9 +283,11 @@
     "test_diffequ_solves_unbounded_inhomogeneous_transport": true,
     "test_diffequ_solves_variable_coefficient_linear_problem": true,
     "test_diffequ_solves_variable_forcing_from_time_boundary": true,
+    "test_diffequ_solves_weighted_cyclic_lagrange_pde": true,
     "test_diffequ_spiral_characteristic_uses_linear_field_rule": true,
     "test_diffequ_stationary_eigenfunction_uses_general_rule": true,
-    "test_diffequ_uses_builtin_alias_as_dependent_symbol": true
+    "test_diffequ_uses_builtin_alias_as_dependent_symbol": true,
+    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {

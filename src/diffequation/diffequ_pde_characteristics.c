@@ -88,8 +88,8 @@ cleanup:
 static expr_t *de_pde_radial_invariant(const expr_t *x, const expr_t *y, const expr_t *x_coefficient,
                                        const expr_t *y_coefficient)
 {
-    expr_t *x_squared = expr_pow_long(x, 2L);
-    expr_t *y_squared = expr_pow_long(y, 2L);
+    expr_t *x_squared = expr_mul(x, x);
+    expr_t *y_squared = expr_mul(y, y);
     expr_t *invariant = x_squared && y_squared ? expr_add_simplify_owned(x_squared, y_squared) : NULL;
     expr_t *invariant_x;
     expr_t *invariant_y;
@@ -228,8 +228,8 @@ static expr_t *de_pde_trace_zero_linear_invariant(const expr_t *x, const expr_t 
     if (!trace || !expr_is_exact_zero(trace))
         goto cleanup;
 
-    x_squared = expr_pow_long(x, 2L);
-    y_squared = expr_pow_long(y, 2L);
+    x_squared = expr_mul(x, x);
+    y_squared = expr_mul(y, y);
     xy = expr_mul_simplify_owned(expr_clone(x), expr_clone(y));
     cx_squared = c && x_squared ? expr_mul_simplify_owned(expr_clone(c), x_squared) : NULL;
     x_squared = NULL;
@@ -307,8 +307,8 @@ static expr_t *de_pde_spiral_linear_invariant(const expr_t *x, const expr_t *y, 
         goto cleanup;
 
     angle = expr_atan2(y, x);
-    x_squared = expr_pow_long(x, 2L);
-    y_squared = expr_pow_long(y, 2L);
+    x_squared = expr_mul(x, x);
+    y_squared = expr_mul(y, y);
     radius_squared = x_squared && y_squared ? expr_add_simplify_owned(x_squared, y_squared) : NULL;
     x_squared = NULL;
     y_squared = NULL;
@@ -456,7 +456,7 @@ static expr_t *de_pde_characteristic_exponent(const expr_t *x, const expr_t *y, 
     expr_t *target_square = target && target_directional &&
                                     de_pde_is_characteristic_constant(target_directional, x, y, dependent) &&
                                     !expr_is_exact_zero(target_directional)
-                                ? expr_pow_long(target, 2L)
+                                ? expr_mul(target, target)
                                 : NULL;
     expr_t *twice_target_directional = target_directional ? expr_mul_long(target_directional, 2L) : NULL;
     expr_t *phase_exponent = NULL;
@@ -669,7 +669,8 @@ static bool de_pde_quadratic_characteristic_solutions(const diffequ_t *de, const
                                                       const expr_t *y_coefficient, const expr_t *remainder,
                                                       equation_t **solutions_out, size_t *solution_count_out)
 {
-    expr_t *dependent_squared = expr_pow_long(dependent, 2L);
+    /* Canonicalise the product used as a structural matching key. */
+    expr_t *dependent_squared = expr_simplify_owned(expr_mul(dependent, dependent));
     expr_t *quadratic_coefficient = NULL;
     expr_t *forcing = NULL;
     expr_t *x_potential = NULL;
@@ -1112,8 +1113,8 @@ static expr_t *de_pde_characteristic_basis_particular(const expr_t *x, const exp
                                                       const expr_t *reaction_coefficient, const expr_t *forcing)
 {
     expr_t *target = expr_negate_owned(expr_clone(forcing));
-    expr_t *trials[5] = {expr_clone(x), expr_clone(y), expr_pow_long(x, 2L),
-                         expr_mul_simplify_owned(expr_clone(x), expr_clone(y)), expr_pow_long(y, 2L)};
+    expr_t *trials[5] = {expr_clone(x), expr_clone(y), expr_mul(x, x),
+                         expr_mul_simplify_owned(expr_clone(x), expr_clone(y)), expr_mul(y, y)};
     expr_t *particular = NULL;
 
     for (size_t i = 0u; target && i < 5u && !particular; ++i) {
@@ -1517,7 +1518,8 @@ static expr_t *de_pde_boundary_parameter_squared_value(const expr_t *boundary_in
 
     if (!boundary_invariant || !parameter || !current_invariant)
         return NULL;
-    parameter_squared = expr_pow_long(parameter, 2L);
+    /* The boundary expression is already simplified before matching. */
+    parameter_squared = expr_simplify_owned(expr_mul(parameter, parameter));
     if (expr_match_div_expr(boundary_invariant, &outer_numerator, &outer_denominator) &&
         expr_struct_eq(outer_denominator, parameter) &&
         expr_match_div_expr(outer_numerator, &inner_numerator, &inner_denominator) &&
@@ -1657,9 +1659,10 @@ static equation_t *de_pde_dependent_square_boundary_solution(const diffequ_t *de
             boundary_invariant = de_pde_substitute_characteristic_curve(invariant, x, y, curve_x, curve_y);
             boundary_particular_raw = de_pde_substitute_characteristic_curve(particular, x, y, curve_x, curve_y);
             boundary_particular_curve = boundary_particular_raw ? expr_simplify(boundary_particular_raw) : NULL;
-            parameter_squared = expr_pow_long(dummy, 2L);
+            /* Use canonical products for matching and substitution in the boundary data. */
+            parameter_squared = expr_simplify_owned(expr_mul(dummy, dummy));
             parameter_squared_value = de_pde_boundary_parameter_squared_value(boundary_invariant, dummy, invariant);
-            boundary_value_squared_curve = expr_pow_long(curve_value, 2L);
+            boundary_value_squared_curve = expr_simplify_owned(expr_mul(curve_value, curve_value));
             if (parameter_squared_value && parameter_squared && boundary_value_squared_curve) {
                 boundary_value_squared =
                     expr_struct_eq(boundary_value_squared_curve, parameter_squared)
@@ -1687,7 +1690,7 @@ static equation_t *de_pde_dependent_square_boundary_solution(const diffequ_t *de
                                           ? expr_substitute(boundary_particular_curve, dummy, parameter_value)
                                           : NULL;
                 boundary_value = expr_substitute(curve_value, dummy, parameter_value);
-                boundary_value_squared = boundary_value ? expr_pow_long(boundary_value, 2L) : NULL;
+                boundary_value_squared = boundary_value ? expr_mul(boundary_value, boundary_value) : NULL;
             }
             arbitrary_value = boundary_value_squared && boundary_particular
                                   ? expr_sub_simplify_owned(boundary_value_squared, boundary_particular)
@@ -1899,7 +1902,8 @@ static equation_t *de_pde_parametric_boundary_solution(const diffequ_t *de, cons
             boundary_invariant = boundary_invariant_raw ? expr_simplify(boundary_invariant_raw) : NULL;
             parameter_value = de_pde_boundary_parameter_value(boundary_invariant, dummy, invariant);
             if (!parameter_value) {
-                parameter_squared = expr_pow_long(dummy, 2L);
+                /* This product is a substitution key in simplified boundary expressions. */
+                parameter_squared = expr_simplify_owned(expr_mul(dummy, dummy));
                 parameter_squared_value = de_pde_boundary_parameter_squared_value(boundary_invariant, dummy, invariant);
                 parameter_root_raw = parameter_squared_value ? expr_sqrt(parameter_squared_value) : NULL;
                 parameter_value = parameter_root_raw ? expr_simplify(parameter_root_raw) : NULL;
@@ -2040,6 +2044,24 @@ static bool de_pde_is_first_integral(const expr_t *x, const expr_t *y, const exp
     expr_t *directional = directional_raw ? expr_simplify(directional_raw) : NULL;
     bool is_first_integral = directional && expr_is_exact_zero(directional);
 
+    if (!is_first_integral && directional_raw) {
+        expr_t *expanded = expr_display_expanded(directional_raw);
+        expr_t *simplified = expanded ? expr_simplify(expanded) : NULL;
+        const expr_t *left = NULL;
+        const expr_t *right = NULL;
+        bool is_sub = false;
+
+        is_first_integral = simplified && expr_is_exact_zero(simplified);
+        if (!is_first_integral && expr_match_add_sub_expr(simplified, &left, &right, &is_sub)) {
+            expr_t *opposite = is_sub ? expr_clone(right) : expr_negate_owned(expr_clone(right));
+
+            is_first_integral = opposite && de_pde_same_symbolic_form(left, opposite);
+            expr_free(opposite);
+        }
+        expr_free(simplified);
+        expr_free(expanded);
+    }
+
     expr_free(directional);
     expr_free(directional_raw);
     expr_free(xy_sum);
@@ -2050,6 +2072,63 @@ static bool de_pde_is_first_integral(const expr_t *x, const expr_t *y, const exp
     expr_free(candidate_y);
     expr_free(candidate_x);
     return is_first_integral;
+}
+
+/* Weighted cyclic fields conserve weighted sums of coordinates and their squares. */
+static equation_t *de_pde_weighted_cyclic_solution(const expr_t *x, const expr_t *y, const expr_t *dependent,
+                                                   const expr_t *x_coefficient, const expr_t *y_coefficient,
+                                                   const expr_t *remainder)
+{
+    expr_t *dependent_coefficient = expr_negate_owned(expr_clone(remainder));
+    expr_t *x_scale = expr_create_deriv(x_coefficient, y);
+    expr_t *y_scale = expr_create_deriv(y_coefficient, dependent);
+    expr_t *dependent_scale = expr_create_deriv(dependent_coefficient, x);
+    expr_t *y_weight = NULL;
+    expr_t *dependent_weight = NULL;
+    expr_t *invariants[2] = {NULL, NULL};
+    equation_t *solution = NULL;
+
+    if (!x_scale || !y_scale || !dependent_scale || expr_is_exact_zero(x_scale) || expr_is_exact_zero(y_scale) ||
+        expr_is_exact_zero(dependent_scale))
+        goto cleanup;
+    y_weight = expr_div_simplify_owned(expr_clone(x_scale), expr_clone(y_scale));
+    dependent_weight = expr_div_simplify_owned(expr_clone(x_scale), expr_clone(dependent_scale));
+    if (!de_pde_is_characteristic_constant(y_weight, x, y, dependent) || expr_is_exact_zero(y_weight) ||
+        !de_pde_is_characteristic_constant(dependent_weight, x, y, dependent) || expr_is_exact_zero(dependent_weight))
+        goto cleanup;
+
+    /* Two fixed candidates, each checked against the complete characteristic field. */
+    for (size_t i = 0u; i < 2u; ++i) {
+        expr_t *x_term = i == 0u ? expr_clone(x) : expr_mul(x, x);
+        expr_t *y_power = i == 0u ? expr_clone(y) : expr_mul(y, y);
+        expr_t *dependent_power = i == 0u ? expr_clone(dependent) : expr_mul(dependent, dependent);
+        expr_t *y_term = expr_mul_simplify_owned(expr_clone(y_weight), y_power);
+        expr_t *dependent_term = expr_mul_simplify_owned(expr_clone(dependent_weight), dependent_power);
+        expr_t *xy_sum = expr_add_simplify_owned(x_term, y_term);
+
+        invariants[i] = expr_add_simplify_owned(xy_sum, dependent_term);
+        if (!invariants[i] || !de_pde_is_first_integral(x, y, dependent, x_coefficient, y_coefficient,
+                                                         dependent_coefficient, invariants[i]))
+            goto cleanup;
+    }
+
+    expr_t *relation = expr_new_arbitrary_function_n("F", 2u, invariants);
+    expr_t *zero = expr_const_zero();
+
+    solution = relation && zero ? equ_new(relation, zero) : NULL;
+    expr_free(zero);
+    expr_free(relation);
+
+cleanup:
+    expr_free(invariants[1]);
+    expr_free(invariants[0]);
+    expr_free(dependent_weight);
+    expr_free(y_weight);
+    expr_free(dependent_scale);
+    expr_free(y_scale);
+    expr_free(x_scale);
+    expr_free(dependent_coefficient);
+    return solution;
 }
 
 static bool de_pde_is_scaled_cyclic_field(const expr_t *x, const expr_t *y, const expr_t *dependent,
@@ -2351,6 +2430,16 @@ de_attempt_t de_pde_attempt_characteristics(const diffequ_t *de, const expr_t *r
                                                   solutions_out, solution_count_out)) {
         attempt = DE_ATTEMPT_SOLVED;
         goto cleanup;
+    }
+
+    /* An arbitrary relation alone does not enforce supplied boundary data. */
+    if (de->condition_count == 0u) {
+        solutions_out[0] = de_pde_weighted_cyclic_solution(x, y, dependent, x_coefficient, y_coefficient, remainder);
+        if (solutions_out[0]) {
+            *solution_count_out = 1u;
+            attempt = DE_ATTEMPT_SOLVED;
+            goto cleanup;
+        }
     }
 
     solutions_out[0] = de_pde_cyclic_first_integral_solution(x, y, dependent, x_coefficient, y_coefficient, remainder);

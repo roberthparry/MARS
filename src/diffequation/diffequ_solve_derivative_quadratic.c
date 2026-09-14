@@ -49,7 +49,7 @@ static expr_t *de_derivative_quadratic_root(const expr_t *quadratic, const expr_
                                             bool positive)
 {
     expr_t *four_a_c = expr_mul_simplify_owned(expr_mul_long(quadratic, 4L), expr_clone(constant));
-    expr_t *discriminant = four_a_c ? expr_sub_simplify_owned(expr_pow_long(linear, 2L), four_a_c) : NULL;
+    expr_t *discriminant = four_a_c ? expr_sub_simplify_owned(expr_mul(linear, linear), four_a_c) : NULL;
     expr_t *root = discriminant ? expr_sqrt(discriminant) : NULL;
     expr_t *negative_linear = de_simplify_unary_owned(expr_clone(linear), expr_neg);
     expr_t *numerator =

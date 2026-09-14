@@ -10624,15 +10624,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
-        renderedTitle.textContent = data.status === 'solved' ? 'Solution' : 'Reduction';
-        lastTex = data.solutions_TeX || data.problem_TeX || '';
+        renderedTitle.textContent = data.status === 'solved' ? 'Equation and solutions' : 'Reduction';
+        lastTex = data.display_TeX || data.solutions_TeX || data.problem_TeX || '';
         rendered.dataset.displayTex = lastTex;
         rendered.dataset.fullTex = lastTex;
         rendered.dataset.displaySvg = data.svg || '';
         rendered.dataset.fullSvg = '';
         rendered.dataset.renderError = data.render_error || '';
         rendered.dataset.compactTex = lastTex;
-        rendered.dataset.wrappedTex = data.solutions_wrapped_TeX || lastTex;
+        rendered.dataset.wrappedTex = data.display_wrapped_TeX || lastTex;
         rendered.dataset.compactSvg = data.svg || '';
         rendered.dataset.wrappedSvg = data.wrapped_svg || '';
         rendered.dataset.responsiveFallback =
@@ -13819,6 +13819,8 @@ def parse_diffequation_lab_output(output: str) -> dict[str, str]:
             "solutions": r"^solutions\s+(.*)$",
             "solutions_TeX": r"^solutions_TeX\s*(.*)$",
             "solutions_wrapped_TeX": r"^solutions_wrapped_TeX\s*(.*)$",
+            "display_TeX": r"^display_TeX\s*(.*)$",
+            "display_wrapped_TeX": r"^display_wrapped_TeX\s*(.*)$",
         },
         {
             "problem_TeX",
@@ -13827,6 +13829,8 @@ def parse_diffequation_lab_output(output: str) -> dict[str, str]:
             "solutions",
             "solutions_TeX",
             "solutions_wrapped_TeX",
+            "display_TeX",
+            "display_wrapped_TeX",
         },
     )
 
@@ -15996,14 +16000,15 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
     )
     steps_left_TeX = wrap_solver_TeX_lines(steps_TeX, threshold=None)
     steps_wrapped_TeX = wrap_solver_TeX_lines(steps_TeX)
-    render_TeX = solutions_TeX or problem_TeX
+    render_TeX = str(fields.get("display_TeX") or "").strip() or solutions_TeX or problem_TeX
+    wrapped_TeX = str(fields.get("display_wrapped_TeX") or "").strip() or render_TeX
     svg = None
     wrapped_svg = None
     render_error = None
     if render_TeX:
         svg, render_error = render_TeX_to_svg(render_TeX)
-    if solutions_wrapped_TeX and solutions_wrapped_TeX != solutions_TeX:
-        wrapped_svg, _ = render_TeX_to_svg(solutions_wrapped_TeX)
+    if wrapped_TeX and wrapped_TeX != render_TeX:
+        wrapped_svg, _ = render_TeX_to_svg(wrapped_TeX)
 
     payload: dict[str, object] = {
         "ok": True,
@@ -16018,6 +16023,8 @@ def prepare_diffequation_fields(fields: dict[str, str]) -> dict[str, object]:
         ),
         "solutions_TeX": solutions_TeX,
         "solutions_wrapped_TeX": solutions_wrapped_TeX,
+        "display_TeX": render_TeX,
+        "display_wrapped_TeX": wrapped_TeX,
         "status": str(fields.get("status") or "").strip(),
         "solver": str(fields.get("solver") or "").strip(),
         "diagnostic": str(fields.get("diagnostic") or "").strip(),

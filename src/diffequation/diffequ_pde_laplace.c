@@ -196,9 +196,9 @@ static bool de_pde_polar_coordinate_verifies(const expr_t *coordinate, const exp
     expr_t *radial_second = radial_first ? expr_create_deriv(radial_first, radius) : NULL;
     expr_t *angular_first = coordinate ? expr_create_deriv(coordinate, angle) : NULL;
     expr_t *angular_second = angular_first ? expr_create_deriv(angular_first, angle) : NULL;
-    expr_t *radius_squared = expr_pow_long(radius, 2);
-    expr_t *radial_first_squared = radial_first ? expr_pow_long(radial_first, 2) : NULL;
-    expr_t *angular_first_squared = angular_first ? expr_pow_long(angular_first, 2) : NULL;
+    expr_t *radius_squared = expr_mul(radius, radius);
+    expr_t *radial_first_squared = radial_first ? expr_mul(radial_first, radial_first) : NULL;
+    expr_t *angular_first_squared = angular_first ? expr_mul(angular_first, angular_first) : NULL;
     expr_t *first_identity_radial =
         radius_squared && radial_first_squared ? expr_mul(radius_squared, radial_first_squared) : NULL;
     expr_t *first_identity_raw =
@@ -336,7 +336,7 @@ de_attempt_t de_pde_attempt_polar_laplace(const diffequ_t *de, const expr_t *res
         attempt = DE_ATTEMPT_FAILED;
         goto cleanup;
     }
-    radius_squared = expr_pow_long(radius, 2);
+    radius_squared = expr_mul(radius, radius);
     expected_radial_first = radial_second_coefficient && radius
                                 ? expr_div_simplify_owned(expr_clone(radial_second_coefficient), expr_clone(radius))
                                 : NULL;
