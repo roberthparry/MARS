@@ -2505,8 +2505,8 @@ INDEX_HTML = r"""<!doctype html>
       grid-template-rows: minmax(0, 1fr);
     }
 
-    .output-grid.card-expanded .card:not(.expanded-card) {
-      display: none;
+    #resultPane.card-expanded > .result-card:not(.expanded-card) {
+      display: none !important;
     }
 
     .card.expanded-card {
@@ -2781,7 +2781,7 @@ INDEX_HTML = r"""<!doctype html>
     #functionStyle.equation-function {
       --solver-tex-scale: 1.5;
       padding-top: 0.15rem;
-      overflow-x: hidden;
+      overflow-x: auto;
       overflow-y: auto;
       white-space: normal;
       overflow-wrap: normal;
@@ -2873,15 +2873,11 @@ INDEX_HTML = r"""<!doctype html>
 
     .rendered {
       margin: 0;
+      min-width: 0;
       min-height: 12rem;
       padding: 2.1rem 1.6rem 3rem;
       overflow: auto;
       font-size: var(--render-font-size);
-    }
-
-    .rendered.vertically-wrapped-tex {
-      overflow-x: hidden;
-      overflow-y: auto;
     }
 
     .rendered-zoom-frame {
@@ -4734,10 +4730,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         collapseResultCards();
       valueCard.classList.toggle('hidden', !visible);
       valueCard.toggleAttribute('hidden', !visible);
-      if (visible)
-        valueCard.style.setProperty('display', 'block', 'important');
-      else
-        valueCard.style.removeProperty('display');
+      // Visibility must not override the selected card's expansion state.
+      valueCard.style.removeProperty('display');
     }
 
     function snapshotElementState(element) {
@@ -10624,7 +10618,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
         clearResultDetails({keepBindings: true});
         clearRenderedError();
-        renderedTitle.textContent = data.status === 'solved' ? 'Equation and solutions' : 'Reduction';
+        renderedTitle.textContent = data.status === 'series' ? 'Equation and local series' :
+          data.status === 'solved' ? 'Equation and solutions' : 'Reduction';
         lastTex = data.display_TeX || data.solutions_TeX || data.problem_TeX || '';
         rendered.dataset.displayTex = lastTex;
         rendered.dataset.fullTex = lastTex;
@@ -10687,7 +10682,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         currentDifferentiable = false;
         renderDerivativeButtons(currentVariables);
         commitModeState();
-        setStatus(data.status === 'solved' ? 'Ready' : 'Not solved');
+        setStatus(data.status === 'series' ? 'Local series' : data.status === 'solved' ? 'Ready' : 'Not solved');
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);

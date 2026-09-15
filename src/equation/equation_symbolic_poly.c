@@ -346,6 +346,24 @@ static bool equ_symbolic_poly_collect(const expr_t *expr, const expr_t *wrt, equ
     if (expr_match_mul_expr(expr, &left, &right))
         return equ_symbolic_poly_collect_mul(left, right, wrt, poly);
 
+    /* Exact rational scaling is still polynomial; division is not always stored as multiplication. */
+    if (expr_match_div_expr(expr, &left, &right) && !equ_expr_depends_on_wrt(right, wrt)) {
+        number_t denominator = num_new();
+        bool regular = expr_match_const_value(right, &denominator) && num_is_finite(denominator) &&
+                       !num_is_zero(denominator);
+        num_destroy(&denominator);
+        if (!regular)
+            return false;
+        equation_symbolic_poly_t numerator = {0};
+        bool ok = equ_symbolic_poly_collect(left, wrt, &numerator);
+        for (size_t i = 0u; ok && i < EQUATION_SYMBOLIC_POLY_COEFFS; ++i) {
+            if (numerator.coeff[i])
+                ok = equ_symbolic_add_owned(poly, i, expr_div(numerator.coeff[i], right));
+        }
+        equ_symbolic_poly_clear(&numerator);
+        return ok;
+    }
+
     if (equ_symbolic_poly_collect_power(expr, wrt, poly))
         return true;
 
@@ -457,8 +475,8 @@ cleanup:
     return ok;
 }
 
-bool equ_match_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
-                                         size_t *degree_out)
+static bool equ_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
+                                           size_t *degree_out, bool allow_zero)
 {
     equation_symbolic_poly_t poly = {0};
     expr_t **coefficients = NULL;
@@ -470,7 +488,7 @@ bool equ_match_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, 
 
     while (degree > 0u && equ_symbolic_coeff_is_zero(poly.coeff[degree]))
         --degree;
-    if (equ_symbolic_coeff_is_zero(poly.coeff[degree]))
+    if (!allow_zero && equ_symbolic_coeff_is_zero(poly.coeff[degree]))
         goto cleanup;
 
     coefficients = calloc(degree + 1u, sizeof(*coefficients));
@@ -495,4 +513,17 @@ cleanup:
     free(coefficients);
     equ_symbolic_poly_clear(&poly);
     return ok;
+}
+
+bool equ_match_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
+                                         size_t *degree_out)
+{
+    return equ_symbolic_polynomial_alloc(expr, wrt, coefficients_out, degree_out, false);
+}
+
+/* Coefficient matching also needs to distinguish the zero polynomial from a failed collection. */
+bool equ_collect_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
+                                           size_t *degree_out)
+{
+    return equ_symbolic_polynomial_alloc(expr, wrt, coefficients_out, degree_out, true);
 }

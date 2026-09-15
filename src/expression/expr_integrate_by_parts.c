@@ -927,7 +927,7 @@ expr_t *integrate_linear_poly_times_inverse_affine(const expr_t *expr, const exp
 
     u = build_affine_from_match(wrt, constant, coeff);
     inverse_u = (u && rule->antiderivative_fn) ? rule->antiderivative_fn(u) : NULL;
-    u_sq = u ? expr_pow(u, &NUM_TWO) : NULL;
+    u_sq = u ? expr_mul(u, u) : NULL;
 
     if (!num_eq(poly[0], NUM_ZERO) && rule->build_base_term && u && inverse_u)
         base_term = rule->build_base_term(u, inverse_u, u_sq, poly[0]);
@@ -1002,9 +1002,9 @@ expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr, con
     }
 
     u = build_affine_from_match(wrt, constant, coeff);
-    u_sq = u ? expr_pow(u, &NUM_TWO) : NULL;
+    u_sq = u ? expr_mul(u, u) : NULL;
     u_cu = (u && u_sq) ? expr_mul(u_sq, u) : NULL;
-    u_qu = u_sq ? expr_pow(u_sq, &NUM_TWO) : NULL;
+    u_qu = u_sq ? expr_mul(u_sq, u_sq) : NULL;
 
     if (!num_eq(poly[0], NUM_ZERO) && u && u_cu) {
         expr_t *scaled_linear = u ? expr_mul_num(u, &neg_log_sqrt_2pi) : NULL;

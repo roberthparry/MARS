@@ -7,9 +7,10 @@
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
 
-/* Index the four ordered derivative pairs directly: xx, xy, yx, yy. */
+/* Index xx, xy, yx, yy directly, with optional separate slots for the first derivatives x and y. */
 static bool de_pde_second_order_derivatives(const expr_t *expr, const expr_t *x, const expr_t *y,
-                                           const expr_t **dependent, const expr_t **derivatives)
+                                           const expr_t **dependent, const expr_t **derivatives,
+                                           const expr_t **first_derivatives)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -20,10 +21,11 @@ static bool de_pde_second_order_derivatives(const expr_t *expr, const expr_t *x,
         const expr_t *subject = expr_formal_derivative_dependent(expr);
         size_t index = 0u;
 
-        if (expr_formal_derivative_order(expr) != 2u || !subject ||
+        size_t order = expr_formal_derivative_order(expr);
+        if ((order != 2u && !(order == 1u && first_derivatives)) || !subject ||
             (*dependent && !expr_struct_eq(*dependent, subject)))
             return false;
-        for (size_t i = 0u; i < 2u; ++i) {
+        for (size_t i = 0u; i < order; ++i) {
             const expr_t *wrt = expr_formal_derivative_wrt_at(expr, i);
 
             index *= 2u;
@@ -32,15 +34,16 @@ static bool de_pde_second_order_derivatives(const expr_t *expr, const expr_t *x,
             else if (!expr_struct_eq(wrt, x))
                 return false;
         }
-        if (derivatives[index] && !expr_struct_eq(derivatives[index], expr))
+        const expr_t **slots = order == 1u ? first_derivatives : derivatives;
+        if (slots[index] && !expr_struct_eq(slots[index], expr))
             return false;
-        derivatives[index] = expr;
+        slots[index] = expr;
         *dependent = subject;
         return true;
     }
     return !expr_child_exprs(expr, &left, &right) ||
-           (de_pde_second_order_derivatives(left, x, y, dependent, derivatives) &&
-            de_pde_second_order_derivatives(right, x, y, dependent, derivatives));
+           (de_pde_second_order_derivatives(left, x, y, dependent, derivatives, first_derivatives) &&
+            de_pde_second_order_derivatives(right, x, y, dependent, derivatives, first_derivatives));
 }
 
 static bool de_pde_second_order_coefficients(const expr_t *residual, const expr_t **derivatives,
@@ -99,6 +102,166 @@ static bool de_pde_second_order_roots(number_t a, number_t b, number_t c, equati
     expr_free(polynomial);
     expr_free(root);
     return solved;
+}
+
+/* Recognise a numeric coefficient times a prescribed Euler weight, without accepting coordinate dependence. */
+static bool de_pde_euler_coefficient(const expr_t *coefficient, const expr_t *weight, number_t *value)
+{
+    expr_t *ratio = expr_div_simplify_owned(expr_clone(coefficient), expr_clone(weight));
+    bool valid = ratio && expr_match_const_value(ratio, value) && num_is_real(*value) && num_is_finite(*value);
+    expr_free(ratio);
+    return valid;
+}
+
+static bool de_pde_euler_steps(const diffequ_t *de, diffequ_solve_result_t *result, const number_t *parameters)
+{
+    /* Coordinates are bound problem symbols; render fresh unbound names, not their unset values. */
+    expr_t *x_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(de->independent_vars[0]));
+    expr_t *y_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(de->independent_vars[1]));
+    char *x = x_symbol ? expr_to_TeX_body(x_symbol) : NULL;
+    char *y = y_symbol ? expr_to_TeX_body(y_symbol) : NULL;
+    expr_free(y_symbol);
+    expr_free(x_symbol);
+    char *values[3] = {NULL, NULL, NULL};
+    char *values_TeX[3] = {NULL, NULL, NULL};
+    bool valid = x && y;
+    for (size_t i = 0u; i < 3u; ++i) {
+        expr_t *value = expr_new_const(parameters[i]);
+        values[i] = value ? expr_to_string(value, style_UNBOUND) : NULL;
+        values_TeX[i] = value ? expr_to_TeX_body(value) : NULL;
+        valid = valid && values[i] && values_TeX[i];
+        expr_free(value);
+    }
+    string_t *steps = valid ? string_sprintf(
+        "Radial Euler equation with A=%s, B=%s, C=%s.\n"
+        "In generic coordinates, E=x*partial_x+y*partial_y differentiates along radial scaling.\n"
+        "x*x*z_xx+2*x*y*z_xy+y*y*z_yy=(E*E-E)z.\n"
+        "On the positive first-coordinate chart, set r=ln(x), eta=y/x; then E=partial_r.\n"
+        "The equation becomes A*z_rr+(B-A)*z_r+C*z=0 at each fixed eta.\n"
+        "Solve A*m*(m-1)+B*m+C=0 using the native equation solver.\n"
+        "Distinct roots give x^m1*F(eta)+x^m2*G(eta); a repeated root gives x^m*(F(eta)+ln(x)*G(eta)).\n"
+        "F and G are arbitrary twice-differentiable functions (complex-valued if needed).\n"
+        "This local chart requires the first coordinate > 0; no boundary data are imposed.\n",
+        values[0], values[1], values[2]) : NULL;
+    string_t *TeX = valid ? string_sprintf(
+        "\\begin{aligned}&\\text{Radial Euler equation: }A=%s,\\ B=%s,\\ C=%s"
+        "\\\\&E=%s\\partial_{%s}+%s\\partial_{%s}\\quad\\text{(differentiation along radial scaling)}"
+        "\\\\&\\text{The second-order radial operator is }E^2-E."
+        "\\\\&r=\\ln(%s),\\quad\\eta=\\frac{%s}{%s},\\quad E=\\partial_r"
+        "\\\\&A z_{rr}+(B-A)z_r+Cz=0\\quad\\text{at fixed }\\eta"
+        "\\\\&A m(m-1)+Bm+C=0\\quad\\text{determines the powers.}"
+        "\\\\&\\text{A repeated root introduces a logarithmic second solution.}"
+        "\\\\&\\text{The two coefficients are arbitrary functions of }\\eta\\text{.}"
+        "\\\\&\\text{Local chart: }%s>0\\text{; no boundary data imposed.}\\end{aligned}",
+        values_TeX[0], values_TeX[1], values_TeX[2], x, x, y, y, x, y, x, x) : NULL;
+    valid = steps && TeX && de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
+            de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
+    string_free(TeX);
+    string_free(steps);
+    for (size_t i = 0u; i < 3u; ++i) {
+        free(values_TeX[i]);
+        free(values[i]);
+    }
+    free(y);
+    free(x);
+    return valid;
+}
+
+/* Reduce A(E²-E)z+B Ez+Cz=0 to an Euler ODE at each fixed ray. */
+diffequ_solve_result_t *de_pde_solve_radial_euler(const diffequ_t *de, const expr_t *residual, bool include_steps)
+{
+    if (!de || !residual || de->independent_count != 2u || de->condition_count != 0u)
+        return NULL;
+    const expr_t *x = de->independent_vars[0], *y = de->independent_vars[1];
+    const expr_t *dependent = NULL;
+    const expr_t *derivatives[6] = {NULL};
+    if (!de_pde_second_order_derivatives(residual, x, y, &dependent, derivatives, derivatives + 4u) || !dependent)
+        return NULL;
+    expr_t *weights[6] = {expr_mul(x, x), expr_mul(x, y), expr_mul(x, y), expr_mul(y, y),
+                         expr_clone(x), expr_clone(y)};
+    number_t coefficients[6];
+    for (size_t i = 0u; i < 6u; ++i)
+        coefficients[i] = num_clone(NUM_ZERO);
+    number_t parameters[3] = {num_new(), num_new(), num_new()};
+    number_t middle = num_new(), mixed = num_new(), twice = num_new();
+    expr_t *remaining = expr_clone(residual), *constant = NULL, *forcing = NULL;
+    expr_t *eta = NULL, *right = NULL;
+    equation_t *solution = NULL;
+    equation_solutions_t roots = {0};
+    diffequ_solve_result_t *result = NULL;
+    bool valid = remaining != NULL;
+    for (size_t i = 0u; valid && i < 6u; ++i) {
+        if (!derivatives[i])
+            continue;
+        expr_t *coefficient = NULL, *next = NULL;
+        valid = weights[i] && de_linear_decompose(remaining, derivatives[i], &coefficient, &next) &&
+                de_pde_euler_coefficient(coefficient, weights[i], &coefficients[i]);
+        expr_free(coefficient);
+        expr_free(remaining);
+        remaining = next;
+    }
+    mixed = num_add(coefficients[1], coefficients[2]);
+    twice = num_mul_long(coefficients[0], 2L);
+    if (!valid || num_is_zero(coefficients[0]) || !num_eq(coefficients[0], coefficients[3]) ||
+        !num_eq(mixed, twice) || !num_eq(coefficients[4], coefficients[5]) ||
+        !de_linear_decompose(remaining, dependent, &constant, &forcing) || !expr_is_exact_zero(forcing) ||
+        !expr_match_const_value(constant, &parameters[2]) || !num_is_real(parameters[2]) ||
+        !num_is_finite(parameters[2]))
+        goto cleanup;
+    parameters[0] = num_clone(coefficients[0]);
+    parameters[1] = num_clone(coefficients[4]);
+    middle = num_sub(parameters[1], parameters[0]);
+    if (!de_pde_second_order_roots(parameters[0], middle, parameters[2], &roots))
+        goto cleanup;
+    size_t count = equ_solutions_count(&roots);
+    if (count != 1u && count != 2u)
+        goto cleanup;
+    eta = expr_div_simplify_owned(expr_clone(y), expr_clone(x));
+    for (size_t i = 0u; i < 2u; ++i) {
+        const expr_t *root = equ_rhs(equ_solutions_at(&roots, count == 1u ? 0u : 1u - i));
+        expr_t *power = root ? expr_pow_xp(x, root) : NULL;
+        expr_t *amplitude = eta ? expr_new_arbitrary_function(i == 0u ? "F" : "G", eta) : NULL;
+        expr_t *term = expr_mul_simplify_owned(power, amplitude);
+        if (!term)
+            goto cleanup;
+        if (i == 1u && count == 1u)
+            term = expr_mul_simplify_owned(term, expr_ln(x));
+        right = i == 0u ? term : expr_add_simplify_owned(right, term);
+        if (!right)
+            goto cleanup;
+    }
+    solution = de_pde_solution_equation(dependent, right);
+    result = solution ? de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_CHARACTERISTICS,
+                                            "solved using radial Euler coordinates on the positive first-coordinate chart")
+                      : NULL;
+    if (!result || de_solve_result_append(result, solution) != 0) {
+        de_solve_result_free(result);
+        result = NULL;
+        goto cleanup;
+    }
+    solution = NULL;
+    if (include_steps && !de_pde_euler_steps(de, result, parameters)) {
+        de_solve_result_free(result);
+        result = NULL;
+    }
+cleanup:
+    equ_free(solution);
+    equ_solutions_clear(&roots);
+    expr_free(right);
+    expr_free(eta);
+    expr_free(forcing);
+    expr_free(constant);
+    expr_free(remaining);
+    num_destroy(&twice);
+    num_destroy(&mixed);
+    num_destroy(&middle);
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&parameters[i]);
+    for (size_t i = 0u; i < 6u; ++i) {
+        num_destroy(&coefficients[i]);
+        expr_free(weights[i]);
+    }
+    return result;
 }
 
 static expr_t *de_pde_second_order_family(const expr_t *x, const expr_t *y, number_t a, number_t b, number_t c)
@@ -394,7 +557,11 @@ static expr_t *de_pde_second_order_particular(const expr_t *forcing, const expr_
     if (expr_is_exact_zero(forcing))
         return expr_const_zero();
     bool is_sum = expr_match_add_sub_expr(forcing, &left, &right, &is_sub);
-    expr_t *expanded = is_sum ? NULL : expr_display_expanded(forcing);
+    expr_t *canonical = is_sum ? NULL : expr_display_expanded(forcing);
+    /* Preserve distributed terms for superposition after collecting cancellations and like terms. */
+    expr_t *expanded = canonical ? expr_expand_products_internal(canonical) : NULL;
+
+    expr_free(canonical);
 
     if (is_sum || (expanded && expr_match_add_sub_expr(expanded, &left, &right, &is_sub))) {
         expr_t *first = de_pde_second_order_particular(left, x, y, coefficients);
@@ -516,7 +683,7 @@ diffequ_solve_result_t *de_pde_solve_second_order_constant(const diffequ_t *de, 
     if (!de || !residual || de->independent_count != 2u || de->condition_count != 0u)
         goto cleanup;
     if (!de_pde_second_order_derivatives(residual, de->independent_vars[0], de->independent_vars[1], &dependent,
-                                          derivatives) || !dependent ||
+                                          derivatives, NULL) || !dependent ||
         !de_pde_second_order_coefficients(residual, derivatives, coefficients, &forcing) ||
         de_expr_uses(forcing, dependent))
         goto cleanup;

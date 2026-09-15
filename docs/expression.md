@@ -126,6 +126,21 @@ Logarithms of negated differences are normalised algebraically without
 splitting logarithms or changing their branches. These rules also supply the
 elementary [inverse-hyperbolic-tangent PDE solution](diffequation.md).
 
+Real affine absolute values and their linear multiples are integrated directly.
+For a real affine argument $u=ax+b$, with $a\ne0$, the primitives are
+$u|u|/(2a)$ for $|u|$ and $u^2|u|/(3a)$ for $u|u|$.
+An arbitrary affine multiplier is first expressed as a constant plus a multiple
+of $u$. Negative slopes and crossings of $u=0$ are supported; these are real
+calculus rules, not holomorphic identities for complex moduli. The same rules
+produce the [absolute-value-forced PDE example](diffequation.md).
+
+Repeated integration of affine inverse sine and inverse cosine remains in
+elementary form. Radical arguments are normalised without changing their
+branches. Cancellation of opposite additive factors moves a sign only through
+an integer power, retaining the base of any fractional power; this also allows
+the symbolic verifier to recognise the resulting antiderivatives. See the
+[inverse-cosine-forced PDE example](diffequation.md).
+
 Riemann and Hurwitz zeta nodes participate in the same symbolic calculus.
 Differentiating `zeta(s)` produces `ζ'(s)` in Expression style and `zetap(s)`
 in Function style. For Hurwitz zeta,
@@ -313,6 +328,10 @@ is equivalent to:
 The parser stores unassigned values as `NaN`; `?` is the input spelling for the
 same unassigned state. The caller does not need to add braces or discover
 bindings before calling `expr_from_string(...)`.
+
+An unset named constant remains a symbolic quantity: copies with the same name
+and binding combine during simplification. Different named constants remain
+independent, and an unnamed numerical `NaN` is not treated as such a symbol.
 
 ```c
 #include <stdio.h>
@@ -567,6 +586,13 @@ are obtained by differentiating derivative expressions again with
 variable pointer so the library knows which variable to differentiate with
 respect to; all other variable nodes in the graph are treated as constants.
 
+Unknown functions with several arguments retain formal coordinate derivatives;
+MARS does not attempt to differentiate the argument list as a scalar. Repeated
+and mixed derivatives preserve their coordinate order. A derivative with
+respect to a coordinate absent from the explicit arguments is zero, including
+when differentiating an already formal derivative. These operations support
+the differential-equation module's general Lie determining equations.
+
 This is symbolic differentiation, not forward-mode automatic differentiation:
 it constructs another expression DAG. MARS does not currently expose a numeric
 forward-mode Jacobian-vector-product (JVP) API. Such an API would propagate one
@@ -625,6 +651,19 @@ simplifies and then arranges an equivalent expression for readable
 presentation, including symmetric surds and Cartesian complex products. The
 beautifier does not select a different expression for TeX output; rendering
 style is applied afterwards.
+
+Integrals and formal derivatives rendered as ordinary or partial derivative
+fractions are kept outside enclosing algebraic fractions. Fractional
+coefficients appear alongside them; reciprocal exponential coefficients use
+negative exponents. Grouped inverse powers are used when a denominator itself
+contains an integral or derivative. This preserves the expression tree and the
+expression, unbound and function output styles.
+
+Paired symmetric function arguments and definite-integral bounds retain their
+common centre first in TeX: $a+b$ together with $a-b$. The formatter recognises
+the common term and opposite shifts structurally, independently of function
+or variable names. Unpaired sums retain their ordinary ordering, and the
+underlying expressions are unchanged.
 
 When an elementary function has a supported symbolic Cartesian identity, the
 native display pass separates an explicit `x + iy` argument into real and
@@ -953,6 +992,11 @@ decide whether derivative controls should be shown.
 
 ### String Conversion
 
+Explicit univariate power series with an `O(...)` remainder are rendered in
+ascending powers of the expansion variable (or its shift), with the remainder
+last. This ordering is shared by expression, unbound, TeX, and function styles;
+ordinary polynomial expressions retain their usual degree ordering.
+
 - `string_t *expr_to_text(const expr_t *expr, style_t style)` — serialise the expression; `style` is `style_FUNCTION`, `style_EXPRESSION`, `style_LATEX`, or `style_UNBOUND`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. `style_UNBOUND` returns the expression body before the `{ body | bindings }` wrapper is added. Returns a newly allocated string; the caller must release it with `string_free(...)`.
 - `void expr_print(const expr_t *expr)` — print the expression to stdout in `style_EXPRESSION` format
 
@@ -1003,6 +1047,11 @@ newline or end of input. The lexer applies longest-match, so two backticks alway
 open a line comment rather than representing an empty delimited comment. A
 backslash escapes a literal backtick within a delimited comment. Comments behave
 as whitespace before full-stop statement termination is interpreted.
+
+The differential-equation module uses a private parser variant that accepts
+undeclared symbolic calls while retaining implicit multiplication for scalar
+bindings. This leaves ordinary Expression and Function input unchanged; see
+[symbolic wave data](diffequation.md#forced-one-dimensional-wave-initial-value-problems).
 
 Unevaluated integral nodes are
 printed in function form as `@S^upper integrand d<dummy>` and in
@@ -1599,7 +1648,11 @@ string_t *expr_sprintf_text(const char *fmt, ...);
 
 ### `expr_substitute()`
 
-Returns the public result described by substitute.
+Return an owning expression with the requested substitution. The source,
+needle and replacement are borrowed. Formal derivative needles are matched
+structurally, so a cloned derivative can be replaced without requiring the
+same node address. Substituting the dependent variable instead differentiates
+its replacement with respect to the derivative's recorded coordinates.
 
 ```c
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);

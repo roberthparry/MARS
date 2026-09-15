@@ -24,6 +24,13 @@ static int const_is_protected_bound_symbol(const expr_t *dv)
 
 static int const_struct_eq(const expr_t *u, const expr_t *v)
 {
+    /* An unset named constant is a symbol, not a numerical NaN. Clones retain its identity. */
+    if (num_is_nan(u->c) || num_is_nan(v->c)) {
+        return num_is_nan(u->c) && num_is_nan(v->c) && u->name && *u->name && v->name &&
+               strcmp(u->name, v->name) == 0 &&
+               ((!u->binding_expr && !v->binding_expr) ||
+                (u->binding_expr && v->binding_expr && expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr)));
+    }
     if (const_is_protected_bound_symbol(u) || const_is_protected_bound_symbol(v)) {
         return const_is_protected_bound_symbol(u) && const_is_protected_bound_symbol(v) && u->name && v->name &&
                strcmp(u->name, v->name) == 0 && expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr);
@@ -181,6 +188,10 @@ static bool expr_simplify_same_named_leaf_local(const expr_t *left, const expr_t
 {
     const char *left_name = (left && left->name && *left->name) ? left->name : NULL;
     const char *right_name = (right && right->name && *right->name) ? right->name : NULL;
+
+    if (left && right && expr_is_const(left) && expr_is_const(right) &&
+        (num_is_nan(left->c) || num_is_nan(right->c)))
+        return const_struct_eq(left, right);
 
     if (left && right && left->ops && right->ops && left->ops->kind == EXPR_KIND_VAR &&
         right->ops->kind == EXPR_KIND_VAR && left->var_id != 0 && right->var_id != 0) {

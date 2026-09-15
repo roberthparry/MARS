@@ -131,9 +131,11 @@ bool equ_solutions_proven_empty(const equation_solutions_t *solutions);
  * sides of the relation, followed by a compact solve-and-output call:
  *
  *   equation equ(x) { return equation(lhs = rhs). }
- *   output(equ(x).solve()).
+ *   output(solve(equ(x))).
  *
- * Use equ_from_text() or equ_from_string() to parse it back.
+ * Unbound and LaTeX styles may use faithful compact solver notation with
+ * definitions. Expression style retains the underlying algebra; use that style
+ * with equ_from_text() or equ_from_string() to parse an equation back.
  */
 string_t *equ_to_text(const equation_t *equation, style_t style);
 

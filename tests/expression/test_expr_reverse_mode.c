@@ -189,7 +189,8 @@ static void test_reverse_gradient_polynomial_num(void)
     want = num_create_from_string("5");
     ASSERT_EXPR_NUMBER_EQ(grads[1], want);
     num_destroy(&want);
-    ASSERT_EQ_INT((int)num_get_prec_bits(value), 384);
+    ASSERT_TRUE(num_is_exact(value));
+    ASSERT_EQ_INT((int)num_get_prec_bits(value), 0);
     ASSERT_EQ_INT((int)num_get_prec_bits(grads[0]), 53);
     ASSERT_EQ_INT((int)num_get_prec_bits(grads[1]), 53);
 

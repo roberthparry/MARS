@@ -2926,8 +2926,9 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return sqrt_scaled;
     }
 
-    /* Keep an exact negated difference in a logarithm canonical without splitting the logarithm. */
-    if (expr_is_op(dv, &ops_log) || expr_is_op(dv, &ops_log10)) {
+    /* Canonicalise the argument without splitting logarithms or roots, preserving their branches. */
+    if (expr_is_op(dv, &ops_log) || expr_is_op(dv, &ops_log10) ||
+        expr_is_op(dv, &ops_sqrt) || expr_is_op(dv, &ops_cubrt)) {
         expr_t *reversed = expr_simplify_reverse_negative_difference_local(a);
 
         if (reversed) {
@@ -5234,8 +5235,10 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 div_fallback_2:
-    if (!expr_is_addsub(a) && (expr_is_op(a, &ops_mul) || expr_is_div(a) || expr_is_negative_real_power_local(a) ||
-                               expr_is_op(b, &ops_mul) || expr_is_div(b) || expr_is_negative_real_power_local(b)))
+    if (((expr_is_addsub(a) || ((expr_is_pow_d_expr(a) || expr_is_sqrt_expr(a)) && expr_is_addsub(a->a))) &&
+         (expr_is_addsub(b) || ((expr_is_pow_d_expr(b) || expr_is_sqrt_expr(b)) && expr_is_addsub(b->a)))) ||
+        (!expr_is_addsub(a) && (expr_is_op(a, &ops_mul) || expr_is_div(a) || expr_is_negative_real_power_local(a) ||
+                                expr_is_op(b, &ops_mul) || expr_is_div(b) || expr_is_negative_real_power_local(b))))
         return expr_simplify_flat_quotient_local(a, b);
 
     if (expr_struct_eq(a, b) || expr_polynomials_equal_deg4(a, b)) {

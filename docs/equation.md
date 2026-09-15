@@ -287,8 +287,12 @@ replacing its binding.
 - `equ_to_text(..., style_FUNCTION)` produces an equation-valued callable
   that preserves the left- and right-hand expressions, notes unbound variables
   with a Function-style line comment beginning with two backticks, then uses
-  the compact `output(equ(...).solve()).` form
-- `equ_to_text(..., style_UNBOUND)` shows the plain equation body
+  the compact `output(solve(equ(...))).` form; `solve` is a function call,
+  leaving the full stop for multiplication and statement termination
+- `equ_to_text(..., style_UNBOUND)` shows the plain equation body, using compact
+  native notation when a solver supplies it (for example, defined spherical
+  means instead of expanded angular integrals). This is display text, not a
+  promise of parseable input; use `style_EXPRESSION` for that purpose.
 - `equ_to_text(..., style_LATEX)` emits TeX-ready display text
 - `equ_to_TeX_body_wrapped(...)` emits an owning aligned TeX body and honours
   native derivation metadata such as a finite sigma step retained while the

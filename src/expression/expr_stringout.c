@@ -2727,6 +2727,88 @@ static bool display_poly_is_explicit_arbitrary_amplitude(const display_poly_term
     return true;
 }
 
+/* An explicit remainder identifies a series; ordinary polynomials retain their usual ordering. */
+static const expr_t *display_series_remainder(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    if (expr_is_arbitrary_function(expr) && expr->name && strcmp(expr->name, "O") == 0)
+        return expr;
+    if (!expr_is_addsub(expr))
+        return NULL;
+    const expr_t *left = display_series_remainder(expr->a);
+    return left ? left : display_series_remainder(expr->b);
+}
+
+static bool display_series_term_degree(const expr_t *expr, const expr_t *base,
+                                       const display_poly_var_list_t *vars, long *degree)
+{
+    if (!expr)
+        return false;
+    if (expr_struct_eq(expr, base))
+        return display_poly_add_degree(degree, 1L);
+    if (!display_poly_expr_contains_any_var(expr, vars))
+        return true;
+    if (expr_is_neg(expr))
+        return display_series_term_degree(expr->a, base, vars, degree);
+    if (expr_is_mul(expr))
+        return display_series_term_degree(expr->a, base, vars, degree) &&
+               display_series_term_degree(expr->b, base, vars, degree);
+    if (expr_is_op(expr, &ops_div))
+        return !display_poly_expr_contains_any_var(expr->b, vars) &&
+               display_series_term_degree(expr->a, base, vars, degree);
+    if ((expr_is_pow_d_expr(expr) || expr_is_op(expr, &ops_pow)) && expr_struct_eq(expr->a, base)) {
+        number_t exponent = num_new();
+        long power = 0L;
+        bool matched = expr_is_pow_d_expr(expr) ? (exponent = num_clone(expr->c), true) :
+                                                 expr_match_const_value(expr->b, &exponent);
+        bool valid = matched && expr_try_get_small_integer_exponent(exponent, &power) &&
+                     display_poly_add_degree(degree, power);
+        num_destroy(&exponent);
+        return valid;
+    }
+    return false;
+}
+
+static bool display_series_collect_terms(const expr_t *expr, bool subtract, const expr_t *base,
+                                         const expr_t *remainder, const display_poly_var_list_t *vars,
+                                         display_poly_term_t *terms, size_t *count, size_t max_terms)
+{
+    long degree = 0L;
+    if (expr == remainder) {
+        degree = LONG_MAX;
+    } else if (!display_series_term_degree(expr, base, vars, &degree)) {
+        if (!expr_is_addsub(expr))
+            return false;
+        return display_series_collect_terms(expr->a, subtract, base, remainder, vars, terms, count, max_terms) &&
+               display_series_collect_terms(expr->b, subtract != expr_is_op(expr, &ops_sub), base, remainder,
+                                             vars, terms, count, max_terms);
+    }
+    if (*count >= max_terms)
+        return false;
+    terms[*count] = (display_poly_term_t){.expr = expr, .subtract = subtract, .degree = {degree}};
+    ++*count;
+    return true;
+}
+
+static bool display_series_prepare_terms(const expr_t *expr, display_poly_term_t *terms,
+                                         size_t *count, size_t max_terms)
+{
+    const expr_t *remainder = display_series_remainder(expr);
+    if (!remainder || !remainder->a)
+        return false;
+    const expr_t *argument = remainder->a;
+    const expr_t *base = expr_is_pow_d_expr(argument) || expr_is_op(argument, &ops_pow) ? argument->a : argument;
+    display_poly_var_list_t vars = {0};
+    if (!display_poly_collect_vars(base, &vars) || vars.count != 1u)
+        return false;
+    *count = 0u;
+    if (!display_series_collect_terms(expr, false, base, remainder, &vars, terms, count, max_terms))
+        return false;
+    display_poly_sort_terms(terms, *count, 1u, true);
+    return true;
+}
+
 static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *terms, size_t *count, size_t max_terms)
 {
     display_poly_var_list_t vars = {0};
@@ -2734,6 +2816,9 @@ static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *
 
     if (!expr || !terms || !count || !expr_is_addsub(expr))
         return false;
+
+    if (display_series_prepare_terms(expr, terms, count, max_terms))
+        return true;
 
     if (display_poly_expr_contains_imaginary_unit(expr) || !display_poly_collect_vars(expr, &vars) || vars.count == 0u)
         return false;
@@ -3782,6 +3867,108 @@ static bool expr_is_rendered_log_local(const expr_t *expr)
             expr->binding_expr->u.unary_op.ops == &ops_log);
 }
 
+/* Inspect only the expression tree being rendered; binding tables and derivative-coordinate metadata are not scanned. */
+static bool TeX_contains_calculus(const expr_t *f)
+{
+    if (!f)
+        return false;
+    if (expr_is_op(f, &ops_integral) ||
+        (expr_is_formal_derivative(f) &&
+         (expr_TeX_partial_derivatives_enabled() || expr_TeX_total_derivatives_enabled())))
+        return true;
+    return TeX_contains_calculus(f->a) || TeX_contains_calculus(f->b);
+}
+
+/* Only multiplicative factors are traversed. Refuse oversized products rather than dropping any factors. */
+static bool TeX_collect_calculus_factors(const expr_t *f, const expr_t **factors, size_t *count, bool *negative)
+{
+    if (expr_is_neg(f)) {
+        *negative = !*negative;
+        return TeX_collect_calculus_factors(f->a, factors, count, negative);
+    }
+    if (expr_is_mul(f))
+        return TeX_collect_calculus_factors(f->a, factors, count, negative) &&
+               TeX_collect_calculus_factors(f->b, factors, count, negative);
+    if (*count == 64u)
+        return false;
+    *negative = *negative != expr_is_negative(f);
+    factors[(*count)++] = f;
+    return true;
+}
+
+/* Keep integrals and derivative fractions outside algebraic fractions; reciprocal exponentials use negative exponents. */
+static bool emit_TeX_calculus_quotient(const expr_t *f, sbuf_t *b, int parent_prec, bool absolute)
+{
+    if (!expr_is_div(f))
+        return false;
+    const expr_t *factors[64];
+    bool calculus[64];
+    size_t count = 0u, calculus_count = 0u;
+    bool negative = expr_is_negative(f->b);
+    if (!TeX_collect_calculus_factors(f->a, factors, &count, &negative))
+        return false;
+    for (size_t i = 0u; i < count; ++i) {
+        calculus[i] = TeX_contains_calculus(factors[i]);
+        calculus_count += calculus[i];
+    }
+    bool inverse_power = TeX_contains_calculus(f->b);
+    if (calculus_count == 0u && !inverse_power)
+        return false;
+    const expr_t *denominator = expr_is_neg(f->b) ? f->b->a : f->b;
+    bool inverse_exp = expr_is_op(denominator, &ops_exp);
+    expr_t *negative_exponent = inverse_exp ? expr_negate_owned(expr_clone(denominator->a)) : NULL;
+    if (inverse_exp && !negative_exponent)
+        return false;
+    bool grouped = PREC_MUL < parent_prec, emitted = false;
+    bool fraction = !inverse_exp && !inverse_power;
+    if (grouped)
+        sbuf_puts(b, "\\left(");
+    if (negative && !absolute)
+        sbuf_putc(b, '-');
+    if (fraction)
+        sbuf_puts(b, "\\frac{");
+    for (size_t i = 0u; i < count; ++i) {
+        if (calculus[i])
+            continue;
+        if (!fraction && expr_is_const(factors[i]) && !factors[i]->name &&
+            (num_eq(factors[i]->c, NUM_ONE) || num_eq(factors[i]->c, NUM_NEG_ONE)))
+            continue;
+        if (emitted)
+            sbuf_puts(b, "\\,");
+        emit_TeX_expr_abs(factors[i], b, PREC_MUL);
+        emitted = true;
+    }
+    if (fraction) {
+        if (!emitted)
+            sbuf_putc(b, '1');
+        sbuf_puts(b, "}{");
+        emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
+        sbuf_putc(b, '}');
+    } else {
+        if (emitted)
+            sbuf_puts(b, "\\,");
+        if (inverse_exp) {
+            sbuf_puts(b, "e^{");
+            emit_TeX_expr(negative_exponent, b, PREC_LOWEST);
+            sbuf_putc(b, '}');
+        } else {
+            sbuf_puts(b, "\\left(");
+            emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)^{-1}");
+        }
+    }
+    expr_free(negative_exponent);
+    for (size_t i = 0u; i < count; ++i) {
+        if (!calculus[i])
+            continue;
+        sbuf_puts(b, "\\,");
+        emit_TeX_expr_abs(factors[i], b, PREC_MUL);
+    }
+    if (grouped)
+        sbuf_puts(b, "\\right)");
+    return true;
+}
+
 static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
@@ -3847,6 +4034,8 @@ static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_op(f, &ops_div) && expr_is_negative(f->a)) {
+        if (emit_TeX_calculus_quotient(f, b, parent_prec, true))
+            return;
         int need = PREC_MUL < parent_prec;
         if (need)
             sbuf_puts(b, "\\left(");
@@ -3910,6 +4099,7 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 }
 
 static _Thread_local unsigned TeX_expression_depth;
+static _Thread_local const expr_t *TeX_shift_centre;
 static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec);
 
 typedef struct TeX_index_domain {
@@ -3964,6 +4154,10 @@ static const expr_t *TeX_postfix_factorial_argument(const expr_t *expr)
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     expr_cartesian_composition_t view;
+    const expr_t *saved_centre = TeX_shift_centre;
+    const expr_t *centre = expr_display_symmetric_shift_centre(f);
+    if (centre)
+        TeX_shift_centre = centre;
 
     if (TeX_expression_depth++ == 0u && expr_cartesian_composition_init(f, &view)) {
         sbuf_puts(b, "\\begin{aligned}\n&");
@@ -3982,12 +4176,26 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_TeX_expr_inner(f, b, parent_prec);
     }
     --TeX_expression_depth;
+    TeX_shift_centre = saved_centre;
 }
 
 static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) {
         sbuf_puts(b, "0");
+        return;
+    }
+
+    const expr_t *shift = NULL;
+    bool subtract = false;
+    if (TeX_shift_centre && expr_display_centred_shift_parts(f, TeX_shift_centre, &shift, &subtract)) {
+        if (parent_prec > PREC_ADD)
+            sbuf_puts(b, "\\left(");
+        emit_TeX_expr(TeX_shift_centre, b, PREC_ADD);
+        sbuf_puts(b, subtract ? " - " : " + ");
+        emit_TeX_expr(shift, b, PREC_MUL);
+        if (parent_prec > PREC_ADD)
+            sbuf_puts(b, "\\right)");
         return;
     }
 
@@ -4117,6 +4325,15 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
+
+        if (num_is_real(f->c) && num_sign(f->c) < 0 && TeX_contains_calculus(f->a)) {
+            sbuf_puts(b, "\\left(");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)^{");
+            emit_TeX_const_value(b, f);
+            sbuf_putc(b, '}');
+            return;
+        }
 
         if (emit_TeX_unit_fraction_power(f->a, f->c, b, parent_prec))
             return;
@@ -4324,6 +4541,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_op(f, &ops_div)) {
+        if (emit_TeX_calculus_quotient(f, b, parent_prec, false))
+            return;
         int need = PREC_MUL < parent_prec;
         bool neg_num = expr_is_negative(f->a);
         bool neg_den = expr_is_negative(f->b);
@@ -5376,6 +5595,10 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+
+    if (expr_is_addsub(f) && display_series_remainder(f) &&
+        emit_func_display_polynomial_sum(f, b, parent_prec))
+        return;
 
     if (emit_func_integral_cartesian(f, b, parent_prec))
         return;

@@ -1319,31 +1319,55 @@ void expr_cancel_common_powers(expr_t **terms, size_t nterms, expr_t **den_terms
             expr_t *common_base;
             number_t den_exponent;
             number_t diff;
+            bool opposite = false;
+            bool negate_result = false;
+            bool use_denominator_base = false;
 
             if (!den)
                 continue;
-            if (!expr_struct_eq(base, pow_base(den)))
-                continue;
-
             den_exponent = pow_exponent(den);
+            if (!expr_struct_eq(base, pow_base(den))) {
+                if (expr_is_addsub(base) && expr_is_addsub(pow_base(den)) &&
+                    (num_is_integer(exponent) || num_is_integer(den_exponent))) {
+                    expr_t *sum = expr_add(base, pow_base(den));
+                    expr_t *normalised = sum ? expr_simplify(sum) : NULL;
+
+                    opposite = normalised && expr_is_exact_zero(normalised);
+                    expr_free(normalised);
+                    expr_free(sum);
+                }
+                if (!opposite)
+                    continue;
+                /* Move the sign through an integer power only; retain the fractional power's base and branch. */
+                use_denominator_base = !num_is_integer(den_exponent);
+                number_t half = num_div(use_denominator_base ? exponent : den_exponent, NUM_TWO);
+
+                negate_result = !num_is_integer(half);
+            }
             diff = num_sub(exponent, den_exponent);
 
-            common_base = pow_base(term);
+            common_base = pow_base(use_denominator_base ? den : term);
             expr_retain(common_base);
             expr_free(term);
             expr_free(den);
 
             if (num_eq(diff, NUM_ZERO)) {
                 expr_free(common_base);
-                terms[i] = NULL;
+                terms[i] = negate_result ? expr_new_const(NUM_NEG_ONE) : NULL;
                 den_terms[j] = NULL;
             } else if (num_gt(diff, NUM_ZERO)) {
                 terms[i] = expr_make_pow_like(common_base, diff);
+                if (negate_result) {
+                    expr_t *negative = expr_neg(terms[i]);
+
+                    expr_free(terms[i]);
+                    terms[i] = negative;
+                }
                 den_terms[j] = NULL;
             } else {
                 number_t den_diff = num_neg(diff);
 
-                terms[i] = NULL;
+                terms[i] = negate_result ? expr_new_const(NUM_NEG_ONE) : NULL;
                 den_terms[j] = expr_make_pow_like(common_base, den_diff);
             }
             break;

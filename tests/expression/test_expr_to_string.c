@@ -1,5 +1,8 @@
 #include "test_expr.h"
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+
 typedef struct {
     char *label;
     char *tex;
@@ -1341,11 +1344,67 @@ static void test_to_string_polynomial_degree_order_expr(void)
     }
 }
 
+static void test_to_string_series_ascending_powers(void)
+{
+    static const struct {
+        const char *base;
+        long sign;
+    } cases[] = {{"x", 1L}, {"x", -1L}, {"x-1", 1L}, {"t", 1L}};
+    static const struct {
+        style_t style;
+        const char *second;
+        const char *sixth;
+    } styles[] = {{style_UNBOUND, "²", "⁶"}, {style_LATEX, "^{2}", "^{6}"}, {style_FUNCTION, "^2", "^6"}};
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *base = expr_from_string(cases[i].base, NULL);
+        expr_t *second_power = expr_mul_simplify_owned(expr_clone(base), expr_clone(base));
+        expr_t *fourth_power = expr_mul_simplify_owned(expr_clone(second_power), expr_clone(second_power));
+        expr_t *sixth_power = expr_mul_simplify_owned(expr_clone(fourth_power), expr_clone(second_power));
+        expr_t *constant = expr_const_long(7L * cases[i].sign);
+        expr_t *second_term = expr_mul_long(second_power, 3L * cases[i].sign);
+        expr_t *sixth_term = expr_mul_long(sixth_power, 5L);
+        expr_t *partial = expr_add(sixth_term, second_term);
+        expr_t *polynomial = expr_add(partial, constant);
+        expr_t *argument = expr_mul_simplify_owned(expr_clone(sixth_power), expr_clone(base));
+        expr_t *remainder = expr_new_arbitrary_function("O", argument);
+        /* Put the remainder first to check that presentation does not depend on construction order. */
+        expr_t *series = expr_add(remainder, polynomial);
+        for (size_t j = 0u; j < sizeof(styles) / sizeof(*styles); ++j) {
+            char *text = expr_to_string(series, styles[j].style);
+            printf("Series ordering (%s, style %d): %s\n", cases[i].base, (int)styles[j].style,
+                   text ? text : "NULL");
+            ASSERT_NOT_NULL(text);
+            const char *constant = text ? strstr(text, "7") : NULL;
+            const char *second = constant ? strstr(constant, styles[j].second) : NULL;
+            const char *sixth = second ? strstr(second, styles[j].sixth) : NULL;
+            const char *tail = sixth ? strstr(sixth, "O") : NULL;
+            ASSERT_NOT_NULL(constant);
+            ASSERT_NOT_NULL(second);
+            ASSERT_NOT_NULL(sixth);
+            ASSERT_NOT_NULL(tail);
+            free(text);
+        }
+        expr_free(series);
+        expr_free(remainder);
+        expr_free(argument);
+        expr_free(polynomial);
+        expr_free(partial);
+        expr_free(sixth_term);
+        expr_free(second_term);
+        expr_free(constant);
+        expr_free(sixth_power);
+        expr_free(fourth_power);
+        expr_free(second_power);
+        expr_free(base);
+    }
+}
+
 void test_to_string_nested_mul_add(void)
 {
     TEST_RUN_SUBTEST(test_to_string_nested_mul_add_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_mul_add_func, NULL);
     TEST_RUN_SUBTEST(test_to_string_polynomial_degree_order_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_series_ascending_powers, NULL);
 }
 
 static void test_to_string_atan2_expr(void)
@@ -2338,8 +2397,71 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
  * TEST SUITE RUNNER
  * ============================================================ */
 
+static void test_to_string_symmetric_shifts_TeX(void)
+{
+    static const struct { const char *source; const char *plus; const char *minus; } cases[] = {
+        {"sin(t+x)+sin(x-t)", "x + t", "x - t"},
+        {"cos(x-t)+sin(t+x)", "x + t", "x - t"},
+        {"sin(a*q+z)+cos(z-a*q)", "z + a\\mkern-2mu q", "z - a\\mkern-2mu q"},
+        {"sin(t+x^2)+cos(x^2-t)", "x^{2} + t", "x^{2} - t"},
+        {"sin(exp(t)+x)+cos(x-exp(t))", "x + e^{t}", "x - e^{t}"},
+        {"integral(x-t,t+x,exp(r),r)", "^{x + t}", "_{x - t}"},
+        {"sin(t+x)+cos(x-2*t)", "t + x", "x - 2\\mkern-2mu t"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *before = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        char *after = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
+        ASSERT_TRUE(TeX && strstr(TeX, cases[i].plus) && strstr(TeX, cases[i].minus));
+        ASSERT_TRUE(before && after && strcmp(before, after) == 0);
+        free(after);
+        free(TeX);
+        free(before);
+        expr_free(expr);
+    }
+    /* A completed paired rendering must not change the ordinary order of an unrelated sum. */
+    expr_t *unpaired = expr_from_string("t+x", NULL);
+    char *TeX = unpaired ? expr_to_TeX_body(unpaired) : NULL;
+    ASSERT_TRUE(TeX && strcmp(TeX, "t + x") == 0);
+    free(TeX);
+    expr_free(unpaired);
+}
+
+static void test_to_string_integrals_outside_fractions_TeX(void)
+{
+    static const struct { const char *source; const char *prefix; } cases[] = {
+        {"integral(0,x,exp(cosh(t)),t)/exp(x)", "e^{-x}\\,"},
+        {"-integral(0,x,exp(cosh(t)),t)/exp(x)", "-e^{-x}\\,"},
+        {"integral(0,x,exp(cosh(t)),t)/c", "\\frac{1}{c}\\,"},
+        {"(1+integral(0,x,exp(cosh(t)),t))/c", "\\frac{1}{c}\\,"},
+        {"1/integral(0,x,exp(cosh(t)),t)", "\\left("},
+        {"1/exp(integral(0,x,exp(cosh(t)),t))", "e^{-"},
+        {"integral(0,x,exp(cosh(t)),t)^(-2)", "\\left("},
+        {"integral(0,x,exp(cosh(t)),t)^(-1/2)", "\\left("}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *before = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        char *after = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        ASSERT_TRUE(TeX && strstr(TeX, cases[i].prefix) == TeX);
+        ASSERT_TRUE(strstr(TeX, "\\int") && !strstr(TeX, "\\frac{\\int"));
+        ASSERT_TRUE(!strstr(TeX, "\\frac{1}{\\int") && !strstr(TeX, "\\frac{1}{e^{\\int"));
+        ASSERT_TRUE(before && after && strcmp(before, after) == 0);
+        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
+        free(after);
+        free(TeX);
+        free(before);
+        expr_free(expr);
+    }
+}
+
 void test_to_string_all(void)
 {
+    TEST_RUN_SUBTEST(test_to_string_symmetric_shifts_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_integrals_outside_fractions_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_clausen, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);

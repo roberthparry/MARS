@@ -9,60 +9,42 @@
 
 static const char *solve_status_name(de_solve_status_t status)
 {
-    switch (status) {
-        case DE_SOLVE_STATUS_SOLVED:
-            return "solved";
-        case DE_SOLVE_STATUS_UNSUPPORTED:
-            return "unsupported";
-        case DE_SOLVE_STATUS_INVALID:
-            return "invalid";
-        case DE_SOLVE_STATUS_FAILED:
-            return "failed";
-    }
-    return "invalid";
+    static const char *const names[] = {
+        [DE_SOLVE_STATUS_SOLVED]      = "solved",
+        [DE_SOLVE_STATUS_UNSUPPORTED] = "unsupported",
+        [DE_SOLVE_STATUS_INVALID]     = "invalid",
+        [DE_SOLVE_STATUS_FAILED]      = "failed",
+        [DE_SOLVE_STATUS_SERIES]      = "series",
+    };
+    return (size_t)status < sizeof(names) / sizeof(*names) && names[status] ? names[status] : "invalid";
 }
 
 static const char *solver_name(de_solver_t solver)
 {
-    switch (solver) {
-        case DE_SOLVER_NONE:
-            return "none";
-        case DE_SOLVER_SEPARABLE:
-            return "separable";
-        case DE_SOLVER_LINEAR:
-            return "first-order linear";
-        case DE_SOLVER_BERNOULLI:
-            return "Bernoulli";
-        case DE_SOLVER_HOMOGENEOUS:
-            return "first-order homogeneous";
-        case DE_SOLVER_LINEAR_SUBSTITUTION:
-            return "linear substitution";
-        case DE_SOLVER_LINEAR_TRANSFORMATION:
-            return "linear transformation";
-        case DE_SOLVER_STURM_LIOUVILLE:
-            return "Sturm-Liouville";
-        case DE_SOLVER_POWER_LAW_BESSEL:
-            return "power-law Bessel";
-        case DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR:
-            return "constant-coefficient linear";
-        case DE_SOLVER_DERIVATIVE_QUADRATIC:
-            return "derivative-quadratic";
-        case DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION:
-            return "exact-derivative linearization";
-        case DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT:
-            return "constant-coefficient transport";
-        case DE_SOLVER_CHARACTERISTICS:
-            return "characteristics";
-        case DE_SOLVER_PARAMETER_LINEAR_PDE:
-            return "parameter-dependent linear PDE";
-        case DE_SOLVER_STATIONARY_EIGENFUNCTION:
-            return "stationary eigenfunction";
-        case DE_SOLVER_EXACT_FIRST_ORDER:
-            return "exact first-order";
-        case DE_SOLVER_LAPLACE:
-            return "Laplace";
-    }
-    return "none";
+    static const char *const names[] = {
+        [DE_SOLVER_NONE]                           = "none",
+        [DE_SOLVER_SEPARABLE]                      = "separable",
+        [DE_SOLVER_LINEAR]                         = "first-order linear",
+        [DE_SOLVER_BERNOULLI]                      = "Bernoulli",
+        [DE_SOLVER_HOMOGENEOUS]                    = "first-order homogeneous",
+        [DE_SOLVER_LINEAR_SUBSTITUTION]            = "linear substitution",
+        [DE_SOLVER_LINEAR_TRANSFORMATION]          = "linear transformation",
+        [DE_SOLVER_STURM_LIOUVILLE]                = "Sturm-Liouville",
+        [DE_SOLVER_POWER_LAW_BESSEL]               = "power-law Bessel",
+        [DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR]    = "constant-coefficient linear",
+        [DE_SOLVER_DERIVATIVE_QUADRATIC]           = "derivative-quadratic",
+        [DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION] = "exact-derivative linearization",
+        [DE_SOLVER_CONSTANT_COEFFICIENT_TRANSPORT] = "constant-coefficient transport",
+        [DE_SOLVER_CHARACTERISTICS]                = "characteristics",
+        [DE_SOLVER_PARAMETER_LINEAR_PDE]           = "parameter-dependent linear PDE",
+        [DE_SOLVER_STATIONARY_EIGENFUNCTION]       = "stationary eigenfunction",
+        [DE_SOLVER_EXACT_FIRST_ORDER]              = "exact first-order",
+        [DE_SOLVER_LAPLACE]                        = "Laplace",
+        [DE_SOLVER_TAYLOR_SERIES]                  = "local Taylor series",
+        [DE_SOLVER_KIRCHHOFF]                      = "Kirchhoff spherical means",
+        [DE_SOLVER_DALEMBERT_DUHAMEL]              = "d'Alembert-Duhamel",
+    };
+    return (size_t)solver < sizeof(names) / sizeof(*names) && names[solver] ? names[solver] : "none";
 }
 
 static void print_solution_field(const char *key, const diffequ_solve_result_t *result, style_t style)
@@ -101,17 +83,18 @@ static void print_result_TeX(const char *key, const diffequ_solve_result_t *resu
     printf("%s ", key);
     if (has_problem)
         printf("\\begin{aligned}[t]\n&%s \\\\[1em]\n&", problem_TeX);
-    printf("\\begin{aligned}[t]\n");
+    if (count > 1u)
+        printf("\\begin{aligned}[t]\n");
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
-        char *lhs = solution ? expr_to_TeX_body_wrapped(equ_lhs(solution), line_limit) : NULL;
-        char *rhs = solution ? expr_to_TeX_body_wrapped(equ_rhs(solution), line_limit) : NULL;
+        char *TeX = solution ? equ_to_TeX_body_wrapped(solution, line_limit) : NULL;
 
-        printf("%s &= %s%s\n", lhs ? lhs : "\\text{null}", rhs ? rhs : "\\text{null}", i + 1u < count ? " \\\\" : "");
-        free(rhs);
-        free(lhs);
+        printf("%s%s%s\n", count > 1u ? "&" : "", TeX ? TeX : "\\text{null}",
+               i + 1u < count ? " \\\\" : "");
+        free(TeX);
     }
-    printf("\\end{aligned}\n");
+    if (count > 1u)
+        printf("\\end{aligned}\n");
     if (has_problem)
         printf("\\end{aligned}\n");
 }

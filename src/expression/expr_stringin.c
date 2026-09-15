@@ -70,6 +70,7 @@
 typedef enum {
     EXPR_PARSE_EXPRESSION_SYNTAX,
     EXPR_PARSE_FUNCTION_SYNTAX,
+    EXPR_PARSE_DIFFERENTIAL_SYNTAX,
 } expr_parse_syntax_t;
 
 typedef struct {
@@ -956,7 +957,7 @@ static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
     size_t argument_count = 0u;
     expr_t *result = NULL;
 
-    if (!p || p->syntax != EXPR_PARSE_FUNCTION_SYNTAX)
+    if (!p || (p->syntax != EXPR_PARSE_FUNCTION_SYNTAX && p->syntax != EXPR_PARSE_DIFFERENTIAL_SYNTAX))
         return NULL;
 
     scan = string_cursor_clone(p->cursor);
@@ -964,6 +965,12 @@ static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
         return NULL;
     name = read_name_for_syntax_cursor(scan, p->syntax);
     if (!name) {
+        string_cursor_free(scan);
+        return NULL;
+    }
+    /* A declared scalar remains a multiplier; only otherwise undeclared calls denote symbolic functions. */
+    if (p->syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX && symtab_has_text(p->syms, name)) {
+        string_free(name);
         string_cursor_free(scan);
         return NULL;
     }
@@ -3850,7 +3857,7 @@ static int collect_implicit_symbols(string_view_t text, symtab_t *syms, expr_par
             }
         }
 
-        if (syntax == EXPR_PARSE_FUNCTION_SYNTAX) {
+        if (syntax == EXPR_PARSE_FUNCTION_SYNTAX || syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX) {
             string_cursor_t *scan = string_cursor_clone(cursor);
             string_t *function_name = scan ? read_name_for_syntax_cursor(scan, syntax) : NULL;
 
@@ -3858,7 +3865,8 @@ static int collect_implicit_symbols(string_view_t text, symtab_t *syms, expr_par
                 size_t after_name = string_cursor_position(scan);
 
                 string_cursor_skip_spaces(scan);
-                if (expr_parse_cursor_consume_char(scan, '(')) {
+                if (expr_parse_cursor_consume_char(scan, '(') &&
+                    (syntax == EXPR_PARSE_FUNCTION_SYNTAX || !symtab_has_text(syms, function_name))) {
                     string_cursor_seek(cursor, after_name);
                     string_free(function_name);
                     string_cursor_free(scan);
@@ -4396,6 +4404,12 @@ expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out)
     return expr_from_text_internal(text, bnd_out, NULL, NULL, EXPR_PARSE_EXPRESSION_SYNTAX);
 }
 
+/* Infer differential-equation value bindings without mistaking undeclared function names for scalar parameters. */
+expr_t *expr_from_differential_text_internal(const string_t *text, expr_bindings_t **bindings)
+{
+    return expr_from_text_internal(text, bindings, NULL, NULL, EXPR_PARSE_DIFFERENTIAL_SYNTAX);
+}
+
 /* Parse a Function-style expression body from string text. */
 expr_t *expr_from_function_body_text(const string_t *text, expr_bindings_t **bnd_out)
 {
@@ -4866,7 +4880,9 @@ static expr_t *expr_from_expression_text_mode(const string_t *expr, const string
 
     result =
         parse_expression_view_with_metadata(string_view_all(expr), nsymbols ? &syms : NULL, "expr_from_expression_text",
-                                            1, EXPR_PARSE_EXPRESSION_SYNTAX, preserve_formal_derivatives, NULL, NULL,
+                                            1, preserve_formal_derivatives ? EXPR_PARSE_DIFFERENTIAL_SYNTAX
+                                                                           : EXPR_PARSE_EXPRESSION_SYNTAX,
+                                            preserve_formal_derivatives, NULL, NULL,
                                             NULL);
     symtab_free(&syms);
     result = simplify_parsed_result(result);

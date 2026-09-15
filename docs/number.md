@@ -341,7 +341,7 @@ owning `number_t`.
 | `num_pow_int(x, n)` | Raises `x` to an integer power; negative powers return the reciprocal of the corresponding positive power. |
 | `num_ldexp(x, n)` | Multiplies `x` by the exact binary scale `2^n`. |
 | `num_mul_pow10(x, n)` | Multiplies `x` by the decimal scale `10^n`. |
-| `num_sqr(x)` | Returns `x²`. |
+| `num_sqr(x)` | Returns `x²`, preserving exact integer and rational arithmetic within the precision budget. |
 | `num_abs(x)` | Returns the real magnitude `\|x\|`. |
 | `num_conj(x)` | Returns the complex conjugate; real inputs are unchanged. |
 | `num_real_part(x)` | Extracts the real component. |

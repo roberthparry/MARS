@@ -296,6 +296,37 @@ static void test_from_string_function_hash(void)
     expr_free(unset_zetap);
 }
 
+static void test_differential_symbolic_call_syntax(void)
+{
+    string_t *source = string_new_with("{ f(x,t) + g(x) | x = ?, t = ?; }");
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_differential_text_internal(source, &bindings);
+    ASSERT_TRUE(expr && bindings);
+    ASSERT_TRUE(expr_bindings_get(bindings, "x") && expr_bindings_get(bindings, "t"));
+    ASSERT_TRUE(!expr_bindings_get(bindings, "f") && !expr_bindings_get(bindings, "g"));
+    char *body = expr_to_function_body(expr);
+    ASSERT_TRUE(body && strstr(body, "f(x, t)") && strstr(body, "g(x)"));
+    free(body);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+    string_free(source);
+
+    source = string_new_with("{ g(x) | x = 3; g = 2 }");
+    expr = expr_from_differential_text_internal(source, NULL);
+    ASSERT_TRUE(expr && !expr_is_arbitrary_function(expr));
+    number_t value = expr_eval(expr), six = num_create_from_long(6L);
+    ASSERT_TRUE(num_eq(value, six));
+    num_destroy(&six);
+    num_destroy(&value);
+    expr_free(expr);
+    string_free(source);
+
+    /* Ordinary Expression mode keeps its existing implicit multiplication, unlike Function mode. */
+    expr = expr_from_string("g(x)", NULL);
+    ASSERT_TRUE(expr && !expr_is_arbitrary_function(expr));
+    expr_free(expr);
+}
+
 static void test_from_function_body_syntax(void)
 {
     /* Function syntax distinguishes calls from explicit multiplication. */
@@ -4206,4 +4237,5 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);
     TEST_RUN_SUBTEST(test_from_function_body_syntax, NULL);
+    TEST_RUN_SUBTEST(test_differential_symbolic_call_syntax, NULL);
 }

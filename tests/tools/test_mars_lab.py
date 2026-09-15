@@ -19,6 +19,59 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_result_expansion_targets_each_clicked_card_and_resets(self) -> None:
+        html = mars_lab.INDEX_HTML
+        self.assertIn(
+            "#resultPane.card-expanded > .result-card:not(.expanded-card) {\n"
+            "      display: none !important;\n"
+            "    }", html,
+        )
+        names = ("collapseResultCards", "toggleResultCardExpansion")
+        functions = "\n".join(
+            "function " + name + "(" + html.split("    function " + name + "(", 1)[1]
+            .split("\n    function ", 1)[0] for name in names
+        )
+        script = functions + r'''
+            function check(value) { if (!value) throw new Error('Wrong expansion state'); }
+            function classes() {
+                const names = new Set();
+                return {add: name => names.add(name), remove: name => names.delete(name),
+                        contains: name => names.has(name)};
+            }
+            const labWorkspace = {classList: classes()};
+            const resultPane = {classList: classes()};
+            const cards = Array.from({length: 4}, () => ({classList: classes()}));
+            const expandCardButtons = cards.map(card => ({
+                closest: () => card, textContent: 'Expand',
+                setAttribute(name, value) { this[name] = value; }
+            }));
+            const document = {querySelectorAll: () => cards.filter(card => card.classList.contains('expanded-card'))};
+            const requestAnimationFrame = callback => callback();
+            let zoomed = null;
+            const applyResultZoom = card => { zoomed = card; };
+            for (let i = 0; i < cards.length; ++i) {
+                toggleResultCardExpansion(expandCardButtons[i]);
+                check(cards.every((card, j) => card.classList.contains('expanded-card') === (i === j)));
+                check(expandCardButtons[i].textContent === 'Collapse');
+                check(expandCardButtons[i]['aria-expanded'] === 'true');
+                check(zoomed === cards[i]);
+                check(labWorkspace.classList.contains('result-card-expanded'));
+                check(resultPane.classList.contains('card-expanded'));
+            }
+            toggleResultCardExpansion(expandCardButtons[3]);
+            check(cards.every(card => !card.classList.contains('expanded-card')));
+            check(expandCardButtons.every(button => button.textContent === 'Expand' && button['aria-expanded'] === 'false'));
+            check(!labWorkspace.classList.contains('result-card-expanded'));
+            check(!resultPane.classList.contains('card-expanded'));
+            toggleResultCardExpansion(expandCardButtons[0]);
+            collapseResultCards();
+            check(cards.every(card => !card.classList.contains('expanded-card')));
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_binding_envelopes_are_idempotent_and_recover_nested_copies(self) -> None:
         names = (
             "lastIndexOfTopLevel", "indexOfTopLevel", "bindingParts", "expressionForEditor",
@@ -170,7 +223,8 @@ class MobileAccessTests(unittest.TestCase):
             mars_lab.INDEX_HTML,
         )
         self.assertIn("valueCard.toggleAttribute('hidden', !visible);", mars_lab.INDEX_HTML)
-        self.assertIn("valueCard.style.setProperty('display', 'block', 'important');", mars_lab.INDEX_HTML)
+        self.assertIn("valueCard.style.removeProperty('display');", mars_lab.INDEX_HTML)
+        self.assertNotIn("valueCard.style.setProperty('display', 'block', 'important');", mars_lab.INDEX_HTML)
         self.assertLess(
             mars_lab.INDEX_HTML.index('id="functionCard"'),
             mars_lab.INDEX_HTML.index('id="valueCard"'),
@@ -289,6 +343,8 @@ class EquationResultTests(unittest.TestCase):
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["status"], "solved", raw)
         payload = mars_lab.prepare_equation_fields(fields, 78)
+        self.assertIn("output(solve(equ(s))).", fields["function"])
+        self.assertIn("output(solve(equ(s))).", payload["function"])
         self.assertEqual(payload["solution_count"], 40)
         self.assertIn("14.134725141734693790", payload["solutions"])
         pairs = payload["display_solutions"].splitlines()
@@ -694,12 +750,12 @@ class EquationResultTests(unittest.TestCase):
         self.assertIn("localEquationUpdatedAt > serverEquationUpdatedAt", mars_lab.INDEX_HTML)
 
     def test_function_card_replaces_backtick_binding_hint(self) -> None:
-        function = "equation equ(x) {\n    return equation(x = 1).\n}\n\n`` x = ?\noutput(equ(x).solve())."
+        function = "equation equ(x) {\n    return equation(x = 1).\n}\n\n`` x = ?\noutput(solve(equ(x)))."
         bindings = [{"name": "x", "kind": "variable", "value": "3"}]
 
         self.assertEqual(
             mars_lab.function_for_result_card(function, bindings),
-            "equation equ(x) {\n    return equation(x = 1).\n}\n\nx = 3.\noutput(equ(x).solve()).",
+            "equation equ(x) {\n    return equation(x = 1).\n}\n\nx = 3.\noutput(solve(equ(x))).",
         )
 
     def test_function_card_uses_typeable_infinity_for_constant_binding(self) -> None:
@@ -2010,7 +2066,7 @@ class MatrixResultTests(unittest.TestCase):
 
         self.assertEqual(inverse_returncode, 0, inverse_raw)
         self.assertEqual(inverse_fields["operation"], "inverse")
-        self.assertEqual(inverse_fields["result"], "(d/(ad - bc), -b/(ad - bc); -c/(ad - bc), a/(ad - bc))")
+        self.assertEqual(inverse_fields["result"], "1/(ad - bc).(d, -b; -c, a)")
         self.assertEqual(product_returncode, 0, product_raw)
         self.assertEqual(product_fields["operation"], "multiply")
         self.assertEqual(product_fields["result"], "(ae + bg, af + bh; ce + dg, cf + dh)")
@@ -2042,7 +2098,7 @@ class MatrixResultTests(unittest.TestCase):
         self.assertEqual(fields["operation"], "multiply")
         self.assertEqual(fields["rows"], "2")
         self.assertEqual(fields["cols"], "1")
-        self.assertEqual(fields["result"], "(1/(ad - bc)·(dx - by); 1/(ad - bc)·(ay - cx))")
+        self.assertEqual(fields["result"], "1/(ad - bc).(dx - by; ay - cx)")
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -2336,6 +2392,61 @@ class DiffequationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_abs_pde_elementary_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2abs(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solutions"], "z = F(y - 3x) + G(y - 2x) + ⅙·(x - y)²·|x - y|")
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+            self.assertNotIn(r"\int", fields[solution_key])
+            self.assertIn(r"\left|", fields[solution_key])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_acos_pde_elementary_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2acos(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(
+            payload["solutions"],
+            "z = F(y - 3x) + G(y - 2x) - ½·asin(x - y) + "
+            "¼·acos(x - y)·(2·(x - y)² - 1) - ¾·(x - y)·√(1 - (x - y)²)",
+        )
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+            self.assertNotIn(r"\int", fields[solution_key])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_atanh_pde_elementary_solution_and_TeX(self) -> None:
         completed = subprocess.run(
             [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2atanh(x-y)"],
@@ -2391,6 +2502,204 @@ class DiffequationResultTests(unittest.TestCase):
         steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
         self.assertIsNone(steps_error)
         self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_compact_pde_parameters_keep_all_derivative_terms(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_y + au_xx + bu_yy = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        expected = (r"\frac{\partial u}{\partial y} + a\mkern-2mu \frac{\partial^{2} u}{\partial x^{2}} + "
+                    r"b\mkern-2mu \frac{\partial^{2} u}{\partial y^{2}} = 0")
+        self.assertEqual(fields["problem_TeX"], expected)
+        self.assertEqual(payload["display_TeX"], expected)
+        self.assertIn("a*∂²u/∂x²", payload["problem"])
+        self.assertIn("b*∂²u/∂y²", payload["problem"])
+        self.assertEqual(payload["status"], "unsupported")
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_integral_solution_uses_negative_exponential_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "Dx(y) + y = exp(cosh(x)); y(0) = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        for key in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX", "steps_TeX"):
+            self.assertIn(r"e^{-x}\,\int^{x} e^{\cosh(t) + t}", fields[key])
+            self.assertNotIn(r"\frac{\int", fields[key])
+        self.assertEqual(payload["solutions_TeX"], fields["solutions_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_wave_ivp_dalembert_duhamel_and_TeX(self) -> None:
+        sources = (
+            "u_tt - 4u_xx = x*t; u(x,0) = x^2; u_t(x,0) = 1",
+            "u_tt - u_xx = exp(cosh(x)+t^2); u(x,0) = sin(x); u_t(x,0) = exp(cosh(x))",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                completed = subprocess.run(
+                    [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+                    check=True, capture_output=True, text=True, timeout=10,
+                )
+                fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+                payload = mars_lab.prepare_diffequation_fields(fields)
+                self.assertEqual(payload["status"], "solved")
+                self.assertEqual(payload["solver"], "d'Alembert-Duhamel")
+                self.assertIn("characteristic triangle", fields["steps"])
+                self.assertEqual(payload["solutions_TeX"], fields["solutions_TeX"])
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+                for key in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+                    self.assertNotIn(r"\frac{\int", fields[key])
+                    self.assertNotIn("NAN", fields[key])
+                if "cosh" in source:
+                    self.assertIn(r"\int_{0}^{t}", fields["solutions_TeX"])
+                    self.assertNotIn(r"\\", fields["solutions_TeX"])
+                    self.assertEqual(fields["solutions_TeX"].count(r"\int"), 3)
+                else:
+                    self.assertEqual(payload["solutions"], "u = ⅙·(t³x + 24t² + 6t + 6x²)")
+                    self.assertNotIn(r"\int", fields["solutions_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_wave_ivp_symbolic_function_input(self) -> None:
+        source = "u_tt - c^2u_xx = f(x,t); u(x, 0) = g(x); u_t(x,0) = h(x)"
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "d'Alembert-Duhamel")
+        self.assertIn(r"f\left(x, t\right)", fields["problem_TeX"])
+        for key in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            self.assertIn(r"f\left(\xi, s\right)", fields[key])
+            self.assertIn(r"h\left(\xi\right)", fields[key])
+            self.assertIn(r"g\left(x + c\mkern-2mu t\right)", fields[key])
+            self.assertIn(r"^{x + c\mkern-2mu t}", fields[key])
+            self.assertNotIn(r"c\mkern-2mu t + x", fields[key])
+            self.assertEqual(fields[key].count(r"\int"), 3)
+            self.assertNotIn(r"\frac{\int", fields[key])
+            self.assertNotIn("NAN", fields[key])
+            self.assertEqual(payload[key], fields[key])
+        self.assertNotIn(r"\\", fields["solutions_TeX"])
+        self.assertNotIn(r"\\", fields["solutions_wrapped_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_wave_kirchhoff_general_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "psi_xx + psi_yy + psi_zz = 1/v^2psi_tt"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "Kirchhoff spherical means")
+        self.assertIn(r"\frac{1}{v^{2}}\,\frac{\partial^{2} \psi}{\partial t^{2}}", fields["problem_TeX"])
+        self.assertNotIn(r"\frac{\frac{\partial", fields["problem_TeX"])
+        self.assertIn("F(", payload["solutions"])
+        self.assertIn("G(", payload["solutions"])
+        self.assertIn("M_(c*t)", payload["solutions"])
+        self.assertIn("sphere centred at r, radius |a|", payload["solutions"])
+        self.assertNotIn("∫", payload["solutions"])
+        self.assertNotIn("sin(", payload["solutions"])
+        self.assertLess(len(payload["solutions"]), 400)
+        for key in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            self.assertIn(r"\mathcal M_", fields[key])
+            self.assertIn(r"\mathcal M_{c\,t}", fields[key])
+            self.assertIn(r"v\in\mathbb R,\quad v\ne0", fields[key])
+            self.assertIn(r"c=\left|v\right|", fields[key])
+            self.assertNotIn(r"\sqrt", fields[key])
+            self.assertNotIn("v>0", fields[key])
+            self.assertNotIn(r"\int", fields[key])
+            self.assertIn("arbitrary smooth spatial functions", fields[key])
+            self.assertNotIn("NAN", fields[key])
+            self.assertEqual(payload[key], fields[key])
+        self.assertIn("Time coordinate: t; spatial coordinates: (x, y, z)", fields["steps"])
+        self.assertIn("exact integral representation", fields["steps"])
+        self.assertIn("c = |v|", payload["solutions"])
+        self.assertIn("v is real and non-zero (either sign)", payload["solutions"])
+        self.assertIn(r"\int_{|\boldsymbol\omega|=1}", fields["steps_TeX"])
+        self.assertIn("no initial data imposed", fields["steps_TeX"])
+        self.assertIn(r"\psi(\mathbf r,0)=F(\mathbf r)", fields["steps_TeX"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_radial_euler_pde_and_compact_equation_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "x^2z_xx + 2xyz_yx + y^2z_yy = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "z = F(y/x) + x·G(y/x)")
+        self.assertNotIn(r"\\", fields["problem_TeX"])
+        self.assertNotIn(r"\begin{aligned}", fields["problem_TeX"])
+        self.assertTrue(fields["problem_TeX"].endswith(" = 0"))
+        self.assertEqual(fields["problem_TeX"].count(r"\frac{\partial^{2} z}"), 3)
+        self.assertEqual(payload["display_TeX"], fields["display_TeX"])
+        self.assertLess(fields["display_TeX"].index(fields["problem_TeX"]),
+                        fields["display_TeX"].index(fields["solutions_TeX"]))
+        self.assertIn("radial scaling", fields["steps"])
+        self.assertIn("x>0", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_polynomial_pde_with_factored_forcing(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "z_xx - 4z_yx + 4z_yy = 48(x^2+y^2)"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solutions"], "z = F(2x + y) + x·G(2x + y) + 4x⁴ + y⁴")
+        self.assertIn("Particular solution: u_p = 4x⁴ + y⁴", fields["steps"])
+        self.assertEqual(payload["display_TeX"], fields["display_TeX"])
+        self.assertLess(fields["display_TeX"].index(fields["problem_TeX"]),
+                        fields["display_TeX"].index(fields["solutions_TeX"]))
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
@@ -2622,7 +2931,7 @@ class DiffequationResultTests(unittest.TestCase):
         )
         self.assertEqual(renamed_fields["status"], "solved")
         self.assertIn(
-            r"u &= F\left(i\mkern-2mu t + s\right) + G\left(s - i\mkern-2mu t\right)",
+            r"u &= F\left(s + i\mkern-2mu t\right) + G\left(s - i\mkern-2mu t\right)",
             renamed_fields["solutions_TeX"],
         )
         self.assertIn(
@@ -2808,7 +3117,11 @@ class DiffequationResultTests(unittest.TestCase):
             r"\left(C_{3} + C_{4}\mkern-2mu t\right)\mkern-2mu e^{-\omega\mkern-2mu t}",
             solution_TeX,
         )
-        self.assertGreater(wrapped_TeX.count(r"\begin{aligned}[t]"), 1)
+        # The native equation renderer aligns continuation lines directly, without a nested RHS wrapper.
+        self.assertEqual(wrapped_TeX.count(r"\begin{aligned}[t]"), 1)
+        self.assertNotIn(r"\\", solution_TeX)
+        self.assertIn(r"\\", wrapped_TeX)
+        self.assertIn("&{} +", wrapped_TeX)
 
         payload = mars_lab.prepare_diffequation_fields(fields)
         self.assertTrue(payload.get("svg"))
@@ -3170,7 +3483,7 @@ solutions y = final
         self.assertEqual(payload["solver"], "linear transformation")
         self.assertEqual(
             payload["solutions"],
-            "y = 1/(x² + C₁x + C₂)·(2x + C₁)",
+            "y = (2x + C₁)/(x² + C₁x + C₂)",
         )
         self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
         self.assertIn("X = x − 1/y", payload["steps"])
@@ -3191,21 +3504,63 @@ solutions y = final
             check=True,
             capture_output=True,
             text=True,
+            timeout=10,
         )
 
         fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
         payload = mars_lab.prepare_diffequation_fields(fields)
 
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["status"], "series")
+        self.assertEqual(payload["solutions"], fields["solutions"].strip())
+        self.assertLess(len(payload["solutions"]), 1500)
+        self.assertTrue(payload["solutions"].startswith("y = C₁ + C₂x"))
+        self.assertIn("O(x⁷)", payload["solutions"])
+        self.assertNotRegex(payload["solutions"], r"\d+\.\d+")
+        for fraction in ("³⁄₂", "⁹⁹⁄₄₀", "⁵¹⁄₄₀", "¹¹⁷⁄₄₀", "²⁷³⁄₈₀"):
+            self.assertIn(fraction, payload["solutions"])
         for key in ("display_TeX", "display_wrapped_TeX"):
-            self.assertEqual(fields[key], fields["problem_TeX"])
+            self.assertIn(fields["problem_TeX"], fields[key])
+            self.assertIn("O", fields[key])
             self.assertEqual(payload[key], fields[key])
-        self.assertEqual(payload["solver"], "none")
-        self.assertEqual(
-            payload["diagnostic"],
-            "not point-linearizable: the Lie–Tressé invariant "
-            "36y(1 − 2y) is not identically zero",
+            self.assertNotRegex(payload[key], r"\d+\.\d+")
+        self.assertEqual(payload["solver"], "local Taylor series")
+        self.assertIn("not a closed form", payload["diagnostic"])
+        self.assertIn("Computed Lie–Tressé invariants", payload["steps"])
+        self.assertIn("I1 = 0", payload["steps"])
+        self.assertIn("I2 = 36", payload["steps"])
+        self.assertIn("total degree <= 2): 1 verified", payload["steps"])
+        self.assertIn("local order reduction", payload["steps"])
+        self.assertIn("Local Taylor series", payload["steps_TeX"])
+        for phrase in ("total differentiation along", "chain rule", "other coordinates fixed",
+                       "divided by factorials", "matching powers", "omitted higher powers"):
+            self.assertIn(phrase, payload["steps"])
+            self.assertIn(phrase, payload["steps_TeX"])
+        self.assertIn("p=y'", payload["steps_TeX"])
+        self.assertIn("y'''=Df", payload["steps_TeX"])
+        if shutil.which("latex") and shutil.which("dvisvgm"):
+            svg, error = mars_lab.render_TeX_to_svg(payload["steps_TeX"])
+            self.assertIsNone(error)
+            self.assertIn("<svg", svg)
+        for key in ("steps", "steps_TeX"):
+            self.assertEqual(payload[key], fields[key].strip())
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_series_with_initial_data_has_ascending_powers(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "y'' + 3*y*y' + y^4 = 0; y(0)=1; y'(0)=0"],
+            check=True, capture_output=True, text=True, timeout=10,
         )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["solutions"], "y = 1 - ½x² + ½x³ - ⁵⁄₂₄x⁴ - ¹⁄₂₀x⁵ + ²³⁄₁₈₀x⁶ + O(x⁷)")
+        for key in ("solutions_TeX", "solutions_wrapped_TeX"):
+            text = fields[key]
+            positions = [text.index("x^{" + str(degree) + "}") for degree in range(2, 8)]
+            self.assertEqual(positions, sorted(positions))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
@@ -3229,13 +3584,13 @@ solutions y = final
         self.assertEqual(payload["symmetry"], "SL(3, ℝ)")
         self.assertIn("X = x − 1/(2y)", payload["steps"])
         self.assertIn("Y = x/(2y) − x²/2", payload["steps"])
-        self.assertIn(r"\text{Recognise the rule:}", payload["steps_TeX"])
+        self.assertIn(r"\text{Modified Emden linearisation}", payload["steps_TeX"])
         self.assertIn(r"\frac{d^2Y}{dX^2}=0", payload["steps_TeX"])
         self.assertNotIn(r"\middle|", payload["steps_TeX"])
         self.assertNotIn("NAN", payload["steps_TeX"])
         self.assertEqual(
             payload["solutions"],
-            "y = 1/(2·(x² + C₁x + C₂))·(2x + C₁)",
+            "y = (2x + C₁)/(2·(x² + C₁x + C₂))",
         )
 
     @unittest.skipUnless(
@@ -4304,7 +4659,8 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(returncode, 0, raw)
         self.assertIn("π +", fields["unbound"])
-        self.assertIn("digamma(n/2 + 5/4) - digamma(n/2 + 3/4)", fields["function"])
+        self.assertIn("const c1 = n/2.", fields["function"])
+        self.assertIn("digamma(c1 + 5/4) - digamma(c1 + 3/4)", fields["function"])
         self.assertIn(r"\sum_{k=0}^{n}", fields["derivation_TeX"])
         self.assertIn(r"\psi^{(0)}(\frac{n}{2} + \frac{5}{4})", fields["derivation_TeX"])
 
@@ -4753,8 +5109,18 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("const integralWrappedSvg = data.integral_wrapped_svg", html)
         self.assertIn("/integral\\s+result$/i.test", html)
         self.assertIn("vertically-wrapped-tex", html)
-        self.assertIn("overflow-x: hidden", html)
-        self.assertIn("overflow-y: auto", html)
+        rendered_style = html.split("    .rendered {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow: auto;", rendered_style)
+        self.assertIn("min-width: 0;", rendered_style)
+        self.assertNotIn(".rendered.vertically-wrapped-tex {", html)
+
+    def test_solver_TeX_allows_horizontal_scrolling(self) -> None:
+        html = mars_lab.INDEX_HTML
+        solver_style = html.split("    #functionStyle.equation-function {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow-x: auto;", solver_style)
+        self.assertIn("overflow-y: auto;", solver_style)
+        expanded_style = html.split("    .card.expanded-card > .rendered {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("overflow", expanded_style)
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -8714,9 +9080,9 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertTrue(matrix["result"].startswith("(-0.315002573091184"))
 
         symbolic_matrix_examples = (
-            ("inverse(a b; c d)", "(d/(ad - bc), -b/(ad - bc); -c/(ad - bc), a/(ad - bc))"),
+            ("inverse(a b; c d)", "1/(ad - bc).(d, -b; -c, a)"),
             ("(a b; c d).(e f; g h)", "(ae + bg, af + bh; ce + dg, cf + dh)"),
-            ("inverse(a b; c d).(x; y)", "(1/(ad - bc)·(dx - by); 1/(ad - bc)·(ay - cx))"),
+            ("inverse(a b; c d).(x; y)", "1/(ad - bc).(dx - by; ay - cx)"),
             ("Dx(ax+b cx+d; y xy)", "(a, c; 0, y)"),
             ("Dxx(x^3 xy; y^2 x^2y)", "(6x, 0; 0, 2y)"),
             ("Dxy(x^2y x*y^2; y^3 x^3y)", "(2x, 2y; 0, 3x²)"),

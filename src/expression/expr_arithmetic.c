@@ -448,6 +448,14 @@ static expr_t *deriv_formal_derivative(expr_t *dv)
     if (!wrt)
         return NULL;
 
+    /* An explicitly parameterised unknown function is constant in coordinates absent from its arguments. */
+    if (dv->a && dv->a->ops == &ops_arbitrary_function) {
+        expr_t *variable = (expr_t *)wrt;
+        bool used = false;
+        if (expr_collect_var_usage(dv->a->a, 1u, &variable, &used) && !used)
+            return expr_const_zero();
+    }
+
     wrts = calloc(dv->formal_wrt_count + 1u, sizeof(*wrts));
     if (!wrts)
         return NULL;
@@ -470,6 +478,14 @@ static expr_t *deriv_arbitrary_function(expr_t *dv)
 
     if (!dv || !dv->name || !dv->a)
         return NULL;
+    if (dv->a->ops == &ops_argument_list) {
+        expr_t *wrt = (expr_t *)expr_current_wrt_internal();
+        bool used = false;
+        if (!wrt || !expr_collect_var_usage(dv->a, 1u, &wrt, &used))
+            return NULL;
+        /* Preserve a coordinate derivative of the whole composition, rather than differentiating a tuple. */
+        return used ? expr_new_formal_derivative(dv, 1u, &wrt) : expr_const_zero();
+    }
     if (strcmp(dv->name, "Si") == 0 || strcmp(dv->name, "Ci") == 0) {
         expr_t *numerator = strcmp(dv->name, "Si") == 0 ? expr_sin(dv->a) : expr_cos(dv->a);
         expr_t *ratio = numerator ? expr_div(numerator, dv->a) : NULL;

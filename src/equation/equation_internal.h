@@ -20,6 +20,8 @@ equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, ex
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 const string_t *equ_lhs_display_TeX(const equation_t *equation);
 const string_t *equ_rhs_display_TeX(const equation_t *equation);
+const string_t *equ_lhs_display_unbound(const equation_t *equation);
+const string_t *equ_rhs_display_unbound(const equation_t *equation);
 void equ_set_power_series_domain(equation_t *equation, bool power_series);
 
 bool equ_match_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *linear_out,
@@ -35,6 +37,8 @@ bool equ_match_symbolic_quartic_expr(const expr_t *expr, const expr_t *wrt, expr
 
 bool equ_match_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
                                          size_t *degree_out);
+bool equ_collect_symbolic_polynomial_alloc(const expr_t *expr, const expr_t *wrt, expr_t ***coefficients_out,
+                                           size_t *degree_out);
 
 bool equ_match_polynomial_expr(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *coeffs_out);
 

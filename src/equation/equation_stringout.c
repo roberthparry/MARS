@@ -387,8 +387,10 @@ cleanup:
 
 static string_t *equ_to_text_unbound(const equation_t *equation)
 {
-    string_t *lhs = expr_to_text(equ_lhs(equation), style_UNBOUND);
-    string_t *rhs = expr_to_text(equ_rhs(equation), style_UNBOUND);
+    const string_t *lhs_display = equ_lhs_display_unbound(equation);
+    const string_t *rhs_display = equ_rhs_display_unbound(equation);
+    string_t *lhs = lhs_display ? string_clone(lhs_display) : expr_to_text(equ_lhs(equation), style_UNBOUND);
+    string_t *rhs = rhs_display ? string_clone(rhs_display) : expr_to_text(equ_rhs(equation), style_UNBOUND);
     string_t *out = NULL;
 
     if (!lhs || !rhs)
@@ -520,9 +522,9 @@ static string_t *equ_to_text_function(const equation_t *equation)
     sbuf_puts(&buffer, "}\n\n");
 
     equ_emit_unknown_variable_hint(&buffer, &variables);
-    sbuf_puts(&buffer, "output(equ(");
+    sbuf_puts(&buffer, "output(solve(equ(");
     equ_emit_function_argument_list(&buffer, &variables, &constants);
-    sbuf_puts(&buffer, ").solve()).");
+    sbuf_puts(&buffer, "))).");
 
     out = sbuf_to_string(&buffer);
     sbuf_free(&buffer);

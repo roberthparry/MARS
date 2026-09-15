@@ -224,7 +224,7 @@ static int equ_build_symbol_arrays(expr_bindings_t *bindings, const string_t ***
 }
 
 static expr_t *equ_parse_side(string_view_t side, const string_t *const *names, expr_t *const *symbols,
-                              size_t symbol_count)
+                              size_t symbol_count, bool differential)
 {
     string_t *side_text = string_from_view(&side);
     expr_t *expr;
@@ -232,12 +232,13 @@ static expr_t *equ_parse_side(string_view_t side, const string_t *const *names, 
     if (!side_text)
         return NULL;
 
-    expr = expr_from_expression_text(side_text, names, symbols, symbol_count);
+    expr = differential ? expr_from_expression_text_formal(side_text, names, symbols, symbol_count)
+                        : expr_from_expression_text(side_text, names, symbols, symbol_count);
     string_free(side_text);
     return expr;
 }
 
-equation_t *equ_from_text(const string_t *text)
+static equation_t *equ_from_text_mode(const string_t *text, bool differential)
 {
     equation_parse_parts_t parts;
     string_t *expanded_lhs = NULL;
@@ -270,7 +271,7 @@ equation_t *equ_from_text(const string_t *text)
     if (!probe)
         goto cleanup;
 
-    probe_expr = expr_from_text(probe, &bindings);
+    probe_expr = differential ? expr_from_differential_text_internal(probe, &bindings) : expr_from_text(probe, &bindings);
     string_free(probe);
     if (!probe_expr)
         goto cleanup;
@@ -285,8 +286,8 @@ equation_t *equ_from_text(const string_t *text)
     if (equ_build_symbol_arrays(bindings, &names, &symbols, &symbol_count) != 0)
         goto cleanup;
 
-    lhs = equ_parse_side(parts.lhs, names, symbols, symbol_count);
-    rhs = equ_parse_side(parts.rhs, names, symbols, symbol_count);
+    lhs = equ_parse_side(parts.lhs, names, symbols, symbol_count, differential);
+    rhs = equ_parse_side(parts.rhs, names, symbols, symbol_count, differential);
     if (!lhs || !rhs)
         goto cleanup;
 
@@ -313,6 +314,18 @@ cleanup:
     string_free(expanded_rhs);
     string_free(expanded_lhs);
     return equation;
+}
+
+/* Parse an equation using the ordinary expression grammar. */
+equation_t *equ_from_text(const string_t *text)
+{
+    return equ_from_text_mode(text, false);
+}
+
+/* Differential-equation probes retain symbolic calls while inferring their argument bindings. */
+equation_t *equ_from_differential_text_internal(const string_t *text)
+{
+    return equ_from_text_mode(text, true);
 }
 
 equation_t *equ_from_string(const char *s)

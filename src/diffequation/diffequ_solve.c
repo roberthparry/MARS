@@ -7,6 +7,8 @@
 #include "diffequ_solve_internal.h"
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 expr_t *de_simplify_unary_owned(expr_t *owned, expr_t *(*operation)(const expr_t *))
 {
@@ -165,7 +167,7 @@ bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coef
     return false;
 }
 
-static bool de_find_derivatives(const expr_t *expr, const expr_t *independent, const expr_t **dependent_out,
+bool de_find_derivatives(const expr_t *expr, const expr_t *independent, const expr_t **dependent_out,
                                 const expr_t **first_out, const expr_t **second_out, size_t *highest_order_out)
 {
     const expr_t *left = NULL;
@@ -319,32 +321,29 @@ static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dep
         x && y && a && x_TeX && y_TeX && a_TeX && ay && au && ay_den && au_den && ay_TeX && au_TeX && steps &&
         steps_TeX &&
         string_append_format(steps,
-                             "Recognise the modified-Emden rule\n"
-                             "      %s″ + 3(%s)%s%s′ + (%s)²%s³ = 0\n"
-                             "Set %s = u′/%s. Then\n"
-                             "      %s″ + 3(%s)%s%s′ + (%s)²%s³ = "
-                             "u‴/%s\n"
-                             "so u‴ = 0 and u is quadratic.\n"
+                             "Modified Emden linearisation\n"
+                             "Set %s = (1/%s)u′, with u non-zero. Then\n"
+                             "      (1/%s)u‴ = 0, hence u‴ = 0.\n"
+                             "Thus u = A%s² + B%s + C; a common non-zero factor cancels from %s.\n"
                              "Equivalently, the point transformation is\n"
                              "      X = %s − 1/%s\n"
                              "      Y = %s/%s − %s²/2\n"
                              "and d²Y/dX² = 0.",
-                             y, a, y, y, a, y, y, au_den, y, a, y, y, a, y, au_den, x, ay_den, x, ay_den, x) >= 0 &&
+                             y, au_den, au_den, x, x, y,
+                             x, ay_den, x, ay_den, x) >= 0 &&
         string_append_format(steps_TeX,
                              "\\begin{aligned}[t]"
-                             "\\text{Recognise the rule:}\\quad&%s''+3(%s)%s%s'"
-                             "+(%s)^2%s^3=0\\\\"
-                             "\\text{Set}\\quad&%s=\\frac{u'}{%s}\\\\"
-                             "&%s''+3(%s)%s%s'+(%s)^2%s^3="
-                             "\\frac{u'''}{%s}\\\\"
-                             "&u'''=0\\\\"
+                             "&\\text{Modified Emden linearisation}\\\\"
+                             "\\text{Set}\\quad&%s=\\frac{1}{%s}u',\\qquad u\\ne0\\\\"
+                             "&\\frac{1}{%s}u'''=0\\quad\\Longrightarrow\\quad u'''=0\\\\"
+                             "&u=A%s^2+B%s+C\\\\"
                              "\\text{Point transformation:}\\quad&"
                              "X=%s-\\frac{1}{%s}\\\\"
                              "&Y=\\frac{%s}{%s}-\\frac{%s^2}{2}\\\\"
                              "&\\frac{d^2Y}{dX^2}=0"
                              "\\end{aligned}",
-                             y_TeX, a_TeX, y_TeX, y_TeX, a_TeX, y_TeX, y_TeX, au_TeX, y_TeX, a_TeX, y_TeX, y_TeX, a_TeX,
-                             y_TeX, au_TeX, x_TeX, ay_TeX, x_TeX, ay_TeX, x_TeX) >= 0;
+                             y_TeX, au_TeX,
+                             au_TeX, x_TeX, x_TeX, x_TeX, ay_TeX, x_TeX, ay_TeX, x_TeX) >= 0;
 
     if (success) {
         *steps_out = strdup(string_c_str(steps));
@@ -374,44 +373,6 @@ static bool de_modified_emden_steps(const expr_t *independent, const expr_t *dep
     return success;
 }
 
-static bool de_matches_modified_emden_power(const expr_t *dependent, const expr_t *first_derivative,
-                                            const expr_t *second_derivative, const expr_t *residual, long power)
-{
-    expr_t *leading = NULL;
-    expr_t *remainder = NULL;
-    expr_t *three = NULL;
-    expr_t *three_y = NULL;
-    expr_t *three_y_y_prime = NULL;
-    expr_t *y_power = NULL;
-    expr_t *expected_remainder = NULL;
-    expr_t *scaled_expected = NULL;
-    bool matches = false;
-
-    if (!dependent || !first_derivative || !second_derivative || !residual ||
-        !de_linear_decompose(residual, second_derivative, &leading, &remainder))
-        goto cleanup;
-
-    three = expr_const_long(3L);
-    three_y = three ? expr_mul(three, dependent) : NULL;
-    three_y_y_prime = three_y ? expr_mul(three_y, first_derivative) : NULL;
-    y_power = expr_pow_long(dependent, power);
-    expected_remainder = three_y_y_prime && y_power ? expr_add(three_y_y_prime, y_power) : NULL;
-    scaled_expected = leading && expected_remainder
-                          ? expr_mul_simplify_owned(expr_clone(leading), expr_clone(expected_remainder))
-                          : NULL;
-    matches = scaled_expected && expr_struct_eq(remainder, scaled_expected);
-
-cleanup:
-    expr_free(scaled_expected);
-    expr_free(expected_remainder);
-    expr_free(y_power);
-    expr_free(three_y_y_prime);
-    expr_free(three_y);
-    expr_free(three);
-    expr_free(remainder);
-    expr_free(leading);
-    return matches;
-}
 
 /*
  * The modified Emden equation
@@ -501,6 +462,18 @@ static de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de,
     right = numerator && solution_denominator ? expr_div(numerator, solution_denominator) : NULL;
     solutions_out[0] = right ? equ_new(dependent, right) : NULL;
     if (solutions_out[0]) {
+        /* Preserve the quotient presentation even when simplification stores a reciprocal product. */
+        char *numerator_text = expr_to_string(numerator, style_UNBOUND);
+        char *denominator_text = expr_to_string(solution_denominator, style_UNBOUND);
+        string_t *quotient = string_new();
+        bool displayed = numerator_text && denominator_text && quotient &&
+                         string_append_format(quotient, "(%s)/(%s)", numerator_text, denominator_text) >= 0 &&
+                         equ_set_display_unbound(solutions_out[0], NULL, quotient) == 0;
+        string_free(quotient);
+        free(denominator_text);
+        free(numerator_text);
+        if (!displayed)
+            goto cleanup;
         *solution_count_out = 1u;
         *scale_out = expr_clone(scale);
         attempt = DE_ATTEMPT_SOLVED;
@@ -724,13 +697,6 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
             goto cleanup;
         }
 
-        if (de_matches_modified_emden_power(dependent, first_derivative, second_derivative, residual, 4L)) {
-            result = de_solve_result_new(DE_SOLVE_STATUS_UNSUPPORTED, DE_SOLVER_NONE,
-                                         "not point-linearizable: the Lie–Tressé invariant "
-                                         "36y(1 − 2y) is not identically zero");
-            goto cleanup;
-        }
-
         sturm_liouville = de_attempt_sturm_liouville(de, independent, dependent, second_derivative, first_derivative,
                                                      residual, &solution, &second_order_solver);
         if (sturm_liouville == DE_ATTEMPT_SOLVED) {
@@ -748,6 +714,15 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
                                              "solved as a constant-coefficient linear ODE");
                 goto append;
             }
+        }
+        if (sturm_liouville == DE_ATTEMPT_NOT_MATCHED) {
+            result = de_solve_series(de, 6u, include_steps ? DE_SOLVE_OPTION_STEPS : DE_SOLVE_OPTION_NONE);
+            if (!result || de_solve_result_status(result) != DE_SOLVE_STATUS_UNSUPPORTED)
+                goto cleanup;
+            de_solve_result_free(result);
+            result = de_lie_unsolved_analysis(de, include_steps);
+            if (result)
+                goto cleanup;
         }
         result = de_solve_result_new(
             sturm_liouville == DE_ATTEMPT_FAILED ? DE_SOLVE_STATUS_FAILED : DE_SOLVE_STATUS_UNSUPPORTED, DE_SOLVER_NONE,

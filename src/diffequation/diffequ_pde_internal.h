@@ -34,6 +34,9 @@ de_attempt_t de_pde_attempt_parameter_linear(const diffequ_t *de, const expr_t *
 diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const expr_t *residual, bool include_steps);
 diffequ_solve_result_t *de_pde_solve_second_order_constant(const diffequ_t *de, const expr_t *residual,
                                                          bool include_steps);
+diffequ_solve_result_t *de_pde_solve_radial_euler(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_wave(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_wave_ivp(const diffequ_t *de, const expr_t *residual, bool include_steps);
 diffequ_solve_result_t *de_pde_solve_multi_variable(const diffequ_t *de, const expr_t *residual, bool include_steps);
 
 #endif

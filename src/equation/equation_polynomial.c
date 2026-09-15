@@ -583,7 +583,9 @@ equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt)
     }
 
     expanded = equ_new(lhs, rhs);
-    if (expanded && equ_set_display_TeX(expanded, equ_lhs_display_TeX(equation), equ_rhs_display_TeX(equation)) != 0) {
+    if (expanded &&
+        (equ_set_display_TeX(expanded, equ_lhs_display_TeX(equation), equ_rhs_display_TeX(equation)) != 0 ||
+         equ_set_display_unbound(expanded, equ_lhs_display_unbound(equation), equ_rhs_display_unbound(equation)) != 0)) {
         equ_free(expanded);
         expanded = NULL;
     }

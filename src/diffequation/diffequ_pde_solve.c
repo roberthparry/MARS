@@ -652,6 +652,10 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     char *laplace_steps_TeX = NULL;
     diffequ_solve_result_t *stationary = NULL;
 
+    result = de_pde_solve_wave_ivp(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
     polar_laplace = residual ? de_pde_attempt_polar_laplace(de, residual, &polar_laplace_solution) : DE_ATTEMPT_FAILED;
     if (polar_laplace == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LAPLACE,
@@ -689,6 +693,10 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     }
 
     result = de_pde_solve_second_order_constant(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
+    result = de_pde_solve_radial_euler(de, residual, include_steps);
     if (result)
         goto cleanup;
 
@@ -757,6 +765,9 @@ cleanup:
 
 diffequ_solve_result_t *de_pde_solve_multi_variable(const diffequ_t *de, const expr_t *residual, bool include_steps)
 {
+    diffequ_solve_result_t *wave = de_pde_solve_wave(de, residual, include_steps);
+    if (wave)
+        return wave;
     diffequ_solve_result_t *stationary = NULL;
     equation_t *solution = NULL;
     bool recognized = false;

@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "equation.h"
+#include "matrix.h"
 
 /**
  * @file diffequation.h
@@ -30,6 +31,103 @@
 typedef struct diffequ_t diffequ_t;
 typedef struct diffequ_solve_result_t diffequ_solve_result_t;
 
+/** @brief Lie point-symmetry analysis of a scalar second-order ODE. */
+typedef struct de_lie_t de_lie_t;
+
+/**
+ * @brief Normalise a scalar second-order ODE to y'' = f(x,y,p), where p = y'.
+ * @param de Problem to analyse; conditions are not imposed on the symmetry algebra.
+ * @return An owning analysis, or NULL for an unsupported normal form or allocation failure.
+ * The equation must be linear in its highest derivative. Analysis is local where
+ * its leading coefficient is non-zero. Release the result with de_lie_free().
+ */
+de_lie_t *de_lie_new(const diffequ_t *de);
+
+/** @brief Release an analysis and its owned expressions; NULL is harmless. */
+void de_lie_free(de_lie_t *lie);
+
+/**
+ * @brief Borrow a jet coordinate: index 0 is x, 1 is y and 2 is p = y'.
+ * @return A borrowed expression, or NULL for a null analysis or invalid index.
+ * The velocity symbol is chosen to avoid collisions with the original equation.
+ */
+const expr_t *de_lie_coordinate(const de_lie_t *lie, size_t index);
+
+/** @brief Borrow the normalised right-hand side f, or NULL for a null analysis. */
+const expr_t *de_lie_rhs(const de_lie_t *lie);
+
+/**
+ * @brief Construct the first or second prolongation coefficient on y'' = f.
+ * @param lie Analysis specifying the jet coordinates and right-hand side.
+ * @param xi Independent-coordinate component of a point generator.
+ * @param eta Dependent-coordinate component; xi and eta must not depend on p.
+ * @param order Prolongation order, either 1 or 2.
+ * @return An owning expression, or NULL for invalid input or allocation failure.
+ */
+expr_t *de_lie_prolongation(const de_lie_t *lie, const expr_t *xi, const expr_t *eta, size_t order);
+
+/**
+ * @brief Construct the infinitesimal invariance residual for a supplied point generator.
+ * @return An owning expression eta^(2)-xi*f_x-eta*f_y-eta^(1)*f_p, or NULL on error.
+ * An identically zero residual verifies the generator; a non-zero expression
+ * is not a symmetry certificate. Release the expression with expr_free().
+ */
+expr_t *de_lie_residual(const de_lie_t *lie, const expr_t *xi, const expr_t *eta);
+
+/**
+ * @brief Construct the determining equation using arbitrary functions xi(x,y) and eta(x,y).
+ * @return An owning equation whose left side is the invariance residual and whose right side is zero,
+ * or NULL on error. This constructs, but does not generally solve, the determining PDE.
+ */
+equation_t *de_lie_determining_equation(const de_lie_t *lie);
+
+/**
+ * @brief Compute a Lie-Tresse relative invariant of the normalised equation.
+ * @param lie Analysis to inspect.
+ * @param index Zero selects f_pppp; one selects the second Lie-Tresse invariant.
+ * @return An owning expression, or NULL for invalid input or allocation failure.
+ * Both invariants vanishing identically is the local point-linearisability criterion.
+ * Evaluating them at a single point is not sufficient.
+ */
+expr_t *de_lie_invariant(const de_lie_t *lie, size_t index);
+
+/**
+ * @brief Search for polynomial point generators by exact coefficient matching.
+ * @param lie Analysis to inspect.
+ * @param degree Maximum total degree of xi and eta, from zero through four.
+ * @return An owning expression matrix with two rows (xi, eta) and one column per generator,
+ * or NULL when the search is unsupported or fails. A zero-column matrix means
+ * no generator was found within the requested polynomial space, not that no symmetry exists.
+ * Residuals must be polynomials of degree at most 15 in each jet coordinate
+ * with finite real numeric coefficients. Every returned generator is verified symbolically.
+ */
+matrix_t *de_lie_polynomial_generators(const de_lie_t *lie, size_t degree);
+
+/**
+ * @brief Compute the Lie bracket of two columns of a two-row point-generator matrix.
+ * @return An owning two-row, one-column expression matrix, or NULL for invalid input or failure.
+ * The convention is [G_i,G_j] = G_i G_j - G_j G_i.
+ */
+matrix_t *de_lie_bracket(const de_lie_t *lie, const matrix_t *generators, size_t i, size_t j);
+
+/**
+ * @brief Compute and verify structure constants for a polynomial generator basis.
+ * @return An owning expression matrix, or NULL for a dependent, non-closed, non-polynomial
+ * or invalid basis, or allocation failure. Row i*n+j contains C_ij^k in column k.
+ * Coefficients are finite real constants and bracket reconstruction is checked exactly.
+ * An empty basis returns a zero-row, zero-column matrix.
+ * The basis may have at most 30 columns. The same degree-15 coefficient bound as the polynomial search applies.
+ */
+matrix_t *de_lie_structure_constants(const de_lie_t *lie, const matrix_t *generators);
+
+/**
+ * @brief Reduce an autonomous equation using its independent-coordinate translation symmetry.
+ * @return An owning first-order equation p*dp/dy = f(y,p), or NULL if f depends on x or on error.
+ * Here p is regarded as a function of y. This local reduction uses y as a coordinate
+ * where p is non-zero; equilibrium solutions must be checked in the original ODE.
+ */
+equation_t *de_lie_autonomous_reduction(const de_lie_t *lie);
+
 /**
  * @brief Optional work requested from a differential-equation solve.
  *
@@ -49,7 +147,9 @@ typedef enum {
     DE_SOLVE_STATUS_SOLVED,
     DE_SOLVE_STATUS_UNSUPPORTED,
     DE_SOLVE_STATUS_INVALID,
-    DE_SOLVE_STATUS_FAILED
+    DE_SOLVE_STATUS_FAILED,
+    /** A local Taylor expansion with an explicit remainder, not an exact finite solution. */
+    DE_SOLVE_STATUS_SERIES
 } de_solve_status_t;
 
 /**
@@ -75,7 +175,12 @@ typedef enum {
     DE_SOLVER_HYDROGEN_MATRIX = DE_SOLVER_STATIONARY_EIGENFUNCTION,
     DE_SOLVER_EXACT_FIRST_ORDER,
     DE_SOLVER_LAPLACE,
-    DE_SOLVER_POWER_LAW_BESSEL
+    DE_SOLVER_POWER_LAW_BESSEL,
+    DE_SOLVER_TAYLOR_SERIES,
+    /** Three-dimensional constant-speed wave equation, represented by Kirchhoff spherical means. */
+    DE_SOLVER_KIRCHHOFF,
+    /** Forced one-dimensional constant-speed wave IVP, using d'Alembert and Duhamel integrals. */
+    DE_SOLVER_DALEMBERT_DUHAMEL
 } de_solver_t;
 
 /**
@@ -273,6 +378,9 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * is supplied on a constant-`x` or constant-`y` boundary.
  * Unsupported but well-formed problems return a result with
  * ::DE_SOLVE_STATUS_UNSUPPORTED rather than returning `NULL`.
+ * Before rejecting an unsolved second-order ODE, a polynomial normal form
+ * may produce a degree-six local Taylor expansion with status
+ * ::DE_SOLVE_STATUS_SERIES. See de_solve_series() for its scope and limitations.
  * This default entry point does not construct presentation derivations; use
  * de_solve_with_options() with ::DE_SOLVE_OPTION_STEPS when they are needed.
  *
@@ -296,6 +404,44 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de);
  *         cannot be allocated. Release it with de_solve_result_free().
  */
 diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options);
+
+/**
+ * @brief Construct a local Taylor solution of a polynomial second-order ODE.
+ *
+ * Requires a finite non-zero numeric coefficient of the highest derivative and
+ * a normal form y'' = f(x,y,y') polynomial in its three coordinates (degree at
+ * most 15 in each coordinate). Other symbols denote finite constant parameters.
+ * Conditions may specify y and/or y' at one common point; missing data remain
+ * arbitrary constants. With no conditions the expansion point is zero.
+ * Boundary data at different points and other condition forms are unsupported.
+ * The returned equation includes O((x-x0)^(degree+1)); its status is
+ * ::DE_SOLVE_STATUS_SERIES. The infinite Taylor series converges locally, but
+ * no convergence radius or numerical truncation-error bound is supplied.
+ *
+ * @param de Problem to expand. Must not be NULL.
+ * @param degree Highest retained power, from 2 through 8 inclusive.
+ * @param options Optional ::DE_SOLVE_OPTION_STEPS presentation work.
+ * @return An owning result, or NULL on result-allocation failure.
+ */
+diffequ_solve_result_t *de_solve_series(const diffequ_t *de, size_t degree, unsigned int options);
+
+/**
+ * @brief Borrow the expansion point of a local series result.
+ * @return A borrowed expression, or NULL for a non-series or null result.
+ */
+const expr_t *de_solve_result_series_centre(const diffequ_solve_result_t *result);
+
+/**
+ * @brief Return the highest retained power of a local Taylor expansion.
+ * @return The degree, or zero for a non-series or null result.
+ */
+size_t de_solve_result_series_degree(const diffequ_solve_result_t *result);
+
+/**
+ * @brief Borrow a Taylor coefficient multiplying (x-x0)^index.
+ * @return A borrowed expression, or NULL for an unavailable or out-of-range coefficient.
+ */
+const expr_t *de_solve_result_series_coefficient(const diffequ_solve_result_t *result, size_t index);
 
 /**
  * @brief Destroy a differential-equation solve result.
@@ -338,8 +484,10 @@ const char *de_solve_result_diagnostic(const diffequ_solve_result_t *result);
  * stored explanation for one literal input equation.
  *
  * @param result Result to inspect.
+ * An unsolved second-order ODE may provide Lie analysis and an order reduction
+ * without claiming a closed-form solution.
  * @return Borrowed multiline UTF-8 text, or `NULL` when derivations were not
- *         requested or the result was not solved.
+ *         requested or no derivation is available.
  */
 const char *de_solve_result_steps(const diffequ_solve_result_t *result);
 const char *de_solve_result_steps_TeX(const diffequ_solve_result_t *result);
