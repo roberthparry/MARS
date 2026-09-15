@@ -219,6 +219,8 @@ while `qc_acos(2)` is
 | `qc_Li(z)` | logarithmic integral Li(z) = Ei(log(z)), using the principal branch |
 | `qc_E1(z)` | exponential integral E₁(z); satisfies E₁(z) = −Ei(−z) for real z > 0 |
 | `qc_dilog(z)` | principal dilogarithm Li₂(z) |
+| `qc_clausen2(z)` | order-two Clausen function, with a real-axis bridge |
+| `qc_clausen(order, z)` | positive integer-order Clausen continuation, analytic between its vertical branch cuts |
 | `qc_polylog1(z)` | order-one polylogarithm Li₁(z) = −Log(1−z) on the principal branch |
 | `qc_polylog(s, z)` | polylogarithm Li_s(z) for integer real orders currently supported by the implementation |
 | `qc_lerch_phi(z, s, a)` | Lerch transcendent Φ(z,s,a) in the defining disc `abs(z) < 1`, with exact reductions at z = 0, z = 1 and s = 0 |
@@ -227,6 +229,23 @@ while `qc_acos(2)` is
 | `qc_hypergeometric_pFq(upper, upper_count, lower, lower_count, argument)` | generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero |
 | `qc_lauricella_f(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
 | `qc_appell_f1(a, b1, b2, c, x, y)` | Appell F₁, implemented as the two-variable Lauricella F_D member |
+
+#### Clausen functions
+
+`qc_clausen(order, z)` takes a positive integer order and an angle in radians.
+Real arguments use the corresponding real, periodic `qf_clausen` function.
+For complex arguments, even orders use
+`(Li_order(exp(i*z)) - Li_order(exp(-i*z)))/(2*i)` and odd orders use the
+half-sum, with principal polylogarithms. These are analytic continuations,
+not the imaginary or real part of a single polylogarithm at an arbitrary
+complex argument.
+
+The continuation is holomorphic inside each strip
+`2*k*pi < Re(z) < 2*(k+1)*pi`; nonreal points on the strip boundaries are
+excluded and return NaN. In the central strip, order one is
+`-log(2*sin(z/2))`. For orders `n >= 2`, differentiation with respect to the
+argument gives `(-1)^n*Cl_(n-1)(z)`. Order zero and non-finite inputs return
+NaN. `qc_clausen2` uses the same branch and domain for order two.
 
 ### Utility
 

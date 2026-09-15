@@ -1456,6 +1456,25 @@ matrix_t *mat_zeta(const matrix_t *A);
 matrix_t *mat_zetap(const matrix_t *A);
 /** @brief Return the principal matrix dilogarithm. */
 matrix_t *mat_dilog(const matrix_t *A);
+/**
+ * @brief Evaluate the order-two Clausen matrix function by functional calculus.
+ *
+ * @param A Square numerical or symbolic matrix argument.
+ * @return A newly allocated result matrix, or NULL on error.
+ */
+matrix_t *mat_clausen2(const matrix_t *A);
+/**
+ * @brief Evaluate the generalised integer-order Clausen matrix function.
+ *
+ * For real scalar arguments, even orders use the sine series and odd orders
+ * use the cosine series. Complex arguments use the scalar analytic continuation.
+ * The function acts on the matrix by functional calculus, not entry by entry.
+ *
+ * @param order Positive integer order.
+ * @param A Square numerical or symbolic matrix argument.
+ * @return A newly allocated result matrix, or NULL for order zero or on error.
+ */
+matrix_t *mat_clausen(unsigned long order, const matrix_t *A);
 /** @brief Return the principal order-one polylogarithm matrix function. */
 matrix_t *mat_polylog1(const matrix_t *A);
 /**

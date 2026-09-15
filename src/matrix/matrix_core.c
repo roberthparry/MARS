@@ -1810,6 +1810,7 @@ DEFINE_NUM_SCALAR_FUNCTION(acoth)
 DEFINE_NUM_SCALAR_FUNCTION(zeta)
 DEFINE_NUM_SCALAR_FUNCTION(zetap)
 DEFINE_NUM_SCALAR_FUNCTION(dilog)
+DEFINE_NUM_SCALAR_FUNCTION(clausen2)
 DEFINE_NUM_SCALAR_FUNCTION(polylog1)
 
 #undef DEFINE_NUM_SCALAR_FUNCTION
@@ -2098,6 +2099,7 @@ DEFINE_EXPR_SCALAR_FUNCTION(acoth)
 DEFINE_EXPR_SCALAR_FUNCTION(zeta)
 DEFINE_EXPR_SCALAR_FUNCTION(zetap)
 DEFINE_EXPR_SCALAR_FUNCTION(dilog)
+DEFINE_EXPR_SCALAR_FUNCTION(clausen2)
 DEFINE_EXPR_SCALAR_FUNCTION(polylog1)
 
 #undef DEFINE_EXPR_SCALAR_FUNCTION
@@ -2967,6 +2969,9 @@ static void num_fun_coeffs_up_to_second(number_t *c0, number_t *c1, number_t *c2
     if (c0)
         *c0 = num_scope_detach(num_clone(f0));
 
+    if (mat_clausen_scalar_coeffs(c1, c2, scalar_f, lambda))
+        return;
+
     if (scalar_f == number_elem.fun->gamma) {
         number_t psi = num_digamma(*lambda);
         number_t tri = num_trigamma(*lambda);
@@ -3150,6 +3155,14 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T, void (*scalar_
 {
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
+
+    if (n > 3u) {
+        matrix_t *clausen = mat_clausen_triangular(T, scalar_f);
+
+        if (clausen)
+            return clausen;
+    }
+
     matrix_t *F = mat_create_upper_triangular_with_elem(n, n, e);
     matrix_t *N = mat_create_upper_triangular_with_elem(n, n, e);
     if (!F || !N) {
@@ -3445,12 +3458,21 @@ static int num_divided_difference_confluent(number_t *out, const number_t *nodes
 
     for (size_t i = 0; i < count; ++i) {
         for (size_t j = i + 1; j < count; ++j) {
-            if (num_eq(nodes[i], nodes[j]))
-                return num_divided_difference_perturbed(out, nodes, count, scalar_f);
+            if (num_eq(nodes[i], nodes[j])) {
+                int status = num_divided_difference_perturbed(out, nodes, count, scalar_f);
+
+                if (status == 0)
+                    *out = num_scope_detach(*out);
+                return status;
+            }
         }
     }
 
-    return num_divided_difference_ordinary(out, nodes, count, scalar_f);
+    int status = num_divided_difference_ordinary(out, nodes, count, scalar_f);
+
+    if (status == 0)
+        *out = num_scope_detach(*out);
+    return status;
 }
 
 static int mat_fun_triangular_confluent_sum_paths(number_t *out, const matrix_t *T, size_t start, size_t current,

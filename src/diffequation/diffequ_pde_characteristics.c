@@ -598,6 +598,7 @@ static expr_t *de_pde_apply_linear_characteristic_operator(const expr_t *x, cons
     return applied;
 }
 
+
 static bool de_pde_matches_expanded_cotangent(const expr_t *candidate, const expr_t *cotangent)
 {
     const expr_t *cot_argument = NULL;
@@ -630,8 +631,17 @@ static bool de_pde_matches_expanded_cotangent(const expr_t *candidate, const exp
 
 static bool de_pde_same_transport_value(const expr_t *left, const expr_t *right)
 {
-    return de_pde_same_symbolic_form(left, right) || de_pde_matches_expanded_cotangent(left, right) ||
-           de_pde_matches_expanded_cotangent(right, left);
+    expr_t *difference;
+    bool matches;
+
+    if (!left || !right)
+        return false;
+    if (de_pde_same_symbolic_form(left, right))
+        return true;
+    difference = expr_sub(left, right);
+    matches = de_pde_is_symbolically_zero(difference);
+    expr_free(difference);
+    return matches || de_pde_matches_expanded_cotangent(left, right) || de_pde_matches_expanded_cotangent(right, left);
 }
 
 static expr_t *de_pde_unit_characteristic_potential(const expr_t *x, const expr_t *y,
@@ -2041,28 +2051,7 @@ static bool de_pde_is_first_integral(const expr_t *x, const expr_t *y, const exp
     expr_t *along_dependent = candidate_dependent ? expr_mul(dependent_coefficient, candidate_dependent) : NULL;
     expr_t *xy_sum = along_x && along_y ? expr_add(along_x, along_y) : NULL;
     expr_t *directional_raw = xy_sum && along_dependent ? expr_add(xy_sum, along_dependent) : NULL;
-    expr_t *directional = directional_raw ? expr_simplify(directional_raw) : NULL;
-    bool is_first_integral = directional && expr_is_exact_zero(directional);
-
-    if (!is_first_integral && directional_raw) {
-        expr_t *expanded = expr_display_expanded(directional_raw);
-        expr_t *simplified = expanded ? expr_simplify(expanded) : NULL;
-        const expr_t *left = NULL;
-        const expr_t *right = NULL;
-        bool is_sub = false;
-
-        is_first_integral = simplified && expr_is_exact_zero(simplified);
-        if (!is_first_integral && expr_match_add_sub_expr(simplified, &left, &right, &is_sub)) {
-            expr_t *opposite = is_sub ? expr_clone(right) : expr_negate_owned(expr_clone(right));
-
-            is_first_integral = opposite && de_pde_same_symbolic_form(left, opposite);
-            expr_free(opposite);
-        }
-        expr_free(simplified);
-        expr_free(expanded);
-    }
-
-    expr_free(directional);
+    bool is_first_integral = de_pde_is_symbolically_zero(directional_raw);
     expr_free(directional_raw);
     expr_free(xy_sum);
     expr_free(along_dependent);

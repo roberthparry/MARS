@@ -8,6 +8,153 @@ static void check_parse_expr(const char *label, const char *s, const char *want_
 static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line);
 static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line);
 
+static void test_from_string_clausen(void)
+{
+    static const char *const unary_aliases[] = {
+        "Cl2(x)", "cl2(x)", "Cl₂(x)", "cl₂(x)", "clausen(x)", "Clausen(x)",
+        "clausen2(x)", "Clausen2(x)", "clausen_2(x)",
+    };
+    static const char *const general_aliases[] = {"Cl(n,x)", "cl(n,x)"};
+
+    for (size_t i = 0u; i < sizeof(unary_aliases) / sizeof(unary_aliases[0]); ++i) {
+        expr_t *expr = expr_from_string(unary_aliases[i], NULL);
+        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(expr);
+        ASSERT_NOT_NULL(text);
+        TEST_ASSERT_STR_EQ(text, "Cl₂(x)");
+        free(text);
+        expr_free(expr);
+    }
+    for (size_t i = 0u; i < sizeof(general_aliases) / sizeof(general_aliases[0]); ++i) {
+        expr_t *expr = expr_from_string(general_aliases[i], NULL);
+        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(expr);
+        ASSERT_NOT_NULL(text);
+        TEST_ASSERT_STR_EQ(text, "Cl(n, x)");
+        free(text);
+        expr_free(expr);
+    }
+    check_parse_val("classic Clausen at pi/2 is Catalan's constant", "Cl2(pi/2)",
+                    0.91596559417721901505, __LINE__);
+    check_parse_val("general Clausen retains order before argument", "cl(1,pi)",
+                    -0.69314718055994530942, __LINE__);
+    check_parse_val("Cl remains algebra without call parentheses", "{ Cl | C=2; l=3 }", 6.0, __LINE__);
+    {
+        expr_t *expr = expr_from_function_body("cl(n, x) + clausen2(x)", NULL);
+
+        ASSERT_NOT_NULL(expr);
+        expr_free(expr);
+    }
+}
+
+static void test_from_string_clausen_sums(void)
+{
+    static const struct {
+        const char *source;
+        const char *closed;
+    } cases[] = {
+        {"sum(k,1,inf,sin(k*abs(x))/k^2)", "Cl2(abs(x))"},
+        {"sum(k,1,inf,sin(k*abs(x)/2)/k^2)", "Cl2(1/2*abs(x))"},
+        {"sum(k,1,inf,sin(abs(x)*k)*k^(-4))", "cl(4,abs(x))"},
+        {"sum(k,1,inf,cos(k*abs(x))/k^3)", "cl(3,abs(x))"},
+        {"sum(k,1,inf,sin(k*abs(x))/k^2+cos(k*abs(x))/k^3)", "Cl2(abs(x))+cl(3,abs(x))"},
+        {"sum(k,0,2,Cl2(abs(x)+2*pi*k/3))", "1/3*Cl2(3*abs(x))"},
+        {"sum(k,0,3,cl(3,abs(x)+2*pi*k/4))", "1/16*cl(3,4*abs(x))"},
+    };
+    static const char *const formal[] = {
+        "sum(k,1,inf,sin(k*x)/k^2)",
+        "{ sum(k,1,inf,sin(k*x)/k^2) | x=1 }",
+        "sum(k,1,inf,sin(k*i)/k^2)",
+        "sum(k,1,inf,cos(k*abs(x))/k^2)",
+        "sum(k,1,inf,sin(k*abs(x))/k^3)",
+        "sum(k,1,inf,cos(k*abs(x))/k)",
+        "sum(k,1,inf,sin(k*abs(x))/k^n)",
+        "{ sum(k,1,inf,sin(k*abs(x))/k^n) | x=1, n=2 }",
+        "sum(k,2,inf,sin(k*abs(x))/k^2)",
+        "sum(k,0,2,Cl2(abs(x)+2*pi*k/4))",
+        "sum(k,0,2,Cl2(abs(x)+2*pi*k^2/3))",
+        "sum(k,0,2,cl(1,abs(x)+2*pi*k/3))",
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_bindings_t *expected_bindings = NULL;
+        expr_t *expr = expr_from_string(cases[i].source, &bindings);
+        expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+        expr_t *expected = expr_from_string(cases[i].closed, &expected_bindings);
+        expr_t *expected_simplified = expected ? expr_simplify(expected) : NULL;
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        char *expected_text = expected_simplified ? expr_to_string(expected_simplified, style_UNBOUND) : NULL;
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *expected_x = expected_bindings ? expr_bindings_get(expected_bindings, "x") : NULL;
+
+        ASSERT_NOT_NULL(text);
+        ASSERT_NOT_NULL(expected_text);
+        TEST_ASSERT_STR_EQ(text, expected_text);
+        /* Retain the live angle after releasing the source sum, and observe subsequent binding edits. */
+        ASSERT_NOT_NULL(x);
+        ASSERT_NOT_NULL(expected_x);
+        expr_free(expr);
+        expr = NULL;
+        for (long sample = 1L; sample <= 2L; ++sample) {
+            number_t argument = num_create_from_long(sample);
+
+            expr_set_val(x, argument);
+            expr_set_val(expected_x, argument);
+            number_t value = expr_eval(simplified);
+            number_t expected_value = expr_eval(expected_simplified);
+
+            ASSERT_TRUE(num_is_finite(value));
+            ASSERT_EXPR_NUMBER_CLOSE(value, expected_value);
+            num_destroy(&expected_value);
+            num_destroy(&value);
+            num_destroy(&argument);
+        }
+        free(expected_text);
+        free(text);
+        expr_free(expected_simplified);
+        expr_free(expected);
+        expr_free(simplified);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+        expr_bindings_free(expected_bindings);
+    }
+    for (size_t i = 0u; i < sizeof(formal) / sizeof(formal[0]); ++i) {
+        expr_t *expr = expr_from_string(formal[i], NULL);
+        expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(text);
+        ASSERT_NOT_NULL(strstr(text, "Σ"));
+        free(text);
+        expr_free(simplified);
+        expr_free(expr);
+    }
+    check_parse_val("order-two Fourier sum gives Catalan's constant", "sum(k,1,inf,sin(k*pi/2)/k^2)",
+                    0.91596559417721901505, __LINE__);
+    check_parse_val("order-one Fourier sum at a regular angle", "sum(k,1,inf,cos(k*pi)/k)",
+                    -0.69314718055994530942, __LINE__);
+    {
+        static const char *const poles[] = {
+            "sum(k,1,inf,cos(k*0)/k)", "sum(k,1,inf,cos(k*2*pi)/k)",
+            "sum(k,1,inf,cos(k*(-2*pi))/k)",
+        };
+
+        for (size_t i = 0u; i < sizeof(poles) / sizeof(poles[0]); ++i) {
+            expr_t *expr = expr_from_string(poles[i], NULL);
+            number_t value;
+
+            ASSERT_NOT_NULL(expr);
+            value = expr_eval(expr);
+            ASSERT_TRUE(!num_is_finite(value));
+            num_destroy(&value);
+            expr_free(expr);
+        }
+    }
+}
+
 static void test_from_string_function_hash(void)
 {
     static const char *const lowercase_alias_inputs[] = {
@@ -4027,6 +4174,8 @@ void test_expr_t_from_string(void)
 {
     TEST_RUN_SUBTEST(test_from_string_infinity_TeX, NULL);
     TEST_RUN_SUBTEST(test_from_string_function_hash, NULL);
+    TEST_RUN_SUBTEST(test_from_string_clausen, NULL);
+    TEST_RUN_SUBTEST(test_from_string_clausen_sums, NULL);
     TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);

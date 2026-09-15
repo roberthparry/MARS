@@ -282,6 +282,16 @@ static number_t eval_finite_summation(expr_t *dv)
     if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
         return num_clone(NUM_NAN);
     {
+        expr_t *closed = expr_clausen_sum_closed_form(dv);
+
+        if (closed) {
+            number_t value = expr_eval(closed);
+
+            expr_free(closed);
+            return value;
+        }
+    }
+    {
         expr_t *order = NULL;
         expr_t *closed = expr_infinite_power_sum_closed_form(dv, &order);
 
@@ -2464,7 +2474,10 @@ static expr_t *expr_simplify_linear_summation_term(const expr_t *term, const exp
         return NULL;
     if (!expr_is_op(term, &ops_add)) {
         expr_t *sum = expr_math_wrap_binary(&ops_summation, term, bounds);
-        expr_t *closed_form = sum ? expr_finite_progression_closed_form(sum) : NULL;
+        expr_t *closed_form = sum ? expr_clausen_sum_closed_form(sum) : NULL;
+
+        if (!closed_form && sum)
+            closed_form = expr_finite_progression_closed_form(sum);
 
         if (closed_form) {
             expr_free(sum);
@@ -2485,12 +2498,29 @@ static expr_t *expr_simplify_linear_summation_term(const expr_t *term, const exp
 
 static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, expr_t *term, expr_t *bounds)
 {
-    expr_t *simplified_term = term ? expr_simplify(term) : NULL;
+    expr_t *sum = term && bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
+    expr_t *closed = sum ? expr_clausen_sum_closed_form(sum) : NULL;
+    expr_t *simplified_term;
     expr_t *out;
 
+    expr_free(sum);
+    if (closed) {
+        expr_free(term);
+        expr_free(bounds);
+        return closed;
+    }
+    simplified_term = term ? expr_simplify(term) : NULL;
     if (simplified_term) {
         expr_free(term);
         term = simplified_term;
+    }
+    sum = term && bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
+    closed = sum ? expr_clausen_sum_closed_form(sum) : NULL;
+    expr_free(sum);
+    if (closed) {
+        expr_free(term);
+        expr_free(bounds);
+        return closed;
     }
     if (term && expr_is_op(term, &ops_add)) {
         out = expr_simplify_linear_summation_term(term, bounds);
@@ -4614,7 +4644,7 @@ const expr_ops_t ops_dilog = {.eval = eval_dilog,
                               .reverse = expr_reverse_dilog,
                               .kind = EXPR_KIND_DILOG,
                               .arity = EXPR_OP_UNARY,
-                              .expression_name = "dilog",
+                              .expression_name = "Li₂",
                               .function_name = "li2",
                               .TeX_name = "\\operatorname{Li}_{2}",
                               .apply_unary = expr_dilog,
@@ -5409,6 +5439,8 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_LERCH_PHI] = &ops_lerch_phi,
         [EXPR_KIND_LERCH_PHI_PACK] = &ops_lerch_phi_pack,
         [EXPR_KIND_DILOG] = &ops_dilog,
+        [EXPR_KIND_CLAUSEN2] = &ops_clausen2,
+        [EXPR_KIND_CLAUSEN] = &ops_clausen,
         [EXPR_KIND_POLYLOG1] = &ops_polylog1,
         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,

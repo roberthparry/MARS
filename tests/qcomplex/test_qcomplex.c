@@ -717,6 +717,53 @@ static void test_polylog(void)
     printf(C_CYAN "TEST: dilog/polylog/harmonic polynomial\n" C_RESET);
 
     {
+        const qcomplex_t arguments[] = {qcz(1.0, 1.0), qcz(1.0, 4.0),
+                                        qc_make(QF_PI, qf_from_double(0.25))};
+
+        for (size_t j = 0u; j < sizeof(arguments) / sizeof(arguments[0]); ++j) {
+            qcomplex_t z = arguments[j];
+            qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
+            qcomplex_t difference = qc_sub(qc_dilog(qc_exp(iz)), qc_dilog(qc_exp(qc_neg(iz))));
+            qcomplex_t reference = qc_make(qf_mul_double(qc_imag(difference), 0.5),
+                                            qf_mul_double(qc_real(difference), -0.5));
+
+            check_qc("Cl2 holomorphic dilogarithm identity", qc_clausen2(z), reference, 1e-27);
+            for (unsigned long order = 1ul; order <= 6ul; ++order) {
+                qcomplex_t value = qc_clausen(order, z);
+                qcomplex_t expected = (order & 1ul) ? value : qc_neg(value);
+
+                check_qc("Clausen complex parity", qc_clausen(order, qc_neg(z)), expected, 1e-26);
+                check_qc("Clausen conjugation", qc_clausen(order, qc_conj(z)), qc_conj(value), 1e-26);
+                check_qc("Clausen complex periodicity", qc_clausen(order, qc_add(z, qc_make(QF_2PI, QF_ZERO))),
+                         value, 1e-26);
+                {
+                    qcomplex_t h = qcr(1e-8);
+                    qcomplex_t derivative = qc_div(qc_sub(qc_clausen(order, qc_add(z, h)),
+                                                         qc_clausen(order, qc_sub(z, h))), qcr(2e-8));
+                    qcomplex_t want = order == 1ul ? qc_mul(qcr(0.5), qc_cot(qc_mul(qcr(0.5), z)))
+                                                   : qc_clausen(order - 1ul, z);
+
+                    check_qc("Clausen holomorphic derivative", derivative, (order & 1ul) ? qc_neg(want) : want, 1e-14);
+                }
+            }
+        }
+        check_qc("Cl1 central branch", qc_clausen(1ul, qcz(1.0, 1.0)),
+                 qc_neg(qc_log(qc_mul(qcr(2.0), qc_sin(qcz(0.5, 0.5))))), 1e-29);
+        check_qc("Cl2 real bridge", qc_clausen2(qcr(-1.0)), qc_make(qf_clausen2(qf_neg(QF_ONE)), QF_ZERO), 1e-30);
+        TEST_ASSERT_TRUE(qc_isnan(qc_clausen(0ul, QC_ONE)), "Clausen order zero is undefined");
+        TEST_ASSERT_TRUE(qc_isnan(qc_clausen2(qcz(0.0, 1.0))), "Clausen excludes the nonreal branch cut");
+        TEST_ASSERT_TRUE(qc_isnan(qc_clausen2(qc_make(QF_2PI, QF_ONE))), "Clausen excludes translated cuts");
+        TEST_ASSERT_TRUE(qc_isnan(qc_clausen2(QC_NAN)), "Clausen NaN propagates");
+    }
+
+    {
+        qcomplex_t want = qc_make(qf_neg(qf_div(qf_sqr(QF_PI), qf_from_double(12.0))), QF_ZERO);
+
+        check_qc("Li₂(-1) = -pi²/12", qc_dilog(qcr(-1.0)), want, 1e-28);
+        check_qc("polylog(2, -1) = -pi²/12", qc_polylog(qcr(2.0), qcr(-1.0)), want, 1e-28);
+    }
+
+    {
         qfloat_t log2 = qf_log(qf_from_double(2.0));
         qfloat_t want =
             qf_sub(qf_div(qf_sqr(QF_PI), qf_from_double(12.0)), qf_div(qf_sqr(log2), qf_from_double(2.0)));

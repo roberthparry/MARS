@@ -2045,6 +2045,36 @@ static void qf_zetah_euler_maclaurin(qfloat_t s, qfloat_t a, qfloat_t *value_out
 /* Evaluate the Riemann zeta function across the real analytic continuation. */
 qfloat_t qf_zeta(qfloat_t s)
 {
+    /* Exact even arguments are also the coefficients of the accelerated Clausen series.
+     * Values follow |B_2k| (2*pi)^(2k)/(2 (2k)!), rounded to two doubles. */
+    static const qfloat_t even_zeta[] = {
+        {1.6449340668482264, 3.040672350398476e-17},
+        {1.0823232337111381, 4.748512042855365e-17},
+        {1.0173430619844492, -9.758599166441531e-17},
+        {1.0040773561979444, -2.0171748307737844e-17},
+        {1.000994575127818, 1.0936913170647002e-16},
+        {1.000246086553308, 3.556599124383171e-18},
+        {1.0000612481350588, -1.0638574497072141e-16},
+        {1.0000152822594086, 4.081759142430904e-17},
+        {1.000003817293265, -4.059356892188128e-17},
+        {1.0000009539620338, 6.109003488414959e-17},
+        {1.0000002384505027, 5.127581332745354e-17},
+        {1.000000059608189, -1.1495873729944047e-19},
+        {1.0000000149015549, -5.056714709585073e-17},
+        {1.000000003725334, -1.646062723884849e-17},
+        {1.0000000009313275, -2.7177118683442012e-17},
+        {1.000000000232831, 9.562457107023127e-17},
+        {1.0000000000582077, 5.996555960166587e-17},
+        {1.000000000014552, 6.662675132429289e-18},
+        {1.000000000003638, 7.40286938238577e-19},
+        {1.0000000000009095, 8.225346069033828e-20},
+        {1.0000000000002274, 9.139233192043922e-21},
+        {1.0000000000000568, 1.0154678412230818e-21},
+        {1.0000000000000142, 1.1282960305241183e-22},
+        {1.0000000000000036, 1.2536612743942848e-23},
+        {1.0000000000000009, 1.3929563579707038e-24},
+        {1.0000000000000002, 1.5477289031520569e-25}
+    };
     qfloat_t value;
 
     if (qf_isnan(s) || qf_isneginf(s))
@@ -2055,6 +2085,21 @@ qfloat_t qf_zeta(qfloat_t s)
         return QF_INF;
     if (qf_eq(s, QF_ZERO))
         return qf_neg(QF_HALF);
+    if (qf_ge(s, qf_from_double(128.0)))
+        return QF_ONE;
+    if (qf_ge(s, QF_TWO) && qf_is_integer(s)) {
+        unsigned int order = (unsigned int)qf_to_double(s);
+
+        if (order <= 52u && (order & 1u) == 0u)
+            return even_zeta[order / 2u - 1u];
+        if (order >= 54u) {
+            qfloat_t sum = QF_ONE;
+
+            for (unsigned int k = 2u; k <= 4u; ++k)
+                sum = qf_add(sum, qf_pow_int(qf_from_double((double)k), -(int)order));
+            return sum;
+        }
+    }
     if (qf_zeta_is_negative_even_integer(s))
         return QF_ZERO;
     if (qf_lt(s, QF_ZERO)) {
@@ -3075,7 +3120,8 @@ qfloat_t qf_dilog(qfloat_t x)
     if (qf_lt(x, qf_from_double(-0.5))) {
         qfloat_t one_minus = qf_sub(QF_ONE, x);
 
-        reduced = qf_div(x, one_minus);
+        /* Li2(x) = -Li2(x/(x-1)) - log(1-x)^2/2 for negative real x. */
+        reduced = qf_div(qf_neg(x), one_minus);
         inner = qf_dilog(reduced);
         log_term = qf_log(one_minus);
         return qf_sub(qf_neg(inner), qf_mul_double(qf_mul(log_term, log_term), 0.5));

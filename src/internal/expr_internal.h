@@ -248,6 +248,23 @@ bool expr_match_cot_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_pow_const(const expr_t *expr, const expr_t **base_out, number_t *exponent_out);
 bool expr_match_pow_expr(const expr_t *expr, const expr_t **base_out, const expr_t **exponent_out);
 bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, const expr_t **domain_out);
+
+/**
+ * @brief Build an unevaluated integral with an explicitly chosen bound variable.
+ *
+ * All inputs are borrowed. The caller must choose a dummy that cannot capture free symbols;
+ * the returned expression is owned by the caller and is numerically integrated from zero.
+ */
+expr_t *expr_integral_with_dummy_internal(const expr_t *integrand, const expr_t *upper, const expr_t *dummy);
+
+/**
+ * @brief Verify an antiderivative symbolically on the real domain.
+ *
+ * The caller must ensure that variable arguments are real. Algebraic expansion and
+ * real logarithmic identities are used when direct simplification does not suffice.
+ * All inputs are borrowed; an unproved identity returns false.
+ */
+bool expr_verify_antiderivative_real_internal(const expr_t *primitive, const expr_t *integrand, const expr_t *wrt);
 void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset);
 bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
 expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out);

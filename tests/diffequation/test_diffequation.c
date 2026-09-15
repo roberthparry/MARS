@@ -5,6 +5,9 @@
 #include "diffequation.h"
 #include "test_harness.h"
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 static bool test_diffequ_want_text(const char *label, const char *got, const char *want, const char *file,
@@ -93,7 +96,7 @@ static void test_diffequ_lifecycle_null_safety(void)
 static void test_diffequ_derivations_are_opt_in(void)
 {
     static const char *sources[] = {"Dx(y) = x*y", "y'' + 3*y*y' + y^3 = 0", "z_y + 2*y*z = x*y^3",
-                                    "phi_xx + phi_yy = 0"};
+                                    "phi_xx + phi_yy = 0", "z_xx - 3z_yx + 2z_yy = 0"};
 
     for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
         diffequ_t *de = de_from_string(sources[i]);
@@ -1097,7 +1100,7 @@ static void test_diffequ_solves_linear_change_of_variables(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("linear-transformation solution text", text, true);
     if (text)
-        WANT_TEXT("linear-transformation solution", string_c_str(text), "½·(x + y)² = 1 - exp(-(x - y))");
+        WANT_TEXT("linear-transformation solution", string_c_str(text), "½·(x + y)² = 1 - exp(y - x)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2282,6 +2285,384 @@ static bool test_diffequ_want_pde_solution(const char *source, const char *want,
     TEST_HARNESS_RETURN_UNLESS(                                                                                        \
         test_diffequ_want_pde_solution((source), (want), DE_SOLVER_LAPLACE, __FILE__, __LINE__))
 
+#define WANT_SECOND_ORDER_PDE_SOLUTION(source, want)                                                               \
+    TEST_HARNESS_RETURN_UNLESS(test_diffequ_want_pde_solution(                                                       \
+        (source), (want), DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR, __FILE__, __LINE__))
+
+static void test_diffequ_solves_second_order_pde_distinct_roots(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_xy + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - z_xy - 2z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("6u_ss - 9u_st + 3u_tt = 0", "u = F(½·(2t + s)) + G(t + s)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + z_xy = 0", "z = F(y - x) + G(y)");
+}
+
+static void test_diffequ_solves_second_order_pde_repeated_roots(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 2z_xy + z_yy = 0", "z = F(x + y) + x·G(x + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 2z_xy + z_yy = 0", "z = F(y - x) + x·G(y - x)");
+}
+
+static void test_diffequ_solves_second_order_pde_degenerate_operator(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xy = 0", "z = F(x) + G(y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xy + 2z_yy = 0", "z = F(½·(2x - y)) + G(x)");
+}
+
+static void test_diffequ_solves_second_order_pde_surd_and_complex_roots(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 2z_yy = 0",
+                                   "z = F(y - ½x·√(8)) + G(½x·√(8) + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 2z_yy = 0",
+                                   "z = F(y - 0.5ix·√(8)) + G(0.5ix·√(8) + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("-z_xx - 2z_yy = 0",
+                                   "z = F(y - 0.5ix·√(8)) + G(0.5ix·√(8) + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("2z_xx + 2z_xy + z_yy = 0",
+                                   "z = F((-0.5 - 0.5i)x + y) + G((-0.5 + 0.5i)x + y)");
+}
+
+static void test_diffequ_second_order_pde_rejects_outside_family(void)
+{
+    static const char *sources[] = {
+        "z_xx - 3z_xy + 2z_yy = exp(x*x-y)",
+        "x*z_xx - 3z_xy + 2z_yy = 0",
+        "z_xx - 3z_xy + 2z_yy + z = 0",
+        "z_xx - 3z_xy + 2z_yy + z_x = 0",
+        "z_xx*z_yy - 3z_xy = 0",
+        "z_xx - 3z_xy + 2z_yy = 0; z(0,y)=y",
+    };
+
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        bool rejected = result && de_solve_result_status(result) == DE_SOLVE_STATUS_UNSUPPORTED &&
+                        de_solve_result_count(result) == 0u;
+
+        printf("  unsupported second-order PDE: %s\n", sources[i]);
+        de_solve_result_free(result);
+        de_free(de);
+        ASSERT_TRUE(rejected);
+    }
+}
+
+static void test_diffequ_second_order_pde_exponential_forcing(void)
+{
+    const char *want = "z = F(y - 3x) + G(y - 2x) + exp(x - y)";
+
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2e^(x-y)", want);
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2exp(x-y)", want);
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy - 2exp(x-y) = 0", want);
+    WANT_SECOND_ORDER_PDE_SOLUTION("2u_ss + 10u_ts + 12u_tt = 4exp(s-t)",
+                                   "u = F(t - 3s) + G(t - 2s) + exp(s - t)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2e^(x-y+3)",
+                                   "z = F(y - 3x) + G(y - 2x) + exp(x - y + 3)");
+}
+
+static void test_diffequ_second_order_pde_resonant_forcing(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(y-2x)",
+                                   "z = F(y - 3x) + G(y - 2x) + x·exp(y - 2x)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 2z_xy + z_yy = exp(x-y)",
+                                   "z = F(y - x) + x·G(y - x) + ½x²·exp(x - y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xy = exp(x)", "z = F(x) + G(y) + y·exp(x)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xy = 1", "z = F(x) + G(y) + xy");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2", "z = F(y - 3x) + G(y - 2x) + x²");
+}
+
+static void test_diffequ_second_order_pde_forcing_superposition(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) + exp(x+y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·exp(x - y) + ¹⁄₁₂·exp(x + y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) - cos(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·exp(x - y) + ½·cos(x - y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2sin(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) - sin(x - y)");
+}
+
+static void test_diffequ_second_order_pde_single_phase_integrals(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2tan(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Cl₂(2x - 2y + π) + ln(2)·(x - y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("2u_ss + 10u_ts + 12u_tt = 4tan(s-t)",
+                                   "u = F(t - 3s) + G(t - 2s) + ½·Cl₂(2s - 2t + π) + ln(2)·(s - t)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2tanh(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(2·(y - x))) - "
+                                   "ln(2)·(x - y) + ½·(x - y)²");
+    WANT_SECOND_ORDER_PDE_SOLUTION("2u_ss + 10u_ts + 12u_tt = 4tanh(s-t)",
+                                   "u = F(t - 3s) + G(t - 2s) + ½·Li₂(-exp(2·(t - s))) - "
+                                   "ln(2)·(s - t) + ½·(s - t)²");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 8tanh(2x-2y+3)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(-2·(2x - 2y + 3))) - "
+                                   "ln(2)·(2x - 2y + 3) + ½·(2x - 2y + 3)²");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2tanh(x-y+C)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(-2·(x - y + C))) - "
+                                   "ln(2)·(x - y + C) + ½·(x - y + C)²");
+}
+
+static void test_diffequ_second_order_pde_single_phase_resonance(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = tanh(y-2x)",
+                                   "z = F(y - 3x) + G(y - 2x) + x·ln(cosh(y - 2x))");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xy = tanh(x)", "z = F(x) + G(y) + y·ln(cosh(x))");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 2z_xy + z_yy = 2tanh(x-y)",
+                                   "z = F(y - x) + x·G(y - x) + x²·tanh(x - y)");
+}
+
+static void test_diffequ_second_order_pde_single_phase_compositions(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2atan(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½x - ½y - ½·(x - y)·ln((x - y)² + 1) + "
+                                   "½·((x - y)² - 1)·atan(x - y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2tanh(x-y)*sin(2x-2y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ∫^(x - y) ∫^u tanh(t)·sin(2t)·dt·du");
+}
+
+/* Remove the arbitrary homogeneous data to independently test the computed particular solution. */
+static expr_t *test_diffequ_zero_arbitrary_functions(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    bool is_sub = false;
+
+    if (expr_is_arbitrary_function(expr))
+        return expr_const_zero();
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        expr_t *first = test_diffequ_zero_arbitrary_functions(left);
+        expr_t *second = test_diffequ_zero_arbitrary_functions(right);
+
+        return is_sub ? expr_sub_simplify_owned(first, second) : expr_add_simplify_owned(first, second);
+    }
+    if (expr_match_mul_expr(expr, &left, &right)) {
+        expr_t *first = test_diffequ_zero_arbitrary_functions(left);
+        expr_t *second = test_diffequ_zero_arbitrary_functions(right);
+
+        return expr_mul_simplify_owned(first, second);
+    }
+    return expr_clone(expr);
+}
+
+static void test_diffequ_second_order_pde_particular_satisfies_equation(void)
+{
+    static const char *sources[] = {
+        "z_xx + 5z_yx + 6z_yy = 2e^(x-y)",
+        "z_xx + 5z_xy + 6z_yy = exp(y-2x)",
+        "z_xx + 2z_xy + z_yy = exp(x-y)",
+        "z_xy = exp(x)",
+        "z_xy = 1",
+        "z_xx + 5z_xy + 6z_yy = exp(x-y) + exp(x+y)",
+        "z_xx + 5z_xy + 6z_yy = 2sin(x-y)",
+        "z_xx + 5z_yx + 6z_yy = 2tanh(x-y)",
+        "z_xx + 5z_yx + 6z_yy = 2tan(x-y)",
+        "2u_ss + 10u_ts + 12u_tt = 4tan(s-t)",
+        "z_xx + 5z_xy + 6z_yy = 8tan(2x-2y+3)",
+        "2u_ss + 10u_ts + 12u_tt = 4tanh(s-t)",
+        "z_xx + 5z_xy + 6z_yy = tanh(y-2x)",
+        "z_xx + 5z_xy + 6z_yy = 2atan(x-y)",
+        "z_xx + 5z_xy + 6z_yy = 2tanh(x-y)*sin(2x-2y)",
+    };
+
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        expr_t *particular = solution ? test_diffequ_zero_arbitrary_functions(equ_rhs(solution)) : NULL;
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = particular && residual ? expr_substitute(residual, equ_lhs(solution), particular) : NULL;
+        expr_t *normalised = applied ? expr_simplify(applied) : NULL;
+        bool valid = normalised != NULL;
+
+        for (size_t sample = 0u; valid && sample < 3u; ++sample) {
+            expr_t *evaluated = expr_clone(normalised);
+
+            for (size_t j = 0u; evaluated && j < 2u; ++j) {
+                expr_t *point = expr_const_long(j == 0u ? (long)sample - 1L : 2L - (long)sample);
+                expr_t *next = expr_substitute(evaluated, de_independent_at(de, j), point);
+
+                expr_free(point);
+                expr_free(evaluated);
+                evaluated = next;
+            }
+            number_t value = evaluated ? expr_eval(evaluated) : num_new();
+            number_t magnitude = num_abs(value);
+            number_t tolerance = num_create_from_string("1e-24");
+
+            valid = num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&value);
+            expr_free(evaluated);
+        }
+        printf("  particular solution satisfies: %s\n", sources[i]);
+        expr_free(normalised);
+        expr_free(applied);
+        expr_free(residual);
+        expr_free(particular);
+        de_solve_result_free(result);
+        de_free(de);
+        ASSERT_TRUE(valid);
+    }
+}
+
+static void test_diffequ_second_order_pde_integral_evaluates(void)
+{
+    diffequ_t *de = de_from_string("z_xx + 5z_yx + 6z_yy = 2tanh(x-y)");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    expr_t *particular = solution ? test_diffequ_zero_arbitrary_functions(equ_rhs(solution)) : NULL;
+    expr_t *zero = expr_const_zero();
+    expr_t *at_y_zero = particular ? expr_substitute(particular, de_independent_at(de, 1u), zero) : NULL;
+    number_t values[3] = {num_new(), num_new(), num_new()};
+    bool valid = at_y_zero != NULL;
+
+    for (size_t i = 0u; valid && i < 3u; ++i) {
+        expr_t *point = expr_const_long((long)i - 1L);
+        expr_t *at_point = expr_substitute(at_y_zero, de_independent_at(de, 0u), point);
+
+        num_destroy(&values[i]);
+        values[i] = at_point ? expr_eval(at_point) : num_new();
+        valid = num_is_real(values[i]) && num_is_finite(values[i]);
+        expr_free(at_point);
+        expr_free(point);
+    }
+    /* The arbitrary functions absorb the constant; normalise only for this zero-based integral check. */
+    number_t pi_square = num_sqr(NUM_PI);
+    number_t divisor = num_create_from_long(24);
+    number_t offset = num_div(pi_square, divisor);
+    number_t at_zero = num_add(values[1], offset);
+    number_t at_zero_magnitude = num_abs(at_zero);
+    number_t positive_value = num_sub(values[2], values[1]);
+    number_t raw_sum = num_add(values[0], values[2]);
+    number_t twice_origin = num_add(values[1], values[1]);
+    number_t sum = num_sub(raw_sum, twice_origin);
+    number_t magnitude = num_abs(sum);
+    number_t tolerance = num_create_from_string("1e-18");
+
+    valid = valid && num_lt(at_zero_magnitude, tolerance) &&
+            num_gt(positive_value, NUM_ZERO) && num_lt(positive_value, NUM_ONE) &&
+            num_lt(magnitude, tolerance);
+    num_destroy(&twice_origin);
+    num_destroy(&raw_sum);
+    num_destroy(&positive_value);
+    num_destroy(&at_zero_magnitude);
+    num_destroy(&at_zero);
+    num_destroy(&offset);
+    num_destroy(&divisor);
+    num_destroy(&pi_square);
+    num_destroy(&tolerance);
+    num_destroy(&magnitude);
+    num_destroy(&sum);
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&values[i]);
+    expr_free(at_y_zero);
+    expr_free(zero);
+    expr_free(particular);
+    de_solve_result_free(result);
+    de_free(de);
+    ASSERT_TRUE(valid);
+}
+
+/* Check the characteristic identities directly, without expanding arbitrary functions. */
+static bool test_diffequ_collect_pde_slopes(const expr_t *expr, const diffequ_t *de, number_t *slopes, size_t *count)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    expr_child_exprs(expr, &left, &right);
+    if (expr_is_arbitrary_function(expr)) {
+        if (*count >= 2u)
+            return false;
+        for (size_t i = 0u; i < 2u; ++i) {
+            expr_t *derivative = expr_create_deriv(left, de_independent_at(de, i));
+            size_t slot = 2u * *count + i;
+            bool linear = derivative != NULL;
+
+            num_destroy(&slopes[slot]);
+            slopes[slot] = derivative ? expr_eval(derivative) : num_new();
+            for (size_t j = 0u; linear && j < 2u; ++j) {
+                expr_t *second = expr_create_deriv(derivative, de_independent_at(de, j));
+                number_t value = second ? expr_eval(second) : num_new();
+
+                linear = num_is_zero(value);
+                num_destroy(&value);
+                expr_free(second);
+            }
+            expr_free(derivative);
+            if (!linear || !num_is_finite(slopes[slot]))
+                return false;
+        }
+        ++*count;
+        return true;
+    }
+    return (!left || test_diffequ_collect_pde_slopes(left, de, slopes, count)) &&
+           (!right || test_diffequ_collect_pde_slopes(right, de, slopes, count));
+}
+
+static void test_diffequ_second_order_pde_solutions_satisfy_operator(void)
+{
+    static const struct {
+        const char *source;
+        long a, b, c;
+        bool repeated;
+    } cases[] = {
+        {"z_xx - 3z_yx + 2z_yy = 0", 1, -3, 2, false},
+        {"z_xx - 2z_xy + z_yy = 0", 1, -2, 1, true},
+        {"z_xy = 0", 0, 1, 0, false},
+        {"z_xy + 2z_yy = 0", 0, 1, 2, false},
+        {"z_xx - 2z_yy = 0", 1, 0, -2, false},
+        {"2z_xx + 2z_xy + z_yy = 0", 2, 2, 1, false},
+        {"z_xx + 2z_yy = 0", 1, 0, 2, false},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        diffequ_t *de = de_from_string(cases[i].source);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        number_t slopes[4] = {num_new(), num_new(), num_new(), num_new()};
+        number_t tolerance = num_create_from_string("1e-24");
+        size_t count = 0u;
+        bool valid = solution && test_diffequ_collect_pde_slopes(equ_rhs(solution), de, slopes, &count) && count == 2u;
+
+        for (size_t j = 0u; valid && j < 2u; ++j) {
+            number_t xx = num_sqr(slopes[2u * j]);
+            number_t xy = num_mul(slopes[2u * j], slopes[2u * j + 1u]);
+            number_t yy = num_sqr(slopes[2u * j + 1u]);
+            number_t first = num_mul_long(xx, cases[i].a);
+            number_t mixed = num_mul_long(xy, cases[i].b);
+            number_t last = num_mul_long(yy, cases[i].c);
+            number_t sum = num_add(first, mixed);
+            number_t residual = num_add(sum, last);
+            number_t magnitude = num_abs(residual);
+
+            valid = num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&residual);
+            num_destroy(&sum);
+            num_destroy(&last);
+            num_destroy(&mixed);
+            num_destroy(&first);
+            num_destroy(&yy);
+            num_destroy(&xy);
+            num_destroy(&xx);
+        }
+        number_t diagonal = num_mul(slopes[0], slopes[3]);
+        number_t off_diagonal = num_mul(slopes[1], slopes[2]);
+        number_t determinant = num_sub(diagonal, off_diagonal);
+
+        valid = valid && num_is_finite(determinant) && (num_is_zero(determinant) == cases[i].repeated);
+        printf("  characteristic identities and independence: %s\n", cases[i].source);
+        num_destroy(&determinant);
+        num_destroy(&off_diagonal);
+        num_destroy(&diagonal);
+        num_destroy(&tolerance);
+        for (size_t j = 0u; j < 4u; ++j)
+            num_destroy(&slopes[j]);
+        de_solve_result_free(result);
+        de_free(de);
+        ASSERT_TRUE(valid);
+    }
+}
+
 static void test_diffequ_solves_two_dimensional_laplace_equation(void)
 {
     WANT_LAPLACE_SOLUTION("phi_xx + phi_yy = 0", "φ = F(x + iy) + G(x - iy)");
@@ -2346,7 +2727,7 @@ static void test_diffequ_solves_parametric_characteristic_boundary(void)
 
 static void test_diffequ_solves_scaled_coordinate_characteristics(void)
 {
-    WANT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0", "z = ½·(2·F(y/(x² + 1)) + y)");
+    WANT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0", "z = F(y/(x² + 1)) + ½y");
     WANT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0; "
                                    "z(x, 1) = (x^2+1)^2",
                                    "z = ½·(y + 2·(1/y·(x² + 1))² - 1)");
@@ -2593,6 +2974,39 @@ static void test_diffequ_solves_dependent_square_characteristic_pde(void)
     string_free(positive_text);
     de_solve_result_free(result);
     de_free(de);
+}
+
+static bool test_diffequ_square_branches_match(const char *source, const char *positive, const char *negative)
+{
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    bool solved = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+                  de_solve_result_solver(result) == DE_SOLVER_CHARACTERISTICS && de_solve_result_count(result) == 2u;
+    const char *expected[2] = {positive, negative};
+
+    printf("%s\n", source);
+    for (size_t i = 0u; i < 2u; ++i) {
+        const equation_t *solution = de_solve_result_at(result, i);
+        string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+        printf("%s\n", text ? string_c_str(text) : "NULL");
+        solved = solved && text && strcmp(string_c_str(text), expected[i]) == 0;
+        string_free(text);
+    }
+
+    de_solve_result_free(result);
+    de_free(de);
+    return solved;
+}
+
+static void test_diffequ_solves_parameter_forced_square_pde(void)
+{
+    ASSERT_TRUE(test_diffequ_square_branches_match("zz_x - zz_t = y-x", "z = √(F(-t - x) + 2xy - x²)",
+                                                  "z = -√(F(-t - x) + 2xy - x²)"));
+    ASSERT_TRUE(test_diffequ_square_branches_match("zz_x - zz_t = 2-x", "z = √(F(-t - x) + 4x - x²)",
+                                                  "z = -√(F(-t - x) + 4x - x²)"));
+    ASSERT_TRUE(test_diffequ_square_branches_match("u*u_a - u*u_b = c-a", "u = √(F(-a - b) + 2ca - a²)",
+                                                  "u = -√(F(-a - b) + 2ca - a²)"));
 }
 
 static void test_diffequ_applies_dependent_square_boundary(void)
@@ -2966,6 +3380,41 @@ static void example_diffequation_weighted_cyclic_pde(void)
     ASSERT_TRUE(valid);
 }
 
+/* README example from docs/diffequation.md: an undifferentiated parameter in the forcing. */
+static void example_diffequation_parameter_forced_pde(void)
+{
+    ASSERT_TRUE(test_diffequ_square_branches_match("zz_x - zz_t = y-x", "z = √(F(-t - x) + 2xy - x²)",
+                                                  "z = -√(F(-t - x) + 2xy - x²)"));
+}
+
+/* README example from docs/diffequation.md: a factored second-order PDE operator. */
+static void example_diffequation_second_order_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
+}
+
+/* README example from docs/diffequation.md: an exponentially forced second-order PDE. */
+static void example_diffequation_forced_second_order_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2e^(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + exp(x - y)");
+}
+
+/* README example from docs/diffequation.md: single-phase forcing integrated using the dilogarithm. */
+static void example_diffequation_single_phase_integral_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2tanh(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(2·(y - x))) - "
+                                   "ln(2)·(x - y) + ½·(x - y)²");
+}
+
+/* README example from docs/diffequation.md: tangent forcing integrated using the real Clausen function. */
+static void example_diffequation_clausen_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2tan(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ½·Cl₂(2x - 2y + π) + ln(2)·(x - y)");
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_diffequ_lifecycle_null_safety);
@@ -3065,6 +3514,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_quadratic_characteristic_evolution);
     RUN_TEST_CASE(test_diffequ_applies_quadratic_characteristic_boundary);
     RUN_TEST_CASE(test_diffequ_solves_dependent_square_characteristic_pde);
+    RUN_TEST_CASE(test_diffequ_solves_parameter_forced_square_pde);
     RUN_TEST_CASE(test_diffequ_applies_dependent_square_boundary);
     RUN_TEST_CASE(test_diffequ_applies_signed_dependent_square_boundary);
     RUN_TEST_CASE(test_diffequ_solves_invariant_forced_square_pde);
@@ -3081,12 +3531,36 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_parameter_linear_pde);
     RUN_TEST_CASE(test_diffequ_parameter_linear_pde_uses_general_rule);
     RUN_TEST_CASE(test_diffequ_parameter_linear_pde_accepts_parameter_rate);
+    RUN_TEST_CASE(test_diffequ_solves_second_order_pde_distinct_roots);
+    RUN_TEST_CASE(test_diffequ_solves_second_order_pde_repeated_roots);
+    RUN_TEST_CASE(test_diffequ_solves_second_order_pde_degenerate_operator);
+    RUN_TEST_CASE(test_diffequ_solves_second_order_pde_surd_and_complex_roots);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_rejects_outside_family);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_solutions_satisfy_operator);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_exponential_forcing);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_resonant_forcing);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_forcing_superposition);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_particular_satisfies_equation);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_integrals);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_resonance);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_compositions);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_integral_evaluates);
 
     TEST_SECTION("README Output Example");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_solving_an_ode, readme_examples, "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_linearising_a_lie_symmetric_ode, readme_examples,
                                   "diffequation,readme,output,lie-symmetry");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_weighted_cyclic_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_parameter_forced_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_second_order_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_forced_second_order_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_single_phase_integral_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_clausen_pde, readme_examples,
                                   "diffequation,readme,output");
 
     return TESTS_EXIT_CODE();

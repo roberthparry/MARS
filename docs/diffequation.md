@@ -365,6 +365,80 @@ Boundary applications retain each coordinate separately. For `u(x, 0)`,
 `de_condition_argument_count(...)` returns two, and
 `de_condition_argument_at(...)` returns the borrowed `x` and `0` expressions.
 
+Homogeneous second-order PDEs with real numeric constant coefficients are
+reduced to a characteristic quadratic. For `A*z_xx + B*z_xy + C*z_yy = 0`,
+the roots of `A*m^2 + B*m + C = 0` give the characteristic coordinates.
+Distinct roots give `F(m1*x+y) + G(m2*x+y)`; a repeated root gives
+`F(m*x+y) + x*G(m*x+y)`. Coordinates are exchanged when necessary, and the
+pure mixed-derivative equation gives `F(x) + G(y)`. Both mixed-derivative
+orders are accepted and their coefficients are combined. For example:
+
+```text
+z_xx - 3z_yx + 2z_yy = 0
+→ z = F(x + y) + G(2x + y)
+```
+
+Here the operator factors as `(Dx-Dy)(Dx-2Dy)`. The native equation solver
+supplies the quadratic roots, including exact surds and complex roots.
+With real characteristic roots, `F` and `G` are arbitrary twice-differentiable
+functions; with complex roots they are analytic functions, related by
+conjugacy when a real-valued solution is required. This rule does not apply
+boundary data or admit lower-order terms or variable coefficients.
+
+For a non-zero right-hand side, the solver adds a verified particular
+solution. For example:
+
+```text
+z_xx + 5z_yx + 6z_yy = 2e^(x-y)
+→ z = F(y - 3x) + G(y - 2x) + exp(x - y)
+```
+
+For exponential forcing `f = K*exp(a*x+b*y+d)`, applying the operator
+multiplies `f` by `A*a*a+B*a*b+C*b*b`. When this is non-zero, division by
+that factor gives the particular solution. Resonance is handled by testing
+linear and quadratic coordinate multipliers instead. The native solver uses
+the fixed multiplier basis `1, x, y, x*x, x*y, y*y`, accepts a candidate only
+after symbolically verifying its differential equation, and applies
+superposition to sums. This also covers constant forcing and non-resonant
+affine sine and cosine forcing.
+
+When those candidates do not suffice, a forcing term depending on a single
+affine phase is reduced to an ordinary differential equation. For
+`s = a*x+b*y+c`, the factor `A*a*a+B*a*b+C*b*b` multiplies the second
+derivative of the particular solution with respect to `s`. The solver
+integrates twice when this factor is non-zero, and handles characteristic
+phases with coordinate multipliers. For example:
+
+```text
+z_xx + 5z_yx + 6z_yy = 2tanh(x-y)
+→ z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(2·(y - x))) - ln(2)·(x - y) + ½·(x - y)²
+```
+
+Both integrations use the native expression integrator. Its general rule for
+the logarithm of a hyperbolic cosine uses the existing dilogarithm `Li2`
+(written `Li₂` in expression text). The particular solution is smooth for
+every real `x-y`; its additive constant is absorbed into `F` or `G`.
+Antiderivatives are checked symbolically by the expression module, and
+unsupported integration steps remain exact integral nodes, evaluated from
+zero to their displayed upper limits, with collision-free bound variables.
+Each phase reduction must remove all
+dependence on the original coordinates from the transformed forcing; terms
+with genuinely independent coordinate dependence remain unsupported by this
+rule.
+
+Tangent forcing uses the native integrator's real [Clausen function](expression.md#clausen-functions)
+rule for logarithms of sine and cosine:
+
+```text
+z_xx + 5z_yx + 6z_yy = 2tan(x-y)
+→ z = F(y - 3x) + G(y - 2x) + ½·Cl₂(2x - 2y + π) + ln(2)·(x - y)
+```
+
+This is a real closed form on each region between consecutive poles
+`x-y = pi/2 + k*pi`; no solution is asserted across those singularities.
+The affine term `ln(2)*(x-y)` can also be absorbed into the arbitrary
+functions. No PDE-specific logarithmic integration is performed.
+
 For the two-dimensional Laplace equation without boundary data, Mars returns
 the general solution using arbitrary analytic functions `F` and `G`:
 
@@ -558,6 +632,26 @@ is accepted only after differentiation and exact substitution into the
 original PDE. Thus `sec(x)*phi_x + phi_y = cot(y)` uses
 `A(x) = sin(x)`, `B(y) = y`, and the particular integral `ln(sin(y))`.
 
+Symbols outside the differentiated coordinates are held as parameters. For
+example, the following PDE differentiates with respect to `x` and `t`, with
+`y` held fixed:
+
+```text
+zz_x - zz_t = y-x
+```
+
+Output:
+
+```text
+z = √(F(-t - x) + 2xy - x²)
+z = -√(F(-t - x) + 2xy - x²)
+```
+
+Setting `w = z*z` gives `w_x - w_t = 2(y-x)`. The arbitrary-function term
+is constant along this characteristic direction, and `2xy-x²` supplies a
+verified particular solution. Verification compares symbolic values even
+when one is expanded and the other is factored.
+
 ```text
 Dx(z) + Dy(z) = 6*(x+y)^2*z^2
 → z = 1/(F(x - y) - (x + y)^3)
@@ -648,6 +742,11 @@ The current symbolic scope is:
   data;
 - the two-dimensional Laplace equation in Cartesian or polar coordinates
   without boundary data, returned as a general harmonic family;
+- homogeneous second-order PDEs with real numeric constant coefficients,
+  including distinct, repeated and complex characteristic roots, without
+  boundary data;
+- corresponding forced second-order PDEs with verified particular solutions,
+  including affine exponential forcing, resonance and superposition;
 - selected nonlinear and variable-coefficient first-order characteristic
   PDEs; and
 - parameter-dependent first-order linear PDEs.
@@ -797,7 +896,7 @@ dY/dX = X*exp(Y),
 and the returned solution is
 
 ```text
-½·(x + y)² = 1 - exp(-(x - y)).
+½·(x + y)² = 1 - exp(y - x).
 ```
 
 The solver implementations are separated by differential-equation family:

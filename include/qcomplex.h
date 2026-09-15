@@ -410,6 +410,28 @@ qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
 qcomplex_t qc_zetap(qcomplex_t z);
 qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
 /**
+ * @brief Evaluate the holomorphic continuation of the integer-order Clausen function.
+ *
+ * For even orders this is (Li_order(exp(i z)) - Li_order(exp(-i z)))/(2i);
+ * for odd orders it is their half-sum, with principal polylogarithms.
+ * The branch is holomorphic on 0 < Re z < 2π and on its 2π translates.
+ * Nonreal points on Re z = 2kπ are excluded and return NaN. In the central
+ * strip Cl₁(z) = -log(2 sin(z/2)) and Cl_order'(z) = (-1)^order Cl_(order-1)(z).
+ * Real inputs use the real periodic function, including its endpoint limits.
+ *
+ * @param order Positive integer order.
+ * @param z Complex angle in radians.
+ * @return Cl_order(z), or NaN for order zero, non-finite input or an excluded branch cut.
+ */
+qcomplex_t qc_clausen(unsigned long order, qcomplex_t z);
+
+/**
+ * @brief Evaluate Cl₂ on the branch and domain documented by qc_clausen().
+ * @param z Complex angle in radians.
+ * @return The holomorphic Clausen function, agreeing with qf_clausen2() on the real axis.
+ */
+qcomplex_t qc_clausen2(qcomplex_t z);
+/**
  * @brief Compute the order-one polylogarithm Li₁(z).
  *
  * @param z Complex argument.
