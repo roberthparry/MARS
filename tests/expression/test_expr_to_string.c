@@ -2235,6 +2235,45 @@ static void test_to_string_appell_f1(void)
     }
 }
 
+static void test_to_string_clausen(void)
+{
+    static const struct {
+        const char *source;
+        const char *expression;
+        const char *function;
+        const char *TeX;
+    } cases[] = {
+        {"Cl2(x)", "Cl₂(x)", "return clausen2(x).", "\\operatorname{Cl}_{2}(x)"},
+        {"Cl(3,x)", "Cl(3, x)", "return cl(3, x).", "\\operatorname{Cl}_{3}(x)"},
+        {"cl(n,x)", "Cl(n, x)", "return cl(n, x).", "\\operatorname{Cl}_{n}(x)"},
+        {"cl(n+1,x)", "Cl(n + 1, x)", "return cl(n + 1, x).", "\\operatorname{Cl}_{n + 1}(x)"},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *expression = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        char *function = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+        char *TeX = expr ? expr_to_string(expr, style_LATEX) : NULL;
+        expr_t *roundtrip = expression ? expr_from_string(expression, NULL) : NULL;
+        char *roundtrip_text = roundtrip ? expr_to_string(roundtrip, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(expression);
+        ASSERT_NOT_NULL(function);
+        ASSERT_NOT_NULL(TeX);
+        ASSERT_NOT_NULL(roundtrip_text);
+        TEST_ASSERT_STR_EQ(expression, cases[i].expression);
+        ASSERT_NOT_NULL(strstr(function, cases[i].function));
+        ASSERT_NOT_NULL(strstr(TeX, cases[i].TeX));
+        TEST_ASSERT_STR_EQ(roundtrip_text, expression);
+        free(roundtrip_text);
+        expr_free(roundtrip);
+        free(TeX);
+        free(function);
+        free(expression);
+        expr_free(expr);
+    }
+}
+
 static void test_to_string_function_uses_lowercase_builtin_names(void)
 {
     static const struct {
@@ -2265,6 +2304,8 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
         {"{ BesselY(n, x) }", "return bessely("},
         {"{ harmonic_poly(n, x) }", "return harmonicpoly("},
         {"{ legendre_chi(s, x) }", "return legendrechi("},
+        {"{ Cl2(x) }", "return clausen2("},
+        {"{ Cl(n, x) }", "return cl("},
         {"{ LommelS(mu, nu, x) }", "return lommels("},
         {"{ LerchPhi(z, s, a) }", "return lerchphi("},
         {"{ qdigamma(q, z) }", "return qdigamma("},
@@ -2299,6 +2340,7 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
 
 void test_to_string_all(void)
 {
+    TEST_RUN_SUBTEST(test_to_string_clausen, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var_TeX, NULL);

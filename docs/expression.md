@@ -847,6 +847,8 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_Li(const expr_t *expr)` — Li(x), logarithmic integral on the principal branch
 - `expr_t *expr_E1(const expr_t *expr)` — E₁(x), exponential integral
 - `expr_t *expr_dilog(const expr_t *expr)` — principal dilogarithm Li₂(x)
+- `expr_t *expr_clausen2(const expr_t *argument)` — order-two Clausen function, with native differentiation, integration and summation support
+- `expr_t *expr_clausen(unsigned long order, const expr_t *argument)` — positive integer-order Clausen family
 - `expr_t *expr_polylog1(const expr_t *expr)` — order-one polylogarithm Li₁(x) = −Log(1−x), with dedicated derivative, reverse-mode and antiderivative operations
 - `expr_t *expr_polylog(unsigned int order, const expr_t *expr)` — polylogarithm Liₙ(x) for non-negative integer orders currently supported by the implementation
 - `expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)` — native harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k with a symbolic degree expression
@@ -878,6 +880,38 @@ styles render the former as Hₙ(x); `style_FUNCTION` emits the typeable
 differentiation uses `(1 - x^n)/(1 - x)`, and direct integration uses
 `x*Hn(n, x) - Hn(n + 1, x) + x`. These rules remain available under repeated
 differentiation.
+
+#### Clausen functions
+
+`expr_clausen2(argument)` constructs the order-two Clausen function;
+`expr_clausen(order, argument)` constructs a fixed positive integer order.
+Arguments are angles in radians. Even orders use the real sine Fourier
+series and odd orders the cosine Fourier series; numerical evaluation uses
+the real or holomorphic semantics of [the number API](number.md#clausen-functions).
+
+The parser accepts `Cl2`, `cl2`, `Cl₂`, `cl₂`, `clausen`, `Clausen`,
+`clausen2`, `Clausen2` and `clausen_2` for order two, and `Cl(n,x)` or
+`cl(n,x)` for the general family. Expression text displays `Cl₂`; function
+notation uses `clausen2`; TeX uses \(\operatorname{Cl}_{2}\). General orders
+display the corresponding subscript in TeX. The standard abbreviation is
+Latin, so there is no Greek alias.
+
+For `n >= 2`, the derivative is `(-1)^n*Cl(n-1,x)`; the derivative of order
+one is `-cot(x/2)/2`. An antiderivative of `Cl(n,x)` is
+`(-1)^(n+1)*Cl(n+1,x)`. Affine arguments include their chain-rule factors,
+and symbolic and reverse-mode differentiation are supported.
+
+The integrator reduces logarithms of affine sine and cosine to order-two
+Clausen functions. Plain real logarithms require positive arguments;
+logarithms of absolute values are valid between consecutive zeros.
+Differential-equation solvers use this same native integration API; see
+the tested [tangent-forced PDE example](diffequation.md) for its real closed
+form and domain.
+
+The summation engine recognises the defining infinite Fourier series where
+the angle is provably real and the series converges. It also recognises a
+complete finite period of equally spaced Clausen arguments. It does not
+apply real Fourier identities to unproved complex bindings.
 
 ### Value-Only Functions (owning)
 

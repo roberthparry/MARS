@@ -898,6 +898,84 @@ void test_qf_polylog(void)
     printf(C_CYAN "TEST: qf_dilog/qf_polylog/qf_harmonic_poly\n" C_RESET);
 
     {
+        qfloat_t catalan = qf_from_string("0.91596559417721901505460351493238411077414937428167");
+        qfloat_t value = qf_clausen2(QF_ONE);
+        qfloat_t tiny = qf_from_string("1e-100");
+        qfloat_t near_pi = qf_sub(QF_PI, qf_from_string("1e-20"));
+        qfloat_t distance = qf_sub(QF_PI, near_pi);
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(value,
+            qf_from_string("1.0139591323607685042945743388859146875611792800777"), 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(QF_PI_2), catalan, 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(QF_PI_3),
+            qf_from_string("1.0149416064096536250212025542745202859416893075303"), 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE(qf_clausen2(QF_ZERO), QF_ZERO);
+        TEST_ASSERT_QFLOAT_CLOSE(qf_clausen2(QF_PI), QF_ZERO);
+        TEST_ASSERT_QFLOAT_CLOSE(qf_clausen2(QF_2PI), QF_ZERO);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(qf_neg(QF_ONE)), qf_neg(value), 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(qf_add(QF_ONE, QF_2PI)), value, 1e-29);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_div(qf_clausen2(tiny), tiny), qf_sub(QF_ONE, qf_log(tiny)), 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_div(qf_clausen2(near_pi), distance), QF_LN2, 1e-30);
+        /* References use the exact binary64 inputs, independently reduced at 500 decimal digits. */
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(qf_from_double(1e100)),
+            qf_from_string("-0.75851209157936161176306076983901149667753654672962"), 1e-29);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen2(qf_from_double(1e300)),
+            qf_from_string("-0.62636096642061978455872796607479383268167729900458"), 1e-29);
+        TEST_ASSERT_TRUE(qf_isnan(qf_clausen(0ul, QF_ONE)), "Clausen order zero is undefined");
+        TEST_ASSERT_TRUE(qf_isnan(qf_clausen2(QF_INF)), "Clausen infinity is undefined");
+        TEST_ASSERT_TRUE(qf_isnan(qf_clausen2(QF_NAN)), "Clausen NaN propagates");
+        TEST_ASSERT_TRUE(qf_isposinf(qf_clausen(1ul, QF_ZERO)), "Cl1 has a logarithmic pole at zero");
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(1ul, QF_PI), qf_neg(QF_LN2), 1e-30);
+
+        for (unsigned long order = 2ul; order <= 8ul; ++order) {
+            qfloat_t h = qf_from_double(1e-8);
+            qfloat_t plus = qf_clausen(order, qf_add(QF_ONE, h));
+            qfloat_t minus = qf_clausen(order, qf_sub(QF_ONE, h));
+            qfloat_t derivative = qf_div(qf_sub(plus, minus), qf_mul_double(h, 2.0));
+            qfloat_t expected = qf_clausen(order - 1ul, QF_ONE);
+            qfloat_t positive = qf_clausen(order, QF_ONE);
+            qfloat_t parity = (order & 1ul) ? positive : qf_neg(positive);
+
+            if (order & 1ul)
+                expected = qf_neg(expected);
+            TEST_ASSERT_QFLOAT_CLOSE_TOL(derivative, expected, 1e-15);
+            TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(order, qf_neg(QF_ONE)), parity, 1e-29);
+            TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(order, qf_add(QF_ONE, QF_2PI)), positive, 1e-28);
+            if (order & 1ul) {
+                qfloat_t zeta = qf_zeta(qf_from_double((double)order));
+                qfloat_t eta = qf_mul(qf_sub(QF_ONE, qf_pow_int(QF_TWO, 1 - (int)order)), zeta);
+
+                TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(order, QF_ZERO), zeta, 1e-29);
+                TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(order, QF_PI_2),
+                                             qf_neg(qf_mul(qf_pow_int(QF_TWO, -(int)order), eta)), 1e-29);
+            }
+        }
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(128ul, QF_ONE), qf_sin(QF_ONE), 1e-30);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_clausen(129ul, QF_ONE), qf_cos(QF_ONE), 1e-30);
+    }
+
+    {
+        qfloat_t minus_one = qf_neg(QF_ONE);
+        qfloat_t pi_square = qf_sqr(QF_PI);
+        qfloat_t want = qf_neg(qf_div(pi_square, qf_from_double(12.0)));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_dilog(minus_one), want, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polylog(qf_from_double(2.0), minus_one), want, 1e-28);
+        static const double magnitudes[] = {2.0, 10.0, 1000.0};
+
+        for (size_t i = 0u; i < sizeof(magnitudes) / sizeof(magnitudes[0]); ++i) {
+            qfloat_t magnitude = qf_from_double(magnitudes[i]);
+            qfloat_t x = qf_neg(magnitude);
+            qfloat_t inverse = qf_div(QF_ONE, x);
+            qfloat_t sum = qf_add(qf_dilog(x), qf_dilog(inverse));
+            qfloat_t expected = qf_neg(qf_add(qf_div(pi_square, qf_from_double(6.0)),
+                                             qf_mul_double(qf_sqr(qf_log(magnitude)), 0.5)));
+
+            TEST_ASSERT_QFLOAT_CLOSE_TOL(sum, expected, 1e-26);
+        }
+    }
+
+    {
         qfloat_t q = qf_from_double(0.5);
         qfloat_t psi_one = qf_qdigamma(q, QF_ONE);
         qfloat_t psi_two = qf_qdigamma(q, qf_from_double(2.0));

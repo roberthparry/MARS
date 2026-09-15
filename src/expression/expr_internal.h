@@ -104,6 +104,8 @@ typedef enum {
     EXPR_KIND_LI,
     EXPR_KIND_E1,
     EXPR_KIND_DILOG,
+    EXPR_KIND_CLAUSEN2,
+    EXPR_KIND_CLAUSEN,
     EXPR_KIND_POLYLOG1,
     EXPR_KIND_POLYLOG,
     EXPR_KIND_HARMONIC_POLY,
@@ -440,6 +442,10 @@ extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog1;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_harmonic_poly;
+extern const expr_ops_t ops_clausen2;
+extern const expr_ops_t ops_clausen;
+expr_t *expr_clausen_xp(const expr_t *order, const expr_t *argument);
+expr_t *expr_clausen_sum_closed_form(const expr_t *expr);
 extern const expr_ops_t ops_lerch_phi;
 extern const expr_ops_t ops_lerch_phi_pack;
 extern const expr_ops_t ops_legendre_chi;

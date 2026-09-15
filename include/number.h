@@ -963,6 +963,27 @@ number_t num_zatahp(const number_t s, const number_t a);
 number_t num_zetap(const number_t number);
 number_t num_dilog(const number_t number);
 /**
+ * @brief Evaluate the integer-order Clausen function at the number's native precision.
+ *
+ * For real angles, even orders use the sine Fourier series and odd orders the cosine series,
+ * with Cl₁(theta) = -log(2 |sin(theta/2)|); evaluation remains entirely real.
+ * For nonreal angles the principal polylogarithm difference (even order) or sum (odd order)
+ * defines the holomorphic branch described by qc_clausen(). Nonreal points on Re z = 2kπ
+ * are excluded. For order >= 2 the derivative is (-1)^order Cl_(order-1).
+ *
+ * @param order Positive integer order.
+ * @param theta Real or complex angle in radians.
+ * @return An owning number containing Cl_order(theta), or NaN outside the domain.
+ */
+number_t num_clausen(unsigned long order, const number_t theta);
+
+/**
+ * @brief Evaluate Cl₂ with the real or holomorphic semantics of num_clausen().
+ * @param theta Real or complex angle in radians.
+ * @return An owning number containing Cl₂(theta).
+ */
+number_t num_clausen2(const number_t theta);
+/**
  * @brief Evaluate the order-one polylogarithm Li₁(z).
  *
  * @param number Real or complex argument on the principal branch.

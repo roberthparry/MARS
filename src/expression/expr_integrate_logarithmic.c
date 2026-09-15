@@ -3,6 +3,140 @@
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 
+/* The absolute-value form is valid away from zeros; a plain real logarithm requires a positive argument. */
+static const expr_t *log_trigonometric_argument(const expr_t *expr, bool *cosine)
+{
+    if (!expr || (!expr_is_op(expr, &ops_log) && !expr_is_op(expr, &ops_log10)))
+        return NULL;
+    const expr_t *trig = expr->a;
+
+    if (expr_is_op(trig, &ops_abs))
+        trig = trig->a;
+    *cosine = expr_is_op(trig, &ops_cos);
+    return (*cosine || expr_is_op(trig, &ops_sin)) && !expr_integrate_contains_imaginary_unit(trig->a)
+               ? trig->a : NULL;
+}
+
+static expr_t *log_trigonometric_clausen_phase(const expr_t *argument, bool cosine)
+{
+    expr_t *twice = expr_mul_long(argument, 2);
+
+    if (cosine)
+        return expr_add_simplify_owned(expr_new_named_const(NUM_PI, "@pi"), twice);
+    return twice;
+}
+
+/* Expand real logarithmic identities for verification without changing the preferred display form. */
+static expr_t *expand_real_logarithmic_identities(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    bool cosine = false;
+    const expr_t *argument = log_trigonometric_argument(expr, &cosine);
+
+    if (argument) {
+        expr_t *phase = log_trigonometric_clausen_phase(argument, cosine);
+        expr_t *first = phase ? expr_clausen(1u, phase) : NULL;
+        expr_t *two = expr_new_const(NUM_TWO);
+        expr_t *log_two = two ? expr_log(two) : NULL;
+        expr_t *negative = first ? expr_neg(first) : NULL;
+        expr_t *out = negative && log_two ? simplify_owned(expr_sub(negative, log_two)) : NULL;
+
+        if (out && expr_is_op(expr, &ops_log10)) {
+            expr_t *scaled = expr_div_num(out, &NUM_LN10);
+
+            expr_free(out);
+            out = simplify_owned(scaled);
+        }
+        expr_free(negative);
+        expr_free(log_two);
+        expr_free(first);
+        expr_free(two);
+        expr_free(phase);
+        return out;
+    }
+    if ((expr_is_op(expr, &ops_log) || expr_is_op(expr, &ops_log10)) &&
+        expr_is_op(expr->a, &ops_cosh) && expr->a->a &&
+        !expr_integrate_contains_imaginary_unit(expr->a->a)) {
+        const expr_t *u = expr->a->a;
+        expr_t *exponent = expr_mul_long(u, -2);
+        expr_t *exponential = exponent ? expr_exp(exponent) : NULL;
+        expr_t *sum = exponential ? expr_add_simplify_owned(exponential, expr_const_one()) : NULL;
+        expr_t *log_sum = sum ? expr_log(sum) : NULL;
+        expr_t *two = expr_new_const(NUM_TWO);
+        expr_t *log_two = two ? expr_log(two) : NULL;
+        expr_t *difference = log_sum && log_two ? expr_sub(log_sum, log_two) : NULL;
+        expr_t *out = difference ? expr_add_simplify_owned(difference, expr_clone(u)) : NULL;
+
+        if (out && expr_is_op(expr, &ops_log10)) {
+            expr_t *scaled = expr_div_num(out, &NUM_LN10);
+
+            expr_free(out);
+            out = simplify_owned(scaled);
+        }
+        expr_free(log_two);
+        expr_free(two);
+        expr_free(log_sum);
+        expr_free(sum);
+        expr_free(exponent);
+        return out;
+    }
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub) ||
+        expr_is_op(expr, &ops_mul) || expr_is_op(expr, &ops_div)) {
+        expr_t *left = expand_real_logarithmic_identities(expr->a);
+        expr_t *right = expand_real_logarithmic_identities(expr->b);
+        expr_t *out = left && right ? expr->ops->apply_binary(left, right) : NULL;
+
+        expr_free(right);
+        expr_free(left);
+        return simplify_owned(out);
+    }
+    if (expr_is_op(expr, &ops_neg))
+        return expr_negate_owned(expand_real_logarithmic_identities(expr->a));
+    return expr_clone(expr);
+}
+
+static bool antiderivative_terms_equal(const expr_t *actual, const expr_t *expected)
+{
+    expr_t *difference = actual && expected ? simplify_owned(expr_sub(actual, expected)) : NULL;
+    bool equal = difference && expr_is_exact_zero(difference);
+
+    if (!equal && difference) {
+        expr_t *expanded = simplify_owned(expr_display_expanded(difference));
+
+        equal = expanded && expr_is_exact_zero(expanded);
+        if (!equal && expanded && expr_is_addsub(expanded)) {
+            expr_t *opposite = expr_is_op(expanded, &ops_sub) ? expr_clone(expanded->b) : expr_neg(expanded->b);
+
+            equal = opposite && expr_equal_exact_local(expanded->a, opposite);
+            expr_free(opposite);
+        }
+        expr_free(expanded);
+    }
+    expr_free(difference);
+    return equal;
+}
+
+/* Verify native antiderivatives without requiring callers to know special-function identities. */
+bool expr_verify_antiderivative_real_internal(const expr_t *primitive, const expr_t *integrand, const expr_t *wrt)
+{
+    if (!primitive || !integrand || !wrt)
+        return false;
+    expr_t *derivative = expr_create_deriv(primitive, wrt);
+    bool verified = derivative && antiderivative_terms_equal(derivative, integrand);
+
+    if (!verified && derivative) {
+        expr_t *actual = expand_real_logarithmic_identities(derivative);
+        expr_t *expected = expand_real_logarithmic_identities(integrand);
+
+        verified = actual && expected && antiderivative_terms_equal(actual, expected);
+        expr_free(expected);
+        expr_free(actual);
+    }
+    expr_free(derivative);
+    return verified;
+}
+
 expr_t *integrate_log_over_proportional_affine(const expr_t *expr, const expr_t *wrt)
 {
     number_t log_constant = num_new();
@@ -26,7 +160,7 @@ expr_t *integrate_log_over_proportional_affine(const expr_t *expr, const expr_t 
     number_t scaled_log_constant = num_mul(scale, log_constant);
     if (num_eq(denom_constant, scaled_log_constant)) {
         expr_t *log_term = expr_log(expr->a->a);
-        expr_t *log_sq = log_term ? expr_pow(log_term, &NUM_TWO) : NULL;
+        expr_t *log_sq = log_term ? expr_mul(log_term, log_term) : NULL;
         number_t denom = num_mul(denom_coeff, NUM_TWO);
 
         out = div_number_owned_consuming(log_sq, &denom);
@@ -42,6 +176,99 @@ expr_t *integrate_log_over_proportional_affine(const expr_t *expr, const expr_t 
     return out;
 }
 
+/* For real u, integrate ln(cosh(u)) using Li2(-exp(-2u)); the additive constant is arbitrary. */
+static expr_t *integrate_log_cosh_affine(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *constant = NULL;
+    expr_t *coeff = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || (!expr_is_op(expr, &ops_log) && !expr_is_op(expr, &ops_log10)) ||
+        !expr_is_op(expr->a, &ops_cosh) || !expr->a->a ||
+        !match_symbolic_affine_constant_and_coeff(expr->a->a, wrt, &constant, &coeff) ||
+        expr_const_is_zero(coeff) || expr_integrate_contains_imaginary_unit(expr->a->a))
+        goto cleanup;
+
+    const expr_t *u = expr->a->a;
+    expr_t *square = expr_mul(u, u);
+    expr_t *half_square = square ? expr_div_long(square, 2) : NULL;
+    expr_t *two = expr_new_const(NUM_TWO);
+    expr_t *log_two = two ? expr_log(two) : NULL;
+    expr_t *linear = log_two ? expr_mul(u, log_two) : NULL;
+    expr_t *polynomial = half_square && linear ? expr_sub(half_square, linear) : NULL;
+    expr_t *exponent = expr_mul_long(u, -2);
+    expr_t *exponential = exponent ? expr_exp(exponent) : NULL;
+    expr_t *argument = exponential ? expr_neg(exponential) : NULL;
+    expr_t *dilog = argument ? expr_dilog(argument) : NULL;
+    expr_t *half_dilog = dilog ? expr_div_long(dilog, 2) : NULL;
+    expr_t *sum = polynomial && half_dilog ? expr_add(polynomial, half_dilog) : NULL;
+
+    out = sum ? simplify_owned(expr_div(sum, coeff)) : NULL;
+    if (out && expr_is_op(expr, &ops_log10)) {
+        expr_t *scaled = expr_div_num(out, &NUM_LN10);
+
+        expr_free(out);
+        out = simplify_owned(scaled);
+    }
+    expr_free(sum);
+    expr_free(half_dilog);
+    expr_free(dilog);
+    expr_free(argument);
+    expr_free(exponential);
+    expr_free(exponent);
+    expr_free(polynomial);
+    expr_free(linear);
+    expr_free(log_two);
+    expr_free(two);
+    expr_free(half_square);
+    expr_free(square);
+
+cleanup:
+    expr_free(coeff);
+    expr_free(constant);
+    return out;
+}
+
+static expr_t *integrate_log_trigonometric_affine(const expr_t *expr, const expr_t *wrt)
+{
+    bool cosine = false;
+    const expr_t *argument = log_trigonometric_argument(expr, &cosine);
+    expr_t *constant = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *out = NULL;
+
+    if (!argument || !match_symbolic_affine_constant_and_coeff(argument, wrt, &constant, &coefficient) ||
+        expr_const_is_zero(coefficient))
+        goto cleanup;
+    expr_t *phase = log_trigonometric_clausen_phase(argument, cosine);
+    expr_t *clausen = phase ? expr_clausen2(phase) : NULL;
+    expr_t *half_clausen = clausen ? expr_div_long(clausen, -2) : NULL;
+    expr_t *two = expr_new_const(NUM_TWO);
+    expr_t *log_two = two ? expr_log(two) : NULL;
+    expr_t *linear = log_two ? expr_mul(argument, log_two) : NULL;
+    expr_t *numerator = half_clausen && linear ? expr_sub(half_clausen, linear) : NULL;
+
+    out = numerator ? simplify_owned(expr_div(numerator, coefficient)) : NULL;
+    if (out && expr_is_op(expr, &ops_log10)) {
+        expr_t *scaled = expr_div_num(out, &NUM_LN10);
+
+        expr_free(out);
+        out = simplify_owned(scaled);
+    }
+    expr_free(numerator);
+    expr_free(linear);
+    expr_free(log_two);
+    expr_free(two);
+    expr_free(half_clausen);
+    expr_free(clausen);
+    expr_free(phase);
+
+cleanup:
+    expr_free(coefficient);
+    expr_free(constant);
+    return out;
+}
+
 expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *x_log_x;
@@ -53,6 +280,12 @@ expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
     if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
+        raw = integrate_log_trigonometric_affine(expr, wrt);
+        if (raw)
+            return raw;
+        raw = integrate_log_cosh_affine(expr, wrt);
+        if (raw)
+            return raw;
         raw = integrate_log_of_symbolic_affine(expr, wrt);
         if (raw)
             return raw;
@@ -83,6 +316,12 @@ expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
     if (!match_affine_unary(expr, wrt, EXPR_PATTERN_UNARY_LOG10, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
+        raw = integrate_log_trigonometric_affine(expr, wrt);
+        if (raw)
+            return raw;
+        raw = integrate_log_cosh_affine(expr, wrt);
+        if (raw)
+            return raw;
         if (!expr_integrate_contains_imaginary_unit(expr) || !expr || !expr->a ||
             !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &symbolic_constant, &symbolic_coeff) ||
             expr_const_is_zero(symbolic_coeff)) {
@@ -178,7 +417,7 @@ expr_t *integrate_log_over_symbolic_proportional_affine(const expr_t *expr, cons
         goto cleanup;
 
     log_term = expr_log(expr->a->a);
-    log_sq = log_term ? expr_pow(log_term, &NUM_TWO) : NULL;
+    log_sq = log_term ? expr_mul(log_term, log_term) : NULL;
     denom = denom_coeff ? expr_mul_num(denom_coeff, &NUM_TWO) : NULL;
     out = (log_sq && denom) ? expr_div(log_sq, denom) : NULL;
     out = simplify_owned(out);
@@ -216,7 +455,7 @@ static expr_t *build_symbolic_quadratic_reciprocal_integral(const expr_t *wrt, c
 
     a_c = expr_mul(quad_coeff, constant_coeff);
     four_ac = a_c ? expr_mul_num(a_c, &four) : NULL;
-    linear_sq = expr_pow(linear_coeff, &NUM_TWO);
+    linear_sq = expr_mul(linear_coeff, linear_coeff);
     delta = (four_ac && linear_sq) ? expr_sub(four_ac, linear_sq) : NULL;
     delta = simplify_owned(delta);
     sqrt_delta = delta ? expr_sqrt(delta) : NULL;
@@ -325,12 +564,12 @@ expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr, const expr_t
         goto cleanup;
 
     log_u = expr_log(log_expr->a);
-    x_sq = expr_pow(wrt, &NUM_TWO);
+    x_sq = expr_mul(wrt, wrt);
     x_sq_log = (x_sq && log_u) ? expr_mul(x_sq, log_u) : NULL;
     first = x_sq_log ? mul_number_owned(x_sq_log, NUM_HALF) : NULL;
     x_sq_log = NULL;
 
-    x_sq_for_quarter = expr_pow(wrt, &NUM_TWO);
+    x_sq_for_quarter = expr_mul(wrt, wrt);
     second = x_sq_for_quarter ? mul_number_owned(x_sq_for_quarter, neg_quarter) : NULL;
     x_sq_for_quarter = NULL;
 
@@ -338,8 +577,8 @@ expr_t *integrate_wrt_times_log_symbolic_affine(const expr_t *expr, const expr_t
     constant_over_two_coeff = (constant_term && two_coeff) ? expr_div(constant_term, two_coeff) : NULL;
     third = constant_over_two_coeff ? expr_mul(wrt, constant_over_two_coeff) : NULL;
 
-    constant_sq = expr_pow(constant_term, &NUM_TWO);
-    coeff_sq = expr_pow(coeff, &NUM_TWO);
+    constant_sq = expr_mul(constant_term, constant_term);
+    coeff_sq = expr_mul(coeff, coeff);
     two_coeff_sq = coeff_sq ? expr_mul_num(coeff_sq, &NUM_TWO) : NULL;
     constant_sq_over_two_coeff_sq = (constant_sq && two_coeff_sq) ? expr_div(constant_sq, two_coeff_sq) : NULL;
     scaled_log = (constant_sq_over_two_coeff_sq && log_u) ? expr_mul(constant_sq_over_two_coeff_sq, log_u) : NULL;
@@ -409,12 +648,12 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr, const exp
         goto cleanup;
 
     log_q = expr_log(log_expr->a);
-    x_sq = expr_pow(wrt, &NUM_TWO);
+    x_sq = expr_mul(wrt, wrt);
     x_sq_log = (x_sq && log_q) ? expr_mul(x_sq, log_q) : NULL;
     first = x_sq_log ? mul_number_owned(x_sq_log, NUM_HALF) : NULL;
     x_sq_log = NULL;
 
-    x_sq_for_half = expr_pow(wrt, &NUM_TWO);
+    x_sq_for_half = expr_mul(wrt, wrt);
     second = x_sq_for_half ? mul_number_owned(x_sq_for_half, neg_half) : NULL;
     x_sq_for_half = NULL;
 
@@ -422,7 +661,7 @@ expr_t *integrate_wrt_times_log_symbolic_quadratic(const expr_t *expr, const exp
     linear_over_two_a = (linear_coeff && two_a) ? expr_div(linear_coeff, two_a) : NULL;
     third = linear_over_two_a ? expr_mul(wrt, linear_over_two_a) : NULL;
 
-    linear_sq = expr_pow(linear_coeff, &NUM_TWO);
+    linear_sq = expr_mul(linear_coeff, linear_coeff);
     linear_sq_over_a = (linear_sq && quad_coeff) ? expr_div(linear_sq, quad_coeff) : NULL;
     two_c = constant_coeff ? expr_mul_num(constant_coeff, &NUM_TWO) : NULL;
     numer_linear = (linear_sq_over_a && two_c) ? expr_sub(linear_sq_over_a, two_c) : NULL;

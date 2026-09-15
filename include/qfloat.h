@@ -1288,6 +1288,26 @@ qfloat_t qf_zetap(qfloat_t x);
 qfloat_t qf_dilog(qfloat_t x);
 
 /**
+ * @brief Evaluate the real, 2π-periodic Clausen function of positive integer order.
+ *
+ * Even orders use sum sin(k theta)/k^order; odd orders use sum cos(k theta)/k^order.
+ * Cl₁(theta) = -log(2 |sin(theta/2)|). Evaluation uses real arithmetic throughout.
+ * For order >= 2, the derivative is (-1)^order Cl_(order-1).
+ *
+ * @param order Positive integer order.
+ * @param theta Real angle in radians.
+ * @return Cl_order(theta), positive infinity at the Cl₁ poles, or NaN for order zero or non-finite input.
+ */
+qfloat_t qf_clausen(unsigned long order, qfloat_t theta);
+
+/**
+ * @brief Evaluate Cl₂(theta) = sum sin(k theta)/k² using real arithmetic.
+ * @param theta Real angle in radians.
+ * @return The odd, 2π-periodic Clausen function, or NaN for non-finite input.
+ */
+qfloat_t qf_clausen2(qfloat_t theta);
+
+/**
  * @brief Compute the order-one polylogarithm Li₁(x).
  *
  * @param x Input value.

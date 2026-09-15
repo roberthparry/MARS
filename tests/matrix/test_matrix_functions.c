@@ -67,6 +67,7 @@ static void test_number_function_matrix_parity(void)
         {"zeta", mat_zeta, num_zeta, 2.5},
         {"zetap", mat_zetap, num_zetap, 2.5},
         {"dilog", mat_dilog, num_dilog, 0.25},
+        {"clausen2", mat_clausen2, num_clausen2, 0.7},
         {"polylog1", mat_polylog1, num_polylog1, 0.25},
     };
 
@@ -93,6 +94,228 @@ static void test_number_function_matrix_parity(void)
         num_destroy(&want);
         num_destroy(&input);
     }
+}
+
+static void check_clausen_entry(const char *label, const matrix_t *A, size_t row, size_t col, number_t want)
+{
+    number_t got = A ? mat_get_num(A, row, col) : num_clone(NUM_NAN);
+
+    check_num_close_local(label, got, want, 1e-11);
+    num_destroy(&got);
+}
+
+static void test_mat_clausen_diagonal(void)
+{
+    NUM_SCOPE(scope);
+    number_t angle = num_mul(NUM_PI, NUM_HALF);
+    number_t negative = num_neg(angle);
+    number_t values[] = {angle, NUM_ZERO, NUM_ZERO, negative};
+    matrix_t *A = mat_create(2u, 2u, values);
+    matrix_t *unary = mat_clausen2(A);
+    matrix_t *invalid_order = mat_clausen(0ul, A);
+
+    printf(C_CYAN "TEST: Clausen matrix real diagonal values and order parity\n" C_RESET);
+    ASSERT_NOT_NULL(unary);
+    check_bool("Clausen rejects order zero for a square matrix", invalid_order == NULL);
+    mat_free(invalid_order);
+    check_clausen_entry("Cl2(pi/2) is Catalan's constant", unary, 0u, 0u,
+                        num_create_from_string("0.915965594177219015054603514932384110774"));
+    for (unsigned long order = 1ul; order <= 5ul; ++order) {
+        matrix_t *result = mat_clausen(order, A);
+        number_t want = num_clausen(order, angle);
+        number_t negative_want = (order & 1ul) ? num_clone(want) : num_neg(want);
+
+        ASSERT_NOT_NULL(result);
+        check_clausen_entry("Cl_n diagonal positive angle", result, 0u, 0u, want);
+        check_clausen_entry("Cl_n diagonal negative angle parity", result, 1u, 1u, negative_want);
+        check_clausen_entry("Cl_n diagonal off-diagonal stays zero", result, 0u, 1u, NUM_ZERO);
+        if (order == 1ul)
+            check_clausen_entry("Cl1(pi/2) = -log(2)/2", result, 0u, 0u,
+                                num_neg(num_mul(NUM_HALF, num_log(NUM_TWO))));
+        if (order == 2ul) {
+            check_clausen_entry("generalised order two agrees with unary Cl2", result, 0u, 0u,
+                                unary ? mat_get_num(unary, 0u, 0u) : NUM_NAN);
+        }
+        mat_free(result);
+    }
+    mat_free(unary);
+    mat_free(A);
+
+    {
+        number_t rectangular_values[] = {NUM_ONE, NUM_TWO};
+        matrix_t *rectangular = mat_create(1u, 2u, rectangular_values);
+        matrix_t *invalid = mat_clausen(0ul, rectangular);
+
+        check_bool("Clausen rejects order zero", invalid == NULL);
+        mat_free(invalid);
+        invalid = mat_clausen(3ul, rectangular);
+        check_bool("Clausen rejects rectangular arguments", invalid == NULL);
+        mat_free(invalid);
+        invalid = mat_clausen2(rectangular);
+        check_bool("Cl2 rejects rectangular arguments", invalid == NULL);
+        mat_free(invalid);
+        invalid = mat_clausen2(NULL);
+        check_bool("Cl2 rejects NULL", invalid == NULL);
+        mat_free(invalid);
+        invalid = mat_clausen(3ul, NULL);
+        check_bool("Clausen rejects NULL", invalid == NULL);
+        mat_free(invalid);
+        mat_free(rectangular);
+    }
+}
+
+static void test_mat_clausen_nondiagonal(void)
+{
+    NUM_SCOPE(scope);
+    number_t half = num_clone(NUM_HALF);
+    number_t low = num_clone(half);
+    number_t high = num_add(NUM_ONE, half);
+    number_t real_values[] = {NUM_ONE, half, half, NUM_ONE};
+    matrix_t *real = mat_create(2u, 2u, real_values);
+    number_t a = num_add(NUM_ONE, num_mul(NUM_I, num_create_from_string("1/4")));
+    number_t b = num_sub(NUM_TWO, num_mul(NUM_I, NUM_HALF));
+    number_t edge = num_sub(NUM_TWO, NUM_I);
+    number_t complex_values[] = {a, edge, NUM_ZERO, b};
+    matrix_t *complex = mat_create(2u, 2u, complex_values);
+
+    printf(C_CYAN "TEST: Clausen matrix functional calculus on dense and complex triangular arguments\n" C_RESET);
+    for (unsigned long order = 1ul; order <= 4ul; ++order) {
+        matrix_t *dense_result = mat_clausen(order, real);
+        matrix_t *complex_result = mat_clausen(order, complex);
+        number_t f_low = num_clausen(order, low);
+        number_t f_high = num_clausen(order, high);
+        number_t diagonal = num_mul(NUM_HALF, num_add(f_high, f_low));
+        number_t offdiagonal = num_mul(NUM_HALF, num_sub(f_high, f_low));
+        number_t fa = num_clausen(order, a);
+        number_t fb = num_clausen(order, b);
+        number_t divided_difference = num_div(num_sub(fa, fb), num_sub(a, b));
+
+        ASSERT_NOT_NULL(dense_result);
+        ASSERT_NOT_NULL(complex_result);
+        check_clausen_entry("dense Cl_n diagonal from eigenvalues", dense_result, 0u, 0u, diagonal);
+        check_clausen_entry("dense Cl_n off-diagonal from eigenvalues", dense_result, 0u, 1u, offdiagonal);
+        check_clausen_entry("dense Cl_n lower off-diagonal", dense_result, 1u, 0u, offdiagonal);
+        check_clausen_entry("complex Cl_n first eigenvalue", complex_result, 0u, 0u, fa);
+        check_clausen_entry("complex Cl_n second eigenvalue", complex_result, 1u, 1u, fb);
+        check_clausen_entry("complex Cl_n uses a divided difference", complex_result, 0u, 1u,
+                            num_mul(edge, divided_difference));
+        check_clausen_entry("complex Cl_n lower triangle stays zero", complex_result, 1u, 0u, NUM_ZERO);
+        if (order == 2ul) {
+            matrix_t *unary = mat_clausen2(complex);
+
+            ASSERT_NOT_NULL(unary);
+            check_clausen_entry("complex generalised order two agrees with unary Cl2", unary, 0u, 1u,
+                                complex_result ? mat_get_num(complex_result, 0u, 1u) : NUM_NAN);
+            mat_free(unary);
+        }
+        mat_free(complex_result);
+        mat_free(dense_result);
+    }
+    mat_free(complex);
+    mat_free(real);
+}
+
+static void test_mat_clausen_jordan(void)
+{
+    NUM_SCOPE(scope);
+    number_t a = num_add(NUM_ONE, num_mul(NUM_I, num_create_from_string("1/4")));
+    number_t b = num_add(a, NUM_ONE);
+    number_t jordan_values[] = {a,        NUM_ONE,  NUM_ZERO, NUM_ZERO,
+                                NUM_ZERO, a,        NUM_ONE,  NUM_ZERO,
+                                NUM_ZERO, NUM_ZERO, a,        NUM_ONE,
+                                NUM_ZERO, NUM_ZERO, NUM_ZERO, a};
+    number_t confluent_values[] = {a, NUM_ONE, NUM_ZERO, NUM_ZERO, b, NUM_ONE, NUM_ZERO, NUM_ZERO, a};
+    matrix_t *jordan = mat_create(4u, 4u, jordan_values);
+    matrix_t *confluent = mat_create(3u, 3u, confluent_values);
+
+    printf(C_CYAN "TEST: Clausen matrix derivatives for complex Jordan and repeated eigenvalues\n" C_RESET);
+    for (unsigned long order = 1ul; order <= 4ul; ++order) {
+        number_t fa = num_clausen(order, a);
+        number_t fb = num_clausen(order, b);
+        number_t half_a = num_mul(NUM_HALF, a);
+        number_t first = order == 1ul ? num_neg(num_mul(NUM_HALF, num_cot(half_a)))
+                                      : num_clausen(order - 1ul, a);
+        number_t second;
+        matrix_t *result = mat_clausen(order, jordan);
+        matrix_t *repeated = mat_clausen(order, confluent);
+
+        if (order > 1ul && (order & 1ul))
+            first = num_neg(first);
+        if (order == 1ul) {
+            number_t cosecant = num_cosec(half_a);
+
+            second = num_div(num_mul(cosecant, cosecant), num_create_from_long(8L));
+        } else if (order == 2ul) {
+            second = num_neg(num_div(num_cot(half_a), num_create_from_long(4L)));
+        } else {
+            second = num_neg(num_mul(NUM_HALF, num_clausen(order - 2ul, a)));
+        }
+        ASSERT_NOT_NULL(result);
+        ASSERT_NOT_NULL(repeated);
+        check_clausen_entry("Jordan Cl_n diagonal", result, 0u, 0u, fa);
+        check_clausen_entry("Jordan Cl_n first derivative", result, 0u, 1u, first);
+        check_clausen_entry("Jordan Cl_n second derivative over two", result, 0u, 2u, second);
+        if (order == 2ul) {
+            number_t cosecant = num_cosec(half_a);
+            number_t third = num_div(num_mul(cosecant, cosecant), num_create_from_long(24L));
+
+            check_clausen_entry("four-by-four Cl2 includes the third derivative", result, 0u, 3u, third);
+        }
+        if (order == 4ul)
+            check_clausen_entry("four-by-four Cl4 includes the third derivative", result, 0u, 3u,
+                                num_neg(num_div(num_clausen(1ul, a), num_create_from_long(6L))));
+        check_clausen_entry("separated repeated eigenvalues use the analytic derivative", repeated, 0u, 2u,
+                            num_sub(num_sub(fb, fa), first));
+        mat_free(repeated);
+        mat_free(result);
+    }
+    mat_free(confluent);
+    mat_free(jordan);
+}
+
+static void test_mat_clausen_symbolic(void)
+{
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string_expr("(x, 1, 0, 0; 0, x, 1, 0; 0, 0, x, 1; 0, 0, 0, x)", &bindings);
+
+    printf(C_CYAN "TEST: Symbolic Clausen matrix values and derivatives retain their bindings\n" C_RESET);
+    ASSERT_NOT_NULL(A);
+    for (unsigned long order = 1ul; order <= 4ul; ++order) {
+        matrix_t *result = mat_clausen(order, A);
+
+        ASSERT_NOT_NULL(result);
+        for (unsigned int pass = 0u; pass < 2u; ++pass) {
+            NUM_SCOPE(scope);
+            double angle = pass ? 1.5 : 1.0;
+            double sine_half = sin(angle / 2.0);
+            number_t x = num_create_from_double(angle);
+            number_t first = order == 1ul ? num_create_from_double(-0.5 / tan(angle / 2.0))
+                                          : num_clausen(order - 1ul, x);
+            number_t second;
+
+            check_bool("update symbolic Clausen angle", test_mat_bindings_set_d(bindings, "x", angle) == 0);
+            if (order > 1ul && (order & 1ul))
+                first = num_neg(first);
+            if (order == 1ul)
+                second = num_create_from_double(0.125 / (sine_half * sine_half));
+            else if (order == 2ul)
+                second = num_create_from_double(-0.25 / tan(angle / 2.0));
+            else
+                second = num_neg(num_mul(NUM_HALF, num_clausen(order - 2ul, x)));
+            check_clausen_entry("symbolic Cl_n value follows binding", result, 0u, 0u, num_clausen(order, x));
+            check_clausen_entry("symbolic Cl_n derivative follows binding", result, 0u, 1u, first);
+            check_clausen_entry("symbolic Cl_n second derivative follows binding", result, 0u, 2u, second);
+            if (order == 2ul)
+                check_clausen_entry("symbolic Cl2 third derivative follows binding", result, 0u, 3u,
+                                    num_create_from_double(1.0 / (24.0 * sine_half * sine_half)));
+            if (order == 4ul)
+                check_clausen_entry("symbolic Cl4 third derivative follows binding", result, 0u, 3u,
+                                    num_neg(num_div(num_clausen(1ul, x), num_create_from_long(6L))));
+        }
+        mat_free(result);
+    }
+    mat_free(A);
+    mat_bindings_free(bindings);
 }
 
 static void test_mat_harmonic_poly(void)
@@ -6462,6 +6685,10 @@ void run_matrix_function_tests(void)
 {
     TEST_RUN_CASE(test_mat_neg_convenience, NULL);
     TEST_RUN_CASE(test_number_function_matrix_parity, NULL);
+    TEST_RUN_CASE(test_mat_clausen_diagonal, NULL);
+    TEST_RUN_CASE(test_mat_clausen_nondiagonal, NULL);
+    TEST_RUN_CASE(test_mat_clausen_jordan, NULL);
+    TEST_RUN_CASE(test_mat_clausen_symbolic, NULL);
     TEST_RUN_CASE(test_mat_harmonic_poly, NULL);
     TEST_RUN_CASE(test_eigen_d, NULL);
     TEST_RUN_CASE(test_eigen_mp_real, NULL);

@@ -1080,6 +1080,8 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |
 | `mat_zetap(A)` | Derivative of the Riemann zeta matrix function |
 | `mat_dilog(A)` | Principal matrix dilogarithm |
+| `mat_clausen2(A)` | Analytic matrix Clausen function Cl₂(A) |
+| `mat_clausen(order, A)` | Positive integer-order Clausen matrix function, including symbolic entries and repeated eigenvalues |
 | `mat_polylog1(A)` | Principal order-one matrix polylogarithm Li₁(A) |
 | `mat_harmonic_poly(A, degree)` | Finite harmonic matrix polynomial Hₙ(A) = Σₖ₌₁ⁿ Aᵏ/k |
 | `mat_lerch_phi(A, s, a)` | Lerch matrix function Φ(A,s,a), evaluated by its convergent matrix power series |
@@ -1093,6 +1095,19 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_Ei(A)` | Matrix exponential integral Ei |
 | `mat_Li(A)` | Principal matrix logarithmic integral Li(A) = Ei(log(A)) |
 | `mat_E1(A)` | Matrix exponential integral E1 |
+
+#### Clausen functions
+
+`mat_clausen2(A)` and `mat_clausen(order, A)` use analytic matrix functional
+calculus, not entrywise evaluation. The order must be a positive integer;
+the matrix must be square. Numerical and symbolic entries are supported,
+including derivatives for repeated eigenvalues and higher Taylor terms for
+Jordan blocks. Symbolic results retain their bindings.
+
+Scalar arguments are angles in radians. The spectrum must lie in a domain
+where the [chosen scalar Clausen branch](qcomplex.md#clausen-functions) is
+analytic. The functions return an owning matrix, or NULL for invalid inputs
+or an unsupported matrix evaluation.
 
 ### Power Functions
 

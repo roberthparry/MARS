@@ -463,6 +463,8 @@ their existing backend-specific precision and representation.
 | `num_Ei(x)` | Evaluates the principal exponential integral `Ei(x)`. |
 | `num_Li(x)` | Evaluates the principal logarithmic integral `Li(x) = Ei(log(x))`. |
 | `num_dilog(x)` | Evaluates the dilogarithm `Li₂(x)`. |
+| `num_clausen2(theta)` | Evaluates the Clausen function `Cl₂(theta)` at native precision. |
+| `num_clausen(order, theta)` | Evaluates the positive integer-order Clausen family, with real arithmetic for real inputs. |
 | `num_polylog1(x)` | Evaluates the order-one polylogarithm `Li₁(x) = −Log(1−x)` on the active backend's principal branch. |
 | `num_polylog(s, x)` | Evaluates the polylogarithm `Liₛ(x)`. |
 | `number_lerch_phi(z, s, a)` | Evaluates the Lerch transcendent `Φ(z,s,a)` while preserving the active real or complex backend. |
@@ -475,6 +477,20 @@ their existing backend-specific precision and representation.
 | `num_appell_f1(a, b1, b2, c, x, y)` | Evaluates the two-variable Appell `F₁` hypergeometric function. |
 | `num_lauricella_f(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
 | `num_hypergeometric_pFq(upper, p, lower, q, x)` | Evaluates the generalised hypergeometric function with `p` upper and `q` lower parameters. |
+
+#### Clausen functions
+
+`num_clausen(order, theta)` takes a positive integer order and an angle in
+radians; `num_clausen2(theta)` selects order two. For real angles, even
+orders use the sine Fourier series and odd orders the cosine Fourier series.
+Order one is `-ln(2*abs(sin(theta/2)))`, with logarithmic poles at multiples
+of `2*pi`; higher orders are continuous and periodic on the real axis.
+
+Real inputs are evaluated using real arithmetic. Fixed-precision and
+arbitrary-precision inputs retain their native precision. Nonreal inputs use
+the [holomorphic Clausen continuation](qcomplex.md#clausen-functions),
+including its exclusion of nonreal points on `Re(z) = 2*k*pi`. Order zero
+and non-finite inputs return NaN. Each call returns an owning number.
 
 ### Exact Integer and Number-Theory Functions
 

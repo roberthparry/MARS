@@ -951,6 +951,36 @@ static int expr_fun_coeffs_up_to_second(expr_t **c0, expr_t **c1, expr_t **c2,
     return 0;
 }
 
+static expr_t *expr_fun_higher_taylor_coeff(void (*scalar_f)(void *, const void *), expr_t *lambda, size_t order)
+{
+    NUM_SCOPE(scope);
+    number_t factorial = num_clone(NUM_ONE);
+    number_t value = expr_eval(lambda);
+    expr_t *u = expr_new_named_var(value, "u");
+    expr_t *derivative = NULL;
+    expr_t *substituted = NULL;
+    expr_t *coefficient = NULL;
+
+    if (!u)
+        return NULL;
+    scalar_f(&derivative, &u);
+    for (size_t k = 1u; derivative && k <= order; ++k) {
+        expr_t *next = expr_create_deriv(derivative, u);
+
+        expr_free(derivative);
+        derivative = next;
+        factorial = num_mul(factorial, num_create_from_long((long)k));
+    }
+    if (derivative)
+        substituted = expr_substitute(derivative, u, lambda);
+    if (substituted)
+        coefficient = expr_div_num(substituted, &factorial);
+    expr_free(substituted);
+    expr_free(derivative);
+    expr_free(u);
+    return coefficient;
+}
+
 static matrix_t *mat_fun_triangular_equal_diag_expr(const matrix_t *T, void (*scalar_f)(void *out, const void *in))
 {
     size_t n = T->rows;
@@ -1047,6 +1077,43 @@ static matrix_t *mat_fun_triangular_equal_diag_expr(const matrix_t *T, void (*sc
             }
         }
 
+        /* A strictly triangular n-by-n matrix requires terms through N^(n-1). */
+        for (size_t k = 3u; k < n; ++k) {
+            matrix_t *next_power = mat_mul(N2, N);
+            expr_t *coefficient = expr_fun_higher_taylor_coeff(scalar_f, lambda, k);
+            bool success = next_power && coefficient;
+
+            mat_free(N2);
+            N2 = next_power;
+            for (size_t i = 0u; success && i + k < n; ++i) {
+                for (size_t j = i + k; success && j < n; ++j) {
+                    expr_t *fij = NULL;
+                    expr_t *power_entry = NULL;
+                    expr_t *term;
+                    expr_t *sum;
+
+                    mat_get(F, i, j, &fij);
+                    mat_get(N2, i, j, &power_entry);
+                    term = expr_mul(coefficient, power_entry);
+                    sum = term ? expr_add(fij, term) : NULL;
+                    expr_free(term);
+                    success = sum != NULL;
+                    if (success)
+                        mat_set(F, i, j, &sum);
+                    expr_free(sum);
+                }
+            }
+            expr_free(coefficient);
+            if (!success) {
+                mat_free(N2);
+                expr_free(c0);
+                expr_free(c1);
+                expr_free(c2);
+                mat_free(F);
+                mat_free(N);
+                return NULL;
+            }
+        }
         mat_free(N2);
     }
 
@@ -3873,6 +3940,127 @@ DEFINE_MATRIX_UNARY_FUNCTION(dilog)
 DEFINE_MATRIX_UNARY_FUNCTION(polylog1)
 
 #undef DEFINE_MATRIX_UNARY_FUNCTION
+
+/* The unary callback engine is synchronous; restore the order after nested calls. */
+static _Thread_local unsigned long mat_clausen_order = 2ul;
+
+static void mat_number_clausen_scalar(void *out, const void *in)
+{
+    number_t value = num_clausen(mat_clausen_order, *(const number_t *)in);
+
+    num_destroy((number_t *)out);
+    *(number_t *)out = value;
+}
+
+static expr_t *mat_expr_clausen_build(const expr_t *arg)
+{
+    return expr_clausen(mat_clausen_order, arg);
+}
+
+/* Preserve all required Taylor terms when a Schur factor has a single eigenvalue. */
+matrix_t *mat_clausen_triangular(const matrix_t *T, void (*scalar_f)(void *, const void *))
+{
+    if (scalar_f == number_elem.fun->clausen2)
+        return mat_number_unary_taylor_from_expr(T, expr_clausen2);
+    if (scalar_f == mat_number_clausen_scalar)
+        return mat_number_unary_taylor_from_expr(T, mat_expr_clausen_build);
+    return NULL;
+}
+
+static void mat_expr_clausen_scalar(void *out, const void *in)
+{
+    expr_t *value = mat_expr_clausen_build(*(expr_t *const *)in);
+
+    expr_free(*(expr_t **)out);
+    *(expr_t **)out = value;
+}
+
+bool mat_clausen_scalar_coeffs(number_t *c1, number_t *c2, void (*scalar_f)(void *, const void *),
+                               const number_t *lambda)
+{
+    unsigned long order;
+
+    if (scalar_f == number_elem.fun->clausen2)
+        order = 2ul;
+    else if (scalar_f == mat_number_clausen_scalar)
+        order = mat_clausen_order;
+    else
+        return false;
+
+    NUM_SCOPE(scope);
+    if (c1) {
+        number_t first;
+
+        if (order == 1ul) {
+            number_t half_arg = num_mul(*lambda, NUM_HALF);
+            number_t cotangent = num_cot(half_arg);
+
+            first = num_neg(num_mul(NUM_HALF, cotangent));
+        } else {
+            number_t lower = num_clausen(order - 1ul, *lambda);
+
+            first = (order & 1ul) ? num_neg(lower) : num_clone(lower);
+        }
+        *c1 = num_scope_detach(first);
+    }
+
+    if (c2) {
+        number_t second;
+
+        if (order <= 2ul) {
+            number_t half_arg = num_mul(*lambda, NUM_HALF);
+
+            if (order == 1ul) {
+                number_t cosecant = num_cosec(half_arg);
+                number_t square = num_mul(cosecant, cosecant);
+
+                second = num_div(square, num_create_from_long(8L));
+            } else {
+                number_t cotangent = num_cot(half_arg);
+
+                second = num_neg(num_div(cotangent, num_create_from_long(4L)));
+            }
+        } else {
+            number_t lower = num_clausen(order - 2ul, *lambda);
+
+            second = num_neg(num_mul(NUM_HALF, lower));
+        }
+        *c2 = num_scope_detach(second);
+    }
+    return true;
+}
+
+/* Apply the order-two Clausen function through matrix functional calculus. */
+matrix_t *mat_clausen2(const matrix_t *A)
+{
+    matrix_t *structured = A && !mat_is_diagonal(A) ? mat_number_unary_taylor_from_expr(A, expr_clausen2) : NULL;
+
+    if (structured)
+        return structured;
+    return mat_apply_unary(A, number_elem.fun->clausen2, expr_elem.fun->clausen2,
+                           A && A->elem && A->elem->fun ? A->elem->fun->clausen2 : NULL);
+}
+
+/* Apply the generalised integer-order Clausen function through matrix functional calculus. */
+matrix_t *mat_clausen(unsigned long order, const matrix_t *A)
+{
+    unsigned long previous_order;
+    matrix_t *result;
+
+    if (!order || !A || A->rows != A->cols)
+        return NULL;
+    if (order == 2ul)
+        return mat_clausen2(A);
+
+    previous_order = mat_clausen_order;
+    mat_clausen_order = order;
+    result = !mat_is_diagonal(A) ? mat_number_unary_taylor_from_expr(A, mat_expr_clausen_build) : NULL;
+    if (!result)
+        result = mat_apply_unary(A, mat_number_clausen_scalar, mat_expr_clausen_scalar,
+                                 A->elem == &number_elem ? mat_number_clausen_scalar : NULL);
+    mat_clausen_order = previous_order;
+    return result;
+}
 
 /* Evaluate the finite logarithmic matrix polynomial by repeated multiplication. */
 matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree)

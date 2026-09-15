@@ -669,6 +669,26 @@ expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
 expr_t *expr_zetap(const expr_t *expr);
 expr_t *expr_dilog(const expr_t *expr);
 /**
+ * @brief Construct the Clausen integral Cl₂ of an angle in radians.
+ *
+ * For real arguments this is the real, odd, 2π-periodic sine series
+ * @f$\sum_{k=1}^{\infty}\sin(k\theta)/k^2@f$.
+ * @param argument Angle expression; it is retained.
+ * @return An owning Clausen expression, or NULL on error.
+ */
+expr_t *expr_clausen2(const expr_t *argument);
+/**
+ * @brief Construct an integer-order Clausen function.
+ *
+ * Even orders use the sine Fourier series and odd orders use the cosine
+ * Fourier series, with denominator k raised to the given order. Order one
+ * is -ln|2 sin(θ/2)| for real angles away from multiples of 2π.
+ * @param order Positive integer order.
+ * @param argument Angle expression; it is retained.
+ * @return An owning Clausen expression, or NULL for order zero or on error.
+ */
+expr_t *expr_clausen(unsigned long order, const expr_t *argument);
+/**
  * @brief Construct the order-one polylogarithm @f$\operatorname{Li}_1(z)@f$.
  *
  * @param expr Argument expression; it is retained.

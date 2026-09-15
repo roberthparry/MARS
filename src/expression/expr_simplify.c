@@ -2748,6 +2748,44 @@ expr_t *expr_simplify_rebuild_binary_operator(const expr_t *dv, expr_t *a, expr_
     return expr_new_binary_internal(dv->ops, a, b);
 }
 
+/* Write -k*(u-v) as k*(v-u) in exponential arguments, retaining the magnitude of the scale. */
+static expr_t *expr_simplify_reverse_negative_difference_local(const expr_t *expr)
+{
+    number_t scale = num_new();
+    const expr_t *base = NULL;
+    expr_t *positive = NULL;
+    expr_t *reversed = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_match_scaled_expr(expr, &scale, &base) || !num_is_real(scale) || !num_is_finite(scale) ||
+        !num_lt(scale, NUM_ZERO) || !expr_is_addsub(base))
+        goto cleanup;
+    if (expr_is_op(base, &ops_sub)) {
+        reversed = expr_sub(base->b, base->a);
+    } else if ((positive = expr_simplify_positive_part_if_negative(base->b))) {
+        reversed = expr_sub(positive, base->a);
+    } else if ((positive = expr_simplify_positive_part_if_negative(base->a))) {
+        reversed = expr_sub(positive, base->b);
+    }
+    if (reversed) {
+        number_t magnitude = num_neg(scale);
+
+        if (num_is_one(magnitude)) {
+            out = reversed;
+            reversed = NULL;
+        } else {
+            out = expr_mul_num(reversed, &magnitude);
+        }
+        num_destroy(&magnitude);
+    }
+
+cleanup:
+    expr_free(reversed);
+    expr_free(positive);
+    num_destroy(&scale);
+    return out;
+}
+
 expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -2757,7 +2795,33 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_t *lambert_argument;
 
     (void)b;
+    /* Preserve the exact dilogarithm endpoint values needed by definite integration. */
+    if (expr_is_op(dv, &ops_dilog) && expr_simplify_allows_const_identity_fold(a) &&
+        (num_is_zero(a->c) || num_eq(a->c, NUM_ONE) || num_eq(a->c, NUM_NEG_ONE))) {
+        expr_t *out = NULL;
+
+        if (num_is_zero(a->c)) {
+            out = expr_const_zero();
+        } else {
+            expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+            expr_t *square = pi ? expr_mul(pi, pi) : NULL;
+
+            out = square ? expr_div_long(square, num_eq(a->c, NUM_ONE) ? 6 : -12) : NULL;
+            expr_free(square);
+            expr_free(pi);
+        }
+        if (out) {
+            expr_free(a);
+            return out;
+        }
+    }
     if (expr_is_exp_expr(dv)) {
+        expr_t *positive_scale = expr_simplify_reverse_negative_difference_local(a);
+
+        if (positive_scale) {
+            expr_free(a);
+            a = positive_scale;
+        }
         expr_t *quarter_turn = expr_try_simplify_exp_quarter_turn(a);
         expr_t *lambert_exp;
 
@@ -3356,6 +3420,12 @@ static int expr_addends_contain_constant_atan_local(const addend_t *terms, size_
     return 0;
 }
 
+static bool expr_contains_arbitrary_function_local(const expr_t *expr)
+{
+    return expr && (expr_is_arbitrary_function(expr) || expr_contains_arbitrary_function_local(expr->a) ||
+                    expr_contains_arbitrary_function_local(expr->b));
+}
+
 expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -3464,9 +3534,16 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_combine_common_denominator_addends(terms, n);
     expr_combine_trig_pythagorean_addends(terms, n);
     expr_sort_addends(terms, n);
-    expr_extract_common_addend_coeff(terms, n, c_const, &common_coeff);
-    if (num_is_one(common_coeff) && !combined_atan_difference && !expr_addends_contain_constant_atan_local(terms, n))
-        expr_try_common_abs_coeff_local(terms, n, c_const, &common_coeff);
+    /* Keep arbitrary-function families additive instead of introducing an outer numerical factor. */
+    bool has_arbitrary_function = false;
+
+    for (size_t i = 0u; !has_arbitrary_function && i < n; ++i)
+        has_arbitrary_function = !num_is_zero(terms[i].coeff) && expr_contains_arbitrary_function_local(terms[i].base);
+    if (!has_arbitrary_function) {
+        expr_extract_common_addend_coeff(terms, n, c_const, &common_coeff);
+        if (num_is_one(common_coeff) && !combined_atan_difference && !expr_addends_contain_constant_atan_local(terms, n))
+            expr_try_common_abs_coeff_local(terms, n, c_const, &common_coeff);
+    }
 
     expr_t *identity = expr_try_trig_pythagorean_identity(terms, n, c_const, common_coeff);
 

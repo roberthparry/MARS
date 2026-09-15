@@ -2275,6 +2275,152 @@ class DiffequationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_single_phase_pde_dilog_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2tanh(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(
+            payload["solutions"],
+            "z = F(y - 3x) + G(y - 2x) + ½·Li₂(-exp(2·(y - x))) - ln(2)·(x - y) + ½·(x - y)²",
+        )
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+            self.assertIn(r"\operatorname{Li}_{2}", fields[solution_key])
+            self.assertNotIn(r"\int", fields[solution_key])
+            self.assertNotIn(r"\pi", fields[solution_key])
+        self.assertIn("Single-phase reduction", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_clausen_pde_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2tan(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertIn("Cl₂", payload["solutions"])
+        self.assertNotIn("∫", payload["solutions"])
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+            self.assertIn(r"\operatorname{Cl}_{2}", fields[solution_key])
+            self.assertNotIn(r"\int", fields[solution_key])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_forced_second_order_pde_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2e^(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "constant-coefficient linear")
+        self.assertEqual(payload["solutions"], "z = F(y - 3x) + G(y - 2x) + exp(x - y)")
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+        self.assertIn("Particular solution: u_p = exp(x - y)", fields["steps"])
+        self.assertIn("L(u_p)=f", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_second_order_pde_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx - 3z_yx + 2z_yy = 0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "constant-coefficient linear")
+        self.assertEqual(payload["solutions"], "z = F(x + y) + G(2x + y)")
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+        self.assertIn("Characteristic polynomial", fields["steps_TeX"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_parameter_forced_pde_has_both_branches_below_equation(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "zz_x - zz_t = y-x"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solutions"], "z = √(F(-t - x) + 2xy - x²)\nz = -√(F(-t - x) + 2xy - x²)")
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertEqual(fields[key].count("z &="), 2)
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_weighted_cyclic_pde_solution_and_TeX(self) -> None:
         completed = subprocess.run(
             [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "(y-z)z_x - (z-x)z_y = x-y"],

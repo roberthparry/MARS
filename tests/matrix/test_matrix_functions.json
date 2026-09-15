@@ -1,5 +1,9 @@
 {
   "test_mat_neg_convenience": true,
+  "test_mat_clausen_diagonal": true,
+  "test_mat_clausen_nondiagonal": true,
+  "test_mat_clausen_jordan": true,
+  "test_mat_clausen_symbolic": true,
   "test_eigen_d": true,
   "test_eigen_mp_real": true,
   "test_eigen_complex": true,

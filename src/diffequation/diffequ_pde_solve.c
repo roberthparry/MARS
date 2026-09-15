@@ -688,6 +688,10 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
         goto cleanup;
     }
 
+    result = de_pde_solve_second_order_constant(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
     transport = residual ? de_pde_attempt_constant_transport(de, residual, &transport_solution, &transport_recognized)
                          : DE_ATTEMPT_FAILED;
     if (transport == DE_ATTEMPT_SOLVED) {

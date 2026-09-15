@@ -115,6 +115,33 @@ bool de_pde_same_symbolic_form(const expr_t *left, const expr_t *right)
     return same;
 }
 
+/* Prove polynomial identities despite different factorisations or opposite term order. */
+bool de_pde_is_symbolically_zero(const expr_t *expression)
+{
+    expr_t *simplified = expression ? expr_simplify(expression) : NULL;
+    bool is_zero = simplified && expr_is_exact_zero(simplified);
+
+    if (!is_zero && expression) {
+        expr_t *expanded = expr_display_expanded(expression);
+        expr_t *normalised = expanded ? expr_simplify(expanded) : NULL;
+        const expr_t *left = NULL;
+        const expr_t *right = NULL;
+        bool is_sub = false;
+
+        is_zero = normalised && expr_is_exact_zero(normalised);
+        if (!is_zero && expr_match_add_sub_expr(normalised, &left, &right, &is_sub)) {
+            expr_t *opposite = is_sub ? expr_clone(right) : expr_negate_owned(expr_clone(right));
+
+            is_zero = opposite && de_pde_same_symbolic_form(left, opposite);
+            expr_free(opposite);
+        }
+        expr_free(normalised);
+        expr_free(expanded);
+    }
+    expr_free(simplified);
+    return is_zero;
+}
+
 equation_t *de_pde_solution_equation(const expr_t *dependent, const expr_t *right)
 {
     const char *name = expr_symbol_name(dependent);

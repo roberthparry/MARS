@@ -4264,8 +4264,140 @@ static void test_iterated_symbolic_best_effort_reduces_remaining_numeric_dims(vo
     expr_bindings_free(bindings);
 }
 
+static void test_arbitrary_function_sums_keep_individual_coefficients(void)
+{
+    static const long divisors[] = {2, 3, 12};
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    expr_t *y = expr_new_named_var(NUM_NAN, "y");
+    expr_t *f = expr_new_arbitrary_function("F", x);
+    expr_t *g = expr_new_arbitrary_function("G", y);
+    expr_t *family = expr_add(f, g);
+
+    for (size_t i = 0u; i < sizeof(divisors) / sizeof(divisors[0]); ++i) {
+        expr_t *denominator = expr_const_long(divisors[i]);
+        expr_t *particular = expr_div(x, denominator);
+        expr_t *sum = expr_add(family, particular);
+        expr_t *simplified = expr_simplify(sum);
+        expr_t *again = expr_simplify(simplified);
+        char *text = expr_to_string(simplified, style_UNBOUND);
+        char *again_text = expr_to_string(again, style_UNBOUND);
+        expr_t *difference = expr_sub_simplify_owned(expr_clone(simplified), expr_clone(sum));
+
+        ASSERT_TRUE(text && strncmp(text, "F(x) + G(y) + ", strlen("F(x) + G(y) + ")) == 0);
+        ASSERT_TRUE(text && again_text && strcmp(text, again_text) == 0);
+        ASSERT_TRUE(difference && expr_is_exact_zero(difference));
+        expr_free(difference);
+        free(again_text);
+        free(text);
+        expr_free(again);
+        expr_free(simplified);
+        expr_free(sum);
+        expr_free(particular);
+        expr_free(denominator);
+    }
+    expr_free(family);
+    expr_free(g);
+    expr_free(f);
+    expr_free(y);
+    expr_free(x);
+}
+
+static void test_clausen_derivatives_and_bindings(void)
+{
+    for (unsigned long order = 1u; order <= 5u; ++order) {
+        expr_t *x = expr_new_named_var(NUM_ONE, "x");
+        expr_t *raw = expr_clausen(order, x);
+        expr_t *value = expr_simplify(raw);
+        expr_t *derivative = expr_create_deriv(value, x);
+        const expr_t *variables[] = {x};
+
+        for (int sample = 1; sample <= 2; ++sample) {
+            number_t point = num_create_from_long(sample);
+            number_t evaluated = NUM_NAN;
+            number_t gradient = NUM_NAN;
+
+            expr_set_val(x, point);
+            ASSERT_EQ_INT(expr_eval_derivatives(value, 1u, variables, &evaluated, &gradient), 0);
+            number_t symbolic = expr_eval(derivative);
+            number_t expected = num_clausen(order, point);
+
+            ASSERT_TRUE(number_close_for_qfloat_precision(evaluated, expected));
+            ASSERT_TRUE(number_close_for_qfloat_precision(symbolic, gradient));
+            num_destroy(&expected);
+            num_destroy(&symbolic);
+            num_destroy(&gradient);
+            num_destroy(&evaluated);
+            num_destroy(&point);
+        }
+        expr_free(derivative);
+        expr_free(value);
+        expr_free(raw);
+        expr_free(x);
+    }
+}
+
+static void test_dilog_display_and_exponential_difference_signs(void)
+{
+    static const char *const aliases[] = {"dilog(x)", "li2(x)", "Li2(x)", "Li₂(x)"};
+
+    for (size_t i = 0u; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string(aliases[i], &bindings);
+        char *text = expr_to_string(expr, style_UNBOUND);
+        char *function = expr_to_string(expr, style_FUNCTION);
+        char *TeX = expr_to_TeX_body(expr);
+
+        ASSERT_TRUE(text && strcmp(text, "Li₂(x)") == 0);
+        ASSERT_TRUE(function && strstr(function, "li2(x)"));
+        ASSERT_TRUE(TeX && strstr(TeX, "\\operatorname{Li}_{2}"));
+        free(TeX);
+        free(function);
+        free(text);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+
+    static const struct {
+        const char *input;
+        const char *expected;
+        double exponent_at_sample;
+    } cases[] = {
+        {"exp(-(x-y))", "exp(y - x)", 2.0},
+        {"exp(-2*(x-y))", "exp(2·(y - x))", 4.0},
+        {"exp(-(x-y)/3)", "exp(⅓·(y - x))", 2.0 / 3.0},
+        {"exp(2*(x-y))", "exp(2·(x - y))", -4.0}
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string(cases[i].input, &bindings);
+        expr_t *simplified = expr_simplify(expr);
+        expr_t *again = expr_simplify(simplified);
+        char *text = expr_to_string(simplified, style_UNBOUND);
+        char *again_text = expr_to_string(again, style_UNBOUND);
+
+        ASSERT_TRUE(text && strcmp(text, cases[i].expected) == 0);
+        ASSERT_TRUE(text && again_text && strcmp(text, again_text) == 0);
+        test_expr_set_val_d(expr_bindings_get(bindings, "x"), 1.0);
+        test_expr_set_val_d(expr_bindings_get(bindings, "y"), 3.0);
+        qfloat_t exponent = i == 2u ? qf_div(qf_from_double(2.0), qf_from_double(3.0))
+                                   : qf_from_double(cases[i].exponent_at_sample);
+
+        check_q_at(__FILE__, __LINE__, 1, cases[i].input, expr_eval_qf(simplified), qf_exp(exponent));
+        free(again_text);
+        free(text);
+        expr_free(again);
+        expr_free(simplified);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+}
+
 void test_runtime_regressions(void)
 {
+    TEST_RUN_SUBTEST(test_dilog_display_and_exponential_difference_signs, NULL);
+    TEST_RUN_SUBTEST(test_clausen_derivatives_and_bindings, NULL);
+    TEST_RUN_SUBTEST(test_arbitrary_function_sums_keep_individual_coefficients, NULL);
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
     TEST_RUN_SUBTEST(test_new_const_num_preserves_mpfr_precision, NULL);
     TEST_RUN_SUBTEST(test_inexact_known_constant_uses_short_text, NULL);

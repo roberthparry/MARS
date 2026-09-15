@@ -92,6 +92,7 @@ struct elem_fun_vtable {
     void (*zeta)(void *out, const void *a);
     void (*zetap)(void *out, const void *a);
     void (*dilog)(void *out, const void *a);
+    void (*clausen2)(void *out, const void *a);
     void (*polylog1)(void *out, const void *a);
     void (*gammainv)(void *out, const void *a);
     void (*normal_pdf)(void *out, const void *a);
@@ -349,6 +350,12 @@ matrix_t *mat_adjugate_exact(const matrix_t *A);
 
 /* Apply scalar function f to an upper triangular matrix T. */
 matrix_t *mat_fun_triangular(const matrix_t *T, void (*scalar_f)(void *out, const void *in));
+
+/* Supply exact first and second Taylor coefficients for the Clausen callbacks. */
+bool mat_clausen_scalar_coeffs(number_t *c1, number_t *c2, void (*scalar_f)(void *, const void *),
+                               const number_t *lambda);
+/* Evaluate every required Clausen Taylor term for a triangular matrix with equal diagonal entries. */
+matrix_t *mat_clausen_triangular(const matrix_t *T, void (*scalar_f)(void *, const void *));
 
 /* High-level Schur-based matrix function engine. */
 matrix_t *mat_fun_schur(const matrix_t *A, void (*scalar_f)(void *out, const void *in));

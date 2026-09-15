@@ -2057,6 +2057,115 @@ static void test_integrate_symbolic_general_quadratic_roots(void)
                                                   sizeof(points) / sizeof(points[0]));
 }
 
+static void test_integrate_clausen_family(void)
+{
+    static const double points[] = {0.2, 0.4, 0.7};
+    static const char *const inputs[] = {
+        "Cl2(x)", "Cl(1,x)", "Cl(3,x)", "Cl(4,2*x+1)", "Cl2(2-3*x)",
+        "ln(cos(x))", "ln(sin(x))", "ln(cos(2*x-1))", "log10(cos(x))",
+        "ln(abs(cos(3*x+2)))", "ln(abs(sin(2*x-3)))"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *integrand = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+        expr_t *wrong = anti ? expr_add(anti, x) : NULL;
+
+        assert_string_antiderivative_matches_without(inputs[i], points, sizeof(points) / sizeof(points[0]),
+                                                      "Cl", "∫", "Li₂");
+        ASSERT_TRUE(expr_verify_antiderivative_real_internal(anti, integrand, x));
+        ASSERT_TRUE(!expr_verify_antiderivative_real_internal(wrong, integrand, x));
+        expr_free(wrong);
+        expr_free(anti);
+        expr_free(integrand);
+        expr_bindings_free(bindings);
+    }
+    assert_string_antiderivative_matches_with_ab("ln(cos(a*x+b))", -2.0, 1.0, points,
+                                                 sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("Cl2(a*x+b)", 2.0, 1.0, points,
+                                                 sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_log_cosh_dilog(void)
+{
+    static const double points[] = {-1.5, -0.4, 0.0, 0.6, 1.8};
+    static const char *const inputs[] = {
+        "ln(cosh(x))", "ln(cosh(2*x+3))", "ln(cosh(3-2*x))", "log10(cosh(2*x+1))",
+        "3*ln(cosh(x))/2", "ln(cosh(x))+ln(cosh(2*x+1))"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *integrand = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+        expr_t *wrong = anti ? expr_add(anti, x) : NULL;
+
+        assert_string_antiderivative_matches_without(inputs[i], points, sizeof(points) / sizeof(points[0]),
+                                                      "Li₂", "∫", "π");
+        ASSERT_TRUE(expr_verify_antiderivative_real_internal(anti, integrand, x));
+        ASSERT_TRUE(!expr_verify_antiderivative_real_internal(wrong, integrand, x));
+        expr_free(wrong);
+        expr_free(anti);
+        expr_free(integrand);
+        expr_bindings_free(bindings);
+    }
+    assert_string_antiderivative_matches_with_ab("ln(cosh(a*x+b))", 2.0, 3.0, points,
+                                                 sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_ab("ln(cosh(a*x+b))", -2.0, 3.0, points,
+                                                 sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("ln(cosh(0*x+2))+x", points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_log_cosh_definite(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integral = expr_from_string("@S_0^x ln(cosh(t)) dt", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *display = integral ? expr_display_simplified(integral) : NULL;
+    char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+    expr_t *at_zero = NULL;
+    expr_t *zero = expr_const_zero();
+    qfloat_t values[3];
+
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(display);
+    ASSERT_TRUE(text && strstr(text, "Li₂") && strstr(text, "π²") && !strstr(text, "∫"));
+    print_antiderivative_text("definite ln(cosh(t)) from 0 to x", text);
+    at_zero = display && x ? expr_simplify_owned(expr_substitute(display, x, zero)) : NULL;
+    ASSERT_TRUE(at_zero && expr_is_exact_zero(at_zero));
+    for (size_t i = 0u; i < 3u; ++i) {
+        test_expr_set_val_d(x, (double)i - 1.0);
+        values[i] = expr_eval_qf(display);
+    }
+    check_q_at(__FILE__, __LINE__, 1, "zero-based log-cosh integral at zero", values[1], QF_ZERO);
+    check_q_at(__FILE__, __LINE__, 1, "zero-based log-cosh integral is odd", values[0], qf_neg(values[2]));
+
+    static const char *const endpoints[] = {"Li2(0)", "Li2(1)", "Li2(-1)"};
+    static const char *const expected[] = {"0", "@pi^2/6", "-@pi^2/12"};
+
+    for (size_t i = 0u; i < 3u; ++i) {
+        expr_t *endpoint = expr_from_string(endpoints[i], NULL);
+        expr_t *want = expr_from_string(expected[i], NULL);
+        expr_t *difference = endpoint && want ? expr_sub(endpoint, want) : NULL;
+        expr_t *simplified = difference ? expr_simplify(difference) : NULL;
+
+        ASSERT_TRUE(simplified && expr_is_exact_zero(simplified));
+        expr_free(simplified);
+        expr_free(difference);
+        expr_free(want);
+        expr_free(endpoint);
+    }
+    expr_free(zero);
+    expr_free(at_zero);
+    free(text);
+    expr_free(display);
+    expr_free(integral);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_log_quadratic(void)
 {
     static const double points[] = {-1.5, -0.4, 0.6, 1.8};
@@ -3586,6 +3695,9 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_denominator, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_log_cosh_dilog, NULL);
+    TEST_RUN_SUBTEST(test_integrate_clausen_family, NULL);
+    TEST_RUN_SUBTEST(test_integrate_log_cosh_definite, NULL);
     TEST_RUN_SUBTEST(test_integrate_negative_quadratic_exponential, NULL);
     TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
