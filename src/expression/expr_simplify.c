@@ -2926,6 +2926,19 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return sqrt_scaled;
     }
 
+    /* Keep an exact negated difference in a logarithm canonical without splitting the logarithm. */
+    if (expr_is_op(dv, &ops_log) || expr_is_op(dv, &ops_log10)) {
+        expr_t *reversed = expr_simplify_reverse_negative_difference_local(a);
+
+        if (reversed) {
+            expr_t *out = dv->ops->apply_unary(reversed);
+
+            expr_free(reversed);
+            expr_free(a);
+            return out;
+        }
+    }
+
     if (dv->ops->apply_unary && a != dv->a) {
         expr_t *out = dv->ops->apply_unary(a);
         expr_free(a);

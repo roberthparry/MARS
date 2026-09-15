@@ -5,37 +5,37 @@
 
 MARS supports the Lerch transcendent
 
-\[
+$$
 \Phi(z, s, a) = \sum_{k=0}^{\infty} \frac{z^k}{(k+a)^s}.
-\]
+$$
 
 One motivating symbolic-integration case is
 
-\[
+$$
 \int \sum_{k=1}^{n} \cosh(kx)\,dx
 = \sum_{k=1}^{n} \frac{\sinh(kx)}{k} + C.
-\]
+$$
 
 The finite sum can alternatively be represented as
 
-\[
+$$
 \frac{1}{2}\left[
 \operatorname{Li}_1(e^x)-\operatorname{Li}_1(e^{-x})
 -e^{(n+1)x}\Phi(e^x,1,n+1)
 +e^{-(n+1)x}\Phi(e^{-x},1,n+1)
 \right] + C.
-\]
+$$
 
 The corresponding weighted cosh sum is
 
-\[
+$$
 \sum_{k=1}^{n}\frac{\cosh(kx)}{k}
 =\frac{1}{2}\left[
 \operatorname{Li}_1(e^x)+\operatorname{Li}_1(e^{-x})
 -e^{(n+1)x}\Phi(e^x,1,n+1)
 -e^{-(n+1)x}\Phi(e^{-x},1,n+1)
 \right].
-\]
+$$
 
 MARS Lab displays the Lerch representation whenever either weighted
 hyperbolic sum is recognised. Consequently, a result produced quickly for a
@@ -53,8 +53,8 @@ not a renamed two-argument polylogarithm node; its corresponding public
 families are `qf_polylog1()`, `qc_polylog1()`, `num_polylog1()`,
 `expr_polylog1()`, and `mat_polylog1()`.
 
-Numerical evaluation currently covers the defining disc \(|z|<1\), together
-with the exact reductions at \(z=0\), \(z=1\), and \(s=0\). Values requiring
+Numerical evaluation currently covers the defining disc $|z|<1$, together
+with the exact reductions at $z=0$, $z=1$, and $s=0$. Values requiring
 general analytic continuation return NaN rather than selecting an accidental
 branch. The finite weighted sinh and cosh sums have a separate stable numerical
 evaluation which works backwards from their dominant endpoint, so a large
@@ -72,7 +72,7 @@ Expression input accepts `lerch_phi(z,s,a)`, `LerchPhi(z,s,a)`, and
 
 - `Φ(z,s,a)` and `Li1(z)` in `style_EXPRESSION`;
 - `lerchphi(z, s, a)` and `li1(z)` in `style_FUNCTION`; and
-- `\Phi\left(z,s,a\right)` and `\operatorname{Li}_{1}(z)` in TeX.
+- $\Phi\left(z,s,a\right)$ and $\operatorname{Li}_{1}(z)$ in TeX.
 
 Function temporaries preserve the reciprocal exponential relationship: after
 `v1 = exp(x)`, the matching negative exponential is emitted as `v2 = 1/v1`.
@@ -98,10 +98,10 @@ For each weighted hyperbolic identity, the simplifier recognises the complete
 Li₁/Lerch expression as the finite source sum. Differentiating the weighted
 sinh form therefore returns the existing finite-cosh identity
 
-\[
+$$
 \sum_{k=1}^{n}\cosh(kx)
 =\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)},
-\]
+$$
 
 rather than exposing the term-by-term derivative of the special-function
 representation. The weighted cosh form correspondingly returns the existing

@@ -304,9 +304,9 @@ coordinate factors remain multiplicative coefficients and the suffix applies
 to the final field: `x*z*z_x`.
 The expression and unbound styles retain `Dx(u)` for round-trip input, while
 TeX output uses standard partial-derivative fractions such as
-`\\frac{\\partial u}{\\partial x}`. Repeated and mixed derivatives render as
-`\\frac{\\partial^2 u}{\\partial x^2}` and
-`\\frac{\\partial^2 u}{\\partial y\\,\\partial x}`.
+$\frac{\partial u}{\partial x}$. Repeated and mixed derivatives render as
+$\frac{\partial^2 u}{\partial x^2}$ and
+$\frac{\partial^2 u}{\partial y\,\partial x}$.
 The Mars Lab problem card likewise preserves the Unicode partial-derivative
 symbol, displaying `∂u/∂x`, `∂²u/∂x²`, and `∂²u/∂y∂x`. These standard Unicode
 forms are also accepted as input aliases, so copying the displayed problem
@@ -438,6 +438,18 @@ This is a real closed form on each region between consecutive poles
 `x-y = pi/2 + k*pi`; no solution is asserted across those singularities.
 The affine term `ln(2)*(x-y)` can also be absorbed into the arbitrary
 functions. No PDE-specific logarithmic integration is performed.
+
+Inverse-hyperbolic-tangent forcing has an elementary closed form:
+
+```text
+z_xx + 5z_yx + 6z_yy = 2atanh(x-y)
+→ z = F(y - 3x) + G(y - 2x) - ½x + ½y + ½·(x - y)·ln(1 - (x - y)²) + ½·((x - y)² + 1)·atanh(x - y)
+```
+
+The particular solution is real for `abs(x-y) < 1`. Both integrations use
+the native expression integrator, whose quadratic-denominator rule selects
+an inverse hyperbolic tangent when `4*a*c-b*b` is known to be negative.
+The affine term can be absorbed into the arbitrary functions.
 
 For the two-dimensional Laplace equation without boundary data, Mars returns
 the general solution using arbitrary analytic functions `F` and `G`:

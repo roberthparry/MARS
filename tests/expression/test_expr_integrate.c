@@ -2166,6 +2166,38 @@ static void test_integrate_log_cosh_definite(void)
     expr_bindings_free(bindings);
 }
 
+static void test_integrate_real_quadratic_discriminants(void)
+{
+    static const double points[] = {-0.3, 0.1, 0.3};
+    static const char *const inputs[] = {
+        "ln(1-x*x)", "ln(-(x*x-1))", "ln(6+2*x-4*x*x)", "ln((x+2)*(x+2))",
+        "ln(1+x*x)", "x*atanh(x)", "(ln(-(x*x-1))+2*x*atanh(x))/2"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *integrand = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+
+        assert_string_antiderivative_matches_without(inputs[i], points, sizeof(points) / sizeof(points[0]),
+                                                      NULL, "∫", NULL);
+        /* The logarithmic term and complete primitive used by the PDE must also verify symbolically. */
+        if (i < 2u || i + 1u == sizeof(inputs) / sizeof(inputs[0]))
+            ASSERT_TRUE(expr_verify_antiderivative_real_internal(anti, integrand, x));
+        for (size_t j = 0u; j < sizeof(points) / sizeof(points[0]); ++j) {
+            test_expr_set_val_d(x, points[j]);
+            number_t value = expr_eval(anti);
+
+            ASSERT_TRUE(num_is_finite(value) && num_is_real(value));
+            num_destroy(&value);
+        }
+        expr_free(anti);
+        expr_free(integrand);
+        expr_bindings_free(bindings);
+    }
+}
+
 static void test_integrate_log_quadratic(void)
 {
     static const double points[] = {-1.5, -0.4, 0.6, 1.8};
@@ -3695,6 +3727,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_denominator, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_real_quadratic_discriminants, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_cosh_dilog, NULL);
     TEST_RUN_SUBTEST(test_integrate_clausen_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_cosh_definite, NULL);

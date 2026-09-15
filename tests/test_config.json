@@ -171,6 +171,7 @@
   "tests/diffequation/test_diffequation.c": {
     "readme_examples": {
       "enabled": true,
+      "example_diffequation_atanh_pde": true,
       "example_diffequation_clausen_pde": true,
       "example_diffequation_forced_second_order_pde": true,
       "example_diffequation_linearising_a_lie_symmetric_ode": true,
@@ -185,6 +186,7 @@
     "test_diffequ_applies_initial_condition_to_exact_differential_form": true,
     "test_diffequ_applies_quadratic_characteristic_boundary": true,
     "test_diffequ_applies_signed_dependent_square_boundary": true,
+    "test_diffequ_atanh_pde_real_residual": true,
     "test_diffequ_constructs_from_equation": true,
     "test_diffequ_defaults_bare_differential_operator": true,
     "test_diffequ_derivations_are_opt_in": true,
@@ -604,6 +606,7 @@
         "test_integrate_quotient_rule_second_derivative": true,
         "test_integrate_quotient_rule_sixth_power": true,
         "test_integrate_quotient_rule_very_high_power": true,
+        "test_integrate_real_quadratic_discriminants": true,
         "test_integrate_reciprocal_and_log": true,
         "test_integrate_scaled_symbolic_sum_before_product_search": true,
         "test_integrate_sec_double_angle_log_tan_cot": true,

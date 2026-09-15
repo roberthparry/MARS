@@ -2411,6 +2411,12 @@ static void test_diffequ_second_order_pde_single_phase_resonance(void)
 
 static void test_diffequ_second_order_pde_single_phase_compositions(void)
 {
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2atanh(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) - ½x + ½y + ½·(x - y)·ln(1 - (x - y)²) + "
+                                   "½·((x - y)² + 1)·atanh(x - y)");
+    WANT_SECOND_ORDER_PDE_SOLUTION("2u_ss + 10u_ts + 12u_tt = 4atanh(s-t)",
+                                   "u = F(t - 3s) + G(t - 2s) - ½s + ½t + ½·(s - t)·ln(1 - (s - t)²) + "
+                                   "½·((s - t)² + 1)·atanh(s - t)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2atan(x-y)",
                                    "z = F(y - 3x) + G(y - 2x) + ½x - ½y - ½·(x - y)·ln((x - y)² + 1) + "
                                    "½·((x - y)² - 1)·atan(x - y)");
@@ -2501,6 +2507,53 @@ static void test_diffequ_second_order_pde_particular_satisfies_equation(void)
         de_solve_result_free(result);
         de_free(de);
         ASSERT_TRUE(valid);
+    }
+}
+
+static void test_diffequ_atanh_pde_real_residual(void)
+{
+    static const char *const sources[] = {
+        "z_xx + 5z_yx + 6z_yy = 2atanh(x-y)",
+        "2u_ss + 10u_ts + 12u_tt = 4atanh(s-t)",
+        "z_xx + 5z_xy + 6z_yy = 8atanh(2x-2y+1/10)"
+    };
+
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        expr_t *particular = solution ? test_diffequ_zero_arbitrary_functions(equ_rhs(solution)) : NULL;
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = particular && residual ? expr_substitute(residual, equ_lhs(solution), particular) : NULL;
+        char *text = particular ? expr_to_string(particular, style_UNBOUND) : NULL;
+
+        ASSERT_TRUE(text && !strstr(text, "∫"));
+        for (long sample = -3L; sample <= 3L; sample += 2L) {
+            number_t coordinate = num_create_from_frac(sample, 10L);
+            expr_t *point = expr_new_const(coordinate);
+            expr_t *zero = expr_const_zero();
+            expr_t *at_x = applied ? expr_substitute(applied, de_independent_at(de, 0u), point) : NULL;
+            expr_t *at_xy = at_x ? expr_substitute(at_x, de_independent_at(de, 1u), zero) : NULL;
+            number_t value = at_xy ? expr_eval(at_xy) : num_clone(NUM_NAN);
+            number_t magnitude = num_abs(value);
+            number_t tolerance = num_create_from_string("1e-24");
+
+            ASSERT_TRUE(num_is_real(value) && num_is_finite(value) && num_lt(magnitude, tolerance));
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&value);
+            expr_free(at_xy);
+            expr_free(at_x);
+            expr_free(zero);
+            expr_free(point);
+            num_destroy(&coordinate);
+        }
+        free(text);
+        expr_free(applied);
+        expr_free(residual);
+        expr_free(particular);
+        de_solve_result_free(result);
+        de_free(de);
     }
 }
 
@@ -3415,6 +3468,14 @@ static void example_diffequation_clausen_pde(void)
                                    "z = F(y - 3x) + G(y - 2x) + ½·Cl₂(2x - 2y + π) + ln(2)·(x - y)");
 }
 
+/* README example from docs/diffequation.md: an elementary inverse-hyperbolic-tangent forcing integral. */
+static void example_diffequation_atanh_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2atanh(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) - ½x + ½y + ½·(x - y)·ln(1 - (x - y)²) + "
+                                   "½·((x - y)² + 1)·atanh(x - y)");
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_diffequ_lifecycle_null_safety);
@@ -3541,6 +3602,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_second_order_pde_resonant_forcing);
     RUN_TEST_CASE(test_diffequ_second_order_pde_forcing_superposition);
     RUN_TEST_CASE(test_diffequ_second_order_pde_particular_satisfies_equation);
+    RUN_TEST_CASE(test_diffequ_atanh_pde_real_residual);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_integrals);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_resonance);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_compositions);
@@ -3561,6 +3623,8 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_single_phase_integral_pde, readme_examples,
                                   "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_clausen_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_atanh_pde, readme_examples,
                                   "diffequation,readme,output");
 
     return TESTS_EXIT_CODE();

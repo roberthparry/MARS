@@ -289,10 +289,16 @@ static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt, co
     expr_t *atan_arg = NULL;
     expr_t *scale = NULL;
     expr_t *out = NULL;
+    bool hyperbolic = false;
+    bool repeated_root = false;
 
     if (delta) {
         number_t delta_value = num_new();
 
+        if (expr_simplify_allows_const_identity_fold(delta) && num_is_real(delta->c)) {
+            hyperbolic = num_lt(delta->c, NUM_ZERO);
+            repeated_root = num_is_zero(delta->c);
+        }
         if (expr_match_const_value(delta, &delta_value)) {
             delta_for_arg = expr_new_const(delta_value);
             delta_for_scale = expr_new_const(delta_value);
@@ -302,16 +308,27 @@ static expr_t *symbolic_general_quadratic_inverse_integral(const expr_t *wrt, co
         }
         num_destroy(&delta_value);
     }
-    sqrt_delta_for_arg = delta_for_arg ? expr_sqrt(delta_for_arg) : NULL;
-    sqrt_delta_for_scale = delta_for_scale ? expr_sqrt(delta_for_scale) : NULL;
+    if (hyperbolic) {
+        delta_for_arg = expr_negate_owned(delta_for_arg);
+        delta_for_scale = expr_negate_owned(delta_for_scale);
+    }
     two_a = (two_for_arg && a) ? expr_mul(two_for_arg, a) : NULL;
     two_ax = (two_a && wrt) ? expr_mul(two_a, wrt) : NULL;
     arg_num = (two_ax && b) ? expr_add(two_ax, b) : NULL;
+    if (hyperbolic)
+        arg_num = expr_negate_owned(arg_num);
+    if (repeated_root) {
+        out = arg_num ? expr_negate_owned(expr_div(two_for_scale, arg_num)) : NULL;
+        goto cleanup;
+    }
+    sqrt_delta_for_arg = delta_for_arg ? expr_sqrt(delta_for_arg) : NULL;
+    sqrt_delta_for_scale = delta_for_scale ? expr_sqrt(delta_for_scale) : NULL;
     arg = (arg_num && sqrt_delta_for_arg) ? expr_div(arg_num, sqrt_delta_for_arg) : NULL;
-    atan_arg = arg ? expr_atan(arg) : NULL;
+    atan_arg = arg ? (hyperbolic ? expr_atanh(arg) : expr_atan(arg)) : NULL;
     scale = (two_for_scale && sqrt_delta_for_scale) ? expr_div(two_for_scale, sqrt_delta_for_scale) : NULL;
     out = (scale && atan_arg) ? expr_mul(scale, atan_arg) : NULL;
 
+cleanup:
     expr_free(scale);
     expr_free(atan_arg);
     expr_free(arg);
