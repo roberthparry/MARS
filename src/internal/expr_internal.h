@@ -145,6 +145,8 @@ expr_t *expr_const_long(long value);
 expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_from_expression_text_formal(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                          size_t nsymbols);
+/* Differential-equation binding inference accepts undeclared symbolic function calls and implicit multiplication. */
+expr_t *expr_from_differential_text_internal(const string_t *text, expr_bindings_t **bindings);
 expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, bool constants_only);
 bool expr_bindings_promote_single_constant_internal(expr_bindings_t *bindings);
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
@@ -256,6 +258,13 @@ bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, 
  * the returned expression is owned by the caller and is numerically integrated from zero.
  */
 expr_t *expr_integral_with_dummy_internal(const expr_t *integrand, const expr_t *upper, const expr_t *dummy);
+
+/* Share native definite-integral construction and inspection without exposing expression internals. */
+expr_t *expr_integral_with_bounds_internal(const expr_t *integrand, const expr_t *lower, const expr_t *upper,
+                                           const expr_t *dummy);
+const expr_t *expr_integral_dummy_expr(const expr_t *integral);
+const expr_t *expr_integral_lower_bound_expr(const expr_t *integral);
+const expr_t *expr_integral_upper_bound_expr(const expr_t *integral);
 
 /**
  * @brief Verify an antiderivative symbolically on the real domain.

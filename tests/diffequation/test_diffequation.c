@@ -66,6 +66,219 @@ static bool test_diffequ_want_number(const char *label, number_t got, number_t w
 #define WANT_NUMBER(label, got, want)                                                                         \
     TEST_HARNESS_RETURN_UNLESS(test_diffequ_want_number((label), (got), (want), __FILE__, __LINE__))
 
+static void test_diffequ_lie_free_particle(void)
+{
+    diffequ_t *de = de_from_string("y'' = 0");
+    de_lie_t *lie = de_lie_new(de);
+    WANT_POINTER("free-particle normal form", lie, true);
+    WANT_LONG("free-particle rhs", expr_is_exact_zero(de_lie_rhs(lie)), 1L);
+    for (size_t k = 0u; k < 2u; ++k) {
+        expr_t *invariant = de_lie_invariant(lie, k);
+        WANT_LONG("free-particle relative invariant", expr_is_exact_zero(invariant), 1L);
+        expr_free(invariant);
+    }
+    equation_t *determining = de_lie_determining_equation(lie);
+    WANT_POINTER("general determining equation", determining, true);
+    string_t *text = equ_to_text(determining, style_LATEX);
+    WANT_POINTER("determining equation TeX", text, true);
+    printf("  determining PDE: %s\n", string_c_str(text));
+    string_free(text);
+    equ_free(determining);
+    const long dimensions[3] = {2L, 6L, 8L};
+    for (size_t degree = 0u; degree <= 2u; ++degree) {
+        matrix_t *generators = de_lie_polynomial_generators(lie, degree);
+        WANT_POINTER("polynomial generators", generators, true);
+        WANT_LONG("polynomial symmetry dimension", (long)mat_get_col_count(generators), dimensions[degree]);
+        if (degree == 2u) {
+            matrix_t *constants = de_lie_structure_constants(lie, generators);
+            WANT_POINTER("free-particle algebra closes", constants, true);
+            WANT_LONG("structure-constant rows", (long)mat_get_row_count(constants), 64L);
+            WANT_LONG("structure-constant columns", (long)mat_get_col_count(constants), 8L);
+            mat_free(constants);
+        }
+        mat_free(generators);
+    }
+    de_lie_free(lie);
+    de_free(de);
+}
+
+static void test_diffequ_lie_invariants_and_normalisation(void)
+{
+    static const struct { const char *equation; const char *invariant; long dimension; } cases[] = {
+        {"y'' + 3*y*y' + y^4 = 0", "36*y-72*y^2", 1L},
+        {"y'' + 6*y*y' + 4*y^3 = 0", "0", 3L},
+        {"2*Dtt(u) + 6*u*Dt(u) + 2*u^4 = 0", "36*u-72*u^2", 1L}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        diffequ_t *de = de_from_string(cases[i].equation);
+        de_lie_t *lie = de_lie_new(de);
+        WANT_POINTER("normalised second-order equation", lie, true);
+        expr_t *invariant = de_lie_invariant(lie, 1u);
+        expr_t *expected = expr_from_string(cases[i].invariant, NULL);
+        expr_t *symbol = expr_new_named_var(NUM_NAN, i == 2u ? "u" : "y");
+        expr_t *linked = expr_substitute(expected, symbol, de_lie_coordinate(lie, 1u));
+        expr_free(symbol);
+        expr_free(expected);
+        expected = linked;
+        expr_t *difference = expr_sub_simplify_owned(expr_clone(invariant), expected);
+        string_t *text = expr_to_text(invariant, style_UNBOUND);
+        printf("  computed invariant: %s\n", string_c_str(text));
+        WANT_LONG("computed Lie-Tresse invariant", expr_is_exact_zero(difference), 1L);
+        matrix_t *generators = de_lie_polynomial_generators(lie, 2u);
+        WANT_POINTER("derived generators", generators, true);
+        WANT_LONG("degree-two search dimension", (long)mat_get_col_count(generators), cases[i].dimension);
+        mat_free(generators);
+        string_free(text);
+        expr_free(difference);
+        expr_free(invariant);
+        de_lie_free(lie);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_lie_nonpolynomial_and_validation(void)
+{
+    diffequ_t *de = de_from_string("y'' + y = 0; y(0) = 1");
+    de_lie_t *lie = de_lie_new(de);
+    expr_t *zero = expr_const_zero();
+    expr_t *eta = expr_sin(de_lie_coordinate(lie, 0u));
+    expr_t *residual = de_lie_residual(lie, zero, eta);
+    WANT_LONG("non-polynomial sine generator is verified", expr_is_exact_zero(residual), 1L);
+    WANT_POINTER("velocity-dependent point generator rejected",
+                  de_lie_residual(lie, de_lie_coordinate(lie, 2u), eta), false);
+    WANT_POINTER("invalid prolongation order", de_lie_prolongation(lie, zero, eta, 3u), false);
+    WANT_POINTER("invalid polynomial degree", de_lie_polynomial_generators(lie, 5u), false);
+    WANT_POINTER("invalid invariant index", de_lie_invariant(lie, 2u), false);
+    WANT_POINTER("invalid coordinate index", de_lie_coordinate(lie, 3u), false);
+    expr_free(residual);
+    expr_free(eta);
+    expr_free(zero);
+    de_lie_free(lie);
+    de_free(de);
+    de = de_from_string("y'' = sin(y)");
+    lie = de_lie_new(de);
+    WANT_POINTER("non-polynomial normal form is supported", lie, true);
+    WANT_POINTER("unsupported polynomial coefficient search is explicit", de_lie_polynomial_generators(lie, 2u), false);
+    de_lie_free(lie);
+    de_free(de);
+    de = de_from_string("y'' = (y')^4");
+    lie = de_lie_new(de);
+    expr_t *invariant = de_lie_invariant(lie, 0u);
+    expr_t *twenty_four = expr_const_long(24L);
+    WANT_LONG("first Lie-Tresse invariant detects quartic velocity dependence",
+                expr_struct_eq(invariant, twenty_four), 1L);
+    expr_free(twenty_four);
+    expr_free(invariant);
+    de_lie_free(lie);
+    de_free(de);
+    static const char *invalid[] = {"y' = y", "(y'')^2 = y", "u_xx + u_yy = 0"};
+    for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        de = de_from_string(invalid[i]);
+        WANT_POINTER("unsupported normal form", de_lie_new(de), false);
+        de_free(de);
+    }
+    WANT_POINTER("null analysis input", de_lie_new(NULL), false);
+    WANT_POINTER("null rhs", de_lie_rhs(NULL), false);
+    WANT_POINTER("null determining equation", de_lie_determining_equation(NULL), false);
+    WANT_POINTER("null polynomial search", de_lie_polynomial_generators(NULL, 2u), false);
+    WANT_POINTER("null bracket", de_lie_bracket(NULL, NULL, 0u, 0u), false);
+    WANT_POINTER("null structure constants", de_lie_structure_constants(NULL, NULL), false);
+    de_lie_free(NULL);
+}
+
+static void test_diffequ_lie_brackets_and_search_limits(void)
+{
+    diffequ_t *de = de_from_string("y'' = 0");
+    de_lie_t *lie = de_lie_new(de);
+    expr_t *zero = expr_const_zero(), *one = expr_const_one();
+    expr_t *x = expr_clone(de_lie_coordinate(lie, 0u));
+    expr_t *y = expr_clone(de_lie_coordinate(lie, 1u));
+    matrix_t *basis = mat_new_sparse_expr(2u, 3u);
+    mat_set(basis, 0u, 0u, &one);
+    mat_set(basis, 0u, 1u, &x);
+    mat_set(basis, 1u, 2u, &y);
+    matrix_t *bracket = de_lie_bracket(lie, basis, 0u, 1u);
+    expr_t *component = NULL;
+    WANT_POINTER("translation-dilation bracket", bracket, true);
+    mat_get(bracket, 0u, 0u, &component);
+    WANT_LONG("[d/dx,x*d/dx] = d/dx", expr_struct_eq(component, one), 1L);
+    matrix_t *constants = de_lie_structure_constants(lie, basis);
+    WANT_POINTER("three-generator subalgebra closes", constants, true);
+    mat_get(constants, 1u, 0u, &component);
+    WANT_LONG("C_01^0 = 1", expr_struct_eq(component, one), 1L);
+    mat_get(constants, 3u, 0u, &component);
+    expr_t *negative = expr_const_long(-1L);
+    WANT_LONG("C_10^0 = -1", expr_struct_eq(component, negative), 1L);
+    expr_free(negative);
+    mat_free(constants);
+    mat_free(bracket);
+    mat_free(basis);
+    expr_t *square = expr_mul(x, x);
+    expr_t *xy = expr_mul(x, y);
+    expr_t *nonclosed[4] = {one, square, zero, xy};
+    basis = mat_create_expr(2u, 2u, nonclosed);
+    WANT_POINTER("non-closed polynomial symmetry basis rejected", de_lie_structure_constants(lie, basis), false);
+    mat_set(basis, 0u, 1u, &one);
+    mat_set(basis, 1u, 1u, &zero);
+    WANT_POINTER("dependent basis rejected", de_lie_structure_constants(lie, basis), false);
+    mat_free(basis);
+    basis = de_lie_polynomial_generators(lie, 4u);
+    WANT_POINTER("degree-four search", basis, true);
+    WANT_LONG("higher degree does not invent free-particle symmetries", (long)mat_get_col_count(basis), 8L);
+    mat_free(basis);
+    expr_free(xy);
+    expr_free(square);
+    expr_free(y);
+    expr_free(x);
+    expr_free(one);
+    expr_free(zero);
+    de_lie_free(lie);
+    de_free(de);
+
+    de = de_from_string("y'' = x + y^2");
+    lie = de_lie_new(de);
+    basis = de_lie_polynomial_generators(lie, 2u);
+    WANT_POINTER("empty search is distinct from unsupported", basis, true);
+    WANT_LONG("no degree-two generators", (long)mat_get_col_count(basis), 0L);
+    constants = de_lie_structure_constants(lie, basis);
+    WANT_POINTER("empty algebra has an empty structure-constant matrix", constants, true);
+    WANT_LONG("empty structure-constant rows", (long)mat_get_row_count(constants), 0L);
+    WANT_LONG("empty structure-constant columns", (long)mat_get_col_count(constants), 0L);
+    mat_free(constants);
+    WANT_POINTER("non-autonomous reduction rejected", de_lie_autonomous_reduction(lie), false);
+    mat_free(basis);
+    de_lie_free(lie);
+    de_free(de);
+}
+
+static void test_diffequ_lie_velocity_symbol_and_reduction(void)
+{
+    diffequ_t *de = de_from_string("y'' + p*y' + p_1*y = 0");
+    de_lie_t *lie = de_lie_new(de);
+    WANT_POINTER("parameter-dependent normal form", lie, true);
+    WANT_TEXT("velocity does not capture either parameter", expr_symbol_name(de_lie_coordinate(lie, 2u)), "p₂");
+    WANT_POINTER("unresolved parameter coefficients are not treated as numeric",
+                  de_lie_polynomial_generators(lie, 1u), false);
+    de_lie_free(lie);
+    de_free(de);
+    de = de_from_string("y'' + 3*y*y' + y^4 = 0");
+    lie = de_lie_new(de);
+    equation_t *reduced = de_lie_autonomous_reduction(lie);
+    WANT_POINTER("autonomous order reduction", reduced, true);
+    string_t *text = equ_to_text(reduced, style_UNBOUND);
+    printf("  reduced equation: %s\n", string_c_str(text));
+    const expr_t *left = NULL, *right = NULL;
+    WANT_LONG("reduced left-hand side is a product", expr_match_mul_expr(equ_lhs(reduced), &left, &right), 1L);
+    const expr_t *derivative = expr_is_formal_derivative(left) ? left : right;
+    WANT_LONG("reduced equation has first derivative", (long)expr_formal_derivative_order(derivative), 1L);
+    WANT_LONG("new independent coordinate is y",
+                expr_struct_eq(expr_formal_derivative_wrt_at(derivative, 0u), de_lie_coordinate(lie, 1u)), 1L);
+    string_free(text);
+    equ_free(reduced);
+    de_lie_free(lie);
+    de_free(de);
+}
+
 static void test_diffequ_lifecycle_null_safety(void)
 {
     diffequ_solve_result_t *invalid_result;
@@ -392,6 +605,28 @@ static void test_diffequ_solves_divided_differential_form(void)
     de_free(de);
 }
 
+static void test_diffequ_derivative_quotient_TeX(void)
+{
+    static const struct { const char *source; const char *TeX; } cases[] = {
+        {"u_tt/v^2 = 0", "\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
+        {"2u_tt/v^2 = 0", "\\frac{2}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
+        {"-2u_tt/v^2 = 0", "-\\frac{2}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
+        {"u_tt/(-v^2) = 0", "-\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
+        {"u - 2u_tt/v^2 = 0", "u - \\frac{2}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
+        {"u_xy/(1+x) = 0", "\\frac{1}{x + 1}\\,\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0"},
+        {"y''/v^2 = 0", "\\frac{1}{v^{2}}\\,\\frac{d^{2} y}{d x^{2}} = 0"},
+        {"a*u_tt*u_x/v^2 = 0",
+         "\\frac{a}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}}\\,\\frac{\\partial u}{\\partial x} = 0"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        diffequ_t *de = de_from_string(cases[i].source);
+        char *TeX = de ? de_to_string(de, style_LATEX) : NULL;
+        WANT_TEXT(cases[i].source, TeX, cases[i].TeX);
+        free(TeX);
+        de_free(de);
+    }
+}
+
 static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
 {
     const char *source = "y'' + 4y = 0";
@@ -547,6 +782,34 @@ static void test_diffequ_parses_subscript_partial_derivatives(void)
     de_free(first);
 }
 
+static void test_diffequ_compact_parameter_derivatives(void)
+{
+    static const struct { const char *compact; const char *explicit_form; } cases[] = {
+        {"u_y + au_xx + bu_yy = 0", "u_y + a*u_xx + b*u_yy = 0"},
+        {"au_xx + bu_yy + u_y = 0", "a*u_xx + b*u_yy + u_y = 0"},
+        {"u_y + 2au_xx + 3bu_yy = 0", "u_y + 2*a*u_xx + 3*b*u_yy = 0"},
+        {"u_y + aau_xx = 0", "u_y + a*a*u_xx = 0"},
+        {"phi_y + aphi_xx = 0", "phi_y + a*phi_xx = 0"},
+        {"xzz_x + z_y = 0", "x*z*z_x + z_y = 0"},
+        {"temperature_x + temperature_y = 0", "Dx([temperature]) + Dy([temperature]) = 0"},
+        {"u_y + velocity_xx = 0", "u_y + Dxx([velocity]) = 0"},
+        {"u_y + mu_xx = 0", "u_y + @mu_xx = 0"},
+        {"au_xx + bu_yy = 0", "Dxx([au]) + Dyy([bu]) = 0"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        diffequ_t *compact = de_from_string(cases[i].compact);
+        diffequ_t *explicit_form = de_from_string(cases[i].explicit_form);
+        char *actual = compact ? de_to_string(compact, style_LATEX) : NULL;
+        char *expected = explicit_form ? de_to_string(explicit_form, style_LATEX) : NULL;
+        WANT_POINTER("explicit comparison equation", expected, true);
+        WANT_TEXT(cases[i].compact, actual, expected);
+        free(expected);
+        free(actual);
+        de_free(explicit_form);
+        de_free(compact);
+    }
+}
+
 static void test_diffequ_rejects_noncanonical_text(void)
 {
     diffequ_t *missing_derivative = de_from_string("y = 1");
@@ -649,7 +912,7 @@ static void test_diffequ_solves_quadratic_separable_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("quadratic separable solution text", text, true);
     if (text)
-        WANT_TEXT("quadratic separable solution", string_c_str(text), "y = -1/(½x² - 1)");
+        WANT_TEXT("quadratic separable solution", string_c_str(text), "y = -1/(½·(x² - 2))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -790,6 +1053,7 @@ static void test_diffequ_linear_solution_uses_special_function(void)
     de_free(de);
 }
 
+/* Also exercised last as the README integrating-factor example from docs/diffequation.md. */
 static void test_diffequ_linear_solution_retains_formal_integral(void)
 {
     diffequ_t *de = de_from_string("Dx(y) + y = exp(cosh(x)); y(0) = 0");
@@ -817,6 +1081,12 @@ static void test_diffequ_linear_solution_retains_formal_integral(void)
     WANT_POINTER("formal-integral solution text", text, true);
     if (text)
         WANT_TEXT("formal-integral linear solution", string_c_str(text), "y = ∫^x exp(cosh(t) + t)·dt/exp(x)");
+
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, "e^{-x}\\,\\int^{x} e^{\\cosh(t) + t}"));
+    ASSERT_TRUE(!strstr(TeX, "\\frac"));
+    printf("  %s\n", TeX ? TeX : "NULL");
+    free(TeX);
 
     string_free(text);
     de_solve_result_free(result);
@@ -1357,7 +1627,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     const char *source = "y'' + 3yy' + y^3 = 0";
     diffequ_t *de = de_from_string(source);
     diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
-    const char *want = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
+    const char *want = "y = (2x + C₁)/(x² + C₁x + C₂)";
 
     WANT_POINTER("parsed modified-Emden problem", de, true);
     WANT_POINTER("modified-Emden solve result", result, true);
@@ -1373,11 +1643,17 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
                        strstr(de_solve_result_steps(result), "d²Y/dX² = 0"), true);
     if (de_solve_result_steps_TeX(result)) {
         WANT_POINTER("modified-Emden TeX uses the dependent symbol directly",
-                       strstr(de_solve_result_steps_TeX(result), "y''+3(1)yy'"), true);
+                       strstr(de_solve_result_steps_TeX(result), "y=\\frac{1}{u}u'"), true);
         WANT_POINTER("modified-Emden TeX omits binding wrappers",
                        strstr(de_solve_result_steps_TeX(result), "\\middle|"), false);
         WANT_POINTER("modified-Emden TeX omits unbound sentinel values",
                        strstr(de_solve_result_steps_TeX(result), "NAN"), false);
+        WANT_POINTER("modified-Emden TeX keeps derivatives outside algebraic fractions",
+                       strstr(de_solve_result_steps_TeX(result), "\\frac{u'"), false);
+        WANT_POINTER("modified-Emden TeX explains the auxiliary polynomial",
+                       strstr(de_solve_result_steps_TeX(result), "u=Ax^2+Bx+C"), true);
+        WANT_POINTER("modified-Emden TeX omits redundant unit coefficients",
+                       strstr(de_solve_result_steps_TeX(result), "3(1)"), false);
     }
     WANT_LONG("modified-Emden solution count", (long)de_solve_result_count(result), 1L);
     {
@@ -1398,17 +1674,233 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
 static void test_diffequ_rejects_quartic_emden_point_linearization(void)
 {
     diffequ_t *de = de_from_string("y'' + 3*y*y' + y^4 = 0");
-    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
 
     WANT_POINTER("parsed quartic Emden problem", de, true);
     WANT_POINTER("quartic Emden solve result", result, true);
-    WANT_LONG("quartic Emden solve status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_UNSUPPORTED);
-    WANT_TEXT("quartic Emden point-linearization diagnostic", de_solve_result_diagnostic(result),
-                "not point-linearizable: the Lie–Tressé invariant "
-                "36y(1 − 2y) is not identically zero");
+    WANT_LONG("quartic Emden solve status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SERIES);
+    WANT_POINTER("computed invariant diagnostic", strstr(de_solve_result_steps(result), "Computed Lie–Tressé"), true);
+    WANT_POINTER("translation symmetry is found despite non-linearisation",
+                  strstr(de_solve_result_steps(result), "total degree <= 2): 1 verified"), true);
+    WANT_POINTER("local order reduction is reported", strstr(de_solve_result_steps(result), "local order reduction"), true);
+    WANT_POINTER("native TeX analysis", de_solve_result_steps_TeX(result), true);
+    const char *explanations[] = {de_solve_result_steps(result), de_solve_result_steps_TeX(result)};
+    for (size_t i = 0u; i < 2u; ++i) {
+        WANT_POINTER("slope substitution is defined", strstr(explanations[i], "p=y'") ?
+                     strstr(explanations[i], "p=y'") : strstr(explanations[i], "p = y'"), true);
+        WANT_POINTER("total derivative is explained", strstr(explanations[i], "total differentiation along"), true);
+        WANT_POINTER("chain rule is named", strstr(explanations[i], "chain rule"), true);
+        WANT_POINTER("partial derivatives are explained", strstr(explanations[i], "other coordinates fixed"), true);
+        WANT_POINTER("Taylor factorials are explained", strstr(explanations[i], "divided by factorials"), true);
+        WANT_POINTER("actual coefficient algorithm is identified", strstr(explanations[i], "matching powers"), true);
+        WANT_POINTER("remainder is explained", strstr(explanations[i], "omitted higher powers"), true);
+    }
 
     de_solve_result_free(result);
     de_free(de);
+}
+
+static void test_diffequ_series_quartic_coefficients(void)
+{
+    static const char *const expected[] = {"0", "1", "0", "-1/2", "0", "3/10", "-1/30", "-51/280", "27/560"};
+    diffequ_t *de = de_from_string("y'' + 3*y*y' + y^4 = 0; y(0)=0; y'(0)=1");
+    diffequ_solve_result_t *result = de_solve_series(de, 8u, DE_SOLVE_OPTION_NONE);
+    WANT_LONG("series status", de_solve_result_status(result), DE_SOLVE_STATUS_SERIES);
+    WANT_LONG("retained degree", de_solve_result_series_degree(result), 8L);
+    WANT_LONG("zero centre", expr_is_exact_zero(de_solve_result_series_centre(result)), 1L);
+    WANT_POINTER("steps remain opt-in", de_solve_result_steps(result), false);
+    for (size_t n = 0u; n < 9u; ++n) {
+        expr_t *want = expr_from_string(expected[n], NULL);
+        expr_t *difference = expr_sub_simplify_owned(expr_clone(de_solve_result_series_coefficient(result, n)), want);
+        WANT_LONG("exact Taylor coefficient", expr_is_exact_zero(difference), 1L);
+        expr_free(difference);
+    }
+    WANT_POINTER("coefficient out of range", de_solve_result_series_coefficient(result, 9u), false);
+    string_t *text = equ_to_text(de_solve_result_at(result, 0u), style_LATEX);
+    WANT_POINTER("explicit remainder in native TeX", strstr(string_c_str(text), "O"), true);
+    printf("  local series: %s\n", string_c_str(text));
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void assert_series_numbers_exact(const expr_t *expr)
+{
+    if (!expr)
+        return;
+    number_t value = num_new();
+    if (!expr_is_named_const(expr) && expr_match_const_value(expr, &value))
+        WANT_LONG("Taylor coefficient has an exact numeric leaf", num_is_exact(value), 1L);
+    num_destroy(&value);
+    const expr_t *left = NULL, *right = NULL;
+    if (expr_child_exprs(expr, &left, &right)) {
+        assert_series_numbers_exact(left);
+        assert_series_numbers_exact(right);
+    }
+}
+
+static void test_diffequ_series_general_data(void)
+{
+    diffequ_t *de = de_from_string("y'' + 3*y*y' + y^4 = 0");
+    diffequ_solve_result_t *result = de_solve(de);
+    WANT_LONG("automatic series fallback", de_solve_result_status(result), DE_SOLVE_STATUS_SERIES);
+    const expr_t *a = de_solve_result_series_coefficient(result, 0u);
+    const expr_t *b = de_solve_result_series_coefficient(result, 1u);
+    WANT_LONG("arbitrary initial value", expr_is_named_const(a), 1L);
+    WANT_LONG("arbitrary initial slope", expr_is_named_const(b), 1L);
+    WANT_LONG("independent initial constants", expr_struct_eq(a, b), 0L);
+    /* Presentation regression: collect the recurrence, rather than printing its nested construction tree. */
+    for (size_t n = 2u; n <= de_solve_result_series_degree(result); ++n) {
+        assert_series_numbers_exact(de_solve_result_series_coefficient(result, n));
+        char *coefficient = expr_to_string(de_solve_result_series_coefficient(result, n), style_UNBOUND);
+        WANT_LONG("compact symbolic Taylor coefficient", coefficient && strlen(coefficient) < 400u, 1L);
+        WANT_LONG("no decimal Taylor coefficients", coefficient && !strchr(coefficient, '.'), 1L);
+        free(coefficient);
+        char *coefficient_TeX = expr_to_string(de_solve_result_series_coefficient(result, n), style_LATEX);
+        WANT_LONG("TeX retains fractional Taylor coefficients",
+                  coefficient_TeX && !strchr(coefficient_TeX, '.') && strstr(coefficient_TeX, "\\frac"), 1L);
+        free(coefficient_TeX);
+    }
+    string_t *series_text = equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND);
+    WANT_LONG("readable Taylor series", series_text && strlen(string_c_str(series_text)) < 1500u, 1L);
+    string_free(series_text);
+    expr_t *square = expr_mul(a, a);
+    expr_t *fourth = expr_mul(square, square);
+    expr_t *product = expr_mul(a, b);
+    expr_t *sum = expr_add_simplify_owned(expr_mul_long(product, 3L), fourth);
+    expr_t *expected = expr_div_long(sum, -2L);
+    expr_t *difference = expr_sub_simplify_owned(expr_clone(de_solve_result_series_coefficient(result, 2u)), expected);
+    expr_t *a_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(a));
+    expr_t *b_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(b));
+    /* Both sides have degree <= 4 in a and <= 1 in b: this exact grid determines their difference. */
+    for (long av = -2L; av <= 2L; ++av) {
+        for (long bv = -1L; bv <= 1L; ++bv) {
+            expr_t *a_value = expr_const_long(av), *b_value = expr_const_long(bv);
+            expr_t *at_a = expr_substitute(difference, a_symbol, a_value);
+            expr_t *at_b = expr_substitute(at_a, b_symbol, b_value);
+            expr_t *simplified = expr_simplify(at_b);
+            WANT_LONG("coefficient for arbitrary initial data", expr_is_exact_zero(simplified), 1L);
+            expr_free(simplified);
+            expr_free(at_b);
+            expr_free(at_a);
+            expr_free(b_value);
+            expr_free(a_value);
+        }
+    }
+    /* Collecting symbolic coefficients must agree with all orders computed directly from numeric data. */
+    static const long initial_data[][2] = {{-1L, 2L}, {1L, 0L}, {2L, -1L}, {0L, 1L}};
+    for (size_t i = 0u; i < sizeof(initial_data) / sizeof(*initial_data); ++i) {
+        char source[128];
+        snprintf(source, sizeof(source), "y'' + 3*y*y' + y^4 = 0; y(0)=%ld; y'(0)=%ld",
+                 initial_data[i][0], initial_data[i][1]);
+        diffequ_t *numeric_de = de_from_string(source);
+        diffequ_solve_result_t *numeric = de_solve_series(numeric_de, 6u, DE_SOLVE_OPTION_NONE);
+        WANT_LONG("numeric comparison series", de_solve_result_status(numeric), DE_SOLVE_STATUS_SERIES);
+        expr_t *a_value = expr_const_long(initial_data[i][0]);
+        expr_t *b_value = expr_const_long(initial_data[i][1]);
+        for (size_t n = 0u; n <= 6u; ++n) {
+            expr_t *at_a = expr_substitute(de_solve_result_series_coefficient(result, n), a_symbol, a_value);
+            expr_t *at_b = expr_substitute(at_a, b_symbol, b_value);
+            expr_t *error = expr_sub_simplify_owned(at_b, expr_clone(de_solve_result_series_coefficient(numeric, n)));
+            WANT_LONG("collected coefficient retains exact value", expr_is_exact_zero(error), 1L);
+            expr_free(error);
+            expr_free(at_a);
+        }
+        expr_free(b_value);
+        expr_free(a_value);
+        de_solve_result_free(numeric);
+        de_free(numeric_de);
+    }
+    expr_free(b_symbol);
+    expr_free(a_symbol);
+    expr_free(difference);
+    expr_free(sum);
+    expr_free(product);
+    expr_free(square);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+/* Verify every determined residual coefficient, independently of the total-derivative recurrence. */
+static void test_diffequ_series_shifted_residuals(void)
+{
+    static const char *const sources[] = {
+        "2*Dtt(u)=2*t+2*u^2+2*Dt(u)^2; u(2)=1; u'(2)=-1",
+        "y'' + 5*y*y' + 2*y^5 = 0; y(1)=2; y'(1)=0",
+        "y'' + 3*y*y' + y^4 = 0; y(0)=0; y'(0)=0",
+    };
+    for (size_t c = 0u; c < sizeof(sources) / sizeof(*sources); ++c) {
+        diffequ_t *de = de_from_string(sources[c]);
+        de_lie_t *normal = de_lie_new(de);
+        diffequ_solve_result_t *result = de_solve_series(de, 6u, DE_SOLVE_OPTION_NONE);
+        WANT_LONG("polynomial normal form series", de_solve_result_status(result), DE_SOLVE_STATUS_SERIES);
+        const expr_t *x = de_lie_coordinate(normal, 0u);
+        const expr_t *centre = de_solve_result_series_centre(result);
+        expr_t *shift = expr_sub(x, centre);
+        expr_t *power = expr_const_one();
+        expr_t *polynomial = expr_const_zero();
+        for (size_t n = 0u; n <= 6u; ++n) {
+            polynomial = expr_add_simplify_owned(polynomial, expr_mul(de_solve_result_series_coefficient(result, n), power));
+            power = expr_mul_simplify_owned(power, expr_clone(shift));
+        }
+        expr_t *first = expr_create_deriv(polynomial, x);
+        expr_t *second = expr_create_deriv(first, x);
+        expr_t *rhs_y = expr_substitute(de_lie_rhs(normal), de_lie_coordinate(normal, 1u), polynomial);
+        expr_t *rhs = expr_substitute(rhs_y, de_lie_coordinate(normal, 2u), first);
+        expr_t *residual = expr_sub(second, rhs);
+        /* Evaluate at the centre before expansion to keep the check small. */
+        for (size_t n = 0u; n <= 4u; ++n) {
+            expr_t *at = expr_substitute(residual, x, centre);
+            expr_t *simplified = expr_simplify(at);
+            WANT_LONG("residual derivative at expansion point", expr_is_exact_zero(simplified), 1L);
+            expr_free(simplified);
+            expr_free(at);
+            expr_t *next = n < 4u ? expr_create_deriv(residual, x) : NULL;
+            expr_free(residual);
+            residual = next;
+        }
+        expr_free(rhs);
+        expr_free(rhs_y);
+        expr_free(second);
+        expr_free(first);
+        expr_free(polynomial);
+        expr_free(power);
+        expr_free(shift);
+        de_solve_result_free(result);
+        de_lie_free(normal);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_series_limits_and_initial_conditions(void)
+{
+    static const char *const rejected[] = {
+        "y''=abs(y)", "x*y''=y^4", "y''=1/y", "y''^2=y", "y'=y^4", "u_xx=u^4",
+        "y''=y^4; y(0)=1; y'(1)=2", "y''=y^4; y(0)=1; y(0)=2",
+        "y''=y^4; y''(0)=1", "y''=y^4; y(0)=x", "y''=y^4; y(0)=inf",
+    };
+    for (size_t i = 0u; i < sizeof(rejected) / sizeof(*rejected); ++i) {
+        diffequ_t *de = de_from_string(rejected[i]);
+        WANT_POINTER("well-formed but unsuitable for Taylor fallback", de, true);
+        diffequ_solve_result_t *result = de_solve_series(de, 6u, DE_SOLVE_OPTION_NONE);
+        WANT_LONG("unsupported series case", de_solve_result_status(result), DE_SOLVE_STATUS_UNSUPPORTED);
+        WANT_LONG("no misleading finite solution", de_solve_result_count(result), 0L);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+    diffequ_t *de = de_from_string("y''=-3*y*y'-y^4; y(2)=0");
+    diffequ_solve_result_t *result = de_solve_series(de, 8u, DE_SOLVE_OPTION_NONE);
+    WANT_LONG("partial initial data", de_solve_result_status(result), DE_SOLVE_STATUS_SERIES);
+    WANT_LONG("supplied value", expr_is_exact_zero(de_solve_result_series_coefficient(result, 0u)), 1L);
+    WANT_LONG("unspecified slope remains arbitrary", expr_is_named_const(de_solve_result_series_coefficient(result, 1u)), 1L);
+    de_solve_result_free(result);
+    result = de_solve_series(de, 9u, DE_SOLVE_OPTION_NONE);
+    WANT_LONG("degree limit", de_solve_result_status(result), DE_SOLVE_STATUS_INVALID);
+    de_solve_result_free(result);
+    de_free(de);
+    WANT_LONG("null series degree", de_solve_result_series_degree(NULL), 0L);
+    WANT_POINTER("null series centre", de_solve_result_series_centre(NULL), false);
+    WANT_POINTER("null series coefficient", de_solve_result_series_coefficient(NULL, 0u), false);
 }
 
 static void test_diffequ_linearizes_scaled_modified_emden_problem(void)
@@ -1425,7 +1917,7 @@ static void test_diffequ_linearizes_scaled_modified_emden_problem(void)
                    true);
     if (text)
         WANT_TEXT("scaled modified-Emden solution", string_c_str(text),
-                    "y = 1/(2·(x² + C₁x + C₂))·(2x + C₁)");
+                    "y = (2x + C₁)/(2·(x² + C₁x + C₂))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1464,9 +1956,9 @@ static void test_diffequ_modified_emden_uses_coefficient_rule(void)
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
 
     WANT_LONG("coefficient-derived Emden status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SOLVED);
-    WANT_POINTER("coefficient-derived Emden scale", strstr(de_solve_result_steps(result), "3(3)"), true);
+    WANT_POINTER("coefficient-derived Emden scale", strstr(de_solve_result_steps(result), "Set y = (1/(3u))u′"), true);
     WANT_TEXT("coefficient-derived Emden solution", text ? string_c_str(text) : NULL,
-                "y = 1/(3·(x² + C₁x + C₂))·(2x + C₁)");
+                "y = (2x + C₁)/(3·(x² + C₁x + C₂))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1590,10 +2082,9 @@ static void test_diffequ_does_not_invent_cubic_potential_functions(void)
         return;
     }
 
-    WANT_LONG("cubic-potential solve status", (long)de_solve_result_status(result),
-                (long)DE_SOLVE_STATUS_UNSUPPORTED);
-    WANT_LONG("cubic-potential selected solver", (long)de_solve_result_solver(result), (long)DE_SOLVER_NONE);
-    WANT_LONG("cubic-potential solution count", (long)de_solve_result_count(result), 0L);
+    WANT_LONG("cubic-potential solve status", (long)de_solve_result_status(result), (long)DE_SOLVE_STATUS_SERIES);
+    WANT_LONG("cubic-potential selected solver", (long)de_solve_result_solver(result), (long)DE_SOLVER_TAYLOR_SERIES);
+    WANT_LONG("cubic-potential series count", (long)de_solve_result_count(result), 1L);
 
     de_solve_result_free(result);
     de_free(de);
@@ -1676,9 +2167,8 @@ static void test_diffequ_normalizes_variable_coefficient_sturm_liouville(void)
         WANT_LONG("variable-coefficient solve status", (long)de_solve_result_status(result),
                     (long)DE_SOLVE_STATUS_UNSUPPORTED);
         WANT_LONG("variable-coefficient solution count", (long)de_solve_result_count(result), 0L);
-        WANT_TEXT("variable-coefficient diagnostic", de_solve_result_diagnostic(result),
-                    "the second-order linear equation has no supported "
-                    "closed-form basis");
+        WANT_POINTER("variable-coefficient Lie diagnostic",
+                      strstr(de_solve_result_diagnostic(result), "computed Lie–Tressé invariants"), true);
     }
 
     de_solve_result_free(result);
@@ -2372,6 +2862,11 @@ static void test_diffequ_second_order_pde_resonant_forcing(void)
 
 static void test_diffequ_second_order_pde_forcing_superposition(void)
 {
+    const char *polynomial = "z = F(2x + y) + x·G(2x + y) + 4x⁴ + y⁴";
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 4z_yx + 4z_yy = 48(x^2 + y^2)", polynomial);
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 4z_xy + 4z_yy = 48x^2 + 48y^2", polynomial);
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 4z_xy + 4z_yy - 48(x^2+y^2) = 0", polynomial);
+    WANT_SECOND_ORDER_PDE_SOLUTION("-2z_xx + 8z_xy - 8z_yy = -96(x^2+y^2)", polynomial);
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) + exp(x+y)",
                                    "z = F(y - 3x) + G(y - 2x) + ½·exp(x - y) + ¹⁄₁₂·exp(x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) - cos(x-y)",
@@ -2510,12 +3005,776 @@ static void test_diffequ_second_order_pde_particular_satisfies_equation(void)
     }
 }
 
-static void test_diffequ_atanh_pde_real_residual(void)
+static void test_diffequ_second_order_pde_polynomial_superposition(void)
+{
+    static const char *const sources[] = {
+        "z_xx - 4z_yx + 4z_yy = 48(x^2+y^2)",
+        "z_xx - 4z_xy + 4z_yy = -48(x^2+y^2)",
+        "z_xx - 4z_xy + 4z_yy = (x^2+y^2)/2",
+        "2u_ss - 8u_ts + 8u_tt = 96(s^2+t^2)",
+        "z_xx - 3z_xy + 2z_yy = 24(x^2+y^2)",
+        "z_xx - 4z_xy + 4z_yy = 48(x+y)*(x-y)",
+        "z_xx - 4z_xy + 4z_yy = 48(x^2-y^2+1)",
+        "z_xy = 6(x^2+y^2)"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        expr_t *particular = solution ? test_diffequ_zero_arbitrary_functions(equ_rhs(solution)) : NULL;
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = particular && residual ? expr_substitute(residual, equ_lhs(solution), particular) : NULL;
+        expr_t *expanded = applied ? expr_expand_products_internal(applied) : NULL;
+        expr_t *normalised = expanded ? expr_simplify(expanded) : NULL;
+        WANT_LONG("polynomial particular solution has identically zero residual",
+                  normalised && expr_is_exact_zero(normalised), 1L);
+        expr_free(normalised);
+        expr_free(expanded);
+        expr_free(applied);
+        expr_free(residual);
+        expr_free(particular);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+/* Borrow an actual function node: expression substitution matches non-leaf nodes by identity. */
+static const expr_t *test_diffequ_find_arbitrary_function(const expr_t *expr)
+{
+    const expr_t *left = NULL, *right = NULL;
+    if (expr_is_arbitrary_function(expr))
+        return expr;
+    if (!expr_child_exprs(expr, &left, &right))
+        return NULL;
+    const expr_t *found = left ? test_diffequ_find_arbitrary_function(left) : NULL;
+    return found ? found : (right ? test_diffequ_find_arbitrary_function(right) : NULL);
+}
+
+static bool test_diffequ_wave_zero_at_samples(const expr_t *expr, const diffequ_t *de)
+{
+    for (long sample = 0L; sample < 3L; ++sample) {
+        expr_t *at = expr_clone(expr);
+        for (size_t i = 0u; at && i < de_independent_count(de); ++i) {
+            number_t coordinate = num_create_from_frac(sample + (long)i - 1L, 4L);
+            expr_t *point = expr_new_const(coordinate);
+            num_destroy(&coordinate);
+            expr_t *next = expr_substitute(at, de_independent_at(de, i), point);
+            expr_free(point);
+            expr_free(at);
+            at = next;
+        }
+        number_t value = at ? expr_eval(at) : num_clone(NUM_NAN);
+        number_t magnitude = num_abs(value), tolerance = num_create_from_string("1e-24");
+        bool zero = num_is_finite(value) && num_lt(magnitude, tolerance);
+        num_destroy(&tolerance);
+        num_destroy(&magnitude);
+        num_destroy(&value);
+        expr_free(at);
+        if (!zero)
+            return false;
+    }
+    return true;
+}
+
+static void test_diffequ_symbolic_function_input(void)
+{
+    static const char *const sources[] = {
+        "u_tt - c^2u_xx = f(x,t); u(x, 0) = g(x); u_t(x,0) = h(x)",
+        "u_tt - c^2u_xx = f (x, t); u(x,0) = g (x); u_t(x,0) = h (x)",
+        "w_ss - 4w_rr = F(r,s); w(r,2) = G(r); w_s(r,2) = H(r)",
+        "u_tt - u_xx = [source](x,t); u(x,0) = [displacement](x); u_t(x,0) = [velocity](x)"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        ASSERT_TRUE(de != NULL);
+        ASSERT_TRUE(expr_is_arbitrary_function(equ_rhs(de_equation(de))));
+        for (size_t j = 0u; j < 2u; ++j)
+            ASSERT_TRUE(expr_is_arbitrary_function(equ_rhs(de_condition_at(de, j))));
+        char *problem_TeX = de_to_string(de, style_LATEX);
+        ASSERT_TRUE(problem_TeX && strstr(problem_TeX, "\\left(") && !strstr(problem_TeX, "NAN"));
+        diffequ_solve_result_t *result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        WANT_LONG("symbolic data use the wave IVP rule", de_solve_result_solver(result), DE_SOLVER_DALEMBERT_DUHAMEL);
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+        ASSERT_TRUE(TeX && strstr(TeX, "\\int") && !strstr(TeX, "NAN"));
+        if (i < 2u) {
+            ASSERT_TRUE(strstr(problem_TeX, "f\\left(x, t\\right)"));
+            ASSERT_TRUE(strstr(TeX, "f\\left(\\xi, s\\right)"));
+            ASSERT_TRUE(strstr(TeX, "h\\left(\\xi\\right)"));
+            ASSERT_TRUE(strstr(TeX, "g\\left(x + c\\mkern-2mu t\\right)"));
+            ASSERT_TRUE(!de_constant(de, "f") && !de_constant(de, "g") && !de_constant(de, "h"));
+            char *canonical = de_to_string(de, style_EXPRESSION);
+            diffequ_t *roundtrip = de_from_string(canonical);
+            char *roundtrip_TeX = roundtrip ? de_to_string(roundtrip, style_LATEX) : NULL;
+            WANT_TEXT("symbolic-call round trip", roundtrip_TeX, problem_TeX);
+            free(roundtrip_TeX);
+            de_free(roundtrip);
+            free(canonical);
+        }
+        if (i == 0u) {
+            /* Substitute f(a,b)=a*b, g(a)=a^2 and h(a)=1 into the actual returned integral tree. */
+            expr_t *candidate = expr_clone(equ_rhs(solution));
+            const expr_t *call = NULL;
+            size_t replacements = 0u;
+            while ((call = test_diffequ_find_arbitrary_function(candidate)) != NULL && replacements++ < 8u) {
+                const char *name = expr_symbol_name(call);
+                const expr_t *args = NULL, *first = NULL, *second = NULL;
+                ASSERT_TRUE(expr_child_exprs(call, &args, NULL));
+                expr_t *replacement = NULL;
+                if (strcmp(name, "f") == 0) {
+                    ASSERT_TRUE(expr_child_exprs(args, &first, &second));
+                    replacement = expr_mul(first, second);
+                } else if (strcmp(name, "g") == 0) {
+                    replacement = expr_mul(args, args);
+                } else if (strcmp(name, "h") == 0) {
+                    replacement = expr_const_one();
+                }
+                ASSERT_TRUE(replacement != NULL);
+                expr_t *next = expr_substitute(candidate, call, replacement);
+                expr_free(replacement);
+                expr_free(candidate);
+                candidate = next;
+            }
+            ASSERT_TRUE(candidate && !test_diffequ_find_arbitrary_function(candidate));
+            expr_t *c = expr_new_named_var(NUM_NAN, "c"), *two = expr_const_long(2L);
+            expr_t *at_speed = expr_substitute(candidate, c, two);
+            diffequ_t *concrete = de_from_string("u_tt - 4u_xx = x*t; u(x,0) = x^2; u_t(x,0) = 1");
+            expr_t *original_residual = equ_residual(de_equation(de));
+            const expr_t *forcing_call = test_diffequ_find_arbitrary_function(original_residual);
+            expr_t *forcing = expr_mul(de_independent_at(de, 0u), de_independent_at(de, 1u));
+            expr_t *with_forcing = expr_substitute(original_residual, forcing_call, forcing);
+            expr_t *residual = expr_substitute(with_forcing, c, two);
+            expr_t *applied = expr_substitute(residual, equ_lhs(solution), at_speed);
+            expr_t *error = expr_simplify(applied);
+            char *candidate_text = expr_to_string(at_speed, style_UNBOUND);
+            char *error_text = expr_to_string(error, style_UNBOUND);
+            printf("  substituted symbolic solution: %s\n  residual: %s\n", candidate_text, error_text);
+            free(error_text);
+            free(candidate_text);
+            ASSERT_TRUE(error && test_diffequ_wave_zero_at_samples(error, de));
+            expr_t *time = expr_new_named_var(NUM_NAN, "t"), *zero = expr_const_zero();
+            for (size_t j = 0u; j < 2u; ++j) {
+                const equation_t *condition = de_condition_at(de, j);
+                expr_t *lhs = expr_substitute(equ_lhs(condition), equ_lhs(solution), at_speed);
+                expr_t *at = expr_substitute(lhs, time, zero);
+                expr_t *initial_error = expr_sub(at, equ_rhs(de_condition_at(concrete, j)));
+                ASSERT_TRUE(initial_error && test_diffequ_wave_zero_at_samples(initial_error, de));
+                expr_free(initial_error);
+                expr_free(at);
+                expr_free(lhs);
+            }
+            expr_free(zero);
+            expr_free(time);
+            expr_free(error);
+            expr_free(applied);
+            expr_free(residual);
+            expr_free(with_forcing);
+            expr_free(forcing);
+            expr_free(original_residual);
+            de_free(concrete);
+            expr_free(at_speed);
+            expr_free(two);
+            expr_free(c);
+            expr_free(candidate);
+        }
+        printf("  %s\n", TeX);
+        free(TeX);
+        de_solve_result_free(result);
+        free(problem_TeX);
+        de_free(de);
+    }
+    /* Calls generalise across the DE parser; this is not a wave-specific f/g/h substitution. */
+    diffequ_t *ode = de_from_string("y' = f(x)");
+    ASSERT_TRUE(ode && expr_is_arbitrary_function(equ_rhs(de_equation(ode))));
+    de_free(ode);
+    ode = de_from_string("y' = f(g(x))");
+    ASSERT_TRUE(ode && expr_is_arbitrary_function(equ_rhs(de_equation(ode))));
+    de_free(ode);
+    ASSERT_TRUE(test_diffequ_want_pde_solution(
+        "{ u_tt - u_xx = 0 | t = ?, x = ?; h = 2; u(x,0) = 0, u_t(x,0) = h(x) }",
+        "u = htx", DE_SOLVER_DALEMBERT_DUHAMEL, __FILE__, __LINE__));
+}
+
+static void test_diffequ_wave_ivp_polynomial_data(void)
+{
+    static const struct { const char *source; const char *expected; const char *time; long initial_time; } cases[] = {
+        {"u_tt - 4u_xx = x*t; u(x,0) = x^2; u_t(x,0) = 1", "x^2+4t^2+t+x*t^3/6", "t", 0L},
+        {"u_tt - 9u_xx = 1; u(x,0) = 0; u_t(x,0) = 0", "t^2/2", "t", 0L},
+        {"8u_xx - 2u_tt = -2x*t; u_t(x,0) = 1; u(x,0) = x^2", "x^2+4t^2+t+x*t^3/6", "t", 0L},
+        {"u_tt - 4u_xx = 0; u(x,2) = x^2; u_t(x,2) = x", "x^2+x*(t-2)+4*(t-2)^2", "t", 2L},
+        {"w_ss - 9w_rr = r*s; w(r,0) = r^2; w_s(r,0) = 1", "r^2+9s^2+s+r*s^3/6", "s", 0L},
+        {"u_tt - 4u_xx = x^2+t^2; u(x,0) = 0; u_t(x,0) = 0", "t^2*x^2/2+5t^4/12", "t", 0L},
+        {"u_xx - u_tt = 0; u(x,0) = sin(x); u_t(x,0) = cos(x)", "sin(x)*cos(t)+cos(x)*sin(t)", "t", 0L}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        diffequ_t *de = de_from_string(cases[i].source);
+        diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
+        WANT_LONG(cases[i].source, de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        WANT_LONG("one-dimensional wave IVP", de_solve_result_solver(result), DE_SOLVER_DALEMBERT_DUHAMEL);
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        expr_t *expected = expr_from_string(cases[i].expected, NULL);
+        expr_t *difference = solution ? expr_sub(equ_rhs(solution), expected) : NULL;
+        ASSERT_TRUE(difference && test_diffequ_wave_zero_at_samples(difference, de));
+        string_t *text = equ_to_text(solution, style_UNBOUND);
+        ASSERT_TRUE(text && !strstr(string_c_str(text), "∫"));
+        printf("  %s\n", string_c_str(text));
+        expr_t *residual = equ_residual(de_equation(de));
+        expr_t *applied = expr_substitute(residual, equ_lhs(solution), equ_rhs(solution));
+        ASSERT_TRUE(applied && test_diffequ_wave_zero_at_samples(applied, de));
+        expr_t *time = expr_new_named_var(NUM_NAN, cases[i].time);
+        expr_t *point = expr_const_long(cases[i].initial_time);
+        for (size_t j = 0u; j < 2u; ++j) {
+            const equation_t *condition = de_condition_at(de, j);
+            expr_t *lhs = expr_substitute(equ_lhs(condition), equ_lhs(solution), equ_rhs(solution));
+            expr_t *at = expr_substitute(lhs, time, point);
+            expr_t *error = expr_sub(at, equ_rhs(condition));
+            ASSERT_TRUE(error && test_diffequ_wave_zero_at_samples(error, de));
+            expr_free(error);
+            expr_free(at);
+            expr_free(lhs);
+        }
+        ASSERT_TRUE(strstr(de_solve_result_steps(result), "Duhamel"));
+        ASSERT_TRUE(!strstr(de_solve_result_steps_TeX(result), "NAN"));
+        expr_free(point);
+        expr_free(time);
+        expr_free(applied);
+        expr_free(residual);
+        string_free(text);
+        expr_free(difference);
+        expr_free(expected);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_wave_ivp_integral_data(void)
+{
+    const char *source = "u_tt - u_xx = exp(cosh(x)+t^2); u(x,0) = sin(x); u_t(x,0) = exp(cosh(x))";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    WANT_LONG(source, de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    WANT_LONG("exact bounded-integral solution", de_solve_result_solver(result), DE_SOLVER_DALEMBERT_DUHAMEL);
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, "\\int_{0}^{t}") && strstr(TeX, "d\\xi\\, ds"));
+    ASSERT_TRUE(!strstr(TeX, "\\frac{\\int") && !strstr(TeX, "NAN"));
+    ASSERT_TRUE(de_solve_result_steps(result) == NULL);
+    printf("  %s\n", TeX);
+    expr_t *residual = equ_residual(de_equation(de));
+    expr_t *applied = expr_substitute(residual, equ_lhs(solution), equ_rhs(solution));
+    expr_t *simplified = applied ? expr_simplify(applied) : NULL;
+    ASSERT_TRUE(simplified && test_diffequ_wave_zero_at_samples(simplified, de));
+    expr_t *time = expr_new_named_var(NUM_NAN, "t"), *zero = expr_const_zero();
+    for (size_t j = 0u; j < 2u; ++j) {
+        const equation_t *condition = de_condition_at(de, j);
+        expr_t *lhs = expr_substitute(equ_lhs(condition), equ_lhs(solution), equ_rhs(solution));
+        expr_t *at = expr_substitute(lhs, time, zero);
+        expr_t *error = expr_sub(at, equ_rhs(condition));
+        ASSERT_TRUE(error && test_diffequ_wave_zero_at_samples(error, de));
+        expr_free(error);
+        expr_free(at);
+        expr_free(lhs);
+    }
+    expr_free(zero);
+    expr_free(time);
+    expr_free(applied);
+    expr_free(simplified);
+    expr_free(residual);
+    free(TeX);
+    de_solve_result_free(result);
+    de_free(de);
+    source = "{ u_tt - u_xx = exp(cosh(x)+t^2) | t = ?, x = ?; s = ?, @xi = ?; "
+             "u(x,0) = s, u_t(x,0) = @xi }";
+    de = de_from_string(source);
+    result = de ? de_solve(de) : NULL;
+    WANT_LONG("fresh dummy variables include initial-data names", de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    solution = de_solve_result_at(result, 0u);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    ASSERT_TRUE(text && strstr(string_c_str(text), "s₁") && strstr(string_c_str(text), "ξ₁"));
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_wave_ivp_rejects_invalid_data(void)
+{
+    static const char *const sources[] = {
+        "u_tt + u_xx = 0; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - x*u_xx = 0; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - u_xx + u_t = 0; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - u_xx + u = 0; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - u_xx = u^2; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - u_xx + u_xt = 0; u(x,0) = 0; u_t(x,0) = 1",
+        "u_tt - u_xx = 0; u(x,0) = 0; u_t(x,1) = 1",
+        "u_tt - u_xx = 0; u(x,0) = 0; u(x,0) = 1",
+        "u_tt - u_xx = 0; u(x,x) = 0; u_t(x,x) = 1",
+        "u_tt - u_xx = 0; u(x,0) = t; u_t(x,0) = 1",
+        "{ u_tt - c^2u_xx = 0 | t = ?, x = ?; c = 0; u(x,0) = 0, u_t(x,0) = 1 }"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        ASSERT_TRUE(de != NULL);
+        diffequ_solve_result_t *result = de_solve(de);
+        printf("  rejected wave IVP: %s\n", sources[i]);
+        ASSERT_TRUE(de_solve_result_status(result) != DE_SOLVE_STATUS_SOLVED);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static const expr_t *test_diffequ_outermost_integral(const expr_t *expr);
+
+static void test_diffequ_wave_ivp_symbolic_speed(void)
+{
+    const char *source = "u_tt - c^2u_xx = 0; u(x,0) = sin(x); u_t(x,0) = exp(cosh(x))";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
+    WANT_LONG(source, de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && !strstr(TeX, "\\sqrt") && strstr(TeX, "\\int_{"));
+    ASSERT_TRUE(strstr(de_solve_result_steps(result), "real and non-zero (either sign)"));
+    expr_t *c = expr_new_named_var(NUM_NAN, "c"), *one = expr_const_one(), *minus = expr_const_long(-1L);
+    expr_t *positive = expr_substitute(equ_rhs(solution), c, one);
+    expr_t *negative = expr_substitute(equ_rhs(solution), c, minus);
+    const expr_t *forward = test_diffequ_outermost_integral(positive);
+    const expr_t *backward = test_diffequ_outermost_integral(negative);
+    ASSERT_TRUE(forward && backward);
+    const expr_t *forward_integrand = NULL, *backward_integrand = NULL;
+    ASSERT_TRUE(expr_match_integral_expr(forward, &forward_integrand, NULL));
+    ASSERT_TRUE(expr_match_integral_expr(backward, &backward_integrand, NULL));
+    ASSERT_TRUE(expr_struct_eq(forward_integrand, backward_integrand));
+    expr_t *lower_error = expr_sub(expr_integral_lower_bound_expr(forward), expr_integral_upper_bound_expr(backward));
+    expr_t *upper_error = expr_sub(expr_integral_upper_bound_expr(forward), expr_integral_lower_bound_expr(backward));
+    ASSERT_TRUE(test_diffequ_wave_zero_at_samples(lower_error, de));
+    ASSERT_TRUE(test_diffequ_wave_zero_at_samples(upper_error, de));
+    /* Reverse the limits and hence the sign; then check the surrounding coefficients independently. */
+    expr_t *forward_value = expr_substitute(positive, forward, one);
+    expr_t *backward_value = expr_substitute(negative, backward, minus);
+    expr_t *difference = expr_sub(forward_value, backward_value);
+    ASSERT_TRUE(difference && test_diffequ_wave_zero_at_samples(difference, de));
+    expr_free(difference);
+    expr_free(backward_value);
+    expr_free(forward_value);
+    expr_free(upper_error);
+    expr_free(lower_error);
+    expr_free(negative);
+    expr_free(positive);
+    expr_free(minus);
+    expr_free(one);
+    expr_free(c);
+    free(TeX);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_wave_kirchhoff_family(void)
+{
+    static const char *const sources[] = {
+        "psi_xx + psi_yy + psi_zz = 1/v^2psi_tt",
+        "u_tt = 9(u_xx + u_yy + u_zz)",
+        "-2u_xx - 2u_yy - 2u_zz + u_tt/2 = 0",
+        "w_aa + w_bb + w_cc = w_ss/4",
+        "u_xx + u_yy + u_zz = F*u_tt",
+        "u_thetatheta + u_phiphi + u_xx = u_tt",
+        "{ u_xx + u_yy + u_zz = 1/v^2u_tt | x = ?, y = ?, z = ?, t = ?; v = -2; }",
+        "u_tt = k^2*(u_xx + u_yy + u_zz)",
+        "{ u_xx + u_yy + u_zz = 1/v^2u_tt | x = ?, y = ?, z = ?, t = ?; v = 2; }"
+    };
+    static const char *const time_names[] = {"t", "t", "t", "s", "t", "t", "t", "t", "t"};
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        WANT_LONG("Kirchhoff solver", de_solve_result_solver(result), DE_SOLVER_KIRCHHOFF);
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        char *TeX = solution ? equ_to_TeX_body_wrapped(solution, 1u) : NULL;
+        ASSERT_TRUE(text && strstr(string_c_str(text), "M_(") && !strstr(string_c_str(text), "∫"));
+        ASSERT_TRUE(strlen(string_c_str(text)) < 400u);
+        ASSERT_TRUE(strstr(string_c_str(text), "sphere centred at r, radius |a|"));
+        string_t *expression_text = equ_to_text(solution, style_EXPRESSION);
+        ASSERT_TRUE(expression_text && !strstr(string_c_str(expression_text), "M_("));
+        ASSERT_TRUE(strstr(string_c_str(expression_text), "∫"));
+        string_free(expression_text);
+        equation_t *expanded = equ_display_expanded(solution, NULL);
+        string_t *expanded_text = expanded ? equ_to_text(expanded, style_UNBOUND) : NULL;
+        ASSERT_TRUE(expanded_text && strcmp(string_c_str(expanded_text), string_c_str(text)) == 0);
+        string_free(expanded_text);
+        equ_free(expanded);
+        ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal M_") && !strstr(TeX, "NAN"));
+        ASSERT_TRUE(strstr(TeX, "arbitrary smooth spatial functions") && !strstr(TeX, "\\int"));
+        if (i == 0u || i >= 6u) {
+            const char *parameter = i == 7u ? "k" : "v";
+            char condition[64], absolute[16];
+            snprintf(condition, sizeof(condition), "%s\\in\\mathbb R,\\quad %s\\ne0", parameter, parameter);
+            snprintf(absolute, sizeof(absolute), "|%s|", parameter);
+            ASSERT_TRUE(strstr(TeX, condition) && !strstr(TeX, "\\sqrt"));
+            ASSERT_TRUE(strstr(string_c_str(text), absolute));
+            ASSERT_TRUE(strstr(string_c_str(text), "real and non-zero (either sign)"));
+        }
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "\\int_{|\\boldsymbol\\omega|=1}"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "no initial data imposed"));
+        ASSERT_TRUE(strstr(de_solve_result_steps(result), "general smooth whole-space family"));
+        ASSERT_TRUE(strstr(de_solve_result_steps(result), "real positive squared speed"));
+        ASSERT_TRUE(!strstr(de_solve_result_steps_TeX(result), "NAN"));
+        char time_line[64];
+        snprintf(time_line, sizeof(time_line), "Time coordinate: %s;", time_names[i]);
+        ASSERT_TRUE(strstr(de_solve_result_steps(result), time_line));
+        if (i == 4u)
+            ASSERT_TRUE(strstr(string_c_str(text), "F_1(") || strstr(string_c_str(text), "F₁("));
+        if (i == 5u) {
+            string_t *raw = expr_to_text(equ_rhs(solution), style_UNBOUND);
+            ASSERT_TRUE(raw && (strstr(string_c_str(raw), "θ₁") || strstr(string_c_str(raw), "θ_1")));
+            ASSERT_TRUE(strstr(string_c_str(raw), "φ₁") || strstr(string_c_str(raw), "φ_1"));
+            string_free(raw);
+        }
+        if (i == 3u)
+            ASSERT_TRUE(strstr(string_c_str(text), "M_(c₁*s)"));
+        diffequ_solve_result_t *plain = de_solve(de);
+        WANT_LONG("solve without derivations", de_solve_result_status(plain), DE_SOLVE_STATUS_SOLVED);
+        ASSERT_TRUE(de_solve_result_steps(plain) == NULL && de_solve_result_steps_TeX(plain) == NULL);
+        string_t *standalone = equ_to_text(de_solve_result_at(plain, 0u), style_UNBOUND);
+        ASSERT_TRUE(standalone && strcmp(string_c_str(text), string_c_str(standalone)) == 0);
+        string_free(standalone);
+        de_solve_result_free(plain);
+        free(TeX);
+        string_free(text);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_wave_rejects_outside_family(void)
+{
+    static const char *const sources[] = {
+        "u_xx + u_yy + u_zz + u_tt = 0",
+        "u_xx + 2u_yy + u_zz = u_tt",
+        "u_xx + u_yy + u_zz = x*u_tt",
+        "u_xx + u_yy + u_zz + u = u_tt",
+        "u_xx + u_yy + u_zz + u_x = u_tt",
+        "u_xx + u_yy + u_zz = u_tt + 1",
+        "u_xx + u_yy + u_zz = u*u_tt",
+        "u_xx + u_yy + u_zz + u_xt = u_tt",
+        "u_xx + u_yy + u_zz = u_tt; u(x,y,z,0)=1",
+        "{ u_xx + u_yy + u_zz = 1/v^2u_tt | x = ?, y = ?, z = ?, t = ?; v = 0; }",
+        "{ u_xx + u_yy + u_zz = a*u_tt | x = ?, y = ?, z = ?, t = ?; a = -1; }",
+        "{ u_xx + u_yy + u_zz = a*u_tt | x = ?, y = ?, z = ?, t = ?; a = 0; }"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_UNSUPPORTED);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+/* Borrow the outermost integral; its bound coordinates must be supplied before evaluating nested integrals. */
+static const expr_t *test_diffequ_outermost_integral(const expr_t *expr)
+{
+    const expr_t *left = NULL, *right = NULL;
+    if (expr_match_integral_expr(expr, NULL, NULL))
+        return expr;
+    if (!expr_child_exprs(expr, &left, &right))
+        return NULL;
+    const expr_t *found = left ? test_diffequ_outermost_integral(left) : NULL;
+    return found ? found : (right ? test_diffequ_outermost_integral(right) : NULL);
+}
+
+/* Independent spherical quadrature, exact for the quadratic data below:
+ * four equally spaced azimuths and two Gauss-Legendre nodes in mu=cos(theta).
+ * Division by sin(theta) changes the polar measure, so the stored Jacobian is tested too. */
+static number_t test_diffequ_wave_quadrature(const expr_t *expr)
+{
+    const expr_t *body = NULL;
+    if (expr_match_integral_expr(expr, &body, NULL)) {
+        const expr_t *dummy = expr_integral_dummy_expr(expr);
+        const expr_t *lower = expr_integral_lower_bound_expr(expr);
+        const expr_t *upper = expr_integral_upper_bound_expr(expr);
+        if (!dummy || !lower || !expr_is_exact_zero(lower) || !upper)
+            return num_clone(NUM_NAN);
+        number_t limit = expr_eval(upper), two_pi = num_mul_long(NUM_PI, 2L);
+        bool azimuth = num_eq(limit, two_pi), polar = num_eq(limit, NUM_PI);
+        num_destroy(&two_pi);
+        num_destroy(&limit);
+        if (!azimuth && !polar)
+            return num_clone(NUM_NAN);
+        number_t sum = num_clone(NUM_ZERO);
+        for (long i = 0L; i < (azimuth ? 4L : 2L); ++i) {
+            number_t weight = num_new(), point = num_new();
+            if (azimuth) {
+                weight = num_div(NUM_PI, NUM_TWO);
+                point = num_mul_long(weight, i);
+            } else {
+                number_t third = num_create_from_frac(1L, 3L), root = num_sqrt(third);
+                number_t mu = num_mul_long(root, i == 0L ? -1L : 1L);
+                point = num_acos(mu);
+                number_t sine = num_sin(point);
+                weight = num_div(NUM_ONE, sine);
+                num_destroy(&sine);
+                num_destroy(&mu);
+                num_destroy(&root);
+                num_destroy(&third);
+            }
+            expr_t *at = expr_new_const(point);
+            expr_t *sample = expr_substitute(body, dummy, at);
+            number_t value = test_diffequ_wave_quadrature(sample);
+            number_t term = num_mul(weight, value), next = num_add(sum, term);
+            num_destroy(&sum);
+            sum = next;
+            num_destroy(&term);
+            num_destroy(&value);
+            expr_free(sample);
+            expr_free(at);
+            num_destroy(&point);
+            num_destroy(&weight);
+        }
+        return sum;
+    }
+    const expr_t *integral = test_diffequ_outermost_integral(expr);
+    if (!integral)
+        return expr ? expr_eval(expr) : num_clone(NUM_NAN);
+    number_t value = test_diffequ_wave_quadrature(integral);
+    expr_t *constant = expr_new_const(value);
+    expr_t *reduced = expr_substitute(expr, integral, constant);
+    number_t result = test_diffequ_wave_quadrature(reduced);
+    expr_free(reduced);
+    expr_free(constant);
+    num_destroy(&value);
+    return result;
+}
+
+static void test_diffequ_wave_polynomial_data(void)
+{
+    diffequ_t *de = de_from_string("u_xx + u_yy + u_zz = u_tt/4");
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    WANT_LONG("wave family status", de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    expr_t *candidate = solution ? expr_clone(equ_rhs(solution)) : NULL;
+    const expr_t *function = NULL;
+    size_t replacements = 0u;
+    /* F(r)=|r|², G(r)=|r|² exercises curvature in all three directions and both arbitrary functions. */
+    while ((function = test_diffequ_find_arbitrary_function(candidate)) != NULL && replacements++ < 16u) {
+        const expr_t *args = NULL, *pair = NULL, *x = NULL, *y = NULL, *z = NULL;
+        ASSERT_TRUE(expr_child_exprs(function, &args, NULL));
+        ASSERT_TRUE(expr_child_exprs(args, &pair, &z));
+        ASSERT_TRUE(expr_child_exprs(pair, &x, &y));
+        expr_t *polynomial = expr_add_simplify_owned(expr_mul(x, x), expr_mul(y, y));
+        polynomial = expr_add_simplify_owned(polynomial, expr_mul(z, z));
+        expr_t *next = expr_substitute(candidate, function, polynomial);
+        expr_free(polynomial);
+        expr_free(candidate);
+        candidate = next;
+    }
+    ASSERT_TRUE(candidate && !test_diffequ_find_arbitrary_function(candidate));
+    const expr_t *x = de_independent_at(de, 0u), *y = de_independent_at(de, 1u);
+    const expr_t *z = de_independent_at(de, 2u), *t = de_independent_at(de, 3u);
+    expr_t *r2 = expr_add_simplify_owned(expr_mul(x, x), expr_mul(y, y));
+    r2 = expr_add_simplify_owned(r2, expr_mul(z, z));
+    expr_t *t2 = expr_mul(t, t);
+    expr_t *expected = expr_add_simplify_owned(expr_clone(r2), expr_mul(t, r2));
+    expected = expr_add_simplify_owned(expected, expr_mul_simplify_owned(expr_const_long(12L), expr_clone(t2)));
+    expected = expr_add_simplify_owned(expected, expr_mul_simplify_owned(expr_const_long(4L), expr_mul(t, t2)));
+    expr_t *difference = expr_sub(candidate, expected);
+    expr_t *residual = equ_residual(de_equation(de));
+    /* Check the independent polynomial against the PDE; the quadrature below checks that the actual integrals equal it. */
+    expr_t *applied = expr_substitute(residual, equ_lhs(solution), expected);
+    const expr_t *checks[2] = {difference, applied};
+    for (size_t check = 0u; check < 2u; ++check) {
+        for (long sample = -2L; sample <= 2L; ++sample) {
+            expr_t *at = expr_clone(checks[check]);
+            for (size_t i = 0u; i < 4u; ++i) {
+                expr_t *point = expr_const_long(i == 3u ? sample : (long)i + 1L);
+                expr_t *next = expr_substitute(at, de_independent_at(de, i), point);
+                expr_free(point);
+                expr_free(at);
+                at = next;
+            }
+            number_t value = test_diffequ_wave_quadrature(at);
+            number_t magnitude = num_abs(value), tolerance = num_create_from_string("1e-20");
+            bool valid = num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&value);
+            expr_free(at);
+            WANT_LONG(check == 0u ? "spherical integrals give r² + t*r² + 12t² + 4t³"
+                                  : "independent polynomial satisfies the original wave equation", valid, 1L);
+        }
+    }
+    expr_free(applied);
+    expr_free(residual);
+    expr_free(difference);
+    expr_free(expected);
+    expr_free(t2);
+    expr_free(r2);
+    expr_free(candidate);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+static void test_diffequ_radial_euler_pde(void)
+{
+    static const char *const sources[] = {
+        "x^2z_xx + 2xyz_yx + y^2z_yy = 0",
+        "-3x^2z_xx - 6xyz_xy - 3y^2z_yy = 0",
+        "s^2u_ss + st*u_st + st*u_ts + t^2u_tt = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy + xz_x + yz_y = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy - 2xz_x - 2yz_y + 2z = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy + xz_x + yz_y + z = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy - xz_x - yz_y + z = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy - 2z = 0"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve_with_options(de, DE_SOLVE_OPTION_STEPS) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        WANT_LONG("radial characteristic solver", de_solve_result_solver(result), DE_SOLVER_CHARACTERISTICS);
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        const char *text = solution_text ? string_c_str(solution_text) : NULL;
+        if (i < 2u)
+            WANT_TEXT("radial Euler solution", text, "z = F(y/x) + x·G(y/x)");
+        ASSERT_TRUE(text && strstr(text, "F(") && strstr(text, "G("));
+        if (i == 3u || i == 6u)
+            ASSERT_TRUE(strstr(text, "ln(x)"));
+        char *TeX = de ? de_to_string(de, style_LATEX) : NULL;
+        ASSERT_TRUE(TeX && !strstr(TeX, "\\\\") && !strstr(TeX, "aligned"));
+        ASSERT_TRUE(strstr(TeX, " = 0") && strcmp(strstr(TeX, " = 0"), " = 0") == 0);
+        ASSERT_TRUE(strstr(de_solve_result_steps(result), "radial scaling"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "Local chart"));
+        ASSERT_TRUE(!strstr(de_solve_result_steps_TeX(result), "NAN"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), i == 2u ? "s>0" : "x>0"));
+
+        /* Exercise both arbitrary functions using 1+eta² and eta³-eta. */
+        const expr_t *x = de_independent_at(de, 0u), *y = de_independent_at(de, 1u);
+        expr_t *eta = expr_div_simplify_owned(expr_clone(y), expr_clone(x));
+        expr_t *square = expr_mul(eta, eta);
+        expr_t *first = expr_add_simplify_owned(expr_const_one(), expr_clone(square));
+        expr_t *second = expr_sub_simplify_owned(expr_mul(square, eta), expr_clone(eta));
+        const expr_t *f = solution ? test_diffequ_find_arbitrary_function(equ_rhs(solution)) : NULL;
+        expr_t *with_f = solution ? expr_substitute(equ_rhs(solution), f, first) : NULL;
+        const expr_t *g = with_f ? test_diffequ_find_arbitrary_function(with_f) : NULL;
+        expr_t *candidate = with_f ? expr_substitute(with_f, g, second) : NULL;
+        ASSERT_TRUE(f && g && candidate && !test_diffequ_find_arbitrary_function(candidate));
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = candidate ? expr_substitute(residual, equ_lhs(solution), candidate) : NULL;
+        ASSERT_TRUE(applied);
+        for (long sample = 1L; sample <= 3L; ++sample) {
+            expr_t *px = expr_const_long(sample), *py = expr_const_long(sample - 2L);
+            expr_t *at_x = expr_substitute(applied, x, px);
+            expr_t *at_xy = at_x ? expr_substitute(at_x, y, py) : NULL;
+            number_t value = at_xy ? expr_eval(at_xy) : num_new();
+            number_t magnitude = num_abs(value), tolerance = num_create_from_string("1e-24");
+            WANT_LONG("non-trivial radial solution satisfies the original PDE",
+                      num_is_finite(magnitude) && num_lt(magnitude, tolerance), 1L);
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&value);
+            expr_free(at_xy);
+            expr_free(at_x);
+            expr_free(py);
+            expr_free(px);
+        }
+        expr_free(applied);
+        expr_free(residual);
+        expr_free(candidate);
+        expr_free(with_f);
+        expr_free(second);
+        expr_free(first);
+        expr_free(square);
+        expr_free(eta);
+        free(TeX);
+        string_free(solution_text);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_radial_euler_rejects_nonmatching_pde(void)
+{
+    static const char *const sources[] = {
+        "x^2z_xx + 3xyz_xy + y^2z_yy = 0",
+        "x^2z_xx + 2xyz_xy + 2y^2z_yy = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy + xz_x + 2yz_y = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy + xz = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy + z^2 = 0",
+        "x^2z_xx + 2xyz_xy + y^2z_yy = 1",
+        "x^2z_xx + 2xyz_xy + y^2z_yy = 0; z(1,y)=y"
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_UNSUPPORTED);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_abs_pde_real_residual(void)
+{
+    static const char *const sources[] = {
+        "z_xx + 5z_yx + 6z_yy = 2abs(x-y)",
+        "2u_ss + 10u_ts + 12u_tt = 4abs(s-t)",
+        "z_xx + 5z_xy + 6z_yy = 8abs(1-2x+2y)"
+    };
+
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        expr_t *particular = solution ? test_diffequ_zero_arbitrary_functions(equ_rhs(solution)) : NULL;
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = particular && residual ? expr_substitute(residual, equ_lhs(solution), particular) : NULL;
+        expr_t *expanded = applied ? expr_display_expanded(applied) : NULL;
+        expr_t *normalised = expanded ? expr_simplify(expanded) : NULL;
+        char *text = particular ? expr_to_string(particular, style_UNBOUND) : NULL;
+
+        ASSERT_TRUE(text && !strstr(text, "∫"));
+        for (long sample = -2L; sample <= 2L; ++sample) {
+            number_t coordinate = num_create_from_frac(sample, 2L);
+            expr_t *point = expr_new_const(coordinate);
+            expr_t *zero = expr_const_zero();
+            expr_t *at_x = normalised ? expr_substitute(normalised, de_independent_at(de, 0u), point) : NULL;
+            expr_t *at_xy = at_x ? expr_substitute(at_x, de_independent_at(de, 1u), zero) : NULL;
+            number_t value = at_xy ? expr_eval(at_xy) : num_clone(NUM_NAN);
+            number_t magnitude = num_abs(value);
+            number_t tolerance = num_create_from_string("1e-24");
+
+            /* Include both sides of each cusp and the cusp itself. */
+            ASSERT_TRUE(num_is_real(value) && num_is_finite(value) && num_lt(magnitude, tolerance));
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&value);
+            expr_free(at_xy);
+            expr_free(at_x);
+            expr_free(zero);
+            expr_free(point);
+            num_destroy(&coordinate);
+        }
+        free(text);
+        expr_free(normalised);
+        expr_free(expanded);
+        expr_free(applied);
+        expr_free(residual);
+        expr_free(particular);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_inverse_pde_real_residual(void)
 {
     static const char *const sources[] = {
         "z_xx + 5z_yx + 6z_yy = 2atanh(x-y)",
         "2u_ss + 10u_ts + 12u_tt = 4atanh(s-t)",
-        "z_xx + 5z_xy + 6z_yy = 8atanh(2x-2y+1/10)"
+        "z_xx + 5z_xy + 6z_yy = 8atanh(2x-2y+1/10)",
+        "z_xx + 5z_yx + 6z_yy = 2acos(x-y)",
+        "2u_ss + 10u_ts + 12u_tt = 4acos(s-t)",
+        "z_xx + 5z_xy + 6z_yy = 8acos(1/10-2x+2y)",
+        "z_xx + 5z_yx + 6z_yy = 2asin(x-y)"
     };
 
     for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
@@ -3349,6 +4608,70 @@ static void test_diffequ_parameter_linear_pde_accepts_parameter_rate(void)
 /*
  * Keep this example synchronised with docs/diffequation.md.
  */
+/* README example from docs/diffequation.md: compute the quartic diagnostic and symmetry. */
+static void example_diffequation_quartic_lie_analysis(void)
+{
+    const char *source = "y'' + 3*y*y' + y^4 = 0";
+    diffequ_t *ode = de_from_string(source);
+    de_lie_t *lie = de_lie_new(ode);
+    diffequ_solve_result_t *result = de_solve(ode);
+    expr_t *first = de_lie_invariant(lie, 0u);
+    expr_t *second = de_lie_invariant(lie, 1u);
+    char *first_text = expr_to_string(first, style_UNBOUND);
+    char *second_text = expr_to_string(second, style_UNBOUND);
+    matrix_t *generators = de_lie_polynomial_generators(lie, 2u);
+    expr_t *xi = NULL, *eta = NULL;
+    bool valid = result && generators && mat_get_col_count(generators) == 1u &&
+                 de_solve_result_status(result) == DE_SOLVE_STATUS_SERIES && first_text && second_text &&
+                 strcmp(first_text, "0") == 0 && strcmp(second_text, "36·(y - 2y²)") == 0;
+    if (valid) {
+        mat_get(generators, 0u, 0u, &xi);
+        mat_get(generators, 1u, 0u, &eta);
+        char *xi_text = expr_to_string(xi, style_UNBOUND);
+        char *eta_text = expr_to_string(eta, style_UNBOUND);
+        valid = xi_text && eta_text && strcmp(xi_text, "1") == 0 && strcmp(eta_text, "0") == 0;
+        if (valid) {
+            printf("input = %s\nsolution status = local series (not a closed form)\n", source);
+            printf("I₁ = %s\nI₂ = %s\n", first_text, second_text);
+            printf("degree-two generators = (ξ, η) = (%s, %s)\n", xi_text, eta_text);
+        }
+        free(eta_text);
+        free(xi_text);
+    }
+    mat_free(generators);
+    free(second_text);
+    free(first_text);
+    expr_free(second);
+    expr_free(first);
+    de_solve_result_free(result);
+    de_lie_free(lie);
+    de_free(ode);
+    ASSERT_TRUE(valid);
+}
+
+/* README example from docs/diffequation.md: derive the free-particle Lie algebra. */
+static void example_diffequation_deriving_a_lie_algebra(void)
+{
+    diffequ_t *ode = de_from_string("y'' = 0");
+    de_lie_t *lie = de_lie_new(ode);
+    matrix_t *generators = de_lie_polynomial_generators(lie, 2);
+    matrix_t *constants = de_lie_structure_constants(lie, generators);
+    bool valid = generators && constants && mat_get_col_count(generators) == 8u &&
+                 mat_get_row_count(constants) == 64u && mat_get_col_count(constants) == 8u;
+
+    if (generators && constants) {
+        printf("polynomial generators = %zu\n", mat_get_col_count(generators));
+        printf("structure constants = %zu x %zu\n",
+               mat_get_row_count(constants), mat_get_col_count(constants));
+    }
+
+    mat_free(constants);
+    mat_free(generators);
+    de_lie_free(lie);
+    de_free(ode);
+    ASSERT_TRUE(valid);
+}
+
 static void example_diffequation_solving_an_ode(void)
 {
     const char *source = "Dx(y) = x*y; y(0) = 1";
@@ -3382,31 +4705,19 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
 {
     const char *source = "y'' + 3*y*y' + y^3 = 0";
     const char *want_symmetry = "SL(3, ℝ)";
-    const char *want_steps = "Recognise the modified-Emden rule\n"
-                                 "      y″ + 3(1)yy′ + (1)²y³ = 0\n"
-                                 "Set y = u′/u. Then\n"
-                                 "      y″ + 3(1)yy′ + (1)²y³ = u‴/u\n"
-                                 "so u‴ = 0 and u is quadratic.\n"
-                                 "Equivalently, the point transformation is\n"
-                                 "      X = x − 1/y\n"
-                                 "      Y = x/y − x²/2\n"
-                                 "and d²Y/dX² = 0.";
-    const char *want_solution = "y = 1/(x² + C₁x + C₂)·(2x + C₁)";
+    const char *want_solution = "y = (2x + C₁)/(x² + C₁x + C₂)";
     diffequ_t *ode = de_from_string(source);
-    diffequ_solve_result_t *result = ode ? de_solve_with_options(ode, DE_SOLVE_OPTION_STEPS) : NULL;
+    diffequ_solve_result_t *result = ode ? de_solve(ode) : NULL;
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     const char *symmetry = result ? de_solve_result_symmetry(result) : NULL;
-    const char *steps = result ? de_solve_result_steps(result) : NULL;
     string_t *solution_text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool valid = ode && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
                  de_solve_result_solver(result) == DE_SOLVER_LINEAR_TRANSFORMATION &&
-                 de_solve_result_count(result) == 1u && symmetry && strcmp(symmetry, want_symmetry) == 0 && steps &&
-                 strcmp(steps, want_steps) == 0 && solution_text &&
+                 de_solve_result_count(result) == 1u && symmetry && strcmp(symmetry, want_symmetry) == 0 && solution_text &&
                  strcmp(string_c_str(solution_text), want_solution) == 0;
 
     printf("input = %s\n", source);
     printf("symmetry = %s\n", symmetry ? symmetry : "NULL");
-    printf("linearisation:\n%s\n", steps ? steps : "NULL");
     printf("solution = %s\n", solution_text ? string_c_str(solution_text) : "NULL");
 
     string_free(solution_text);
@@ -3444,6 +4755,87 @@ static void example_diffequation_parameter_forced_pde(void)
 static void example_diffequation_second_order_pde(void)
 {
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
+    /* README example from docs/diffequation.md: variable-coefficient radial Euler PDE. */
+    WANT_CHARACTERISTIC_SOLUTION("x^2z_xx + 2xyz_yx + y^2z_yy = 0", "z = F(y/x) + x·G(y/x)");
+}
+
+/* README example from docs/diffequation.md: parameter prefixes retain all derivative terms. */
+static void example_diffequation_compact_parameter_derivatives(void)
+{
+    const char *source = "u_y + au_xx + bu_yy = 0";
+    diffequ_t *de = de_from_string(source);
+    char *TeX = de ? de_to_string(de, style_LATEX) : NULL;
+    WANT_TEXT("README compact parameter coefficients", TeX,
+        "\\frac{\\partial u}{\\partial y} + a\\mkern-2mu \\frac{\\partial^{2} u}{\\partial x^{2}} + "
+        "b\\mkern-2mu \\frac{\\partial^{2} u}{\\partial y^{2}} = 0");
+    printf("  %s\n  %s\n", source, TeX ? TeX : "NULL");
+    free(TeX);
+    de_free(de);
+}
+
+/* README examples from docs/diffequation.md: forced wave IVPs with evaluated and retained integrals. */
+static void example_diffequation_wave_ivp(void)
+{
+    ASSERT_TRUE(test_diffequ_want_pde_solution("u_tt - 4u_xx = x*t; u(x,0) = x^2; u_t(x,0) = 1",
+        "u = ⅙·(t³x + 24t² + 6t + 6x²)", DE_SOLVER_DALEMBERT_DUHAMEL, __FILE__, __LINE__));
+    const char *source = "u_tt - u_xx = exp(cosh(x)+t^2); u(x,0) = sin(x); u_t(x,0) = exp(cosh(x))";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    WANT_LONG("README wave integral IVP", de_solve_result_solver(result), DE_SOLVER_DALEMBERT_DUHAMEL);
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, "\\int_{0}^{t}") && strstr(TeX, "d\\xi\\, ds"));
+    printf("  %s\n  %s\n", source, TeX);
+    free(TeX);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+/* README example from docs/diffequation.md: unspecified forcing and initial profiles remain symbolic calls. */
+static void example_diffequation_symbolic_wave_ivp(void)
+{
+    const char *source = "u_tt - c^2u_xx = f(x,t); u(x, 0) = g(x); u_t(x,0) = h(x)";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    WANT_LONG("README symbolic wave IVP", de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    char *problem_TeX = de ? de_to_string(de, style_LATEX) : NULL;
+    ASSERT_TRUE(problem_TeX && strstr(problem_TeX, "f\\left(x, t\\right)"));
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, "f\\left(\\xi, s\\right)") && strstr(TeX, "h\\left(\\xi\\right)"));
+    ASSERT_TRUE(strstr(TeX, "g\\left(x + c\\mkern-2mu t\\right)"));
+    ASSERT_TRUE(strstr(TeX, "^{x + c\\mkern-2mu t}"));
+    ASSERT_TRUE(!strstr(TeX, "c\\mkern-2mu t + x") && !strstr(TeX, "\\\\"));
+    printf("  %s\n  %s\n  %s\n", source, problem_TeX, TeX);
+    free(TeX);
+    free(problem_TeX);
+    de_solve_result_free(result);
+    de_free(de);
+}
+
+/* README example from docs/diffequation.md: Kirchhoff's formula without prescribed initial data. */
+static void example_diffequation_wave_kirchhoff(void)
+{
+    const char *source = "psi_xx + psi_yy + psi_zz = 1/v^2psi_tt";
+    diffequ_t *de = de_from_string(source);
+    char *problem_TeX = de ? de_to_string(de, style_LATEX) : NULL;
+    ASSERT_TRUE(problem_TeX && strstr(problem_TeX,
+        "\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
+    printf("  %s\n", problem_TeX ? problem_TeX : "NULL");
+    free(problem_TeX);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    WANT_LONG(source, de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+    WANT_LONG("wave solver", de_solve_result_solver(result), DE_SOLVER_KIRCHHOFF);
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal M_") && strstr(TeX, "arbitrary smooth spatial functions"));
+    ASSERT_TRUE(strstr(TeX, "F(\\mathbf r)") && strstr(TeX, "G(\\mathbf r)"));
+    ASSERT_TRUE(strstr(TeX, "v\\in\\mathbb R,\\quad v\\ne0") && !strstr(TeX, "\\sqrt"));
+    ASSERT_TRUE(strstr(TeX, "\\mathbf r=(x,y,z)"));
+    printf("  %s\n  %s\n", source, TeX);
+    free(TeX);
+    de_solve_result_free(result);
+    de_free(de);
 }
 
 /* README example from docs/diffequation.md: an exponentially forced second-order PDE. */
@@ -3451,6 +4843,9 @@ static void example_diffequation_forced_second_order_pde(void)
 {
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2e^(x-y)",
                                    "z = F(y - 3x) + G(y - 2x) + exp(x - y)");
+    /* README example: polynomial forcing with a repeated characteristic root. */
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 4z_yx + 4z_yy = 48(x^2+y^2)",
+                                   "z = F(2x + y) + x·G(2x + y) + 4x⁴ + y⁴");
 }
 
 /* README example from docs/diffequation.md: single-phase forcing integrated using the dilogarithm. */
@@ -3476,8 +4871,32 @@ static void example_diffequation_atanh_pde(void)
                                    "½·((x - y)² + 1)·atanh(x - y)");
 }
 
+/* README example from docs/diffequation.md: absolute-value forcing has a twice-differentiable primitive. */
+static void example_diffequation_abs_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2abs(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) + ⅙·(x - y)²·|x - y|");
+}
+
+/* README example from docs/diffequation.md: inverse-cosine forcing uses the shared elementary integrator. */
+static void example_diffequation_acos_pde(void)
+{
+    WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_yx + 6z_yy = 2acos(x-y)",
+                                   "z = F(y - 3x) + G(y - 2x) - ½·asin(x - y) + "
+                                   "¼·acos(x - y)·(2·(x - y)² - 1) - ¾·(x - y)·√(1 - (x - y)²)");
+}
+
 int tests_main(void)
 {
+    RUN_TEST_CASE(test_diffequ_lie_free_particle);
+    RUN_TEST_CASE(test_diffequ_series_quartic_coefficients);
+    RUN_TEST_CASE(test_diffequ_series_general_data);
+    RUN_TEST_CASE(test_diffequ_series_shifted_residuals);
+    RUN_TEST_CASE(test_diffequ_series_limits_and_initial_conditions);
+    RUN_TEST_CASE(test_diffequ_lie_invariants_and_normalisation);
+    RUN_TEST_CASE(test_diffequ_lie_nonpolynomial_and_validation);
+    RUN_TEST_CASE(test_diffequ_lie_brackets_and_search_limits);
+    RUN_TEST_CASE(test_diffequ_lie_velocity_symbol_and_reduction);
     RUN_TEST_CASE(test_diffequ_lifecycle_null_safety);
     RUN_TEST_CASE(test_diffequ_derivations_are_opt_in);
     RUN_TEST_CASE(test_diffequ_constructs_from_equation);
@@ -3490,7 +4909,9 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_applies_initial_condition_to_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_solves_divided_differential_form);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_derivative_quotient_TeX);
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
+    RUN_TEST_CASE(test_diffequ_compact_parameter_derivatives);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);
     RUN_TEST_CASE(test_diffequ_solves_separable_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_linear_initial_value_problem);
@@ -3602,7 +5023,19 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_second_order_pde_resonant_forcing);
     RUN_TEST_CASE(test_diffequ_second_order_pde_forcing_superposition);
     RUN_TEST_CASE(test_diffequ_second_order_pde_particular_satisfies_equation);
-    RUN_TEST_CASE(test_diffequ_atanh_pde_real_residual);
+    RUN_TEST_CASE(test_diffequ_second_order_pde_polynomial_superposition);
+    RUN_TEST_CASE(test_diffequ_radial_euler_pde);
+    RUN_TEST_CASE(test_diffequ_radial_euler_rejects_nonmatching_pde);
+    RUN_TEST_CASE(test_diffequ_wave_kirchhoff_family);
+    RUN_TEST_CASE(test_diffequ_wave_ivp_polynomial_data);
+    RUN_TEST_CASE(test_diffequ_symbolic_function_input);
+    RUN_TEST_CASE(test_diffequ_wave_ivp_integral_data);
+    RUN_TEST_CASE(test_diffequ_wave_ivp_symbolic_speed);
+    RUN_TEST_CASE(test_diffequ_wave_ivp_rejects_invalid_data);
+    RUN_TEST_CASE(test_diffequ_wave_rejects_outside_family);
+    RUN_TEST_CASE(test_diffequ_wave_polynomial_data);
+    RUN_TEST_CASE(test_diffequ_inverse_pde_real_residual);
+    RUN_TEST_CASE(test_diffequ_abs_pde_real_residual);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_integrals);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_resonance);
     RUN_TEST_CASE(test_diffequ_second_order_pde_single_phase_compositions);
@@ -3620,12 +5053,36 @@ int tests_main(void)
                                   "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_forced_second_order_pde, readme_examples,
                                   "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_wave_kirchhoff, readme_examples,
+                                  "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_single_phase_integral_pde, readme_examples,
                                   "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_clausen_pde, readme_examples,
                                   "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_atanh_pde, readme_examples,
                                   "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_abs_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_acos_pde, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_deriving_a_lie_algebra, readme_examples,
+                                  "diffequation,readme,output,lie-symmetry");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_quartic_lie_analysis, readme_examples,
+                                  "diffequation,readme,output,lie-symmetry");
+    /* README example from docs/diffequation.md: the degree-eight quartic IVP series. */
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_diffequ_series_quartic_coefficients, readme_examples,
+                                  "diffequation,readme,output,series");
+    /* README example from docs/diffequation.md: preserve both arbitrary initial constants. */
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_diffequ_series_general_data, readme_examples,
+                                  "diffequation,readme,output,series");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_diffequ_linear_solution_retains_formal_integral, readme_examples,
+                                  "diffequation,readme,output,linear");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_compact_parameter_derivatives, readme_examples,
+                                  "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_wave_ivp, readme_examples,
+                                  "diffequation,readme,output,wave");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_symbolic_wave_ivp, readme_examples,
+                                  "diffequation,readme,output,wave");
 
     return TESTS_EXIT_CODE();
 }

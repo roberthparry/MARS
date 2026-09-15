@@ -763,12 +763,12 @@ The direct symbolic forms use the same editor:
 
 | Input | Output |
 |---|---|
-| `inverse(a b; c d)` | `(d/(ad-bc), -b/(ad-bc); -c/(ad-bc), a/(ad-bc))` |
+| `inverse(a b; c d)` | `1/(ad - bc).(d, -b; -c, a)` |
 | `det((1 2; 3 4) - lambdaI)` | `(1-λ)(4-λ)-6` |
 | `tr(a b; c d)` | `a+d` |
 | `(a b; c d)^dagger` | `(conj(a) conj(c); conj(b) conj(d))` |
 | `(a b; c d).(e f; g h)` | `(ae+bg, af+bh; ce+dg, cf+dh)` |
-| `inverse(a b; c d).(x; y)` | `(1/(ad-bc)(dx-by); 1/(ad-bc)(ay-cx))` |
+| `inverse(a b; c d).(x; y)` | `1/(ad - bc).(dx - by; ay - cx)` |
 | `Dx(ax+b cx+d; y xy)` | `(a, c; 0, y)` |
 | `Dxx(x^3 xy; y^2 x^2y)` | `(6x, 0; 0, 2y)` |
 | `Dxy(x^2y x*y^2; y^3 x^3y)` | `(2x, 2y; 0, 3x²)` |
@@ -864,5 +864,7 @@ code.
   Tailscale network as the computer.
 - **A result is too wide:** use the result card's zoom controls. Long rendered
   mathematics is broken over lines where possible and continues vertically.
+  Lines that still exceed the card width have a horizontal scrollbar, including
+  in expanded cards.
 - **A previous result is still visible:** evaluate the new input or use
   **Clear**. **Back** and **Forward** navigate the Lab's own workspace history.

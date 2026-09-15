@@ -45,6 +45,9 @@ struct diffequ_solve_result_t {
     char *steps;
     char *steps_TeX;
     char *symmetry;
+    expr_t *series_centre;
+    expr_t **series_coefficients;
+    size_t series_degree;
 };
 
 diffequ_t *de_new_owned(equation_t *equation);

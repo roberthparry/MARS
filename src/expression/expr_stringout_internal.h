@@ -41,6 +41,11 @@ bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
 
 /* Variable and constant discovery. */
+/* Recognise opposite shifts in paired function arguments or definite-integral bounds, without rewriting the DAG. */
+const expr_t *expr_display_symmetric_shift_centre(const expr_t *expr);
+bool expr_display_centred_shift_parts(const expr_t *expr, const expr_t *centre,
+                                      const expr_t **shift, bool *subtract);
+
 void autoname_init(autoname_table_t *t);
 void autoname_restore(autoname_table_t *t);
 void assign_unnamed_vars_dfs(expr_t *f, autoname_table_t *t);

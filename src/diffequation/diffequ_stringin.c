@@ -7,8 +7,8 @@
 #include "diffequation.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation/equation_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
@@ -1883,17 +1883,72 @@ fail:
     return NULL;
 }
 
+/* A single lexical pass finds an unambiguous shortest field spelling, independent of term order. */
+static char *de_subscript_shorthand_dependent(const char *text, const char *independent_declarations)
+{
+    const char *best = NULL;
+    size_t best_length = SIZE_MAX, i = 0u;
+    bool ambiguous = false;
+    while (text && text[i]) {
+        if (text[i] == '[') {
+            while (text[i] && text[i] != ']')
+                ++i;
+            if (text[i])
+                ++i;
+            continue;
+        }
+        if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
+            ++i;
+            continue;
+        }
+        size_t start = i++, underscore = SIZE_MAX;
+        bool multiple = false, alias = start > 0u && text[start - 1u] == '@';
+        while (isalnum((unsigned char)text[i]) || text[i] == '_') {
+            if (text[i] == '_') {
+                multiple = multiple || underscore != SIZE_MAX;
+                underscore = i;
+            }
+            ++i;
+        }
+        if (alias || multiple || underscore == SIZE_MAX || underscore == start)
+            continue;
+        char *suffix = de_normalise_subscript_derivative_suffix(
+            text + underscore + 1u, i - underscore - 1u, independent_declarations);
+        if (!suffix)
+            continue;
+        free(suffix);
+        size_t length = underscore - start;
+        if (length < best_length) {
+            best = text + start;
+            best_length = length;
+            ambiguous = false;
+        } else if (length == best_length && memcmp(best, text + start, length) != 0) {
+            ambiguous = true;
+        }
+    }
+    return best && !ambiguous ? de_trimmed_copy(best, best_length) : NULL;
+}
+
 static bool de_subscript_coefficient_prefix(const char *base, size_t length, const char *independent_declarations)
 {
     char coordinate[2];
 
     if (!base || length < 2u || !islower((unsigned char)base[0]) || !islower((unsigned char)base[length - 1u]))
         return false;
-    if (!independent_declarations)
-        return base[0] == 'x' || base[0] == 'y' || base[0] == 'z' || base[0] == 't';
-    coordinate[0] = base[0];
     coordinate[1] = '\0';
-    return de_declarations_contain_name(independent_declarations, coordinate);
+    for (size_t i = 0u; i + 1u < length; ++i) {
+        if (i > 0u && base[i] == base[length - 1u])
+            continue;
+        if (!independent_declarations) {
+            if (base[i] != 'x' && base[i] != 'y' && base[i] != 'z' && base[i] != 't')
+                return false;
+        } else {
+            coordinate[0] = base[i];
+            if (!de_declarations_contain_name(independent_declarations, coordinate))
+                return false;
+        }
+    }
+    return true;
 }
 
 static bool de_subscript_needs_implicit_product(const char *text, size_t token_start)
@@ -1920,6 +1975,11 @@ static int de_append_subscript_dependent(string_t *out, const char *name, size_t
 
     if (alias)
         return string_append_char(out, '@') == 0 ? string_append_chars(out, name, length) : -1;
+    char *greek = de_normalise_greek_alias(name, length);
+    if (greek) {
+        free(greek);
+        return string_append_char(out, '@') == 0 ? string_append_chars(out, name, length) : -1;
+    }
     raw = string_new();
     if (!raw || string_append_chars(raw, name, length) != 0) {
         string_free(raw);
@@ -1927,8 +1987,15 @@ static int de_append_subscript_dependent(string_t *out, const char *name, size_t
     }
     normalised = expr_default_constant_canonical_name_text(raw);
     canonical = normalised ? string_c_str(normalised) : NULL;
-    result =
-        canonical && canonical[0] == '@' ? string_append_cstr(out, canonical) : string_append_chars(out, name, length);
+    if (canonical && canonical[0] == '@') {
+        result = string_append_cstr(out, canonical);
+    } else if (length > 1u) {
+        /* A field name is one symbol, never an implicit product or a unit expression. */
+        result = string_append_char(out, '[') == 0 && string_append_chars(out, name, length) == 0 &&
+                 string_append_char(out, ']') == 0 ? 0 : -1;
+    } else {
+        result = string_append_chars(out, name, length);
+    }
     string_free(normalised);
     string_free(raw);
     return result;
@@ -2240,6 +2307,7 @@ fail:
 static char *de_normalize_subscript_derivatives(const char *text, const char *independent_declarations)
 {
     string_t *out;
+    char *dependent;
     size_t i = 0u;
     char *result;
 
@@ -2248,6 +2316,7 @@ static char *de_normalize_subscript_derivatives(const char *text, const char *in
     out = string_new();
     if (!out)
         return NULL;
+    dependent = de_subscript_shorthand_dependent(text, independent_declarations);
 
     while (text[i]) {
         size_t token_start = i;
@@ -2306,13 +2375,21 @@ static char *de_normalize_subscript_derivatives(const char *text, const char *in
         }
 
         dependent_start = name_start;
-        if (!alias &&
-            de_subscript_coefficient_prefix(text + name_start, underscore - name_start, independent_declarations)) {
+        size_t dependent_length = dependent ? strlen(dependent) : 0u;
+        size_t base_length = underscore - name_start;
+        char *greek = de_normalise_greek_alias(text + name_start, base_length);
+        if (!alias && !greek && dependent_length > 0u && base_length > dependent_length &&
+            memcmp(text + underscore - dependent_length, dependent, dependent_length) == 0) {
+            dependent_start = underscore - dependent_length;
+        } else if (!alias && !greek &&
+                   de_subscript_coefficient_prefix(text + name_start, base_length, independent_declarations)) {
             dependent_start = underscore - 1u;
-            if (string_append_chars(out, text + name_start, dependent_start - name_start) != 0)
-                goto fail;
         }
+        free(greek);
         if ((de_subscript_needs_implicit_product(text, token_start) && string_append_char(out, '*') != 0) ||
+            (dependent_start > name_start &&
+             (string_append_chars(out, text + name_start, dependent_start - name_start) != 0 ||
+              string_append_char(out, '*') != 0)) ||
             string_append_char(out, 'D') != 0 || string_append_cstr(out, derivative_suffix) != 0 ||
             string_append_char(out, '(') != 0 ||
             de_append_subscript_dependent(out, text + dependent_start, underscore - dependent_start, alias) != 0 ||
@@ -2325,10 +2402,12 @@ static char *de_normalize_subscript_derivatives(const char *text, const char *in
 
     result = strdup(string_c_str(out));
     string_free(out);
+    free(dependent);
     return result;
 
 fail:
     string_free(out);
+    free(dependent);
     return NULL;
 }
 
@@ -3082,7 +3161,9 @@ diffequ_t *de_from_string(const char *text)
         if (asprintf(&probe_text, "{ %s = %s | %s; }", masked_lhs, masked_rhs, probe_independent) < 0)
             probe_text = NULL;
     }
-    probe = probe_text ? equ_from_string(probe_text) : NULL;
+    string_t *differential_probe = probe_text ? string_new_with(probe_text) : NULL;
+    probe = differential_probe ? equ_from_differential_text_internal(differential_probe) : NULL;
+    string_free(differential_probe);
     if (!probe)
         goto cleanup;
     de_name_contextual_dependents(parts.equation, equ_bindings(probe));

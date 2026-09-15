@@ -3438,6 +3438,7 @@ number_t num_ldexp(const number_t number, int exponent2)
     return result;
 }
 
+/* Square exact values without promoting them to floating-point arithmetic. */
 number_t num_sqr(const number_t number)
 {
     number_kind_t kind = number_impl_const(&number)->kind;
@@ -3448,7 +3449,7 @@ number_t num_sqr(const number_t number)
         return num_create_from_qfloat(qf_sqr(number_impl_const(&number)->value.qf));
     if (kind == NUMBER_INVALID)
         return number_invalid();
-    if (!num_is_real(number))
+    if (kind == NUMBER_MPZ || kind == NUMBER_MPQ || !num_is_real(number))
         return num_mul(number, number);
     return number_apply_unary_math(number, qf_sqr, NULL, number_mpfr_sqr_mut, NULL);
 }

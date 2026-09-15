@@ -31,6 +31,7 @@ static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_C
     [EXPR_KIND_SQRT] = {.primitive = integrate_sqrt_rule},
     [EXPR_KIND_CUBRT] = {.primitive = integrate_cubrt_rule},
     [EXPR_KIND_ROOT] = {.primitive = integrate_root_rule},
+    [EXPR_KIND_ABS] = {.primitive = integrate_abs_rule},
     [EXPR_KIND_LOG] = {.primitive = integrate_log_rule},
     [EXPR_KIND_LOG10] = {.primitive = integrate_log10_rule},
     [EXPR_KIND_EXP] = {.primitive = integrate_exp_rule},
@@ -217,7 +218,8 @@ static expr_t *expr_integrate_symbolic_affine_unary_local(const expr_t *expr, co
     expr_t *quotient = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->ops || expr->ops->arity != EXPR_OP_UNARY || !expr->ops->apply_unary || !expr->a ||
+    if (!expr || !wrt || !expr->ops || expr_is_op(expr, &ops_abs) ||
+        expr->ops->arity != EXPR_OP_UNARY || !expr->ops->apply_unary || !expr->a ||
         !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) ||
         expr_const_is_zero(coefficient))
         goto cleanup;

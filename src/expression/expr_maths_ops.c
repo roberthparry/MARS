@@ -4430,6 +4430,7 @@ const expr_ops_t ops_abs = {.eval = eval_abs,
                             .apply_unary = expr_abs,
                             .apply_binary = NULL,
                             .finite_progression = expr_finite_abs_progression_closed_form,
+                            .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
                             .fold_const_unary = NULL};
 const expr_ops_t ops_conj = {.eval = eval_conj,

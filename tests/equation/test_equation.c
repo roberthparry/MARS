@@ -683,7 +683,7 @@ static void test_equation_function_style_preserves_both_sides(void)
     ASSERT_TRUE(strstr(string_c_str(text), "equation equ(x, y, z, const a)") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "return equation(x + y = a.z).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "return x + y - a.z.") == NULL);
-    ASSERT_TRUE(strstr(string_c_str(text), "output(equ(x, y, z, a).solve()).") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(text), "output(solve(equ(x, y, z, a))).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "constant[] solve") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "print(") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "equ_eval") == NULL);
@@ -759,7 +759,7 @@ static void test_equation_expands_conjugate_factors_and_solves_all_roots(void)
     ASSERT_TRUE(strstr(string_c_str(function), "884.x^2") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "912.x") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "1040 = 0") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "`` x = ?\noutput(equ(x).solve()).") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "`` x = ?\noutput(solve(equ(x))).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "(x - (1 + i))") == NULL);
 
     ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);

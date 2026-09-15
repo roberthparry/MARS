@@ -18,6 +18,8 @@ struct equation_t {
     expr_bindings_t *bindings;
     string_t *lhs_display_TeX;
     string_t *rhs_display_TeX;
+    string_t *lhs_display_unbound;
+    string_t *rhs_display_unbound;
     bool power_series_domain;
 };
 
@@ -79,6 +81,8 @@ void equ_free(equation_t *equation)
         return;
     string_free(equation->rhs_display_TeX);
     string_free(equation->lhs_display_TeX);
+    string_free(equation->rhs_display_unbound);
+    string_free(equation->lhs_display_unbound);
     expr_bindings_free(equation->bindings);
     expr_free(equation->lhs);
     expr_free(equation->rhs);
@@ -105,6 +109,33 @@ int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_
 const string_t *equ_lhs_display_TeX(const equation_t *equation)
 {
     return equation ? equation->lhs_display_TeX : NULL;
+}
+
+/* Retain compact, faithful plain notation without changing the calculable expression trees. */
+int equ_set_display_unbound(equation_t *equation, const string_t *lhs, const string_t *rhs)
+{
+    string_t *lhs_copy = lhs ? string_clone(lhs) : NULL;
+    string_t *rhs_copy = rhs ? string_clone(rhs) : NULL;
+    if (!equation || (lhs && !lhs_copy) || (rhs && !rhs_copy)) {
+        string_free(lhs_copy);
+        string_free(rhs_copy);
+        return -1;
+    }
+    string_free(equation->lhs_display_unbound);
+    string_free(equation->rhs_display_unbound);
+    equation->lhs_display_unbound = lhs_copy;
+    equation->rhs_display_unbound = rhs_copy;
+    return 0;
+}
+
+const string_t *equ_lhs_display_unbound(const equation_t *equation)
+{
+    return equation ? equation->lhs_display_unbound : NULL;
+}
+
+const string_t *equ_rhs_display_unbound(const equation_t *equation)
+{
+    return equation ? equation->rhs_display_unbound : NULL;
 }
 
 const string_t *equ_rhs_display_TeX(const equation_t *equation)

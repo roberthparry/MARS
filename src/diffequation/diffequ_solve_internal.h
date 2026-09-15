@@ -18,6 +18,9 @@ expr_t *de_integrate_or_formal(const expr_t *integrand, const expr_t *wrt);
 bool de_expr_contains(const expr_t *expr, const expr_t *needle);
 bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coefficient_out, expr_t **constant_out);
 bool de_expr_uses(const expr_t *expr, const expr_t *variable);
+bool de_find_derivatives(const expr_t *expr, const expr_t *independent, const expr_t **dependent_out,
+                          const expr_t **first_out, const expr_t **second_out, size_t *highest_order_out);
+diffequ_solve_result_t *de_lie_unsolved_analysis(const diffequ_t *de, bool include_steps);
 bool de_find_initial_condition(const diffequ_t *de, const expr_t *dependent, const expr_t **point_out,
                                const expr_t **value_out);
 bool de_find_derivative_condition(const diffequ_t *de, const expr_t *dependent, const expr_t *independent, size_t order,

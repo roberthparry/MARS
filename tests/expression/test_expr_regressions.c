@@ -5,6 +5,146 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
+static void test_unset_constant_clones_combine_symbolically(void)
+{
+    expr_t *a = expr_new_named_const(NUM_NAN, "C_1");
+    expr_t *copy = expr_clone(a);
+    expr_t *b = expr_new_named_const(NUM_NAN, "C_2");
+    expr_t *nan = expr_new_const(NUM_NAN);
+    expr_t *nan_copy = expr_clone(nan);
+    expr_t *bound = expr_new_named_const(NUM_ONE, "C_1");
+    ASSERT_TRUE(expr_struct_eq(a, copy));
+    ASSERT_FALSE(expr_struct_eq(a, b));
+    ASSERT_FALSE(expr_struct_eq(a, nan));
+    ASSERT_FALSE(expr_struct_eq(nan, nan_copy));
+    ASSERT_FALSE(expr_struct_eq(a, bound));
+    expr_t *sum = expr_add_simplify_owned(expr_clone(a), expr_clone(copy));
+    expr_t *twice = expr_mul_long(a, 2L);
+    ASSERT_TRUE(expr_struct_eq(sum, twice));
+    expr_t *product = expr_mul_simplify_owned(expr_clone(a), expr_clone(copy));
+    expr_t *square = expr_pow(a, &NUM_TWO);
+    ASSERT_TRUE(expr_struct_eq(product, square));
+    expr_t *difference = expr_sub_simplify_owned(expr_clone(a), expr_clone(copy));
+    ASSERT_TRUE(expr_is_exact_zero(difference));
+    expr_free(difference);
+    expr_free(square);
+    expr_free(product);
+    expr_free(twice);
+    expr_free(sum);
+    expr_free(bound);
+    expr_free(nan_copy);
+    expr_free(nan);
+    expr_free(b);
+    expr_free(copy);
+    expr_free(a);
+}
+
+static void test_multivariable_arbitrary_function_derivatives(void)
+{
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    expr_t *y = expr_new_named_var(NUM_NAN, "y");
+    expr_t *p = expr_new_named_var(NUM_NAN, "p");
+    expr_t *arguments[2] = {x, y};
+    expr_t *function = expr_new_arbitrary_function_n("F", 2u, arguments);
+    expr_t *dx = expr_create_deriv(function, x);
+    expr_t *dxy = expr_create_deriv(dx, y);
+    expr_t *dp = expr_create_deriv(function, p);
+    expr_t *dxp = expr_create_deriv(dx, p);
+    ASSERT_NOT_NULL(dx);
+    ASSERT_NOT_NULL(dxy);
+    ASSERT_TRUE(expr_is_formal_derivative(dx));
+    ASSERT_TRUE(expr_formal_derivative_order(dxy) == 2u);
+    ASSERT_TRUE(expr_struct_eq(expr_formal_derivative_wrt_at(dxy, 0u), x));
+    ASSERT_TRUE(expr_struct_eq(expr_formal_derivative_wrt_at(dxy, 1u), y));
+    ASSERT_TRUE(expr_is_exact_zero(dp));
+    ASSERT_TRUE(expr_is_exact_zero(dxp));
+    expr_free(dxp);
+    expr_free(dp);
+    expr_free(dxy);
+    expr_free(dx);
+    expr_free(function);
+    expr_free(p);
+    expr_free(y);
+    expr_free(x);
+}
+
+static void test_cloned_formal_derivative_substitution(void)
+{
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    expr_t *y = expr_new_named_var(NUM_NAN, "y");
+    expr_t *p = expr_new_named_var(NUM_NAN, "p");
+    expr_t *derivative = expr_new_formal_derivative(y, 1u, &x);
+    expr_t *copy = expr_clone(derivative);
+    expr_t *product = expr_mul(y, copy);
+    expr_t *replaced = expr_substitute(product, derivative, p);
+    expr_t *expected = expr_mul(y, p);
+    expr_t *difference = expr_sub_simplify_owned(expr_clone(replaced), expr_clone(expected));
+    ASSERT_TRUE(expr_is_exact_zero(difference));
+    expr_free(difference);
+    expr_free(expected);
+    expr_free(replaced);
+    expr_free(product);
+    expr_free(copy);
+    expr_free(derivative);
+    expr_free(p);
+    expr_free(y);
+    expr_free(x);
+}
+
+static void test_opposite_factor_cancellation(void)
+{
+    static const char *const inputs[] = {
+        "(y-x)/(x-y)+1", "(y-x)^2/(x-y)^2-1", "(y-x)^3/(x-y)^2-(y-x)",
+        "(y-x)^2/(x-y)^3+1/(y-x)", "(y-x)^3/(x-y)^3+1",
+        "(2*y-2*x+1)/(2*x-2*y-1)+1",
+        "(x*x-1)/sqrt(1-x*x)+sqrt(1-x*x)",
+        "sqrt(1-x*x)/(x*x-1)+1/sqrt(1-x*x)",
+        "sqrt(-(x*x-1))-sqrt(1-x*x)", "cubrt(-(x*x-1))-cubrt(1-x*x)"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *input = expr_from_string(inputs[i], &bindings);
+        expr_t *simplified = input ? expr_simplify(input) : NULL;
+
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        printf("Opposite-factor cancellation: %s -> %s\n", inputs[i], text ? text : "(null)");
+        free(text);
+        ASSERT_TRUE(simplified && expr_is_exact_zero(simplified));
+        expr_free(simplified);
+        expr_free(input);
+        expr_bindings_free(bindings);
+    }
+}
+
+static void test_opposite_radicals_keep_complex_branches(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *input = expr_from_string("sqrt(x-1)/sqrt(1-x)", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified = input ? expr_simplify(input) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    for (int side = -1; side <= 1; side += 2) {
+        test_expr_set_val_d(x, 1.0 + side);
+        number_t actual = expr_eval(simplified);
+        number_t expected = num_clone(side < 0 ? NUM_I : NUM_NEG_I);
+        number_t difference = num_sub(actual, expected);
+        number_t magnitude = num_abs(difference);
+        number_t tolerance = num_create_from_string("1e-24");
+
+        ASSERT_TRUE(num_is_finite(actual) && num_lt(magnitude, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&magnitude);
+        num_destroy(&difference);
+        num_destroy(&expected);
+        num_destroy(&actual);
+    }
+    expr_free(simplified);
+    expr_free(input);
+    expr_bindings_free(bindings);
+}
+
 static string_t *format_number_at_own_precision(const number_t value)
 {
     char fmt[32];
@@ -4395,6 +4535,11 @@ static void test_dilog_display_and_exponential_difference_signs(void)
 
 void test_runtime_regressions(void)
 {
+    TEST_RUN_SUBTEST(test_multivariable_arbitrary_function_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_unset_constant_clones_combine_symbolically, NULL);
+    TEST_RUN_SUBTEST(test_cloned_formal_derivative_substitution, NULL);
+    TEST_RUN_SUBTEST(test_opposite_factor_cancellation, NULL);
+    TEST_RUN_SUBTEST(test_opposite_radicals_keep_complex_branches, NULL);
     TEST_RUN_SUBTEST(test_dilog_display_and_exponential_difference_signs, NULL);
     TEST_RUN_SUBTEST(test_clausen_derivatives_and_bindings, NULL);
     TEST_RUN_SUBTEST(test_arbitrary_function_sums_keep_individual_coefficients, NULL);

@@ -32,6 +32,7 @@ expr_t *expr_integrate_as_constant(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_integrate_normalize_radical_products(const expr_t *expr);
 
 /* Polynomial and affine matching helpers. */
+expr_t *integrate_abs_rule(const expr_t *expr, const expr_t *wrt);
 bool match_nonconstant_affine_linear_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out,
                                           number_t *coeff_out);
 void number_array_zero_local(number_t *values, size_t count);

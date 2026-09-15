@@ -1537,9 +1537,25 @@ static void test_integrate_symbolic_power_exponent(void)
     ASSERT_NOT_NULL(diff);
     ASSERT_NOT_NULL(simplified);
     ASSERT_NOT_NULL(text);
-    ASSERT_TRUE(strstr(text, "√(3)^(n + 1)/(n + 1)") != NULL);
-    ASSERT_TRUE(strstr(text, "1/(n + 1)") != NULL);
+    print_antiderivative_text("definite integral of x^n from 1 to sqrt(3)", text);
+    /* Copies of the unset constant n now share a symbolic denominator. */
+    ASSERT_TRUE(strcmp(text, "1/(n + 1)·(√(3)^(n + 1) - 1)") == 0);
     ASSERT_TRUE(strstr(text, "1^") == NULL);
+
+    expr_t *n_symbol = expr_new_named_var(NUM_NAN, "n");
+    for (long n = -3L; n <= 3L; ++n) {
+        if (n == -1L)
+            continue;
+        expr_t *value = expr_const_long(n);
+        expr_t *before = expr_substitute(diff, n_symbol, value);
+        expr_t *after = expr_substitute(simplified, n_symbol, value);
+        check_q_at(__FILE__, __LINE__, 1, "symbolic denominator collection preserves the integral",
+                   expr_eval_qf(after), expr_eval_qf(before));
+        expr_free(after);
+        expr_free(before);
+        expr_free(value);
+    }
+    expr_free(n_symbol);
 
     free(text);
     free(anti_text);
@@ -2163,6 +2179,89 @@ static void test_integrate_log_cosh_definite(void)
     free(text);
     expr_free(display);
     expr_free(integral);
+    expr_bindings_free(bindings);
+}
+
+static void test_integrate_inverse_trig_second_primitives(void)
+{
+    static const double points[] = {-0.3, -0.1, 0.1, 0.3};
+    static const char *const inputs[] = {
+        "x*acos(x)", "x*asin(x)", "x*acos(x)-sqrt(1-x*x)", "x*asin(x)+sqrt(1-x*x)",
+        "(2*x+1)*acos(2*x-1/10)", "(1-3*x)*asin(1/10-2*x)"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *integrand = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *primitive = x ? expr_integrate(integrand, x) : NULL;
+
+        assert_string_antiderivative_matches_without(inputs[i], points, sizeof(points) / sizeof(points[0]),
+                                                      NULL, "∫", NULL);
+        /* The phase primitives used by the PDE must verify symbolically; affine variants are also checked numerically. */
+        if (i < 4u)
+            ASSERT_TRUE(expr_verify_antiderivative_real_internal(primitive, integrand, x));
+        expr_free(primitive);
+        expr_free(integrand);
+        expr_bindings_free(bindings);
+    }
+}
+
+static void test_integrate_absolute_value_affine(void)
+{
+    static const double points[] = {-2.0, -0.5, 0.0, 0.5, 2.0};
+    static const char *const inputs[] = {
+        "abs(x)", "abs(3*x-1)", "abs(1-2*x)", "x*abs(x)/2",
+        "(2*x+3)*abs(3*x-1)", "abs(1-2*x)*(3*x+1)", "-3*abs(x)/2"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *integrand = expr_from_string(inputs[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+
+        assert_string_antiderivative_matches_without(inputs[i], points, sizeof(points) / sizeof(points[0]),
+                                                      NULL, "∫", NULL);
+        ASSERT_TRUE(expr_verify_antiderivative_real_internal(anti, integrand, x));
+        expr_free(anti);
+        expr_free(integrand);
+        expr_bindings_free(bindings);
+    }
+
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string("abs(a*x+b)", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+    expr_t *derivative = anti ? expr_create_deriv(anti, x) : NULL;
+    expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
+    expr_t *b = bindings ? expr_bindings_get(bindings, "b") : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(derivative);
+    for (int sign = -1; sign <= 1; sign += 2) {
+        test_expr_set_val_d(a, 2.0 * sign);
+        test_expr_set_val_d(b, 1.0);
+        for (size_t i = 0u; i < sizeof(points) / sizeof(points[0]); ++i) {
+            test_expr_set_val_d(x, points[i]);
+            check_q_at(__FILE__, __LINE__, 1, "symbolic affine absolute-value primitive retains bindings",
+                         expr_eval_qf(derivative), expr_eval_qf(integrand));
+        }
+    }
+    expr_free(derivative);
+    expr_free(anti);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("abs(x+i)", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    anti = integrand && x ? expr_integrate(integrand, x) : NULL;
+
+    /* A complex modulus must not enter the real affine chain-rule fallback. */
+    ASSERT_NULL(anti);
+    expr_free(anti);
+    expr_free(integrand);
     expr_bindings_free(bindings);
 }
 
@@ -3728,6 +3827,8 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_quadratic, NULL);
     TEST_RUN_SUBTEST(test_integrate_real_quadratic_discriminants, NULL);
+    TEST_RUN_SUBTEST(test_integrate_absolute_value_affine, NULL);
+    TEST_RUN_SUBTEST(test_integrate_inverse_trig_second_primitives, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_cosh_dilog, NULL);
     TEST_RUN_SUBTEST(test_integrate_clausen_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_log_cosh_definite, NULL);

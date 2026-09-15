@@ -135,6 +135,21 @@ static void run_number_exact_arithmetic_tests(void)
 
 static void run_number_exact_integer_math_tests(void)
 {
+    static const char *const inputs[] = {"0", "-3", "18446744073709551617", "1/2", "-3/2", "7/11"};
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+        number_t input = num_create_from_string(inputs[i]);
+        number_t expected = num_mul(input, input);
+        number_t squared = num_sqr(input);
+        number_t power = num_pow(input, NUM_TWO);
+        ASSERT_TRUE(num_is_exact(squared));
+        ASSERT_TRUE(num_is_exact(power));
+        ASSERT_NUMBER_EQ(squared, expected);
+        ASSERT_NUMBER_EQ(power, expected);
+        num_destroy(&power);
+        num_destroy(&squared);
+        num_destroy(&expected);
+        num_destroy(&input);
+    }
     number_t two = num_create_from_long(2);
     number_t three = num_create_from_long(3);
     number_t ten = num_create_from_long(10);

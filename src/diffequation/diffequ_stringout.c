@@ -9,8 +9,9 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-/* TeX commands are considerably wider in source than when rendered. */
-static const size_t de_TeX_line_limit = 180u;
+/* Keep an equation's sides intact: a top-aligned wrapped left side would strand '=' on its first line.
+ * Result cards handle horizontal overflow; solution series have their own explicit wrapped layout. */
+static const size_t de_TeX_line_limit = SIZE_MAX;
 
 static int de_append_superscript(string_t *out, size_t value)
 {
@@ -351,7 +352,7 @@ static char *de_expr_to_unbound_TeX(const expr_t *expr, bool partial_derivatives
     char *tex;
 
     symbol_name = expr_symbol_name(expr);
-    if (symbol_name) {
+    if (symbol_name && (expr_is_variable(expr) || expr_is_named_const(expr))) {
         expr_t *symbol = expr_new_named_var(NUM_NAN, symbol_name);
 
         tex = symbol ? expr_to_TeX_body_wrapped(symbol, de_TeX_line_limit) : NULL;

@@ -1167,6 +1167,87 @@ static expr_t *integrate_mul_rule_dispatch(unsigned int features, const expr_t *
     return NULL;
 }
 
+/* Absolute-value calculus here is real; do not treat a complex modulus as a holomorphic function. */
+static bool integrate_abs_has_complex_value(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if ((expr_is_const(expr) || expr_is_var(expr)) && num_is_finite(expr->c) && !num_is_real(expr->c))
+        return true;
+    return integrate_abs_has_complex_value(expr->a) || integrate_abs_has_complex_value(expr->b);
+}
+
+/* For real affine u = a*x+b, integrate |u| as u*|u|/(2*a). */
+expr_t *integrate_abs_rule(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *constant = NULL;
+    expr_t *slope = NULL;
+    expr_t *out = NULL;
+
+    if (!expr || !expr_is_op(expr, &ops_abs) || !expr->a || integrate_abs_has_complex_value(expr->a) ||
+        !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &slope) || expr_const_is_zero(slope))
+        goto cleanup;
+
+    expr_t *product = expr_mul(expr->a, expr);
+    expr_t *denominator = expr_mul_long(slope, 2L);
+
+    out = product && denominator ? simplify_owned(expr_div(product, denominator)) : NULL;
+    expr_free(denominator);
+    expr_free(product);
+cleanup:
+    expr_free(slope);
+    expr_free(constant);
+    return out;
+}
+
+/* Express a linear multiplier as c+d*u and integrate (c+d*u)*|u| in the same affine coordinate. */
+static expr_t *integrate_linear_times_abs(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *absolute = expr_is_op(expr->a, &ops_abs) ? expr->a : expr->b;
+    const expr_t *factor = absolute == expr->a ? expr->b : expr->a;
+    expr_t *offset = NULL;
+    expr_t *slope = NULL;
+    expr_t *factor_offset = NULL;
+    expr_t *factor_slope = NULL;
+    expr_t *out = NULL;
+
+    if (!expr_is_op(absolute, &ops_abs) || !absolute->a || integrate_abs_has_complex_value(absolute->a) ||
+        !match_symbolic_affine_constant_and_coeff(absolute->a, wrt, &offset, &slope) || expr_const_is_zero(slope) ||
+        !match_symbolic_affine_constant_and_coeff(factor, wrt, &factor_offset, &factor_slope))
+        goto cleanup;
+
+    expr_t *d = simplify_owned(expr_div(factor_slope, slope));
+    expr_t *shift = d ? expr_mul(d, offset) : NULL;
+    expr_t *c = shift ? simplify_owned(expr_sub(factor_offset, shift)) : NULL;
+    expr_t *u_abs = expr_mul(absolute->a, absolute);
+    expr_t *u_square = expr_mul(absolute->a, absolute->a);
+    expr_t *u_square_abs = u_square ? expr_mul(u_square, absolute) : NULL;
+    expr_t *linear = c && u_abs ? expr_mul(c, u_abs) : NULL;
+    expr_t *quadratic = d && u_square_abs ? expr_mul(d, u_square_abs) : NULL;
+    expr_t *half = linear ? expr_div_long(linear, 2L) : NULL;
+    expr_t *third = quadratic ? expr_div_long(quadratic, 3L) : NULL;
+    expr_t *sum = half && third ? expr_add(half, third) : NULL;
+
+    out = sum ? simplify_owned(expr_div(sum, slope)) : NULL;
+    expr_free(sum);
+    expr_free(third);
+    expr_free(half);
+    expr_free(quadratic);
+    expr_free(linear);
+    expr_free(u_square_abs);
+    expr_free(u_square);
+    expr_free(u_abs);
+    expr_free(c);
+    expr_free(shift);
+    expr_free(d);
+cleanup:
+    expr_free(factor_slope);
+    expr_free(factor_offset);
+    expr_free(slope);
+    expr_free(offset);
+    return out;
+}
+
 expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
 {
     bool left_depends;
@@ -1190,6 +1271,10 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
         if (product)
             return simplify_owned(product);
     }
+
+    matched = integrate_linear_times_abs(expr, wrt);
+    if (matched)
+        return matched;
 
     matched = integrate_exact_substitution_product(expr, wrt);
     if (matched)

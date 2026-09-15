@@ -564,7 +564,8 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
     if (!expr)
         return NULL;
 
-    if (expr == needle || expr_is_same_named_leaf_for_substitution(expr, needle)) {
+    if (expr == needle || expr_is_same_named_leaf_for_substitution(expr, needle) ||
+        (expr_is_formal_derivative(expr) && expr_is_formal_derivative(needle) && expr_struct_eq(expr, needle))) {
         expr_retain(replacement);
         return (expr_t *)replacement;
     }
