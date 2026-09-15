@@ -118,6 +118,14 @@ argument long enough to integrate it before presentation expansion; in
 particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
 as native Cartesian expressions rather than unevaluated integral nodes.
 
+Quadratic-logarithm and affine-over-quadratic integrals share a discriminant
+rule. For `a*x*x+b*x+c`, a known negative `4*a*c-b*b` selects an inverse
+hyperbolic tangent; a zero discriminant uses a rational primitive. This avoids
+introducing complex inverse tangents for real primitives between the roots.
+Logarithms of negated differences are normalised algebraically without
+splitting logarithms or changing their branches. These rules also supply the
+elementary [inverse-hyperbolic-tangent PDE solution](diffequation.md).
+
 Riemann and Hurwitz zeta nodes participate in the same symbolic calculus.
 Differentiating `zeta(s)` produces `ζ'(s)` in Expression style and `zetap(s)`
 in Function style. For Hurwitz zeta,
@@ -870,7 +878,7 @@ the dedicated node or its calculus operations.
 
 The parser accepts `lerch_phi(z,s,a)`, `LerchPhi(z,s,a)` and `Φ(z,s,a)`.
 `style_EXPRESSION` uses the capital-phi form `Φ(z,s,a)`, `style_FUNCTION` uses
-`lerchphi(z,s,a)`, and TeX uses `\Phi`. Numerical evaluation is limited to the
+`lerchphi(z,s,a)`, and TeX uses $\Phi$. Numerical evaluation is limited to the
 implemented defining-series domain and exact reductions; unsupported analytic
 continuations remain unavailable instead of silently selecting a branch.
 
@@ -892,7 +900,7 @@ the real or holomorphic semantics of [the number API](number.md#clausen-function
 The parser accepts `Cl2`, `cl2`, `Cl₂`, `cl₂`, `clausen`, `Clausen`,
 `clausen2`, `Clausen2` and `clausen_2` for order two, and `Cl(n,x)` or
 `cl(n,x)` for the general family. Expression text displays `Cl₂`; function
-notation uses `clausen2`; TeX uses \(\operatorname{Cl}_{2}\). General orders
+notation uses `clausen2`; TeX uses $\operatorname{Cl}_{2}$. General orders
 display the corresponding subscript in TeX. The standard abbreviation is
 Latin, so there is no Greek alias.
 

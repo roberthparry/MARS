@@ -2336,6 +2336,36 @@ class DiffequationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_atanh_pde_elementary_solution_and_TeX(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2atanh(x-y)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(
+            payload["solutions"],
+            "z = F(y - 3x) + G(y - 2x) - ½x + ½y + ½·(x - y)·ln(1 - (x - y)²) + "
+            "½·((x - y)² + 1)·atanh(x - y)",
+        )
+        for key, solution_key in (
+            ("display_TeX", "solutions_TeX"),
+            ("display_wrapped_TeX", "solutions_wrapped_TeX"),
+        ):
+            self.assertEqual(payload[key], fields[key])
+            self.assertLess(fields[key].index(fields["problem_TeX"]), fields[key].index(fields[solution_key]))
+            self.assertNotIn(r"\int", fields[solution_key])
+            self.assertNotIn(r"\arctan", fields[solution_key])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_forced_second_order_pde_solution_and_TeX(self) -> None:
         completed = subprocess.run(
             [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), "z_xx + 5z_yx + 6z_yy = 2e^(x-y)"],

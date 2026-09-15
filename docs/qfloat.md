@@ -352,11 +352,11 @@ The Clausen functions take angles in radians and are `2*pi`-periodic. For a
 positive integer order, even orders use the sine Fourier series and odd orders
 use the cosine Fourier series:
 
-\[
+$$
 \operatorname{Cl}_{2m}(\theta)=\sum_{k=1}^{\infty}\frac{\sin(k\theta)}{k^{2m}},
 \qquad
 \operatorname{Cl}_{2m-1}(\theta)=\sum_{k=1}^{\infty}\frac{\cos(k\theta)}{k^{2m-1}}.
-\]
+$$
 
 Order one is `-ln(2*abs(sin(theta/2)))`, with logarithmic poles at multiples
 of `2*pi`. Higher orders are continuous on the real axis. Evaluation uses
