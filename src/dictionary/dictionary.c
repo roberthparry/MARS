@@ -3,8 +3,8 @@
  *
  * Data layout:
  *   Keys and values are stored in two parallel arenas (key_arena, value_arena).
- *   Each slot in key_arena holds a size_t hash followed by the key bytes;
- *   each slot in value_arena holds the value bytes directly.
+ *   Each slot in key_arena holds a size_t hash followed by an aligned key;
+ *   each slot in value_arena holds an aligned value. Both strides include padding.
  *   A separate hash table (table[]) holds singly-linked bucket chains that
  *   index into the arenas by slot number.
  *
@@ -24,6 +24,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "dictionary.h"
@@ -47,8 +48,9 @@ struct _dict_entry {
 struct _dictionary_t {
     size_t key_size;
     size_t value_size;
-    size_t key_slot_stride;   /* sizeof(size_t) + key_size */
-    size_t value_slot_stride; /* value_size */
+    size_t key_data_offset;   /* aligned offset after the hash */
+    size_t key_slot_stride;   /* padded hash and key storage */
+    size_t value_slot_stride; /* padded value storage */
 
     size_t count;
     size_t capacity;
@@ -85,6 +87,14 @@ struct _dictionary_t {
  * Slot helpers
  * ---------------------------------------------------------------------- */
 
+static size_t dict_aligned_size(size_t size)
+{
+    const size_t alignment = _Alignof(max_align_t);
+    if (size > SIZE_MAX - (alignment - 1u))
+        return 0u;
+    return ((size + alignment - 1u) / alignment) * alignment;
+}
+
 static inline size_t *key_slot_hash_ptr(const struct _dictionary_t *dict, size_t index)
 {
     return (size_t *)(dict->key_arena + index * dict->key_slot_stride);
@@ -92,7 +102,7 @@ static inline size_t *key_slot_hash_ptr(const struct _dictionary_t *dict, size_t
 
 static inline void *key_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
 {
-    return (void *)(dict->key_arena + index * dict->key_slot_stride + sizeof(size_t));
+    return (void *)(dict->key_arena + index * dict->key_slot_stride + dict->key_data_offset);
 }
 
 static inline void *value_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
@@ -190,6 +200,13 @@ dictionary_t *dictionary_create(size_t key_size, size_t value_size, dictionary_h
 {
     if (key_size == 0 || value_size == 0 || !key_hash || !key_cmp)
         return NULL;
+    size_t key_data_offset = dict_aligned_size(sizeof(size_t));
+    if (key_size > SIZE_MAX - key_data_offset)
+        return NULL;
+    size_t key_stride = dict_aligned_size(key_data_offset + key_size);
+    size_t value_stride = dict_aligned_size(value_size);
+    if (!key_stride || !value_stride)
+        return NULL;
 
     struct _dictionary_t *dict = (struct _dictionary_t *)calloc(1, sizeof(*dict));
     if (!dict)
@@ -197,8 +214,9 @@ dictionary_t *dictionary_create(size_t key_size, size_t value_size, dictionary_h
 
     dict->key_size = key_size;
     dict->value_size = value_size;
-    dict->key_slot_stride = sizeof(size_t) + key_size;
-    dict->value_slot_stride = value_size;
+    dict->key_data_offset = key_data_offset;
+    dict->key_slot_stride = key_stride;
+    dict->value_slot_stride = value_stride;
 
     dict->key_hash = key_hash;
     dict->key_cmp = key_cmp;
@@ -273,14 +291,20 @@ static bool dict_reserve_arenas(struct _dictionary_t *dict, size_t min_capacity)
     if (dict->capacity >= min_capacity)
         return true;
 
-    size_t new_capacity = dict->capacity ? dict->capacity * 2 : 8;
+    size_t largest_stride = dict->key_slot_stride > dict->value_slot_stride ?
+                            dict->key_slot_stride : dict->value_slot_stride;
+    size_t limit = SIZE_MAX / largest_stride;
+    if (min_capacity > limit)
+        return false;
+    size_t new_capacity = dict->capacity ? (dict->capacity > limit / 2u ? limit : dict->capacity * 2u) :
+                                          (limit < 8u ? limit : 8u);
     if (new_capacity < min_capacity)
         new_capacity = min_capacity;
 
     size_t new_key_bytes = new_capacity * dict->key_slot_stride;
     size_t new_value_bytes = new_capacity * dict->value_slot_stride;
 
-    /* Allocate both before committing, so we can roll back on failure. */
+    /* Commit the capacity only when both arenas have grown successfully. */
     unsigned char *new_key_arena = (unsigned char *)realloc(dict->key_arena, new_key_bytes);
     if (!new_key_arena)
         return false;
@@ -413,7 +437,7 @@ bool dictionary_set(dictionary_t *dict, const void *key, const void *value)
         return true;
     }
 
-    if (!dict_reserve_arenas(dict, dict->count + 1))
+    if (dict->count == SIZE_MAX || !dict_reserve_arenas(dict, dict->count + 1u))
         return false;
     if (!dict_ensure_table_capacity(dict))
         return false;

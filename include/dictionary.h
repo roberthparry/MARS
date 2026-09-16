@@ -122,6 +122,9 @@ typedef enum {
  * Keys and values are copied into dictionary storage using the provided clone
  * functions (or shallow byte copies if clone is NULL). Destroy callbacks are
  * applied only to those stored copies.
+ * Stored keys and values have fundamental alignment (up to that of
+ * max_align_t); types requiring extended alignment are not supported.
+ * Sizes whose internal padding would overflow are rejected.
  */
 dictionary_t *dictionary_create(size_t key_size, size_t value_size, dictionary_hash_fn key_hash,
                                 dictionary_cmp_fn key_cmp, dictionary_clone_fn key_clone,

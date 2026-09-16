@@ -3,6 +3,11 @@
 `set_t` is a generic hash set with dense element storage and caller-defined
 copy/cleanup rules for the stored element slots.
 
+Stored elements are aligned for fundamental C types, up to the alignment of
+`max_align_t`, including `long double`. Odd-sized byte elements do not misalign
+subsequent slots. Types requiring extended alignment are not supported, and
+sizes whose internal padding would overflow are rejected.
+
 ## Capabilities
 
 - add, remove, and membership test

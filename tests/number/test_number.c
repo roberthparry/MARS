@@ -38,6 +38,7 @@ int tests_main(void)
 
     TEST_SECTION("Special Functions");
     TEST_RUN_IN_GROUP(run_number_special_function_tests, tests, "number,special-functions");
+    TEST_RUN_IN_GROUP(run_number_nonfinite_series_tests, tests, "number,special-functions,nonfinite");
 
     TEST_SECTION("Backend Parity");
     TEST_RUN_IN_GROUP(run_number_backend_parity_tests, tests, "number,backend-parity");

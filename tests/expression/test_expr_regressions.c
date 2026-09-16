@@ -1066,12 +1066,31 @@ static void test_expr_ln10_singleton(void)
     number_t want = num_const(NUM_LN10);
     char *text = expr_to_string(EXPR_LN10, style_EXPRESSION);
 
-    ASSERT_TRUE(num_eq(got, want));
-    ASSERT_TRUE(text && strstr(text, "ln10") != NULL);
+    bool matches = num_eq(got, want);
+    bool named = text && strstr(text, "ln10") != NULL;
 
     free(text);
     num_destroy(&want);
     num_destroy(&got);
+    ASSERT_TRUE(matches);
+    ASSERT_TRUE(named);
+}
+
+static void test_expr_singleton_rendering_first_use(void)
+{
+    char *one = expr_to_TeX_body(EXPR_ONE);
+    char *zero = expr_to_string(EXPR_ZERO, style_UNBOUND);
+    char *named = expr_to_string(EXPR_LN10, style_UNBOUND);
+    bool one_matches = one && strcmp(one, "1") == 0;
+    bool zero_matches = zero && strcmp(zero, "0") == 0;
+    bool named_matches = named && strstr(named, "ln10") != NULL;
+
+    free(named);
+    free(zero);
+    free(one);
+    ASSERT_TRUE(one_matches);
+    ASSERT_TRUE(zero_matches);
+    ASSERT_TRUE(named_matches);
 }
 
 static void test_get_val_updates_after_set(void)
@@ -4150,7 +4169,9 @@ static void test_named_sixth_root_uses_exact_cartesian_principal_value(void)
     expr_t *beautified = simplified ? expr_beautify_presimplified(simplified) : NULL;
     char *text = beautified ? expr_to_string(beautified, style_UNBOUND) : NULL;
     number_t seed = (number_t){0};
-    number_t want_seed = num_add(NUM_ONE, num_mul(NUM_TWO, NUM_I));
+    number_t imaginary_seed = num_mul(NUM_TWO, NUM_I);
+    number_t want_seed = num_add(NUM_ONE, imaginary_seed);
+    num_destroy(&imaginary_seed);
     long order = 0L;
 
     ASSERT_NOT_NULL(expr);
@@ -4555,6 +4576,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision, NULL);
     TEST_RUN_SUBTEST(test_default_constants_preserve_builtin_precision, NULL);
     TEST_RUN_SUBTEST(test_expr_ln10_singleton, NULL);
+    TEST_RUN_SUBTEST(test_expr_singleton_rendering_first_use, NULL);
     TEST_RUN_SUBTEST(test_get_val_updates_after_set, NULL);
     TEST_RUN_SUBTEST(test_new_const_num, NULL);
     TEST_RUN_SUBTEST(test_new_const_num_rational_complex, NULL);

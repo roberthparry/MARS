@@ -1,6 +1,7 @@
 #include <complex.h>
 #include <limits.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "number.h"
@@ -230,11 +231,18 @@ static int number_bessel_integer_order(mpfr_srcptr order, long *value)
 
 static int number_special_series_converged(mpfr_srcptr term, mpfr_srcptr sum, mpfr_prec_t target_precision)
 {
+    if (!mpfr_number_p(term) || !mpfr_number_p(sum))
+        return 0;
     if (mpfr_zero_p(term))
         return 1;
     if (mpfr_zero_p(sum))
         return 0;
-    return mpfr_get_exp(term) < mpfr_get_exp(sum) - (mpfr_exp_t)target_precision - 16;
+    mpfr_exp_t term_exponent = mpfr_get_exp(term), sum_exponent = mpfr_get_exp(sum);
+    if (term_exponent >= sum_exponent)
+        return 0;
+    /* Unsigned subtraction preserves the positive gap even across the signed exponent range. */
+    uintmax_t gap = (uintmax_t)sum_exponent - (uintmax_t)term_exponent;
+    return gap > (uintmax_t)target_precision + 16u;
 }
 
 static int number_mpfr_bessel_j(mpfr_ptr out, mpfr_srcptr order, mpfr_srcptr argument, mpfr_rnd_t rounding)
@@ -5253,6 +5261,11 @@ static int number_mpc_polylog_series_int(mpc_ptr out, int order, mpc_srcptr z, m
 
 static int number_mpc_Ei(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
+    if (!mpfr_number_p(mpc_realref(z)) || !mpfr_number_p(mpc_imagref(z))) {
+        mpfr_set_nan(mpc_realref(out));
+        mpfr_set_nan(mpc_imagref(out));
+        return 0;
+    }
     mpfr_prec_t target_precision = mpc_get_prec(out);
     mpfr_prec_t work_precision = target_precision + NUMBER_EI_GUARD_BITS;
     mpc_t work_z;
@@ -5279,7 +5292,8 @@ static int number_mpc_Ei(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
         mpc_add(sum, sum, term, MPC_RNDNN);
         mpc_abs(term_magnitude, term, MPFR_RNDN);
         mpc_abs(sum_magnitude, sum, MPFR_RNDN);
-        if (number_special_series_converged(term_magnitude, sum_magnitude, target_precision))
+        if (!mpfr_number_p(term_magnitude) || !mpfr_number_p(sum_magnitude) ||
+            number_special_series_converged(term_magnitude, sum_magnitude, target_precision))
             break;
 
         mpc_mul_ui(term, term, k, MPC_RNDNN);

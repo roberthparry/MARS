@@ -485,6 +485,8 @@ void check_d(const char *label, double got, double want, double tol);
 void check_qf_val(const char *label, qfloat_t got, qfloat_t want, double tol);
 void check_qc_val(const char *label, qcomplex_t got, qcomplex_t want, double tol);
 void check_bool(const char *label, int cond);
+void check_expr_text_contains(const char *label, expr_t *dv, const char *needle);
+void test_expr_matrix_functions_extended(void);
 void clear_matrix_input_context(void);
 extern char current_matrix_input_label[128];
 

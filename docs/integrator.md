@@ -69,6 +69,11 @@ generic adaptive path.
 
 ## Examples
 
+Integral and error outputs receive newly owned numbers; the integrator does
+not release a previous value in either output slot. Initialise fresh outputs
+with the allocation-free `NUM_ZERO`, and destroy previous results before
+reusing their slots. Destroy returned numbers when they are no longer needed.
+
 ### Basic integration
 
 ```c
@@ -86,8 +91,8 @@ int main(void) {
     expr_t *x2 = expr_mul(x, x);
     expr_t *negx2 = expr_neg(x2);
     expr_t *expr = expr_exp(negx2);
-    number_t result = num_new();
-    number_t err = num_new();
+    number_t result = NUM_ZERO;
+    number_t err = NUM_ZERO;
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
@@ -134,8 +139,8 @@ int main(void) {
     number_t hi = num_create_from_long(1);
     expr_t *x = expr_new_var(x0);
     expr_t *expr = expr_exp(x);
-    number_t result = num_new();
-    number_t err = num_new();
+    number_t result = NUM_ZERO;
+    number_t err = NUM_ZERO;
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
@@ -188,8 +193,8 @@ int main(void) {
     expr_t *vars[2] = { x, y };
     number_t lo[2] = { num_create_from_long(0), num_create_from_long(0) };
     number_t hi[2] = { num_create_from_long(1), num_create_from_long(1) };
-    number_t result = num_new();
-    number_t err = num_new();
+    number_t result = NUM_ZERO;
+    number_t err = NUM_ZERO;
 
     intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
@@ -242,8 +247,8 @@ int main(void) {
     number_t exponent = num_create_from_string("2.5");
     expr_t *x = expr_new_named_var(x0, "x");
     expr_t *expr = expr_pow(x, &exponent);
-    number_t result = num_new();
-    number_t err = num_new();
+    number_t result = NUM_ZERO;
+    number_t err = NUM_ZERO;
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 

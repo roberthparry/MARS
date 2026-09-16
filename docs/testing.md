@@ -90,7 +90,10 @@ discipline to any prerequisite instrumented build.
 
 Use the normal release binary for Valgrind checks, with full leak reporting,
 origin tracking and a non-zero error exit code. Treat definite, indirect and
-possible leaks as errors. AddressSanitizer, LeakSanitizer and
+possible leaks as errors. Retain Valgrind's default 12-frame trace depth for
+routine bounded checks; deeper allocation traces can substantially increase
+the checker's own memory use. Increasing trace depth is not required for full
+leak detection. AddressSanitizer, LeakSanitizer and
 UndefinedBehaviorSanitizer provide complementary checks in a separate build;
 stop on the first diagnostic. If sandbox restrictions prevent LeakSanitizer's
 final scan, report that check as incomplete rather than disabling leak detection
@@ -109,12 +112,204 @@ The focused checks against commit `e879c4d` completed as follows:
 - The unset-binding `exp(Li(x+iy))` case stopped on signed integer overflow in
   `number_special_series_converged`, at `src/number/number_maths.c:237` in that
   revision. The stack passed through complex `Li`/`Ei` evaluation and the Lab's
-  display inspection. This remains an unresolved undefined-behaviour finding;
-  the aborted case did not complete its final leak scan.
+  display inspection. This was unresolved at the time of that check; the
+  aborted case did not complete its final leak scan. The broader 16 September
+  audit below records its fix and subsequent regression checks.
 
 Full-suite memory coverage was not completed. These targeted results are not a
-project-wide guarantee of memory safety. Update this dated record when the
-overflow is fixed and its regression checks have completed.
+project-wide guarantee of memory safety.
+
+### Recorded Check: 15 September 2026
+
+The differential-equation and expression checks based on commit `21292ad`
+found two ownership leaks: the Taylor-series formatter replaced an allocated
+exponent, and the wave solver replaced an allocated coefficient value. Both
+paths now release or avoid the redundant allocation, including all callers of
+the shared wave helper.
+
+After these fixes, 13 distinct regression tests and four README examples
+completed Valgrind checks with zero reported errors and zero bytes in use at
+exit. These cover Taylor-series rendering, wave coefficients and rejected
+inputs, the three-dimensional Kirchhoff family, symmetric-argument and
+integral rendering, and symbolic-function parsing and substitution. Six
+additional modified-Emden and Lie tests were clean before the fixes.
+
+The larger polynomial wave IVP regression reached the enforced 512 MiB limit
+and was killed before its final leak scan. At that point its memory result was
+incomplete; the 16 September follow-up below closes this particular gap.
+The smaller documented polynomial-and-integral wave example subsequently
+completed cleanly under the unchanged limits. This does not establish clean
+memory coverage for every case in the larger regression.
+
+All memory batches used the safeguards above. Full-suite memory coverage and
+sanitizer checks remain incomplete; the earlier undefined-behaviour finding
+has not been resolved by these ownership fixes.
+
+With the original test configuration restored, both affected ordinary native
+suites passed: 152 differential-equation tests and 20 README examples, followed
+by 513 expression tests and its output example.
+
+### Recorded Check: 16 September 2026
+
+The polynomial wave IVP test now has individually selectable subtests in
+`tests/diffequation/test_diffequ_wave_ivp.c`. Keep its parent
+`test_diffequ_wave_ivp_polynomial_data` enabled in the main differential-equation
+test configuration, then select one child in the helper file's matching group.
+Each child retains its solution comparison, PDE residual, both initial
+conditions and derivation checks. Run the children sequentially in separate
+bounded processes, and restore their enabled states afterwards.
+
+All seven cases completed full Valgrind leak scans with zero reported errors
+and zero bytes in use at exit. These cover polynomial, constant and quadratic
+forcing, a scaled operator, shifted initial time, renamed coordinates and
+trigonometric initial data. No assertions or sample points were removed.
+
+The isolated quadratic case still exceeded 512 MiB with the earlier 30-frame
+trace setting. With Valgrind's default 12 frames, it completed in 76.172 seconds
+at 268.9 MiB. The first polynomial case also fell from 475.3 MiB to 257 MiB,
+with identical allocation and free counts. The excessive diagnostic trace
+depth contributed substantially to the checker's memory consumption.
+
+All seven default-depth runs retained full leak reporting, origin tracking,
+allocation/free stack tracking and the existing memory-error checks. They used
+the unchanged 512 MiB, zero-swap, 50% CPU and 90-second safeguards. Splitting the
+cases also keeps the expensive quadratic check within its own time budget.
+This resolves the previously incomplete polynomial-wave regression, not
+whole-library memory coverage or the separately recorded sanitizer finding.
+
+After restoring the original enablement and enabling all seven new children,
+the full ordinary differential-equation suite passed: 158 tests and 20 README
+examples, with none skipped. The previous single parent test is now a group
+of seven cases, accounting for the increase from 152 to 158 tests.
+
+### Broader Audit: 16 September 2026
+
+The follow-up audit fixes the earlier signed-overflow diagnostic in complex
+`Ei`/`Li` evaluation. Non-finite inputs no longer enter finite-exponent
+convergence arithmetic, and the exponent-gap comparison avoids signed
+subtraction overflow. A dedicated number regression checks promoted complex
+NaNs and infinities, together with the real-axis singular values.
+
+UndefinedBehaviorSanitizer also exposed misaligned dictionary and set slots,
+and a null pointer passed to `qsort` for an empty holiday query. Container
+headers and strides now preserve fundamental alignment; allocation-size
+rounding and arena growth reject overflow. The empty holiday query avoids
+sorting fewer than two events. New regressions cover odd-sized and
+`long double` elements, growth and removal, impossible element sizes and empty
+holiday results. These fixes complement the two ownership fixes recorded above.
+
+The wider differential-equation run subsequently found a 352-byte leak when a
+nonlinear characteristic equation passed through the radial-Euler recogniser.
+All five number-replacement sites in that recogniser now destroy the previous
+value before assigning its replacement. The isolated reproducer, accepted and
+rejected radial cases, and the original ten-test batch completed clean final
+leak scans after the fix.
+
+The wave checks then exposed redundant number allocations in the independent
+spherical-quadrature test helper and the expression evaluator's numerical
+integral fallback. Removing those allocations fixed the isolated reproducers
+and the original wave batch. The integrator documentation now uses
+allocation-free output initialisation, matching the existing README tests, and
+states that output slots must not retain an owned previous value.
+
+Isolating the expression regressions also exposed first-use initialisation of
+canonical expression constants: evaluating `EXPR_LN10` before constructing an
+expression failed its assertion and bypassed the test's cleanup. Evaluation
+and rendering now initialise the constants, a first-use rendering regression
+was added, and the assertion checks run after cleanup. Both isolated cases
+completed cleanly. A separate sixth-root regression found unscoped temporary
+products in exact-complex evaluation and a retained temporary in the test's
+expected value. The evaluator now uses the same scoped ownership convention
+as its sibling binding routines; returned components remain detached and
+owned by the caller. The sixth-root reproducer completed its final leak scan
+after both fixes.
+
+Full-library AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer
+builds have completed the array, bitset, dictionary, set, JSON, datetime,
+string, SQLite, timeseries, integrator, jurisdiction, almanac, test-configuration,
+qcomplex, qfloat, number and equation suites, including their README examples. The
+integrator suite was split into bounded processes. The test-configuration
+suite retains its deliberately skipped harness fixtures.
+
+The original unset-binding `exp(Li(x+iy))` Lab case and related unset `Ei` and
+bound complex `Li` checks also completed against the fully instrumented
+library, with default sanitizer settings and final leak detection enabled.
+
+Matrix solve and extended symbolic-function tests now have separately
+selectable children in `test_matrix_solve.c` and `test_matrix_symfunc.c`.
+Their assertions and fixtures are preserved. All ten extended symbolic-function
+children completed sanitizer checks; the expensive dense six-by-six solve and
+inverse checks initially exceeded the time limit.
+
+For allocation-heavy sanitizer batches, allocation backtraces were shortened
+to four frames and the freed-memory quarantine reduced to 64 MiB. Bounds
+checks, redzones, undefined-behaviour checks and the final leak scan remain
+enabled, with no suppressions. The smaller quarantine reduces how long freed
+blocks are retained for detecting use-after-free; these runs are not identical
+to default-quarantine coverage. The memory and CPU caps were not raised.
+Resource-limited runs are incomplete, not clean passes. At the end of the
+90-second audit, in addition to the 17 complete module suites above, completed
+sanitizer checks covered 217 of 219
+matrix tests, 512 of 514 expression tests, and 156 of 158 differential-equation
+tests, together with all their README examples. These six checks each
+exceeded the 90-second process limit:
+
+- `test_inverse_expr_dense_6x6`;
+- `test_solve_symbolic_dense_six`;
+- `test_integrate_iterated_exp_unary_derivatives`;
+- `test_integrate_more_by_parts`;
+- `test_diffequ_inverse_pde_real_residual`;
+- `test_diffequ_series_shifted_residuals`.
+
+All 20 ordinary C test suites and their README examples subsequently passed
+against the repaired release library, including those six cases. The final
+ordinary totals for the larger suites were 219 matrix tests, 514 expression
+tests and 158 differential-equation tests. Ordinary success does not replace
+sanitizer checks or establish project-wide memory safety. Each initial audit
+process retained a 512 MiB memory limit, no swap, a 50% CPU quota and a
+90-second runtime limit.
+
+Additional release-build Valgrind checks completed with zero errors and zero
+definite, indirect or possible lost bytes for the complete dictionary and set
+suites, non-finite-number handling, the empty holiday query, the isolated radial
+leak reproducer, wave quadrature, and the singleton/exact-complex regressions.
+The broader radial batch and wave integral-data cross-check initially exceeded
+the same time limit under Valgrind. Markdown API coverage and both targeted Lab
+complex-integral regressions passed after the final release rebuild.
+
+#### Extended runtime verification
+
+The user subsequently approved longer runs, then unlimited runtime while
+retaining the 512 MiB memory cap, zero swap and 50% CPU quota. All six cases
+above completed AddressSanitizer, UndefinedBehaviorSanitizer and final
+LeakSanitizer checks without errors. Their earlier gaps were runtime limits,
+not additional diagnosed memory faults.
+
+| Check | Elapsed time | Peak memory |
+| --- | --- | --- |
+| Six-by-six symbolic inverse | 233 s | 157 MiB |
+| Six-by-six symbolic solve | 325 s | 164 MiB |
+| Iterated exponential/unary integration | 213 s | 218 MiB |
+| Integration by parts | 96 s | 187 MiB |
+| Inverse-PDE real residual | 96 s | 210 MiB |
+| Shifted-series residuals | 154 s | 168 MiB |
+
+Together with the earlier sequential batches, this completes configured
+sanitizer coverage for all 20 modules and their README examples, including all
+219 matrix, 514 expression and 158 differential-equation tests. The reduced
+quarantine/backtrace settings described above still apply; passing the tested
+paths does not prove memory safety for every possible input.
+
+The two supplementary Valgrind cross-checks also completed once the runtime
+limit was removed: all three radial cases passed in 198 seconds and the wave
+integral-data case passed in 112 seconds. Both reported zero errors, zero heap
+bytes in use at exit and no suppressions. Their peak memory was 309 MiB and
+283 MiB respectively. These results close the earlier timeout gaps without
+raising memory or CPU limits or requiring another code fix.
+
+The two matrix, one expression and twenty differential-equation README examples
+then passed again under the sanitizers, after the ordinary cases. The full
+test configuration was restored at the end of the audit.
 
 MARS Lab expression-presentation regressions live in
 `tests/tools/test_mars_lab.py`. They exercise native Cartesian complex

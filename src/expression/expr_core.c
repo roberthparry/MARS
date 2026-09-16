@@ -110,6 +110,7 @@ static number_t expr_eval_cached_num(const expr_t *dv)
 
 number_t expr_eval_num_internal(const expr_t *dv)
 {
+    expr_init_singletons();
     return expr_eval_cached_num(dv);
 }
 

@@ -2758,10 +2758,10 @@ static bool display_series_term_degree(const expr_t *expr, const expr_t *base,
         return !display_poly_expr_contains_any_var(expr->b, vars) &&
                display_series_term_degree(expr->a, base, vars, degree);
     if ((expr_is_pow_d_expr(expr) || expr_is_op(expr, &ops_pow)) && expr_struct_eq(expr->a, base)) {
-        number_t exponent = num_new();
+        bool literal_power = expr_is_pow_d_expr(expr);
+        number_t exponent = literal_power ? num_clone(expr->c) : num_new();
         long power = 0L;
-        bool matched = expr_is_pow_d_expr(expr) ? (exponent = num_clone(expr->c), true) :
-                                                 expr_match_const_value(expr->b, &exponent);
+        bool matched = literal_power || expr_match_const_value(expr->b, &exponent);
         bool valid = matched && expr_try_get_small_integer_exponent(exponent, &power) &&
                      display_poly_add_degree(degree, power);
         num_destroy(&exponent);
@@ -6028,6 +6028,7 @@ string_t *expr_to_text(const expr_t *dv, style_t style)
 {
     string_t *text;
 
+    expr_init_singletons();
     if (!dv)
         return string_new_with("NULL");
 

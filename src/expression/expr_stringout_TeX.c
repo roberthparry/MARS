@@ -273,6 +273,7 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     sbuf_t expr;
     sbuf_t bindings;
 
+    expr_init_singletons();
     if (!expr_out || !bindings_out)
         return -1;
 

@@ -1,6 +1,7 @@
 // test_set.c — tests for the generic value-set container using the new test harness
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,6 +125,65 @@ static void deep_destroy(void *elem)
 /* -------------------------------------------------------------
  * Tests
  * ------------------------------------------------------------- */
+
+static size_t aligned_hash(const void *value)
+{
+    return (size_t)*(const long double *)value;
+}
+
+static int aligned_cmp(const void *a, const void *b)
+{
+    long double left = *(const long double *)a, right = *(const long double *)b;
+    return (left > right) - (left < right);
+}
+
+static size_t bytes_hash(const void *value)
+{
+    return *(const unsigned char *)value;
+}
+
+static int bytes_cmp(const void *a, const void *b)
+{
+    return memcmp(a, b, 3u);
+}
+
+static void test_slot_alignment(void)
+{
+    set_t *set = set_create(sizeof(long double), aligned_hash, aligned_cmp, NULL, NULL);
+    ASSERT_NOT_NULL(set);
+    for (size_t i = 0u; i < 40u; ++i) {
+        long double value = (long double)i;
+        ASSERT_TRUE(set_add(set, &value));
+    }
+    for (size_t i = 0u; i < 40u; i += 2u) {
+        long double value = (long double)i;
+        ASSERT_TRUE(set_remove(set, &value));
+    }
+    set_t *copy = set_clone(set);
+    ASSERT_NOT_NULL(copy);
+    for (size_t i = 0u; i < set_get_size(copy); ++i) {
+        const void *value = set_get_sorted(copy, i);
+        ASSERT_TRUE((uintptr_t)value % _Alignof(max_align_t) == 0u);
+        ASSERT_TRUE(*(const long double *)value == (long double)(2u * i + 1u));
+    }
+    set_destroy(copy);
+    set_destroy(set);
+    set = set_create(3u, bytes_hash, bytes_cmp, NULL, NULL);
+    ASSERT_NOT_NULL(set);
+    for (unsigned char i = 0u; i < 40u; ++i) {
+        unsigned char value[3] = {i, 1u, 2u};
+        ASSERT_TRUE(set_add(set, value));
+        ASSERT_TRUE((uintptr_t)set_get(set, i) % _Alignof(max_align_t) == 0u);
+        ASSERT_TRUE(memcmp(set_get(set, i), value, sizeof(value)) == 0);
+    }
+    set_destroy(set);
+}
+
+static void test_size_overflow(void)
+{
+    ASSERT_TRUE(!set_create(SIZE_MAX, int_hash, int_cmp, NULL, NULL));
+    ASSERT_TRUE(!set_create(SIZE_MAX - sizeof(size_t), int_hash, int_cmp, NULL, NULL));
+}
 
 void test_ints(void)
 {
@@ -275,6 +335,8 @@ int tests_main(void)
 
     TEST_SECTION("Integer Tests");
     TEST_RUN_IN_GROUP(test_ints, tests, NULL);
+    TEST_RUN_IN_GROUP(test_slot_alignment, tests, "set,alignment");
+    TEST_RUN_IN_GROUP(test_size_overflow, tests, "set,bounds");
 
     TEST_SECTION("String Tests");
     TEST_RUN_IN_GROUP(test_strings, tests, NULL);

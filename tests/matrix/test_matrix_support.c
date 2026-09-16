@@ -1016,6 +1016,14 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t want, double tol
     printf("    error    = %.16g\n", err);
 }
 
+/* Check a symbolic matrix entry's rendering in both core and solve regressions. */
+void check_expr_text_contains(const char *label, expr_t *dv, const char *needle)
+{
+    char *s = dv ? expr_to_string(dv, style_EXPRESSION) : NULL;
+    check_bool(label, s && strstr(s, needle) != NULL);
+    free(s);
+}
+
 void check_bool(const char *label, int cond)
 {
     if (!cond)

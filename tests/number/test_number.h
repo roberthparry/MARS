@@ -21,6 +21,7 @@ void run_number_constant_tests(void);
 void run_number_public_api_tests(void);
 void run_number_formatting_tests(void);
 void run_number_special_function_tests(void);
+void run_number_nonfinite_series_tests(void);
 void run_number_backend_parity_tests(void);
 void run_number_readme_example_tests(void);
 void run_number_readme_mersenne_prime_search(void);

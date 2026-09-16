@@ -165,7 +165,21 @@
       "test_sort_by_value": true,
       "test_sorted": true,
       "test_sorted_fuzz": true,
-      "test_str_int": true
+      "test_str_int": true,
+      "test_dictionary_slot_alignment": true,
+      "test_dictionary_size_overflow": true
+    }
+  },
+  "tests/diffequation/test_diffequ_wave_ivp.c": {
+    "test_diffequ_wave_ivp_polynomial_data": {
+      "enabled": true,
+      "test_diffequ_wave_ivp_constant_forcing": true,
+      "test_diffequ_wave_ivp_polynomial_forcing": true,
+      "test_diffequ_wave_ivp_quadratic_forcing": true,
+      "test_diffequ_wave_ivp_renamed_coordinates": true,
+      "test_diffequ_wave_ivp_scaled_operator": true,
+      "test_diffequ_wave_ivp_shifted_time": true,
+      "test_diffequ_wave_ivp_trigonometric_data": true
     }
   },
   "tests/diffequation/test_diffequation.c": {
@@ -802,7 +816,8 @@
         "test_unit_complex_square_root_keeps_conjugate_surds_together": true,
         "test_unresolved_zero_over_zero_returns_nan_without_recursing": true,
         "test_unset_constant_clones_combine_symbolically": true,
-        "test_updated_decimal_binding_stays_decimal": true
+        "test_updated_decimal_binding_stays_decimal": true,
+        "test_expr_singleton_rendering_first_use": true
       }
     }
   },
@@ -1474,7 +1489,8 @@
       "run_number_parse_tests": true,
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
-      "run_number_special_function_tests": true
+      "run_number_special_function_tests": true,
+      "run_number_nonfinite_series_tests": true
     }
   },
   "tests/number/test_number_backend_parity.c": {
@@ -1819,7 +1835,9 @@
       "test_fuzz": true,
       "test_ints": true,
       "test_sorted": true,
-      "test_strings": true
+      "test_strings": true,
+      "test_slot_alignment": true,
+      "test_size_overflow": true
     }
   },
   "tests/sqlite/test_sqlite.c": {
@@ -1890,5 +1908,43 @@
     "test_output_and_write_file": true,
     "test_regression_and_forecast": true,
     "test_transforms_and_aggregation": true
+  },
+  "tests/matrix/test_matrix_solve.c": {
+    "test_solve_and_lstsq": {
+      "enabled": true,
+      "test_solve_numeric_pivoting": true,
+      "test_solve_lower_triangular": true,
+      "test_solve_upper_triangular": true,
+      "test_solve_sparse_lower": true,
+      "test_solve_diagonal_sparse_rhs": true,
+      "test_solve_sparse_general": true,
+      "test_solve_sparse_pivoting": true,
+      "test_solve_rank_deficient": true,
+      "test_solve_minimum_norm": true,
+      "test_solve_least_squares": true,
+      "test_solve_symbolic_least_squares": true,
+      "test_solve_symbolic_rank_deficient": true,
+      "test_solve_complex": true,
+      "test_solve_symbolic_lower": true,
+      "test_solve_symbolic_dense": true,
+      "test_solve_symbolic_numeric_rhs": true,
+      "test_solve_symbolic_cramer": true,
+      "test_solve_symbolic_dense_six": true
+    }
+  },
+  "tests/matrix/test_matrix_symfunc.c": {
+    "test_expr_matrix_functions_extended": {
+      "enabled": true,
+      "test_symfunc_jordan_special": true,
+      "test_symfunc_jordan_exp": true,
+      "test_symfunc_dense_numeric_fallback": true,
+      "test_symfunc_cubic_three": true,
+      "test_symfunc_quadratic_three": true,
+      "test_symfunc_uniform_five": true,
+      "test_symfunc_rank_one_four": true,
+      "test_symfunc_biquadratic_four": true,
+      "test_symfunc_block_diagonal_four": true,
+      "test_symfunc_permuted_blocks_four": true
+    }
   }
 }
