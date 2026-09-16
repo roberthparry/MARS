@@ -3,6 +3,11 @@
 `dictionary_t` is a generic key/value container with caller-defined hashing,
 comparison, cloning, and destruction rules.
 
+Stored keys and values are aligned for fundamental C types, up to the
+alignment of `max_align_t`, including `long double`. Odd-sized byte keys do
+not misalign subsequent entries. Types requiring extended alignment are not
+supported. Element sizes whose internal padding would overflow are rejected.
+
 ## Capabilities
 
 - generic keys and values (any fixed-size type)

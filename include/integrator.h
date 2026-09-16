@@ -73,9 +73,9 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  *   number_t x0  = num_create_from_double(0.0);
  *   expr_t *x    = expr_new_var(x0);
  *   expr_t *expr = expr_sin(x);
- *   number_t result = num_new();
- *   number_t err = num_new();
- *   intg_integral(ig, expr, x, num_create_from_double(0.0), NUM_PI, &result, &err);
+ *   number_t result = NUM_ZERO;
+ *   number_t err = NUM_ZERO;
+ *   intg_integral(ig, expr, x, NUM_ZERO, NUM_PI, &result, &err);
  *   // result ≈ 2.0
  *   num_destroy(&err); num_destroy(&result);
  *   expr_free(expr); expr_free(x); num_destroy(&x0); intg_free(ig);
@@ -87,8 +87,8 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  *                   created with expr_new_var() or expr_new_named_var().
  * @param a          Lower bound.
  * @param b          Upper bound.
- * @param result     Receives the integral estimate.
- * @param error_est  If non-NULL, receives the final total error estimate.
+ * @param result     Receives a new owned integral estimate; release any previous value before calling.
+ * @param error_est  If non-NULL, receives a new owned error estimate; release any previous value before calling.
  *
  * @return  0  Converged within tolerance.
  * @return  1  Maximum subintervals reached before convergence.

@@ -267,7 +267,8 @@ static void expr_shutdown_singletons(void)
     num_destroy(&_EXPR_LN10_NODE.x);
 }
 
-static void expr_init_singletons(void)
+/* Initialise canonical constants even when the first operation is evaluation or rendering. */
+void expr_init_singletons(void)
 {
     if (expr_singletons_ready)
         return;

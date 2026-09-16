@@ -1405,6 +1405,7 @@ bool expr_binding_expr_exact_complex(const expr_binding_expr_t *expr, binding_ex
 
 bool expr_exact_complex_value(const expr_t *expr, binding_exact_complex_t *out)
 {
+    NUM_SCOPE(scope);
     binding_exact_complex_t left;
     binding_exact_complex_t right;
 

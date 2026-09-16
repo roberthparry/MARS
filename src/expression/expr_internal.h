@@ -660,6 +660,7 @@ int expr_get_default_constant_num(const char *name, number_t *value_out);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
 void expr_store_const_num(expr_t *dv, number_t value);
 void expr_store_value_num(expr_t *dv, number_t value);
+void expr_init_singletons(void);
 /* Return a borrowed cache value; use expr_eval() when the caller needs an owning number. */
 number_t expr_eval_num_internal(const expr_t *dv);
 expr_t *expr_get_dx_internal(const expr_t *dv);

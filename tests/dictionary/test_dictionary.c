@@ -8,6 +8,7 @@
 
 #include "dictionary.h"
 #include "test_harness.h"
+#include "test_dict_layout.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -700,6 +701,8 @@ int tests_main(void)
 
     TEST_SECTION("Core");
     TEST_RUN_IN_GROUP(test_int_int, tests, NULL);
+    TEST_RUN_IN_GROUP(test_dictionary_slot_alignment, tests, "dictionary,alignment");
+    TEST_RUN_IN_GROUP(test_dictionary_size_overflow, tests, "dictionary,bounds");
     TEST_RUN_IN_GROUP(test_str_int, tests, NULL);
     TEST_RUN_IN_GROUP(test_int_str, tests, NULL);
     TEST_RUN_IN_GROUP(test_deep_deep, tests, NULL);

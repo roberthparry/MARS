@@ -444,6 +444,12 @@ static void test_jurisdiction_queries_weekend_and_holiday_status(void)
     ASSERT_TRUE(!jurisdict_is_weekend(holiday, working_tuesday));
     ASSERT_TRUE(!jurisdict_is_national_holiday(holiday, working_tuesday));
 
+    /* An empty holiday range must not pass a null event buffer to qsort. */
+    array_t *no_events = jurisdict_holidays_between(holiday, working_tuesday, working_tuesday);
+    ASSERT_NOT_NULL(no_events);
+    ASSERT_EQ_LONG((long)array_size(no_events), 0L);
+    array_destroy(no_events);
+
     datetime_dealloc(working_tuesday);
     datetime_dealloc(new_year);
     jurisdict_close(holiday);

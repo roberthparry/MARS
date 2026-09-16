@@ -200,7 +200,9 @@ diffequ_solve_result_t *de_pde_solve_radial_euler(const diffequ_t *de, const exp
         expr_free(remaining);
         remaining = next;
     }
+    num_destroy(&mixed);
     mixed = num_add(coefficients[1], coefficients[2]);
+    num_destroy(&twice);
     twice = num_mul_long(coefficients[0], 2L);
     if (!valid || num_is_zero(coefficients[0]) || !num_eq(coefficients[0], coefficients[3]) ||
         !num_eq(mixed, twice) || !num_eq(coefficients[4], coefficients[5]) ||
@@ -208,8 +210,11 @@ diffequ_solve_result_t *de_pde_solve_radial_euler(const diffequ_t *de, const exp
         !expr_match_const_value(constant, &parameters[2]) || !num_is_real(parameters[2]) ||
         !num_is_finite(parameters[2]))
         goto cleanup;
+    num_destroy(&parameters[0]);
     parameters[0] = num_clone(coefficients[0]);
+    num_destroy(&parameters[1]);
     parameters[1] = num_clone(coefficients[4]);
+    num_destroy(&middle);
     middle = num_sub(parameters[1], parameters[0]);
     if (!de_pde_second_order_roots(parameters[0], middle, parameters[2], &roots))
         goto cleanup;

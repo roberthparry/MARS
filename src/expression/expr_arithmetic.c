@@ -355,7 +355,8 @@ static number_t eval_integral(expr_t *dv)
         return num_clone(NUM_NAN);
     }
 
-    result = num_new();
+    /* The numeric integrator writes a new owned result; its output slot must not own an allocation. */
+    result = NUM_ZERO;
     antiderivative = expr_integrate(local_integrand, local_var);
     if (antiderivative && expr_contains_integral_operation(antiderivative)) {
         expr_free(antiderivative);

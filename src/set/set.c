@@ -1,6 +1,7 @@
 /* set.c - implementation of generic value-set container with dense arena and lazy sorting */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "set.h"
@@ -14,7 +15,8 @@ struct bucket {
 
 struct _set_t {
     size_t elem_size;   /* size of each element */
-    size_t slot_stride; /* bytes per slot: sizeof(size_t) + elem_size */
+    size_t data_offset; /* aligned offset after the hash */
+    size_t slot_stride; /* padded hash and element storage */
 
     size_t count;    /* number of elements stored */
     size_t capacity; /* number of slots allocated in arena */
@@ -45,8 +47,16 @@ struct _set_t {
  *       unsigned char data[elem_size];
  *   }
  *
- * We implement this via a stride and pointer arithmetic.
+ * Padding before data and after each slot preserves fundamental alignment.
  */
+
+static size_t set_aligned_size(size_t size)
+{
+    const size_t alignment = _Alignof(max_align_t);
+    if (size > SIZE_MAX - (alignment - 1u))
+        return 0u;
+    return ((size + alignment - 1u) / alignment) * alignment;
+}
 
 static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index)
 {
@@ -55,7 +65,7 @@ static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index)
 
 static inline void *slot_data_ptr(const struct _set_t *set, size_t index)
 {
-    return (void *)(set->arena + index * set->slot_stride + sizeof(size_t));
+    return (void *)(set->arena + index * set->slot_stride + set->data_offset);
 }
 
 /* Prime sizes for hash table capacities */
@@ -79,6 +89,12 @@ set_t *set_create(size_t elem_size, set_hash_fn hash, set_cmp_fn cmp, set_clone_
     if (elem_size == 0 || hash == NULL || cmp == NULL) {
         return NULL;
     }
+    size_t data_offset = set_aligned_size(sizeof(size_t));
+    if (elem_size > SIZE_MAX - data_offset)
+        return NULL;
+    size_t stride = set_aligned_size(data_offset + elem_size);
+    if (!stride)
+        return NULL;
 
     struct _set_t *set = (struct _set_t *)calloc(1, sizeof(struct _set_t));
     if (!set) {
@@ -86,7 +102,8 @@ set_t *set_create(size_t elem_size, set_hash_fn hash, set_cmp_fn cmp, set_clone_
     }
 
     set->elem_size = elem_size;
-    set->slot_stride = sizeof(size_t) + elem_size;
+    set->data_offset = data_offset;
+    set->slot_stride = stride;
     set->count = 0;
     set->capacity = 0;
     set->arena = NULL;
@@ -232,7 +249,11 @@ static bool set_reserve_arena(struct _set_t *set, size_t min_capacity)
         return true;
     }
 
-    size_t new_capacity = set->capacity ? set->capacity * 2 : 8;
+    size_t limit = SIZE_MAX / set->slot_stride;
+    if (min_capacity > limit)
+        return false;
+    size_t new_capacity = set->capacity ? (set->capacity > limit / 2u ? limit : set->capacity * 2u) :
+                                        (limit < 8u ? limit : 8u);
     if (new_capacity < min_capacity) {
         new_capacity = min_capacity;
     }
@@ -336,7 +357,7 @@ bool set_add(set_t *set, const void *elem)
     }
 
     /* Ensure arena capacity */
-    if (!set_reserve_arena(set, set->count + 1)) {
+    if (set->count == SIZE_MAX || !set_reserve_arena(set, set->count + 1u)) {
         return false;
     }
 

@@ -414,7 +414,7 @@ static number_t eval_finite_summation(expr_t *dv)
                 return weighted_value;
             num_destroy(&weighted_value);
         }
-        if ((unsigned long)upper_value - (unsigned long)lower_value >= maximum_streamed_terms)
+        if ((unsigned long)upper_value - (unsigned long)lower_value >= (unsigned long)maximum_streamed_terms)
             return num_clone(NUM_NAN);
     }
 

@@ -840,7 +840,7 @@ When `p` is nonzero and `q(x,y)` is polynomial, Mars inverts the transport
 operator directly. If $D=a\partial_x+b\partial_y$, then repeated applications of `D`
 eventually annihilate the polynomial, so
 
-$\displaystyle\quad (p+D)^{-1}q$
+$\displaystyle\quad (D+p)^{-1}q$
 
 is evaluated as a finite derivative series. This avoids introducing an
 unevaluated characteristic integral for an elementary polynomial solution.

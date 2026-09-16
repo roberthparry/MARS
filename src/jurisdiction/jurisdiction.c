@@ -2717,7 +2717,8 @@ bool jurisdict_each_holiday_between(jurisdiction_t *holiday, const datetime_t *s
     filter_events_to_range(&events, start_text, end_text);
 
     event_items = events.items;
-    qsort(event_items, events.count, sizeof(*event_items), event_compare);
+    if (events.count > 1u)
+        qsort(event_items, events.count, sizeof(*event_items), event_compare);
     dedupe_sorted_events(&events);
     for (i = 0; i < events.count; ++i) {
         holiday_event_t public_event;

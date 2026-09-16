@@ -58,7 +58,7 @@ typedef void (*set_destroy_fn)(void *elem);
 /* Opaque set type. */
 typedef struct _set_t set_t;
 
-/* Create a new set.
+/** Create a new set.
  *
  * Parameters:
  *   elem_size   - size in bytes of each element stored in the set
@@ -74,6 +74,8 @@ typedef struct _set_t set_t;
  *   - The set stores the callback pointers for its lifetime; callers must keep
  *     those functions available, and the set never frees them.
  *   - Elements are stored by value, inline in an internal arena.
+ *   - Storage supports fundamental alignment up to max_align_t, but not
+ *     extended alignment. Sizes whose internal padding would overflow are rejected.
  *   - If clone is NULL, elements are copied with memcpy.
  *   - If destroy is NULL, elements are not individually destroyed.
  */

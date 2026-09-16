@@ -68,6 +68,7 @@ static bool de_wave_numeric_value(const expr_t *expr, const diffequ_t *de, numbe
     expr_t *copy = expr_clone(expr);
     bool known = true;
     de_wave_bind_known_parameters(expr, de, &copy, &known);
+    num_destroy(value);
     *value = copy ? expr_eval(copy) : num_clone(NUM_NAN);
     expr_free(copy);
     return known;
