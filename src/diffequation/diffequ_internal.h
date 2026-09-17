@@ -12,6 +12,8 @@
 
 struct diffequ_t {
     equation_t *equation;
+    expr_t *display_lhs;
+    expr_t *display_rhs;
     string_t *equation_text;
     string_t *differential_form_text;
     bool differential_form_input;
@@ -41,6 +43,8 @@ struct diffequ_solve_result_t {
     de_solver_t solver;
     equation_t **solutions;
     size_t solution_count;
+    expr_t *envelope_parameter;
+    equation_t *parameter_constraint;
     char *diagnostic;
     char *steps;
     char *steps_TeX;
@@ -58,5 +62,7 @@ int de_solve_result_set_steps_TeX(diffequ_solve_result_t *result, const char *st
 int de_solve_result_set_symmetry(diffequ_solve_result_t *result, const char *symmetry);
 int de_solve_result_ensure_rule_steps(const diffequ_t *de, diffequ_solve_result_t *result);
 bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coefficient_out, expr_t **constant_out);
+/* Scan an optional positive derivative order; return 1, 0 (absent), or -1 (invalid). */
+int de_parse_derivative_order(const char *text, size_t *position, size_t *order);
 
 #endif /* DIFFEQU_INTERNAL_H */

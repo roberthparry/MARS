@@ -5,6 +5,17 @@
 #include "diffequation.h"
 #include "test_harness.h"
 #include "test_diffequ_wave_ivp.h"
+#include "test_diffequ_format.h"
+#include "test_diffequ_autonomous.h"
+#include "test_diffequ_affine.h"
+#include "test_diffequ_triangular.h"
+#include "test_diffequ_gradient.h"
+#include "test_diffequ_flow.h"
+#include "test_diffequ_fourier.h"
+#include "test_diffequ_kdv.h"
+#include "test_diffequ_gkdv.h"
+#include "test_diffequ_heat.h"
+#include "test_diffequ_notation.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
@@ -614,7 +625,7 @@ static void test_diffequ_derivative_quotient_TeX(void)
         {"-2u_tt/v^2 = 0", "-\\frac{2}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
         {"u_tt/(-v^2) = 0", "-\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
         {"u - 2u_tt/v^2 = 0", "u - \\frac{2}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}} = 0"},
-        {"u_xy/(1+x) = 0", "\\frac{1}{x + 1}\\,\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0"},
+        {"u_xy/(1+x) = 0", "\\frac{1}{1 + x}\\,\\frac{\\partial^{2} u}{\\partial y\\,\\partial x} = 0"},
         {"y''/v^2 = 0", "\\frac{1}{v^{2}}\\,\\frac{d^{2} y}{d x^{2}} = 0"},
         {"a*u_tt*u_x/v^2 = 0",
          "\\frac{a}{v^{2}}\\,\\frac{\\partial^{2} u}{\\partial t^{2}}\\,\\frac{\\partial u}{\\partial x} = 0"}
@@ -3913,7 +3924,7 @@ static void test_diffequ_parses_pde_boundary_arguments(void)
     const char *source = "{ 2*Dx(u) + Dy(u) = 0 | x = ?, y = ?;; "
                          "u(x, 0) = x^2 }";
     const char *want_problem = "{ 2*∂u/∂x + ∂u/∂y = 0 | x = ?, y = ?; ; "
-                                   "u(x, 0) = x^2 }";
+                                   "u(x, 0) = x² }";
     diffequ_t *de = de_from_string(source);
     char *problem = de ? de_to_string(de, style_EXPRESSION) : NULL;
     const expr_t *first = de ? de_condition_argument_at(de, 0u, 0u) : NULL;
@@ -4441,7 +4452,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
     WANT_LONG("parameter-linear PDE solver", (long)de_solve_result_solver(result),
                 (long)DE_SOLVER_PARAMETER_LINEAR_PDE);
     WANT_TEXT("single-coordinate subscript remains a partial derivative", problem,
-                "{ ∂z/∂y + 2*y*z = x*y^3 | y = ?; ;  }");
+                "{ ∂z/∂y + 2*y*z = x*y³ | y = ?; ;  }");
     WANT_TEXT("single-coordinate subscript partial derivative TeX", tex,
                 "\\frac{\\partial z}{\\partial y} + 2\\mkern-2mu y\\mkern-2mu z = x\\mkern-2mu y^{3}");
     WANT_TEXT("parameter-linear PDE solution", text ? string_c_str(text) : NULL, "z = ½x·(y² - 1) + F(x)·exp(-y²)");
@@ -4743,7 +4754,7 @@ static void example_diffequation_wave_kirchhoff(void)
     diffequ_t *de = de_from_string(source);
     char *problem_TeX = de ? de_to_string(de, style_LATEX) : NULL;
     ASSERT_TRUE(problem_TeX && strstr(problem_TeX,
-        "\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
+        "\\frac{1}{v^{2}}\\mkern-2mu \\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
     printf("  %s\n", problem_TeX ? problem_TeX : "NULL");
     free(problem_TeX);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
@@ -4826,6 +4837,36 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_separable_ode);
     RUN_TEST_CASE(test_diffequ_parses_linear_ode_and_constant);
     RUN_TEST_CASE(test_diffequ_expression_text_round_trips);
+    RUN_TEST_CASE(test_diffequ_expression_integer_powers);
+    RUN_TEST_CASE(test_diffequ_autonomous_transport);
+    RUN_TEST_CASE(test_diffequ_affine_transport);
+    RUN_TEST_CASE(test_diffequ_time_affine_transport);
+    RUN_TEST_CASE(test_diffequ_coupled_flow);
+    RUN_TEST_CASE(test_diffequ_fourier_evolution);
+    RUN_TEST_CASE(test_diffequ_fourier_scope);
+    RUN_TEST_CASE(test_diffequ_fourier_kernel);
+    RUN_TEST_CASE(test_diffequ_kdv_family);
+    RUN_TEST_CASE(test_diffequ_kdv_scope);
+    RUN_TEST_CASE(test_diffequ_kdv_residual);
+    RUN_TEST_CASE(test_diffequ_gkdv_family);
+    RUN_TEST_CASE(test_diffequ_gkdv_scope);
+    RUN_TEST_CASE(test_diffequ_gkdv_residual);
+    RUN_TEST_CASE(test_diffequ_half_line_heat);
+    RUN_TEST_CASE(test_diffequ_half_line_heat_scope);
+    RUN_TEST_CASE(test_diffequ_half_line_heat_kernel);
+    RUN_TEST_CASE(test_diffequ_caret_derivative_orders);
+    RUN_TEST_CASE(test_diffequ_invalid_derivative_orders);
+    RUN_TEST_CASE(test_diffequ_coupled_flow_scope);
+    RUN_TEST_CASE(test_diffequ_nested_source_order_TeX);
+    RUN_TEST_CASE(test_diffequ_triangular_transport);
+    RUN_TEST_CASE(test_diffequ_triangular_scope);
+    RUN_TEST_CASE(test_diffequ_gradient_envelope);
+    RUN_TEST_CASE(test_diffequ_gradient_scope);
+    RUN_TEST_CASE(test_diffequ_gradient_non_affine);
+    RUN_TEST_CASE(test_diffequ_calculus_coefficients_TeX);
+    RUN_TEST_CASE(test_diffequ_affine_transport_scope);
+    RUN_TEST_CASE(test_diffequ_ordered_equation_TeX);
+    RUN_TEST_CASE(test_diffequ_autonomous_transport_scope);
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
     RUN_TEST_CASE(test_diffequ_parses_greek_differential_forms);
     RUN_TEST_CASE(test_diffequ_solves_exact_differential_form);
@@ -4953,6 +4994,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_wave_ivp_polynomial_data);
     RUN_TEST_CASE(test_diffequ_symbolic_function_input);
     RUN_TEST_CASE(test_diffequ_wave_ivp_integral_data);
+    RUN_TEST_CASE(test_diffequ_wave_ivp_zero_terms);
     RUN_TEST_CASE(test_diffequ_wave_ivp_symbolic_speed);
     RUN_TEST_CASE(test_diffequ_wave_ivp_rejects_invalid_data);
     RUN_TEST_CASE(test_diffequ_wave_rejects_outside_family);
@@ -5006,6 +5048,34 @@ int tests_main(void)
                                   "diffequation,readme,output,wave");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_symbolic_wave_ivp, readme_examples,
                                   "diffequation,readme,output,wave");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_unicode_powers, readme_examples,
+                                  "diffequation,readme,output,formatting");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_autonomous_transport, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_affine_transport, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_triangular_transport, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_gradient_envelope, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_time_affine_transport, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_coupled_flow, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_symbolic_affine_transport, readme_examples,
+                                  "diffequation,readme,output,characteristics");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_fourier_evolution, readme_examples,
+                                  "diffequation,readme,output,fourier");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_wave_zero_data, readme_examples,
+                                  "diffequation,readme,output,wave");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_kdv, readme_examples,
+                                  "diffequation,readme,output,kdv");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_caret_pde, readme_examples,
+                                  "diffequation,readme,output,notation");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_gkdv, readme_examples,
+                                  "diffequation,readme,output,gkdv");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_half_line_heat, readme_examples,
+                                  "diffequation,readme,output,heat");
 
     return TESTS_EXIT_CODE();
 }

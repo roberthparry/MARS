@@ -329,6 +329,11 @@ The parser stores unassigned values as `NaN`; `?` is the input spelling for the
 same unassigned state. The caller does not need to add braces or discover
 bindings before calling `expr_from_string(...)`.
 
+Variable and constant binding values accept Unicode nonnegative integer
+superscripts as well as caret powers, so displayed powers can be copied back
+into a binding. Power chains retain the parser's left-associative convention;
+superscripts outside the supported integer range are rejected.
+
 An unset named constant remains a symbolic quantity: copies with the same name
 and binding combine during simplification. Different named constants remain
 independent, and an unnamed numerical `NaN` is not treated as such a symbol.
@@ -658,6 +663,20 @@ coefficients appear alongside them; reciprocal exponential coefficients use
 negative exponents. Grouped inverse powers are used when a denominator itself
 contains an integral or derivative. This preserves the expression tree and the
 expression, unbound and function output styles.
+
+In TeX products, scalar coefficients precede integrals and ordinary or partial
+derivatives, including higher and mixed orders. Parenthesised coefficient
+sums stay together before the calculus factor. The ordering is stable within
+the coefficient and calculus groups and also applies to negative products;
+it changes presentation only. See the triangular-transport example in
+[the differential-equation guide](diffequation.md) for a tested PDE display.
+Adjacent calculus factors receive an explicit multiplication dot rather than
+running derivative fractions or integrals together. The gradient-envelope
+example in that guide tests this product display.
+Authored differential equations use a scoped native TeX mode that preserves
+nested additive order, including coefficient sums, without changing the
+normal polynomial ordering of simplified expression results. The coupled-flow
+example in the same guide tests this distinction.
 
 Paired symmetric function arguments and definite-integral bounds retain their
 common centre first in TeX: $a+b$ together with $a-b$. The formatter recognises

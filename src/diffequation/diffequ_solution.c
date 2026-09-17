@@ -330,6 +330,8 @@ void de_solve_result_free(diffequ_solve_result_t *result)
     for (size_t i = 0u; i < result->solution_count; ++i)
         equ_free(result->solutions[i]);
     free(result->solutions);
+    expr_free(result->envelope_parameter);
+    equ_free(result->parameter_constraint);
     if (result->series_coefficients) {
         for (size_t i = 0u; i <= result->series_degree; ++i)
             expr_free(result->series_coefficients[i]);
@@ -383,6 +385,18 @@ const equation_t *de_solve_result_at(const diffequ_solve_result_t *result, size_
     if (!result || index >= result->solution_count)
         return NULL;
     return result->solutions[index];
+}
+
+/* Borrow the auxiliary variable used in the first, constrained envelope family. */
+const expr_t *de_solve_result_parameter(const diffequ_solve_result_t *result)
+{
+    return result ? result->envelope_parameter : NULL;
+}
+
+/* Borrow the equation that determines the first solution family's auxiliary parameter. */
+const equation_t *de_solve_result_parameter_constraint(const diffequ_solve_result_t *result)
+{
+    return result ? result->parameter_constraint : NULL;
 }
 
 /* Borrow the centre without transferring ownership. */

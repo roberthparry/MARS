@@ -3070,6 +3070,17 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     check_parse_expr("binding value preserves symbolic 3/2*pi", "{ e^(sin(x)) | x = 3/2*pi }",
                      "{ e^sin(x) | x = ³⁄₂π }", __LINE__);
     check_parse_expr("binding value preserves symbolic pi^2/2", "{ x | x = (pi^2)/2 }", "π²/2", __LINE__);
+    check_parse_val("binding value accepts Unicode integer powers", "{ x | x = 2³ }", 8.0, __LINE__);
+    check_parse_val("constant binding accepts Unicode integer powers", "{ c | ; c = 2³ }", 8.0, __LINE__);
+    check_parse_val("binding value accepts multi-digit superscripts", "{ x | x = 2¹² }", 4096.0, __LINE__);
+    check_parse_val("binding power chains retain left association", "{ x | x = 2²^3 }", 64.0, __LINE__);
+    check_parse_expr("binding value round-trips Unicode powers", "{ x | x = (pi²)/2 }", "π²/2", __LINE__);
+    {
+        expr_t *oversized = expr_from_string("{ x | x = 2²¹⁴⁷⁴⁸³⁶⁴⁸ }", NULL);
+        bool rejected = oversized == NULL;
+        expr_free(oversized);
+        ASSERT_TRUE(rejected);
+    }
     check_parse_expr("pure numeric expression preserves full mathematical tree", "{ phi - 1/2(1+sqrt(5)) }",
                      "φ - ½·(1 + √(5))", __LINE__);
     check_parse_expr("binding value preserves full mathematical tree", "{ x | x = 1/2(1+sqrt(5)) }", "¹⁄₂·(1 + √(5))",

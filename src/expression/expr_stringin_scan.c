@@ -600,6 +600,10 @@ int expr_parse_read_superscript_int(string_cursor_t *cursor)
         digit = expr_parse_superscript_digit_value(value);
         if (digit < 0)
             break;
+        if (result > (INT_MAX - digit) / 10) {
+            string_cursor_free(scan);
+            return -1;
+        }
         result = (result < 0) ? digit : result * 10 + digit;
         (void)string_cursor_next(scan);
     }

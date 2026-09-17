@@ -2697,6 +2697,13 @@ static expr_binding_expr_t *parse_binding_power(binding_parser_t *p)
         unsigned char c;
 
         binding_skip_spaces(p);
+        int superscript = expr_parse_read_superscript_int(p->cursor);
+        if (superscript >= 0) {
+            base = expr_binding_expr_new_powi(base, superscript);
+            if (!base)
+                return NULL;
+            continue;
+        }
         if (!binding_peek_ascii(p, &c) || c != '^')
             return base;
 

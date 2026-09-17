@@ -145,6 +145,8 @@ expr_t *expr_const_long(long value);
 expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_from_expression_text_formal(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                          size_t nsymbols);
+expr_t *expr_from_expression_text_formal_ordered(const string_t *expr, const string_t *const *names,
+                                                 expr_t *const *symbols, size_t nsymbols);
 /* Differential-equation binding inference accepts undeclared symbolic function calls and implicit multiplication. */
 expr_t *expr_from_differential_text_internal(const string_t *text, expr_bindings_t **bindings);
 expr_bindings_t *expr_bindings_clone_internal(const expr_bindings_t *bindings, bool constants_only);
@@ -345,6 +347,7 @@ char *expr_tostring_texify(const char *text);
 int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
+char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial);
 
 #endif /* EXPR_INTERNAL_H */
 

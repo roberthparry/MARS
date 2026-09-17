@@ -2528,6 +2528,23 @@ class DiffequationResultTests(unittest.TestCase):
         (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
         "release diffequation_lab helper is not built",
     )
+    def test_native_problem_card_uses_unicode_integer_powers(self) -> None:
+        source = "u_tt - v^2u_xx = f(x,t); u(x,0) = g(x); u_t(x,0) = h(x)"
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertIn("v²∂²u/∂x²", fields["problem"])
+        self.assertNotIn("^2", fields["problem"])
+        self.assertEqual(payload["problem"], fields["problem"])
+        self.assertIn("v^{2}", fields["problem_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
     def test_native_integral_solution_uses_negative_exponential_TeX(self) -> None:
         completed = subprocess.run(
             [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
@@ -2619,7 +2636,7 @@ class DiffequationResultTests(unittest.TestCase):
         payload = mars_lab.prepare_diffequation_fields(fields)
         self.assertEqual(payload["status"], "solved")
         self.assertEqual(payload["solver"], "Kirchhoff spherical means")
-        self.assertIn(r"\frac{1}{v^{2}}\,\frac{\partial^{2} \psi}{\partial t^{2}}", fields["problem_TeX"])
+        self.assertIn(r"\frac{1}{v^{2}}\mkern-2mu \frac{\partial^{2} \psi}{\partial t^{2}}", fields["problem_TeX"])
         self.assertNotIn(r"\frac{\frac{\partial", fields["problem_TeX"])
         self.assertIn("F(", payload["solutions"])
         self.assertIn("G(", payload["solutions"])
@@ -2647,6 +2664,340 @@ class DiffequationResultTests(unittest.TestCase):
         self.assertIn("no initial data imposed", fields["steps_TeX"])
         self.assertIn(r"\psi(\mathbf r,0)=F(\mathbf r)", fields["steps_TeX"])
         self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(steps_error)
+        self.assertTrue(steps_svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_gradient_envelope_and_derivative_product(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_x + u_x u_y = 1"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertIn(r"\cdot", fields["problem_TeX"])
+        self.assertIn("Local envelope:", payload["solutions"])
+        self.assertIn("subject to H =", payload["solutions"])
+        self.assertIn("a != 0", payload["solutions"])
+        self.assertIn("dH/da != 0", payload["solutions"])
+        self.assertIn("Affine complete integral:", payload["solutions"])
+        self.assertNotIn("NAN", payload["solutions"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_triangular_transport_and_coefficient_order(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "xu_x + (x+y)u_y = 1"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "u = F(y/x - ln(|x|)) + ln(|x|)")
+        self.assertLess(fields["problem_TeX"].index(r"\left(x + y\right)"),
+                        fields["problem_TeX"].index(r"\frac{\partial u}{\partial y}"))
+        self.assertIn("x>0 and x<0", fields["steps"])
+        self.assertIn("x != 0", fields["steps"])
+        self.assertNotIn("NAN", fields["steps"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_coupled_characteristic_flow(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "f_t + xf_x + (x+t) f_y = t^3"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "f = F(x·exp(-t), ½·(2y - 2x - t²)) + ¼t⁴")
+        self.assertIn(r"\left(x + t\right)", fields["problem_TeX"])
+        self.assertNotIn(r"\left(t + x\right)", fields["problem_TeX"])
+        self.assertIn("upstream", fields["steps"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_wave_zero_data_omits_zero_terms(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_tt - u_xx = f(x)*cos(t); u(x,0) = 0; u_t(x,0) = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "d'Alembert-Duhamel")
+        self.assertEqual(payload["solutions"], "u = ½·∫^t_0 ∫^(t + x - s)_(s - t + x) cos(s)·f(ξ)·dξ·ds")
+        for name in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            with self.subTest(field=name):
+                self.assertNotIn("0 + 0", fields[name])
+                self.assertNotIn(r"\frac{0}", fields[name])
+                self.assertIn(r"\int_{0}^{t}", fields[name])
+                self.assertNotIn(r"\frac{\int", fields[name])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_caret_partial_derivatives(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "∂u/∂t = 1/2(n + 1)(n + 2)u^n ∂u/∂x - ∂^3u/∂x^3"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "generalised KdV travelling waves")
+        self.assertIn(r"\frac{\partial^{3} u}{\partial x^{3}}", fields["problem_TeX"])
+        self.assertIn(r"\left(n + 1\right)", fields["problem_TeX"])
+        self.assertIn(r"\left(n + 2\right)", fields["problem_TeX"])
+        self.assertNotIn("parse error", completed.stdout)
+        self.assertIn("moving singularity", fields["diagnostic"])
+        for name in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            with self.subTest(field=name):
+                self.assertIn(r"n\in\mathbb{Z}_{>0}", fields[name])
+                self.assertIn(r"\operatorname{cosech}^{2}", fields[name])
+                self.assertIn("not the general solution", fields[name])
+                self.assertIn("moving singularity excluded", fields[name])
+                self.assertNotIn("NAN", fields[name])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_half_line_heat_boundary(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_t - u_xx + au = 0; u(x,0)=0; u(0,t)=g(t)"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "half-line heat boundary kernel")
+        self.assertIn("zero corner value", fields["diagnostic"])
+        self.assertIn("g(s)", payload["solutions"])
+        for name in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            with self.subTest(field=name):
+                self.assertIn(r"\int_{0}^{t}", fields[name])
+                self.assertIn(r"\begin{aligned}[t]&", fields[name])
+                self.assertIn("right-hand spatial limit", fields[name])
+                self.assertNotIn(r"\frac{\int", fields[name])
+                self.assertNotIn("NAN", fields[name])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_solution_notes_do_not_centre_rhs(self) -> None:
+        sources = (
+            "u_t - (n+1)*(n+2)/2*u^n*u_x + u_xxx = 0",
+            "u_t + 6uu_x + u_xxx = 0",
+            "u_x + u_x*u_y = 1",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                completed = subprocess.run(
+                    [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+                    check=True, capture_output=True, text=True, timeout=10,
+                )
+                fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+                payload = mars_lab.prepare_diffequation_fields(fields)
+                self.assertEqual(payload["status"], "solved")
+                for name in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+                    self.assertNotIn(r"\begin{gathered}", fields[name])
+                    self.assertIn(r"\begin{aligned}[t]&", fields[name])
+                    self.assertIn(r"\\&", fields[name])
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_kdv_solitary_wave(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_t + 6uu_x + u_xxx = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "KdV solitary waves")
+        self.assertIn("not the general solution", fields["diagnostic"])
+        self.assertIn("not the general solution", payload["solutions"])
+        for name in ("solutions_TeX", "solutions_wrapped_TeX", "display_TeX", "display_wrapped_TeX"):
+            with self.subTest(field=name):
+                self.assertIn("not the general solution", fields[name])
+                self.assertIn("k>0", fields[name])
+                self.assertIn(r"\operatorname{sech}^{2}", fields[name])
+                self.assertNotIn("NAN", fields[name])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_fourier_evolution(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_t + Uu_x + u_xx + u_xxxx = 0; u(x,0) = f(x)"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "Fourier evolution")
+        self.assertIn("Schwartz", fields["diagnostic"])
+        self.assertIn("π", payload["solutions"])
+        self.assertIn("f(ξ)", payload["solutions"])
+        self.assertNotIn("0.318309", payload["solutions"])
+        self.assertIn(r"\frac{1}{\pi}", fields["solutions_TeX"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_symbolic_affine_transport(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_t +(α + βt)u_x + γe^tu_y = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "u = F(½·(2x - 2αt - βt²), y - γ·exp(t))")
+        self.assertIn(r"\left(\alpha + \beta\mkern-2mu t\right)", fields["problem_TeX"])
+        self.assertNotIn("NAN", fields["display_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_time_affine_transport(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "f_t + xf_x + 3t^2 f_y = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "f = F(x·exp(-t), y - t³)")
+        positions = [fields["problem_TeX"].index(r"{\partial " + name + "}") for name in ("t", "x", "y")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("mu", fields["steps"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertTrue(payload.get("svg"), payload.get("render_error"))
+        svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+        self.assertIsNone(error)
+        self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_affine_transport_and_source_order(self) -> None:
+        for source, coordinates in (
+            ("u_t + u_x + yu_y = sin(t)", ("t", "x", "y")),
+            ("yu_y + u_x + u_t = sin(t)", ("y", "x", "t")),
+        ):
+            with self.subTest(source=source):
+                completed = subprocess.run(
+                    [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"), source],
+                    check=True, capture_output=True, text=True, timeout=10,
+                )
+                fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+                payload = mars_lab.prepare_diffequation_fields(fields)
+                self.assertEqual(payload["status"], "solved")
+                self.assertEqual(payload["solver"], "characteristics")
+                positions = [fields["problem_TeX"].index(r"{\partial " + name + "}") for name in coordinates]
+                self.assertEqual(positions, sorted(positions))
+                self.assertNotIn(r"\left(", fields["problem_TeX"])
+                self.assertIn("cos", payload["solutions"])
+                self.assertIn("F(", payload["solutions"])
+                self.assertIn("Affine transport", fields["steps"])
+                self.assertNotIn("NAN", fields["steps_TeX"])
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+                svg, error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
+                self.assertIsNone(error)
+                self.assertTrue(svg)
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "diffequation_lab").is_file(),
+        "release diffequation_lab helper is not built",
+    )
+    def test_native_autonomous_transport_implicit_solution(self) -> None:
+        completed = subprocess.run(
+            [str(ROOT / "build" / "release" / "scratch" / "diffequation_lab"),
+             "u_y + uu_x = 0"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        fields = mars_lab.parse_diffequation_lab_output(completed.stdout)
+        payload = mars_lab.prepare_diffequation_fields(fields)
+        self.assertEqual(payload["status"], "solved")
+        self.assertEqual(payload["solver"], "characteristics")
+        self.assertEqual(payload["solutions"], "u = F(x - uy)")
+        self.assertIn("implicit", fields["steps"])
+        self.assertIn("nonzero", fields["steps"])
+        self.assertIn("no initial or boundary data", fields["steps"])
+        self.assertIn("characteristic crossings", fields["steps"])
+        self.assertNotIn("NAN", fields["steps_TeX"])
+        self.assertEqual(payload["display_TeX"], fields["display_TeX"])
         self.assertTrue(payload.get("svg"), payload.get("render_error"))
         steps_svg, steps_error = mars_lab.render_TeX_to_svg(mars_lab.TeX_for_display(fields["steps_TeX"]))
         self.assertIsNone(steps_error)
@@ -3242,7 +3593,7 @@ solutions y = final
         fields = {
             "input": "(y-x)z_x + (y+x)z_y = (x^2+y^2)/z",
             "problem": (
-                "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x^2+y^2)/z "
+                "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x²+y²)/z "
                 "| x = ?, y = ?; ;  }"
             ),
             "problem_TeX": "",
@@ -3257,7 +3608,7 @@ solutions y = final
 
         self.assertEqual(
             payload["problem"],
-            "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x^2+y^2)/z "
+            "{ (y-x)∂z/∂x + (y+x)∂z/∂y = (x²+y²)/z "
             "| x = ?, y = ?; ;  }",
         )
         self.assertEqual(payload["input"], fields["input"])
@@ -3344,7 +3695,7 @@ solutions y = final
         self.assertEqual(payload["solver"], "exact first-order")
         self.assertEqual(
             payload["problem"],
-            "{ (sin(θ)-2r cos^2(θ))dr + "
+            "{ (sin(θ)-2r cos²(θ))dr + "
             "r cos(θ)(2r sin(θ)+1)dθ = 0 | θ = ?; ;  }",
         )
         self.assertEqual(
@@ -3707,7 +4058,7 @@ solutions y = final
         self.assertEqual(single_fields["status"], "solved")
         self.assertEqual(
             single_fields["problem"],
-            "{ ∂z/∂y + 2yz = xy^3 | y = ?; ;  }",
+            "{ ∂z/∂y + 2yz = xy³ | y = ?; ;  }",
         )
         self.assertIn(
             r"\frac{\partial z}{\partial y}",
@@ -3740,7 +4091,7 @@ solutions y = final
 
         self.assertEqual(payload["status"], "solved")
         self.assertIn(
-            "d²y/dx² + 4y = e^x + x^3",
+            "d²y/dx² + 4y = e^x + x³",
             payload["problem"],
         )
         self.assertEqual(
@@ -3989,6 +4340,55 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_heat_integral_removable_endpoint(self) -> None:
+        source = ("{x/(2*sqrt(pi))*∫^t_0 sin(s)*(t-s)^(-3/2)"
+                  "*exp(-1/4*(4*a*(t-s)+x^2/(t-s)))·ds | x=1, t=0.2; a=5}")
+        reference = decimal.Decimal("0.0043306190052547702890248083612581630181010048186691321571605166")
+        for precision in (78, 270):
+            with self.subTest(precision=precision):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, precision, "x", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                self.assertNotIn("value_note", fields)
+                self.assertLess(abs(decimal.Decimal(fields["value"]) - reference), decimal.Decimal("1e-60"))
+
+    def test_divergent_endpoint_is_not_replaced_with_zero(self) -> None:
+        for source in ("∫^1_0 x^(-3/2)·dx", "∫^1_0 exp(1/x)*x^(-3/2)·dx"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 78, "x", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                self.assertIn(fields["value"], ("NAN", "INF", "+INF"))
+
+    def test_heat_integral_numeric_value(self) -> None:
+        source = ("{x/(2*sqrt(pi))*∫^t_0 sin(s)*(t-s)^(-3/2)"
+                  "*exp(-1/4*(4*a*(t-s)+x^2/(t-s)))·ds | x=1, t=1; a=5}")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, source, 20, "x", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertAlmostEqual(float(fields["value"]), 0.07419003644637065, places=15)
+        self.assertIn(r"\int", fields["tex"])
+
+    @unittest.skipUnless(shutil.which("stdbuf"), "Line-buffered native output is required")
+    def test_integral_display_does_not_wait_for_quadrature(self) -> None:
+        source = ("{x/(2*sqrt(pi))*∫^t_0 sin(s)*(t-s)^(-3/2)"
+                  "*exp(-1/4*(4*a*(t-s)+x^2/(t-s)))·ds | x=1, t=1; a=5}")
+        # The expensive Value calculation may continue, but formatting must already be available.
+        with subprocess.Popen(
+            ["stdbuf", "-oL", str(self.expression_binary), source, "x", "270", "evaluate"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        ) as process:
+            try:
+                output, errors = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                output, errors = process.communicate()
+        self.assertIn("evaluation_ready  yes", output, errors)
+        self.assertIn(r"\int", output)
+
     def test_specialised_sum_keeps_original_input_bindings_editable(self) -> None:
         for value in ("1", "5", "1"):
             source = f"{{1+1/2^s+1/3^s+1/4^s+...+1/n^s | s={value}; n=100}}"

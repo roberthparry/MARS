@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,88 @@ static int de_append_superscript(string_t *out, size_t value)
 static int de_is_derivative_letter(char value)
 {
     return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z');
+}
+
+static int de_append_next_character(string_t *out, const char *text, size_t *position);
+
+/* Preserve source order while displaying simple integer powers consistently with derivative orders. */
+static string_t *de_powers_to_superscripts(const string_t *source)
+{
+    const char *text = source ? string_c_str(source) : "";
+    string_t *out = string_new();
+    bool chained = false;
+
+    if (!out)
+        return NULL;
+    for (size_t i = 0u; text[i];) {
+        if (text[i] != '^') {
+            if (!isspace((unsigned char)text[i]))
+                chained = false;
+            if (de_append_next_character(out, text, &i) != 0)
+                goto fail;
+            continue;
+        }
+        size_t start = i + 1u;
+        while (isspace((unsigned char)text[start]))
+            ++start;
+        bool enclosed = text[start] == '(';
+        if (enclosed) {
+            ++start;
+            while (isspace((unsigned char)text[start]))
+                ++start;
+        }
+        size_t end = start, value = 0u;
+        bool overflow = false;
+        while (isdigit((unsigned char)text[end])) {
+            unsigned int digit = (unsigned int)(text[end++] - '0');
+            if (value > ((size_t)INT_MAX - digit) / 10u)
+                overflow = true;
+            if (!overflow)
+                value = 10u * value + digit;
+        }
+        if (end == start) {
+            if (string_append_char(out, text[i++]) != 0)
+                goto fail;
+            chained = false;
+            continue;
+        }
+        size_t next = end;
+        while (isspace((unsigned char)text[next]))
+            ++next;
+        bool integer = !overflow;
+        if (enclosed) {
+            integer = integer && text[next] == ')';
+            if (text[next] == ')') {
+                end = ++next;
+                while (isspace((unsigned char)text[next]))
+                    ++next;
+            }
+        } else {
+            /* Do not truncate decimal/scientific exponents or the parser's ^1/n root shorthand. */
+            integer = integer && !(text[end] == '.' && isdigit((unsigned char)text[end + 1u])) &&
+                      text[end] != 'e' && text[end] != 'E' && text[next] != '/';
+        }
+        /* Adjacent superscripts would merge a power chain into one exponent; retain its original syntax. */
+        bool continues = text[next] == '^';
+        unsigned char lead = (unsigned char)text[next];
+        bool superscript = lead == 0xc2u || (lead == 0xe2u && (unsigned char)text[next + 1u] == 0x81u);
+        bool previous_superscript = (i >= 2u && (unsigned char)text[i - 2u] == 0xc2u) ||
+                                    (i >= 3u && (unsigned char)text[i - 3u] == 0xe2u &&
+                                     (unsigned char)text[i - 2u] == 0x81u);
+        if (integer && !chained && !continues && !superscript && !previous_superscript && text[next] != '!') {
+            if (de_append_superscript(out, value) != 0)
+                goto fail;
+        } else if (string_append_chars(out, text + i, end - i) != 0) {
+            goto fail;
+        }
+        chained = continues;
+        i = end;
+    }
+    return out;
+
+fail:
+    string_free(out);
+    return NULL;
 }
 
 static size_t de_derivative_letter_length(const char *text)
@@ -343,7 +426,9 @@ static string_t *de_to_expression_text(const diffequ_t *de)
 
     string_free(conditions);
     string_free(equation);
-    return out;
+    string_t *display = out ? de_powers_to_superscripts(out) : NULL;
+    string_free(out);
+    return display;
 }
 
 static char *de_expr_to_unbound_TeX(const expr_t *expr, bool partial_derivatives)
@@ -361,6 +446,42 @@ static char *de_expr_to_unbound_TeX(const expr_t *expr, bool partial_derivatives
     }
     return partial_derivatives ? expr_to_TeX_body_wrapped_with_partials(expr, de_TeX_line_limit)
                                : expr_to_TeX_body_wrapped_with_totals(expr, de_TeX_line_limit);
+}
+
+/* Equation sides retain additive source order; only products and other nested operations need grouping. */
+static bool de_append_ordered_side_TeX(string_t *out, const expr_t *expr, bool partial, bool negative, bool *first)
+{
+    const expr_t *left = NULL, *right = NULL;
+    bool subtract = false;
+    if (expr_match_neg_expr(expr, &left))
+        return de_append_ordered_side_TeX(out, left, partial, !negative, first);
+    if (expr_match_add_sub_expr(expr, &left, &right, &subtract))
+        return de_append_ordered_side_TeX(out, left, partial, negative, first) &&
+               de_append_ordered_side_TeX(out, right, partial, negative != subtract, first);
+    /* Preserve nested authored sums as well as the outer equation's term order. */
+    const char *name = expr_symbol_name(expr);
+    char *term = name && (expr_is_variable(expr) || expr_is_named_const(expr))
+        ? de_expr_to_unbound_TeX(expr, partial) : expr_to_TeX_body_ordered(expr, partial);
+    const char *magnitude = term;
+    if (term && term[0] == '-') {
+        negative = !negative;
+        magnitude = term + 1u;
+    }
+    bool valid = term && string_append_format(out, "%s%s", *first ? (negative ? "-" : "") :
+                                              (negative ? " - " : " + "), magnitude) >= 0;
+    free(term);
+    *first = false;
+    return valid;
+}
+
+static char *de_ordered_side_TeX(const expr_t *expr, bool partial)
+{
+    string_t *out = string_new();
+    bool first = true;
+    char *text = out && de_append_ordered_side_TeX(out, expr, partial, false, &first)
+                     ? strdup(string_c_str(out)) : NULL;
+    string_free(out);
+    return text;
 }
 
 static expr_t *de_TeX_binomial_coefficient(size_t n, size_t k)
@@ -599,8 +720,9 @@ static string_t *de_to_TeX(const diffequ_t *de)
             return out;
     }
 
-    lhs = de_expr_to_unbound_TeX(equ_lhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
-    rhs = de_expr_to_unbound_TeX(equ_rhs(de->equation), de->independent_count > 1u || de->partial_derivative_input);
+    bool partial = de->independent_count > 1u || de->partial_derivative_input;
+    lhs = de_ordered_side_TeX(de->display_lhs ? de->display_lhs : equ_lhs(de->equation), partial);
+    rhs = de_ordered_side_TeX(de->display_rhs ? de->display_rhs : equ_rhs(de->equation), partial);
     out = lhs && rhs ? string_sprintf("%s = %s", lhs, rhs) : NULL;
     free(rhs);
     free(lhs);

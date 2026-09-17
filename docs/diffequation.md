@@ -132,6 +132,26 @@ equivalent input aliases. In the Mars Lab, ordinary derivatives are displayed
 this way in both the rendered equation and the differential-equation card.
 The canonical expression form remains `Dx(y)`, `Dxx(y)`, and `Dxxx(y)`.
 
+Derivative orders also accept caret powers, optionally enclosed in braces,
+instead of Unicode superscripts. This applies to ordinary, partial and mixed
+derivatives, including multi-digit orders up to 128. Numerator and denominator
+orders must agree when both are supplied; orders must be positive integers.
+For example, the following generalised KdV input is parsable:
+
+```text
+∂u/∂t = 1/2(n + 1)(n + 2)u^n ∂u/∂x - ∂^3u/∂x^3
+```
+
+Its canonical equation output is:
+
+```text
+Dt(u) = ½·(n·(n + 3) + 2)·u^n·Dx(u) - Dxxx(u)
+```
+
+The TeX uses proper third-order partial derivatives and preserves the authored
+coefficient factors. Under the explicit positive-integer assumption on `n`, the
+generalised KdV rule below also supplies a particular real travelling-wave family.
+
 Constant-coefficient polynomial differential operators can be applied to a
 dependent variable directly, with or without parentheses around that
 variable. Coefficients may be numeric or symbolic. MARS expands the operator
@@ -667,6 +687,19 @@ their usual meanings; declared scalar names remain coefficients, so explicit
 ordinary Expression-mode grammar.
 
 Here $f$, $g$ and $h$ describe prescribed data, not extra unknowns to solve for.
+Zero contributions are omitted from the native solution display, including
+zero displacement averages and zero velocity or forcing integrals. For example:
+
+```text
+u_tt - u_xx = f(x)*cos(t); u(x,0) = 0; u_t(x,0) = 0
+```
+
+$\displaystyle\quad u(x,t)=\frac12\int_0^t\int_{x-(t-s)}^{x+(t-s)}\cos(s)f(\xi)\,d\xi\,ds.$
+
+Only the forcing contribution remains; neither $\tfrac12(0+0)$ nor $0/2$
+is displayed. Non-zero initial-data contributions retain their paired
+travelling-wave notation.
+
 You can instead supply concrete expressions, for example:
 
 ```text
@@ -714,6 +747,177 @@ the answer unchanged. The physical wave speed is $|c|$. Spatial boundaries,
 variable coefficients, mixed or lower-order derivatives, nonlinear forcing,
 and data on different time slices are outside this rule. Existing solvers
 continue to handle supported equations without initial data.
+
+Multi-line solution right-hand sides are left-aligned with their accompanying
+restrictions and explanatory notes. A long note does not centre the formula
+away from the equals sign.
+
+### KdV Solitary Waves
+
+The Korteweg–de Vries equation is recognised structurally, including reordered
+terms, renamed coordinates and nonzero real numerical coefficient scalings.
+For `A*u_t + B*u*u_x + C*u_xxx = 0`, with known finite real nonzero constants
+`A`, `B` and `C`, `DE_SOLVER_KDV_SOLITARY_WAVE` returns the zero-background family
+
+\[
+u(x,t)=\frac{12C}{B}k^2\operatorname{sech}^2\!\left(k\left(x-\frac{4C}{A}k^2t-x_0\right)\right),
+\qquad k>0,\quad x_0\in\mathbb{R}.
+\]
+
+This is a particular solitary-wave family, **not the general solution**.
+Both native plain-text and TeX output retain that qualification and the
+parameter restrictions even when derivation steps are disabled. Generated
+parameter names avoid collisions with the input symbols. The native equation
+still contains an ordinary, differentiable `sech` expression.
+
+For example:
+
+```text
+u_t + 6uu_x + u_xxx = 0
+```
+
+Output:
+
+```text
+Solitary-wave family (not the general solution): u = 2k²·sech²(k·(x - x₀ - 4k²t)); k > 0, x₀ real (arbitrary constants).
+```
+
+The travelling-wave substitution reduces the PDE to
+`C*V'' - A*v*V + (B/2)*V^2 = 0` after integration with zero background.
+Substituting `V=M*sech(k*z)^2` gives `M=12*C*k^2/B` and `v=4*C*k^2/A`.
+This rule does not handle prescribed initial or boundary data, forcing,
+variable or unresolved coefficients, or multi-soliton and periodic families.
+Positive-integer powers of the field are handled by the generalised rule below.
+Upper-case `U` is not the field `u`.
+
+### Generalised KdV Travelling Waves
+
+For the positive-integer-power equation
+\(A u_t+B u^n u_x+C u_{xxx}=0\), the native solver recognises the monomial
+nonlinearity structurally, without relying on the field, coordinate or exponent
+names. `A` and `C` must be known finite real nonzero constants. The normalised
+coefficient \(g=2B/[C(n+1)(n+2)]\) must reduce to a known real nonzero constant.
+Factored and expanded coefficient forms are accepted. An unset symbolic
+exponent is explicitly restricted to a positive integer in the result; known
+nonpositive or noninteger exponents are not accepted by this rule.
+
+For the input:
+
+```text
+∂u/∂t = 1/2(n + 1)(n + 2)u^n ∂u/∂x - ∂^3u/∂x^3
+```
+
+the output is:
+
+```text
+Singular travelling-wave family (not the general solution): u = (v·cosech²(½n·√(v)·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; positive real root; x - x₀ - vt != 0 (moving singularity excluded).
+```
+
+Equivalently,
+
+\[
+u(x,t)=\left[v\,\operatorname{csch}^{2}\!\left(
+\frac{n\sqrt v}{2}(x-vt-x_0)\right)\right]^{1/n},
+\qquad n\in\mathbb Z_{>0},\quad v>0,\quad x_0\in\mathbb R.
+\]
+
+Use the **positive real root**, on either real region excluding the moving
+singularity \(x=vt+x_0\). This is not a globally smooth soliton and not the
+general solution. The sign in this input does not allow a real zero-background
+`sech` pulse for every positive integer `n`.
+
+More generally, putting \(z=x-(C/A)vt-x_0\) reduces the equation to
+\((V')^2=vV^2-gV^{n+2}\) when both integration constants are zero. For
+\(g>0\), the positive branch is
+\(V=[(v/g)\operatorname{sech}^2(n\sqrt v\,z/2)]^{1/n}\).
+For \(g<0\), it is
+\(V=[(-v/g)\operatorname{csch}^2(n\sqrt v\,z/2)]^{1/n}\), with \(z\ne0\).
+These formulas give \(V''=vV-g(n+2)V^{n+1}/2\); differentiating verifies the
+original PDE. The sign and domain restrictions remain visible without optional
+derivation steps. Supplied initial or boundary data, forcing, other nonlinear
+terms and unresolved coefficient signs are not handled by this rule.
+
+The result uses `DE_SOLVER_GKDV_TRAVELLING_WAVE`. Read the diagnostic and native
+solution qualifications alongside `DE_SOLVE_STATUS_SOLVED`; this status does
+not claim a general solution or continuation through the singularity.
+
+### Half-Line Heat Boundary Problems
+
+`DE_SOLVER_HALF_LINE_HEAT` recognises a constant-coefficient heat-reaction
+equation with zero initial data and a prescribed Dirichlet history at the
+origin. It uses the **right half-line**, not the whole line or a finite interval.
+For example:
+
+```text
+u_t - u_xx + au = 0; u(x,0)=0; u(0,t)=g(t)
+```
+
+For real constant `a`, continuous locally bounded `g` and `g(0)=0`, the output is
+
+\[
+u(x,t)=\frac{x}{2\sqrt\pi}\int_0^t
+(t-s)^{-3/2}\exp\!\left(-\frac{x^2}{4(t-s)}-a(t-s)\right)g(s)\,ds,
+\qquad x>0,\quad t>0.
+\]
+
+The solution decays at spatial infinity, is bounded on finite time strips,
+and has zero initial trace for each positive `x`. The boundary value is
+recovered as `x` tends to zero from the right; **do not substitute `x=0` inside
+the integral**. The kernel concentrates near the upper integration endpoint
+in that limit. Corner compatibility requires `g(0)=0`; data with a known
+nonzero corner value are declined. For an unspecified profile, compatibility
+and regularity remain explicit assumptions in the native result.
+
+The rule also handles reordered terms and conditions, renamed coordinates,
+and equations normalising to \(u_t=\kappa u_{xx}-a u\) with known positive
+constant \(\kappa\). Replace the prefactor by \(x/(2\sqrt{\pi\kappa})\) and
+the Gaussian exponent by \(-x^2/[4\kappa(t-s)]\). Reaction coefficients may
+be finite real numerical constants or real scalar parameters. The underlying
+result contains a genuine native definite integral, with its coefficient
+outside the integral and left-aligned domain notes.
+
+Nonzero initial profiles, forcing, variable coefficients, backward diffusion,
+unknown diffusivity signs, Neumann data, shifted boundaries and extra finite-end
+conditions are outside this rule. Neither a left half-line nor a continuation
+across the boundary is implied. Derivation steps explain the exponential
+reaction substitution and the limiting boundary trace.
+
+### Whole-Line Fourier Evolution
+
+Capital and lowercase symbols remain distinct. In particular, `U` below is a
+constant coefficient, not the dependent variable `u`:
+
+```text
+u_t + Uu_x + u_xx + u_xxxx = 0; u(x,0) = f(x)
+```
+
+$\displaystyle\quad \frac{\partial u}{\partial t}+U\frac{\partial u}{\partial x}+\frac{\partial^2u}{\partial x^2}+\frac{\partial^4u}{\partial x^4}=0$
+
+$\displaystyle\quad u(x,t)=\frac1\pi\int_{-\infty}^{\infty} f(\xi)\left[\int_0^{\infty}e^{t(k^2-k^4)}\cos\!\bigl(k(x-\xi)-Ukt\bigr)\,dk\right]d\xi,\qquad t>0.$
+
+This is an exact integral representation on the whole real spatial line, for
+finite real `U` and Schwartz initial data: smooth functions whose derivatives
+of every order, including the function itself, decrease faster than every
+inverse power. The initial condition is recovered in the limit $t\downarrow0$;
+the inner kernel integral at $t=0$ is not an ordinary convergent integral.
+No numerical integration or finite-interval boundary conditions are claimed.
+
+The solver family is `DE_SOLVER_FOURIER_EVOLUTION`. More generally, it extracts
+a homogeneous equation $a u_t+P(\partial_x)u=0$ with spatial order at most eight,
+normalises by a known finite real non-zero $a$, and constructs the real and
+imaginary parts of $P(ik)/a$. The highest non-zero even power in its real part
+must have a known positive coefficient, ensuring high-frequency decay.
+Other coefficients may contain symbolic real constant parameters. Odd spatial
+derivatives contribute to the cosine phase; even derivatives determine the
+exponential amplitude. The rule does not depend on the coordinate names or
+the order in which derivatives appear.
+
+One initial condition on a known finite real time slice is required; its
+argument matching identifies space and time independently of their order in
+the PDE. Mixed derivatives, nonlinear or variable coefficients, forcing,
+additional boundary data and an unverified damping sign are outside this
+rule. Existing solvers retain priority for elementary solutions. The domain,
+coefficient and initial-data assumptions accompany the result and derivation.
 
 ### Three-Dimensional Wave Equations
 
@@ -873,6 +1077,170 @@ and constructs the other `n - 1` independent invariants. The arbitrary
 function therefore has `n - 1` arguments; it is not collapsed into a
 one-variable approximation.
 
+Diagonal affine transport is also supported in two or more coordinates, with
+a nonzero constant coefficient for a characteristic parameter and forcing
+depending only on that parameter. For example:
+
+```text
+u_t + u_x + y*u_y = sin(t)
+```
+
+$\displaystyle\quad \frac{\partial u}{\partial t}+\frac{\partial u}{\partial x}+y\frac{\partial u}{\partial y}=\sin(t)$
+
+$\displaystyle\quad u=F(x-t,ye^{-t})-\cos(t)$
+
+Along characteristics, $dx/dt=1$, $dy/dt=y$ and $du/dt=\sin(t)$.
+Thus $x-t$ and $ye^{-t}$ are invariant, and integrating the forcing gives
+the particular solution $-\cos(t)$. `F` is an arbitrary differentiable
+function of both invariants; no initial or boundary data are imposed.
+
+More generally, each remaining coordinate may obey $dz/dt=Az+B$ after
+normalisation. Its invariant is $z-Bt$ when $A=0$, and
+$(z+B/A)e^{-At}$ otherwise, for finite numerical affine constants
+(including supplied constant bindings).
+
+The affine rates and offsets may also depend on the chosen parameter:
+
+```text
+f_t + xf_x + 3t^2 f_y = 0
+```
+
+$\displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+3t^2\frac{\partial f}{\partial y}=0$
+
+$\displaystyle\quad f=F(xe^{-t},y-t^3)$
+
+Here $dx/dt=x$, $dy/dt=3t^2$ and $df/dt=0$, so $xe^{-t}$ and $y-t^3$
+are invariant. `F` is an arbitrary differentiable function of both invariants;
+no initial or boundary data are imposed.
+
+For $dz/dt=A(t)z+B(t)$, the solver constructs
+$\mu(t)=\exp(-\int A(t)\,dt)$ and the invariant
+$I=\mu(t)z-\int\mu(t)B(t)\,dt$. This requires supported antiderivatives;
+each proposed invariant is checked against the original transport operator.
+The representation is local to regions where the coefficients and primitives
+are defined. Constants of integration merely shift or rescale invariant
+arguments and are absorbed into the arbitrary function.
+
+The rule retains a nonzero constant clock coefficient, no reaction term,
+and forcing depending only on that clock. It does not discard prescribed
+data. The forcing primitive is verified separately; the chain rule then
+verifies the arbitrary-function family through the already verified invariants.
+
+Symbolic constant parameters can occur in these time-dependent coefficients:
+
+```text
+u_t +(α + βt)u_x + γe^tu_y = 0
+```
+
+$\displaystyle\quad \frac{\partial u}{\partial t}+(\alpha+\beta t)\frac{\partial u}{\partial x}+\gamma e^t\frac{\partial u}{\partial y}=0$
+
+$\displaystyle\quad u=F\!\left(\tfrac12(2x-2\alpha t-\beta t^2),y-\gamma e^t\right)$
+
+Here $\alpha$, $\beta$ and $\gamma$ are constant parameters, not additional
+independent coordinates. Integrating $dx/dt=\alpha+\beta t$ and
+$dy/dt=\gamma e^t$ gives the invariants $x-\alpha t-\beta t^2/2$ and
+$y-\gamma e^t$. `F` is arbitrary and differentiable; no initial or boundary
+data are imposed. The input coefficient retains its authored order
+$\alpha+\beta t$ in the rendered equation.
+
+Triangular coupled characteristic flows are supported too:
+
+```text
+f_t + xf_x + (x+t) f_y = t^3
+```
+
+$\displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+(x+t)\frac{\partial f}{\partial y}=t^3$
+
+$\displaystyle\quad f=F\!\left(xe^{-t},\tfrac12(2y-2x-t^2)\right)+\tfrac14t^4$
+
+Along a characteristic, $dx/dt=x$ and $dy/dt=x+t$. Thus $xe^{-t}$ is
+constant, and $d(y-x)/dt=t$ gives the second invariant $y-x-t^2/2$.
+Integrating $df/dt=t^3$ gives the particular solution $t^4/4$.
+`F` is an arbitrary differentiable function of both invariants; no initial
+or boundary data are imposed.
+
+For coupled fields, Mars orders the spatial coordinates by their dependencies,
+independently of their order in the input. Each characteristic must be linear
+in its own coordinate, with a rate depending only on the clock; its drift may
+depend on already resolved coordinates. The known characteristic flows are
+substituted into that drift before applying the integrating-factor rule.
+Auxiliary integration parameters are then eliminated using the earlier
+invariants. Every final invariant is verified against the full original
+operator, and no auxiliary parameter is left in the solution.
+
+This rule supports up to 32 independent coordinates, including the clock,
+and requires the resulting primitives to be supported. Dependency cycles,
+spatially dependent self-rates, reaction terms and supplied conditions are
+not silently handled as triangular flows. Other solver rules may still
+recognise some of those equations.
+
+Triangular linear characteristic fields are supported as well. For example:
+
+```text
+x*u_x + (x+y)*u_y = 1
+```
+
+$\displaystyle\quad x\frac{\partial u}{\partial x}+(x+y)\frac{\partial u}{\partial y}=1$
+
+$\displaystyle\quad u=F\!\left(\frac{y}{x}-\ln|x|\right)+\ln|x|,\qquad x\ne0$
+
+The characteristic equations are $dx/ds=x$, $dy/ds=x+y$ and $du/ds=1$.
+Consequently, $d(y/x)/ds=1$ and $d\ln|x|/ds=1$, so
+$I=y/x-\ln|x|$ is invariant and $\ln|x|$ is a particular solution.
+`F` is arbitrary and differentiable. The representation is local to either
+half-plane $x>0$ or $x<0$; it does not assert an extension across `x = 0`.
+
+The rule recognises $axu_x+(bx+dy)u_y=q$ with finite real constants,
+$a\ne0$, constant forcing `q`, and no supplied conditions. If $a=d$, it
+uses $I=y/x-(b/a)\ln|x|$. Otherwise it uses
+$I=(y-bx/(a-d))\exp(-(d/a)\ln|x|)$. In both cases the particular solution
+is $(q/a)\ln|x|$. Both coordinate orientations are considered, and the
+invariant and complete solution are verified separately on the two real
+half-planes. Nonlinear coefficient fields and supplied conditions are not
+silently treated as belonging to this family.
+
+Native equation TeX preserves the additive order of each input side rather
+than sorting derivative terms as a polynomial. It also preserves the order
+inside authored coefficients such as `(x+t)`. Additive grouping is flattened
+with signs preserved; necessary grouping inside products is retained.
+Coefficients, including parenthesised sums, precede ordinary and partial
+derivatives of every order. The same factor-ordering rule places scalar
+coefficients before integrals, without changing the underlying algebra.
+
+Gradient-only nonlinear equations also admit characteristic envelopes. For example:
+
+```text
+u_x + u_x u_y = 1
+```
+
+$\displaystyle\quad \frac{\partial u}{\partial x}+\frac{\partial u}{\partial x}\cdot\frac{\partial u}{\partial y}=1$
+
+The native result distinguishes two families:
+
+$\displaystyle\quad u=ax+\left(\frac1a-1\right)y+F(a),\qquad H=x-\frac{y}{a^2}+F'(a)=0$
+
+$\displaystyle\quad u=ax+\left(\frac1a-1\right)y+b,\qquad a\ne0$
+
+The first is a **local envelope**: `F` is an arbitrary twice continuously differentiable
+function, and `a` is determined jointly with `u` by `H = 0`, not treated as a
+free constant. It applies where $a\ne0$ and $\partial H/\partial a\ne0$.
+The second is the **affine complete integral**, with arbitrary constants `a`
+and `b`; these planes are not the whole arbitrary-function solution family.
+No continuation through envelope singularities or initial data is asserted.
+
+Set $p=u_x$ and $q=u_y$. The PDE gives $p(1+q)=1$, so $p=a\ne0$ and
+$q=1/a-1$. Integration of constant gradients gives the planes. Replacing
+their additive constant by $F(a)$ and imposing stationarity with respect to
+`a` gives the envelope. The chain-rule terms involving derivatives of `a`
+then vanish because they are multiplied by `H`. The native solver verifies
+the gradient identity and all three derivatives of the envelope expression.
+
+The rule recognises $Apq+Bp+Cq+D=0$ with finite real constant coefficients,
+$A\ne0$ and $BC-AD\ne0$, in two independent variables without supplied
+conditions. Reducible gradient curves, coordinate-dependent coefficients and
+higher-order equations are not silently treated as this family. Products of
+calculus factors receive an explicit multiplication dot in native TeX.
+
 Aliases for standard constants are contextual in derivative operands.
 Consequently, `@phi` ordinarily denotes the golden ratio, but in
 `Dx(@phi)` or `Dy(@phi)` it denotes the dependent field `φ`. The same rule
@@ -883,6 +1251,34 @@ canonicalised identically: `phi`, `@phi`, and `φ` all render as `φ` throughout
 the normalised differential equation and its solution. This also applies when
 the dependent variable follows a polynomial differential operator directly.
 
+Autonomous nonlinear transport also has an implicit characteristic solution:
+
+```text
+u_y + u*u_x = 0
+```
+
+$\displaystyle\quad u = F(x-uy)$
+
+Here `F` is an arbitrary differentiable function, not a specified initial
+profile. Along a characteristic, $dx/dy=u$ and $du/dy=0$, so both `u` and
+$x-uy$ are constant. Relating these constants gives the displayed solution.
+It is implicit because `u` occurs on both sides.
+
+The recogniser handles the family
+$c\frac{\partial u}{\partial t}+a(u)\frac{\partial u}{\partial x}=0$,
+where `c` is a nonzero constant and `a(u)` is independent of the coordinates.
+With $s(u)=a(u)/c$, the result is $u=F(x-t\,s(u))$. Coordinate names, term
+order and constant scaling do not determine the match. Mars verifies the
+characteristic invariant and implicit relation against the original
+transport operator before accepting the result.
+
+For $H=u-F(x-t\,s(u))$, a smooth local branch requires
+$\partial H/\partial u\ne0$. In the example this is
+$1+yF'(x-uy)\ne0$. The formula does not assert a classical continuation
+through characteristic crossings. This rule applies without initial or
+boundary data; it does not silently discard supplied conditions. Symbolic
+normalising coefficients are accompanied by an explicit nonzero condition.
+
 The characteristic solver also handles these nonlinear and
 variable-coefficient forms:
 
@@ -890,8 +1286,8 @@ variable-coefficient forms:
 | :--- | :--- | :--- |
 | `x^2*Dx(@psi) - x*y*Dy(@psi) + y*@psi = 0` | $x^{2}\mkern-2mu \frac{\partial \psi}{\partial x} - x\mkern-2mu y\mkern-2mu \frac{\partial \psi}{\partial y} + \psi\mkern-2mu y = 0$ | $\psi = e^{y/(2x)}F(xy)$ |
 | `x*Dx(z) - 7*y*Dy(z) = 5*x^2*y` | $x\mkern-2mu \frac{\partial z}{\partial x} - 7\mkern-2mu y\mkern-2mu \frac{\partial z}{\partial y} = 5\mkern-2mu x^{2}\mkern-2mu y$ | $z = F(x^7y)-x^2y$ |
-| `x*y*Dx(z) - x^2*Dy(z) + y*z = 3*x^2*y` | $x\mkern-2mu y\mkern-2mu \frac{\partial z}{\partial x} + y\mkern-2mu z - x^{2}\mkern-2mu \frac{\partial z}{\partial y} = 3\mkern-2mu x^{2}\mkern-2mu y$ | $z = \dfrac{F(x^2+y^2)}{x}+x^2$ |
-| `Dx(@phi)*sec(x) + Dy(@phi) = cot(y)` | $\frac{\partial \phi}{\partial y} + \sec(x)\mkern-2mu \frac{\partial \phi}{\partial x} = \cot(y)$ | $\phi = F(y-\sin x)+\ln(\sin y)$ |
+| `x*y*Dx(z) - x^2*Dy(z) + y*z = 3*x^2*y` | $x\mkern-2mu y\mkern-2mu \frac{\partial z}{\partial x} - x^{2}\mkern-2mu \frac{\partial z}{\partial y} + y\mkern-2mu z = 3\mkern-2mu x^{2}\mkern-2mu y$ | $z = \dfrac{F(x^2+y^2)}{x}+x^2$ |
+| `Dx(@phi)*sec(x) + Dy(@phi) = cot(y)` | $\sec(x)\mkern-2mu \frac{\partial \phi}{\partial x} + \frac{\partial \phi}{\partial y} = \cot(y)$ | $\phi = F(y-\sin x)+\ln(\sin y)$ |
 | `x*(y-z)*z_x + y*(z-x)*z_y = z*(x-y)` | $x\mkern-2mu \left(y - z\right)\mkern-2mu \frac{\partial z}{\partial x} + y\mkern-2mu \left(z - x\right)\mkern-2mu \frac{\partial z}{\partial y} = z\mkern-2mu \left(x - y\right)$ | $F(x+y+z,xyz) = 0$ |
 | `x*(y^2-z^2)*z_x + y*(z^2-x^2)*z_y = z*(x^2-y^2)` | $x\mkern-2mu \left(y^{2} - z^{2}\right)\mkern-2mu \frac{\partial z}{\partial x} + y\mkern-2mu \left(z^{2} - x^{2}\right)\mkern-2mu \frac{\partial z}{\partial y} = z\mkern-2mu \left(x^{2} - y^{2}\right)$ | $F(x^2+y^2+z^2,xyz) = 0$ |
 
@@ -962,7 +1358,7 @@ when one is expanded and the other is factored.
 | `x^2*Dx(z) + y^2*Dy(z) = z^2` | $x^{2}\mkern-2mu \frac{\partial z}{\partial x} + y^{2}\mkern-2mu \frac{\partial z}{\partial y} = z^{2}$ | $z = \dfrac{1}{F(1/x-1/y)+1/x}$ or $z=0$ |
 | `x*z*Dx(z) + y*z*Dy(z) + x^2 + y^2 = 0` | $x\mkern-2mu z\mkern-2mu \frac{\partial z}{\partial x} + y\mkern-2mu z\mkern-2mu \frac{\partial z}{\partial y} + x^{2} + y^{2} = 0$ | $z = \pm\sqrt{F(y/x)-x^2-y^2}$ |
 | `z*z_x + z*z_y = y - x` | $z\mkern-2mu \frac{\partial z}{\partial x} + z\mkern-2mu \frac{\partial z}{\partial y} = y - x$ | $z = \pm\sqrt{F(y-x)-x^2+y^2}$ |
-| `(y-x)*z_x + (y+x)*z_y = (x^2+y^2)/z` | $\left(y - x\right)\mkern-2mu \frac{\partial z}{\partial x} + \left(x + y\right)\mkern-2mu \frac{\partial z}{\partial y} = \frac{x^{2} + y^{2}}{z}$ | $z = \pm\sqrt{F(x^2+2xy-y^2)+2xy}$ |
+| `(y-x)*z_x + (y+x)*z_y = (x^2+y^2)/z` | $\left(y - x\right)\mkern-2mu \frac{\partial z}{\partial x} + \left(y + x\right)\mkern-2mu \frac{\partial z}{\partial y} = \frac{x^{2} + y^{2}}{z}$ | $z = \pm\sqrt{F(x^2+2xy-y^2)+2xy}$ |
 | `(x+y)*Dx(z) + (y-x)*Dy(z) = 0` | $\left(x + y\right)\mkern-2mu \frac{\partial z}{\partial x} + \left(y - x\right)\mkern-2mu \frac{\partial z}{\partial y} = 0$ | $z = F\bigl(\operatorname{atan2}(y,x)+\tfrac12\ln(x^2+y^2)\bigr)$ |
 
 When both derivative coefficients contain one factor of the dependent field,
@@ -1841,9 +2237,27 @@ its equation with `de_solve_result_at()` and use the equation module.
 
 | Style | Output |
 | :--- | :--- |
-| `style_EXPRESSION` | Curly-brace problem notation, including independent variables, constants and conditions. Derivatives use ordinary or partial-derivative fractions in Unicode text. |
+| `style_EXPRESSION` | Curly-brace problem notation, including independent variables, constants and conditions. Derivatives and simple nonnegative integer powers use Unicode superscripts consistently. |
 | `style_UNBOUND` | The base equation alone, using formal derivative notation, without the surrounding declarations or conditions. |
 | `style_LATEX` | The base equation as TeX, without declarations or conditions. |
+
+For example, the Differential Equation card formats this input:
+
+```text
+u_tt - v^2u_xx = f(x,t); u(x,0) = g(x); u_t(x,0) = h(x)
+```
+
+Output:
+
+```text
+{ ∂²u/∂t² - v²∂²u/∂x² = f(x,t) | t = ?, x = ?; ; u(x,0) = g(x), ∂u/∂t(x,0) = h(x) }
+```
+
+This native formatting rule applies to the equation, bindings and conditions,
+without reordering the input. Exponents that cannot safely be represented as a
+simple superscript, including fractional expressions and power chains, retain
+their caret notation so that copying the problem back as input preserves its
+meaning. TeX retains its own exponent syntax.
 
 `de_to_text()` returns a newly allocated `string_t`; release it with
 `string_free()`. `de_to_string()` returns a newly allocated C string;
@@ -1932,7 +2346,7 @@ Return the outcome of the solve attempt:
 
 | Status | Meaning |
 | :--- | :--- |
-| `DE_SOLVE_STATUS_SOLVED` | A symbolic solution was produced. It may be implicit, contain arbitrary functions or constants, or retain exact unevaluated integrals. This does not promise an elementary closed form. |
+| `DE_SOLVE_STATUS_SOLVED` | A symbolic solution was produced. It may be implicit, contain arbitrary functions or constants, or retain exact unevaluated integrals. It may be a labelled particular family, such as KdV solitary waves; inspect the diagnostic and solution qualifications. This does not promise a general solution or an elementary closed form. |
 | `DE_SOLVE_STATUS_SERIES` | A local Taylor expansion was produced, with an explicit remainder. The finite polynomial alone is not asserted to solve the equation exactly. |
 | `DE_SOLVE_STATUS_UNSUPPORTED` | The problem is well formed, but the available symbolic rules could not complete it. This does not mean that the equation has no solution. |
 | `DE_SOLVE_STATUS_INVALID` | The solve input is invalid. This is also the value returned by this accessor for a null result. |
@@ -1980,6 +2394,27 @@ the result is null or the index is out of range.
 Do not assume that the dependent variable has been isolated: a solution may
 be an implicit equation. The result owns the equation; do not call
 `equ_free()` on this borrowed pointer.
+
+If `de_solve_result_parameter_constraint()` is non-null, the first solution
+must be solved jointly with that equation. Later entries are separate
+families. Native unbound and TeX output includes labels and conditions;
+consumers of the expression trees must inspect the constraint explicitly.
+
+#### `de_solve_result_parameter()` and `de_solve_result_parameter_constraint()`
+
+```c
+const expr_t *de_solve_result_parameter(const diffequ_solve_result_t *result);
+const equation_t *de_solve_result_parameter_constraint(const diffequ_solve_result_t *result);
+```
+
+Return the borrowed envelope parameter and its coupled stationarity equation,
+respectively. Return `NULL` for a null result or one without an envelope
+constraint. They remain available without `DE_SOLVE_OPTION_STEPS` and remain
+valid until the solve result is freed. Do not free either borrowed object.
+The parameter is determined locally by the constraint; it is not an
+independent arbitrary constant in the envelope family. The constraint
+residual must have a nonzero derivative with respect to this parameter for
+the stated regular local representation to apply.
 
 ### Diagnostics and presentation
 
