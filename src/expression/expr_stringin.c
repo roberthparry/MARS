@@ -4844,7 +4844,8 @@ expr_t *expr_from_expression_string(const char *expr, const char *const *names, 
 }
 
 static expr_t *expr_from_expression_text_mode(const string_t *expr, const string_t *const *names,
-                                              expr_t *const *symbols, size_t nsymbols, bool preserve_formal_derivatives)
+                                              expr_t *const *symbols, size_t nsymbols, bool preserve_formal_derivatives,
+                                              bool simplify)
 {
     symtab_t syms;
     expr_t *result;
@@ -4885,18 +4886,26 @@ static expr_t *expr_from_expression_text_mode(const string_t *expr, const string
                                             preserve_formal_derivatives, NULL, NULL,
                                             NULL);
     symtab_free(&syms);
-    result = simplify_parsed_result(result);
+    if (simplify)
+        result = simplify_parsed_result(result);
     return result;
 }
 
 expr_t *expr_from_expression_text(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                   size_t nsymbols)
 {
-    return expr_from_expression_text_mode(expr, names, symbols, nsymbols, false);
+    return expr_from_expression_text_mode(expr, names, symbols, nsymbols, false, true);
 }
 
 expr_t *expr_from_expression_text_formal(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                          size_t nsymbols)
 {
-    return expr_from_expression_text_mode(expr, names, symbols, nsymbols, true);
+    return expr_from_expression_text_mode(expr, names, symbols, nsymbols, true, true);
+}
+
+/* Preserve the authored tree for native differential-equation presentation, independently of solving. */
+expr_t *expr_from_expression_text_formal_ordered(const string_t *expr, const string_t *const *names,
+                                                 expr_t *const *symbols, size_t nsymbols)
+{
+    return expr_from_expression_text_mode(expr, names, symbols, nsymbols, true, false);
 }

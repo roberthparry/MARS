@@ -37,6 +37,20 @@ diffequ_solve_result_t *de_pde_solve_second_order_constant(const diffequ_t *de, 
 diffequ_solve_result_t *de_pde_solve_radial_euler(const diffequ_t *de, const expr_t *residual, bool include_steps);
 diffequ_solve_result_t *de_pde_solve_wave(const diffequ_t *de, const expr_t *residual, bool include_steps);
 diffequ_solve_result_t *de_pde_solve_wave_ivp(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_autonomous_transport(const diffequ_t *de, const expr_t *residual,
+                                                        bool include_steps);
 diffequ_solve_result_t *de_pde_solve_multi_variable(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_affine_transport(const diffequ_t *de, const expr_t *residual, bool include_steps);
+bool de_pde_affine_flow_invariants(const diffequ_t *de, const expr_t *dependent, size_t clock,
+                                  expr_t *const *coefficients, expr_t **invariants);
+diffequ_solve_result_t *de_pde_solve_triangular_transport(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_gradient_envelope(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_fourier_evolution(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_kdv(const diffequ_t *de, const expr_t *residual, bool include_steps);
+diffequ_solve_result_t *de_pde_solve_half_line_heat(const diffequ_t *de, const expr_t *residual, bool include_steps);
+expr_t *de_pde_kdv_parameter(const diffequ_t *de, const expr_t *residual, const char *base);
+diffequ_solve_result_t *de_pde_solve_gkdv(const diffequ_t *de, const expr_t *residual, const expr_t *field,
+    const expr_t *time, const expr_t *space, const expr_t *a, const expr_t *c, const expr_t *nonlinear,
+    bool include_steps);
 
 #endif

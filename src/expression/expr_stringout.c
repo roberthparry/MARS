@@ -591,7 +591,12 @@ static void emit_expr_mul_separator_local(const expr_t *left, const expr_t *righ
 
     left_atomic = is_atomic_for_mul(left);
     right_atomic = is_atomic_for_mul(right);
-    if (!(left_atomic && right_atomic))
+    /* An uncombined integer factor must not join preceding digits: 29*1 must not print as 291. */
+    bool numeric_pair = expr_is_const(left) && (!left->name || !*left->name) &&
+                        expr_is_const(right) && (!right->name || !*right->name) &&
+                        num_is_real(left->c) && num_is_integer(right->c) &&
+                        (!right->binding_expr || expr_binding_expr_is_numeric_literal(right->binding_expr));
+    if (numeric_pair || !(left_atomic && right_atomic))
         sbuf_puts(b, "·");
 }
 
@@ -2887,13 +2892,15 @@ static bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int 
     return true;
 }
 
+static _Thread_local unsigned TeX_source_order_depth;
+
 static bool emit_TeX_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
     size_t count = 0u;
     int need = PREC_ADD < parent_prec;
 
-    if (!display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
+    if (TeX_source_order_depth || !display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
         return false;
 
     if (need)
@@ -3841,15 +3848,25 @@ static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
         emit_TeX_expr(f, b, PREC_MUL);
 }
 
+static bool TeX_contains_calculus(const expr_t *f);
+
 static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
     const expr_t *right_power_base = NULL;
+
+    if (TeX_contains_calculus(left) && TeX_contains_calculus(right)) {
+        sbuf_puts(b, " \\cdot ");
+        return;
+    }
 
     if (right && (expr_is_op(right, &ops_pow) || expr_is_pow_d_expr(right)))
         right_power_base = right->a;
 
     if (left && expr_is_const(left) && (!left->name || !*left->name) &&
-        ((right_power_base && expr_is_const(right_power_base) &&
+        ((right && expr_is_const(right) && (!right->name || !*right->name) &&
+          num_is_real(left->c) && num_is_integer(right->c) &&
+          (!right->binding_expr || expr_binding_expr_is_numeric_literal(right->binding_expr))) ||
+         (right_power_base && expr_is_const(right_power_base) &&
           (!right_power_base->name || !*right_power_base->name)) ||
          (right && expr_is_const(right) && right->binding_expr &&
           expr_binding_expr_needs_explicit_mul_separator(right->binding_expr)))) {
@@ -3877,6 +3894,24 @@ static bool TeX_contains_calculus(const expr_t *f)
          (expr_TeX_partial_derivatives_enabled() || expr_TeX_total_derivatives_enabled())))
         return true;
     return TeX_contains_calculus(f->a) || TeX_contains_calculus(f->b);
+}
+
+/* Stable partition of the renderer's bounded factor array: coefficients precede derivatives and integrals. */
+static void sort_TeX_factors(expr_t **factors, int count)
+{
+    expr_t *ordered[64];
+    bool calculus[64];
+    int next = 0;
+    sort_factors(factors, count);
+    for (int i = 0; i < count; ++i) {
+        calculus[i] = TeX_contains_calculus(factors[i]);
+        if (!calculus[i])
+            ordered[next++] = factors[i];
+    }
+    for (int i = 0; i < count; ++i)
+        if (calculus[i])
+            ordered[next++] = factors[i];
+    memcpy(factors, ordered, (size_t)count * sizeof(*factors));
 }
 
 /* Only multiplicative factors are traversed. Refuse oversized products rather than dropping any factors. */
@@ -4010,7 +4045,7 @@ static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         int n = 0;
 
         flatten_mul((expr_t *)f, fac, &n, 64);
-        sort_factors(fac, n);
+        sort_TeX_factors(fac, n);
 
         for (int i = 0; i < n; ++i) {
             if (expr_tostring_is_negative_const(fac[i]) && num_eq(fac[i]->c, NUM_NEG_ONE)) {
@@ -4426,7 +4461,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\left(");
 
         flatten_mul((expr_t *)f, fac, &n, 64);
-        sort_factors(fac, n);
+        sort_TeX_factors(fac, n);
 
         for (int i = 0; i < n; i++) {
             if (!expr_is_negative(fac[i]))
@@ -5969,6 +6004,29 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 /* ------------------------------------------------------------------------- */
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
+
+/* Render an authored equation term without polynomial reordering, retaining the normal calculus factor layout. */
+char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial)
+{
+    if (!expr)
+        return NULL;
+    sbuf_t buffer;
+    sbuf_init(&buffer);
+    ++TeX_source_order_depth;
+    if (partial)
+        expr_TeX_partial_derivatives_push();
+    else
+        expr_TeX_total_derivatives_push();
+    emit_TeX_expr(expr, &buffer, PREC_LOWEST);
+    if (partial)
+        expr_TeX_partial_derivatives_pop();
+    else
+        expr_TeX_total_derivatives_pop();
+    --TeX_source_order_depth;
+    char *text = expr_tostring_texify(sbuf_c_str(&buffer));
+    sbuf_free(&buffer);
+    return text;
+}
 
 static string_t *expr_to_TeX_text(const expr_t *dv)
 {

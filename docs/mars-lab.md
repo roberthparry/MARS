@@ -56,6 +56,12 @@ expressions. When variables are present, the buttons beneath the editor can
 differentiate or integrate with respect to each variable. **Goal seek** finds a
 numeric value for a selected variable.
 
+Native display probes for complex-number formatting do not numerically evaluate
+integrals or summations. Numerical quadrature belongs to the Value calculation,
+not to the checks that choose a symbolic presentation. High-precision quadrature
+can still exceed the Lab's calculation timeout; this separation does not reduce
+the requested numerical precision.
+
 Supported elementary functions with an explicit symbolic complex argument are
 presented in Cartesian `p + qi` form. The complete set comprises `exp`, `ln`,
 `lg`; the circular functions `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`;

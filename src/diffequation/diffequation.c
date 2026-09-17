@@ -77,6 +77,8 @@ void de_free(diffequ_t *de)
     expr_free(de->repeated_quadratic_square);
     expr_bindings_free(de->constants);
     equ_free(de->equation);
+    expr_free(de->display_lhs);
+    expr_free(de->display_rhs);
     free(de);
 }
 

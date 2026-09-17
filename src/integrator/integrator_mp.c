@@ -311,6 +311,7 @@ static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol, const
 }
 
 static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t center, const number_t half_width,
+                                  const number_t a, const number_t b,
                                   const number_t pi_over_two, const number_t h, const number_t term_tolerance,
                                   size_t min_steps, int max_steps, number_t *sum_out, number_t *last_term_out,
                                   size_t *used_steps_out)
@@ -348,7 +349,12 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t cen
         number_t term_mag = NUM_ZERO;
         int eval_ok;
 
-        eval_ok = eval(ctx, x_pos, &f_pos) == 0;
+        /* The map is open. Rounded endpoints are not valid quadrature samples.
+         * Retain the last interior contribution as a tail error for refinement;
+         * in particular, do not infer that an undefined endpoint means divergence. */
+        bool rounded_endpoint = num_cmp(x_pos, a) == 0 || num_cmp(x_pos, b) == 0 ||
+                                num_cmp(x_neg, a) == 0 || num_cmp(x_neg, b) == 0;
+        eval_ok = !rounded_endpoint && eval(ctx, x_pos, &f_pos) == 0;
         if (eval_ok && k > 0)
             eval_ok = eval(ctx, x_neg, &f_neg) == 0;
 
@@ -372,6 +378,13 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t cen
             num_destroy(&sh);
             num_destroy(&t);
             num_destroy(&k_num);
+            if (rounded_endpoint && used_steps > 0u) {
+                *sum_out = sum;
+                *last_term_out = last_term;
+                if (used_steps_out)
+                    *used_steps_out = used_steps;
+                return 1;
+            }
             num_destroy(&last_term);
             num_destroy(&sum);
             return -1;
@@ -389,7 +402,16 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t cen
         }
 
         num_destroy(&term_mag);
-        term_mag = num_abs(contrib);
+        /* Opposite signs at the two tails must not cancel the error estimate. */
+        number_t abs_pos = num_abs(f_pos);
+        number_t abs_neg = num_abs(f_neg);
+        number_t abs_pair = num_add(abs_pos, abs_neg);
+        number_t abs_weight = num_abs(weight);
+        term_mag = num_mul(abs_pair, abs_weight);
+        num_destroy(&abs_weight);
+        num_destroy(&abs_pair);
+        num_destroy(&abs_neg);
+        num_destroy(&abs_pos);
         {
             number_t next_sum = num_add(sum, contrib);
 
@@ -479,8 +501,7 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
     number_t best_error = NUM_ZERO;
     bool have_best = false;
     size_t used_steps = 0u;
-    int max_steps = 256;
-    int refine_limit = 18;
+    int refine_limit = 2;
     int status = 1;
 
     if (!eval || !result_out || !error_out) {
@@ -488,33 +509,8 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
         goto cleanup;
     }
 
-    if (max_intervals < 1000u) {
-        max_steps = 128;
-    } else if (max_intervals < 10000u) {
-        max_steps = 512;
-    } else {
-        max_steps = 2048;
-        /*
-         * Large, precision-derived work budgets need a proportionally wider
-         * transformed interval.  Keeping max_steps fixed at 2048 truncates
-         * the tanh-sinh tails once h becomes small, so additional refinement
-         * cannot improve the result.  Retain room for at least eight complete
-         * refinement levels while growing the per-level range.
-         */
-        while (max_steps <= INT_MAX / 2) {
-            size_t next_steps = (size_t)max_steps * 2u;
-
-            if (next_steps > (SIZE_MAX - 1u) / 8u || (next_steps + 1u) * 8u > max_intervals)
-                break;
-            max_steps *= 2;
-        }
-    }
-
-    if (max_steps < 8)
-        max_steps = 8;
-    refine_limit = (int)((max_intervals + (size_t)max_steps) / ((size_t)max_steps + 1u)) + 2;
-    if (refine_limit < 4)
-        refine_limit = 4;
+    for (size_t capacity = max_intervals; capacity > 1u; capacity /= 2u)
+        ++refine_limit;
 
     for (int level = 0; level < refine_limit; ++level) {
         number_t level_sum = NUM_ZERO;
@@ -523,19 +519,27 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
         size_t level_steps = 0u;
         size_t remaining_steps = used_steps < max_intervals ? max_intervals - used_steps : 0u;
         int level_max_steps;
-        size_t level_min_steps =
-            remaining_steps < ((size_t)max_steps + 1u) ? remaining_steps : ((size_t)max_steps + 1u);
         if (remaining_steps == 0u) {
             num_destroy(&threshold);
             num_destroy(&level_last_term);
             num_destroy(&level_sum);
             break;
         }
-        level_max_steps = max_steps;
+        /* Halving h must not halve the covered transformed interval. */
+        size_t level_capacity = 8u;
+        for (int refinement = 0; refinement < level && level_capacity < remaining_steps; ++refinement) {
+            if (level_capacity > SIZE_MAX / 2u) {
+                level_capacity = remaining_steps;
+                break;
+            }
+            level_capacity *= 2u;
+        }
+        level_max_steps = level_capacity > INT_MAX ? INT_MAX : (int)level_capacity;
         if (remaining_steps <= (size_t)level_max_steps)
             level_max_steps = (int)remaining_steps - 1;
+        size_t level_min_steps = (size_t)level_max_steps + 1u;
         int sum_status =
-            mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width, pi_over_two, h, term_tolerance, level_min_steps,
+            mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width, a, b, pi_over_two, h, term_tolerance, level_min_steps,
                                    level_max_steps, &level_sum, &level_last_term, &level_steps);
 
         if (sum_status < 0) {

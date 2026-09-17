@@ -176,6 +176,16 @@ static expr_t *expr_expand_all_complex_unary_for_display(const expr_t *expr)
     return current;
 }
 
+static bool expr_contains_summation_for_display(const expr_t *expr);
+
+/* Display probes must never run numerical quadrature or summation. */
+static number_t expr_display_probe_value(const expr_t *expr)
+{
+    if (expr_contains_integral_operation(expr) || expr_contains_summation_for_display(expr))
+        return num_clone(NUM_NAN);
+    return expr_eval(expr);
+}
+
 static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
 {
     const expr_t *left = NULL;
@@ -185,7 +195,7 @@ static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
 
     if (!expr)
         return false;
-    value = expr_eval(expr);
+    value = expr_display_probe_value(expr);
     matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
     num_destroy(&value);
     if (matched)
@@ -340,7 +350,7 @@ static bool expr_is_cartesian_sum_with_unit_imaginary_for_display(const expr_t *
         return false;
     (void)left;
     (void)subtract;
-    value = expr_eval(right);
+    value = expr_display_probe_value(right);
     matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
     num_destroy(&value);
     return matched;
@@ -971,7 +981,7 @@ static bool expr_imaginary_product_parts(const expr_t *expr, const expr_t **coef
 
     if (!expr || !coefficient_out || !sign_out || !expr_match_mul_expr(expr, &left, &right))
         goto cleanup;
-    value = expr_eval(left);
+    value = expr_display_probe_value(left);
     if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
         *coefficient_out = right;
         *sign_out = num_eq(value, NUM_I) ? 1 : -1;
@@ -980,7 +990,7 @@ static bool expr_imaginary_product_parts(const expr_t *expr, const expr_t **coef
     }
     num_destroy(&value);
     value = (number_t){0};
-    value = expr_eval(right);
+    value = expr_display_probe_value(right);
     if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
         *coefficient_out = left;
         *sign_out = num_eq(value, NUM_I) ? 1 : -1;
@@ -1169,7 +1179,7 @@ static bool expr_complex_argument_pi_ratio(const expr_t *expr, long *numerator_o
 
     if (!expr || !numerator_out || !denominator_out)
         goto cleanup;
-    value = expr_eval(expr);
+    value = expr_display_probe_value(expr);
     if (!num_is_finite(value) || num_is_real(value))
         goto cleanup;
     real = num_real_part(value);
@@ -1289,7 +1299,7 @@ static char *expr_polar_cartesian_root_TeX_dup(const expr_t *base, long root_ind
     if (phase_denominator > ULONG_MAX / (unsigned long)order ||
         root_index > (LONG_MAX - phase_numerator) / (2L * (long)phase_denominator))
         goto cleanup;
-    value = expr_eval(base);
+    value = expr_display_probe_value(base);
     real = num_real_part(value);
     imaginary = num_imag_part(value);
     real_squared = num_mul(real, real);
@@ -1345,8 +1355,8 @@ static expr_t *expr_reorder_positive_sum_for_display(const expr_t *expr)
 
     if (!expr_match_add_sub_expr(expr, &left, &right, &subtract) || subtract)
         goto cleanup;
-    left_value = expr_eval(left);
-    right_value = expr_eval(right);
+    left_value = expr_display_probe_value(left);
+    right_value = expr_display_probe_value(right);
     if (!num_is_real(left_value) || !num_is_real(right_value) || num_get_sign(left_value) >= 0 ||
         num_get_sign(right_value) < 0)
         goto cleanup;
@@ -1403,7 +1413,7 @@ static char *expr_rotated_cartesian_root_TeX_dup(const expr_t *seed, long root_i
     if (!seed || root_index <= 0L || order < 2L)
         goto cleanup;
     if (!expr_scaled_cartesian_parts(seed, &scale, &real, &imaginary, &imaginary_sign)) {
-        seed_value = expr_eval(seed);
+        seed_value = expr_display_probe_value(seed);
         real_value = num_real_part(seed_value);
         imaginary_value = num_imag_part(seed_value);
         if (!num_is_finite(seed_value) || num_is_zero(imaginary_value))
@@ -1441,8 +1451,8 @@ static char *expr_rotated_cartesian_root_TeX_dup(const expr_t *seed, long root_i
         ordered_display = NULL;
     }
 
-    displayed_real_value = expr_eval(real_display);
-    displayed_imaginary_value = expr_eval(imaginary_display);
+    displayed_real_value = expr_display_probe_value(real_display);
+    displayed_imaginary_value = expr_display_probe_value(imaginary_display);
     real_is_zero = num_is_zero(displayed_real_value);
     imaginary_is_zero = num_is_zero(displayed_imaginary_value);
     imaginary_is_negative = num_get_sign(displayed_imaginary_value) < 0;
@@ -1455,7 +1465,7 @@ static char *expr_rotated_cartesian_root_TeX_dup(const expr_t *seed, long root_i
         imaginary_display = positive_imaginary_display;
         positive_imaginary_display = NULL;
         num_destroy(&displayed_imaginary_value);
-        displayed_imaginary_value = expr_eval(imaginary_display);
+        displayed_imaginary_value = expr_display_probe_value(imaginary_display);
     }
     ordered_display = expr_reorder_positive_sum_for_display(imaginary_display);
     if (ordered_display) {
@@ -1626,7 +1636,7 @@ static void print_explicit_root_family(const expr_t *expr, int precision)
     seed_TeX = seed_expr ? expr_TeX_body_dup(seed_expr) : NULL;
     if (!seed_TeX)
         goto cleanup;
-    seed_value = expr_eval(seed_expr);
+    seed_value = expr_display_probe_value(seed_expr);
     seed_has_cartesian_parts = expr_scaled_cartesian_parts(seed_expr, &seed_scale, &seed_real, &seed_imaginary,
                                                            &seed_imaginary_sign);
 

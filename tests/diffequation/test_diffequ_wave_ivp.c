@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "test_diffequ_wave_ivp.h"
@@ -129,4 +130,51 @@ void test_diffequ_wave_ivp_polynomial_data(void)
     TEST_RUN_SUBTEST(test_diffequ_wave_ivp_renamed_coordinates, "diffequation,wave,ivp");
     TEST_RUN_SUBTEST(test_diffequ_wave_ivp_quadratic_forcing, "diffequation,wave,ivp");
     TEST_RUN_SUBTEST(test_diffequ_wave_ivp_trigonometric_data, "diffequation,wave,ivp");
+}
+
+void test_diffequ_wave_ivp_zero_terms(void)
+{
+    static const char *const sources[] = {
+        "u_tt - u_xx = f(x)*cos(t); u(x,0) = 0; u_t(x,0) = 0",
+        "u_tt - c^2*u_xx = f(x,t); u(x,0) = 0; u_t(x,0) = 0",
+        "u_tt - u_xx = 0; u(x,0) = 0; u_t(x,0) = h(x)",
+        "u_tt - u_xx = f(x,t); u(x,0) = x-x; u_t(x,0) = 0",
+        "w_ss - 4*w_rr = q(r,s); w(r,2) = 0; w_s(r,2) = 0",
+        "u_tt - u_xx = 0; u(x,0) = 0; u_t(x,0) = 0",
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(*sources); ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = de_solve_result_at(result, 0u);
+        char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+        const char *text = TeX;
+        printf("  %s\n  %s\n", sources[i], text ? text : "NULL");
+        bool clean = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
+                     !strstr(text, "0 + 0") && !strstr(text, "\\frac{0}") && !strstr(text, " + \\frac");
+        if (i < 5u)
+            clean = clean && strstr(text, "\\int") && !strstr(text, "NAN");
+        else
+            clean = clean && expr_is_exact_zero(equ_rhs(solution));
+        free(TeX);
+        de_solve_result_free(result);
+        de_free(de);
+        ASSERT_TRUE(clean);
+    }
+}
+
+/* README example from docs/diffequation.md: zero Cauchy data leave only the forcing integral. */
+void example_diffequation_wave_zero_data(void)
+{
+    const char *source = "u_tt - u_xx = f(x)*cos(t); u(x,0) = 0; u_t(x,0) = 0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    const char *expected = "u = ½·∫^t_0 ∫^(t + x - s)_(s - t + x) cos(s)·f(ξ)·dξ·ds";
+    bool valid = text && strcmp(string_c_str(text), expected) == 0 && TeX &&
+                 !strstr(TeX, "0 + 0") && !strstr(TeX, "\\frac{0}");
+    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    free(TeX); string_free(text); de_solve_result_free(result); de_free(de);
+    ASSERT_TRUE(valid);
 }

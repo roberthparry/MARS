@@ -656,6 +656,10 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     if (result)
         goto cleanup;
 
+    result = de_pde_solve_half_line_heat(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
     polar_laplace = residual ? de_pde_attempt_polar_laplace(de, residual, &polar_laplace_solution) : DE_ATTEMPT_FAILED;
     if (polar_laplace == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LAPLACE,
@@ -700,6 +704,10 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     if (result)
         goto cleanup;
 
+    result = de_pde_solve_autonomous_transport(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
     transport = residual ? de_pde_attempt_constant_transport(de, residual, &transport_solution, &transport_recognized)
                          : DE_ATTEMPT_FAILED;
     if (transport == DE_ATTEMPT_SOLVED) {
@@ -733,11 +741,28 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
         goto cleanup;
     }
 
+    result = de_pde_solve_affine_transport(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+    result = de_pde_solve_triangular_transport(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+    result = de_pde_solve_gradient_envelope(de, residual, include_steps);
+    if (result)
+        goto cleanup;
     stationary = de_pde_solve_stationary_eigenfunction(de, residual, include_steps);
     if (stationary) {
         result = stationary;
         goto cleanup;
     }
+
+    result = de_pde_solve_kdv(de, residual, include_steps);
+    if (result)
+        goto cleanup;
+
+    result = de_pde_solve_fourier_evolution(de, residual, include_steps);
+    if (result)
+        goto cleanup;
 
     result = de_solve_result_new(polar_laplace == DE_ATTEMPT_FAILED || laplace == DE_ATTEMPT_FAILED ||
                                          transport == DE_ATTEMPT_FAILED || characteristics == DE_ATTEMPT_FAILED
@@ -787,6 +812,9 @@ diffequ_solve_result_t *de_pde_solve_multi_variable(const diffequ_t *de, const e
     }
 
     equ_free(solution);
+    result = de_pde_solve_affine_transport(de, residual, include_steps);
+    if (result)
+        return result;
     stationary = de_pde_solve_stationary_eigenfunction(de, residual, include_steps);
     if (stationary)
         return stationary;

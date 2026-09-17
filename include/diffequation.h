@@ -180,7 +180,15 @@ typedef enum {
     /** Three-dimensional constant-speed wave equation, represented by Kirchhoff spherical means. */
     DE_SOLVER_KIRCHHOFF,
     /** Forced one-dimensional constant-speed wave IVP, using d'Alembert and Duhamel integrals. */
-    DE_SOLVER_DALEMBERT_DUHAMEL
+    DE_SOLVER_DALEMBERT_DUHAMEL,
+    /** Whole-line constant-coefficient dissipative evolution, represented by a Fourier kernel. */
+    DE_SOLVER_FOURIER_EVOLUTION,
+    /** Zero-background KdV solitary waves: a particular family, not the general solution. */
+    DE_SOLVER_KDV_SOLITARY_WAVE,
+    /** Positive-integer-power generalised KdV travelling waves, with explicit branch and domain restrictions. */
+    DE_SOLVER_GKDV_TRAVELLING_WAVE,
+    /** Heat-reaction equation on the right half-line with zero initial data and a Dirichlet boundary history. */
+    DE_SOLVER_HALF_LINE_HEAT
 } de_solver_t;
 
 /**
@@ -511,10 +519,42 @@ size_t de_solve_result_count(const diffequ_solve_result_t *result);
 /**
  * @brief Borrow one symbolic solution equation.
  *
+ * A solution may be a particular family rather than a general solution.
+ * KdV solitary waves retain their scope and parameter restrictions in native
+ * presentation, even without optional derivation steps; inspect the diagnostic.
+ *
+ * When de_solve_result_parameter_constraint() is non-NULL, the first family
+ * must be solved jointly with that constraint. Later families are separate
+ * alternatives; for a gradient-envelope result, the second is the affine
+ * complete integral. Native unbound and TeX renderings include these labels
+ * and conditions; other consumers must inspect the constraint explicitly.
+ *
  * @param result Result to inspect.
  * @param index Zero-based solution index.
  * @return A borrowed equation, or `NULL` when @p index is out of range.
  */
 const equation_t *de_solve_result_at(const diffequ_solve_result_t *result, size_t index);
+
+/**
+ * @brief Borrow the auxiliary parameter of a local envelope solution.
+ *
+ * The parameter is determined jointly with the first solution equation by
+ * de_solve_result_parameter_constraint(), not a free constant in that family.
+ * @param result Result to inspect.
+ * @return Borrowed parameter, or `NULL` for a result without an envelope.
+ */
+const expr_t *de_solve_result_parameter(const diffequ_solve_result_t *result);
+
+/**
+ * @brief Borrow the constraint determining the first family's envelope parameter.
+ *
+ * Regular local branches require a nonzero derivative of the constraint
+ * residual with respect to de_solve_result_parameter(). Native output also
+ * states the coefficient-domain restrictions. The condition is retained even
+ * when derivation steps were not requested.
+ * @param result Result to inspect.
+ * @return Borrowed constraint equation, or `NULL` when none is required.
+ */
+const equation_t *de_solve_result_parameter_constraint(const diffequ_solve_result_t *result);
 
 #endif /* DIFFEQUATION_H */

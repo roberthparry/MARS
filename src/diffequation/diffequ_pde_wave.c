@@ -583,13 +583,24 @@ static bool de_wave_ivp_notation(equation_t *solution, const expr_t *displacemen
             valid = false;
             break;
         }
-        if (expr_is_exact_zero(terms[i]))
+        /* Zero data can still be represented as (0+0)/2 or 0/(2*c).
+           Test the reduced term, but retain the paired-endpoint notation for non-zero contributions. */
+        expr_t *reduced = expr_simplify(terms[i]);
+        if (!reduced) {
+            valid = false;
+            break;
+        }
+        bool zero = expr_is_exact_zero(reduced);
+        expr_free(reduced);
+        if (zero)
             continue;
         char *term = expr_to_TeX_body_wrapped(terms[i], SIZE_MAX);
         valid = term && string_append_format(TeX, "%s%s", first ? "" : " + ", term) >= 0;
         free(term);
         first = false;
     }
+    if (valid && first)
+        valid = string_append_cstr(TeX, "0") >= 0;
     valid = valid && equ_set_display_TeX(solution, NULL, TeX) == 0;
     string_free(TeX);
     for (size_t i = 0u; i < 3u; ++i)

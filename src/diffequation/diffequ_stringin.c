@@ -2001,59 +2001,6 @@ static int de_append_subscript_dependent(string_t *out, const char *name, size_t
     return result;
 }
 
-static bool de_utf8_superscript_digit(const char *text, size_t *length_out, unsigned int *digit_out)
-{
-    static const struct {
-        const char *text;
-        unsigned int digit;
-    } digits[] = {
-        {"⁰", 0u}, {"¹", 1u}, {"²", 2u}, {"³", 3u}, {"⁴", 4u}, {"⁵", 5u}, {"⁶", 6u}, {"⁷", 7u}, {"⁸", 8u}, {"⁹", 9u},
-    };
-
-    if (!text)
-        return false;
-    for (size_t i = 0u; i < sizeof(digits) / sizeof(digits[0]); ++i) {
-        size_t length = strlen(digits[i].text);
-
-        if (strncmp(text, digits[i].text, length) != 0)
-            continue;
-        if (length_out)
-            *length_out = length;
-        if (digit_out)
-            *digit_out = digits[i].digit;
-        return true;
-    }
-    return false;
-}
-
-static bool de_parse_utf8_superscript(const char *text, size_t *position, size_t *value_out)
-{
-    size_t cursor;
-    size_t value = 0u;
-    bool found = false;
-
-    if (!text || !position)
-        return false;
-    cursor = *position;
-    while (text[cursor]) {
-        size_t length = 0u;
-        unsigned int digit = 0u;
-
-        if (!de_utf8_superscript_digit(text + cursor, &length, &digit))
-            break;
-        if (value > (SIZE_MAX - digit) / 10u)
-            return false;
-        value = value * 10u + digit;
-        cursor += length;
-        found = true;
-    }
-    if (!found)
-        return false;
-    *position = cursor;
-    if (value_out)
-        *value_out = value;
-    return true;
-}
 
 static void de_skip_ascii_space(const char *text, size_t *position)
 {
@@ -2101,7 +2048,8 @@ static bool de_try_unicode_partial_derivative(const char *text, size_t start, si
     if (!text || !out || strncmp(text + cursor, partial, sizeof(partial) - 1u) != 0)
         return false;
     cursor += sizeof(partial) - 1u;
-    (void)de_parse_utf8_superscript(text, &cursor, &numerator_order);
+    if (de_parse_derivative_order(text, &cursor, &numerator_order) < 0)
+        return false;
     de_skip_ascii_space(text, &cursor);
 
     dependent_start = cursor;
@@ -2131,9 +2079,10 @@ static bool de_try_unicode_partial_derivative(const char *text, size_t start, si
         if (!islower((unsigned char)text[cursor]))
             return false;
         variable = text[cursor++];
-        if (de_parse_utf8_superscript(text, &cursor, &parsed_order)) {
-            if (parsed_order == 0u)
-                return false;
+        int order_status = de_parse_derivative_order(text, &cursor, &parsed_order);
+        if (order_status < 0)
+            return false;
+        if (order_status > 0) {
             multiplicity = parsed_order;
         }
         if (multiplicity > sizeof(suffix) - suffix_length)
@@ -2212,7 +2161,8 @@ static bool de_try_unicode_total_derivative(const char *text, size_t start, size
     if (!text || !out || text[cursor] != 'd')
         return false;
     cursor++;
-    (void)de_parse_utf8_superscript(text, &cursor, &numerator_order);
+    if (de_parse_derivative_order(text, &cursor, &numerator_order) < 0)
+        return false;
     if (numerator_order == 0u)
         return false;
     de_skip_ascii_space(text, &cursor);
@@ -2253,7 +2203,8 @@ static bool de_try_unicode_total_derivative(const char *text, size_t start, size
     if (variable_length == 0u)
         return false;
     cursor += variable_length;
-    (void)de_parse_utf8_superscript(text, &cursor, &denominator_order);
+    if (de_parse_derivative_order(text, &cursor, &denominator_order) < 0)
+        return false;
     if (denominator_order == 0u || numerator_order != denominator_order)
         return false;
 
@@ -3190,6 +3141,37 @@ diffequ_t *de_from_string(const char *text)
     if (!de)
         goto cleanup;
     base = NULL;
+
+    {
+        char *left = NULL, *right = NULL;
+        if (!de_split_equation(parts.equation, &left, &right)) {
+            free(left);
+            free(right);
+            de_free(de);
+            de = NULL;
+            goto cleanup;
+        }
+        string_t *lhs = string_new_with(left), *rhs = string_new_with(right);
+        de->display_lhs = lhs ? expr_from_expression_text_formal_ordered(lhs, names, symbols, symbol_count) : NULL;
+        de->display_rhs = rhs ? expr_from_expression_text_formal_ordered(rhs, names, symbols, symbol_count) : NULL;
+        string_free(rhs);
+        string_free(lhs);
+        free(right);
+        free(left);
+        if (!de->display_lhs || !de->display_rhs) {
+            de_free(de);
+            de = NULL;
+            goto cleanup;
+        }
+        char *dependent_name = de_contextual_dependent_name(parts.equation);
+        if (dependent_name) {
+            de_name_formal_dependent(equ_lhs(de->equation), dependent_name);
+            de_name_formal_dependent(equ_rhs(de->equation), dependent_name);
+            de_name_formal_dependent(de->display_lhs, dependent_name);
+            de_name_formal_dependent(de->display_rhs, dependent_name);
+        }
+        free(dependent_name);
+    }
 
     de->constants = expr_bindings_clone_internal(equ_bindings(probe), true);
     string_free(de->equation_text);

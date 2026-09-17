@@ -14,6 +14,20 @@ intervals `[a, b]`, with automatic subinterval bisection and error control:
 
 ## Algorithms
 
+### Multiprecision endpoint handling
+
+The multiprecision numerical path first uses tanh–sinh quadrature. Its nodes
+remain strictly inside the integration interval: a transformed node that rounds
+onto an endpoint is not evaluated there. The last interior tail contribution
+is retained in the error estimate, and refinement preserves the transformed
+interval width as the step size decreases. Contributions from opposite tails
+are measured separately in magnitude so that cancellation cannot hide an error.
+
+This permits convergent improper integrals, including algebraic factors damped
+by reciprocal exponential decay, without directly evaluating an undefined
+endpoint product. It is a numerical convergence check, not a general symbolic
+limit prover; a singular endpoint is never unconditionally assigned zero.
+
 ### G7K15 Background
 
 Each subinterval is evaluated with a 15-point Kronrod rule (K15) containing an

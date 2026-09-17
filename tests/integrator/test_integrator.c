@@ -641,6 +641,40 @@ cleanup:
     ASSERT_EQ_INT(num_set_default_prec_bits(old_bits), 0);
 }
 
+void test_exponential_endpoint_decay(void)
+{
+    size_t old_bits = num_get_default_prec_bits();
+    const size_t precisions[] = {78u, 270u};
+    const char *sources[] = {"exp(-1/x)*x^(-3/2)", "exp(-1/(1-x))*(1-x)^(-3/2)"};
+
+    for (size_t p = 0u; p < 2u; ++p) {
+        ASSERT_EQ_INT(num_set_default_prec_digits(precisions[p]), 0);
+        for (size_t i = 0u; i < 2u; ++i) {
+            expr_bindings_t *bindings = NULL;
+            expr_t *expr = expr_from_string(sources[i], &bindings);
+            expr_t *x = expr_bindings_get(bindings, "x");
+            expr_t *reference = expr_from_string("sqrt(pi)*erfc(1)", NULL);
+            integrator_t *ig = intg_new();
+            number_t result = NUM_ZERO;
+            number_t error = NUM_ZERO;
+            number_t want = expr_eval(reference);
+
+            intg_set_interval_count_max(ig, 40000u);
+            int status = intg_integral(ig, expr, x, NUM_ZERO, NUM_ONE, &result, &error);
+            ASSERT_EQ_INT(status, 0);
+            test_assert_integrator_number_close_tol(result, want, p ? "1e-240" : "1e-50", __FILE__, __LINE__);
+            num_destroy(&want);
+            num_destroy(&error);
+            num_destroy(&result);
+            intg_free(ig);
+            expr_free(reference);
+            expr_free(expr);
+            expr_bindings_free(bindings);
+        }
+    }
+    ASSERT_EQ_INT(num_set_default_prec_bits(old_bits), 0);
+}
+
 void test_sin(void)
 {
     /* ∫₀^π sin(x) dx = 2 */
@@ -3573,6 +3607,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_expr_exp, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_arctan, tests, NULL);
     TEST_RUN_IN_GROUP(test_single_integral_num_high_precision_log, tests, NULL);
+    TEST_RUN_IN_GROUP(test_exponential_endpoint_decay, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_null_safety, tests, NULL);
 
     TEST_SECTION("intg_double_integral Tests");
