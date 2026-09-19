@@ -40,6 +40,55 @@ static number_t eval_arbitrary_function(expr_t *dv)
     return num_clone(NUM_NAN);
 }
 
+/* Preserve the function, evaluation argument and derivative order as separate operands. */
+expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order)
+{
+    if (!expr_is_arbitrary_function(function) || function->a->ops == &ops_argument_list || !order)
+        return NULL;
+    if (expr_is_exact_zero(order))
+        return expr_clone(function);
+    expr_t *out = expr_alloc(&ops_ordered_derivative);
+    out->a = expr_clone(function);
+    out->b = expr_clone(order);
+    return out;
+}
+
+static expr_t *deriv_ordered_derivative(expr_t *expr)
+{
+    expr_t *order_derivative = expr_get_dx_internal(expr->b);
+    bool fixed_order = order_derivative && expr_is_exact_zero(order_derivative);
+    expr_free(order_derivative);
+    if (!fixed_order)
+        return NULL;
+    expr_t *one = expr_const_one();
+    expr_t *order = expr_add(expr->b, one);
+    expr_t *outer = expr_new_ordered_derivative(expr->a, order);
+    expr_t *inner = expr_get_dx_internal(expr->a->a);
+    expr_t *out = inner ? expr_mul(outer, inner) : NULL;
+    expr_free(inner);
+    expr_free(outer);
+    expr_free(order);
+    expr_free(one);
+    return out;
+}
+
+static expr_t *simplify_ordered_derivative(const expr_t *expr, expr_t *a, expr_t *b)
+{
+    (void)expr;
+    expr_t *out = expr_new_ordered_derivative(a, b);
+    expr_free(a);
+    expr_free(b);
+    return out;
+}
+
+const expr_ops_t ops_ordered_derivative = {
+    .eval = eval_arbitrary_function, .deriv = deriv_ordered_derivative,
+    .reverse = expr_reverse_not_differentiable, .kind = EXPR_KIND_ORDERED_DERIVATIVE,
+    .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
+    .expression_name = "ordered_derivative", .function_name = "ordered_derivative",
+    .apply_binary = expr_new_ordered_derivative, .simplify = simplify_ordered_derivative,
+};
+
 static number_t eval_argument_list(expr_t *dv)
 {
     (void)dv;
@@ -2446,6 +2495,16 @@ fail:
     return expr_new_const(NUM_NAN);
 }
 
+static expr_t *expr_integral_apply(const expr_t *integrand, const expr_t *domain)
+{
+    /* Rebuilding an integral must preserve its existing bounds/dummy metadata, not nest another scope. */
+    if (!integrand || !domain)
+        return NULL;
+    expr_retain(integrand);
+    expr_retain(domain);
+    return expr_new_binary_internal(&ops_integral, integrand, domain);
+}
+
 static expr_t *expr_integral_meta_apply(const expr_t *domain, const expr_t *dummy)
 {
     if (!domain || !dummy)
@@ -2680,7 +2739,7 @@ const expr_ops_t ops_integral = {.eval = eval_integral,
                                  .function_name = "integral",
                                  .TeX_name = "\\int",
                                  .apply_unary = NULL,
-                                 .apply_binary = expr_integral,
+                                 .apply_binary = expr_integral_apply,
                                  .simplify = expr_simplify_rebuild_binary_operator,
                                  .fold_const_unary = NULL};
 

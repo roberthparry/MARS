@@ -135,6 +135,13 @@ static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *b
     if (expr_is_const(expr))
         return;
 
+    if (expr_is_laplace_transform(expr)) {
+        find_vars_dfs_impl(expr->b->b->a, vars, bound_vars);
+        varlist_add(bound_vars, expr->b->a);
+        find_vars_dfs_impl(expr->a, vars, bound_vars);
+        --bound_vars->count;
+        return;
+    }
     if (expr_is_op(expr, &ops_integral)) {
         lower = expr_integral_lower_bound_expr(expr);
         upper = expr_integral_upper_bound_expr(expr);

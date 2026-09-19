@@ -386,7 +386,7 @@ static int test_legacy_binding_is_const_name(const char *name, const char *value
     if (!name)
         return 0;
 
-    if (strcmp(name, "π") == 0 || strcmp(name, "τ") == 0)
+    if (strcmp(name, "π") == 0 || strcmp(name, "τ") == 0 || strcmp(name, "@tau") == 0)
         return 1;
     if (strcmp(name, "e") == 0)
         return value && strncmp(value, "2.718281828", 11u) == 0;
@@ -3699,9 +3699,9 @@ void test_expressions(void)
         /* 32 */
         {"τ*cos(x)", make_expr_32, "{ τ·cos(x) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = τ*cos(x)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = @tau*cos(x)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 33 */
@@ -3713,18 +3713,18 @@ void test_expressions(void)
 
         /* 34 */
         {"π*τ*e", make_expr_34, "{ πτe | ; τ = 6.283185307179586476925286766559011 }",
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(τ) = @pi*τ*e\n"
-         "return expr(τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(@tau) = @pi*@tau*e\n"
+         "return expr(@tau)",
          __LINE__},
 
         /* 35 */
         {"π*x*τ*y", make_expr_35, "{ πτxy | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = @pi*τ*x*y\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = @pi*@tau*x*y\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 36 */
@@ -3737,9 +3737,9 @@ void test_expressions(void)
         /* 37 */
         {"τ*exp(x^2)", make_expr_37, "{ τ·exp(x²) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = τ*exp(x^2)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = @tau*exp(x^2)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 38 */
@@ -3753,17 +3753,17 @@ void test_expressions(void)
         /* 39 */
         {"π*exp(τ*x)", make_expr_39, "{ π·exp(τx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = @pi*exp(τ*x)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = @pi*exp(@tau*x)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 40 */
         {"exp(π*x)*τ", make_expr_40, "{ τ·exp(πx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = τ*exp(@pi*x)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = @tau*exp(@pi*x)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 41 */
@@ -3776,17 +3776,17 @@ void test_expressions(void)
         /* 42 */
         {"cos(τ*x)", make_expr_42, "{ cos(τx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = cos(τ*x)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = cos(@tau*x)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 43 */
         {"exp(π*τ*x)", make_expr_43, "{ exp(πτx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,τ) = exp(@pi*τ*x)\n"
-         "return expr(x,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,@tau) = exp(@pi*@tau*x)\n"
+         "return expr(x,@tau)",
          __LINE__},
 
         /* 44 */
@@ -3801,9 +3801,9 @@ void test_expressions(void)
          "{ x + y + e + π + τ | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = x + y + e + @pi + τ\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = x + y + e + @pi + @tau\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 46 */
@@ -3811,9 +3811,9 @@ void test_expressions(void)
          "{ xy + πx + τy + e | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = e + @pi*x + τ*y + x*y\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = e + @pi*x + @tau*y + x*y\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 47 */
@@ -3821,9 +3821,9 @@ void test_expressions(void)
          "{ (x + π)·(y + τ) | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = (x + @pi)*(y + τ)\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = (x + @pi)*(y + @tau)\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 48 */
@@ -3831,9 +3831,9 @@ void test_expressions(void)
          "{ exp(x + y + π + τ) | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = exp(x + y + @pi + τ)\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = exp(x + y + @pi + @tau)\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 49 */
@@ -3841,9 +3841,9 @@ void test_expressions(void)
          "{ sin(x + π)·cos(y + τ) | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = sin(x + @pi)*cos(y + τ)\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = sin(x + @pi)*cos(y + @tau)\n"
+         "return expr(x,y,@tau)",
          __LINE__},
 
         /* 50 */
@@ -3851,9 +3851,9 @@ void test_expressions(void)
          "{ exp(sin(x + π) + cos(y + τ)) | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
          "x = 1.25\n"
          "y = 1.25\n"
-         "τ = 6.283185307179586476925286766559011\n"
-         "expr(x,y,τ) = exp(sin(x + @pi) + cos(y + τ))\n"
-         "return expr(x,y,τ)",
+         "@tau = 6.283185307179586476925286766559011\n"
+         "expr(x,y,@tau) = exp(sin(x + @pi) + cos(y + @tau))\n"
+         "return expr(x,y,@tau)",
          __LINE__},
     };
 

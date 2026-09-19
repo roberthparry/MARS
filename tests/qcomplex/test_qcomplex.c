@@ -1041,6 +1041,11 @@ static void test_Ei_E1(void)
 
     check_qc_rel("E1(1) = 0.21938...", qc_E1(qcr(1.0)), qcrs("0.21938393439552027367716377546049389941229571528030"),
                  1e-26);
+    /* Principal E1(i) = -Ci(1) + i*(Si(1)-pi/2), and reflection below the cut. */
+    qcomplex_t e1_i = qc_make(qf_from_string("-0.33740392290096813466264620388915"),
+                             qf_from_string("-0.62471325642771360428996837781657"));
+    check_qc_rel("E1(i) principal branch", qc_E1(qcz(0.0, 1.0)), e1_i, 1e-26);
+    check_qc_rel("E1(-i) conjugate branch", qc_E1(qcz(0.0, -1.0)), qc_conj(e1_i), 1e-26);
 
     double zs[] = {0.5, 1.0, 2.0};
     for (int i = 0; i < 3; i++) {

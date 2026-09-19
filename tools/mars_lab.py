@@ -3722,6 +3722,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <pre id="functionStyle"></pre>
         </div>
+        <div class="card result-card hidden" id="valueNoteCard" role="status">
+          <div class="card-title">Evaluation note</div>
+          <pre id="valueNote"></pre>
+        </div>
         <div class="card result-card" id="valueCard">
           <div class="card-title value-title">
             <span id="valueTitle">Value</span>
@@ -4367,6 +4371,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const functionTitle = document.getElementById('functionTitle');
     const functionMore = document.getElementById('functionMore');
     const valueCard = document.getElementById('valueCard');
+    const valueNoteCard = document.getElementById('valueNoteCard');
+    const valueNote = document.getElementById('valueNote');
     const value = document.getElementById('value');
     const valueTitle = document.getElementById('valueTitle');
     const valueMore = document.getElementById('valueMore');
@@ -5984,6 +5990,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       shortened = shortened || body !== parts.body;
 
       function compactAssignments(assignmentsText, kind) {
+        // Conditions follow the assignment group, not its final value.
+        const conditionStart = indexOfTopLevel(assignmentsText, ';');
+        const conditions = conditionStart >= 0 ? assignmentsText.slice(conditionStart) : '';
+        if (conditionStart >= 0)
+          assignmentsText = assignmentsText.slice(0, conditionStart);
         const rows = splitTopLevel(assignmentsText, ',')
           .map((part) => {
             const eq = indexOfTopLevel(part, '=');
@@ -6013,7 +6024,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               kind
             });
         });
-        return rows.map((row) => row.text);
+        const texts = rows.map((row) => row.text);
+        if (conditions && texts.length)
+          texts[texts.length - 1] += conditions;
+        return texts;
       }
 
       const variableAssignments = compactAssignments(parts.variables, 'variable');
@@ -6415,7 +6429,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function normalisedBindingInputValue(input) {
-      const text = String(input.value || '').trim();
+      let text = String(input.value || '').trim();
+      // Recover values contaminated by an older result-envelope parser.
+      const conditionStart = indexOfTopLevel(text, ';');
+      if (conditionStart >= 0)
+        text = text.slice(0, conditionStart).trim();
       return text || '?';
     }
 
@@ -9880,6 +9898,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function setValueText(fullText) {
+      valueNote.textContent = '';
+      valueNoteCard.classList.add('hidden');
       const full = String(fullText || '');
       setExpandableText(value, valueMore, full, full);
     }
@@ -10357,9 +10377,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           data.display_function || data.function || '',
           data.full_display_function || data.function || ''
         );
-        setValueText(data.value_note
-          ? `${data.value || ''}\n${data.value_note}`
-          : (data.value || ''));
+        setValueText(data.value || '');
+        valueNote.textContent = data.value_note || '';
+        valueNoteCard.classList.toggle('hidden', !valueNote.textContent.trim());
         valueTitle.textContent = data.root_value ? 'Values' : 'Value';
         setValueCardVisible(Boolean(String(value.textContent || '').trim()));
         lastEvaluationInputText = text;
@@ -13674,12 +13694,14 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
         "derivation_TeX": r"^derivation_TeX\s*(.*)$",
+        "transform_identity_TeX": r"^transform_identity_TeX\s*(.*)$",
         "algebraic_specialisation": r"^algebraic_specialisation\s+(.*)$",
         "root_expression": r"^root_expression\s{2,}(.*)$",
         "root_TeX": r"^root_tex\s+(.*)$",
         "root_function": r"^root_function\s{2,}(.*)$",
         "root_value": r"^root_value\s{2,}(.*)$",
         "bindings": r"^binding\s{2,}(.*)$",
+        "binding_function_names": r"^binding_function_name\s+(.*)$",
         "differentiable": r"^differentiable\s+(.*)$",
         "evaluation_ready": r"^evaluation_ready\s+(.*)$",
         "value": r"^value\s+(.*)$",
@@ -14338,6 +14360,9 @@ def parse_expression_body(expression: str) -> tuple[str, str, str]:
 
 def parse_binding_assignments(bindings: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
+    condition_start = index_top_level_text(bindings, ";")
+    if condition_start >= 0:
+        bindings = bindings[:condition_start]
 
     for part in split_top_level_text(bindings, ","):
         eq = index_top_level_text(part, "=")
@@ -15369,7 +15394,11 @@ def function_for_result_card(
     algebraic_function: str,
     bindings: list[dict[str, str]],
     bound_function: str = "",
+    binding_function_names: str = "",
 ) -> str:
+    # Use native identifier spellings; do not reinterpret mathematical names in the client.
+    names = dict(record.split("\t", 1) for record in binding_function_names.splitlines() if "\t" in record)
+    bindings = [dict(item, name=names.get(item["name"], item["name"])) for item in bindings]
     values = {item["name"]: str(item.get("value") or "?") for item in bindings}
     kinds = {item["name"]: str(item.get("kind") or "variable") for item in bindings}
     initializers = function_binding_initializers(bound_function)
@@ -15451,7 +15480,9 @@ def merge_algebraic_expression_fields(
 
     fields["unbound"] = algebraic_body
     fields["expression"] = expression_for_result_card(algebraic_body, bindings)
-    fields["function"] = function_for_result_card(algebraic_function, bindings, bound_function)
+    fields["function"] = function_for_result_card(
+        algebraic_function, bindings, bound_function, fields.get("binding_function_names", "")
+    )
     fields["tex"] = algebraic_tex
     fields["derivation_TeX"] = algebraic_derivation_TeX
     result_sources: dict[str, str] = {}
@@ -15477,6 +15508,7 @@ def merge_algebraic_expression_fields(
             algebraic_fields.get(f"{prefix}_function", ""),
             result_bindings,
             fields.get(f"{prefix}_function", ""),
+            fields.get("binding_function_names", ""),
         )
         fields[f"{prefix}_TeX"] = algebraic_fields.get(f"{prefix}_TeX", fields.get(f"{prefix}_TeX", ""))
 
@@ -15550,7 +15582,11 @@ def prepare_evaluation_fields(
     input_binding_values: list[dict[str, str]] | None = None
     algebraic_result_sources: dict[str, str] = {}
 
-    if action != "binding-edit":
+    if fields.get("algebraic_specialisation") == "native-result":
+        # Transform results already include specialised constants and domain conditions.
+        # Keep native card renderings intact; the editable input still needs all its bindings.
+        input_binding_values = mars_binding_values(fields.get("bindings"))
+    elif action != "binding-edit":
         algebraic_action = action if action in {"derivative", "integral"} else "evaluate"
         algebraic_expression = expression_with_unset_bindings(expression)
         try:
@@ -15625,7 +15661,8 @@ def prepare_evaluation_fields(
         fields.get("conditioned_expression") or expression_for_display(display_expression_source)
     )
     fields["full_display_TeX"] = TeX_for_display(
-        fields.get("derivation_TeX", "") or fields.get("root_TeX", "") or fields.get("tex", "")
+        fields.get("transform_identity_TeX", "") or fields.get("derivation_TeX", "")
+        or fields.get("root_TeX", "") or fields.get("tex", "")
     )
     fields["full_display_function"] = function_with_source_comment(
         function_for_display(fields.get("root_function", "") or fields.get("function", "")),
@@ -18802,6 +18839,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         fields = parse_mars_lab_output(raw)
         fields["ok"] = completed.returncode == 0
         if completed.returncode != 0:
+            error = tidy_lab_error_text(completed.stderr).strip() or f"mars_lab exited with {completed.returncode}"
             binding_error = binding_syntax_error_details(raw)
             if binding_error:
                 binding_name, _ = binding_error
@@ -18817,7 +18855,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     if fallback_rc == 0:
                         fallback_fields["ok"] = True
                         fallback_fields["partial_error"] = True
-                        fallback_fields["error"] = tidy_lab_error_text(raw)
+                        fallback_fields["error"] = error
                         fallback_fields["raw"] = raw
                         fallback_fields["recovery_expression"] = fallback_expression
                         prepare_evaluation_fields(
@@ -18833,24 +18871,16 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                         return
                     fields["recovery_raw"] = fallback_raw
             fields["raw"] = raw
-            fields["error"] = raw or f"mars_lab exited with {completed.returncode}"
+            fields["error"] = error
             self.send_json(422, fields)
             return
 
         if action == "bindings":
-            symbolic_bindings = expression_variable_binding_values(
-                str(fields.get("expression") or expression),
-                precision,
-            )
             self.send_json(200, {
                 "ok": True,
                 "expression": fields.get("expression", "") or expression,
                 "bindings": fields.get("bindings", ""),
-                "binding_values": (
-                    symbolic_bindings
-                    if symbolic_bindings
-                    else mars_binding_values(fields.get("bindings"))
-                ),
+                "binding_values": mars_binding_values(fields.get("bindings")),
                 "differentiable": fields.get("differentiable", "yes"),
                 "evaluation_ready": fields.get("evaluation_ready", "no"),
             })

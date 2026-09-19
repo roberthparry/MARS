@@ -938,12 +938,15 @@ qcomplex_t qc_Li(qcomplex_t z)
     return qc_Ei(qc_log(z));
 }
 
+/* Evaluate the principal E1 branch, including its off-axis logarithmic correction. */
 qcomplex_t qc_E1(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))
         return qc_make(qf_E1(qc_real(z)), QF_ZERO);
 
-    return qc_neg(qc_Ei(qc_neg(z)));
+    qcomplex_t result = qc_neg(qc_Ei(qc_neg(z)));
+    qfloat_t correction = qf_gt(qc_imag(z), QF_ZERO) ? QF_PI : qf_neg(QF_PI);
+    return qc_sub(result, qc_make(QF_ZERO, correction));
 }
 
 static int qc_to_integer_order(qcomplex_t value, int *order)

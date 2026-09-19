@@ -1732,6 +1732,12 @@ static void print_bindings(const char *label, expr_bindings_t *bindings, int pre
         value_text = owned_number_text(expr_get_val(binding), precision);
         printf("%-20s %s\t%s\t%s\n", label, expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
                value_text ? value_text : "(num_to_string failed)");
+        expr_t *named = expr_new_named_var(NUM_NAN, name);
+        char *function_name = named ? expr_to_function_body(named) : NULL;
+        if (function_name && strcmp(function_name, name) != 0)
+            printf("binding_function_name  %s\t%s\n", name, function_name);
+        free(function_name);
+        expr_free(named);
         free(value_text);
     }
 }
@@ -2043,6 +2049,14 @@ int main(int argc, char **argv)
     if (!display_expr)
         display_expr = expr;
 
+    expr_t *specialised_transform = expr_transform_specialise_constants(display_expr);
+    if (specialised_transform) {
+        if (display_expr_owned)
+            expr_free(display_expr);
+        display_expr = specialised_transform;
+        display_expr_owned = true;
+    }
+
     /* The complete native identity supersedes the parser's bare ellipsis preview. */
     expr_t *infinite_closed = expr_infinite_power_sum_closed_form(display_expr, NULL);
     if (infinite_closed) {
@@ -2067,10 +2081,14 @@ int main(int argc, char **argv)
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
+    char *transform_identity = expr_laplace_identity_TeX(expr, display_expr);
+    printf("transform_identity_TeX  %s\n", transform_identity ? transform_identity : "");
+    free(transform_identity);
     char *conditioned_expression = expr_conditioned_cases_to_string(display_expr);
     printf("conditioned_expression  %s\n", conditioned_expression ? conditioned_expression : "");
     free(conditioned_expression);
-    printf("algebraic_specialisation  %s\n", domain_specialised ? "domain-required" : "none");
+    printf("algebraic_specialisation  %s\n",
+           specialised_transform ? "native-result" : domain_specialised ? "domain-required" : "none");
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
@@ -2099,7 +2117,10 @@ int main(int argc, char **argv)
         }
 
         print_owned_number("value", num_clone(value_number), precision);
-        if (!num_is_finite(value_number) && expr_integral_value_note(expr, value_note, sizeof(value_note)))
+        const char *transform_note = !num_is_finite(value_number) ? expr_laplace_value_note(expr) : NULL;
+        if (transform_note)
+            printf("value_note  %s\n", transform_note);
+        else if (!num_is_finite(value_number) && expr_integral_value_note(expr, value_note, sizeof(value_note)))
             printf("value_note  %s\n", value_note);
         else if (num_is_nan(value_number) && expr_finite_summation_exceeds_direct_limit(expr))
             printf("value_note  Value not computed: the finite sum exceeds the safe direct-evaluation limit and has "

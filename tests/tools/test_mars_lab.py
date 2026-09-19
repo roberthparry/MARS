@@ -1,4 +1,5 @@
 import datetime as py_datetime
+import cmath
 import decimal
 import math
 import re
@@ -19,6 +20,53 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_conditions_are_not_binding_values(self) -> None:
+        source = "{ f(s) | s = NAN; a = NAN, b = NAN; Re(s) > Re(b); Re(s) > Re(a) }"
+        values = mars_lab.expression_variable_binding_values(source, 40)
+        self.assertEqual([(v["name"], v["value"]) for v in values],
+                         [("s", "NAN"), ("a", "NAN"), ("b", "NAN")])
+        self.assertEqual(mars_lab.parse_binding_assignments("b = { x | x = 2; c = 3 }; Re(s) > 0"),
+                         [("b", "{ x | x = 2; c = 3 }")])
+        names = (
+            "lastIndexOfTopLevel", "indexOfTopLevel", "splitTopLevel", "bindingParts", "expressionForEditor",
+            "compactExpressionForEditor", "compactBindingValue", "compactLongNumericTokens",
+            "compareBindingNames", "bindingsWithAuthoredValues",
+            "normalisedBindingInputValue",
+        )
+        functions = "\n".join(
+            "function " + name + "(" + mars_lab.INDEX_HTML.split("    function " + name + "(", 1)[1]
+            .split("\n    function ", 1)[0] for name in names
+        )
+        script = functions + r'''
+            const COMPACT_BINDING_VALUE_LIMIT = 80, COMPACT_BINDING_VALUE_KEEP = 30;
+            const source = '{ f(s) | s = NAN; a = NAN, b = NAN; Re(s) > Re(b); Re(s) > Re(a) }';
+            const native = [
+                {name: 's', value: 'NAN', kind: 'variable'},
+                {name: 'a', value: 'NAN', kind: 'constant'},
+                {name: 'b', value: 'NAN', kind: 'constant'}
+            ];
+            if (!compactExpressionForEditor(source).display.includes('; Re(s) > Re(b); Re(s) > Re(a)'))
+                throw new Error('Lost expression conditions');
+            for (const bindings of [compactExpressionForEditor(source).bindings,
+                                    bindingsWithAuthoredValues(native, source)]) {
+                if (bindings.length !== 3 || bindings.some(b => !['NAN', '?'].includes(b.value)))
+                    throw new Error(JSON.stringify(bindings));
+            }
+            const exact = bindingsWithAuthoredValues(native, '{ f(s) | s = 2; a = @pi, b = 1/3 }');
+            if (exact[1].value !== '@pi' || exact[2].value !== '1/3')
+                throw new Error(JSON.stringify(exact));
+            for (const value of ['?; Re(s) > Re(b)', 'NAN; Re(s) > Re(b)']) {
+                if (!['?', 'NAN'].includes(normalisedBindingInputValue({value})))
+                    throw new Error('Visible contaminated input was submitted again');
+            }
+            if (normalisedBindingInputValue({value: '{ x | x=2; c=3 }'}) !== '{ x | x=2; c=3 }')
+                throw new Error('Changed a nested binding value');
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_result_expansion_targets_each_clicked_card_and_resets(self) -> None:
         html = mars_lab.INDEX_HTML
         self.assertIn(
@@ -1616,10 +1664,31 @@ class MatrixResultTests(unittest.TestCase):
             fields["expression_pretty"],
             "{ (\n\t1 - λ,\t2;\n\t3,\t4 - λ\n) | λ = 3 }",
         )
-        self.assertIn("matrix mat(λ)", fields["function"])
-        self.assertIn("λ = 3.", fields["function"])
+        self.assertIn("matrix mat(@lambda)", fields["function"])
+        self.assertIn("@lambda = 3.", fields["function"])
+        self.assertIn("output(mat(@lambda))", fields["function"])
+        self.assertNotIn("λ", fields["function"])
         self.assertEqual(fields["value"], "(-2, 2; 3, 1)")
         self.assertIn("-2 2", fields["value_pretty"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
+        "release matrix_lab helper is not built",
+    )
+    def test_matrix_factors_use_style_specific_names(self) -> None:
+        fields, raw, returncode = mars_lab.run_matrix_lab_fields(
+            ROOT / "build" / "release" / "scratch" / "matrix_lab",
+            "{ (omega*x, omega; omega*x^2, omega) | x = 2; omega = 3 }",
+            "eval", 32,
+        )
+        self.assertEqual(returncode, 0, raw)
+        self.assertIn("ω", fields["expression_pretty"])
+        self.assertNotIn("@omega", fields["expression_pretty"])
+        self.assertIn("x²", fields["expression_pretty"])
+        self.assertIn("matrix mat(@omega, x)", fields["function"])
+        self.assertIn("@omega = 3.", fields["function"])
+        self.assertNotIn("ω", fields["function"])
+        self.assertEqual(fields["value"], "(6, 3; 12, 3)")
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "matrix_lab").is_file(),
@@ -4340,6 +4409,879 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_TeX_rational_coefficients_share_the_outer_denominator(self) -> None:
+        cases = (
+            ("(1/2)*(x+y)/(c*s)", r"\frac{1}{2\mkern-2mu c\mkern-2mu s}"),
+            ("(2/3)/(c*s)", r"\frac{2}{3\mkern-2mu c\mkern-2mu s}"),
+            ("(1/16)*sqrt(c^2)/c^3", r"\frac{\sqrt{c^{2}}}{16\mkern-2mu c^{3}}"),
+            ("1-(1/2)/(c*s)", r"1 - \frac{1}{2\mkern-2mu c\mkern-2mu s}"),
+            ("(1/2)/(c+s)", r"\frac{1}{2\mkern-2mu \left(s + c\right)}"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertIn(expected, fields["tex"])
+                self.assertNotIn(r"\frac{\frac{", fields["tex"])
+
+    def test_derivative_error_does_not_display_native_protocol(self) -> None:
+        handler = object.__new__(mars_lab.MarsLabHandler)
+        handler.path = "/eval"
+        handler.binary = Path("mars_lab")
+        body = b'{"expression":"@L{tanh(c*t)}","action":"derivative","wrt":"s","persist_expression":false}'
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = mock.Mock()
+        handler.rfile.read.return_value = body
+        handler.request_allowed = mock.Mock(return_value=True)
+        handler.send_json = mock.Mock()
+        for diagnostic in ("Failed to build derivative with respect to s\n", ""):
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="expression  native protocol output\n", stderr=diagnostic)
+            with (
+                mock.patch.object(mars_lab, "load_state_expression", return_value=""),
+                mock.patch.object(mars_lab.subprocess, "run", return_value=completed),
+            ):
+                handler.do_POST()
+            status, payload = handler.send_json.call_args.args
+            self.assertEqual(status, 422)
+            self.assertEqual(payload["error"], diagnostic.strip() or "mars_lab exited with 1")
+            self.assertIn("native protocol output", payload["raw"])
+
+    def test_conditioned_laplace_derivatives(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L{tanh(c*t)}", 40, "s", "derivative")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("trigamma(", fields["derivative_function"])
+        self.assertNotIn("digamma(", fields["derivative_function"])
+        self.assertNotIn(r"\frac{\frac{", fields["derivative_TeX"])
+        self.assertIn("realpart(s) > 0", fields["derivative_function"])
+        self.assertIn("realpart(sqrt(c^2)) > 0", fields["derivative_function"])
+        for source, expected in (("{@L{tanh(c*t)} | s=2; c=1}", 0.25-math.pi**2/24),
+                                 ("{1/s where (Re(s)>0) | s=2}", -0.25)):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "s", "derivative")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["derivative_value"]), expected, places=14)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{1/s where (Re(s)>0) | s=-1}", 40, "s", "derivative")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["derivative_value"], "NAN")
+
+    def test_laplace_tanh_rates_and_conditions(self) -> None:
+        cases = (("1", "2", math.log(2)-0.5), ("-1", "2", 0.5-math.log(2)),
+                 ("2", "4", (math.log(2)-0.5)/2), ("-2", "4", (0.5-math.log(2))/2),
+                 ("0", "-2", 0))
+        for rate, target, expected in cases:
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L{tanh(c*t)} | s=" + target + "; c=" + rate + "}", 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+            self.assertNotIn("Laplace(", fields["function"])
+            self.assertNotIn("value_note", fields)
+        for source in ("{@L{tanh(c*t)} | s=-1; c=1}", "{@L{tanh(c*t)} | s=2; c=i}"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], "NAN")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L{tanh(c*t)}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertNotIn("Laplace(", fields["function"])
+        self.assertIn("digamma(", fields["function"])
+        self.assertIn("Re(s) > 0", fields["expression"])
+        self.assertIn("sqrt(", fields["function"])
+        copied, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, fields["expression"], 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(copied["unbound"], fields["unbound"])
+
+    def test_laplace_tanh_complex_rate_against_quadrature(self) -> None:
+        # Independent composite Simpson integration, including a negligible exp(-80) tail.
+        count = 20000
+        step = 40/count
+        def integrand(t):
+            return math.exp(-2*t)*cmath.tanh((1+1j)*t)
+        expected = step/3*(integrand(0)+integrand(40)+sum(
+            (4 if k % 2 else 2)*integrand(k*step) for k in range(1, count)))
+        derivative_expected = step/3*(-40*integrand(40)+sum(
+            (4 if k % 2 else 2)*(-k*step)*integrand(k*step) for k in range(1, count)))
+        for rate, sign in (("1+i", 1), ("-1-i", -1)):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L{tanh(c*t)} | s=2; c="+rate+"}", 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            actual = complex(fields["value"].replace(" ", "").replace("i", "j"))
+            self.assertAlmostEqual(actual.real, sign*expected.real, places=10)
+            self.assertAlmostEqual(actual.imag, sign*expected.imag, places=10)
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L{tanh(c*t)} | s=2; c="+rate+"}", 40, "s", "derivative")
+            self.assertEqual(code, 0, raw)
+            actual = complex(fields["derivative_value"].replace(" ", "").replace("i", "j"))
+            self.assertAlmostEqual(actual.real, sign*derivative_expected.real, places=10)
+            self.assertAlmostEqual(actual.imag, sign*derivative_expected.imag, places=10)
+
+    def test_laplace_tangent_convergence_notes(self) -> None:
+        self.assertIn('id="valueNoteCard"', mars_lab.INDEX_HTML)
+        self.assertIn("valueNote.textContent = data.value_note || '';", mars_lab.INDEX_HTML)
+        for rate in ("1", "-2", "1/3"):
+            source = "{@L{tan(c*t)} | c=" + rate + "}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertIn("ordinary Laplace transform does not exist", fields["value_note"])
+            self.assertIn("poles", fields["value_note"])
+            self.assertEqual(fields["value"], "NAN")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L{tan(c*t)}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("Transform left symbolic", fields["value_note"])
+        self.assertIn("Laplace(tan(", fields["function"])
+        for rate in ("i", "1+i"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L{tan(c*t)} | c=" + rate + "}", 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertNotIn("value_note", fields)
+            self.assertIn("Laplace(", fields["function"])
+        for source in ("{@L{tan(c*t)} | c=0}", "{@L{tan(c*t)} | s=-2; c=0}", "@L{0,t}"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(float(fields["value"]), 0)
+            self.assertNotIn("value_note", fields)
+            self.assertNotIn("Re(s)", fields["unbound"])
+
+    def test_inverse_laplace_logarithms(self) -> None:
+        for operand in ("-(ln(s)+γ)/s", "(-ln(s)-@eulermascheroni)/s", "-ln(s)/s-γ/s"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "@Linv{" + operand + "}", 40, "t", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["unbound"], "ln(t)")
+            self.assertIn("return ln(t).", fields["function"])
+            self.assertIn(r"= \ln(t)", fields["transform_identity_TeX"])
+        cases = (("-(ln(s)+γ)/s", math.log(2)),
+                 ("ln(s)/s", -math.log(2)-0.5772156649015329),
+                 ("(3*ln(s)+2)/(2*s)", (2-3*(math.log(2)+0.5772156649015329))/2),
+                 ("log(s)/s", -(math.log(2)+0.5772156649015329)/math.log(10)))
+        for operand, expected in cases:
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@Linv{" + operand + "} | t=2}", 40, "t", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@Linv{ln(s)^2/s}", 40, "t", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("InverseLaplace(", fields["function"])
+
+    def test_laplace_braces_and_logarithm(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{@L{log(t)} | s=1}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertAlmostEqual(float(fields["value"]), -0.5772156649015329/math.log(10), places=14)
+        for alias in ("@L", "Laplace", "ℒ"):
+            for delimiters in ("()", "{}"):
+                call = alias + delimiters[0] + "ln(t)" + delimiters[1]
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, "{" + call + " | s=1}", 40, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertAlmostEqual(float(fields["value"]), -0.5772156649015329, places=14)
+                self.assertIn(r"\gamma", fields["tex"])
+                self.assertIn("Re(s) > 0", fields["expression"])
+        for alias in ("@Linv", "InverseLaplace", "ℒ⁻¹"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{" + alias + "{1/s^2,s,x} | x=2}", 30, "x", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(float(fields["value"]), 2)
+        for source in ("@L{ln(t))", "@L(ln(t)}", "@L{}", "@Linv{}"):
+            _, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertNotEqual(code, 0, raw)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{@L{ln(t)} | s=-1}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["value"], "NAN")
+
+    def test_inverse_laplace_aliases_and_shifted_cosine(self) -> None:
+        for alias in ("@Linv", "ℒ⁻¹", "InverseLaplace"):
+            source = "{" + alias + "(1/((s-a)^2+1)*(s-a)) | a=2; t=0.5}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "t", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), math.exp(1)*math.cos(0.5), places=13)
+            self.assertNotIn("InverseLaplace(", fields["function"])
+            self.assertIn(r"\mathcal{L}^{-1}", fields["transform_identity_TeX"])
+            self.assertNotIn("variable\ts\t", fields.get("bindings", ""))
+
+    def test_inverse_laplace_rules_and_round_trip(self) -> None:
+        cases = (
+            ("1/s", 1.0), ("1/s^2", 0.5), ("1/(s-2)", math.e),
+            ("1/(s-2)^3", math.e/8), ("1/(s^2+1)", math.sin(0.5)),
+            ("s/(s^2+1)", math.cos(0.5)), ("1/(s^2-1)", math.sinh(0.5)),
+            ("2/s+3/s^2", 3.5), ("1/(s^2+2*s+2)", math.exp(-0.5)*math.sin(0.5)),
+            ("1/(s*(s+1))", 1-math.exp(-0.5)),
+            ("1/(s*(s+1)^2)", 1-1.5*math.exp(-0.5)),
+        )
+        for operand, expected in cases:
+            with self.subTest(operand=operand):
+                source = "{@Linv(" + operand + ") | t=0.5}"
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, "t", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertAlmostEqual(float(fields["value"]), expected, places=13)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@Linv(F(s),s,x)", 30, "x", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("InverseLaplace(F(s), s, x)", fields["function"])
+        copied, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, fields["expression"], 30, "x", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(copied["unbound"], fields["unbound"])
+
+    def test_inverse_laplace_invalid_scope_and_unsupported_input(self) -> None:
+        for source in ("@Linv()", "@Linv(1)", "@Linv(F(s),s,s)", "@Linv(F(s)+t,s)"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "t", "evaluate")
+            self.assertNotEqual(code, 0, raw)
+        for source in ("@Linv(1,s)", "@Linv(exp(s^2))"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "t", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertIn("InverseLaplace(", fields["function"])
+            self.assertEqual(fields["value"], "NAN")
+
+    def test_inverse_laplace_result_calculus(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@Linv(1/s^2)", 30, "t", "derivative")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("return 1.", fields["derivative_function"])
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@Linv(1/s^2)", 30, "t", "integral")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("t²", fields["integral"])
+        self.assertNotIn("InverseLaplace(", fields["integral_function"])
+
+    def test_laplace_exponential_shift_formal_definition_and_round_trip(self) -> None:
+        for source in ('@L(e^(at)f(t))', '@L(f(t)*exp(a*t))'):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r'= F\left(s - a\right)', fields['transform_identity_TeX'])
+            self.assertIn(r'F(s):=\mathcal{L}_{t\to s}', fields['transform_identity_TeX'])
+            self.assertIn(r'\operatorname{ROC}(F)', fields['transform_identity_TeX'])
+            self.assertIn('Laplace(f(t), t, s - a)', fields['function'])
+            self.assertEqual(fields.get('value'), 'NAN')
+            payload = mars_lab.prepare_evaluation_fields(self.expression_binary, fields, source, 30, False)
+            self.assertIn(r'= F\left(s - a\right)', payload['full_display_TeX'])
+            for _ in range(2):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, fields['expression'], 30, 's', 'evaluate')
+                self.assertEqual(code, 0, raw)
+                self.assertIn('Laplace(f(t), t, s - a)', fields['function'])
+
+    def test_laplace_exponential_shift_known_functions_and_domains(self) -> None:
+        cases = (
+            ('{@L(exp(a*t)*sin(t)) | s=3; a=1}', 0.2),
+            ('{@L(exp(a*t)*t*sin(t)) | s=3; a=1}', 0.16),
+            ('{@L(exp(a*t)*J_0(t)) | s=3; a=1}', 1 / math.sqrt(5)),
+            ('{Laplace(t*sin(t),t,s-a) | s=3; a=1}', 0.16),
+            ('{Laplace([laplace_target_0],[laplace_target_0],s-a) | s=3; a=1}', 0.25),
+        )
+        for source, expected in cases:
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields['value']), expected, places=14)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, '{@L(exp(a*t)*sin(t)) | s=1; a=2}', 30, 's', 'evaluate')
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields.get('value'), 'NAN')
+
+    def test_laplace_bessel_zero_aliases_and_values(self) -> None:
+        for call in ('J_0(t)', 'J0(t)', 'J₀(t)', 'besselj(0,t)', 'BesselJ(0,t)', 'bessel_j(0,t)'):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, '{@L(' + call + ') | s=pi}', 40, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields['value']), 1 / math.sqrt(math.pi**2 + 1), places=14)
+            self.assertIn(r'\frac{1}{\sqrt{s^{2} + 1}}', fields['transform_identity_TeX'])
+            self.assertNotIn('Laplace(', fields['function'])
+        for rate in ('0', '2', '-2', 'i', '1+i'):
+            source = '{@L(J_0(a*t))*sqrt(s^2+a^2) | s=3; a=' + rate + '}'
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields['value']), 1, places=14)
+        for source in ('{@L(J_0(t)) | s=-1}', '{@L(J_0(a*t)) | s=1; a=2i}'):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 40, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields.get('value'), 'NAN', raw)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, '@L(J_0(t+1))', 40, 's', 'evaluate')
+        self.assertEqual(code, 0, raw)
+        self.assertIn('Laplace(', fields['function'])
+
+    def test_laplace_difference_round_trip_keeps_one_domain(self) -> None:
+        source = '{@L((e^(at)-e^(bt))/(a-b)) | s=?; a=?, b=?; Re(s)>Re(b); Re(s)>Re(a)}'
+        fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, 's', 'evaluate')
+        self.assertEqual(code, 0, raw)
+        self.assertTrue(fields['transform_identity_TeX'].startswith(r'\mathcal{L}'), raw)
+        self.assertEqual(fields['function'].count('if ('), 1, raw)
+        self.assertEqual(fields['function'].count('realpart(s) > realpart(b)'), 1, raw)
+        self.assertEqual(fields['function'].count('realpart(s) > realpart(a)'), 1, raw)
+        self.assertNotIn('where', fields['expression'].split('|')[0], raw)
+        payload = mars_lab.prepare_evaluation_fields(self.expression_binary, fields, source, 30, False)
+        self.assertTrue(all(v['value'] in ('NAN', '?') for v in payload['binding_values']), payload)
+        for _ in range(3):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, fields['expression'], 30, 's', 'evaluate')
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields['function'].count('if ('), 1, raw)
+            self.assertEqual(fields['function'].count('realpart(s) > realpart(b)'), 1, raw)
+
+    def test_laplace_rendered_card_shows_native_identity(self) -> None:
+        source = "@L(sinh(@omegat))"
+        fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        identity = fields["transform_identity_TeX"]
+        self.assertTrue(identity.startswith(r"\mathcal{L}_{t\to s}\left\{"), identity)
+        self.assertIn(r"\sinh", identity)
+        self.assertIn(r"\omega", identity.split(" = ")[0])
+        self.assertEqual(identity.split(" = ", 1)[1], fields["tex"])
+        payload = mars_lab.prepare_evaluation_fields(
+            self.expression_binary, fields, source, 30, False, action="evaluate"
+        )
+        self.assertEqual(payload["full_display_TeX"], mars_lab.TeX_for_display(identity))
+        self.assertNotIn("Laplace(", payload["full_display_function"])
+
+    def test_laplace_identity_specialises_constants_and_skips_unevaluated(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{@L(t^n) | s=2; n=5}", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertIn(r"\left\{t^{5}\right\} = ", fields["transform_identity_TeX"])
+        self.assertIn(r"\frac{120}{s^{6}}", fields["transform_identity_TeX"])
+        for source in ("@L(f(t))", "sin(t)"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertFalse(fields.get("transform_identity_TeX"))
+
+    def test_function_card_uses_typeable_greek_aliases(self) -> None:
+        for alias, symbol in (("@omega", "ω"), ("@alpha", "α"), ("@beta", "β"),
+                              ("@theta", "θ"), ("@OMEGA", "Ω")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{alias}/(s^2-{alias}^2)", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertTrue(fields["function"].isascii(), fields["function"])
+            self.assertIn(alias, fields["function"])
+            self.assertIn(symbol, fields["expression"])
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(sinh(@omegat))", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertTrue(fields["function"].isascii(), fields["function"])
+        for fragment in ("expr(@omega, s)", "realpart(@omega)", "realpart(-@omega)",
+                         "return @omega/(s^2 - @omega^2).", "@omega = ?.", "output(expr(@omega, s))."):
+            self.assertIn(fragment, fields["function"])
+        self.assertIn(r"\omega", fields["tex"])
+
+    def test_laplace_prefers_time_with_frequency_parameters(self) -> None:
+        for parameter in ("@omega", "ω", "x"):
+            implicit, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"@L(sinh({parameter}*t))", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            explicit, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"@L(sinh({parameter}*t),t)", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            for key in ("tex", "expression", "function", "bindings"):
+                self.assertEqual(implicit[key], explicit[key])
+            self.assertNotIn("Laplace(", implicit["function"])
+
+    def test_laplace_explicit_source_and_remaining_ambiguity(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(sinh(x*t),x)", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertIn(r"\frac{t}{s^{2} - t^{2}}", fields["tex"])
+        for source in ("@L(sinh(x*y))", "@L(sinh(s*t))", "@L(t,t,t)"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, source, 30, "s", "evaluate"
+            )
+            self.assertNotEqual(code, 0, source)
+            self.assertIn("parse error", raw)
+
+    def test_laplace_reciprocal_error_scale_simplification(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(erf(t/(2a)))", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["tex"],
+                         r"\frac{a\mkern-2mu e^{a^{2}\mkern-2mu s^{2}}\mkern-2mu "
+                         r"\operatorname{erfc}(s\mkern-2mu \sqrt{a^{2}})}{s\mkern-2mu \sqrt{a^{2}}}"
+                         r"\quad (\operatorname{Re}(s)>0,\;\operatorname{Re}(a^{2})>0)")
+        self.assertNotIn("1/(2", fields["expression"])
+        self.assertNotIn("Laplace(", fields["function"])
+        self.assertIn("Re(a²) > 0", fields["expression"].split("|", 1)[1])
+
+    def test_laplace_reciprocal_error_scales_values(self) -> None:
+        for name in ("erf", "erfc"):
+            for scale in (-2, -1, 1, 2):
+                for offset in (0, 1):
+                    for factor in (2, 3):
+                        source = f"{{@L({name}(t/({factor}a)+b),t) | s=2; a={scale}; b={offset}}}"
+                        reference = f"{{@L({name}(({1/(factor*scale):.17g})*t+b),t) | s=2; b={offset}}}"
+                        fields, raw, code = mars_lab.run_mars_lab_fields(
+                            self.expression_binary, source, 30, "s", "evaluate"
+                        )
+                        self.assertEqual(code, 0, raw)
+                        expected, raw, code = mars_lab.run_mars_lab_fields(
+                            self.expression_binary, reference, 30, "s", "evaluate"
+                        )
+                        self.assertEqual(code, 0, raw)
+                        self.assertAlmostEqual(float(fields["value"]), float(expected["value"]), places=13)
+        for bindings in ("s=2; a=0", "s=0; a=1", "s=2; a=i"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L(erf(t/(2a))) | " + bindings + "}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], "NAN")
+
+    def test_laplace_error_function_cards(self) -> None:
+        for name in ("erf", "erfc"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"@L({name}(at))", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertNotIn("Laplace(", fields["function"])
+            self.assertIn(r"\operatorname{erfc}", fields["tex"])
+            self.assertIn("Re(a²) > 0", fields["expression"].split("|", 1)[1])
+            self.assertIn("return @nan.", fields["function"])
+
+    def test_laplace_error_function_real_values(self) -> None:
+        for rate in (-2, -1, 1, 2):
+            for target in (1, 2, 5):
+                z = target/(2*abs(rate))
+                expected_erf = math.copysign(1, rate)*math.exp(z*z)*math.erfc(z)/target
+                for name, expected in (("erf", expected_erf), ("erfc", 1/target-expected_erf)):
+                    fields, raw, code = mars_lab.run_mars_lab_fields(
+                        self.expression_binary, f"{{@L({name}(at)) | s={target}; a={rate}}}", 30, "s", "evaluate"
+                    )
+                    self.assertEqual(code, 0, raw)
+                    self.assertAlmostEqual(float(fields["value"]), expected, places=13)
+
+    def test_laplace_error_function_affine_quadrature(self) -> None:
+        for rate, offset in ((1, 1), (-1, 1), (2, -1)):
+            n = 20000
+            step = 20/n
+            def integrand(t):
+                return math.exp(-2*t)*math.erf(rate*t+offset)
+            total = integrand(0)+integrand(20)
+            total += sum((4 if k % 2 else 2)*integrand(k*step) for k in range(1, n))
+            expected = total*step/3
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{{@L(erf(at+b),t) | s=2; a={rate}; b={offset}}}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), expected, places=10)
+
+    def test_laplace_error_function_domain_and_zero_rate(self) -> None:
+        for name, target, rate, expected in (("erf", "2", "0", "0"), ("erfc", "2", "0", "0.5"),
+                                             ("erf", "0", "1", "NAN"), ("erfc", "-1", "1", "NAN"),
+                                             ("erf", "2", "i", "NAN")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{{@L({name}(at)) | s={target}; a={rate}}}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], expected)
+
+    def test_laplace_time_weighted_symbolic_trigonometric_cards(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(tsin(at))", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertIn(r"\frac{2\mkern-2mu a\mkern-2mu s}{\left(s^{2} + a^{2}\right)^{2}}", fields["tex"])
+        self.assertNotIn("Laplace(", fields["function"])
+        self.assertIn("return @nan.", fields["function"])
+        self.assertIn("Re(s) > Re(ai)", fields["expression"].split("|", 1)[1])
+        self.assertIn("Re(s) > Re(-ai)", fields["expression"].split("|", 1)[1])
+
+    def test_laplace_time_weights_and_affine_phase_values(self) -> None:
+        examples = (("t*sin(at)", "a=1", 4/25), ("sin(at)*t", "a=1", 4/25),
+                    ("t*cos(at)", "a=1", 3/25), ("t^2*sin(at)", "a=1", 22/125),
+                    ("t^2*cos(at)", "a=1", 4/125), ("t^n*sin(at)", "a=1; n=2", 22/125),
+                    ("t*exp(at)", "a=1", 1), ("t*sinh(at)", "a=1", 4/9),
+                    ("t*sin(at+b)", "a=1; b=pi/2", 3/25),
+                    ("t*cos(at+b)", "a=1; b=pi/2", -4/25))
+        for operand, bindings, expected in examples:
+            with self.subTest(operand=operand):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, f"{{@L({operand},t) | s=2; {bindings}}}", 30, "s", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+                self.assertNotIn("Laplace(", fields["function"])
+
+    def test_laplace_complex_frequency_convergence(self) -> None:
+        for target in ("0", "1", "2"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{{@L(t*sin(at)/(4*i/9),t) | s={target}; a=i}}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            if target == "2":
+                self.assertAlmostEqual(float(fields["value"]), 1, places=14)
+            else:
+                self.assertEqual(fields["value"], "NAN")
+
+    def test_laplace_root_spellings_match_powers(self) -> None:
+        for source, equivalent in (("sqrt(t)", "t^(1/2)"), ("√(t)", "t^(1/2)"),
+                                   ("cubrt(t)", "t^(1/3)"), ("root(t,4)", "t^(1/4)"),
+                                   ("1/sqrt(t)", "t^(-1/2)")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, f"@L({source})", 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            expected, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, f"@L({equivalent})", 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["tex"], expected["tex"])
+            self.assertNotIn("Laplace(", fields["function"])
+
+    def test_laplace_square_root_exact_result_and_domain(self) -> None:
+        for target in ("1", "4", "0", "-1"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L(sqrt(t)) | s=" + target + "}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r"\sqrt{\pi}", fields["tex"])
+            self.assertNotIn(r"\sqrt{s^{3}}", fields["tex"])
+            if int(target) > 0:
+                self.assertAlmostEqual(float(fields["value"]), math.sqrt(math.pi)/(2*int(target)**1.5), places=14)
+            else:
+                self.assertEqual(fields["value"], "NAN")
+
+    def test_laplace_symbolic_hyperbolic_cards(self) -> None:
+        for name, numerator in (("sinh", "a"), ("cosh", "s")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"@L({name}(at))", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r"\frac{" + numerator + r"}{s^{2} - a^{2}}", fields["tex"])
+            self.assertNotIn("Laplace(", fields["function"])
+            self.assertIn("realpart(s) > realpart(a)", fields["function"])
+            self.assertIn("realpart(s) > realpart(-a)", fields["function"])
+            self.assertIn("return @nan.", fields["function"])
+            self.assertIn("Re(s) > Re(a)", fields["expression"].split("|", 1)[1])
+            for rate in ("1", "-1", "i", "1+i"):
+                source = "{" + fields["unbound"] + " | s=2; a=" + rate + "}"
+                copied, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertNotEqual(copied["value"], "NAN")
+
+    def test_laplace_hyperbolic_values_and_convergence(self) -> None:
+        for name in ("sinh", "cosh"):
+            for rate in (-2, -1, 0, 1, 2):
+                for target in (-3, 0, 1, 2, 3):
+                    source = f"{{@L({name}(a*t)) | s={target}; a={rate}}}"
+                    fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                    self.assertEqual(code, 0, raw)
+                    if target > abs(rate):
+                        expected = (rate if name == "sinh" else target) / (target*target-rate*rate)
+                        self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+                    else:
+                        self.assertEqual(fields["value"], "NAN")
+
+    def test_laplace_hyperbolic_affine_offsets(self) -> None:
+        for name in ("sinh", "cosh"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{{@L({name}(a*t+b),t) | s=3; a=1, b=1}}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            expected = ((3*math.sinh(1) + math.cosh(1)) if name == "sinh"
+                        else (3*math.cosh(1) + math.sinh(1))) / 8
+            self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+
+    def test_laplace_symbolic_affine_exponentials(self) -> None:
+        for source in ("@L(e^(a*t))", "@L(exp(a*t))", "@L(exp(a*t+b),t)"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertNotIn("Laplace(", fields["function"])
+                self.assertIn("realpart(s) > realpart(a)", fields["function"])
+                self.assertIn("Re(a)", fields["expression"].split("|", 1)[1])
+                self.assertIn("return @nan.", fields["function"])
+                copied = "{" + fields["unbound"] + " | s=2; a=1, b=0}"
+                result, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, copied, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertAlmostEqual(float(result["value"]), 1.0, places=14)
+
+    def test_laplace_exponential_convergence_and_specialisation(self) -> None:
+        cases = (
+            ("{@L(e^(a*t)) | s=2; a=1}", "1"),
+            ("{@L(exp(a*t)) | s=-1; a=-2}", "1"),
+            ("{@L(exp(a*t)) | s=1; a=1}", "NAN"),
+            ("{@L(exp(a*t)) | s=0; a=1}", "NAN"),
+            ("{@L(exp(a*t)) | s=2+i; a=1+i}", "1"),
+            ("{@L(exp(a*t+b),t) | s=2; a=1, b=0}", "1"),
+            ("{@L(exp(a*t)+exp(b*t),t) | s=-1; a=-2, b=-3}", "1.5"),
+            ("{@L(exp(a*t)+1,t) | s=-1; a=-2}", "NAN"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertEqual(fields["value"], expected)
+                self.assertNotIn("Laplace(", fields["function"])
+                self.assertNotIn("const a", fields["function"])
+
+    def test_laplace_integer_trigonometric_powers(self) -> None:
+        # Independent finite Fourier expansion evaluated at s = 1.
+        for name in ("sin", "cos"):
+            for n in range(17):
+                for frequency in (-2, 0, 1, 3):
+                    with self.subTest(name=name, n=n, frequency=frequency):
+                        source = f"{{@L({name}({frequency}*t)^n) | s=1; n={n}}}"
+                        fields, raw, code = mars_lab.run_mars_lab_fields(
+                            self.expression_binary, source, 30, "s", "evaluate"
+                        )
+                        self.assertEqual(code, 0, raw)
+                        expected = sum(
+                            math.comb(n, k) * ((-1) ** k if name == "sin" else 1)
+                            / (1 - 1j * (n - 2*k) * frequency)
+                            for k in range(n + 1)
+                        ) / ((2j if name == "sin" else 2) ** n)
+                        self.assertAlmostEqual(float(fields["value"]), expected.real, places=12)
+                        self.assertNotIn("Laplace(", fields["function"])
+                        self.assertNotIn("const n", fields["function"])
+
+    def test_laplace_sine_power_cards_and_domain(self) -> None:
+        for value in ("1", "2", "0", "-1", "?"):
+            source = "{@L(sin^n(t)) | s=" + value + "; n=5}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertIn("Re(s) > 0", fields["expression"].split("|", 1)[1])
+            self.assertNotIn("where", fields["expression"])
+            self.assertIn("return @nan.", fields["function"])
+            self.assertIn("realpart(s) > 0", fields["function"])
+            self.assertNotIn("Laplace(", fields["function"])
+            self.assertNotIn("Gamma", fields["tex"])
+            if value in ("1", "2"):
+                s = int(value)
+                self.assertAlmostEqual(float(fields["value"]), 120 / ((s*s+1)*(s*s+9)*(s*s+25)), places=14)
+            else:
+                self.assertEqual(fields["value"], "NAN")
+            payload = mars_lab.prepare_evaluation_fields(
+                self.expression_binary, fields, source, 30, False, action="evaluate"
+            )
+            self.assertNotIn("n =", payload["full_display_expression"])
+
+    def test_laplace_trig_power_unsupported_arguments_stay_symbolic(self) -> None:
+        for source in ("@L(sin(t^2)^3)", "@L(cos(t+1)^n,t)", "@L(sin(t)^t)"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertIn("Laplace(", fields["function"])
+
+    def test_laplace_symbolic_trig_sums_and_integer_domain(self) -> None:
+        for name in ("sin", "cos"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"@L({name}(t)^n,t)", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r"\sum", fields["tex"])
+            self.assertIn(r"\mathbb{Z}_{\ge0}", fields["tex"])
+            self.assertIn("nonnegative_integer(n)", fields["expression"].split("|", 1)[1])
+            self.assertIn("floor(n) == n", fields["function"])
+            self.assertNotIn("v1 =", fields["function"])
+            if name == "sin":
+                self.assertIn("(2i)^n", fields["unbound"])
+            self.assertNotIn("Laplace(", fields["function"])
+            for n in ("0", "5", "17", "64", "-1", "1/2"):
+                copied = "{" + fields["unbound"] + " | s=1, n=" + n + "}"
+                result, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, copied, 30, "s", "evaluate"
+                )
+                self.assertEqual(code, 0, raw)
+                if n in ("-1", "1/2"):
+                    self.assertEqual(result["value"], "NAN")
+                else:
+                    # Compare the preserved finite sum against the derivative recurrence.
+                    order = int(n)
+                    expected = 1.0 if order % 2 == 0 else 0.5
+                    for k in range(order % 2 + 2, order + 1, 2):
+                        expected = (k*(k-1)*expected + (1 if name == "cos" else 0)) / (1+k*k)
+                    self.assertAlmostEqual(float(result["value"]), expected, places=12)
+
+    def test_laplace_large_bound_power_uses_sum(self) -> None:
+        for name in ("sin", "cos"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, f"{{@L({name}(t)^n) | s=1; n=64}}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r"\sum", fields["tex"])
+            self.assertNotIn("nonnegative_integer", fields["expression"])
+            self.assertNotIn("const n", fields["function"])
+
+    def test_laplace_sum_index_does_not_capture_target(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "{@L(cos(t)^n,t,k) | k=1, n=3}", 30, "k", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertIn("sum(j, 0, n,", fields["function"])
+        self.assertAlmostEqual(float(fields["value"]), 0.4, places=14)
+
+    def test_transform_cards_preserve_native_output_in_response(self) -> None:
+        for value in ("5", "3", "5"):
+            source = "{@L(t^n) | s=1; n=" + value + "}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            expected = "{ 120/s⁶ | s = 1; Re(s) > 0 }" if value == "5" else "{ 6/s⁴ | s = 1; Re(s) > 0 }"
+            native_TeX = fields["transform_identity_TeX"]
+            with mock.patch.object(mars_lab, "run_mars_lab_fields", side_effect=AssertionError("native result must be preserved")):
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, fields, source, 30, False, wrt="s", action="evaluate"
+                )
+            self.assertEqual(payload["full_display_expression"], expected)
+            self.assertEqual(payload["full_display_TeX"], mars_lab.TeX_for_display(native_TeX))
+            self.assertNotIn("const n", payload["full_display_function"])
+            self.assertIn("return @nan.", payload["full_display_function"])
+            self.assertEqual([(item["name"], item["value"]) for item in payload["binding_values"]],
+                             [("s", "1"), ("n", value)])
+
+    def test_laplace_symbolic_power(self) -> None:
+        for exponent, expected in (("0", 0.5), ("3", 0.375), ("-1/2", (3.141592653589793 / 2)**0.5)):
+            source = "{@L(t^n,t) | s=2; n=" + exponent + "}"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), expected)
+            self.assertNotIn(r"\operatorname{Re}(n)", fields["tex"])
+        for bindings in ("s=2; n=-1", "s=2; n=-3/2", "s=0; n=2", "s=-1; n=2"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L(t^n,t) | " + bindings + "}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], "NAN")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(t^n+2*t,t)", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertIn(r"\operatorname{Re}(n)>-1", fields["tex"])
+
+    def test_laplace_transform_expression_input(self) -> None:
+        cases = (
+            ("@L(t)", r"\frac{1}{s^{2}}", ">0"),
+            ("@L(exp(-t))", r"\frac{1}{s + 1}", ">-1"),
+            ("@L(sin(t))", r"\frac{1}{s^{2} + 1}", ">0"),
+            ("@L(cos(t))", r"\frac{s}{s^{2} + 1}", ">0"),
+            ("@L(t,t,p)", r"\frac{1}{p^{2}}", ">0"),
+            ("@L(1,t)", r"\frac{1}{s}", ">0"),
+        )
+        for source, formula, condition in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertIn(formula, fields["tex"])
+                self.assertIn(condition, fields["tex"])
+                self.assertIn(r"\operatorname{Re}", fields["tex"])
+                self.assertIn(" where (Re(", fields["unbound"])
+                self.assertNotIn("where_real_gt", fields["expression"])
+                self.assertNotIn("Laplace(", fields["function"])
+                roundtrip, text, status = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, fields["unbound"], 30, "s", "evaluate"
+                )
+                self.assertEqual(status, 0, text)
+                self.assertEqual(roundtrip["tex"], fields["tex"])
+
+    def test_laplace_transform_bindings_and_scope(self) -> None:
+        for alias in ("@L", "ℒ", "Laplace"):
+            source = "{ " + alias + "(exp(-t)) | s=2 }"
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(fields["value"]), 1/3)
+            self.assertNotIn("variable\tt\t", fields.get("bindings", ""))
+        for value in ("-1", "-2"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L(exp(-t)) | s=" + value + "}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], "NAN")
+        for source in ("@L(f(t))", "@L(exp(t^2))"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertIn(r"\mathcal{L}_{t\to s}", fields["tex"])
+            self.assertEqual(fields["value"], "NAN")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@L(t,t,2)", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(float(fields["value"]), 0.25)
+        for source in ("@L(1)", "@L(t,t,t)", "@L(t+s,t)", "@L(t,t,t-1)", "@L()"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertNotEqual(code, 0, raw)
+
+    def test_laplace_result_cards_preserve_formula_and_domain(self) -> None:
+        source = "{@L(t^n) | s=2; n=5}"
+        fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(float(fields["value"]), 1.875)
+        self.assertNotIn("ℒ(", fields["expression"])
+        self.assertNotIn("Laplace(", fields["function"])
+        self.assertEqual(fields["unbound"], "120/s⁶ where (Re(s) > 0)")
+        self.assertEqual(fields["expression"], "{ 120/s⁶ | s = 2; Re(s) > 0 }")
+        self.assertIn("if (realpart(s) > 0)", fields["function"])
+        self.assertIn("return 120/s^6.", fields["function"])
+        self.assertIn("else {\n        return @nan.", fields["function"])
+        self.assertNotIn(" where ", fields["function"])
+        self.assertNotIn("const n", fields["function"])
+        self.assertEqual(fields["tex"], r"\frac{120}{s^{6}}\quad (\operatorname{Re}(s)>0)")
+        for bindings, expected in (("s=2", "1.875"), ("s=-2", "NAN")):
+            copied = "{" + fields["unbound"] + " | " + bindings + "}"
+            result, text, status = mars_lab.run_mars_lab_fields(
+                self.expression_binary, copied, 30, "s", "evaluate"
+            )
+            self.assertEqual(status, 0, text)
+            self.assertEqual(result["value"], expected)
+            self.assertEqual(result["tex"], fields["tex"])
+
+    def test_laplace_binding_conditions_roundtrip(self) -> None:
+        for source, value in (("{120/s^6 | s=2; Re(s)>0}", "1.875"),
+                              ("{120/s^6 | s=-2; Re(s)>0}", "NAN"),
+                              ("{gamma(n+1)/s^(n+1) | s=2; n=5; Re(s)>0; Re(n)>-1}", "1.875"),
+                              ("{gamma(n+1)/s^(n+1) | s=2; n=-1.5; Re(s)>0; Re(n)>-1}", "NAN")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], value)
+            self.assertNotIn(" where ", fields["expression"])
+            copied, text, status = mars_lab.run_mars_lab_fields(
+                self.expression_binary, fields["expression"], 30, "s", "evaluate"
+            )
+            self.assertEqual(status, 0, text)
+            self.assertEqual(copied["value"], value)
+        fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, "@L(t^n)", 30, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertIn("; Re(s) > 0; Re(n) > -1 }", fields["expression"])
+        copied, text, status = mars_lab.run_mars_lab_fields(
+            self.expression_binary, fields["expression"], 30, "s", "evaluate"
+        )
+        self.assertEqual(status, 0, text)
+        self.assertEqual(copied["tex"], fields["tex"])
+
+    def test_transform_function_domain_guards(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, "@L(t^n)", 30, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        function = fields["function"]
+        self.assertIn("realpart(s) > 0", function)
+        self.assertIn("realpart(n) > -1", function)
+        self.assertIn("if (realpart(s) > 0 && realpart(n) > -1) {", function)
+        self.assertNotIn("abs(", function)
+        self.assertNotIn("@inf", function)
+        self.assertIn("return @nan.", function)
+        self.assertLess(function.index("if ("), function.index("gamma("))
+        self.assertNotIn(" where ", function)
+        for value in ("0", "-1", "?"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(
+                self.expression_binary, "{@L(t) | s=" + value + "}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], "NAN")
+
+    def test_function_long_domain_guard_wraps(self) -> None:
+        conditions = "; ".join(f"Re({name}) > 0" for name in "stxyzabc")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, f"1/s where ({conditions})", 30, "s", "evaluate"
+        )
+        self.assertEqual(code, 0, raw)
+        function = fields["function"]
+        self.assertIn(" &&\n        realpart(", function)
+        for line in function.splitlines():
+            if "realpart(" in line:
+                self.assertLessEqual(len(line), 120)
+        for name in "stxyzabc":
+            self.assertIn(f"realpart({name}) > 0", function)
+
     def test_heat_integral_removable_endpoint(self) -> None:
         source = ("{x/(2*sqrt(pi))*∫^t_0 sin(s)*(t-s)^(-3/2)"
                   "*exp(-1/4*(4*a*(t-s)+x^2/(t-s)))·ds | x=1, t=0.2; a=5}")
@@ -7498,8 +8440,9 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(payload["full_display_TeX"], r"0 + \theta\mkern-2mu i")
         self.assertEqual(payload["full_display_expression"], "{ 0 + θi | θ = π }")
-        self.assertIn("return 0 + θ.i.", payload["full_display_function"])
-        self.assertIn("θ = @pi", payload["full_display_function"])
+        self.assertIn("return 0 + @theta.i.", payload["full_display_function"])
+        self.assertIn("@theta = @pi", payload["full_display_function"])
+        self.assertNotIn("θ", payload["full_display_function"].split("`", 2)[-1])
         self.assertIn("value", payload)
 
     @unittest.skipUnless(
@@ -9188,6 +10131,145 @@ class AlmanacLocationTests(unittest.TestCase):
 # README examples: this class is named to sort after the ordinary regressions
 # and deliberately runs the examples documented in docs/mars-lab.md last.
 class ZZMarsLabReadmeExamples(unittest.TestCase):
+    def test_laplace_tanh_readme_example(self) -> None:
+        # README example: docs/expression.md, the hyperbolic tangent transform.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "{@L{tanh(c*t)} | s=2; c=1}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertAlmostEqual(float(fields["value"]), math.log(2)-0.5, places=14)
+        self.assertIn("digamma(", fields["function"])
+
+    def test_laplace_tangent_readme_examples(self) -> None:
+        # README examples: docs/expression.md, tangent divergence and zero rate.
+        for source in ("@L{tan(t)}", "@L{tan(c*t)}"):
+            fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertIn("poles", fields["value_note"])
+            self.assertIn("Laplace(", fields["function"])
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "{@L{tan(c*t)} | c=0}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(float(fields["value"]), 0)
+
+    def test_inverse_laplace_logarithm_readme_example(self) -> None:
+        # README example: docs/expression.md, inverse logarithm pair.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "@Linv{-(ln(s)+γ)/s}", 40, "t", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], "ln(t)")
+        self.assertIn("return ln(t).", fields["function"])
+
+    def test_laplace_logarithm_readme_example(self) -> None:
+        # README example: docs/expression.md, braces and the natural logarithm.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "{@L{ln(t)} | s=1}", 40, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertAlmostEqual(float(fields["value"]), -0.5772156649015329, places=14)
+        self.assertIn(r"\gamma", fields["transform_identity_TeX"])
+        self.assertIn("Re(s) > 0", fields["expression"])
+
+    def test_inverse_laplace_readme_example(self) -> None:
+        # README examples: docs/expression.md, shifted cosine and unsupported inverse.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "{@Linv((s-a)/((s-a)^2+1)) | a=2; t=0.5}", 40, "t", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertAlmostEqual(float(fields["value"]), 2.385516730959136, places=13)
+        self.assertIn(r"\mathcal{L}^{-1}", fields["transform_identity_TeX"])
+        self.assertNotIn("InverseLaplace(", fields["function"])
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "@Linv(F(s),s,x)", 30, "x", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], "ℒ⁻¹(F(s), s, x)")
+        self.assertIn("InverseLaplace(F(s), s, x)", fields["function"])
+
+    def test_laplace_exponential_shift_readme_example(self) -> None:
+        # README example: define the unknown transform locally and apply its shifted argument.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, '@L(e^(at)f(t))', 30, 's', 'evaluate')
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields['unbound'], 'ℒ(f(t), t, s - a)')
+        self.assertIn('return Laplace(f(t), t, s - a).', fields['function'])
+        self.assertIn(r'= F\left(s - a\right)', fields['transform_identity_TeX'])
+        self.assertIn(r'F(s):=\mathcal{L}_{t\to s}\left\{f\left(t\right)\right\}',
+                      fields['transform_identity_TeX'])
+        self.assertIn(r's - a\in\operatorname{ROC}(F)', fields['transform_identity_TeX'])
+
+    def test_laplace_finite_sum_readme_examples(self) -> None:
+        # README examples: docs/expression.md, symbolic trigonometric powers.
+        binary = ROOT / "build" / "release" / "scratch" / "mars_lab"
+        for name, numerator, denominator, scale, value in (
+            ("cos", r"s\mkern-2mu \Gamma(n + 1)",
+             r"s^{2} + \left(n - 2\mkern-2mu k\right)^{2}", "2^{n}", 0.4),
+            ("sin", r"\left(-1\right)^{k}\mkern-2mu \Gamma(n + 1)",
+             r"s - \left(n - 2\mkern-2mu k\right)\mkern-2mu i", r"\left(2i\right)^{n}", 0.3),
+        ):
+            source = f"@L({name}(t)^n,t)"
+            fields, raw, code = mars_lab.run_mars_lab_fields(binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            expected = (r"\frac{\sum_{k=0}^{n}\frac{" + numerator
+                        + r"}{k!\mkern-2mu \Gamma(1 - k + n)\mkern-2mu \left(" + denominator
+                        + r"\right)}}{" + scale
+                        + r"}\quad (\operatorname{Re}(s)>0,\;n\in\mathbb{Z}_{\ge0})")
+            self.assertEqual(fields["tex"], expected)
+            copied, raw, code = mars_lab.run_mars_lab_fields(
+                binary, "{" + fields["unbound"] + " | s=1, n=3}", 30, "s", "evaluate"
+            )
+            self.assertEqual(code, 0, raw)
+            self.assertAlmostEqual(float(copied["value"]), value, places=14)
+
+    def test_laplace_readme_examples(self) -> None:
+        # README examples: docs/expression.md, Laplace transforms.
+        cases = (
+            ("@L(t)", r"\frac{1}{s^{2}}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(erf(t/(2a)))", r"\frac{a\mkern-2mu e^{a^{2}\mkern-2mu s^{2}}\mkern-2mu "
+             r"\operatorname{erfc}(s\mkern-2mu \sqrt{a^{2}})}{s\mkern-2mu \sqrt{a^{2}}}"
+             r"\quad (\operatorname{Re}(s)>0,\;\operatorname{Re}(a^{2})>0)"),
+            ("@L(erf(t))", r"\frac{e^{\frac{1}{4}\mkern-2mu s^{2}}\mkern-2mu "
+             r"\operatorname{erfc}(\frac{1}{2}\mkern-2mu s)}{s}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(erfc(t))", r"\frac{1 - e^{\frac{1}{4}\mkern-2mu s^{2}}\mkern-2mu "
+             r"\operatorname{erfc}(\frac{1}{2}\mkern-2mu s)}{s}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(tsin(at))", r"\frac{2\mkern-2mu a\mkern-2mu s}{\left(s^{2} + a^{2}\right)^{2}}"
+             r"\quad (\operatorname{Re}(s)>\operatorname{Re}(a\mkern-2mu i),\;"
+             r"\operatorname{Re}(s)>\operatorname{Re}(-a\mkern-2mu i))"),
+            ("@L(sinh(@omega*t))", r"\frac{\omega}{s^{2} - \omega^{2}}"
+             r"\quad (\operatorname{Re}(s)>\operatorname{Re} \omega,\;"
+             r"\operatorname{Re}(s)>\operatorname{Re}(-\omega))"),
+            ("@L(sqrt(t))", r"\frac{\sqrt{\pi}}{2\mkern-2mu s^{\frac{3}{2}}}"
+             r"\quad (\operatorname{Re}(s)>0)"),
+            ("@L(J_0(t))", r"\frac{1}{\sqrt{s^{2} + 1}}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(cubrt(t))", r"\frac{\Gamma(\frac{4}{3})}{s^{\frac{4}{3}}}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(exp(-t))", r"\frac{1}{s + 1}\quad (\operatorname{Re}(s)>-1)"),
+            ("@L(e^(a*t))", r"\frac{1}{s - a}\quad (\operatorname{Re}(s)>\operatorname{Re}(a))"),
+            ("@L(exp(a*t+b),t)", r"\frac{e^{b}}{s - a}\quad (\operatorname{Re}(s)>\operatorname{Re}(a))"),
+            ("@L(sin(t))", r"\frac{1}{s^{2} + 1}\quad (\operatorname{Re}(s)>0)"),
+            ("@L(sinh(at))", r"\frac{a}{s^{2} - a^{2}}\quad (\operatorname{Re}(s)>\operatorname{Re}(a),\;"
+             r"\operatorname{Re}(s)>\operatorname{Re}(-a))"),
+            ("@L(cosh(at))", r"\frac{s}{s^{2} - a^{2}}\quad (\operatorname{Re}(s)>\operatorname{Re}(a),\;"
+             r"\operatorname{Re}(s)>\operatorname{Re}(-a))"),
+            ("@L(t,t,p)", r"\frac{1}{p^{2}}\quad (\operatorname{Re}(p)>0)"),
+            ("@L(f(t))", r"\mathcal{L}_{t\to s}\{f\left(t\right)\}"),
+            ("@L(t^n,t)", r"\frac{\Gamma(n + 1)}{s^{n + 1}}\quad (\operatorname{Re}(s)>0,\;\operatorname{Re}(n)>-1)"),
+            ("{@L(t^n) | s=?; n=5}", r"\frac{120}{s^{6}}\quad (\operatorname{Re}(s)>0)"),
+            ("{@L(sin^n(t)) | s=1; n=5}",
+             r"\frac{120}{\left(s^{2} + 25\right)\mkern-2mu \left(s^{4} + 10\mkern-2mu s^{2} + 9\right)}"
+             r"\quad (\operatorname{Re}(s)>0)"),
+        )
+        binary = ROOT / "build" / "release" / "scratch" / "mars_lab"
+        for source, expected in cases:
+            fields, raw, code = mars_lab.run_mars_lab_fields(binary, source, 30, "s", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["tex"], expected)
+            if source == "{@L(sin^n(t)) | s=1; n=5}":
+                self.assertAlmostEqual(float(fields["value"]), 3/13, places=14)
+            if fields.get("transform_identity_TeX"):
+                # README: the displayed identity retains the documented algebraic result.
+                self.assertTrue(fields["transform_identity_TeX"].endswith(" = " + expected))
+            if source == "@L(t)":
+                self.assertEqual(fields["unbound"], "1/s² where (Re(s) > 0)")
+                self.assertEqual(fields["expression"].replace("NAN", "?"), "{ 1/s² | s = ?; Re(s) > 0 }")
+                self.assertIn("    if (realpart(s) > 0) {\n"
+                              "        return 1/s^2.\n    } else {\n        return @nan.\n    }", fields["function"])
+
     @unittest.skipUnless(
         all(
             (ROOT / "build" / "release" / "scratch" / name).is_file()

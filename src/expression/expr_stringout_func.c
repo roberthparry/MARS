@@ -676,8 +676,99 @@ static bool function_root_has_explicit_integral_cartesian_output(const expr_t *r
     return explicit_output;
 }
 
+/* Index-dependent expressions must stay inside their binding operator, never in outer temporaries. */
+static bool function_contains_bound_operator(const expr_t *expr)
+{
+    return expr && (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product) ||
+                    expr_is_op(expr, &ops_integral) || function_contains_bound_operator(expr->a) ||
+                    function_contains_bound_operator(expr->b));
+}
+
 static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants)
 {
+    if (expr_is_laplace_transform(root)) {
+        expr_t *result = expr_transform_result(root);
+        if (result) {
+            emit_function_body(b, result, variables, constants);
+            expr_free(result);
+            return;
+        }
+    }
+    if (expr_is_op(root, &ops_real_domain)) {
+        sbuf_puts(b, "    if (");
+        size_t line_width = strlen("    if (");
+        for (const expr_t *pair = root->b; pair; pair = pair->b->b) {
+            sbuf_t condition;
+            sbuf_init(&condition);
+            if (expr_is_op(pair->a, &ops_real_parameter)) {
+                sbuf_puts(&condition, "realpart(");
+                emit_func(pair->a->a, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") == ");
+                emit_func(pair->a->a, &condition, PREC_ADD);
+            } else if (expr_is_op(pair->a, &ops_nonnegative_integer)) {
+                const expr_t *value = pair->a->a;
+                sbuf_puts(&condition, "realpart(");
+                emit_func(value, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") == ");
+                emit_func(value, &condition, PREC_ADD);
+                sbuf_puts(&condition, " && ");
+                emit_func(value, &condition, PREC_ADD);
+                sbuf_puts(&condition, " >= 0 && floor(");
+                emit_func(value, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") == ");
+                emit_func(value, &condition, PREC_ADD);
+            } else {
+                sbuf_puts(&condition, "realpart(");
+                emit_func(pair->a, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") > ");
+                emit_func(pair->b->a, &condition, PREC_ADD);
+                number_t limit = NUM_ZERO;
+                bool real_limit = expr_is_op(pair->b->a, &ops_real_bound) ||
+                                  (expr_match_const_value(pair->b->a, &limit) &&
+                                   num_is_finite(limit) && num_is_real(limit));
+                num_destroy(&limit);
+                if (!real_limit) {
+                    sbuf_puts(&condition, " && realpart(");
+                    emit_func(pair->b->a, &condition, PREC_LOWEST);
+                    sbuf_puts(&condition, ") == ");
+                    emit_func(pair->b->a, &condition, PREC_ADD);
+                }
+            }
+            if (pair != root->b) {
+                if (line_width + strlen(" && ") + sbuf_len(&condition) + strlen(") {") > 120u) {
+                    sbuf_puts(b, " &&\n        ");
+                    line_width = 8u;
+                } else {
+                    sbuf_puts(b, " && ");
+                    line_width += strlen(" && ");
+                }
+            }
+            char *condition_text = sbuf_to_c_string(&condition);
+            if (condition_text)
+                sbuf_puts(b, condition_text);
+            line_width += sbuf_len(&condition);
+            free(condition_text);
+            sbuf_free(&condition);
+        }
+        sbuf_puts(b, ") {\n");
+        sbuf_t body;
+        sbuf_init(&body);
+        emit_function_body(&body, root->a, variables, constants);
+        char *text = sbuf_to_c_string(&body);
+        if (text) {
+            bool line_start = true;
+            for (const char *cursor = text; *cursor; ++cursor) {
+                if (line_start && *cursor != '\n')
+                    sbuf_puts(b, "    ");
+                sbuf_putc(b, *cursor);
+                line_start = *cursor == '\n';
+            }
+        }
+        free(text);
+        sbuf_free(&body);
+        sbuf_puts(b, "    } else {\n        return @nan.\n    }\n");
+        return;
+    }
     function_dag_table_t dag;
     function_temporary_table_t temporaries;
     sbuf_t direct;
@@ -719,6 +810,13 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
 
     if (function_root_has_explicit_integral_cartesian_output(root)) {
         (void)emit_func_integral_cartesian_body(root, b);
+        return;
+    }
+
+    if (function_contains_bound_operator(root)) {
+        sbuf_puts(b, "    return ");
+        emit_func(root, b, PREC_LOWEST);
+        sbuf_puts(b, ".\n");
         return;
     }
 

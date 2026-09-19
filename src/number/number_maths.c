@@ -5312,14 +5312,26 @@ static int number_mpc_Ei(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 static int number_mpc_E1(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
     mpfr_prec_t precision = mpc_get_prec(out);
+    int side = mpfr_sgn(mpc_imagref(z));
     mpc_t negative;
     int status;
 
     mpc_init2(negative, precision);
     mpc_neg(negative, z, MPC_RNDNN);
     status = number_mpc_Ei(out, negative, rnd);
-    if (status == 0)
+    if (status == 0) {
         mpc_neg(out, out, rnd);
+        /* E1(z) = -Ei(-z) - i*pi*sign(Im(z)) away from the real axis. */
+        if (side) {
+            mpfr_t correction;
+            mpfr_init2(correction, precision);
+            mpfr_const_pi(correction, MPFR_RNDN);
+            if (side < 0)
+                mpfr_neg(correction, correction, MPFR_RNDN);
+            mpfr_sub(mpc_imagref(out), mpc_imagref(out), correction, MPC_RND_IM(rnd));
+            mpfr_clear(correction);
+        }
+    }
     mpc_clear(negative);
     return status;
 }

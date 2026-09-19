@@ -1933,7 +1933,7 @@ static void test_integrate_symbolic_shifted_sqrt(void)
     print_antiderivative_text("{ 1/sqrt((a-bx)^5) }", text);
     ASSERT_TRUE(strstr(text, "2/(3b·(a - bx)^³⁄₂)") != NULL);
     ASSERT_TRUE(strstr(tex,
-                       "\\frac{2}{3\\mkern-2mu b\\mkern-2mu \\sqrt{\\left(a - b\\mkern-2mu x\\right)^{3}}}") !=
+                       "\\frac{2}{3\\mkern-2mu b\\mkern-2mu \\left(a - b\\mkern-2mu x\\right)^{\\frac{3}{2}}}") !=
                 NULL);
     ASSERT_TRUE(strstr(tex, "\\frac{\\frac{2}{3}}") == NULL);
 

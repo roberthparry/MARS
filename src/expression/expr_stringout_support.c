@@ -307,9 +307,19 @@ void emit_name_func(sbuf_t *b, const char *name)
         return;
     }
 
-    if (strcmp(name, "π") == 0) {
-        sbuf_puts(b, "@pi");
-        return;
+    if ((unsigned char)name[0] >= 0x80u) {
+        string_t *text = string_new_with(name);
+        string_cursor_t *cursor = text ? string_cursor_new(text) : NULL;
+        const char *alias = cursor ? expr_greek_symbol_alias(string_cursor_peek(cursor)) : NULL;
+        if (cursor)
+            string_cursor_next(cursor);
+        bool single_greek = alias && string_cursor_done(cursor);
+        string_cursor_free(cursor);
+        string_free(text);
+        if (single_greek) {
+            sbuf_puts(b, alias);
+            return;
+        }
     }
 
     if (expr_tostring_is_simple_name(name)) {

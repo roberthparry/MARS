@@ -759,11 +759,15 @@ expr_t *expr_expand_preserved_for_display(const expr_t *expr)
     left = expr_expand_preserved_for_display(expr->a);
     if (!left)
         goto cleanup;
-    if (expr_is_pow_d_expr(expr)) {
+    if (expr_is_arbitrary_function(expr)) {
+        rebuilt = expr_new_arbitrary_function(expr->name, left);
+        expr_free(left);
+        left = NULL;
+    } else if (expr_is_pow_d_expr(expr)) {
         rebuilt = expr_new_pow_const_internal(left, expr->c);
     } else if (expr->ops->arity == EXPR_OP_BINARY) {
         right = expr_expand_preserved_for_display(expr->b);
-        if (!right)
+        if (!right && (expr->b || expr->ops != &ops_argument_list))
             goto cleanup;
         rebuilt = expr_new_binary_internal(expr->ops, left, right);
     } else {

@@ -660,7 +660,7 @@ static void test_mat_to_string_result_card_styles(void)
                expression && strcmp(expression, "{ (x, c; d, x²) | x = ?; c = ?, d = ? }") == 0);
     check_bool("mat_to_string laid-out expression card exact",
                expression_layout &&
-                   strcmp(expression_layout, "{ (\n\tx,\tc;\n\td,\tx^2\n) | x = ?; c = ?, d = ? }") == 0);
+                   strcmp(expression_layout, "{ (\n\tx,\tc;\n\td,\tx²\n) | x = ?; c = ?, d = ? }") == 0);
     layout_roundtrip = expression_layout ? mat_from_string_expr(expression_layout, &layout_bindings) : NULL;
     check_bool("mat_to_string laid-out expression card reparses", layout_roundtrip != NULL);
     check_bool("mat_to_string long laid-out expression card stacks cells",

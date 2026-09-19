@@ -169,7 +169,14 @@ typedef enum {
     EXPR_KIND_SUMMATION,
     EXPR_KIND_PRODUCT,
     EXPR_KIND_FORMAL_DERIVATIVE,
+    EXPR_KIND_ORDERED_DERIVATIVE,
     EXPR_KIND_ARBITRARY_FUNCTION,
+    EXPR_KIND_LAPLACE,
+    EXPR_KIND_INVERSE_LAPLACE,
+    EXPR_KIND_REAL_DOMAIN,
+    EXPR_KIND_NONNEGATIVE_INTEGER,
+    EXPR_KIND_REAL_PARAMETER,
+    EXPR_KIND_REAL_BOUND,
     EXPR_KIND_ARGUMENT_LIST,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
@@ -356,7 +363,34 @@ extern const expr_ops_t ops_indexed_symbol;
 extern const expr_ops_t ops_summation;
 extern const expr_ops_t ops_product;
 extern const expr_ops_t ops_formal_derivative;
+extern const expr_ops_t ops_ordered_derivative;
+/** Construct an ordinary derivative of a unary symbolic function with a symbolic order. */
+expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order);
 extern const expr_ops_t ops_arbitrary_function;
+extern const expr_ops_t ops_laplace;
+extern const expr_ops_t ops_inverse_laplace;
+/** Return whether an expression is a forward or inverse Laplace operator. */
+bool expr_is_laplace_transform(const expr_t *expr);
+/** Simplify a forward or inverse Laplace operator, retaining unsupported transforms. */
+expr_t *expr_transform_result(const expr_t *transform);
+/** Construct an inverse Laplace operator from its expression and optional variable mapping. */
+expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args);
+/** Return a recognised inverse Laplace formula, or NULL when no rule applies. */
+expr_t *expr_inverse_laplace_result(const expr_t *transform);
+extern const expr_ops_t ops_real_domain;
+extern const expr_ops_t ops_nonnegative_integer;
+extern const expr_ops_t ops_real_parameter;
+extern const expr_ops_t ops_real_bound;
+expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
+expr_t *expr_laplace_result(const expr_t *transform);
+expr_t *expr_laplace_from_args(size_t count, expr_t *const *args);
+expr_t *expr_laplace_formula(const expr_t *transform, number_t *abscissa, expr_t **conditions);
+/** Build a supported elementary transform, retaining sufficient convergence conditions. */
+expr_t *expr_laplace_elementary_rule(const expr_t *f, const expr_t *t, const expr_t *s,
+                                   number_t *bound, expr_t **conditions);
+/** Build a supported special-function transform, retaining sufficient convergence conditions. */
+expr_t *expr_laplace_special_rule(const expr_t *f, const expr_t *t, const expr_t *s,
+                               number_t *bound, expr_t **conditions);
 extern const expr_ops_t ops_argument_list;
 
 expr_t *expr_new_indexed_symbol(const char *name, const expr_t *index);
