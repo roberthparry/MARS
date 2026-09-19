@@ -2,6 +2,426 @@
 
 `expr_t` is a reference-counted expression DAG for differentiable values.
 
+## Laplace transforms
+
+Expression mode accepts the forward unilateral Laplace operator `@L`, its
+canonical spelling `ℒ`, and the function spelling `Laplace`. The source variable
+defaults to the free variable `t` when present, otherwise it is inferred when
+exactly one free variable is present. Other symbols remain parameters for the
+transform without changing their binding kinds. An explicit source overrides
+inference, and a distinct target can also be supplied. Multiple free variables
+without `t` require an explicit source.
+
+The Rendered TeX card presents evaluated transforms as identities, with the
+calligraphic Laplace operator and source expression on the left and the
+algebraic result with its convergence conditions on the right. The Expression
+and Function cards retain the algebraic result alone. Supplied constant
+parameters are specialised consistently on both sides; unresolved transforms
+remain a single unevaluated operator.
+
+| Input | Algebraic result |
+|---|---|
+| `@L(t)` | $1/s^2,\quad \operatorname{Re}(s)>0$ |
+| `@L(J_0(t))` | $1/\sqrt{s^2+1},\quad \operatorname{Re}(s)>0$ |
+| `@L(sqrt(t))` | $\sqrt{\pi}/(2s^{3/2}),\quad \operatorname{Re}(s)>0$ |
+| `@L(cubrt(t))` | $\Gamma(4/3)/s^{4/3},\quad \operatorname{Re}(s)>0$ |
+| `@L(exp(-t))` | $1/(s+1),\quad \operatorname{Re}(s)>-1$ |
+| `@L(e^(a*t))` | $1/(s-a),\quad \operatorname{Re}(s)>\operatorname{Re}(a)$ |
+| `@L(exp(a*t+b),t)` | $e^b/(s-a),\quad \operatorname{Re}(s)>\operatorname{Re}(a)$ |
+| `@L(sin(t))` | $1/(s^2+1),\quad \operatorname{Re}(s)>0$ |
+| `@L(erf(t))` | $e^{s^2/4}\operatorname{erfc}(s/2)/s,\quad \operatorname{Re}(s)>0$ |
+| `@L(erf(t/(2a)))` | $a e^{a^2s^2}\operatorname{erfc}(s\sqrt{a^2})/(s\sqrt{a^2}),\quad \operatorname{Re}(s)>0,\quad \operatorname{Re}(a^2)>0$ |
+| `@L(erfc(t))` | $(1-e^{s^2/4}\operatorname{erfc}(s/2))/s,\quad \operatorname{Re}(s)>0$ |
+| `@L(tsin(at))` | $2as/(s^2+a^2)^2,\quad \operatorname{Re}(s)>\operatorname{Re}(ai),\quad \operatorname{Re}(s)>\operatorname{Re}(-ai)$ |
+| `@L(sinh(at))` | $a/(s^2-a^2),\quad \operatorname{Re}(s)>\operatorname{Re}(a),\quad \operatorname{Re}(s)>\operatorname{Re}(-a)$ |
+| `@L(sinh(@omega*t))` | $\omega/(s^2-\omega^2),\quad \operatorname{Re}(s)>\operatorname{Re}(\omega),\quad \operatorname{Re}(s)>\operatorname{Re}(-\omega)$ |
+| `@L(cosh(at))` | $s/(s^2-a^2),\quad \operatorname{Re}(s)>\operatorname{Re}(a),\quad \operatorname{Re}(s)>\operatorname{Re}(-a)$ |
+| `@L(t,t,p)` | $1/p^2,\quad \operatorname{Re}(p)>0$ |
+| `@L(f(t))` | $\mathcal{L}_{t\to s}\{f(t)\}$ |
+| `@L(t^n,t)` | $\Gamma(n+1)/s^{n+1},\quad \operatorname{Re}(s)>0,\quad \operatorname{Re}(n)>-1$ |
+| `{@L(t^n) \| s=?; n=5}` | $120/s^6,\quad \operatorname{Re}(s)>0$ |
+| `{@L(sin^n(t)) \| s=1; n=5}` | $120/((s^2+25)(s^4+10s^2+9)),\quad \operatorname{Re}(s)>0$; value $3/13$ |
+
+The initial rule set covers constants, source powers with exponent real part greater than −1,
+including square roots, cube roots, integer-order roots and their reciprocals.
+Root notation uses the same rule as fractional powers. Half-integer gamma factors
+remain exact multiples of $\sqrt{\pi}$; other non-integer gamma factors stay
+symbolic. Fractional powers remain explicit when rewriting them as roots could
+change the principal complex branch. General root orders must be known integers
+greater than one; supplied constant order bindings are accepted.
+The rules also cover
+linear combinations and source-independent factors, symbolic affine
+exponentials, sine and cosine with symbolic affine arguments, including complex
+rates and offsets. Both `exp(...)` and powers of Euler's constant
+are recognised. Exponential convergence uses the real part of the rate; negative
+rates do not acquire an unnecessary restriction to positive target real parts.
+For sine and cosine, both exponential components must converge:
+$\operatorname{Re}(s)>|\operatorname{Im}(a)|$. This reduces to
+$\operatorname{Re}(s)>0$ for real frequencies.
+Multiplication by a known positive integer power of the source variable uses
+$\mathcal L\{t^m f(t)\}=(-1)^m F^{(m)}(s)$, retaining the original convergence
+conditions. Orders up to 64 are expanded by repeated differentiation; unsupported
+orders remain symbolic. Supplied constant integer orders are accepted.
+Error functions and their complements accept affine arguments. With
+$q=\sqrt{a^2}$ on the principal branch, the error-function transform is
+$$
+\mathcal L\{\operatorname{erf}(at+b)\}
+=\frac{\operatorname{erf}(b)+(a/q)e^{s^2/(4a^2)+sb/a}
+\operatorname{erfc}(s/(2q)+bq/a)}{s}.
+$$
+The sufficient conditions are $\operatorname{Re}(s)>0$ and
+$\operatorname{Re}(a^2)>0$; both signs of non-zero real rates are covered.
+The complementary transform is one over the target variable minus this result.
+A supplied zero rate is handled separately. The unshifted positive-rate formula
+is [DLMF 7.14.2](https://dlmf.nist.gov/7.14.E2); the affine extension follows by
+integration by parts and the Gaussian integral.
+Reciprocal argument scales are cancelled before introducing square roots, so
+divided arguments do not retain nested reciprocal powers. Principal square roots
+remain explicit unless the parameter values justify further simplification;
+$\sqrt{a^2}$ must not be replaced by $a$ for an unspecified parameter.
+**Known numerical limitation:** the existing complex error-function evaluator
+can return incorrect values. The symbolic transform is valid under its stated
+conditions, but numerical validation currently covers real rates, offsets and
+positive real target values only.
+Hyperbolic sine and cosine also accept symbolic affine arguments, including complex
+rates and offsets. Their two displayed half-plane conditions are equivalent to
+$\operatorname{Re}(s)>|\operatorname{Re}(a)|$, so both exponential components
+converge. These are sufficient conditions, retained even for degenerate zero rates.
+Non-negative integer powers of sine/cosine with real numerical frequency and zero phase use an exact recurrence
+through order 16 and a finite sum for larger or symbolic orders. There is no
+order-16 support limit. Supplied constant exponents are resolved before choosing
+the rule. A symbolic exponent retains the explicit condition that it is a
+non-negative integer; negative, fractional and non-real values fail that condition.
+
+For example, `@L(cos(t)^n,t)` gives the finite-sum result
+
+$$
+\frac{1}{2^n}\sum_{k=0}^{n}\binom{n}{k}
+\frac{s}{s^2+(n-2k)^2},\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.
+$$
+
+Similarly, `@L(sin(t)^n,t)` gives
+
+$$
+\frac{1}{(2i)^n}\sum_{k=0}^{n}\frac{(-1)^k\binom{n}{k}}{s-i(n-2k)},
+\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.
+$$
+
+The renderer currently expresses the binomial coefficients using gamma functions.
+Both sums are exact; their integer-order restrictions survive copying through the
+parseable `nonnegative_integer(n)` condition. The Function card checks reality,
+non-negativity and integrality before evaluating the sum. Summation-index expressions
+remain inside the sum rather than becoming outer function temporaries.
+Unsupported expressions retain a symbolic transform. Unknown function calls
+inside the operator are preserved as functions, not implicit multiplication.
+
+Recognised transforms simplify to a native formula with convergence restrictions.
+Both Laplace directions accept braces as well as parentheses. For example,
+`@L{ln(t)}` gives
+
+$$
+\mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+\ln(s)}{s},\qquad \operatorname{Re}(s)>0,
+$$
+
+where $\gamma$ is the Euler–Mascheroni constant. At `s=1`, the value is
+approximately `-0.5772156649015329`.
+The inverse pair is also recognised: `@Linv{-(ln(s)+γ)/s}` returns `ln(t)`
+for positive time, with `return ln(t).` in the Function card. More generally,
+linear combinations of a logarithm and a constant divided by the source
+variable are inverted algebraically.
+
+Inverse Laplace transforms use `@Linv`, `ℒ⁻¹`, or `InverseLaplace`, with the
+conventional source `s` and target `t`. An explicit source and target are accepted
+in the same positions as for the forward operator. The initial inverse rules
+cover linearity, repeated linear poles and quadratic denominators. They use the
+causal unilateral convention: ordinary formulas describe the result for
+non-negative time, not an arbitrary two-sided inverse.
+Polynomial degree is limited to 16. Unproved symbolic pole separations,
+quadratic frequencies that cannot be established as zero or non-zero, and
+distributional inverses remain symbolic.
+
+For example, `@Linv((s-a)/((s-a)^2+1))` produces
+
+$$
+\mathcal{L}^{-1}_{s\to t}\left\{\frac{s-a}{(s-a)^2+1}\right\}
+= e^{at}\cos(t).
+$$
+
+The Function card returns `exp(a*t)*cos(t)` (using MARS multiplication syntax),
+and numerical bindings `a=2`, `t=0.5` give approximately `2.385516730959136`.
+An unknown input such as `@Linv(F(s),s,x)` remains `ℒ⁻¹(F(s), s, x)`;
+its Function representation is `InverseLaplace(F(s), s, x)`.
+Unsupported inverse transforms remain symbolic; this is not a numerical
+Bromwich-integral implementation.
+
+The exponential-shift rule also applies when the base transform is unknown.
+For `@L(e^(at)f(t))`, Rendered TeX displays
+$\mathcal L\{e^{at}f(t)\}(s)=F(s-a)$, with the local definition
+$F(s):=\mathcal L\{f(t)\}(s)$ and the restriction
+$s-a\in\operatorname{ROC}(F)$. Here ROC denotes the region of convergence;
+no numerical bound is assumed for an unspecified function.
+The corresponding unbound Expression output is `ℒ(f(t), t, s - a)` and the
+Function return expression is `Laplace(f(t), t, s - a)`, so neither relies on an
+undefined global function named `F`. These evaluated transform arguments are
+accepted as input. Known base transforms are evaluated and their convergence
+restrictions shifted with the formula.
+
+TeX, Expression and Function output all display the same formula. Supplied constant
+parameters are specialised consistently across these cards; free variables remain
+symbolic even when they have numerical bindings. Conditions proved by the supplied
+constants are removed. Expression and Function show readable, parseable conditions,
+so restrictions survive copying a result back as input.
+For example, `@L(t)` produces `1/s² where (Re(s) > 0)` in unbound Expression output.
+The bound Expression card places conditions after the binding bar instead:
+`{ 1/s² | s = ?; Re(s) > 0 }`. This form is also accepted as input.
+Several conditions are separated by semicolons inside the `where` parentheses.
+The Function card checks the restrictions before evaluating the formula and
+returns `@nan` otherwise. For `@L(t)`, its function body is:
+
+```text
+    if (realpart(s) > 0) {
+        return 1/s^2.
+    } else {
+        return @nan.
+    }
+```
+
+With several conditions, all must hold; any formula temporaries are evaluated
+only inside the successful branch. Non-finite input handling remains in the
+native evaluator, rather than appearing as a displayed mathematical condition.
+Unsupported transforms retain their original symbolic operation.
+The [function-by-function coverage inventory](#laplace-function-coverage) distinguishes
+implemented formulas, proven obstructions and well-defined cases still left symbolic.
+Hyperbolic tangent, unlike tangent, has a supported digamma transform. For real
+$c>0$ and $\operatorname{Re}(s)>0$,
+
+$$
+\mathcal L\{\tanh(ct)\}
+=\frac1s-\frac{\psi(1+s/(4c))-\psi(1/2+s/(4c))}{2c}.
+$$
+
+The native result uses the equivalent symmetric form
+$[2\psi(z+1/2)-\psi(z)-\psi(z+1)]/(4c)$, where $z=s/(4c)$.
+Applying the digamma recurrence before differentiation removes cancelling terms:
+
+$$
+\frac{d}{ds}\mathcal L\{\tanh(ct)\}
+=\frac{2\psi^{(1)}(z+1/2)-\psi^{(1)}(z)-\psi^{(1)}(z+1)}{16c^2}.
+$$
+
+Negative real coefficients follow by oddness, and a zero coefficient gives
+zero without a condition on `s`. With an unspecified coefficient the formula
+uses $q=\sqrt{c^2}$ on the principal branch and retains
+$\operatorname{Re}(q)>0$; this also covers complex coefficients off the
+imaginary axis without assuming $\sqrt{c^2}=c$. For example,
+`{@L{tanh(c*t)} | s=2; c=1}` gives $\ln(2)-1/2$, approximately
+`0.1931471805599453`. Non-zero imaginary coefficients are excluded by the
+convergence guard, since the integrand then has real-axis poles.
+
+Tangent transforms report convergence separately from the numeric Value card.
+For example, `@L{tan(t)}` remains symbolic with an evaluation note explaining
+that the ordinary Laplace transform does not exist because of poles on the
+positive integration axis. With an unspecified coefficient, `@L{tan(c*t)}`
+retains the operator and gives a conditional explanation; complex coefficients
+are not classified as divergent by this test. `{@L{tan(c*t)} | c=0}` returns
+`0`, even without a value for `s`.
+Numerical evaluation requires a supplied target strictly inside that half-plane.
+Symbolic powers retain the condition on the exponent, including in linear combinations;
+numerical evaluation also checks this condition. For non-negative integer exponents,
+the gamma factor equals the factorial. An explicit source, as in the power example,
+avoids treating a free exponent as another transform variable.
+This initial implementation requires one source variable; inferred
+multidimensional transforms and Fourier operators are still planned.
+Targets that would capture an existing input parameter are rejected.
+
+### Derivatives of unspecified functions
+
+Prime notation and parenthesised derivative orders are accepted for unary
+symbolic functions. In this notation, `f^(n)(t)` means the derivative of order
+`n`, not the power `f(t)^n`. The derivative order must be a non-negative integer.
+Small literal orders expand the initial-value terms; symbolic and larger orders
+retain a finite sum. Supplied bindings do not replace the order in the symbolic cards.
+
+With $F(s)=\mathcal L\{f(t)\}(s)$, the rule is
+
+$$
+\mathcal L\{f^{(n)}(t)\}(s)
+=s^n F(s)-\sum_{k=0}^{n-1}s^{n-1-k}f^{(k)}(0^+).
+$$
+
+This assumes the required derivatives, finite right-hand initial limits and
+vanishing exponentially weighted boundary terms at infinity. No numerical
+convergence half-plane is invented for an unspecified function. Initial values
+written `f(0)`, `f'(0)`, and so on in the output denote those right-hand limits.
+Order zero is the original transform, with no initial-value sum. Fractional
+derivatives and derivatives evaluated at a nontrivial composed argument are not
+covered by this rule.
+
+Expanded initial-value terms are displayed in ascending powers of the transform
+variable, after the leading transform term, including in multiline TeX output.
+
+| Input | Unbound expression output |
+| --- | --- |
+| `@L{f'(t)}` | `s·ℒ(f(t), t, s) - f(0)` |
+| `@L{f''(t)}` | `s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)` |
+| `@L{f^(n)(t)}` | `s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (nonnegative_integer(n))` |
+
+### Laplace transforms of integrals
+
+Inside a transform, an unspecified call such as `f(x)` remains a function in the
+integrand; it is not interpreted as multiplication by a scalar `f`.
+With $\widehat f(s)=\mathcal L\{f(t)\}(s)$, the zero-based integral transforms to $\widehat f(s)/s$.
+An upper-only integral denotes a chosen primitive $G(t)$ and transforms to
+$(\widehat f(s)+G(0^+))/s$, retaining its initial value as an upper-only integral at zero.
+For a fixed non-zero lower bound $a$, the initial value is $\int_a^0 f(x)\,dx$.
+In rendered TeX, a single upper-only initial-value integral is abbreviated as
+$F(0)$, with $F'(x)=f(x)$ and a label defining $F$ as the chosen antiderivative.
+In that display, $F$ does not denote the Laplace transform. The explicit integral
+is retained in Expression and Function output. The abbreviation is not used when
+the name $F$ is already present or when multiple initial-value integrals would
+make its meaning ambiguous.
+These identities apply where the transforms converge and the initial value is
+finite; they do not assert a convergence half-plane for an unspecified function.
+
+| Input | Unbound expression output |
+| --- | --- |
+| `@L{@S_0^t f(x) dx}` | `ℒ(f(t), t, s)/s` |
+| `@L{@S^t f(x) dx}` | `1/s·(ℒ(f(t), t, s) + ∫^0 f(x)·dx)` |
+
+### Laplace function coverage
+
+The [forward transform tables](design-notes/integral-transforms.md#implemented-forward-laplace-transforms)
+give the corresponding formulas and convergence conditions.
+
+This inventory concerns the ordinary unilateral integral over real `t >= 0`.
+A singularity is not automatically an obstruction: logarithmic singularities
+are locally integrable, whereas a simple pole is not. Exponential damping
+cannot repair a non-integrable finite singularity or super-exponential growth.
+Distributional and principal-value transforms are separate operations and are
+not silently substituted for the ordinary transform.
+
+The inventory covers the mathematical constructors in `include/expression.h`.
+Parser aliases share their underlying operation; they do not need separate
+transform formulas. Structural operations such as differentiation, integration,
+binding, serialisation and parsing are not scalar function families.
+
+#### Supported families
+
+Restrictions below are sufficient domains used by the implementation, not
+claims that every listed domain is maximal. A scale described as *known* must
+be a supplied constant, not a free variable which happens to have a value.
+All three symbolic cards use the same native expression and conditions.
+
+| Functions | Recognised forms and restrictions |
+| --- | --- |
+| `exp`, powers of `e` | Affine exponents with the shifted convergence half-plane; quadratic exponents `-a*t^2+b*t+d` when `Re(a)>0`, for every finite `s`. |
+| `pow`, `pow_xp`, `sqrt`, `cubrt`, `root` | Source powers `t^v`, with `Re(v)>-1` and `Re(s)>0`; root spellings use the same rule. |
+| `sin`, `cos`, `sinh`, `cosh` | Affine arguments; both component exponentials must converge. Small integer powers of hyperbolic functions are finite exponential sums. Integer circular powers use recurrences or finite sums. |
+| `versin`, `vercos`, `coversin`, `covercos`, `haversin`, `havercos`, `hacoversin`, `hacovercos` | Reductions to sine, cosine and constants, with their convergence conditions. |
+| `tanh`, `sech` | Digamma formulas for scaled arguments; branch-safe square-root scales retain sufficient conditions. |
+| `log`, `ln`, `log10`, `lg` | Direct logarithms; supported positive affine arguments use exponential integrals. |
+| `abs`, `conj` | Homogeneous linear arguments; absolute values additionally cover known real affine arguments, including a zero crossing. |
+| `floor`, `ceil` | Homogeneous arguments with known real rates, including negative and zero rates. |
+| `atan`, `acot` | Homogeneous arguments with known real rates, using exponential integrals and the native inverse-cotangent branch. |
+| `asinh` | Homogeneous arguments with known real rates, using a hypergeometric representation of the Struve function and order-zero Bessel Y. |
+| `atanh` | Homogeneous arguments with real rates, including symbolic rates guarded as real and non-zero; exponential integrals retain the native complex boundary value beyond the branch points. Zero rates give zero. |
+| `erf`, `erfc` | Affine arguments; Gaussian decay conditions are retained for complex scales. |
+| `normal_pdf`, `pdf` | Affine Gaussian density; quadratic decay gives an entire transform in `s`. |
+| `normal_cdf`, `cdf` | Affine arguments via the complementary-error-function rule. |
+| `normal_logpdf`, `logpdf` | Affine arguments reduce to a quadratic polynomial. |
+| `Ei`, `E1` | Homogeneous arguments with supported rates; conservative right half-planes avoid removable quotient singularities at `s=0`. |
+| `gammainc_lower`, `gammainc_upper`, `gammainc_P`, `gammainc_Q` | Source in the second argument, with `Re(shape)>0` and a supported positive scale. |
+| `bessel_j` | Positive real scales and orders with `Re(order)>-1`; known negative integers use the exact order-reflection identity. The existing zero-order rule also supports complex scales with appropriate bounds. |
+| `bessel_y` | Order zero with positive real scale; its logarithmic origin is integrable. Higher orders are not inferred from this rule. |
+| `clausen2`, `clausen` | Known integer orders 1–32 and non-zero known real scales; digamma and zeta formulas derived from the periodic Fourier series, with `Re(s)>0`. |
+
+Linearity, source-independent factors, exponential frequency shifts and finite
+integer powers of `t` multiplying a supported function reuse these formulas.
+Constants, including zero, retain their existing transforms. This does not
+mean that arbitrary compositions of supported functions are supported.
+
+The symbolic `asinh` formula is valid on its stated half-plane, but its Bessel-Y
+factor currently lacks a complex numeric backend. Complex `s` therefore retains
+the formula without a numerical Value-card result. Real positive `s` is checked
+numerically. This implementation limitation is not a convergence restriction.
+
+`log` and `lg` are common-logarithm parser aliases; `ln` is the natural-logarithm
+spelling. The C constructor `expr_log` denotes the natural logarithm.
+
+#### Ordinary transforms that fail in the direct source argument
+
+| Functions | Obstruction |
+| --- | --- |
+| `tan`, `sec`, `cosec`, `cot` | Real non-zero-rate arguments encounter poles on the integration axis. |
+| `cosech`, `coth` | The unshifted function has a non-integrable origin; shifted cases require separate analysis. |
+| `gamma` | Super-exponential growth and a pole at zero. |
+| `digamma`, `trigamma`, `polygamma` | Non-integrable origin for the direct argument and admissible fixed derivative order. Translated functions can be integrable. |
+| `zeta`, `zetap` | Pole at `t=1`. Source-independent parameters or other argument choices can change this conclusion. |
+
+The native evaluation note diagnoses the direct cases it can prove. A
+rejected parameter guard returns `@nan`; this is distinct from proving that
+every possible parameter choice is divergent.
+
+#### Well-defined or parameter-dependent cases still left symbolic
+
+The following are audited gaps, not declarations of non-existence. Many have
+ordinary transforms on suitable branches, but a correct closed form can need
+additional special functions, parameter conditions or continuation machinery.
+
+| Functions | Remaining issue |
+| --- | --- |
+| `asin`, `acos`, `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. |
+| `acosh`, `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
+| `arcversin`, `arcvercos`, `arccoversin`, `arccovercos`, `archaversin`, `archavercos`, `archacoversin`, `archacovercos` | Reduce to inverse circular functions, so their branch restrictions carry over. |
+| `hypot` | Polynomial reductions can work; the general transform needs further radical-function rules. |
+| `lgamma` | Logarithmic origin and `t*log(t)` growth allow a transform, but no general closed form is implemented. |
+| `Li` | Its logarithmic singularity at `t=1` is integrable; a closed-form rule is not implemented. |
+| `erfinv`, `erfcinv`, `gammainv` | The full positive axis can leave a real inverse's domain; complex branches need separate definitions and growth checks. |
+| `lambert_w`, `lambert_wn`, `lambert_w0`, `lambert_wm1` | Branch-specific transforms are not currently represented in closed form. |
+| `dilog`, `polylog1`, `polylog`, `legendre_chi` | Source on a branch cut needs explicit boundary-value conventions. Exponentially composed arguments are a separate potentially convergent family. |
+| `qdigamma` | Depends on the base, poles and the source's position; a direct zero argument can be singular. |
+| `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
+| `lerch_phi`, `lommel_s`, `appell_f1`, `lauricella_f`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
+| `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
+
+#### Discrete operations
+
+`factorial`, `fibonacci`, `partition`, `isqrt`, `gcd`, `lcm`, `mod`, `modinv`, `is_prime`,
+`next_prime`, `prev_prime`, `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shl`,
+`shr` and `factors` do not acquire a continuous-time definition merely by
+putting `t` in their argument. A specified step interpolation, analytic
+continuation or impulse train would define a different transform problem.
+Finite `new_finite_summation_range` and `new_finite_product_range` operations
+can reduce algebraically, but no general infinite-transform interchange is
+assumed.
+
+#### Checked examples
+
+These inputs have the following numerical Value-card outputs (rounded here).
+They are exercised after the ordinary regression tests as README examples.
+
+| Input | Output |
+| --- | --- |
+| `{@L(exp(-t^2)) \| s=0}` | `0.886226925452758` |
+| `{@L(normal_pdf(t)) \| s=0}` | `0.5` |
+| `{@L(floor(t)) \| s=1}` | `0.581976706869326` |
+| `{@L(sech(t)) \| s=1}` | `0.693147180559945` |
+| `{@L(E1(t)) \| s=1}` | `0.693147180559945` |
+| `{@L(bessel_j(1,t)) \| s=1}` | `0.292893218813452` |
+| `{@L(atanh(t)) \| s=1}` | `0.646761122779130 + 0.577863674895461i` |
+
+#### Formula references
+
+Definitions and transform conventions follow [DLMF §1.14](https://dlmf.nist.gov/1.14).
+Exponential-integral formulas can be checked against
+[DLMF §6.14](https://dlmf.nist.gov/6.14); Bessel integral identities are collected
+in [DLMF §10.22](https://dlmf.nist.gov/10.22). Incomplete-gamma formulas follow
+by interchanging their defining integral with the Laplace integral on the
+stated absolute-convergence domain. Gaussian formulas follow by completing
+the square and analytic continuation within the stated decay domain.
+
+## Numeric representation
+
 The internal numeric core is now `number_t`-native:
 
 - constant and variable leaves store `number_t`

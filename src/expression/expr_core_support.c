@@ -538,8 +538,15 @@ size_t expr_match_leading_greek_alias_len(const string_cursor_t *cursor, string_
 
         if (!entry->ascii)
             continue;
-        if (entry->klen > best && string_cursor_match_at(cursor, pos, entry->ascii)) {
-            best = entry->klen;
+        if (entry->klen > best) {
+            char upper[16];
+            if (entry->klen >= sizeof(upper))
+                continue;
+            for (size_t j = 0u; j < entry->klen; ++j)
+                upper[j] = (char)toupper((unsigned char)entry->ascii[j]);
+            upper[entry->klen] = '\0';
+            if (string_cursor_match_at(cursor, pos, entry->ascii) || string_cursor_match_at(cursor, pos, upper))
+                best = entry->klen;
         }
     }
 
@@ -1409,12 +1416,12 @@ expr_t *expr_clone(const expr_t *expr)
     if (expr->ops->arity == EXPR_OP_BINARY) {
         left = expr_clone(expr->a);
         right = expr_clone(expr->b);
-        if (!left || !right) {
+        if (!left || (!right && (expr->b || expr->ops != &ops_argument_list))) {
             expr_free(left);
             expr_free(right);
             return NULL;
         }
-        if (expr->ops->apply_binary) {
+        if (expr->ops->apply_binary && (right || expr->ops != &ops_argument_list)) {
             out = expr->ops->apply_binary(left, right);
         } else {
             out = expr_new_binary_internal(expr->ops, left, right);
@@ -1492,7 +1499,8 @@ static expr_t *expr_clone_linked_symbols_internal(const expr_t *expr, const expr
     if (expr->ops->arity == EXPR_OP_BINARY) {
         left = expr_clone_linked_symbols_internal(expr->a, source);
         right = expr_clone_linked_symbols_internal(expr->b, source);
-        if (!left || !right) {
+        /* Metadata lists legitimately terminate with a null child. Preserve that shape. */
+        if ((expr->a && !left) || (expr->b && !right)) {
             expr_free(left);
             expr_free(right);
             return NULL;

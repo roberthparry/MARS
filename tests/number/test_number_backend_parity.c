@@ -610,6 +610,10 @@ static void test_number_complex_special_parity(void)
     number_t w_roundtrip = num_sub(num_mul(w, num_exp(w)), w_input);
     number_t ei_input = number_text("1 + 1i");
     number_t ei_value = num_Ei(ei_input);
+    number_t e1_input = number_text("0 + 1i");
+    number_t e1_value = num_E1(e1_input);
+    number_t e1_negative_input = num_neg(e1_input);
+    number_t e1_negative = num_E1(e1_negative_input);
 
     assert_number_real_imag_prefix("gamma(1 + 0i)", gamma_one, "1", "0");
     assert_number_real_imag_prefix("erf(1 + 0i)", erf_one, "0.84270079294971486934122063508262", "0");
@@ -624,7 +628,17 @@ static void test_number_complex_special_parity(void)
     assert_number_real_imag_prefix("Ei(1 + 1i)", ei_value,
                                    "1.764625985563854068426738161351237966008304411668431454586176601",
                                    "2.387769851510522419262792089103796064407333845441811107627919345");
+    assert_number_real_imag_close("E1(i) principal branch", e1_value,
+                                  "-0.33740392290096813466264620388915",
+                                  "-0.62471325642771360428996837781657", "1e-30");
+    assert_number_real_imag_close("E1(-i) principal branch", e1_negative,
+                                  "-0.33740392290096813466264620388915",
+                                  "0.62471325642771360428996837781657", "1e-30");
 
+    num_destroy(&e1_negative);
+    num_destroy(&e1_negative_input);
+    num_destroy(&e1_value);
+    num_destroy(&e1_input);
     num_destroy(&ei_value);
     num_destroy(&ei_input);
     num_destroy(&w_roundtrip);

@@ -55,6 +55,16 @@ static int TeX_collect_add_terms(const expr_t *expr, int sign, TeX_add_terms_t *
 {
     if (!expr)
         return -1;
+    const expr_t *nodes[96];
+    int signs[96];
+    size_t count = 0u;
+    if (expr_display_ordered_sum(expr, nodes, signs, &count, 96u)) {
+        for (size_t i = 0u; i < count; ++i) {
+            if (TeX_add_terms_push(terms, nodes[i], sign * signs[i]) != 0)
+                return -1;
+        }
+        return 0;
+    }
     if (expr_is_neg(expr))
         return TeX_collect_add_terms(expr->a, -sign, terms);
     if (expr_is_op(expr, &ops_add))
@@ -264,6 +274,78 @@ static int TeX_tree_contains_formal_derivative(const expr_t *expr)
     return TeX_tree_contains_formal_derivative(expr->a) || TeX_tree_contains_formal_derivative(expr->b);
 }
 
+typedef struct {
+    const expr_t *initial;
+    size_t count;
+    bool has_transform;
+    bool name_collision;
+} TeX_primitive_context_t;
+
+static void TeX_find_primitive_initial(const expr_t *expr, TeX_primitive_context_t *context)
+{
+    if (!expr)
+        return;
+    context->has_transform |= expr_is_laplace_transform(expr);
+    context->name_collision |= expr->name && strcmp(expr->name, "F") == 0;
+    if (expr_is_op(expr, &ops_integral) && !expr_integral_lower_bound_expr(expr) &&
+        expr_const_is_zero(expr_integral_upper_bound_expr(expr))) {
+        context->initial = expr;
+        ++context->count;
+    }
+    TeX_find_primitive_initial(expr->a, context);
+    TeX_find_primitive_initial(expr->b, context);
+}
+
+static void TeX_replace_primitive(expr_t **display, const expr_t *source, const expr_t *initial, const expr_t *alias)
+{
+    if (!source || !*display)
+        return;
+    if (source == initial) {
+        expr_free(*display);
+        *display = expr_clone(alias);
+        return;
+    }
+    TeX_replace_primitive(&(*display)->a, source->a, initial, alias);
+    TeX_replace_primitive(&(*display)->b, source->b, initial, alias);
+}
+
+/* F is a local display abbreviation only; retain the actual primitive in executable output. */
+static expr_t *TeX_primitive_display(const expr_t *expr, expr_t **initial)
+{
+    TeX_primitive_context_t context = {0};
+    *initial = NULL;
+    expr_t *resolved = expr_is_laplace_transform(expr) ? expr_transform_result(expr) : NULL;
+    const expr_t *source = resolved ? resolved : expr;
+    TeX_find_primitive_initial(source, &context);
+    if (!context.has_transform || context.name_collision || context.count != 1u ||
+        !expr_is_var(expr_integral_dummy_expr(context.initial))) {
+        expr_free(resolved);
+        return NULL;
+    }
+    expr_t *zero = expr_const_zero();
+    expr_t *alias = expr_new_arbitrary_function("F", zero);
+    expr_t *display = alias ? expr_clone(source) : NULL;
+    if (display) {
+        TeX_replace_primitive(&display, source, context.initial, alias);
+        *initial = expr_clone(context.initial);
+    }
+    expr_free(alias);
+    expr_free(zero);
+    expr_free(resolved);
+    return display;
+}
+
+static void TeX_primitive_definition(const expr_t *initial, sbuf_t *out)
+{
+    if (!initial)
+        return;
+    sbuf_puts(out, "\\qquad F'(");
+    emit_TeX_expr(expr_integral_dummy_expr(initial), out, PREC_LOWEST);
+    sbuf_puts(out, ")=");
+    emit_TeX_expr(initial->a, out, PREC_LOWEST);
+    sbuf_puts(out, "\\quad\\text{(F is the chosen antiderivative)}");
+}
+
 int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 {
     autoname_table_t vnames;
@@ -279,6 +361,8 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
 
     *expr_out = NULL;
     *bindings_out = NULL;
+    expr_t *initial = NULL;
+    expr_t *display = dv ? TeX_primitive_display(dv, &initial) : NULL;
 
     /*
      * A binding expression records the user's surface syntax, but its compact
@@ -286,7 +370,7 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
      * derivative.  Render the expression tree whenever formal derivatives are
      * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
      */
-    if (dv && dv->binding_expr && !expr_is_const(dv) && !TeX_tree_contains_formal_derivative(dv)) {
+    if (!display && dv && dv->binding_expr && !expr_is_const(dv) && !TeX_tree_contains_formal_derivative(dv)) {
         *expr_out = expr_binding_expr_to_TeX(dv->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
@@ -309,7 +393,10 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     find_named_consts_dfs(g, &cl);
 
     sbuf_init(&expr);
-    emit_TeX_expr(g, &expr, PREC_LOWEST);
+    emit_TeX_expr(display ? display : g, &expr, PREC_LOWEST);
+    TeX_primitive_definition(initial, &expr);
+    expr_free(initial);
+    expr_free(display);
 
     sbuf_init(&bindings);
     if (vl.count > 0u || cl.count > 0u) {
@@ -400,7 +487,20 @@ char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit)
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)expr, &vnames);
-    body = TeX_wrapped_body_inner(expr, line_limit);
+    expr_t *initial = NULL;
+    expr_t *display = TeX_primitive_display(expr, &initial);
+    body = TeX_wrapped_body_inner(display ? display : expr, line_limit);
+    if (body && initial) {
+        sbuf_t defined;
+        sbuf_init(&defined);
+        sbuf_puts(&defined, body);
+        TeX_primitive_definition(initial, &defined);
+        free(body);
+        body = expr_tostring_xstrdup(sbuf_c_str(&defined));
+        sbuf_free(&defined);
+    }
+    expr_free(display);
+    expr_free(initial);
     autoname_restore(&vnames);
     return body;
 }

@@ -349,7 +349,7 @@ fail:
     return NULL;
 }
 
-static string_t *mat_join_binding_list_for_card(string_t **bindings, size_t nbindings, int plain_expression_syntax)
+static string_t *mat_join_binding_list_for_card(string_t **bindings, size_t nbindings)
 {
     string_t *out = string_new();
     mat_binding_token_t token = {0};
@@ -367,17 +367,6 @@ static string_t *mat_join_binding_list_for_card(string_t **bindings, size_t nbin
         if (mat_value_is_nan(token.value)) {
             if (string_append_char(out, '?') != 0)
                 goto token_fail;
-        } else if (plain_expression_syntax) {
-            expr_t *value_expr = expr_from_string(string_c_str(token.value), NULL);
-            string_t *value_text = value_expr ? expr_to_function_body_text(value_expr) : NULL;
-
-            if (string_append_string(out, value_text ? value_text : token.value) != 0) {
-                string_free(value_text);
-                expr_free(value_expr);
-                goto token_fail;
-            }
-            string_free(value_text);
-            expr_free(value_expr);
         } else if (string_append_string(out, token.value) != 0) {
             goto token_fail;
         }
@@ -920,7 +909,7 @@ static string_t *mat_matrix_factor_text(const expr_t *factor, mat_string_style_t
 
     if (!factor)
         return NULL;
-    if (style == MAT_STRING_FUNCTION || style == MAT_STRING_EXPRESSION_LAYOUT) {
+    if (style == MAT_STRING_FUNCTION) {
         expression = mat_function_expression_text(temporaries, factor);
         if (!expression)
             return NULL;
@@ -1188,7 +1177,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             size_t idx = i * A->cols + j;
             expr_t *display_expr = beautification.entries[idx];
 
-            if (function || expression_layout) {
+            if (function) {
                 expr = mat_function_expression_text(function_temporaries, display_expr);
                 if (mat_split_expr_repr(display_expr, &constant_binding_text, &binding_text) != 0) {
                     string_free(expr);
@@ -1218,7 +1207,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             if (mat_text_display_length(exprs[idx]) > widths[j])
                 widths[j] = mat_text_display_length(exprs[idx]);
             if (beautification.additive_constants) {
-                if (function || expression_layout) {
+                if (function) {
                     additive_constants[idx] =
                         mat_function_expression_text(function_temporaries, beautification.additive_constants[idx]);
                     if (mat_split_expr_repr(beautification.additive_constants[idx], &expr, &constant_binding_text) != 0) {
@@ -1285,8 +1274,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
                                          : mat_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings,
                                                                    nconst_bindings));
         if (expression_style) {
-            string_t *vars = mat_join_binding_list_for_card(var_bindings, nvar_bindings, expression_layout);
-            string_t *consts = mat_join_binding_list_for_card(const_bindings, nconst_bindings, expression_layout);
+            string_t *vars = mat_join_binding_list_for_card(var_bindings, nvar_bindings);
+            string_t *consts = mat_join_binding_list_for_card(const_bindings, nconst_bindings);
 
             joined = string_new();
             if (joined && vars && string_length(vars) > 0u)
@@ -1379,7 +1368,13 @@ static int mat_append_function_binding_name(string_t *out, const mat_bindings_t 
         return -1;
     if (with_qualifier && mat_bindings_is_constant_at(bindings, index) && string_append_cstr(out, "const ") != 0)
         return -1;
-    return string_append_cstr(out, name);
+    /* Use exactly the same native identifier spelling as the function body. */
+    expr_t *symbol = expr_new_named_var(NUM_NAN, name);
+    string_t *function_name = symbol ? expr_to_function_body_text(symbol) : NULL;
+    int rc = function_name ? string_append_string(out, function_name) : -1;
+    string_free(function_name);
+    expr_free(symbol);
+    return rc;
 }
 
 static int mat_append_function_binding_value(string_t *out, mat_bindings_t *bindings, size_t index)

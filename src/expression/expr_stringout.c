@@ -461,9 +461,6 @@ static int pow_exp_needs_parens(const expr_t *e)
 
 static int pow_base_needs_visible_parens(const expr_t *base)
 {
-    number_t real;
-    int has_real_part;
-
     if (base && (expr_is_formal_derivative(base) || expr_is_pow_d_expr(base) || expr_is_op(base, &ops_pow)))
         return 1;
 
@@ -480,10 +477,7 @@ static int pow_base_needs_visible_parens(const expr_t *base)
         return 0;
     if (num_is_real(base->c))
         return num_lt(base->c, NUM_ZERO);
-    real = num_real_part(base->c);
-    has_real_part = !num_eq(real, NUM_ZERO);
-    num_destroy(&real);
-    return has_real_part;
+    return !num_eq(base->c, NUM_I);
 }
 
 static int mul_factor_needs_visible_parens(const expr_t *factor)
@@ -1891,6 +1885,35 @@ static void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+/* Ordered function derivatives keep their order separate from ordinary powers. */
+static void emit_ordered_derivative(const expr_t *f, sbuf_t *b, int style)
+{
+    void (*emit)(const expr_t *, sbuf_t *, int) = style == 2 ? emit_TeX_expr : style == 1 ? emit_func : emit_expr;
+    const char *name = f->a->name;
+    if (style == 2)
+        emit_TeX_name(b, name);
+    else if (style == 1)
+        emit_name_func(b, name);
+    else
+        emit_name(b, name);
+    number_t order = NUM_NAN;
+    long p = 0, q = 0;
+    bool primes = expr_match_const_value(f->b, &order) && num_get_small_rational(order, &p, &q) &&
+                  q == 1 && p > 0 && p <= 3;
+    num_destroy(&order);
+    if (primes) {
+        for (long i = 0; i < p; ++i)
+            sbuf_putc(b, '\'');
+    } else {
+        sbuf_puts(b, style == 2 ? "^{(" : "^(");
+        emit(f->b, b, PREC_LOWEST);
+        sbuf_puts(b, style == 2 ? ")}" : ")");
+    }
+    sbuf_puts(b, style == 2 ? "\\left(" : "(");
+    emit(f->a->a, b, PREC_LOWEST);
+    sbuf_puts(b, style == 2 ? "\\right)" : ")");
+}
+
 static _Thread_local unsigned int expr_TeX_partial_derivative_depth;
 static _Thread_local unsigned int expr_TeX_total_derivative_depth;
 
@@ -2238,16 +2261,14 @@ static bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, 
     long numerator;
     long denominator;
     bool reciprocal;
-    bool group_power_base;
     int need;
-    unsigned long magnitude;
 
-    if (!num_get_small_rational(exponent, &numerator, &denominator) || numerator == 0L || denominator <= 1L)
+    /* Root(base^p, q) is not the principal base^(p/q) for general complex bases. */
+    if (!num_get_small_rational(exponent, &numerator, &denominator) ||
+        (numerator != 1L && numerator != -1L) || denominator <= 1L)
         return false;
 
     reciprocal = numerator < 0L;
-    magnitude = reciprocal ? (unsigned long)(-(numerator + 1L)) + 1u : (unsigned long)numerator;
-    group_power_base = magnitude > 1u && pow_base_needs_visible_parens(base);
     need = (reciprocal ? PREC_MUL : PREC_UNARY) < parent_prec;
     if (need)
         sbuf_puts(b, "\\left(");
@@ -2263,19 +2284,7 @@ static bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, 
         sbuf_puts(b, index_text);
         sbuf_puts(b, "]{");
     }
-    if (group_power_base)
-        sbuf_puts(b, "\\left(");
-    emit_TeX_expr(base, b, magnitude > 1u ? PREC_POW : PREC_LOWEST);
-    if (magnitude > 1u) {
-        char exponent_text[32];
-
-        snprintf(exponent_text, sizeof(exponent_text), "%lu", magnitude);
-        if (group_power_base)
-            sbuf_puts(b, "\\right)");
-        sbuf_puts(b, "^{");
-        sbuf_puts(b, exponent_text);
-        sbuf_putc(b, '}');
-    }
+    emit_TeX_expr(base, b, PREC_LOWEST);
     sbuf_putc(b, '}');
     if (reciprocal)
         sbuf_putc(b, '}');
@@ -2814,6 +2823,76 @@ static bool display_series_prepare_terms(const expr_t *expr, display_poly_term_t
     return true;
 }
 
+/* A transform is not a polynomial coefficient: retain its term ahead of the initial-value polynomial. */
+static const expr_t *display_transform_factor(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    if (expr_is_laplace_transform(expr))
+        return expr;
+    if (expr_is_neg(expr))
+        return display_transform_factor(expr->a);
+    if (expr_is_mul(expr)) {
+        const expr_t *left = display_transform_factor(expr->a);
+        const expr_t *right = display_transform_factor(expr->b);
+        return left && right ? NULL : left ? left : right;
+    }
+    return NULL;
+}
+
+static bool display_sum_has_transform(const expr_t *expr)
+{
+    if (expr_is_addsub(expr))
+        return display_sum_has_transform(expr->a) || display_sum_has_transform(expr->b);
+    return display_transform_factor(expr) != NULL;
+}
+
+static bool display_transform_collect_terms(const expr_t *expr, bool subtract, display_poly_term_t *terms,
+                                            size_t *count, size_t max_terms)
+{
+    if (expr_is_addsub(expr))
+        return display_transform_collect_terms(expr->a, subtract, terms, count, max_terms) &&
+               display_transform_collect_terms(expr->b, subtract != expr_is_op(expr, &ops_sub),
+                                                terms, count, max_terms);
+    if (*count >= max_terms)
+        return false;
+    terms[(*count)++] = (display_poly_term_t){.expr = expr, .subtract = subtract};
+    return true;
+}
+
+static bool display_transform_prepare_terms(const expr_t *expr, display_poly_term_t *terms,
+                                            size_t *count, size_t max_terms)
+{
+    const expr_t *transform = NULL;
+    size_t leading = 0u;
+    *count = 0u;
+    if (!display_transform_collect_terms(expr, false, terms, count, max_terms) || *count < 2u)
+        return false;
+    /* Bounded by the shared display-term capacity; reject ambiguous multiple-transform sums. */
+    for (size_t i = 0u; i < *count; ++i) {
+        const expr_t *candidate = display_transform_factor(terms[i].expr);
+        if (!candidate)
+            continue;
+        if (transform)
+            return false;
+        transform = candidate;
+        leading = i;
+    }
+    const expr_t *target = transform && transform->b && transform->b->b ? transform->b->b->a : NULL;
+    if (!target || !expr_is_var(target) || !target->name)
+        return false;
+    display_poly_var_list_t vars = {.name = {target->name}, .count = 1u};
+    for (size_t i = 0u; i < *count; ++i) {
+        if (i != leading && !display_poly_term_degrees(terms[i].expr, &vars, terms[i].degree))
+            return false;
+    }
+    display_poly_term_t first = terms[leading];
+    memmove(terms + 1u, terms, leading * sizeof(*terms));
+    terms[0] = first;
+    display_poly_sort_terms(terms + 1u, *count - 1u, 1u, true);
+    return true;
+}
+
 static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *terms, size_t *count, size_t max_terms)
 {
     display_poly_var_list_t vars = {0};
@@ -2823,6 +2902,9 @@ static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *
         return false;
 
     if (display_series_prepare_terms(expr, terms, count, max_terms))
+        return true;
+
+    if (display_transform_prepare_terms(expr, terms, count, max_terms))
         return true;
 
     if (display_poly_expr_contains_imaginary_unit(expr) || !display_poly_collect_vars(expr, &vars) || vars.count == 0u)
@@ -2850,6 +2932,20 @@ static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *
                             display_poly_is_explicit_arbitrary_amplitude(terms, *count, vars.count));
     if (terms[0].subtract != (expr_renders_negative(terms[0].expr) ? true : false))
         return false;
+    return true;
+}
+
+/* Share the display ordering with the multiline TeX renderer. */
+bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *signs, size_t *count, size_t capacity)
+{
+    display_poly_term_t terms[96];
+    size_t limit = capacity < 96u ? capacity : 96u;
+    if (!expr_is_addsub(expr) || !display_poly_prepare_terms(expr, terms, count, limit))
+        return false;
+    for (size_t i = 0u; i < *count; ++i) {
+        nodes[i] = terms[i].expr;
+        signs[i] = terms[i].subtract ? -1 : 1;
+    }
     return true;
 }
 
@@ -3915,15 +4011,15 @@ static void sort_TeX_factors(expr_t **factors, int count)
 }
 
 /* Only multiplicative factors are traversed. Refuse oversized products rather than dropping any factors. */
-static bool TeX_collect_calculus_factors(const expr_t *f, const expr_t **factors, size_t *count, bool *negative)
+static bool TeX_collect_signed_factors(const expr_t *f, const expr_t **factors, size_t *count, bool *negative)
 {
     if (expr_is_neg(f)) {
         *negative = !*negative;
-        return TeX_collect_calculus_factors(f->a, factors, count, negative);
+        return TeX_collect_signed_factors(f->a, factors, count, negative);
     }
     if (expr_is_mul(f))
-        return TeX_collect_calculus_factors(f->a, factors, count, negative) &&
-               TeX_collect_calculus_factors(f->b, factors, count, negative);
+        return TeX_collect_signed_factors(f->a, factors, count, negative) &&
+               TeX_collect_signed_factors(f->b, factors, count, negative);
     if (*count == 64u)
         return false;
     *negative = *negative != expr_is_negative(f);
@@ -3940,7 +4036,7 @@ static bool emit_TeX_calculus_quotient(const expr_t *f, sbuf_t *b, int parent_pr
     bool calculus[64];
     size_t count = 0u, calculus_count = 0u;
     bool negative = expr_is_negative(f->b);
-    if (!TeX_collect_calculus_factors(f->a, factors, &count, &negative))
+    if (!TeX_collect_signed_factors(f->a, factors, &count, &negative))
         return false;
     for (size_t i = 0u; i < count; ++i) {
         calculus[i] = TeX_contains_calculus(factors[i]);
@@ -4000,6 +4096,101 @@ static bool emit_TeX_calculus_quotient(const expr_t *f, sbuf_t *b, int parent_pr
         emit_TeX_expr_abs(factors[i], b, PREC_MUL);
     }
     if (grouped)
+        sbuf_puts(b, "\\right)");
+    return true;
+}
+
+/* A small prefactor keeps a long sum at the surrounding font size. */
+static bool emit_TeX_large_sum_quotient(const expr_t *sum, const expr_t *denominator,
+                                      long p, long q, sbuf_t *b, int parent_prec)
+{
+    if (!sum || !(expr_is_op(sum, &ops_add) || expr_is_op(sum, &ops_sub)))
+        return false;
+    sbuf_t numerator, divisor;
+    sbuf_init(&numerator);
+    sbuf_init(&divisor);
+    emit_TeX_expr(sum, &numerator, PREC_LOWEST);
+    if (q != 1L) {
+        char text[32];
+        snprintf(text, sizeof(text), "%ld", q);
+        sbuf_puts(&divisor, text);
+        sbuf_puts(&divisor, "\\mkern-2mu ");
+    }
+    emit_TeX_expr(denominator, &divisor, q == 1L ? PREC_LOWEST : PREC_MUL);
+    bool factored = sbuf_len(&numerator) >= 200u && sbuf_len(&divisor) <= 32u;
+    if (factored) {
+        if (PREC_MUL < parent_prec)
+            sbuf_puts(b, "\\left(");
+        char text[48];
+        snprintf(text, sizeof(text), "\\frac{%ld}{", p);
+        sbuf_puts(b, text);
+        sbuf_put_string(b, divisor.text);
+        sbuf_puts(b, "}\\,\\left[");
+        sbuf_put_string(b, numerator.text);
+        sbuf_puts(b, "\\right]");
+        if (PREC_MUL < parent_prec)
+            sbuf_puts(b, "\\right)");
+    }
+    sbuf_free(&divisor);
+    sbuf_free(&numerator);
+    return factored;
+}
+
+/* Put an exact rational coefficient's denominator into the surrounding fraction. */
+static bool emit_TeX_rational_quotient(const expr_t *numerator, const expr_t *denominator,
+                                     sbuf_t *b, bool absolute, int parent_prec)
+{
+    long p, q;
+    const expr_t *factors[64];
+    size_t count = 0u, coefficient_index = 0u;
+    bool negative = false, found = false;
+    if (!numerator || !TeX_collect_signed_factors(numerator, factors, &count, &negative))
+        return false;
+    /* The native product normaliser collects numeric factors into one coefficient. */
+    for (size_t i = 0u; i < count; ++i) {
+        if (expr_is_const(factors[i]) && !factors[i]->name &&
+            num_get_small_rational(factors[i]->c, &p, &q) && q > 1L) {
+            coefficient_index = i;
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        return false;
+    if (count == 2u && p > 0 && !negative &&
+        emit_TeX_large_sum_quotient(factors[1u - coefficient_index], denominator, p, q, b, parent_prec))
+        return true;
+    number_t coefficient = num_create_from_frac(p, 1L);
+    if (p < 0L) {
+        number_t positive = num_neg(coefficient);
+        num_destroy(&coefficient);
+        coefficient = positive;
+    }
+    if (PREC_MUL < parent_prec)
+        sbuf_puts(b, "\\left(");
+    if (negative && !absolute)
+        sbuf_putc(b, '-');
+    sbuf_puts(b, "\\frac{");
+    bool emitted = !num_eq(coefficient, NUM_ONE) || count == 1u;
+    if (emitted)
+        emit_TeX_number_value(b, coefficient);
+    num_destroy(&coefficient);
+    for (size_t i = 0u; i < count; ++i) {
+        if (i == coefficient_index)
+            continue;
+        if (emitted)
+            sbuf_puts(b, "\\mkern-2mu ");
+        emit_TeX_expr_abs(factors[i], b, PREC_MUL);
+        emitted = true;
+    }
+    sbuf_puts(b, "}{");
+    char text[32];
+    snprintf(text, sizeof(text), "%ld", q);
+    sbuf_puts(b, text);
+    sbuf_puts(b, "\\mkern-2mu ");
+    emit_TeX_expr(denominator, b, PREC_MUL);
+    sbuf_putc(b, '}');
+    if (PREC_MUL < parent_prec)
         sbuf_puts(b, "\\right)");
     return true;
 }
@@ -4074,6 +4265,11 @@ static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_MUL < parent_prec;
         if (need)
             sbuf_puts(b, "\\left(");
+        if (emit_TeX_rational_quotient(f->a, f->b, b, true, PREC_LOWEST)) {
+            if (need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
         sbuf_puts(b, "\\frac{");
         emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{");
@@ -4234,8 +4430,47 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_op(f, &ops_real_domain)) {
+        emit_TeX_expr(f->a, b, parent_prec);
+        sbuf_puts(b, "\\quad (");
+        for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
+            if (pair != f->b)
+                sbuf_puts(b, ",\\;");
+            if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
+                emit_TeX_expr(pair->a->a, b, PREC_LOWEST);
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "\\in\\mathbb{R}" : "\\in\\mathbb{Z}_{\\ge0}");
+                continue;
+            }
+            sbuf_puts(b, "\\operatorname{Re}(");
+            emit_TeX_expr(pair->a, b, PREC_LOWEST);
+            sbuf_puts(b, ")>");
+            emit_TeX_expr(pair->b->a, b, PREC_LOWEST);
+        }
+        sbuf_putc(b, ')');
+        return;
+    }
+    if (expr_is_laplace_transform(f)) {
+        expr_t *result = expr_transform_result(f);
+        if (result) {
+            emit_TeX_expr(result, b, parent_prec);
+        } else {
+            sbuf_puts(b, f->ops == &ops_inverse_laplace ? "\\mathcal{L}^{-1}_{" : "\\mathcal{L}_{");
+            emit_TeX_expr(f->b->a, b, PREC_LOWEST);
+            sbuf_puts(b, "\\to ");
+            emit_TeX_expr(f->b->b->a, b, PREC_LOWEST);
+            sbuf_puts(b, "}\\{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "\\}");
+        }
+        expr_free(result);
+        return;
+    }
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_TeX(f, b);
+        return;
+    }
+    if (expr_is_op(f, &ops_ordered_derivative)) {
+        emit_ordered_derivative(f, b, 2);
         return;
     }
     if (expr_is_arbitrary_function(f)) {
@@ -4578,6 +4813,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_op(f, &ops_div)) {
         if (emit_TeX_calculus_quotient(f, b, parent_prec, false))
             return;
+        if (emit_TeX_large_sum_quotient(f->a, f->b, 1L, 1L, b, parent_prec))
+            return;
         int need = PREC_MUL < parent_prec;
         bool neg_num = expr_is_negative(f->a);
         bool neg_den = expr_is_negative(f->b);
@@ -4604,14 +4841,16 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
             if (need)
                 sbuf_puts(b, "\\left(");
-            sbuf_puts(b, "\\frac{");
-            if (common_numerator_factor)
-                emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
-            else
-                emit_TeX_expr(common_sum, b, PREC_LOWEST);
-            sbuf_puts(b, "}{");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
-            sbuf_putc(b, '}');
+            if (!emit_TeX_rational_quotient(common_numerator_factor, f->b, b, false, PREC_LOWEST)) {
+                sbuf_puts(b, "\\frac{");
+                if (common_numerator_factor)
+                    emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
+                else
+                    emit_TeX_expr(common_sum, b, PREC_LOWEST);
+                sbuf_puts(b, "}{");
+                emit_TeX_expr(f->b, b, PREC_LOWEST);
+                sbuf_putc(b, '}');
+            }
             if (common_numerator_factor) {
                 sbuf_puts(b, "\\mkern-2mu \\left(");
                 emit_TeX_expr(common_sum, b, PREC_LOWEST);
@@ -4621,6 +4860,9 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_puts(b, "\\right)");
             return;
         }
+
+        if (emit_TeX_rational_quotient(f->a, f->b, b, false, parent_prec))
+            return;
 
         if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) && !expr_is_negative(denominator)) {
             if (need)
@@ -4861,8 +5103,56 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (emit_expr_integral_cartesian(f, b, parent_prec))
         return;
 
+    if (expr_is_op(f, &ops_real_domain)) {
+        if (parent_prec > PREC_LOWEST)
+            sbuf_putc(b, '(');
+        emit_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, " where (");
+        for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
+            if (pair != f->b)
+                sbuf_puts(b, "; ");
+            if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
+                emit_expr(pair->a->a, b, PREC_LOWEST);
+                sbuf_putc(b, ')');
+                continue;
+            }
+            sbuf_puts(b, "Re(");
+            emit_expr(pair->a, b, PREC_LOWEST);
+            sbuf_puts(b, ") > ");
+            emit_expr(pair->b->a, b, PREC_LOWEST);
+        }
+        sbuf_putc(b, ')');
+        if (parent_prec > PREC_LOWEST)
+            sbuf_putc(b, ')');
+        return;
+    }
+    if (expr_is_laplace_transform(f)) {
+        expr_t *result = expr_transform_result(f);
+        if (result) {
+            emit_expr(result, b, parent_prec);
+            expr_free(result);
+            return;
+        }
+        sbuf_puts(b, f->ops == &ops_inverse_laplace ? "ℒ⁻¹(" : "ℒ(");
+        emit_expr(f->a, b, PREC_LOWEST);
+        if (num_to_double(f->b->b->b->c) > 1) {
+            sbuf_puts(b, ", ");
+            emit_expr(f->b->a, b, PREC_LOWEST);
+        }
+        if (num_to_double(f->b->b->b->c) > 2) {
+            sbuf_puts(b, ", ");
+            emit_expr(f->b->b->a, b, PREC_LOWEST);
+        }
+        sbuf_putc(b, ')');
+        return;
+    }
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_expr(f, b);
+        return;
+    }
+    if (expr_is_op(f, &ops_ordered_derivative)) {
+        emit_ordered_derivative(f, b, 0);
         return;
     }
     if (expr_is_arbitrary_function(f)) {
@@ -5631,15 +5921,59 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
 
-    if (expr_is_addsub(f) && display_series_remainder(f) &&
+    if (expr_is_addsub(f) && (display_series_remainder(f) || display_sum_has_transform(f)) &&
         emit_func_display_polynomial_sum(f, b, parent_prec))
         return;
 
     if (emit_func_integral_cartesian(f, b, parent_prec))
         return;
 
+    if (expr_is_laplace_transform(f)) {
+        expr_t *result = expr_transform_result(f);
+        if (result) {
+            emit_func(result, b, parent_prec);
+            expr_free(result);
+            return;
+        }
+        sbuf_puts(b, f->ops == &ops_inverse_laplace ? "InverseLaplace(" : "Laplace(");
+        emit_func(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, ", ");
+        emit_func(f->b->a, b, PREC_LOWEST);
+        sbuf_puts(b, ", ");
+        emit_func(f->b->b->a, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        return;
+    }
+    if (expr_is_op(f, &ops_real_domain)) {
+        if (parent_prec > PREC_LOWEST)
+            sbuf_putc(b, '(');
+        emit_func(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, " where (");
+        for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
+            if (pair != f->b)
+                sbuf_puts(b, "; ");
+            if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
+                emit_func(pair->a->a, b, PREC_LOWEST);
+                sbuf_putc(b, ')');
+                continue;
+            }
+            sbuf_puts(b, "Re(");
+            emit_func(pair->a, b, PREC_LOWEST);
+            sbuf_puts(b, ") > ");
+            emit_func(pair->b->a, b, PREC_LOWEST);
+        }
+        sbuf_putc(b, ')');
+        if (parent_prec > PREC_LOWEST)
+            sbuf_putc(b, ')');
+        return;
+    }
     if (expr_is_formal_derivative(f)) {
         emit_formal_derivative_func(f, b);
+        return;
+    }
+    if (expr_is_op(f, &ops_ordered_derivative)) {
+        emit_ordered_derivative(f, b, 1);
         return;
     }
     if (expr_is_arbitrary_function(f)) {

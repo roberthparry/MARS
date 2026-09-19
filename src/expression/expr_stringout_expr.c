@@ -21,10 +21,18 @@ string_t *expr_to_text_expr(const expr_t *f)
     varlist_t vl;
     varlist_t cl;
     const expr_t *g = f;
+    expr_t *resolved = NULL;
     string_t *out;
 
     if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
+
+    if (expr_is_laplace_transform(f)) {
+        resolved = expr_transform_result(f);
+        if (resolved)
+            g = resolved;
+    }
+    const bool conditioned = expr_is_op(g, &ops_real_domain);
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)f, &vnames);
@@ -37,12 +45,12 @@ string_t *expr_to_text_expr(const expr_t *f)
     find_named_consts_dfs(g, &cl);
 
     sbuf_init(&b);
-    if (vl.count == 0u && cl.count == 0u) {
+    if (vl.count == 0u && cl.count == 0u && !conditioned) {
         emit_expr(g, &b, PREC_LOWEST);
     } else {
         sbuf_putc(&b, '{');
         sbuf_putc(&b, ' ');
-        emit_expr(g, &b, PREC_LOWEST);
+        emit_expr(conditioned ? g->a : g, &b, PREC_LOWEST);
         sbuf_putc(&b, ' ');
         sbuf_putc(&b, '|');
         sbuf_putc(&b, ' ');
@@ -78,6 +86,22 @@ string_t *expr_to_text_expr(const expr_t *f)
             }
         }
 
+        if (conditioned) {
+            for (const expr_t *pair = g->b; pair; pair = pair->b->b) {
+                if (vl.count || cl.count || pair != g->b)
+                    sbuf_puts(&b, "; ");
+                if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
+                    sbuf_puts(&b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
+                    emit_expr(pair->a->a, &b, PREC_LOWEST);
+                    sbuf_putc(&b, ')');
+                    continue;
+                }
+                sbuf_puts(&b, "Re(");
+                emit_expr(pair->a, &b, PREC_LOWEST);
+                sbuf_puts(&b, ") > ");
+                emit_expr(pair->b->a, &b, PREC_LOWEST);
+            }
+        }
         sbuf_putc(&b, ' ');
         sbuf_putc(&b, '}');
     }
@@ -87,6 +111,7 @@ string_t *expr_to_text_expr(const expr_t *f)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
+    expr_free(resolved);
     return out;
 }
 

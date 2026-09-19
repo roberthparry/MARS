@@ -63,6 +63,8 @@ char *binding_rhs_c_string_local(const expr_t *dv);
 /* Expression emitters. */
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+/** Collect borrowed additive terms in display order, with their signs, within the supplied capacity. */
+bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *signs, size_t *count, size_t capacity);
 void emit_func_fragment(sbuf_t *b, const char *text);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 bool emit_func_integral_cartesian_body(const expr_t *f, sbuf_t *b);

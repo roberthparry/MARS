@@ -22,6 +22,24 @@ SPEC.loader.exec_module(coverage)
 class MarkdownApiCoverageTests(unittest.TestCase):
     """Check public declaration extraction and the committed reference."""
 
+    def test_laplace_documentation_uses_markdown_math_delimiters(self) -> None:
+        for name in ("expression.md", "design-notes/integral-transforms.md"):
+            fenced = False
+            math_rows = 0
+            for line in (ROOT / "docs" / name).read_text(encoding="utf-8").splitlines():
+                if line.lstrip().startswith(("```", "~~~")):
+                    fenced = not fenced
+                if fenced:
+                    continue
+                with self.subTest(document=name, line=line):
+                    self.assertNotEqual(line.strip(), "$", "Display maths requires double-dollar delimiters")
+                    for delimiter in (r"\(", r"\)", r"\[", r"\]"):
+                        self.assertNotIn(delimiter, line)
+                    if line.startswith("|") and "$" in line:
+                        math_rows += 1
+                        self.assertEqual(line.count("$") % 2, 0)
+            self.assertGreater(math_rows, 10, name)
+
     def test_extractor_finds_prototypes_and_inline_functions_only(self) -> None:
         source = """
         typedef int (*callback_t)(int value);

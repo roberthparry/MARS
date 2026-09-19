@@ -8,6 +8,78 @@ static void check_parse_expr(const char *label, const char *s, const char *want_
 static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line);
 static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line);
 
+static void test_from_string_laplace(void)
+{
+    check_parse_num("Laplace zero hyperbolic tangent", "{@L(tanh(c*t)) | c=0}", "0", __LINE__);
+    check_parse_num("Laplace zero tangent without target", "{@L(tan(c*t)) | c=0}", "0", __LINE__);
+    check_parse_num("Laplace zero tangent no half-plane restriction", "{@L(tan(c*t)) | s=-2; c=0}", "0", __LINE__);
+    check_parse_num("Inverse Laplace logarithm", "{@Linv{-(ln(s)+γ)/s} | t=1}", "0", __LINE__);
+    check_parse_num("Inverse Laplace logarithmic coefficient", "{@Linv{-(ln(s)+γ)/s}/ln(2) | t=2}", "1", __LINE__);
+    check_parse_num("Laplace braced logarithm", "{@L{ln(t)}/@eulermascheroni | s=1}", "-1", __LINE__);
+    check_parse_num("Laplace braced inverse", "{@Linv{1/s^2} | t=2}", "2", __LINE__);
+    check_parse_num("Inverse Laplace pole", "{@Linv(1/s) | t=2}", "1", __LINE__);
+    check_parse_num("Inverse Laplace repeated pole", "{InverseLaplace(1/s^3) | t=2}", "2", __LINE__);
+    check_parse_num("Inverse Laplace Unicode", "{ℒ⁻¹(s/(s^2+1)) | t=0}", "1", __LINE__);
+    check_parse_num("Inverse Laplace shifted cosine", "{@Linv((s-a)/((s-a)^2+1)) | t=0; a=2}", "1", __LINE__);
+    check_parse_num("Laplace polynomial", "{@L(t^2+3*t+2) | s=2}", "2", __LINE__);
+    check_parse_num("Laplace Bessel zero", "{@L(J_0(t))*sqrt(5) | s=2}", "1", __LINE__);
+    check_parse_num("Bessel ASCII alias", "J0(0)", "1", __LINE__);
+    check_parse_num("Bessel subscript alias", "J₀(0)", "1", __LINE__);
+    check_parse_num("Laplace symbolic power", "{@L(t^n,t) | s=2; n=3}", "3/8", __LINE__);
+    expr_t *obsolete_guard = expr_from_string("where_real_gt(1/s,s,0)", NULL);
+    ASSERT_NULL(obsolete_guard);
+    expr_free(obsolete_guard);
+    check_parse_num("Laplace fractional power", "{@L(t^(-1/2)) | s=1}", "sqrt(pi)", __LINE__);
+    check_parse_num("Laplace square root", "{2*@L(sqrt(t))/sqrt(pi) | s=1}", "1", __LINE__);
+    check_parse_num("Laplace cube root", "{@L(cubrt(t))/gamma(4/3) | s=1}", "1", __LINE__);
+    check_parse_num("Laplace fourth root", "{@L(root(t,4))/gamma(5/4) | s=1}", "1", __LINE__);
+    check_parse_num("Laplace reciprocal root", "{@L(1/sqrt(t)) | s=1}", "sqrt(pi)", __LINE__);
+    check_parse_num("Readable transform domain", "{120/s^6 where (Re(s)>0) | s=2}", "15/8", __LINE__);
+    check_parse_num("Binding domain condition", "{120/s^6 | s=2; Re(s)>0}", "15/8", __LINE__);
+    check_parse_expr("Binding condition rendering", "{120/s^6 where (Re(s)>0) | s=2}",
+                     "{ 120/s⁶ | s = 2; Re(s) > 0 }", __LINE__);
+    check_parse_num("Multiple domain conditions", "{gamma(n+1)/s^(n+1) where (Re(s) > 0; Re(n) > -1) | s=2; n=5}",
+                    "15/8", __LINE__);
+    expr_t *guard = expr_from_string("1/s^2 where (Re(s) > 0)", NULL);
+    expr_t *copy = expr_clone(guard);
+    ASSERT_NOT_NULL(copy);
+    expr_free(copy);
+    expr_free(guard);
+    check_parse_num("Laplace exponential", "{@L(exp(-t)) | s=2}", "1/3", __LINE__);
+    check_parse_num("Laplace symbolic exponential notation", "{@L(e^(a*t)) | s=2; a=1}", "1", __LINE__);
+    check_parse_num("Laplace negative rate half-plane", "{@L(exp(a*t)) | s=-1; a=-2}", "1", __LINE__);
+    check_parse_num("Laplace complex rate", "{@L(exp(a*t)) | s=2+i; a=1+i}", "1", __LINE__);
+    check_parse_num("Real-part bound round trip", "{1/(s-a) | s=2+i; a=1+i; Re(s)>Re(a)}", "1", __LINE__);
+    check_parse_num("Laplace sine", "{ℒ(sin(t)) | s=2}", "1/5", __LINE__);
+    check_parse_num("Laplace inferred time with Greek frequency", "{@L(sinh(@omega*t)) | s=2; @omega=1}",
+                    "1/3", __LINE__);
+    check_parse_num("Laplace inferred time with free parameter", "{@L(sinh(x*t)) | s=2; x=1}", "1/3", __LINE__);
+    check_parse_num("Laplace explicit source overrides time", "{@L(sinh(x*t),x) | s=2; t=1}", "1/3", __LINE__);
+    check_parse_num("Laplace complementary error functions", "{@L(erf(t))+@L(erfc(t)) | s=2}", "1/2", __LINE__);
+    check_parse_num("Laplace opposite error function rates", "{@L(erf(t))+@L(erf(-t)) | s=2}", "0", __LINE__);
+    check_parse_num("Laplace zero error function rate", "{@L(erf(at)) | s=2; a=0}", "0", __LINE__);
+    check_parse_num("Laplace time-weighted symbolic sine", "{@L(tsin(at)) | s=2; a=1}", "4/25", __LINE__);
+    check_parse_num("Laplace time-weighted cosine", "{@L(tcos(at)) | s=2; a=1}", "3/25", __LINE__);
+    check_parse_num("Laplace squared-time cosine", "{@L(t^2*cos(at),t) | s=2; a=1}", "4/125", __LINE__);
+    check_parse_num("Laplace time-weighted exponential", "{@L(t*exp(at)) | s=2; a=1}", "1", __LINE__);
+    check_parse_num("Laplace hyperbolic sine", "{@L(sinh(at)) | s=2; a=1}", "1/3", __LINE__);
+    check_parse_num("Laplace hyperbolic cosine", "{@L(cosh(at)) | s=2; a=1}", "2/3", __LINE__);
+    check_parse_num("Laplace imaginary hyperbolic rate", "{@L(cosh(at)) | s=2; a=i}", "2/5", __LINE__);
+    check_parse_num("Laplace bound sine power", "{@L(sin^n(t)) | s=1; n=5}", "3/13", __LINE__);
+    check_parse_num("Laplace even sine power", "{ℒ(sin(t)^2) | s=1}", "2/5", __LINE__);
+    check_parse_num("Laplace even cosine power", "{Laplace(cos(t)^4,t,p) | p=1}", "41/85", __LINE__);
+    check_parse_num("Laplace odd cosine power", "{@L(cos(t)^3) | s=1}", "2/5", __LINE__);
+    check_parse_num("Laplace symbolic cosine sum", "{@L(cos(t)^n,t) | s=1, n=3}", "2/5", __LINE__);
+    check_parse_num("Laplace symbolic sine sum", "{@L(sin(t)^n,t) | s=1, n=5}", "3/13", __LINE__);
+    check_parse_num("Integer domain satisfied", "{1/s | s=2; n=5; nonnegative_integer(n)}", "1/2", __LINE__);
+    check_parse_num("Laplace negative frequency", "{@L(sin(-2*t)^3) | s=1}", "-48/185", __LINE__);
+    check_parse_num("Laplace explicit target", "{Laplace(t,t,p) | p=2}", "1/4", __LINE__);
+    check_parse_expr("Laplace canonical call", "@L(f(t),t,p)", "{ ℒ(f(t), t, p) | p = NAN }", __LINE__);
+    check_parse_TeX("Laplace convergence", "@L(t)",
+                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\operatorname{Re}(s)>0) \\;\\middle|\\; s = NAN \\right\\}",
+                    __LINE__);
+}
+
 static void test_from_string_clausen(void)
 {
     static const char *const unary_aliases[] = {
@@ -4217,6 +4289,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_infinity_TeX, NULL);
     TEST_RUN_SUBTEST(test_from_string_function_hash, NULL);
     TEST_RUN_SUBTEST(test_from_string_clausen, NULL);
+    TEST_RUN_SUBTEST(test_from_string_laplace, NULL);
     TEST_RUN_SUBTEST(test_from_string_clausen_sums, NULL);
     TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
