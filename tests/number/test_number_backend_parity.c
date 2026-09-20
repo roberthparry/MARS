@@ -461,6 +461,26 @@ static void test_number_real_special_identities(void)
 static void test_number_complex_arithmetic_parity(void)
 {
     NUM_SCOPE(scope);
+    /* Real-valued complex backends must still use a complex-capable square operation. */
+    const char *real_values[] = {"0", "2", "-3"};
+    const double expected[] = {0, 4, 9};
+    for (size_t index = 0u; index < sizeof(expected) / sizeof(expected[0]); ++index) {
+        double value = strtod(real_values[index], NULL);
+        number_t inputs[] = {
+            num_create_from_cdouble(value + 0.0 * I),
+            num_create_from_qcomplex(qc_make(qf_from_double(value), QF_ZERO)),
+            num_mul(number_text(real_values[index]), num_mul(NUM_I, num_neg(NUM_I))),
+        };
+        for (size_t backend = 0u; backend < sizeof(inputs) / sizeof(inputs[0]); ++backend) {
+            number_t squared = num_sqr(inputs[backend]);
+            number_t power = num_pow(inputs[backend], NUM_TWO);
+            ASSERT_TRUE(num_eq(squared, num_create_from_double(expected[index])));
+            ASSERT_TRUE(num_eq(power, num_create_from_double(expected[index])));
+            num_destroy(&power);
+            num_destroy(&squared);
+            num_destroy(&inputs[backend]);
+        }
+    }
     number_t a = number_text("3 + 4i");
     number_t b = number_text("1 - 2i");
     number_t add = num_add(a, b);

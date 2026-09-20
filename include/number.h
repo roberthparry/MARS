@@ -833,6 +833,17 @@ number_t num_root(const number_t number, const number_t order);
 number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
 number_t num_ceil(const number_t number);
+
+/** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
+number_t num_step(number_t argument);
+/** @brief Unit-width rectangular pulse, with half-height endpoints. */
+number_t num_rect(number_t argument);
+/** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
+number_t num_tri(number_t argument);
+/** @brief Even unit-radius aperture profile, with half-height endpoints. */
+number_t num_circ(number_t argument);
+/** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
+number_t num_sinc(number_t argument);
 number_t num_mul_pow10(const number_t number, int exponent10);
 number_t num_hypot(const number_t a, const number_t b);
 /**
@@ -1000,6 +1011,15 @@ number_t num_polylog(const number_t order, const number_t number);
  * @return An owning number containing the finite logarithmic sum, or NaN for an invalid degree.
  */
 number_t num_harmonic_poly(const number_t degree, const number_t argument);
+
+/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
+number_t num_chebyshev_t(number_t degree, number_t argument);
+
+/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
+number_t num_chebyshev_u(number_t degree, number_t argument);
+
+/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
+number_t num_hermite_h(number_t degree, number_t argument);
 number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y);
 number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,

@@ -2081,7 +2081,7 @@ int main(int argc, char **argv)
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
-    char *transform_identity = expr_laplace_identity_TeX(expr, display_expr);
+    char *transform_identity = expr_transform_identity_TeX(expr, display_expr);
     printf("transform_identity_TeX  %s\n", transform_identity ? transform_identity : "");
     free(transform_identity);
     char *conditioned_expression = expr_conditioned_cases_to_string(display_expr);
@@ -2117,7 +2117,7 @@ int main(int argc, char **argv)
         }
 
         print_owned_number("value", num_clone(value_number), precision);
-        const char *transform_note = !num_is_finite(value_number) ? expr_laplace_value_note(expr) : NULL;
+        const char *transform_note = !num_is_finite(value_number) ? expr_transform_value_note(expr) : NULL;
         if (transform_note)
             printf("value_note  %s\n", transform_note);
         else if (!num_is_finite(value_number) && expr_integral_value_note(expr, value_note, sizeof(value_note)))

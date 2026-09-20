@@ -661,6 +661,23 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_
     return binding_expr_fold_to_number_owned(expr, magnitude);
 }
 
+/* Fold literal real magnitudes without evaluating named parameters or symbolic constants. */
+expr_binding_expr_t *binding_expr_try_simplify_abs_numeric(expr_binding_expr_t *expr)
+{
+    number_t value;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP || expr->u.unary_op.ops != &ops_abs ||
+        !expr_binding_expr_number_value(expr->u.unary_op.child, &value))
+        return expr;
+    if (!num_is_real(value) || !num_is_finite(value)) {
+        num_destroy(&value);
+        return expr;
+    }
+    number_t magnitude = num_abs(value);
+    num_destroy(&value);
+    return binding_expr_fold_to_number_owned(expr, magnitude);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_trigamma_positive_infinity(expr_binding_expr_t *expr)
 {
     number_t value;

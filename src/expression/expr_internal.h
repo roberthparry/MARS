@@ -109,6 +109,11 @@ typedef enum {
     EXPR_KIND_POLYLOG1,
     EXPR_KIND_POLYLOG,
     EXPR_KIND_HARMONIC_POLY,
+    EXPR_KIND_CHEBYSHEV_T,
+    EXPR_KIND_CHEBYSHEV_U,
+    EXPR_KIND_HERMITE_H,
+    EXPR_KIND_CONVOLUTION,
+    EXPR_KIND_CAUSAL_CONVOLUTION,
     EXPR_KIND_LERCH_PHI,
     EXPR_KIND_LERCH_PHI_PACK,
     EXPR_KIND_LEGENDRE_CHI,
@@ -173,6 +178,15 @@ typedef enum {
     EXPR_KIND_ARBITRARY_FUNCTION,
     EXPR_KIND_LAPLACE,
     EXPR_KIND_INVERSE_LAPLACE,
+    EXPR_KIND_FOURIER,
+    EXPR_KIND_INVERSE_FOURIER,
+    EXPR_KIND_STEP,
+    EXPR_KIND_RECT,
+    EXPR_KIND_TRI,
+    EXPR_KIND_CIRC,
+    EXPR_KIND_SINC,
+    EXPR_KIND_DELTA,
+    EXPR_KIND_PRINCIPAL_VALUE,
     EXPR_KIND_REAL_DOMAIN,
     EXPR_KIND_NONNEGATIVE_INTEGER,
     EXPR_KIND_REAL_PARAMETER,
@@ -369,9 +383,26 @@ expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order)
 extern const expr_ops_t ops_arbitrary_function;
 extern const expr_ops_t ops_laplace;
 extern const expr_ops_t ops_inverse_laplace;
-/** Return whether an expression is a forward or inverse Laplace operator. */
-bool expr_is_laplace_transform(const expr_t *expr);
-/** Simplify a forward or inverse Laplace operator, retaining unsupported transforms. */
+extern const expr_ops_t ops_fourier;
+extern const expr_ops_t ops_inverse_fourier;
+extern const expr_ops_t ops_step;
+extern const expr_ops_t ops_rect;
+extern const expr_ops_t ops_tri;
+extern const expr_ops_t ops_circ;
+extern const expr_ops_t ops_sinc;
+extern const expr_ops_t ops_delta;
+extern const expr_ops_t ops_principal_value;
+/** Construct an integral transform with explicit or inferred variable mapping. */
+expr_t *expr_integral_transform_from_args(size_t count, expr_t *const *args, const expr_ops_t *ops);
+/** Construct a forward Fourier transform using angular frequency. */
+expr_t *expr_fourier_from_args(size_t count, expr_t *const *args);
+/** Construct an inverse Fourier transform, including its normalisation. */
+expr_t *expr_inverse_fourier_from_args(size_t count, expr_t *const *args);
+/** Return a recognised Fourier formula, or NULL for an unsupported case. */
+expr_t *expr_fourier_result(const expr_t *transform);
+/** Return whether an expression is a forward or inverse integral-transform operator. */
+bool expr_is_integral_transform(const expr_t *expr);
+/** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
 /** Construct an inverse Laplace operator from its expression and optional variable mapping. */
 expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args);
@@ -476,6 +507,12 @@ extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog1;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_harmonic_poly;
+extern const expr_ops_t ops_chebyshev_t, ops_chebyshev_u, ops_hermite_h;
+expr_t *expr_orthopoly_expand(const expr_t *expr);
+extern const expr_ops_t ops_convolution, ops_causal_convolution;
+expr_t *expr_convolution_from_args(size_t count, expr_t *const *args);
+expr_t *expr_causal_convolution_from_args(size_t count, expr_t *const *args);
+expr_t *expr_convolution_integral(const expr_t *expr);
 extern const expr_ops_t ops_clausen2;
 extern const expr_ops_t ops_clausen;
 expr_t *expr_clausen_xp(const expr_t *order, const expr_t *argument);

@@ -2,6 +2,27 @@
 
 `qcomplex_t` is a double-double complex number with `qfloat_t` real and imaginary parts, providing approximately 106 bits of precision (~31–32 decimal digits) across the full complex plane.
 
+## Signal functions
+
+`qc_sinc` is the entire complex continuation of normalised sinc, with value one
+at zero. `qc_step`, `qc_rect`, `qc_tri` and `qc_circ` follow the
+[real signal definitions](expression.md#signal-functions-and-distributions)
+and return NaN for non-real arguments; they are not applied separately to the
+real and imaginary components.
+
+README example:
+
+```c
+qcomplex_t value = qc_sinc(qc_make(QF_ZERO, QF_ZERO));
+printf("sinc(0) = %.0f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+```
+
+Output:
+
+```text
+sinc(0) = 1 + 0i
+```
+
 ## Representation
 
 ```c
@@ -370,3 +391,30 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).
+
+
+## Chebyshev and Hermite polynomials
+
+| API | Family |
+| :--- | :--- |
+| `qc_chebyshev_t` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
+| `qc_chebyshev_u` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
+| `qc_hermite_h` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
+
+These APIs take an unsigned long degree followed by the argument and evaluate
+the three-term polynomial recurrence.
+The existing harmonic-polynomial API is unchanged. See the
+[expression naming table](expression.md#chebyshev-and-hermite-polynomials)
+for `Tn`, `Un` and the distinct script-H Hermite notation.
+
+README example:
+
+```c
+qc_hermite_h(3, qc_make(QF_ZERO, QF_ONE))
+```
+
+Output:
+
+```text
+Hermite H3(i) = -20i
+```

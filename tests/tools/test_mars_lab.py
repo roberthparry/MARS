@@ -5073,7 +5073,7 @@ class ExpressionResultTests(unittest.TestCase):
             self.assertEqual(code, 0, raw)
             self.assertIn(r"\sum", fields["tex"])
             self.assertIn(r"\mathbb{Z}_{\ge0}", fields["tex"])
-            self.assertIn("nonnegative_integer(n)", fields["expression"].split("|", 1)[1])
+            self.assertIn("n ∈ ℤ≥0", fields["expression"].split("|", 1)[1])
             self.assertIn("floor(n) == n", fields["function"])
             self.assertNotIn("v1 =", fields["function"])
             if name == "sin":

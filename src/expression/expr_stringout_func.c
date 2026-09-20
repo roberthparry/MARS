@@ -686,7 +686,7 @@ static bool function_contains_bound_operator(const expr_t *expr)
 
 static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants)
 {
-    if (expr_is_laplace_transform(root)) {
+    if (expr_is_integral_transform(root)) {
         expr_t *result = expr_transform_result(root);
         if (result) {
             emit_function_body(b, result, variables, constants);
@@ -756,12 +756,17 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
         emit_function_body(&body, root->a, variables, constants);
         char *text = sbuf_to_c_string(&body);
         if (text) {
-            bool line_start = true;
-            for (const char *cursor = text; *cursor; ++cursor) {
-                if (line_start && *cursor != '\n')
+            for (char *line = text; *line;) {
+                char *newline = strchr(line, '\n');
+                if (newline)
+                    *newline = '\0';
+                if (*line)
                     sbuf_puts(b, "    ");
-                sbuf_putc(b, *cursor);
-                line_start = *cursor == '\n';
+                sbuf_puts(b, line);
+                if (!newline)
+                    break;
+                sbuf_putc(b, '\n');
+                line = newline + 1;
             }
         }
         free(text);

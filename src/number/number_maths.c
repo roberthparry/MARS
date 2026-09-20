@@ -3457,7 +3457,8 @@ number_t num_sqr(const number_t number)
         return num_create_from_qfloat(qf_sqr(number_impl_const(&number)->value.qf));
     if (kind == NUMBER_INVALID)
         return number_invalid();
-    if (kind == NUMBER_MPZ || kind == NUMBER_MPQ || !num_is_real(number))
+    if (kind == NUMBER_MPZ || kind == NUMBER_MPQ || kind == NUMBER_CDOUBLE ||
+        kind == NUMBER_QCOMPLEX || kind == NUMBER_COMPLEX)
         return num_mul(number, number);
     return number_apply_unary_math(number, qf_sqr, NULL, number_mpfr_sqr_mut, NULL);
 }

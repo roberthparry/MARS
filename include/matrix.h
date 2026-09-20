@@ -1333,6 +1333,16 @@ matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 
 matrix_t *mat_exp(const matrix_t *A);
 matrix_t *mat_sin(const matrix_t *A);
+/** @brief Apply the symmetric-endpoint unit step through spectral functional calculus on real spectra. */
+matrix_t *mat_step(const matrix_t *A);
+/** @brief Apply the unit-width rectangular pulse through spectral functional calculus on real spectra. */
+matrix_t *mat_rect(const matrix_t *A);
+/** @brief Apply the triangular pulse through spectral functional calculus on real spectra. */
+matrix_t *mat_tri(const matrix_t *A);
+/** @brief Apply the even unit-radius aperture profile through spectral functional calculus on real spectra. */
+matrix_t *mat_circ(const matrix_t *A);
+/** @brief Apply the entire normalised sinc function through spectral functional calculus. */
+matrix_t *mat_sinc(const matrix_t *A);
 matrix_t *mat_cos(const matrix_t *A);
 matrix_t *mat_tan(const matrix_t *A);
 /** @brief Return the matrix secant, the inverse of `cos(A)`. */
@@ -1485,6 +1495,15 @@ matrix_t *mat_polylog1(const matrix_t *A);
  * @return A newly allocated matrix containing the finite logarithmic sum, or NULL on error.
  */
 matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree);
+
+/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
+matrix_t *mat_chebyshev_t(const matrix_t *A, unsigned int degree);
+
+/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
+matrix_t *mat_chebyshev_u(const matrix_t *A, unsigned int degree);
+
+/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
+matrix_t *mat_hermite_h(const matrix_t *A, unsigned int degree);
 /**
  * @brief Evaluate the Lerch matrix function Phi(Z,s,a) by its convergent power series.
  *

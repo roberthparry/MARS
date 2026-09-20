@@ -3201,8 +3201,8 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("binding value round-trips pretty multiply", "{ -x + phi | x = ½·(1 + √(5)) }",
                      "{ -x + φ | x = ½·(1 + √(5)) }", __LINE__);
-    check_parse_expr("binding value preserves mathematical notation functions",
-                     "{ x | x = abs(-3)+floor(pi)+ceil(phi) }", "|-3| + ⌊π⌋ + ⌈φ⌉", __LINE__);
+    check_parse_expr("binding value simplifies numeric magnitude and preserves symbolic functions",
+                     "{ x | x = abs(-3)+floor(pi)+ceil(phi) }", "3 + ⌊π⌋ + ⌈φ⌉", __LINE__);
     check_parse_expr("binding value accepts unknown marker", "{ sinh(x) | x = ? }", "{ sinh(x) | x = NAN }", __LINE__);
     check_parse_expr("user-bound e remains symbolic", "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
                      "{ E - M - e·sin(E) | E = NAN; M = π/1.234, e = 0.0167 }", __LINE__);

@@ -2,6 +2,26 @@
 
 `number_t` is MARS's generic numeric value cluster.
 
+The signal APIs `num_step`, `num_rect`, `num_tri`, `num_circ` and `num_sinc`
+follow the [expression-level definitions](expression.md#signal-functions-and-distributions),
+using the existing numeric precision policy. Piecewise functions require real
+arguments; sinc has an entire complex continuation and an exact removable value
+of one at zero. Distributional impulses and principal values are not numeric APIs.
+
+README example (the scope owns temporary numbers):
+
+```c
+NUM_SCOPE(scope);
+number_t edge = num_rect(NUM_HALF);
+printf("rect(1/2) = %.1f\n", num_to_double(edge));
+```
+
+Output:
+
+```text
+rect(1/2) = 0.5
+```
+
 It gives the library a single by-value public numeric handle that can represent:
 
 - exact integers via an internal MPZ-backed representation
@@ -1025,4 +1045,32 @@ Returns the public result described by inline qfloat.
 
 ```c
 static inline qfloat_t number_inline_qfloat(number_t number);
+```
+
+
+## Chebyshev and Hermite polynomials
+
+| API | Family |
+| :--- | :--- |
+| `num_chebyshev_t` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
+| `num_chebyshev_u` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
+| `num_hermite_h` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
+
+These APIs take the degree followed by the argument. Degrees must be real,
+non-negative integers no larger than INT_MAX; invalid degrees return NaN.
+Ordinary number arithmetic preserves exact values and the chosen precision.
+The existing harmonic-polynomial API is unchanged. See the
+[expression naming table](expression.md#chebyshev-and-hermite-polynomials)
+for `Tn`, `Un` and the distinct script-H Hermite notation.
+
+README example:
+
+```c
+num_hermite_h(num_create_from_long(3), NUM_TWO)
+```
+
+Output:
+
+```text
+Hermite H3(2) = 40
 ```

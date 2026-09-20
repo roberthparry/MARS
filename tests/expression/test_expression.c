@@ -635,8 +635,14 @@ int tests_main(void)
     TEST_SECTION("Reverse mode");
     TEST_RUN_IN_GROUP(test_reverse_mode, tests, NULL);
 
+    TEST_SECTION("Fourier transforms and signal functions");
+    TEST_RUN_IN_GROUP(test_fourier_and_signal_functions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_orthogonal_polynomials, tests, NULL);
+
     TEST_SECTION("README Output Examples");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "expression,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_signal_readme_examples, readme_examples, "signal,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_orthopoly_readme_examples, readme_examples, "orthopoly,readme,output");
 
     return TESTS_EXIT_CODE();
 }

@@ -2,8 +2,9 @@
 
 > Design note: this is the agreed target syntax. An initial one-dimensional
 > forward and inverse Laplace implementation is available in Expression mode; see
-> [the expression guide](../expression.md#laplace-transforms). Fourier transforms
-> and inferred multidimensional transforms remain planned.
+> [the expression guide](../expression.md#laplace-transforms). Native
+> one-dimensional Fourier and inverse Fourier operators now implement the subset
+> listed below; inferred multidimensional transforms remain planned.
 
 Integral transforms use explicit forward and inverse operators:
 
@@ -167,6 +168,110 @@ $$
 
 This fixes the sign and normalisation rather than making them implicit
 implementation choices.
+
+## Fourier acceptance criteria
+
+Fourier support is partially implemented. The following is the full acceptance
+checklist, **not a claim that every row is complete**. Use the
+[tables of important Fourier transforms](https://en.wikipedia.org/wiki/Fourier_transform#Tables_of_important_Fourier_transforms)
+as the reference inventory. Match their **non-unitary, angular-frequency**
+column to the convention above; do not mix entries from different columns.
+Check each identity independently, including its hypotheses and distributional
+interpretation, before turning it into a simplification rule.
+
+| Coverage area | Acceptance requirement |
+| --- | --- |
+| Operator interface | Forward and inverse aliases, explicit and inferred variable mappings, bound-variable protection, and native renderings must work consistently. |
+| Functional relationships | Test linearity, translation, modulation, real non-zero scaling, duality, conjugation, derivatives, multiplication by powers, convolution and products. Antiderivatives must retain the appropriate integration constant and distributional terms. |
+| Ordinary one-dimensional pairs | Cover the reference pulse, sinc, triangular, one-sided exponential, Gaussian, two-sided exponential, hyperbolic-secant and Hermite–Gaussian families in both directions. |
+| Distributional one-dimensional pairs | Cover constants, polynomials, impulses and their derivatives, harmonics, chirps, sign and step functions, the impulse train, and the reference Bessel, power and logarithmic families. Principal values and finite parts need explicit mathematical representations. |
+| Two-dimensional pairs | Track the reference Gaussian, circular aperture, radial reciprocal and complex reciprocal pairs separately. A one-dimensional interval rule does not establish circular-aperture support. |
+| General-dimensional pairs | Track the reference weighted-ball, radial-power, multivariate-Gaussian and radial-exponential families, together with their inverse pairs and dimensional normalisation. |
+| Parameters and singularities | Preserve sufficient conditions, distinguish zero scales from non-zero scales, check negative scales and complex parameters where allowed, and handle removable singularities and endpoint conventions explicitly. |
+| Simplification and presentation | Equivalent factored and expanded inputs must agree. Generate all Lab result cards from the same native simplified expression; expose any remaining conditions without internal helper names. |
+
+Every reference family needs an explicit status: implemented with tested
+conditions, implemented only for a stated subset, or unsupported. An unevaluated
+operator is a safe fallback, not successful coverage. Do not describe the
+reference inventory as fully implemented while rows or inverse directions remain
+unsupported. In particular, completion of the one-dimensional checklist is not
+completion of the multidimensional checklist.
+
+For each implemented family, tests must check the forward and inverse formulas
+independently, then check round trips. Round trips alone can conceal matching sign
+or normalisation errors. Use numerical quadrature where ordinary convergence
+allows it; validate distributions through their action on suitable test
+functions or independent distributional identities, not pointwise sampling.
+Test equivalent input forms, all output styles, parameter specialisation,
+variable binding, invalid domains and symbolic fallback. Run the documented
+examples after the ordinary tests.
+
+Supporting functions must have documented definitions. In particular, specify
+the sinc normalisation, the pulse width, the circular-aperture radius, and values
+at discontinuities. Keep arbitrary `u` distinct from the explicitly named unit
+step. An impulse is a distribution and must not acquire an invented finite value
+at its support. For reciprocal powers and logarithms, specify the regularisation
+rather than silently treating a singular formula as an ordinary function.
+
+### Current Fourier coverage
+
+The following pairs use the convention above and real target coordinates.
+The reverse-direction rule includes the inverse normalisation $1/(2\pi)$;
+it is not obtained by merely renaming the forward operator. Scalar parameters
+must satisfy the stated conditions. Signal definitions and checked parser
+examples are in the [expression guide](../expression.md#fourier-transforms).
+
+| Source $f(t)$ | Forward transform | Status |
+| --- | --- | --- |
+| $e^{-at^2+bt+d}$ | $\sqrt{\pi/a}\exp(d-(\omega+ib)^2/(4a))$ | Both directions, $\Re(a)>0$. |
+| $\operatorname{rect}(t)$ | $\operatorname{sinc}(\omega/(2\pi))$ | Both directions; real affine arguments. |
+| $\operatorname{tri}(t)$ | $\operatorname{sinc}^2(\omega/(2\pi))$ | Both directions, including real affine scaling of sinc-squared. |
+| $\operatorname{sinc}(t)$ | $\operatorname{rect}(\omega/(2\pi))$ | Both directions; normalised sinc. |
+| $e^{-a\lvert t\rvert}$ | $2a/(a^2+\omega^2)$ | Both directions, $\Re(a)>0$. Quadratic reciprocals also support real translations. |
+| $e^{-at}\operatorname{step}(t)$ | $1/(a+i\omega)$ | Both directions, $\Re(a)>0$; reversed gates and imaginary-rate linear reciprocals are also supported. |
+| $\operatorname{sech}(t)$ | $\pi\operatorname{sech}(\pi\omega/2)$ | Both directions; real affine arguments. |
+| $J_n(t)$ | $2(-i)^n T_{\lvert n\rvert}(\omega)/\sqrt{1-\omega^2}$ for $\lvert\omega\rvert<1$, zero for $\lvert\omega\rvert>1$ | Integer $n$, including negative orders; real affine arguments in both directions. The inverse transform of $J_n$ uses coefficient $i^n/\pi$. Singular support edges have no finite pointwise value. |
+| $T_n(t)\operatorname{rect}(t/2)/\sqrt{1-t^2}$ | $\pi(-i)^nJ_n(\omega)$ | Non-negative integral $n$. The inverse coefficient is $i^n/2$. Recognised directly, including real affine arguments. |
+| $e^{-a^2t^2/2}\mathcal H_n(at)$ | $\sqrt{2\pi}(-i)^n e^{-\omega^2/(2a^2)}\mathcal H_n(\omega/a)/\lvert a\rvert$ | Non-negative integral $n$, real non-zero $a$; translations also supported. Inverse coefficient $i^n/(\sqrt{2\pi}\lvert a\rvert)$. $\mathcal H_n$ is physicists' Hermite, distinct from harmonic $H_n$. |
+| $\delta(t)$ | $1$ | Both directions; real non-zero affine scaling and translations. |
+| $1$ | $2\pi\delta(\omega)$ | Both directions, distributionally. |
+| $t^n$ | $2\pi i^n\delta^{(n)}(\omega)$ | Symbolic non-negative integral orders; inverse rule $(-i)^n\delta^{(n)}(t)$. |
+| $\operatorname{step}(t)$ | $\pi\delta(\omega)+\operatorname{PV}(1/(i\omega))$ | Both directions, retaining the principal value. |
+| $\cos(at+b)$, $\sin(at+b)$, $e^{iat+b}$ | Shifted impulses with their phase factors | Both directions for real harmonic rates. |
+| $t^n f(t)$ | $i^n\partial_\omega^n\mathcal F\{f\}(\omega)$ | Integral $0\leq n\leq32$; formal derivatives retained when necessary. |
+| $f^{(n)}(t)$ | $(i\omega)^n\mathcal F\{f\}(\omega)$ | Known derivative orders and symbolic non-negative integral orders. |
+| $\operatorname{circ}(t)$ | $2\operatorname{sinc}(\omega/\pi)$ | One-dimensional interval profile only; **not** the disk/Bessel pair. |
+
+Linearity, unary real affine changes, modulation, conjugation, duality and
+whole-line convolution/product identities are implemented in both directions.
+The Hermite–Gaussian family supports symbolic degree through the native
+script-H polynomial. General antiderivative identities remain unsupported.
+Chirps, impulse trains, non-integral-order and second-kind Bessel functions, regularised powers and logarithms,
+all listed two-dimensional pairs and all general-dimensional pairs remain
+unsupported. These gaps must remain visible until independently tested rules
+replace their symbolic fallback.
+
+### Convolution identities
+
+Here $F=\mathcal F(f)$ and $G=\mathcal F(g)$. An asterisk denotes
+whole-line convolution; $*_+$ denotes integration from zero to the output
+coordinate. Formal identities require the relevant integrals or distributional
+operations to exist.
+
+| Direction | Input | Result |
+| :--- | :--- | :--- |
+| Fourier | $f*g$ | $FG$ |
+| Fourier | $fg$ | $(F*G)/(2\pi)$ |
+| Inverse Fourier | $F*G$ | $2\pi fg$ |
+| Inverse Fourier | $FG$ | $f*g$ |
+| Laplace | $f*_+g$ | $\mathcal L(f)\mathcal L(g)$ |
+| Inverse Laplace | $AB$ | $\mathcal L^{-1}(A)*_+\mathcal L^{-1}(B)$ |
+
+Use the native expression operators documented under
+[Convolutions](../expression.md#convolutions). Known Laplace convergence
+half-planes are combined; arbitrary functions retain their formal transforms.
+The function-name and polynomial-convention table is in
+[Chebyshev and Hermite polynomials](../expression.md#chebyshev-and-hermite-polynomials).
 
 ## Implemented forward Laplace transforms
 

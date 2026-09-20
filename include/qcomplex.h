@@ -449,6 +449,15 @@ qcomplex_t qc_lerch_phi(qcomplex_t z, qcomplex_t s, qcomplex_t a);
  * @return The finite logarithmic sum.
  */
 qcomplex_t qc_harmonic_poly(unsigned long degree, qcomplex_t argument);
+
+/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
+qcomplex_t qc_chebyshev_t(unsigned long degree, qcomplex_t argument);
+
+/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
+qcomplex_t qc_chebyshev_u(unsigned long degree, qcomplex_t argument);
+
+/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
+qcomplex_t qc_hermite_h(unsigned long degree, qcomplex_t argument);
 qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,
                         qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
 qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,
@@ -483,6 +492,17 @@ qcomplex_t qc_E1(qcomplex_t z);                           /**< exponential integ
  */
 qcomplex_t qc_ldexp(qcomplex_t z, int k);        /**< z * 2^k */
 qcomplex_t qc_floor(qcomplex_t z);               /**< floor(z) */
+
+/** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
+qcomplex_t qc_step(qcomplex_t argument);
+/** @brief Unit-width rectangular pulse, with half-height endpoints. */
+qcomplex_t qc_rect(qcomplex_t argument);
+/** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
+qcomplex_t qc_tri(qcomplex_t argument);
+/** @brief Even unit-radius aperture profile, with half-height endpoints. */
+qcomplex_t qc_circ(qcomplex_t argument);
+/** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
+qcomplex_t qc_sinc(qcomplex_t argument);
 qcomplex_t qc_hypot(qcomplex_t x, qcomplex_t y); /**< sqrt(|x|^2 + |y|^2) */
 /** @} */
 

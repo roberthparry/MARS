@@ -285,7 +285,7 @@ static void TeX_find_primitive_initial(const expr_t *expr, TeX_primitive_context
 {
     if (!expr)
         return;
-    context->has_transform |= expr_is_laplace_transform(expr);
+    context->has_transform |= expr_is_integral_transform(expr);
     context->name_collision |= expr->name && strcmp(expr->name, "F") == 0;
     if (expr_is_op(expr, &ops_integral) && !expr_integral_lower_bound_expr(expr) &&
         expr_const_is_zero(expr_integral_upper_bound_expr(expr))) {
@@ -314,7 +314,7 @@ static expr_t *TeX_primitive_display(const expr_t *expr, expr_t **initial)
 {
     TeX_primitive_context_t context = {0};
     *initial = NULL;
-    expr_t *resolved = expr_is_laplace_transform(expr) ? expr_transform_result(expr) : NULL;
+    expr_t *resolved = expr_is_integral_transform(expr) ? expr_transform_result(expr) : NULL;
     const expr_t *source = resolved ? resolved : expr;
     TeX_find_primitive_initial(source, &context);
     if (!context.has_transform || context.name_collision || context.count != 1u ||

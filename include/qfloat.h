@@ -410,6 +410,17 @@ qfloat_t qf_sqr(qfloat_t x);
  */
 qfloat_t qf_floor(qfloat_t x);
 
+/** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
+qfloat_t qf_step(qfloat_t argument);
+/** @brief Unit-width rectangular pulse, with half-height endpoints. */
+qfloat_t qf_rect(qfloat_t argument);
+/** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
+qfloat_t qf_tri(qfloat_t argument);
+/** @brief Even unit-radius aperture profile, with half-height endpoints. */
+qfloat_t qf_circ(qfloat_t argument);
+/** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
+qfloat_t qf_sinc(qfloat_t argument);
+
 /**
  * @brief Multiply a qfloat_t by a power of 10.
  *
@@ -1338,6 +1349,15 @@ qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a);
  * @return The finite logarithmic sum.
  */
 qfloat_t qf_harmonic_poly(unsigned long degree, qfloat_t argument);
+
+/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
+qfloat_t qf_chebyshev_t(unsigned long degree, qfloat_t argument);
+
+/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
+qfloat_t qf_chebyshev_u(unsigned long degree, qfloat_t argument);
+
+/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
+qfloat_t qf_hermite_h(unsigned long degree, qfloat_t argument);
 
 /**
  * @brief Compute Appell's hypergeometric function F1.

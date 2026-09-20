@@ -2795,6 +2795,13 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_t *lambert_argument;
 
     (void)b;
+    /* Literal real magnitudes are exact; named and symbolic constants retain their identity. */
+    if (expr_is_op(dv, &ops_abs) && expr_simplify_is_plain_real_const(a) && num_is_finite(a->c)) {
+        expr_t *out = expr_new_const_owned_local(num_abs(a->c));
+
+        expr_free(a);
+        return out;
+    }
     /* Preserve the exact dilogarithm endpoint values needed by definite integration. */
     if (expr_is_op(dv, &ops_dilog) && expr_simplify_allows_const_identity_fold(a) &&
         (num_is_zero(a->c) || num_eq(a->c, NUM_ONE) || num_eq(a->c, NUM_NEG_ONE))) {

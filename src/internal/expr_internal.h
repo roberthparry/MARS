@@ -363,13 +363,13 @@ char *expr_conditioned_cases_to_string(const expr_t *expr);
 /** @brief Specialise supplied constant parameters in transform results; retain free variables and domain checks. */
 expr_t *expr_transform_specialise_constants(const expr_t *expr);
 
-/** @brief Render an evaluated Laplace identity, specialising only supplied constants.
+/** @brief Render an evaluated integral-transform identity, specialising only supplied constants.
  * @return An owned TeX string to release with free(), or NULL for other expressions.
  */
-char *expr_laplace_identity_TeX(const expr_t *source, const expr_t *result);
+char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result);
 
-/** Return a borrowed convergence explanation for an unevaluated Laplace transform, or NULL. */
-const char *expr_laplace_value_note(const expr_t *expr);
+/** Return a borrowed convergence, unsupported-transform or distribution explanation, or NULL. */
+const char *expr_transform_value_note(const expr_t *expr);
 
 typedef struct expr_newton_region {
     number_t real_min;

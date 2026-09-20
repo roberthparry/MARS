@@ -109,7 +109,7 @@ $$
 
 The renderer currently expresses the binomial coefficients using gamma functions.
 Both sums are exact; their integer-order restrictions survive copying through the
-parseable `nonnegative_integer(n)` condition. The Function card checks reality,
+parseable `n ∈ ℤ≥0` condition. The Function card checks reality,
 non-negativity and integrality before evaluating the sum. Summation-index expressions
 remain inside the sum rather than becoming outer function temporaries.
 Unsupported expressions retain a symbolic transform. Unknown function calls
@@ -248,7 +248,7 @@ numerical evaluation also checks this condition. For non-negative integer expone
 the gamma factor equals the factorial. An explicit source, as in the power example,
 avoids treating a free exponent as another transform variable.
 This initial implementation requires one source variable; inferred
-multidimensional transforms and Fourier operators are still planned.
+multidimensional transforms remain planned. Fourier operators are described below.
 Targets that would capture an existing input parameter are rejected.
 
 ### Derivatives of unspecified functions
@@ -289,7 +289,7 @@ variable, after the leading transform term, including in multiline TeX output.
 | `@L{f'(t)}` | `s·ℒ(f(t), t, s) - f(0)` |
 | `@L{f'}` | `s·ℒ(f(t), t, s) - f(0)` |
 | `@L{f''(t)}` | `s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)` |
-| `@L{f^(n)(t)}` | `s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (nonnegative_integer(n))` |
+| `@L{f^(n)(t)}` | `s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (n ∈ ℤ≥0)` |
 
 ### Laplace transforms of integrals
 
@@ -444,6 +444,13 @@ additional special functions, parameter conditions or continuation machinery.
 | `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
 | `lerch_phi`, `lommel_s`, `appell_f1`, `lauricella_f`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
 | `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
+| `chebyshev_t`, `chebyshev_u`, `hermite_h` | Fixed non-negative integral degrees give polynomials with ordinary Laplace transforms. Direct named-polynomial Laplace rules are not yet implemented; their Fourier pairs are documented separately. |
+
+The `causal_convolve` constructor implements the unilateral convolution theorem:
+its transform is the product of the operands' transforms, combining known
+convergence half-planes. The whole-line `convolve` constructor is distinct and
+is not automatically treated as causal. See [Convolutions](#convolutions) for
+the Fourier rules and the precise integration bounds.
 
 #### Discrete operations
 
@@ -480,6 +487,218 @@ in [DLMF §10.22](https://dlmf.nist.gov/10.22). Incomplete-gamma formulas follow
 by interchanging their defining integral with the Laplace integral on the
 stated absolute-convergence domain. Gaussian formulas follow by completing
 the square and analytic continuation within the stated decay domain.
+
+## Fourier transforms
+
+Expression mode supports native one-dimensional `@F` and `@Finv` operators,
+also named `ℱ`/`Fourier` and `ℱ⁻¹`/`InverseFourier`. Parentheses and braces are
+accepted. The non-unitary angular-frequency convention is
+
+$$
+\mathcal F\{f\}(\omega)=\int_{-\infty}^{\infty}f(t)e^{-i\omega t}\,dt,
+\qquad
+\mathcal F^{-1}\{G\}(t)=\frac{1}{2\pi}\int_{-\infty}^{\infty}G(\omega)e^{i\omega t}\,d\omega.
+$$
+
+Both coordinates are real. Default coordinate pairs are `t`/`ω`, `x`/`k`,
+`y`/`m` and `z`/`n`; inverse transforms reverse the pair. The three-argument
+form takes the operand, bound source variable and free target expression.
+Unfamiliar coordinate names require an explicit target. Source coordinates
+are not exposed as Lab bindings, and target names must not capture parameters
+already present in the operand.
+
+The current rules cover Gaussian, rectangular, triangular, normalised sinc,
+two-sided exponential, quadratic-reciprocal and hyperbolic-secant pairs, plus
+one-sided exponentials with explicit step factors. Distributional rules cover
+constants, impulses, harmonics, the unit step with its principal value,
+derivatives and polynomial weighting. Linearity, real affine changes of a
+unary function, exponential modulation, conjugation and duality also apply
+to supported or unspecified functions. Known non-negative integral time powers
+up to 32 generate frequency derivatives. Bare monomials also support symbolic
+orders: $\mathcal F\{t^n\}=2\pi i^n\delta^{(n)}(\omega)$ for
+$n\in\mathbb Z_{\ge0}$. Symbolic derivative orders retain their
+non-negative-integer condition. `Derivative` (also `ordered_derivative`)
+preserves an unspecified unary function or Dirac delta and its derivative order
+separately; the derivative is taken with respect to that function's argument.
+Other built-in functions continue to use ordinary derivative notation. Delta derivatives are
+rendered as $\delta^{(n)}$ in TeX and remain distributions, not numerical values.
+These identities assume the relevant
+ordinary transform or tempered-distribution interpretation exists; they are
+not convergence proofs for arbitrary functions.
+
+Unsupported transforms remain symbolic with a native evaluation note.
+This is **partial coverage**, not the entire reference table: multidimensional
+transforms, circular-aperture disk transforms, chirps, impulse trains,
+non-integral-order or second-kind Bessel transforms, and regularised power or
+logarithmic families remain unsupported. See the
+[coverage inventory](design-notes/integral-transforms.md#fourier-acceptance-criteria).
+
+### Indexed Bessel transforms
+
+`J_n(x)` denotes `BesselJ(n,x)`, and `Y_n(x)` denotes `BesselY(n,x)`.
+Numeric ASCII and Unicode subscripts and braced order expressions are accepted.
+The Fourier rule currently covers **integer-order first-kind** Bessel functions,
+including negative orders and real non-zero affine scales and translations.
+The indexed notation does not imply Fourier support for second-kind Bessel functions.
+
+For $n\in\mathbb Z$, the angular-frequency transform is
+
+$$
+\mathcal F_{x\to k}\{J_n(x)\}=
+\begin{cases}
+2(-i)^n T_{|n|}(k)/\sqrt{1-k^2},&|k|<1,\\
+0,&|k|>1.
+\end{cases}
+$$
+
+The inverse transform of $J_n(\omega)$ has the same compact support in $t$,
+with coefficient $i^n/\pi$ instead of $2(-i)^n$. These rules follow from
+[Bessel's integral representation](https://dlmf.nist.gov/10.9.E2).
+The independently entered compact spectrum also has a Bessel transform;
+its inverse is recognised without requiring a nested transform expression.
+Native output represents the support with `rect` and excludes the singular
+edges: no finite pointwise value is assigned at $k=\pm1$. Symbolic orders retain
+the equivalent conditions $n\in\mathbb R$ and $|n|\in\mathbb Z_{\ge0}$.
+The default pair is `x` to `k`; supply the third transform argument to use `ω` instead.
+
+README examples (Value-card output):
+
+| Input | Output |
+| --- | --- |
+| `{@F{J_n(x)} \| k=0; n=0}` | `2` |
+| `{@F{J_n(x)} \| k=2; n=3}` | `0` |
+| `{@F(J_n(x),x,ω) \| ω=0; n=0}` | `2` |
+
+### Chebyshev and Hermite polynomials
+
+The names distinguish the existing harmonic polynomial from Hermite:
+
+| Input name | Mathematical notation | Convention | Other spellings |
+| :--- | :---: | :--- | :--- |
+| `Tn(n,x)` | $T_n(x)$ | Chebyshev, first kind; $T_0=1$, $T_1=x$ | `chebyshev_t`, `ChebyshevT`, indexed `T_n(x)` |
+| `Un(n,x)` | $U_n(x)$ | Chebyshev, second kind; $U_0=1$, $U_1=2x$ | `chebyshev_u`, `ChebyshevU`, indexed `U_n(x)` |
+| `ℋ(n,x)` | $\mathcal H_n(x)$ | Physicists' Hermite; $\mathcal H_0=1$, $\mathcal H_1=2x$ | `hermite_h`, `HermiteH`, indexed `ℋ_n(x)` |
+| `Hn(n,x)` | $H_n(x)$ | Existing harmonic polynomial; unchanged | `harmonic_poly`, `harmonicpoly` |
+
+The three orthogonal-polynomial families use non-negative integral degrees.
+Real and complex arguments are evaluated by polynomial recurrence, without
+inverse-trigonometric branch choices. The number backend retains its working
+precision and exact arithmetic; matrix APIs evaluate matrix polynomials, not
+entrywise values. C constructors use the names `expr_chebyshev_t`,
+`expr_chebyshev_u` and `expr_hermite_h`.
+
+Differentiation uses $T_n'=nU_{n-1}$ and
+$\mathcal H_n'=2n\mathcal H_{n-1}$. Second-kind derivatives use polynomial
+expansion or a finite sum, retaining regular values at both endpoints.
+Hermite and second-kind Chebyshev primitives support symbolic degree and
+affine arguments. First-kind primitives currently expand literal degrees
+through 64; larger or symbolic degrees may remain formal. Finite sums support
+all three families through the ordinary bounded-sum evaluator.
+The recurrences and calculus conventions follow
+[DLMF §18.9](https://dlmf.nist.gov/18.9).
+
+README examples (Value-card output):
+
+| Input | Output |
+| :--- | ---: |
+| `Tn(3,2)` | `26` |
+| `Un(3,2)` | `56` |
+| `ℋ(3,2)` | `40` |
+| `sum(k,0,3,Tn(k,2))` | `36` |
+| `sum(k,0,3,ℋ(k,2))` | `59` |
+
+The Hermite–Gaussian Fourier rule and its inverse apply to symbolic
+non-negative integral degree and real non-zero affine scales. Hermite uses
+script $\mathcal H$ in MARS to distinguish it from the harmonic $H$;
+it is the physicists' $H_n$ in the reference transform table.
+
+### Convolutions
+
+`convolve(f(t),g(t),t)` denotes whole-line convolution:
+
+$$
+(f*g)(t)=\int_{-\infty}^{\infty}f(\tau)g(t-\tau)\,d\tau.
+$$
+
+`causal_convolve(f(t),g(t),t)` denotes the zero-based convolution used by
+unilateral Laplace transforms:
+
+$$
+(f*_+g)(t)=\int_0^t f(\tau)g(t-\tau)\,d\tau.
+$$
+
+The aliases are `convolution` and `causal_convolution`; C constructors are
+`expr_convolve` and `expr_causal_convolve`. The third argument is an explicit
+output coordinate. A separate integration variable is introduced without
+capturing parameters, even when the input already contains a parameter named
+$\tau$. Ordinary multiplication is never reinterpreted as convolution.
+
+| Operation | Transform identity | Interpretation |
+| :--- | :--- | :--- |
+| Whole-line convolution | $\mathcal F(f*g)=\mathcal F(f)\mathcal F(g)$ | Ordinary convergence or a valid distributional convolution is required. |
+| Ordinary product | $\mathcal F(fg)=(\mathcal F(f)*\mathcal F(g))/(2\pi)$ | Used as a symbolic fallback after more specific rules. |
+| Inverse Fourier convolution | $\mathcal F^{-1}(F*G)=2\pi\mathcal F^{-1}(F)\mathcal F^{-1}(G)$ | Same angular-frequency normalisation. |
+| Inverse Fourier product | $\mathcal F^{-1}(FG)=\mathcal F^{-1}(F)*\mathcal F^{-1}(G)$ | No extra factor. |
+| Causal convolution | $\mathcal L(f*_+g)=\mathcal L(f)\mathcal L(g)$ | Known half-plane conditions are combined. |
+| Inverse Laplace product | $\mathcal L^{-1}(FG)=\mathcal L^{-1}(F)*_+\mathcal L^{-1}(G)$ | Used after direct rational rules. |
+
+Arbitrary operands retain formal transforms; these identities do not assert
+convergence for arbitrary functions or define products of arbitrary distributions.
+Recognised convolution values include rectangular pulses, impulses with
+numerical real affine arguments, centred Gaussians, and causal operands whose
+finite integral the native integrator can evaluate. Unsupported convolutions
+remain symbolic, without inventing numerical values.
+
+README examples (Value-card output):
+
+| Input | Output |
+| :--- | ---: |
+| `{convolve(rect(t),rect(t),t) \| t=1/4}` | `0.75` |
+| `{causal_convolve(t,t,t) \| t=2}` | `1.333333333333…` |
+| `{@L{causal_convolve(t,t,t)} \| s=2}` | `0.0625` |
+
+### Signal functions and distributions
+
+The new expression functions are `step`, `rect`, `tri`, `circ`, `sinc`,
+`delta` and `principal_value` (`PV`). The ordinary functions also have
+`qf_`, `qc_`, `num_` and `mat_` APIs. Their C expression constructors are
+`expr_step`, `expr_rect`, `expr_tri`, `expr_circ`, `expr_sinc`, `expr_delta` and
+`expr_principal_value`; each retains its argument and returns an owning node.
+Their definitions are:
+
+| Function | Definition and endpoint convention |
+| --- | --- |
+| `step(x)` | Zero for negative real arguments, one for positive arguments and one half at zero. Aliases: `heaviside`, `Heaviside`, `θ`. |
+| `rect(x)` | One for $\lvert x\rvert<1/2$, zero outside, one half at either endpoint. Alias: `Π`. |
+| `tri(x)` | $\max(1-\lvert x\rvert,0)$ for real arguments. Alias: `Λ`. |
+| `circ(x)` | The even, unit-radius profile: one for $\lvert x\rvert<1$, zero outside, one half at either endpoint. Applied to a single real coordinate this is an interval, **not a two-dimensional disk transform**. |
+| `sinc(x)` | $\sin(\pi x)/(\pi x)$ with the removable value one at zero; entire for complex arguments. |
+| `delta(x)` | The Dirac distribution, with no invented finite pointwise value. Aliases: `δ`, `@delta`, `DiracDelta`. Expression output uses `δ(x)`; Function output uses `delta(x)`. |
+| `principal_value(x)` | An explicit principal-value interpretation, not a pointwise numerical regularisation. Alias: `PV`. |
+
+The real piecewise functions reject non-real scalar arguments. Distributional
+functions intentionally have no ordinary numeric or matrix API. In particular,
+`u(t)` remains an arbitrary function and is never silently interpreted as a step.
+Differentiation, affine-argument primitives and finite numerical sums are
+available for the ordinary signal functions; step/pulse derivatives retain
+their boundary impulses. Sinc calculus uses entire representations that remain
+regular at zero. General principal-value integration remains symbolic.
+
+### Checked Fourier examples
+
+These are exact native unbound outputs, exercised as README examples after the
+ordinary tests. Conditions are retained in Expression and Function renderings;
+TeX uses the corresponding mathematical notation.
+
+| Input | Output |
+| --- | --- |
+| `@F{exp(-t^2)}` | `√(π)·exp(-¼ω²) where (ω ∈ ℝ)` |
+| `@Finv{exp(-ω^2)}` | `½·exp(-¼t²)/√(π) where (t ∈ ℝ)` |
+| `@F{rect(t)}` | `sinc(ω/(2π)) where (ω ∈ ℝ)` |
+| `@F{delta(t)}` | `1` |
+| `@F{step(t)}` | `principal_value(1/(iω)) + π·δ(ω) where (ω ∈ ℝ)` |
+| `@F{1+t^n+delta(t)}` | `2π·(δ(ω) + i^n·Derivative(δ(ω), n)) + 1 where (ω ∈ ℝ; n ∈ ℤ≥0)` |
+| `@F{f(t)}` | `ℱ(f(t))` |
 
 ## Numeric representation
 

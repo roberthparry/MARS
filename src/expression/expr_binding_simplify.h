@@ -46,6 +46,7 @@ expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_abs_numeric(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_integer_exp_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exp_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_euler_square(expr_binding_expr_t *expr);

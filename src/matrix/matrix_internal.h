@@ -14,6 +14,13 @@
 #include "internal/number_internal.h"
 #include "ustring.h"
 
+/** Evaluate a scalar expression's Taylor series on an equal-diagonal triangular numeric matrix. */
+matrix_t *mat_number_unary_taylor_from_expr(const matrix_t *A, expr_t *(*build_expr)(const expr_t *));
+
+/** Apply scalar callbacks through the module's spectral functional calculus. */
+matrix_t *mat_apply_scalar_callbacks(const matrix_t *A, void (*number_f)(void *, const void *),
+                                    void (*expression_f)(void *, const void *));
+
 /* ============================================================
    Element kinds
    ============================================================ */
