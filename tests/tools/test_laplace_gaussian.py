@@ -11,6 +11,40 @@ import mars_lab
 
 
 class LaplaceGaussianTests(unittest.TestCase):
+    def test_transform_antiderivatives_retain_their_domains(self):
+        for source in ("@L{sin^2(1/2@pit)}", "@L{sin^2((@pi*t)/2)}", "@L{exp(-t)}", "@L{sin(t)}"):
+            with self.subTest(source=source):
+                fields = self.evaluate(source, "integral")
+                self.assertTrue(fields["integral"].startswith("∫ds = "), fields["integral"])
+                self.assertIn("Re(s)", fields["integral"])
+                self.assertIn("C", fields["integral"])
+                copied = fields["integral"].split(" = ", 1)[1].replace("s = NAN", "s = 2")
+                derivative = self.evaluate(copied, "derivative")
+                expected = self.evaluate("{" + source + " | s=2}")
+                self.assertAlmostEqual(float(derivative["derivative_value"]), float(expected["value"]), places=13)
+                outside = copied.replace("s = 2", "s = -2").replace("C = NAN", "C = 0")
+                self.assertEqual(self.evaluate(outside)["value"], "NAN")
+
+    def test_trigonometric_powers_preserve_exact_affine_rates(self):
+        for rate_text, rate in (("@pi/2", math.pi/2), ("sqrt(2)/3", math.sqrt(2)/3)):
+            for function in ("sin", "cos"):
+                with self.subTest(function=function, rate=rate_text):
+                    source = "@L{" + function + "^2((" + rate_text + ")*t)}"
+                    fields = self.evaluate("{" + source + " | s=2}")
+                    numerator = 2*rate**2 + (4 if function == "cos" else 0)
+                    expected = numerator/(2*(4+4*rate**2))
+                    self.assertNotIn("Laplace(", fields["function"])
+                    self.assertAlmostEqual(float(fields["value"]), expected, places=13)
+                    copied = self.evaluate("{" + fields["unbound"] + " | s=2}")
+                    self.assertAlmostEqual(float(copied["value"]), expected, places=13)
+        fields = self.evaluate("@L{sin^2((@pi*t)/2)}")
+        self.assertIn(r"\pi", fields["tex"])
+        self.assertNotIn("3.14159", fields["function"])
+        fields = self.evaluate("@L{sin((@pi*t)/2)^n}")
+        self.assertIn("sum(", fields["function"])
+        self.assertIn("@pi", fields["function"])
+        self.assertIn("Laplace(", self.evaluate("@L{sin((@pi*t^2)/2)^2}")["function"])
+
     def test_public_mathematical_function_inventory_is_audited(self):
         import re
         header = (ROOT / "include/expression.h").read_text()

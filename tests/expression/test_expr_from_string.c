@@ -8,6 +8,48 @@ static void check_parse_expr(const char *label, const char *s, const char *want_
 static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line);
 static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line);
 
+static void test_from_string_laplace_prime_shorthand(void)
+{
+    static const struct {
+        const char *shorthand;
+        const char *explicit;
+    } cases[] = {
+        { "@L{y''+4y'+5y-50t}", "@L{y''(t)+4*y'(t)+5*y(t)-50*t}" },
+        { "@L{5y+4y'+y''-50t}", "@L{5*y(t)+4*y'(t)+y''(t)-50*t}" },
+        { "@L(y''+a*y'+b*y,x,p)", "@L(y''(x)+a*y'(x)+b*y(x),x,p)" },
+        { "@L(y'+@L(z',x,p),t,s)", "@L(y'(t)+@L(z'(x),x,p),t,s)" },
+        { "y+@L{y'+y}", "y+@L{y'(t)+y(t)}" },
+        { "@L{y'+y}+@L{y*t}", "@L{y'(t)+y(t)}+@L{y*t}" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *shorthand = expr_from_string(cases[i].shorthand, NULL);
+        expr_t *explicit = expr_from_string(cases[i].explicit, NULL);
+        char *got = shorthand ? expr_to_string(shorthand, style_UNBOUND) : NULL;
+        char *want = explicit ? expr_to_string(explicit, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(shorthand);
+        ASSERT_NOT_NULL(explicit);
+        TEST_ASSERT_STR_EQ(got, want);
+        free(want);
+        free(got);
+        expr_free(explicit);
+        expr_free(shorthand);
+    }
+}
+
+static void test_from_string_inverse_rational(void)
+{
+    check_parse_num("inverse of Equation-mode rational output",
+                    "{@Linv{-5*(-s-10/s^2-3)/(s*(s+4)+5)} | t=0}", "5", __LINE__);
+    check_parse_num("expanded rational denominator",
+                    "{@Linv{(5*s^3+15*s^2+50)/(s^4+4*s^3+5*s^2)} | t=0}", "5", __LINE__);
+    check_parse_num("repeated quadratic inverse",
+                    "{2*@Linv{1/(s^2+1)^2}/(sin(t)-t*cos(t)) | t=1}", "1", __LINE__);
+    check_parse_num("distinct quadratic inverse",
+                    "{3*@Linv{1/((s^2+1)*(s^2+4))}/(sin(t)-sin(2*t)/2) | t=1}", "1", __LINE__);
+}
+
 static void test_from_string_laplace(void)
 {
     check_parse_num("Laplace zero hyperbolic tangent", "{@L(tanh(c*t)) | c=0}", "0", __LINE__);
@@ -4290,6 +4332,8 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_function_hash, NULL);
     TEST_RUN_SUBTEST(test_from_string_clausen, NULL);
     TEST_RUN_SUBTEST(test_from_string_laplace, NULL);
+    TEST_RUN_SUBTEST(test_from_string_inverse_rational, NULL);
+    TEST_RUN_SUBTEST(test_from_string_laplace_prime_shorthand, NULL);
     TEST_RUN_SUBTEST(test_from_string_clausen_sums, NULL);
     TEST_RUN_SUBTEST(test_from_string_conjugation, NULL);
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);

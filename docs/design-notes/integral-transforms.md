@@ -346,6 +346,8 @@ $G(s)=\mathcal L\{g(t)\}(s)$.
 | $H(t)=\int^t f(x)\,dx$ | $(F(s)+H(0^+))/s$ | Upper-only chosen primitive; finite initial value retained, not assumed zero |
 | $\int_a^t f(x)\,dx$ | $(F(s)+\int_a^0 f(x)\,dx)/s$ | Source-independent lower bound and finite initial integral |
 | $e^{at+b}f(t)$ | $e^bF(s-a)$ | Shift every convergence condition by $s\mapsto s-a$; unknown $F$ remains symbolic |
+| $f(t-a)$, arbitrary $f$ | $e^{-as}[F(s)+\int_{-a}^{0}e^{-sx}f(x)\,dx]$ | Real shift; finite history integral and convergence of the transforms; no causality assumed |
+| $16t^2u(t-\tfrac14)$, arbitrary $u$ | $16\frac{d^2}{ds^2}[e^{-s/4}(\mathcal L\{u(t)\}(s)+\int_{-1/4}^{0}e^{-sx}u(x)\,dx)]$ | History retained; convergence sufficient for differentiation; `u` does not denote a unit step automatically |
 | $t^n f(t)$ | $(-1)^n F^{(n)}(s)$ | Recognised finite non-negative integer time powers and an available symbolic derivative |
 | $\cos^n(at)$ | $2^{-n}\sum_{j=0}^{n}\binom nj\,s/[s^2+(n-2j)^2a^2]$ | Known real rate $a$, non-negative integer $n$, $\sigma>0$; symbolic $n$ retains an integer guard |
 | $\sin^n(at)$ | $(2i)^{-n}\sum_{j=0}^{n}(-1)^j\binom nj/[s-i(n-2j)a]$ | Same restrictions |

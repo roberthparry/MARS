@@ -112,6 +112,8 @@ static expr_t *laplace_trig_sum(const expr_t *order, const expr_t *frequency, co
     return out;
 }
 
+static bool laplace_affine_parts(const expr_t *f, const expr_t *t, expr_t **rate, expr_t **offset);
+
 /* Use the short recurrence for small orders and a finite sum for all other integer orders. */
 static expr_t *laplace_trig_power(const expr_t *f, const expr_t *t, const expr_t *s, expr_t **conditions)
 {
@@ -137,19 +139,12 @@ static expr_t *laplace_trig_power(const expr_t *f, const expr_t *t, const expr_t
         return NULL;
     }
 
-    expr_t *zero = expr_const_zero();
-    expr_t *one = expr_const_one();
-    expr_t *at_zero = expr_substitute(base->a, t, zero);
-    expr_t *at_one = expr_substitute(base->a, t, one);
-    number_t offset = expr_eval(at_zero);
-    number_t rate = expr_eval(at_one);
-    expr_t *frequency = expr_new_const(rate);
-    expr_t *linear = expr_mul(frequency, t);
-    expr_t *difference = expr_sub(base->a, linear);
-    expr_t *check_expr = expr_simplify(difference);
-    number_t check = NUM_ZERO;
-    valid = num_is_zero(offset) && num_is_finite(rate) && num_is_real(rate) &&
-            expr_match_const_value(check_expr, &check) && num_is_zero(check);
+    expr_t *raw_frequency = NULL, *raw_offset = NULL;
+    valid = laplace_affine_parts(base->a, t, &raw_frequency, &raw_offset);
+    expr_t *frequency = valid ? expr_beautify(raw_frequency) : NULL;
+    expr_t *offset = valid ? expr_beautify(raw_offset) : NULL;
+    number_t rate = NUM_NAN;
+    valid = valid && expr_const_is_zero(offset) && laplace_constant_value(frequency, &rate) && num_is_real(rate);
     expr_t *out = NULL;
     if (valid && !small_order) {
         out = laplace_trig_sum(order, frequency, s, base->ops == &ops_sin);
@@ -195,17 +190,11 @@ static expr_t *laplace_trig_power(const expr_t *f, const expr_t *t, const expr_t
         expr_free(rate_squared);
         expr_free(s_squared);
     }
-    num_destroy(&check);
     num_destroy(&rate);
-    num_destroy(&offset);
-    expr_free(check_expr);
-    expr_free(difference);
-    expr_free(linear);
+    expr_free(offset);
     expr_free(frequency);
-    expr_free(at_one);
-    expr_free(at_zero);
-    expr_free(one);
-    expr_free(zero);
+    expr_free(raw_offset);
+    expr_free(raw_frequency);
     expr_free(order);
     return out;
 }
@@ -676,6 +665,34 @@ static unsigned int laplace_time_order(const expr_t *f, const expr_t *t)
 static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, number_t *bound,
                             expr_t **conditions);
 
+/* Extract a bounded time monomial without depending on multiplication association. */
+static unsigned int laplace_time_monomial(const expr_t *f, const expr_t *t, expr_t **coefficient)
+{
+    *coefficient = NULL;
+    unsigned int order = laplace_time_order(f, t);
+    if (order) {
+        *coefficient = expr_const_one();
+        return order;
+    }
+    if (!laplace_uses(f, t)) {
+        *coefficient = expr_clone(f);
+        return 0u;
+    }
+    const expr_t *left = NULL, *right = NULL;
+    if (!expr_match_mul_expr(f, &left, &right))
+        return 0u;
+    expr_t *a = NULL, *b = NULL;
+    unsigned int first = laplace_time_monomial(left, t, &a);
+    unsigned int second = laplace_time_monomial(right, t, &b);
+    if (a && b && first + second <= 64u) {
+        *coefficient = expr_mul(a, b);
+        order = first + second;
+    }
+    expr_free(b);
+    expr_free(a);
+    return order;
+}
+
 /* Recognise quadratic exponents algebraically, without sampling binding values. */
 static bool laplace_quadratic_parts(const expr_t *f, const expr_t *t, expr_t **quadratic,
                                    expr_t **linear, expr_t **constant)
@@ -1130,6 +1147,102 @@ static expr_t *laplace_time_integral(const expr_t *f, const expr_t *t, const exp
     return out;
 }
 
+/* A real time translation of an unspecified function retains its finite history integral.
+ * Use the original bound source variable: this cannot capture an unrelated parameter. */
+static expr_t *laplace_function_translation(const expr_t *f, const expr_t *t, const expr_t *s,
+                                           number_t *bound, expr_t **conditions)
+{
+    if (!expr_is_arbitrary_function(f) || f->b)
+        return NULL;
+    expr_t *rate = NULL, *offset = NULL;
+    if (!laplace_affine_parts(f->a, t, &rate, &offset))
+        return NULL;
+    expr_t *clean_rate = expr_beautify(rate);
+    expr_t *clean_offset = expr_beautify(offset);
+    expr_free(rate);
+    expr_free(offset);
+    rate = clean_rate;
+    offset = clean_offset;
+    number_t value = NUM_NAN;
+    bool known = laplace_constant_value(offset, &value);
+    bool supported = expr_const_is_one(rate) && (!known || num_is_real(value));
+    num_destroy(&value);
+    expr_free(rate);
+    if (!supported) {
+        expr_free(offset);
+        return NULL;
+    }
+
+    expr_t *base = expr_new_arbitrary_function(f->name, t);
+    expr_t *args[] = {base, (expr_t *)t, (expr_t *)s};
+    expr_t *transform = expr_laplace_from_args(3u, args);
+    if (expr_const_is_zero(offset)) {
+        bool unchanged = expr_struct_eq(f->a, t);
+        expr_free(base);
+        expr_free(offset);
+        if (unchanged) {
+            expr_free(transform);
+            return NULL;
+        }
+        num_destroy(bound);
+        *bound = num_clone(NUM_NINF);
+        return transform;
+    }
+    expr_t *st = expr_mul(s, t);
+    expr_t *minus_st = expr_neg(st);
+    expr_t *kernel = expr_exp(minus_st);
+    expr_t *integrand = expr_mul(kernel, base);
+    expr_t *zero = expr_const_zero();
+    expr_t *history = expr_integral_with_bounds_internal(integrand, offset, zero, t);
+    expr_t *sum = expr_add(transform, history);
+    expr_t *exponent = expr_mul(s, offset);
+    expr_t *factor = expr_exp(exponent);
+    expr_t *out = expr_mul(factor, sum);
+    if (out) {
+        num_destroy(bound);
+        *bound = num_clone(NUM_NINF);
+        if (!known) {
+            expr_t *predicate = expr_new_unary_internal(&ops_real_parameter, expr_clone(offset));
+            laplace_add_half_plane(predicate, zero, conditions);
+            expr_free(predicate);
+        }
+    }
+    expr_free(factor);
+    expr_free(exponent);
+    expr_free(sum);
+    expr_free(history);
+    expr_free(zero);
+    expr_free(integrand);
+    expr_free(kernel);
+    expr_free(minus_st);
+    expr_free(st);
+    expr_free(transform);
+    expr_free(base);
+    expr_free(offset);
+    return out;
+}
+
+/* Keep derivatives of unknown transforms compact instead of expanding their history terms. */
+static bool laplace_contains_formal_transform(const expr_t *expr)
+{
+    return expr && (expr->ops == &ops_laplace || laplace_contains_formal_transform(expr->a) ||
+                    laplace_contains_formal_transform(expr->b));
+}
+
+/* Linearity may retain an unspecified base transform without re-entering its simplifier. */
+static expr_t *laplace_operand_rule(const expr_t *f, const expr_t *t, const expr_t *s, number_t *bound,
+                                   expr_t **conditions)
+{
+    expr_t *out = laplace_rule(f, t, s, bound, conditions);
+    if (!out && expr_is_arbitrary_function(f) && !f->b && expr_is_var(f->a) && f->a->var_id == t->var_id) {
+        expr_t *args[] = {(expr_t *)f, (expr_t *)t, (expr_t *)s};
+        out = expr_laplace_from_args(3u, args);
+        num_destroy(bound);
+        *bound = num_clone(NUM_NINF);
+    }
+    return out;
+}
+
 static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, number_t *bound,
                             expr_t **conditions)
 {
@@ -1146,6 +1259,10 @@ static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, n
         return out;
 
     out = laplace_function_derivative(f, t, s, bound, conditions);
+    if (out)
+        return out;
+
+    out = laplace_function_translation(f, t, s, bound, conditions);
     if (out)
         return out;
 
@@ -1239,8 +1356,8 @@ static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, n
         out = expr_div(b, a);
     } else if (expr_match_add_sub_expr(f, &left, &right, &subtract)) {
         number_t other_bound = NUM_ZERO;
-        a = laplace_rule(left, t, s, bound, conditions);
-        b = laplace_rule(right, t, s, &other_bound, conditions);
+        a = laplace_operand_rule(left, t, s, bound, conditions);
+        b = laplace_operand_rule(right, t, s, &other_bound, conditions);
         if (num_cmp(other_bound, *bound) > 0) {
             num_destroy(bound);
             *bound = num_clone(other_bound);
@@ -1259,11 +1376,11 @@ static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, n
         } else if (a && b)
             out = subtract ? expr_sub(a, b) : expr_add(a, b);
     } else if (f->ops == &ops_neg) {
-        a = laplace_rule(f->a, t, s, bound, conditions);
+        a = laplace_operand_rule(f->a, t, s, bound, conditions);
         if (a)
             out = expr_neg(a);
     } else if (f->ops == &ops_div && !laplace_uses(f->b, t)) {
-        a = laplace_rule(f->a, t, s, bound, conditions);
+        a = laplace_operand_rule(f->a, t, s, bound, conditions);
         if (a) {
             out = expr_div(a, f->b);
             expr_t *magnitude = expr_abs(f->b);
@@ -1274,28 +1391,41 @@ static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, n
         }
     } else if (expr_match_mul_expr(f, &left, &right)) {
         if (!laplace_uses(left, t)) {
-            a = laplace_rule(right, t, s, bound, conditions);
+            a = laplace_operand_rule(right, t, s, bound, conditions);
             if (a)
                 out = expr_mul(left, a);
         } else if (!laplace_uses(right, t)) {
-            a = laplace_rule(left, t, s, bound, conditions);
+            a = laplace_operand_rule(left, t, s, bound, conditions);
             if (a)
                 out = expr_mul(right, a);
         } else {
-            unsigned int order = laplace_time_order(left, t);
+            expr_t *coefficient = NULL;
+            unsigned int order = laplace_time_monomial(left, t, &coefficient);
             const expr_t *operand = right;
             if (!order) {
-                order = laplace_time_order(right, t);
+                expr_free(coefficient);
+                order = laplace_time_monomial(right, t, &coefficient);
                 operand = left;
             }
-            if (order) {
-                a = laplace_rule(operand, t, s, bound, conditions);
+            if (order && !laplace_uses(operand, s)) {
+                a = laplace_operand_rule(operand, t, s, bound, conditions);
                 if (a) {
-                    b = expr_create_nth_deriv(order, a, s);
-                    if (b)
-                        out = order % 2u ? expr_neg(b) : expr_clone(b);
+                    if (laplace_contains_formal_transform(a)) {
+                        expr_t *wrts[64];
+                        for (unsigned int i = 0u; i < order; ++i)
+                            wrts[i] = (expr_t *)s;
+                        b = expr_new_formal_derivative(a, order, wrts);
+                    } else {
+                        b = expr_create_nth_deriv(order, a, s);
+                    }
+                    if (b) {
+                        expr_t *signed_derivative = order % 2u ? expr_neg(b) : expr_clone(b);
+                        out = expr_mul(coefficient, signed_derivative);
+                        expr_free(signed_derivative);
+                    }
                 }
             }
+            expr_free(coefficient);
         }
     } else if (laplace_source_power(f, t, &exponent)) {
         number_t real = num_real_part(exponent);

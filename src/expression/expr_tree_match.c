@@ -553,6 +553,7 @@ bool expr_collect_var_usage(const expr_t *expr, size_t nvars, expr_t *const *var
     return expr_collect_var_usage_impl(expr, nvars, vars, used_out);
 }
 
+/* Substitute free occurrences while preserving the local scopes of integral and transform variables. */
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement)
 {
     expr_t *left;
@@ -568,6 +569,31 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
         (expr_is_formal_derivative(expr) && expr_is_formal_derivative(needle) && expr_struct_eq(expr, needle))) {
         expr_retain(replacement);
         return (expr_t *)replacement;
+    }
+
+    /* Transform sources are bound variables; substitution may still change the target or free parameters. */
+    if (expr_is_op(expr, &ops_laplace) || expr_is_op(expr, &ops_inverse_laplace)) {
+        const expr_t *source = expr->b->a;
+        const bool shadowed = source == needle || expr_is_same_named_leaf_for_substitution(source, needle);
+
+        left = shadowed ? expr_clone(expr->a) : expr_substitute(expr->a, needle, replacement);
+        right = expr_substitute(expr->b->b->a, needle, replacement);
+        if (!left || !right) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        out = expr_clone(expr);
+        if (!out) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        expr_free(out->a);
+        expr_free(out->b->b->a);
+        out->a = left;
+        out->b->b->a = right;
+        return out;
     }
 
     /* Substitution may change a finite operator's bounds, but must not capture a shadowing index. */

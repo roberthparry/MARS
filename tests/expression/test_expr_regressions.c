@@ -1508,6 +1508,42 @@ static void check_simplified_expression_string(const char *label, const char *in
     expr_free(expr);
 }
 
+static void test_simplify_common_minus_and_reciprocal_coefficients(void)
+{
+    static const struct {
+        const char *input;
+        const char *expected;
+    } cases[] = {
+        {"-(-x-y-3)", "x + y + 3"},
+        {"-(-x+(-y))", "x + y"},
+        {"-5*(-x-3)", "5·(x + 3)"},
+        {"7*(1/x^2)", "7/x²"},
+        {"3*(2/x^2)", "6/x²"},
+        {"5/(x*(-y-3))", "-5/(x·(y + 3))"},
+        {"-(-x+y)", "-(y - x)"},
+        {"-(-x-y)^0.5", "-√(-x - y)"},
+        {"-5*(-s-10/s^2-3)/(s*(s+4)+5)", "5/(s·(s + 4) + 5)·(s + 10/s² + 3)"},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *parsed = expr_from_string(cases[i].input, &bindings);
+        expr_t *simplified = parsed ? expr_simplify(parsed) : NULL;
+        expr_t *again = simplified ? expr_simplify(simplified) : NULL;
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        char *repeated = again ? expr_to_string(again, style_UNBOUND) : NULL;
+
+        TEST_ASSERT_STR_EQ(text, cases[i].expected);
+        TEST_ASSERT_STR_EQ(repeated, cases[i].expected);
+        free(repeated);
+        free(text);
+        expr_free(again);
+        expr_free(simplified);
+        expr_free(parsed);
+        expr_bindings_free(bindings);
+    }
+}
+
 static void test_simplify_exact_rational_square_roots(void)
 {
     number_t four = num_create_from_long(4L);
@@ -4601,6 +4637,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);
     TEST_RUN_SUBTEST(test_log_constant_difference_simplifies_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_exact_rational_square_roots, NULL);
+    TEST_RUN_SUBTEST(test_simplify_common_minus_and_reciprocal_coefficients, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_lambert_exp_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);

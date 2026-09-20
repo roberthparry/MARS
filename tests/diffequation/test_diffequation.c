@@ -717,6 +717,46 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
     de_free(de);
 }
 
+static void test_diffequ_infers_prime_coordinate(void)
+{
+    static const struct {
+        const char *source;
+        const char *coordinate;
+    } cases[] = {
+        { "y''+4y'+5y = 50t; y(0) = 5; y'(0) = -5", "t" },
+        { "y''+ay'+by = sin(t)", "t" },
+        { "y''+ty = 0", "t" },
+        { "y''+y = exp(x)", "x" },
+        { "y''+y = exp(t)", "t" },
+        { "y'' = atanh(t)", "t" },
+        { "y'' = atanh(x)", "x" },
+        { "y''/v^2 = 0", "x" },
+        { "y''+ay'+by = 0", "x" },
+        { "x''+x = sin(t)", "t" },
+        { "t''+t = x", "x" },
+        { "y''+Dt(y)+y = 0", "t" },
+        { "y''+Dt(y) = x", "t" },
+        { "y''+D[r](y) = r", "r" },
+        { "{ y''+y = t | x = ?; t = ?; }", "x" },
+        { "y'' = x+t", NULL },
+        { "y''+Dx(y)+Dt(y) = 0", NULL },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        diffequ_t *de = de_from_string(cases[i].source);
+
+        WANT_POINTER(cases[i].source, de, cases[i].coordinate != NULL);
+        if (cases[i].coordinate) {
+            const expr_t *coordinate = de ? equ_binding(de_equation(de), cases[i].coordinate) : NULL;
+
+            WANT_LONG("one inferred coordinate", de ? (long)de_independent_count(de) : -1L, 1L);
+            WANT_POINTER("inferred coordinate binding", coordinate, true);
+            WANT_LONG(cases[i].source, coordinate == de_independent_at(de, 0u), 1L);
+        }
+        de_free(de);
+    }
+}
+
 static void test_diffequ_parses_subscript_partial_derivatives(void)
 {
     const char *first_source = "u_x + u_y = 0";
@@ -2742,7 +2782,7 @@ static void test_diffequ_general_nonhomogeneous_solution(void)
 static void test_diffequ_general_trigonometric_forcing_solution(void)
 {
     WANT_CONSTANT_LINEAR_SOLUTION("Dxx(y) + y = cos(2*x)", "y = -⅓·cos(2x) + C₁·cos(x) + C₂·sin(x)");
-    WANT_CONSTANT_LINEAR_SOLUTION("Dxx(y) + 2*Dx(y) + 5*y = sin(3*x)", "y = ¹⁄₂₆·(-3·cos(3x) - 2·sin(3x)) + "
+    WANT_CONSTANT_LINEAR_SOLUTION("Dxx(y) + 2*Dx(y) + 5*y = sin(3*x)", "y = -¹⁄₂₆·(3·cos(3x) + 2·sin(3x)) + "
                                                                          "C₁·exp(-x)·cos(2x) + C₂·exp(-x)·sin(2x)");
 }
 
@@ -4606,6 +4646,28 @@ static void example_diffequation_deriving_a_lie_algebra(void)
     ASSERT_TRUE(valid);
 }
 
+/* README example from docs/diffequation.md: infer time from a prime-notation initial-value problem. */
+static void example_diffequation_prime_time_ivp(void)
+{
+    const char *source = "y''+4y'+5y = 50t; y(0) = 5; y'(0) = -5";
+    const char *want = "y = 10t + 13·cos(t)·exp(-2t) + 11·sin(t)·exp(-2t) - 8";
+    diffequ_t *ode = de_from_string(source);
+    diffequ_solve_result_t *result = ode ? de_solve_with_options(ode, DE_SOLVE_OPTION_STEPS) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+
+    printf("input = %s\nsolution = %s\n", source, text ? string_c_str(text) : "NULL");
+    WANT_LONG("time IVP solved", result ? (long)de_solve_result_status(result) : -1L,
+              (long)DE_SOLVE_STATUS_SOLVED);
+    WANT_LONG("constant-coefficient solver", result ? (long)de_solve_result_solver(result) : -1L,
+              (long)DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR);
+    WANT_TEXT("time IVP solution", text ? string_c_str(text) : NULL, want);
+
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(ode);
+}
+
 static void example_diffequation_solving_an_ode(void)
 {
     const char *source = "Dx(y) = x*y; y(0) = 1";
@@ -4873,6 +4935,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_applies_initial_condition_to_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_solves_divided_differential_form);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_infers_prime_coordinate);
     RUN_TEST_CASE(test_diffequ_derivative_quotient_TeX);
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
     RUN_TEST_CASE(test_diffequ_compact_parameter_derivatives);
@@ -5076,6 +5139,8 @@ int tests_main(void)
                                   "diffequation,readme,output,gkdv");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_half_line_heat, readme_examples,
                                   "diffequation,readme,output,heat");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_prime_time_ivp, readme_examples,
+                                  "diffequation,readme,output,notation");
 
     return TESTS_EXIT_CODE();
 }

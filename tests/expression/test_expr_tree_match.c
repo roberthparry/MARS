@@ -248,6 +248,46 @@ static void test_scaled_expr_and_var_usage(void)
     expr_free(x);
 }
 
+static void test_substitute_transform_scope(void)
+{
+    static const struct {
+        const char *source;
+        const char *needle;
+        const char *replacement;
+        const char *expected;
+    } cases[] = {
+        { "Laplace(f(t)+a*t,t,s)", "a", "b", "Laplace(f(t)+b*t,t,s)" },
+        { "Laplace(f(t)+a*t,t,s)", "t", "x", "Laplace(f(t)+a*t,t,s)" },
+        { "Laplace(f(t)+a*t,t,s)", "s", "p", "Laplace(f(t)+a*t,t,p)" },
+        { "InverseLaplace(F(s)+a/s,s,t)", "a", "b", "InverseLaplace(F(s)+b/s,s,t)" },
+        { "InverseLaplace(F(s)+a/s,s,t)", "s", "p", "InverseLaplace(F(s)+a/s,s,t)" },
+        { "InverseLaplace(F(s)+a/s,s,t)", "t", "x", "InverseLaplace(F(s)+a/s,s,x)" },
+        { "t+Laplace(f(t),t,s)", "t", "x", "x+Laplace(f(t),t,s)" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *source = expr_from_string(cases[i].source, NULL);
+        expr_t *needle = expr_new_named_var(NUM_NAN, cases[i].needle);
+        expr_t *replacement = expr_new_named_var(NUM_NAN, cases[i].replacement);
+        expr_t *expected = expr_from_string(cases[i].expected, NULL);
+        expr_t *result = expr_substitute(source, needle, replacement);
+        char *got = result ? expr_to_string(result, style_UNBOUND) : NULL;
+        char *want = expected ? expr_to_string(expected, style_UNBOUND) : NULL;
+
+        ASSERT_NOT_NULL(source);
+        ASSERT_NOT_NULL(expected);
+        ASSERT_NOT_NULL(result);
+        TEST_ASSERT_STR_EQ(got, want);
+        free(want);
+        free(got);
+        expr_free(result);
+        expr_free(expected);
+        expr_free(replacement);
+        expr_free(needle);
+        expr_free(source);
+    }
+}
+
 static void test_substitute_and_powd(void)
 {
     expr_t *x = test_expr_new_named_var_d(2.0, "x");
@@ -986,6 +1026,7 @@ void test_expr_tree_match_helpers(void)
     TEST_RUN_SUBTEST(test_tree_match_rejections, NULL);
     TEST_RUN_SUBTEST(test_scaled_expr_and_var_usage, NULL);
     TEST_RUN_SUBTEST(test_substitute_and_powd, NULL);
+    TEST_RUN_SUBTEST(test_substitute_transform_scope, NULL);
     TEST_RUN_SUBTEST(test_square_affine_matchers, NULL);
     TEST_RUN_SUBTEST(test_cube_affine_matchers, NULL);
     TEST_RUN_SUBTEST(test_quartic_affine_matchers, NULL);

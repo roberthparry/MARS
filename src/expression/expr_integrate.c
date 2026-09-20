@@ -18,6 +18,18 @@ typedef struct expr_integrate_dispatch_rule {
 
 static _Thread_local unsigned int expr_integrate_depth;
 
+/* Integrate on the interior of the existing domain, retaining its predicates unchanged. */
+static expr_t *integrate_real_domain_rule(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *antiderivative = expr_integrate(expr->a, wrt);
+    if (!antiderivative)
+        return NULL;
+    expr_t *out = expr_alloc(&ops_real_domain);
+    out->a = antiderivative;
+    out->b = expr_clone(expr->b);
+    return out;
+}
+
 static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_CONST] = {.structural = integrate_constant_rule},
     [EXPR_KIND_VAR] = {.structural = integrate_var_rule},
@@ -28,6 +40,7 @@ static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_C
     [EXPR_KIND_DIV] = {.structural = integrate_div_rule},
     [EXPR_KIND_POW] = {.structural = integrate_pow_rule},
     [EXPR_KIND_POW_D] = {.structural = integrate_pow_d_rule},
+    [EXPR_KIND_REAL_DOMAIN] = {.structural = integrate_real_domain_rule},
     [EXPR_KIND_SQRT] = {.primitive = integrate_sqrt_rule},
     [EXPR_KIND_CUBRT] = {.primitive = integrate_cubrt_rule},
     [EXPR_KIND_ROOT] = {.primitive = integrate_root_rule},

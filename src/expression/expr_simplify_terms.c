@@ -449,6 +449,14 @@ expr_t *expr_make_scaled(number_t coeff, expr_t *base)
     }
     if (num_eq(coeff, NUM_ONE))
         return base;
+    if (expr_simplify_is_plain_real_const(base)) {
+        number_t product = num_mul(coeff, base->c);
+        expr_t *out = expr_new_const(product);
+
+        num_destroy(&product);
+        expr_free(base);
+        return out;
+    }
     if (num_eq(coeff, NUM_NEG_ONE)) {
         expr_t *positive = expr_simplify_positive_part_if_negative(base);
 
