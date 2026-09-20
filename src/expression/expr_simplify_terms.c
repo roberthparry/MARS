@@ -1295,11 +1295,7 @@ void expr_combine_like_powers(expr_t **terms, size_t nterms)
             continue;
         }
 
-        if (num_is_one(exponent) && !expr_is_pow_d_expr(term)) {
-            num_destroy(&exponent);
-            continue;
-        }
-
+        /* A merged pair of square roots has exponent one: rebuild the base, not the first root. */
         expr_retain(base);
         expr_free(term);
         terms[i] = expr_make_pow_like(base, exponent);
@@ -1549,6 +1545,23 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
             if (!right_radicand)
                 continue;
 
+            if (expr_struct_eq(left_radicand, right_radicand)) {
+                expr_free(terms[i]);
+                expr_free(terms[j]);
+                terms[i] = expr_clone(left_radicand);
+                terms[j] = NULL;
+                expr_free(right_radicand);
+                break;
+            }
+            /* Principal roots multiply across a product only with a proven non-negative real factor. */
+            bool left_nonnegative = expr_is_unnamed_const(left_radicand) && num_is_real(left_radicand->c) &&
+                                    num_ge(left_radicand->c, NUM_ZERO);
+            bool right_nonnegative = expr_is_unnamed_const(right_radicand) && num_is_real(right_radicand->c) &&
+                                     num_ge(right_radicand->c, NUM_ZERO);
+            if (!left_nonnegative && !right_nonnegative) {
+                expr_free(right_radicand);
+                continue;
+            }
             prod = expr_mul(left_radicand, right_radicand);
             expr_free(right_radicand);
             simp_arg = expr_simplify(prod);

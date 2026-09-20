@@ -329,6 +329,10 @@ void test_partial_derivatives(void);
 void test_expr_tree_match_helpers(void);
 void test_symbolic_integration(void);
 void test_runtime_regressions(void);
+void test_fourier_and_signal_functions(void);
+void test_orthogonal_polynomials(void);
+void example_orthopoly_readme_examples(void);
+void example_signal_readme_examples(void);
 void test_reverse_mode(void);
 
 void test_to_string_all(void);

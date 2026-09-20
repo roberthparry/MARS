@@ -3,6 +3,27 @@
 `qfloat_t` is a double-double floating-point type built from the unevaluated sum
 of two IEEE-754 `double` values.
 
+## Signal functions
+
+`qf_step`, `qf_rect`, `qf_tri`, `qf_circ` and `qf_sinc` implement the
+[signal definitions](expression.md#signal-functions-and-distributions).
+Sinc is normalised by pi and has value one at zero. Pulse discontinuities use
+the symmetric half-value convention; NaN inputs remain NaN. Dirac impulses
+and principal values are expression-level distributions, not scalar numbers.
+
+README example:
+
+```c
+double half = qf_to_double(qf_step(QF_ZERO));
+printf("step(0) = %.1f\n", half);
+```
+
+Output:
+
+```text
+step(0) = 0.5
+```
+
 ## Representation
 
 ```text
@@ -513,3 +534,30 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).
+
+
+## Chebyshev and Hermite polynomials
+
+| API | Family |
+| :--- | :--- |
+| `qf_chebyshev_t` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
+| `qf_chebyshev_u` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
+| `qf_hermite_h` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
+
+These APIs take an unsigned long degree followed by the argument and evaluate
+the three-term polynomial recurrence.
+The existing harmonic-polynomial API is unchanged. See the
+[expression naming table](expression.md#chebyshev-and-hermite-polynomials)
+for `Tn`, `Un` and the distinct script-H Hermite notation.
+
+README example:
+
+```c
+qf_chebyshev_t(3, qf_from_double(2))
+```
+
+Output:
+
+```text
+T3(2) = 26
+```

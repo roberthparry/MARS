@@ -8,6 +8,38 @@ complex values through the `number_t` layer. Storage remains pluggable
 All operations dispatch through internal vtables; no type switches or storage
 switches appear in user code.
 
+## Signal functions
+
+`mat_step`, `mat_rect`, `mat_tri`, `mat_circ` and `mat_sinc` apply their
+[scalar signal functions](expression.md#signal-functions-and-distributions)
+through spectral matrix functional calculus, not entry by entry. Real pulse
+functions require an appropriate real spectrum and remain subject to the
+existing spectral engine's supported matrix classes. They are not holomorphic
+at their breakpoints. Normalised sinc is entire; repeated-eigenvalue triangular
+numeric matrices use its Taylor derivatives, including at zero.
+
+README example:
+
+```c
+NUM_SCOPE(scope);
+number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+matrix_t *a = mat_create_diagonal(3u, diagonal);
+matrix_t *b = mat_step(a);
+if (b) {
+    printf("step(diag(-1, 0, 1)) = diag(%.1f, %.1f, %.1f)\n",
+           num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+           num_to_double(mat_get_num(b, 2, 2)));
+}
+mat_free(b);
+mat_free(a);
+```
+
+Output:
+
+```text
+step(diag(-1, 0, 1)) = diag(0.0, 0.5, 1.0)
+```
+
 ## Representation
 
 `matrix_t` is an opaque struct. Clients hold a pointer and access it only through
@@ -1677,3 +1709,34 @@ Sparse matrices support efficient arithmetic operations:
 Use `mat_to_sparse` to convert a dense matrix to sparse form, and `mat_to_dense`
 to convert a sparse matrix to dense form. The `mat_is_sparse` function queries
 whether a matrix uses sparse storage.
+
+
+## Chebyshev and Hermite polynomials
+
+| API | Family |
+| :--- | :--- |
+| `mat_chebyshev_t` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
+| `mat_chebyshev_u` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
+| `mat_hermite_h` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
+
+These APIs take a square matrix followed by an unsigned integral degree and
+return a newly allocated matrix polynomial, not entrywise values. Non-square
+matrices return NULL. Matrix multiplication makes the recurrence valid for
+non-diagonalisable and symbolic matrices too.
+The existing harmonic-polynomial API is unchanged. See the
+[expression naming table](expression.md#chebyshev-and-hermite-polynomials)
+for `Tn`, `Un` and the distinct script-H Hermite notation.
+
+README example:
+
+```c
+number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
+matrix_t *a = mat_create(2, 2, values);
+matrix_t *t = mat_chebyshev_t(a, 3);
+```
+
+Output:
+
+```text
+T3((0, 1; 0, 0)) = (0, -3; 0, 0)
+```

@@ -130,7 +130,7 @@ static bool domain_numeric(const expr_t *expr)
 static expr_t *real_domain_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 {
     (void)expr;
-    if (expr_is_laplace_transform(a)) {
+    if (expr_is_integral_transform(a)) {
         expr_t *evaluated = expr_transform_result(a);
         if (evaluated) {
             expr_free(a);
@@ -287,17 +287,17 @@ expr_t *expr_transform_specialise_constants(const expr_t *expr)
 }
 
 /* Present an evaluated transform as an identity without changing the result algebra. */
-char *expr_laplace_identity_TeX(const expr_t *source, const expr_t *result)
+char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
 {
     while (source && source->ops == &ops_real_domain)
         source = source->a;
     while (result && result->ops == &ops_real_domain && !result->b)
         result = result->a;
-    if (!expr_is_laplace_transform(source) || !result)
+    if (!expr_is_integral_transform(source) || !result)
         return NULL;
     bool shifted_formal = source->ops == &ops_laplace && result->ops == &ops_laplace &&
                           !expr_struct_eq(source->b->b->a, result->b->b->a);
-    if (expr_is_laplace_transform(result) && !shifted_formal)
+    if (expr_is_integral_transform(result) && !shifted_formal)
         return NULL;
     expr_t *operand = shifted_formal ? expr_clone(source->a) : domain_specialise_copy(source->a);
     char *body = expr_to_TeX_body(operand);
@@ -326,7 +326,7 @@ char *expr_laplace_identity_TeX(const expr_t *source, const expr_t *result)
         out = malloc(size);
         if (out)
             snprintf(out, size, "%s_{%s\\to %s}\\left\\{%s\\right\\} = %s",
-                     source->ops == &ops_inverse_laplace ? "\\mathcal{L}^{-1}" : "\\mathcal{L}",
+                     source->ops->TeX_name,
                      from, to, body, rhs);
     }
     free(rhs);

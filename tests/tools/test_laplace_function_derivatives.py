@@ -146,7 +146,7 @@ class ZZLaplaceDerivativeReadmeExamples(unittest.TestCase):
             ("@L{f'(t)}", "s·ℒ(f(t), t, s) - f(0)"),
             ("@L{f'}", "s·ℒ(f(t), t, s) - f(0)"),
             ("@L{f''(t)}", "s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)"),
-            ("@L{f^(n)(t)}", "s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (nonnegative_integer(n))"),
+            ("@L{f^(n)(t)}", "s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (n ∈ ℤ≥0)"),
         )
         for source, expected in cases:
             fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "s", "evaluate")

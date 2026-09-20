@@ -916,6 +916,15 @@ static expr_t *inverse_rule(const expr_t *f, const expr_t *metadata)
             if (a)
                 out = expr_mul(scalar, a);
             expr_free(a);
+        } else if (expr_is_var(t)) {
+            expr_t *a = inverse_rule(f->a, metadata), *b = inverse_rule(f->b, metadata);
+            if (!a)
+                a = inverse_formal(f->a, metadata);
+            if (!b)
+                b = inverse_formal(f->b, metadata);
+            out = a && b ? expr_causal_convolve(a, b, t) : NULL;
+            expr_free(a);
+            expr_free(b);
         }
     } else if (f->ops == &ops_div && !inverse_uses(f->b, s) && inverse_nonzero(f->b)) {
         expr_t *a = inverse_rule(f->a, metadata);

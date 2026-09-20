@@ -119,6 +119,7 @@ static void test_opposite_factor_cancellation(void)
 
 static void test_opposite_radicals_keep_complex_branches(void)
 {
+    NUM_SCOPE(scope);
     expr_bindings_t *bindings = NULL;
     expr_t *input = expr_from_string("sqrt(x-1)/sqrt(1-x)", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
@@ -143,6 +144,24 @@ static void test_opposite_radicals_keep_complex_branches(void)
     expr_free(simplified);
     expr_free(input);
     expr_bindings_free(bindings);
+
+    static const char *const products[] = {
+        "{sqrt(x)*sqrt(x) | x=-4}", "{sqrt(x)*sqrt(y) | x=-4; y=-9}",
+        "{sqrt(x)*sqrt(y) | x=4; y=-9}"
+    };
+    const number_t expected[] = {num_create_from_long(-4), num_create_from_long(-6),
+                                 num_mul(NUM_I, num_create_from_long(6))};
+    for (size_t n = 0u; n < 3u; ++n) {
+        expr_bindings_t *local = NULL;
+        expr_t *product = expr_from_string(products[n], &local);
+        expr_t *reduced = product ? expr_simplify(product) : NULL;
+        number_t value = reduced ? expr_eval(reduced) : num_clone(NUM_NAN);
+        ASSERT_TRUE(num_eq(value, expected[n]));
+        num_destroy(&value);
+        expr_free(reduced);
+        expr_free(product);
+        expr_bindings_free(local);
+    }
 }
 
 static string_t *format_number_at_own_precision(const number_t value)

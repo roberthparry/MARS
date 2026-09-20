@@ -236,6 +236,17 @@ static void test_scaled_expr_and_var_usage(void)
     ASSERT_TRUE(used[1]);
     ASSERT_TRUE(!used[2]);
 
+    expr_t *zero = expr_new_const(NUM_ZERO);
+    expr_t *scoped_body = expr_add(x, y);
+    expr_t *scoped_sum = expr_new_finite_summation_range(scoped_body, x, zero, z);
+    ASSERT_TRUE(expr_collect_var_usage(scoped_sum, 3, vars, used));
+    ASSERT_TRUE(!used[0]);
+    ASSERT_TRUE(used[1]);
+    ASSERT_TRUE(used[2]);
+    expr_free(scoped_sum);
+    expr_free(scoped_body);
+    expr_free(zero);
+
     num_destroy(&scale);
     expr_free(usage_expr);
     expr_free(usage_exp);

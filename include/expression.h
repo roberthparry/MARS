@@ -550,6 +550,21 @@ expr_t *expr_cubrt(const expr_t *expr);
  */
 expr_t *expr_root(const expr_t *expr, const expr_t *order);
 expr_t *expr_floor(const expr_t *expr);
+
+/** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
+expr_t *expr_step(const expr_t *argument);
+/** @brief Unit-width rectangular pulse, with half-height endpoints. */
+expr_t *expr_rect(const expr_t *argument);
+/** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
+expr_t *expr_tri(const expr_t *argument);
+/** @brief Even unit-radius aperture profile, with half-height endpoints. */
+expr_t *expr_circ(const expr_t *argument);
+/** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
+expr_t *expr_sinc(const expr_t *argument);
+/** @brief Construct a Dirac distribution; no pointwise value is assigned at its support. */
+expr_t *expr_delta(const expr_t *argument);
+/** @brief Mark a singular expression as its Cauchy principal-value distribution. */
+expr_t *expr_principal_value(const expr_t *argument);
 expr_t *expr_ceil(const expr_t *expr);
 /**
  * @brief Construct a power with a constant numeric exponent.
@@ -704,6 +719,30 @@ expr_t *expr_polylog(unsigned int order, const expr_t *expr);
  * @return A newly allocated harmonic-polynomial expression, or NULL on error.
  */
 expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument);
+
+/** @brief Construct the first-kind Chebyshev polynomial of non-negative integral degree. */
+expr_t *expr_chebyshev_t(const expr_t *degree, const expr_t *argument);
+
+/** @brief Construct the second-kind Chebyshev polynomial of non-negative integral degree. */
+expr_t *expr_chebyshev_u(const expr_t *degree, const expr_t *argument);
+
+/** @brief Construct the physicists' Hermite polynomial of non-negative integral degree. */
+expr_t *expr_hermite_h(const expr_t *degree, const expr_t *argument);
+
+/**
+ * @brief Construct the whole-line convolution of two expressions in a common coordinate.
+ * @param left First function of coordinate.
+ * @param right Second function of coordinate.
+ * @param coordinate Free output coordinate; integration uses a separate bound dummy.
+ * @return Newly allocated expression, or NULL for an invalid coordinate.
+ */
+expr_t *expr_convolve(const expr_t *left, const expr_t *right, const expr_t *coordinate);
+
+/**
+ * @brief Construct the causal convolution, integrating from zero to the output coordinate.
+ * @return Newly allocated expression, or NULL for an invalid coordinate.
+ */
+expr_t *expr_causal_convolve(const expr_t *left, const expr_t *right, const expr_t *coordinate);
 /**
  * @brief Construct the Lerch transcendent @f$\Phi(z,s,a)@f$.
  *

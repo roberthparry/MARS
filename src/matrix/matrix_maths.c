@@ -108,6 +108,13 @@ static matrix_t *mat_apply_unary(const matrix_t *A, void (*number_f)(void *out, 
     return mat_fun_apply(A, number_f, expr_elem.fun ? expr_f : NULL, native_f);
 }
 
+/* Share spectral functional calculus with scalar families defined in separate source files. */
+matrix_t *mat_apply_scalar_callbacks(const matrix_t *A, void (*number_f)(void *, const void *),
+                                    void (*expression_f)(void *, const void *))
+{
+    return mat_fun_apply(A, number_f, expression_f, NULL);
+}
+
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)
 {
     return A && !matrix_is_symbolic(A);
@@ -683,7 +690,8 @@ fail:
     return NULL;
 }
 
-static matrix_t *mat_number_unary_taylor_from_expr(const matrix_t *A, expr_t *(*build_expr)(const expr_t *))
+/* Evaluate a scalar expression on a triangular matrix with a repeated eigenvalue. */
+matrix_t *mat_number_unary_taylor_from_expr(const matrix_t *A, expr_t *(*build_expr)(const expr_t *))
 {
     matrix_t *T = NULL;
     matrix_t *FT = NULL;

@@ -43,7 +43,8 @@ static number_t eval_arbitrary_function(expr_t *dv)
 /* Preserve the function, evaluation argument and derivative order as separate operands. */
 expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order)
 {
-    if (!expr_is_arbitrary_function(function) || function->a->ops == &ops_argument_list || !order)
+    if (!function || (!expr_is_arbitrary_function(function) && function->ops != &ops_delta) ||
+        !function->a || function->a->ops == &ops_argument_list || !order)
         return NULL;
     if (expr_is_exact_zero(order))
         return expr_clone(function);

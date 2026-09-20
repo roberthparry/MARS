@@ -1254,6 +1254,32 @@ static expr_t *laplace_rule(const expr_t *f, const expr_t *t, const expr_t *s, n
     expr_t *b = NULL;
     number_t exponent = NUM_ZERO;
 
+    if (f->ops == &ops_causal_convolution && expr_struct_eq(f->b, t)) {
+        number_t left_bound = num_clone(NUM_ZERO), right_bound = num_clone(NUM_ZERO);
+        expr_t *left = laplace_operand_rule(f->a->a, t, s, &left_bound, conditions);
+        expr_t *right = laplace_operand_rule(f->a->b, t, s, &right_bound, conditions);
+        if (!left) {
+            expr_t *args[] = {f->a->a, (expr_t *)t, (expr_t *)s};
+            left = expr_laplace_from_args(3u, args);
+            num_destroy(&left_bound);
+            left_bound = num_clone(NUM_NINF);
+        }
+        if (!right) {
+            expr_t *args[] = {f->a->b, (expr_t *)t, (expr_t *)s};
+            right = expr_laplace_from_args(3u, args);
+            num_destroy(&right_bound);
+            right_bound = num_clone(NUM_NINF);
+        }
+        out = left && right ? expr_mul(left, right) : NULL;
+        num_destroy(bound);
+        *bound = num_clone(num_cmp(left_bound, right_bound) > 0 ? left_bound : right_bound);
+        num_destroy(&left_bound);
+        num_destroy(&right_bound);
+        expr_free(left);
+        expr_free(right);
+        return out;
+    }
+
     out = laplace_time_integral(f, t, s, bound, conditions);
     if (out)
         return out;
@@ -1575,81 +1601,36 @@ const expr_ops_t ops_laplace = {
     .simplify = laplace_simplify,
 };
 
-static expr_t *laplace_from_args(size_t count, expr_t *const *args, bool inverse)
-{
-    if (!args || count < 1u || count > 3u)
-        return NULL;
-    expr_bindings_t *bindings = expr_bindings_from_expr_internal(args[0]);
-    const expr_t *source = count > 1u ? args[1] : NULL;
-    if (!source) {
-        /* The conventional time variable takes precedence over frequency parameters. */
-        const expr_t *time = expr_bindings_get(bindings, inverse ? "s" : "t");
-        if (time && expr_is_var(time))
-            source = time;
-    }
-    if (!source) {
-        for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
-            expr_t *candidate = expr_bindings_get(bindings, expr_bindings_name_at(bindings, i));
-            if (!expr_is_var(candidate))
-                continue;
-            if (source) {
-                expr_bindings_free(bindings);
-                return NULL;
-            }
-            source = candidate;
-        }
-    }
-    expr_t *target = count > 2u ? expr_clone(args[2]) : expr_new_named_var(NUM_NAN, inverse ? "t" : "s");
-    expr_t *out = NULL;
-    bool collision = target && target->name && expr_bindings_get(bindings, target->name);
-    bool valid_target = target && source && source->name && !laplace_uses(target, source) &&
-                        (!expr_is_var(target) || (target->name && !collision &&
-                         strcmp(source->name, target->name) != 0));
-    if (source && expr_is_var(source) && source->name && valid_target) {
-        expr_t *meta = expr_alloc(&ops_argument_list);
-        meta->a = expr_clone(source);
-        meta->b = expr_alloc(&ops_argument_list);
-        meta->b->a = expr_clone(target);
-        meta->b->b = expr_const_long((long)count);
-        out = expr_alloc(inverse ? &ops_inverse_laplace : &ops_laplace);
-        out->a = expr_clone(args[0]);
-        out->b = meta;
-    }
-    expr_free(target);
-    expr_bindings_free(bindings);
-    return out;
-}
-
-/* Construct a forward transform using the shared variable-mapping rules. */
-expr_t *expr_laplace_from_args(size_t count, expr_t *const *args)
-{
-    return laplace_from_args(count, args, false);
-}
-
-/* Construct an inverse transform with the conventional s-to-t mapping. */
-expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args)
-{
-    return laplace_from_args(count, args, true);
-}
-
-/* Identify either direction without duplicating dispatch at each renderer. */
-bool expr_is_laplace_transform(const expr_t *expr)
-{
-    return expr && (expr->ops == &ops_laplace || expr->ops == &ops_inverse_laplace);
-}
-
-/* Dispatch recognised formulas through the operator's native implementation. */
-expr_t *expr_transform_result(const expr_t *transform)
-{
-    return transform && transform->ops == &ops_inverse_laplace
-               ? expr_inverse_laplace_result(transform) : expr_laplace_result(transform);
-}
 
 /* Explain proven obstructions separately from transforms whose closed form is unsupported. */
-const char *expr_laplace_value_note(const expr_t *expr)
+const char *expr_transform_value_note(const expr_t *expr)
 {
     if (!expr)
         return NULL;
+    if (expr->ops == &ops_convolution || expr->ops == &ops_causal_convolution) {
+        expr_t *simplified = expr_simplify(expr);
+        const char *note = simplified && simplified->ops != expr->ops ? expr_transform_value_note(simplified) : NULL;
+        expr_free(simplified);
+        return note;
+    }
+    if (expr->ops == &ops_delta || expr->ops == &ops_principal_value)
+        return "This result is a distribution, not an ordinary pointwise function. "
+               "Dirac impulses and principal values do not have finite pointwise numerical values.";
+    if (expr->ops == &ops_fourier || expr->ops == &ops_inverse_fourier) {
+        expr_t *known = expr_fourier_result(expr);
+        if (!known)
+            return "Fourier transform left symbolic: no supported closed form has been established for this "
+                   "function and its parameters. This does not establish non-existence of its transform.";
+        if (expr->a->ops == &ops_bessel_j) {
+            expr_free(known);
+            return "The integer-order Bessel spectrum has inverse-square-root singularities at its support edges. "
+                   "No finite pointwise value is assigned at those frequencies.";
+        }
+        /* A partial rule can still contain the same formal transform; do not recurse into it indefinitely. */
+        const char *note = expr_struct_eq(known, expr) ? NULL : expr_transform_value_note(known);
+        expr_free(known);
+        return note;
+    }
     if (expr->ops == &ops_laplace && expr->a->ops == &ops_tan) {
         expr_t *rate = NULL, *offset = NULL;
         if (!laplace_affine_parts(expr->a->a, expr->b->a, &rate, &offset)) {
@@ -1725,8 +1706,8 @@ const char *expr_laplace_value_note(const expr_t *expr)
         return "Transform left symbolic: no supported closed form has been established for this function and its parameters. "
                "This does not imply that the ordinary Laplace transform fails to exist.";
     }
-    if (expr_is_laplace_transform(expr))
+    if (expr_is_integral_transform(expr))
         return NULL;
-    const char *note = expr_laplace_value_note(expr->a);
-    return note ? note : expr_laplace_value_note(expr->b);
+    const char *note = expr_transform_value_note(expr->a);
+    return note ? note : expr_transform_value_note(expr->b);
 }

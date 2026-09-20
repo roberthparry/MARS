@@ -5374,6 +5374,13 @@ const expr_ops_t ops_factors = {.eval = eval_factors,
 expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
 {
     static const expr_ops_t *const unary_ops_by_kind[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_STEP] = &ops_step,
+        [EXPR_KIND_RECT] = &ops_rect,
+        [EXPR_KIND_TRI] = &ops_tri,
+        [EXPR_KIND_CIRC] = &ops_circ,
+        [EXPR_KIND_SINC] = &ops_sinc,
+        [EXPR_KIND_DELTA] = &ops_delta,
+        [EXPR_KIND_PRINCIPAL_VALUE] = &ops_principal_value,
         [EXPR_KIND_NEG] = &ops_neg,
         [EXPR_KIND_SIN] = &ops_sin,
         [EXPR_KIND_COS] = &ops_cos,

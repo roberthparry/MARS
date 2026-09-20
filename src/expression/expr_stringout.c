@@ -461,11 +461,15 @@ static int pow_exp_needs_parens(const expr_t *e)
 
 static int pow_base_needs_visible_parens(const expr_t *base)
 {
-    if (base && (expr_is_formal_derivative(base) || expr_is_pow_d_expr(base) || expr_is_op(base, &ops_pow)))
+    if (base && (expr_is_neg(base) || expr_is_formal_derivative(base) || expr_is_pow_d_expr(base) ||
+                 expr_is_op(base, &ops_pow)))
         return 1;
 
     if (base && expr_is_const(base) && expr_tostring_should_emit_binding_expr(base) && base->binding_expr) {
         if (base->binding_expr->kind == EXPR_BINDING_EXPR_ADD || base->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+            return 1;
+        if (base->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+            base->binding_expr->u.unary_op.ops == &ops_neg)
             return 1;
         if (base->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             base->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
@@ -1890,7 +1894,22 @@ static void emit_ordered_derivative(const expr_t *f, sbuf_t *b, int style)
 {
     void (*emit)(const expr_t *, sbuf_t *, int) = style == 2 ? emit_TeX_expr : style == 1 ? emit_func : emit_expr;
     const char *name = f->a->name;
-    if (style == 2)
+    bool builtin = !expr_is_arbitrary_function(f->a);
+    if (builtin && style != 2) {
+        sbuf_puts(b, "Derivative(");
+        const expr_t *expanded = function_temporary_context.expanded_node;
+        if (style == 1)
+            function_temporary_context.expanded_node = f->a;
+        emit(f->a, b, PREC_LOWEST);
+        function_temporary_context.expanded_node = expanded;
+        sbuf_puts(b, ", ");
+        emit(f->b, b, PREC_LOWEST);
+        sbuf_putc(b, ')');
+        return;
+    }
+    if (builtin)
+        sbuf_puts(b, f->a->ops->TeX_name ? f->a->ops->TeX_name : "\\operatorname{f}");
+    else if (style == 2)
         emit_TeX_name(b, name);
     else if (style == 1)
         emit_name_func(b, name);
@@ -1978,7 +1997,7 @@ static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
 
 static bool display_contains_transform(const expr_t *expr)
 {
-    return expr && (expr_is_laplace_transform(expr) || display_contains_transform(expr->a) ||
+    return expr && (expr_is_integral_transform(expr) || display_contains_transform(expr->a) ||
                     display_contains_transform(expr->b));
 }
 
@@ -2853,7 +2872,7 @@ static const expr_t *display_transform_factor(const expr_t *expr)
 {
     if (!expr)
         return NULL;
-    if (expr_is_laplace_transform(expr))
+    if (expr_is_integral_transform(expr))
         return expr;
     if (expr_is_neg(expr))
         return display_transform_factor(expr->a);
@@ -3387,8 +3406,20 @@ static const char *TeX_unary_name(const expr_t *f)
     return f->ops->TeX_name;
 }
 
-static bool TeX_unary_arg_is_greek_symbol(const expr_t *arg)
+static bool TeX_unary_has_bare_greek_argument(const expr_t *function)
 {
+    static const bool explicit_argument[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_STEP]            = true,
+        [EXPR_KIND_RECT]            = true,
+        [EXPR_KIND_TRI]             = true,
+        [EXPR_KIND_CIRC]            = true,
+        [EXPR_KIND_SINC]            = true,
+        [EXPR_KIND_DELTA]           = true,
+        [EXPR_KIND_PRINCIPAL_VALUE] = true,
+    };
+    if (!function || explicit_argument[function->ops->kind])
+        return false;
+    const expr_t *arg = function->a;
     const char *name;
     string_t *name_text;
     string_t *normalized;
@@ -4474,12 +4505,13 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         sbuf_putc(b, ')');
         return;
     }
-    if (expr_is_laplace_transform(f)) {
+    if (expr_is_integral_transform(f)) {
         expr_t *result = expr_transform_result(f);
         if (result) {
             emit_TeX_expr(result, b, parent_prec);
         } else {
-            sbuf_puts(b, f->ops == &ops_inverse_laplace ? "\\mathcal{L}^{-1}_{" : "\\mathcal{L}_{");
+            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, "_{");
             emit_TeX_expr(f->b->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\to ");
             emit_TeX_expr(f->b->b->a, b, PREC_LOWEST);
@@ -4601,7 +4633,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             }
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
-            if (TeX_unary_arg_is_greek_symbol(f->a)) {
+            if (TeX_unary_has_bare_greek_argument(f)) {
                 sbuf_putc(b, ' ');
                 emit_TeX_expr(f->a, b, PREC_UNARY);
             } else {
@@ -4679,7 +4711,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             } else {
                 emit_TeX_const_value(b, f);
             }
-            if (TeX_unary_arg_is_greek_symbol(f->a->a)) {
+            if (TeX_unary_has_bare_greek_argument(f->a)) {
                 sbuf_puts(b, "} ");
                 emit_TeX_expr(f->a->a, b, PREC_UNARY);
             } else {
@@ -5039,6 +5071,16 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_polylog(f, b);
             return;
         }
+        if (f->ops == &ops_chebyshev_t || f->ops == &ops_chebyshev_u || f->ops == &ops_hermite_h) {
+            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, "_{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "}");
+            sbuf_puts(b, "\\left(");
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right)");
+            return;
+        }
         if (expr_is_op(f, &ops_harmonic_poly)) {
             emit_TeX_harmonic_poly(f, b);
             return;
@@ -5137,9 +5179,8 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (pair != f->b)
                 sbuf_puts(b, "; ");
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
-                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
                 emit_expr(pair->a->a, b, PREC_LOWEST);
-                sbuf_putc(b, ')');
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
                 continue;
             }
             sbuf_puts(b, "Re(");
@@ -5152,14 +5193,15 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
         return;
     }
-    if (expr_is_laplace_transform(f)) {
+    if (expr_is_integral_transform(f)) {
         expr_t *result = expr_transform_result(f);
         if (result) {
             emit_expr(result, b, parent_prec);
             expr_free(result);
             return;
         }
-        sbuf_puts(b, f->ops == &ops_inverse_laplace ? "ℒ⁻¹(" : "ℒ(");
+        sbuf_puts(b, f->ops->expression_name);
+        sbuf_putc(b, '(');
         emit_expr(f->a, b, PREC_LOWEST);
         if (num_to_double(f->b->b->b->c) > 1) {
             sbuf_puts(b, ", ");
@@ -5523,10 +5565,11 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (need)
                 sbuf_putc(b, '(');
             emit_expr(f->a->a, b, PREC_MUL);
-            sbuf_putc(b, '/');
-            emit_expr(f->a->b, b, PREC_MUL);
+            sbuf_puts(b, "/(");
+            emit_expr(f->a->b, b, PREC_POW);
             sbuf_puts(b, "·");
-            emit_expr(f->b, b, PREC_MUL);
+            emit_expr(f->b, b, PREC_POW);
+            sbuf_putc(b, ')');
             if (need)
                 sbuf_putc(b, ')');
             return;
@@ -5953,14 +5996,15 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (emit_func_integral_cartesian(f, b, parent_prec))
         return;
 
-    if (expr_is_laplace_transform(f)) {
+    if (expr_is_integral_transform(f)) {
         expr_t *result = expr_transform_result(f);
         if (result) {
             emit_func(result, b, parent_prec);
             expr_free(result);
             return;
         }
-        sbuf_puts(b, f->ops == &ops_inverse_laplace ? "InverseLaplace(" : "Laplace(");
+        sbuf_puts(b, f->ops->function_name);
+        sbuf_putc(b, '(');
         emit_func(f->a, b, PREC_LOWEST);
         sbuf_puts(b, ", ");
         emit_func(f->b->a, b, PREC_LOWEST);
@@ -5978,9 +6022,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             if (pair != f->b)
                 sbuf_puts(b, "; ");
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
-                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
                 emit_func(pair->a->a, b, PREC_LOWEST);
-                sbuf_putc(b, ')');
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
                 continue;
             }
             sbuf_puts(b, "Re(");

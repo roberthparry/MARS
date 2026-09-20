@@ -440,101 +440,43 @@ static bool expr_collect_var_usage_impl(const expr_t *expr, size_t nvars, expr_t
         return true;
     }
 
-    if (expr_is_op(expr, &ops_integral)) {
-        const expr_t *dummy = expr_integral_dummy_expr(expr);
-        const expr_t *lower = expr_integral_lower_bound_expr(expr);
-        const expr_t *upper = expr_integral_upper_bound_expr(expr);
-
-        if (lower && !expr_collect_var_usage_impl(lower, nvars, vars, used_out))
-            return false;
-        if (upper && !expr_collect_var_usage_impl(upper, nvars, vars, used_out))
-            return false;
-        if (expr->a) {
-            expr_t *const *filtered_vars = vars;
-            size_t filtered_nvars = nvars;
-
-            if (dummy && nvars > 0u) {
-                size_t out = 0u;
-                expr_t *stack_vars[16];
-                expr_t **filtered_storage = NULL;
-
-                filtered_storage = (nvars <= 16u) ? stack_vars : calloc(nvars, sizeof(*filtered_storage));
-                if (!filtered_storage)
-                    return false;
-                filtered_vars = filtered_storage;
-
-                for (size_t i = 0; i < nvars; ++i) {
-                    int same_dummy = vars[i] == dummy || (expr_is_var(vars[i]) && expr_is_var(dummy) &&
-                                                          vars[i]->var_id != 0 && vars[i]->var_id == dummy->var_id);
-                    if (!same_dummy)
-                        filtered_storage[out++] = vars[i];
-                }
-                filtered_nvars = out;
-                if (!expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out)) {
-                    if (filtered_storage != stack_vars)
-                        free(filtered_storage);
-                    return false;
-                }
-                if (filtered_storage != stack_vars)
-                    free(filtered_storage);
-                return true;
-            }
-
-            return expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out);
-        }
-        return true;
-    }
-
-    if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
-        const expr_t *index = expr->b;
-        const expr_t *lower = NULL;
-        const expr_t *upper = NULL;
-
+    const expr_t *dummy = NULL, *lower = NULL, *upper = NULL;
+    if (expr_is_integral_transform(expr)) {
+        dummy = expr->b->a;
+        upper = expr->b->b->a; /* The target is free; the source is bound only within the operand. */
+    } else if (expr_is_op(expr, &ops_integral)) {
+        dummy = expr_integral_dummy_expr(expr);
+        lower = expr_integral_lower_bound_expr(expr);
+        upper = expr_integral_upper_bound_expr(expr);
+    } else if (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product)) {
+        dummy = expr->b;
         if (expr_is_op(expr->b, &ops_argument_list)) {
-            index = expr->b->a;
+            dummy = expr->b->a;
             upper = expr->b->b;
             if (expr_is_op(upper, &ops_argument_list)) {
                 lower = upper->a;
                 upper = upper->b;
             }
         }
-        if (lower && !expr_collect_var_usage_impl(lower, nvars, vars, used_out))
+    }
+    if (dummy) {
+        if (!expr_collect_var_usage_impl(lower, nvars, vars, used_out) ||
+            !expr_collect_var_usage_impl(upper, nvars, vars, used_out))
             return false;
-        if (upper && !expr_collect_var_usage_impl(upper, nvars, vars, used_out))
+        expr_t *stack_vars[16];
+        expr_t **scoped = nvars <= 16u ? stack_vars : calloc(nvars, sizeof(*scoped));
+        if (!scoped)
             return false;
-        if (expr->a) {
-            expr_t *const *filtered_vars = vars;
-            size_t filtered_nvars = nvars;
-
-            if (index && nvars > 0u) {
-                size_t out = 0u;
-                expr_t *stack_vars[16];
-                expr_t **filtered_storage = nvars <= 16u ? stack_vars : calloc(nvars, sizeof(*filtered_storage));
-
-                if (!filtered_storage)
-                    return false;
-                filtered_vars = filtered_storage;
-                for (size_t i = 0u; i < nvars; ++i) {
-                    const int same_index = vars[i] == index ||
-                                           (expr_is_var(vars[i]) && expr_is_var(index) && vars[i]->var_id != 0u &&
-                                            vars[i]->var_id == index->var_id);
-
-                    if (!same_index)
-                        filtered_storage[out++] = vars[i];
-                }
-                filtered_nvars = out;
-                if (!expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out)) {
-                    if (filtered_storage != stack_vars)
-                        free(filtered_storage);
-                    return false;
-                }
-                if (filtered_storage != stack_vars)
-                    free(filtered_storage);
-                return true;
-            }
-            return expr_collect_var_usage_impl(expr->a, filtered_nvars, filtered_vars, used_out);
+        /* Preserve indices into used_out. Compacting the variable list mislabels later free variables. */
+        for (size_t i = 0u; i < nvars; ++i) {
+            bool shadowed = vars[i] == dummy || (expr_is_var(vars[i]) && expr_is_var(dummy) &&
+                                                vars[i]->var_id != 0u && vars[i]->var_id == dummy->var_id);
+            scoped[i] = shadowed ? NULL : vars[i];
         }
-        return true;
+        bool ok = expr_collect_var_usage_impl(expr->a, nvars, scoped, used_out);
+        if (scoped != stack_vars)
+            free(scoped);
+        return ok;
     }
 
     if (expr->a && !expr_collect_var_usage_impl(expr->a, nvars, vars, used_out))
@@ -572,7 +514,7 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
     }
 
     /* Transform sources are bound variables; substitution may still change the target or free parameters. */
-    if (expr_is_op(expr, &ops_laplace) || expr_is_op(expr, &ops_inverse_laplace)) {
+    if (expr_is_integral_transform(expr)) {
         const expr_t *source = expr->b->a;
         const bool shadowed = source == needle || expr_is_same_named_leaf_for_substitution(source, needle);
 
@@ -594,6 +536,18 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
         out->a = left;
         out->b->b->a = right;
         return out;
+    }
+
+    /* Domain predicates and argument lists contain expressions, not additional binding scopes. */
+    if (expr_is_op(expr, &ops_real_domain) || expr_is_op(expr, &ops_argument_list)) {
+        left = expr_substitute(expr->a, needle, replacement);
+        right = expr->b ? expr_substitute(expr->b, needle, replacement) : NULL;
+        if (!left || (expr->b && !right)) {
+            expr_free(left);
+            expr_free(right);
+            return NULL;
+        }
+        return expr_new_binary_internal(expr->ops, left, right);
     }
 
     /* Substitution may change a finite operator's bounds, but must not capture a shadowing index. */

@@ -27,7 +27,7 @@ string_t *expr_to_text_expr(const expr_t *f)
     if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
 
-    if (expr_is_laplace_transform(f)) {
+    if (expr_is_integral_transform(f)) {
         resolved = expr_transform_result(f);
         if (resolved)
             g = resolved;
@@ -91,9 +91,8 @@ string_t *expr_to_text_expr(const expr_t *f)
                 if (vl.count || cl.count || pair != g->b)
                     sbuf_puts(&b, "; ");
                 if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
-                    sbuf_puts(&b, expr_is_op(pair->a, &ops_real_parameter) ? "real_parameter(" : "nonnegative_integer(");
                     emit_expr(pair->a->a, &b, PREC_LOWEST);
-                    sbuf_putc(&b, ')');
+                    sbuf_puts(&b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
                     continue;
                 }
                 sbuf_puts(&b, "Re(");

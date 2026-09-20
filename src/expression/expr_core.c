@@ -123,7 +123,7 @@ static uint64_t current_wrt_id(void)
  * Returns a borrowed pointer owned by the cache entry. */
 static expr_t *expr_build_dx(expr_t *dv)
 {
-    if (!dv)
+    if (!dv || !dv->ops->deriv)
         return NULL;
 
     uint64_t wrt_id = current_wrt_id();
@@ -152,8 +152,10 @@ bool expr_is_differentiable(const expr_t *dv)
         return false;
     if (dv->ops && dv->ops->diff_kind == EXPR_DIFF_NONE)
         return false;
-    if (expr_is_laplace_transform(dv) || dv->ops == &ops_real_domain)
+    if (expr_is_integral_transform(dv) || dv->ops == &ops_real_domain)
         return true;
+    if (dv->ops == &ops_convolution || dv->ops == &ops_causal_convolution)
+        return expr_is_differentiable(dv->a->a) && expr_is_differentiable(dv->a->b);
     if (dv->ops == &ops_summation || dv->ops == &ops_product)
         return expr_is_differentiable(dv->a);
     if (dv->ops == &ops_pow_d)
