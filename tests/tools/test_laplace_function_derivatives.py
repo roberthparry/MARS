@@ -25,6 +25,54 @@ class LaplaceFunctionDerivativeTests(unittest.TestCase):
             self.assertNotIn("realpart(s)", prime["function"])
             self.assertIn(" = ", prime["transform_identity_TeX"])
 
+    def test_linearity_combines_derivatives_and_unknown_functions(self):
+        fields = self.fields("@L{y''(t)+4*y'(t)+5*y(t)-50*t}")
+        self.assertIn("ℒ(y(t), t, s)", fields["unbound"])
+        self.assertNotIn("Laplace(y''", fields["function"])
+        self.assertIn("y'(0)", fields["function"])
+        self.assertIn("y(0)", fields["function"])
+        self.assertIn(" = ", fields["transform_identity_TeX"])
+        # y(t)=t^2 gives L{2-42t+5t^2}=2/s-42/s^2+10/s^3.
+        specialised = fields["unbound"].replace("ℒ(y(t), t, s)", "(2/s^3)")
+        specialised = specialised.replace("y'(0)", "0").replace("y(0)", "0")
+        result = self.fields("{" + specialised + " | s=2}")
+        self.assertAlmostEqual(float(result["value"]), -8.25, places=13)
+        for source in ("@L{2*u(t)+3*v(t)}", "@L{-u(t)}", "@L{u(t)/2}"):
+            result = self.fields(source)
+            self.assertIn("Laplace(u(t), t, s)", result["function"])
+            self.assertNotIn("realpart(s)", result["function"])
+
+    def test_bare_prime_shorthand_matches_explicit_functions(self):
+        pairs = (
+            ("@L{y''+4y'+5y-50t}", "@L{y''(t)+4*y'(t)+5*y(t)-50*t}"),
+            ("@L{5y+4y'+y''-50t}", "@L{5*y(t)+4*y'(t)+y''(t)-50*t}"),
+            ("@L{y''+a*y'+b*y}", "@L{y''(t)+a*y'(t)+b*y(t)}"),
+            ("@L(y''+4y'+5y-50x,x,p)", "@L(y''(x)+4*y'(x)+5*y(x)-50*x,x,p)"),
+            ("@L{y+z+y'+z''}", "@L{y(t)+z(t)+y'(t)+z''(t)}"),
+            ("@L{y+y'(t)}", "@L{y(t)+y'(t)}"),
+            ("@L{y'''}", "@L{y'''(t)}"),
+            ("Laplace(y'+a*y,t,s)", "Laplace(y'(t)+a*y(t),t,s)"),
+        )
+        for shorthand, explicit in pairs:
+            with self.subTest(source=shorthand):
+                got, expected = self.fields(shorthand), self.fields(explicit)
+                for key in ("unbound", "tex", "function", "transform_identity_TeX"):
+                    self.assertEqual(got[key], expected[key])
+
+    def test_prime_shorthand_is_scoped_to_its_transform(self):
+        for shorthand, explicit in (
+            ("y+@L{y'+y}", "y+@L{y'(t)+y(t)}"),
+            ("y(0)+@L{y'}", "y(0)+@L{y'(t)}"),
+            ("@L{y'}+y(0)", "@L{y'(t)}+y(0)"),
+            ("@L{y'+y}+@L{y*t}", "@L{y'(t)+y(t)}+@L{y*t}"),
+            ("@L{y'+y+[_laplace_prime_0_0]*t}",
+             "@L{y'(t)+y(t)+[_laplace_prime_0_0]*t}"),
+            ("@L(y'+@L(z',x,p),t,s)", "@L(y'(t)+@L(z'(x),x,p),t,s)"),
+        ):
+            with self.subTest(source=shorthand):
+                self.assertEqual(self.fields(shorthand)["unbound"], self.fields(explicit)["unbound"])
+        self.assertNotIn("a(t)", self.fields("@L{a*t}")["unbound"])
+
     def test_symbolic_order_and_round_trip(self):
         fields = self.fields("@L{f^(n)(t)}")
         self.assertIn(r"\sum_{k=0}^{n - 1}", fields["tex"])
@@ -96,6 +144,7 @@ class ZZLaplaceDerivativeReadmeExamples(unittest.TestCase):
         # README examples: docs/expression.md and the integral-transform design note.
         cases = (
             ("@L{f'(t)}", "s·ℒ(f(t), t, s) - f(0)"),
+            ("@L{f'}", "s·ℒ(f(t), t, s) - f(0)"),
             ("@L{f''(t)}", "s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)"),
             ("@L{f^(n)(t)}", "s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (nonnegative_integer(n))"),
         )

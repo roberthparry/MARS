@@ -74,6 +74,11 @@ typedef enum {
 } expr_parse_syntax_t;
 
 typedef struct {
+    symtab_t functions;
+    expr_t *argument;
+} expr_prime_shorthand_t;
+
+typedef struct {
     string_cursor_t *cursor;
     symtab_t *syms;
     expr_parse_syntax_t syntax;
@@ -83,6 +88,7 @@ typedef struct {
     bool has_symbolic_integral;
     bool preserve_formal_derivatives;
     unsigned transform_depth;
+    expr_prime_shorthand_t *prime_shorthand;
     symtab_t symbolic_integral_variables;
     symtab_t symbolic_functions;
     bool report_errors;
@@ -119,6 +125,7 @@ static int expr_parse_state_init(expr_parse_state_t *p, string_view_t text, symt
     p->has_symbolic_derivative = false;
     p->has_symbolic_integral = false;
     p->transform_depth = 0u;
+    p->prime_shorthand = NULL;
     p->preserve_formal_derivatives = false;
     symtab_init(&p->symbolic_integral_variables);
     symtab_init(&p->symbolic_functions);
@@ -1047,6 +1054,26 @@ static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
         string_cursor_skip_spaces(scan);
     }
     if (!expr_parse_cursor_consume_char(scan, '(')) {
+        if (primes && p->prime_shorthand) {
+            /* The transform resolves this private argument after reading its optional source variable. */
+            expr_t *function = symtab_lookup_text(&p->prime_shorthand->functions, name);
+
+            if (!function) {
+                function = expr_new_arbitrary_function(string_c_str(name), p->prime_shorthand->argument);
+                if (function)
+                    symtab_add_text(&p->prime_shorthand->functions, name, function);
+            }
+            if (function && !symtab_has_text(&p->symbolic_functions, name))
+                symtab_add_text(&p->symbolic_functions, name, expr_clone(function));
+            result = function ? expr_new_ordered_derivative(function, order) : NULL;
+            string_cursor_seek(p->cursor, string_cursor_position(scan));
+            expr_free(order);
+            string_free(name);
+            string_cursor_free(scan);
+            if (!result)
+                set_error(p, "could not construct shorthand derivative");
+            return result;
+        }
         string_cursor_seek(p->cursor, original_position);
         expr_free(order);
         string_free(name);
@@ -1066,6 +1093,9 @@ static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
     }
 
     result = expr_new_arbitrary_function_n(string_c_str(name), argument_count, arguments);
+    if (result && order && argument_count == 1u && expr_is_var(arguments[0]) && p->prime_shorthand &&
+        !symtab_has_text(&p->prime_shorthand->functions, name))
+        symtab_add_text(&p->prime_shorthand->functions, name, expr_clone(result));
     if (result && !symtab_has_text(&p->symbolic_functions, name))
         symtab_add_text(&p->symbolic_functions, name, expr_clone(result));
     if (result && order) {
@@ -1083,6 +1113,64 @@ done:
     free(arguments);
     string_free(name);
     return result;
+}
+
+/* Resolve all bare occurrences, including terms preceding the prime, within this transform operand only. */
+static bool resolve_transform_prime_shorthand(expr_parse_state_t *p, const expr_prime_shorthand_t *shorthand,
+                                              expr_t **arguments, size_t argument_count)
+{
+    if (shorthand->functions.count == 0 || argument_count == 0u)
+        return true;
+
+    string_t *time_name = string_new_with("t");
+    expr_t *time = time_name ? symtab_lookup_text(p->syms, time_name) : NULL;
+    expr_t *source = argument_count > 1u ? expr_clone(arguments[1])
+                                       : time ? expr_clone(time) : expr_new_named_var(NUM_NAN, "t");
+    expr_t *body = expr_clone(arguments[0]);
+
+    string_free(time_name);
+
+    /* Each entry is a distinct function established by a prime in this operand, not a global scalar binding. */
+    for (int i = 0; body && i < shorthand->functions.count; ++i) {
+        const string_t *name = shorthand->functions.entries[i].name;
+        expr_t *scalar = symtab_lookup_text(p->syms, name);
+
+        if (scalar) {
+            expr_t *updated = expr_substitute(body, scalar, shorthand->functions.entries[i].node);
+
+            expr_free(body);
+            body = updated;
+        }
+    }
+    expr_t *resolved = body && source ? expr_substitute(body, shorthand->argument, source) : NULL;
+
+    expr_free(body);
+    expr_free(source);
+    if (!resolved) {
+        set_error(p, "could not resolve shorthand derivatives in transform");
+        return false;
+    }
+    expr_free(arguments[0]);
+    arguments[0] = resolved;
+    return true;
+}
+
+/* A fresh name survives cloning; distinct depth prefixes keep nested transform arguments separate. */
+static expr_t *new_transform_prime_argument(const expr_parse_state_t *p)
+{
+    for (size_t suffix = 0u;; ++suffix) {
+        string_t *name = string_sprintf("_laplace_prime_%u_%zu", p->transform_depth, suffix);
+
+        if (!name)
+            return NULL;
+        if (!symtab_has_text(p->syms, name)) {
+            expr_t *argument = expr_new_named_var_text(NUM_NAN, name);
+
+            string_free(name);
+            return argument;
+        }
+        string_free(name);
+    }
 }
 
 static expr_t *lookup_symbol_text_normalised(const symtab_t *syms, const string_t *name)
@@ -3053,12 +3141,30 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                 unsigned char opening = '(';
                 expr_parse_view_peek_ascii(text, paren_pos, &opening);
                 const char closing = laplace_transform && opening == '{' ? '}' : ')';
-                if (laplace_transform)
+                expr_prime_shorthand_t shorthand;
+                expr_prime_shorthand_t *outer_shorthand = p->prime_shorthand;
+
+                symtab_init(&shorthand.functions);
+                shorthand.argument = laplace_transform && !inverse_laplace
+                                         ? new_transform_prime_argument(p) : NULL;
+                if (laplace_transform) {
                     ++p->transform_depth;
+                    p->prime_shorthand = inverse_laplace ? NULL : &shorthand;
+                }
                 bool parsed = binds_index ? parse_finite_operator_args(p, &arguments, &argument_count)
                                           : parse_variadic_args(p, &arguments, &argument_count);
-                if (laplace_transform)
+                if (laplace_transform) {
                     --p->transform_depth;
+                    p->prime_shorthand = outer_shorthand;
+                    if (parsed && !resolve_transform_prime_shorthand(p, &shorthand, arguments, argument_count)) {
+                        for (size_t i = 0u; i < argument_count; ++i)
+                            expr_free(arguments[i]);
+                        free(arguments);
+                        parsed = false;
+                    }
+                }
+                expr_free(shorthand.argument);
+                symtab_free(&shorthand.functions);
                 if (!parsed)
                     return NULL;
                 if (!parse_required_char(p, closing, closing == '}' ? "expected '}' after transform"

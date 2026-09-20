@@ -1684,33 +1684,7 @@ static void de_name_formal_dependent(const expr_t *expr, const char *name)
     }
 }
 
-static const char *de_prime_shorthand_independent(const char *equation)
-{
-    size_t i = 0u;
-
-    if (!equation)
-        return "x";
-
-    while (equation[i]) {
-        size_t name_start;
-        size_t name_end;
-
-        if (!(isalpha((unsigned char)equation[i]) || equation[i] == '_')) {
-            i++;
-            continue;
-        }
-        name_start = i++;
-        while (isalnum((unsigned char)equation[i]) || equation[i] == '_')
-            i++;
-        name_end = i;
-        if (equation[i] != '\'')
-            continue;
-        if (name_end - name_start == 1u && equation[name_start] == 'x')
-            return "t";
-        return "x";
-    }
-    return "x";
-}
+static char *de_prime_shorthand_independent(const char *equation);
 
 static char *de_prime_shorthand_dependent(const char *text)
 {
@@ -2500,10 +2474,11 @@ static char *de_expand_shorthand(const char *source)
 
     equation = de_trimmed_copy(trimmed, first_separator == SIZE_MAX ? length : first_separator);
     if (equation) {
-        const char *wrt = de_prime_shorthand_independent(equation);
         char *subscript_normalized = de_normalize_subscript_derivatives(equation, NULL);
-        char *normalized = subscript_normalized ? de_normalize_prime_derivatives(subscript_normalized, wrt) : NULL;
+        char *wrt = subscript_normalized ? de_prime_shorthand_independent(subscript_normalized) : NULL;
+        char *normalized = wrt ? de_normalize_prime_derivatives(subscript_normalized, wrt) : NULL;
 
+        free(wrt);
         free(subscript_normalized);
         free(equation);
         equation = normalized;
@@ -2646,6 +2621,53 @@ static char *de_mask_formal_derivatives(const char *text)
 fail:
     string_free(out);
     return NULL;
+}
+
+/* Infer conventional ODE coordinates from parsed symbols, never letters inside function or parameter names. */
+static char *de_prime_shorthand_independent(const char *equation)
+{
+    char *dependent = de_prime_shorthand_dependent(equation);
+    string_t *explicit_names = NULL;
+    char *normalised = NULL;
+    char *masked = NULL;
+    equation_t *probe = NULL;
+    char *result = NULL;
+    const char *fallback = dependent && strcmp(dependent, "x") == 0 ? "t" : "x";
+    bool has_x;
+    bool has_t;
+
+    /* Equations without primes already carry their coordinates in their derivative operators. */
+    if (!dependent)
+        return strdup(fallback);
+
+    explicit_names = de_infer_independent_names(equation);
+    if (explicit_names) {
+        /* A prime in a PDE with several declared derivative coordinates is ambiguous. */
+        if (!strchr(string_c_str(explicit_names), ','))
+            result = de_first_independent_name(explicit_names);
+        goto cleanup;
+    }
+
+    normalised = de_normalize_prime_derivatives(equation, fallback);
+    masked = normalised ? de_mask_formal_derivatives(normalised) : NULL;
+    probe = masked ? equ_from_string(masked) : NULL;
+    if (!probe)
+        goto cleanup;
+
+    has_x = strcmp(dependent, "x") != 0 && equ_binding(probe, "x") != NULL;
+    has_t = strcmp(dependent, "t") != 0 && equ_binding(probe, "t") != NULL;
+    if (has_x && has_t)
+        goto cleanup;
+    /* Other symbols remain parameters; autonomous equations retain the historical default. */
+    result = strdup(has_t ? "t" : has_x ? "x" : fallback);
+
+cleanup:
+    equ_free(probe);
+    free(masked);
+    free(normalised);
+    string_free(explicit_names);
+    free(dependent);
+    return result;
 }
 
 static int de_build_symbol_arrays(expr_bindings_t *bindings, const string_t ***names_out, expr_t ***symbols_out,

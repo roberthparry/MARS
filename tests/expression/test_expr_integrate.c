@@ -2484,8 +2484,8 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
     static const char *const exp_sin_derivatives[4] = {"cos(x)·exp(sin(x))", "exp(sin(x))·(cos²(x) - sin(x))",
                                                        "exp(sin(x))·(cos(x)·(cos²(x) - sin(x)) - sin(2x) - cos(x))",
                                                        "exp(sin(x))·(sin(x) - 2·cos(2x) + "
-                                                       "cos(x)·(cos(x)·(cos²(x) - sin(x)) - sin(2x) - cos(x)) + "
-                                                       "cos(x)·(-sin(2x) - cos(x)) - sin(x)·(cos²(x) - sin(x)))"};
+                                                       "cos(x)·(cos(x)·(cos²(x) - sin(x)) - sin(2x) - cos(x)) - "
+                                                       "sin(x)·(cos²(x) - sin(x)) - cos(x)·(sin(2x) + cos(x)))"};
     static const char *const exp_cos_derivatives[4] = {"-sin(x)·exp(cos(x))", "exp(cos(x))·(sin²(x) - cos(x))",
                                                        "exp(cos(x))·(sin(2x) + sin(x) - sin(x)·(sin²(x) - cos(x)))",
                                                        "exp(cos(x))·(2·cos(2x) + cos(x) - "
@@ -2503,27 +2503,25 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
                                                        "2·(tan(x) + 1)·(tan(x)·(tan(x) + 2) + 1) + 1))"};
     static const char *const exp_cot_derivatives[4] = {"-cosec²(x)·exp(cot(x))",
                                                        "cosec²(x)·exp(cot(x))·(2·cot(x) + cosec²(x))",
+                                                       "-cosec²(x)·exp(cot(x))·"
+                                                       "(2·(cot(x) + 1)·cosec²(x) + (2·cot(x) + cosec²(x))²)",
                                                        "cosec²(x)·exp(cot(x))·"
-                                                       "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
-                                                       "2·(cot(x) + 1)·cosec²(x))",
-                                                       "cosec²(x)·exp(cot(x))·"
-                                                       "((-2·cot(x) - cosec²(x))·"
-                                                       "((-2·cot(x) - cosec²(x))·(2·cot(x) + cosec²(x)) - "
-                                                       "2·(cot(x) + 1)·cosec²(x)) + "
+                                                       "((2·cot(x) + cosec²(x))·"
+                                                       "(2·(cot(x) + 1)·cosec²(x) + (2·cot(x) + cosec²(x))²) + "
                                                        "2·(2·(cot(x) + 1)·(3·cot(x) + cosec²(x)) + "
                                                        "cosec²(x))·cosec²(x))"};
     static const char *const exp_cosec_derivatives[4] = {"-cosec(x)·cot(x)·exp(cosec(x))",
                                                          "cosec(x)·exp(cosec(x))·((cosec(x) + 1)·cot²(x) + cosec²(x))",
-                                                         "cosec(x)·cot(x)·exp(cosec(x))·"
-                                                         "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
-                                                         "(cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x)))",
+                                                         "-cosec(x)·cot(x)·exp(cosec(x))·"
+                                                         "((cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x)) + "
+                                                         "cosec(x)·(2·cosec(x)·(cosec(x) + 2) + cot²(x)))",
                                                          "cosec(x)·exp(cosec(x))·"
-                                                         "((-(cosec(x) + 1)·cot²(x) - cosec²(x))·"
-                                                         "(cosec(x)·(-2·cosec(x)·(cosec(x) + 2) - cot²(x)) - "
-                                                         "(cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x))) + "
+                                                         "(((cosec(x) + 1)·cot²(x) + cosec²(x))·"
+                                                         "((cosec(x) + 1)·((cosec(x) + 1)·cot²(x) + cosec²(x)) + "
+                                                         "cosec(x)·(2·cosec(x)·(cosec(x) + 2) + cot²(x))) + "
                                                          "cosec(x)·(2·(cosec(x) + 1)·"
-                                                         "(cosec(x)·(cosec(x) + 6) + cot²(x)) + cot²(x) + "
-                                                         "cosec²(x))·cot²(x))"};
+                                                         "(cosec(x)·(cosec(x) + 6) + cot²(x)) + cosec²(x) + "
+                                                         "cot²(x))·cot²(x))"};
     static const char *const exp_sec_derivatives[4] = {"sec(x)·tan(x)·exp(sec(x))",
                                                        "sec(x)·exp(sec(x))·((sec(x) + 2)·tan²(x) + 1)",
                                                        "sec(x)·tan(x)·exp(sec(x))·"
@@ -2572,30 +2570,29 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
                                                         "(2·(1 - tanh²(x))·(sech(x) + 2) - "
                                                         "(sech(x) + 1)·((sech(x) + 2)·tanh²(x) - 1) - "
                                                         "tanh²(x)·sech(x)) + "
-                                                        "(2·(1 - tanh²(x))·(-3·sech(x) - 4) - "
+                                                        "(sech(x)·((sech(x) + 2)·tanh²(x) - 1) - "
+                                                        "2·(1 - tanh²(x))·(3·sech(x) + 4) - "
                                                         "(sech(x) + 1)·(2·(1 - tanh²(x))·(sech(x) + 2) - "
-                                                        "tanh²(x)·sech(x)) + sech(x)·((sech(x) + 2)·tanh²(x) - 1) - "
+                                                        "tanh²(x)·sech(x)) - "
                                                         "sech(x)·(2 - 3·tanh²(x)))·tanh²(x))"};
     static const char *const exp_cosech_hyperbolic_derivatives[4] = {
         "-cosech(x)·coth(x)·exp(cosech(x))", "cosech(x)·exp(cosech(x))·((cosech(x) + 1)·coth²(x) + cosech²(x))",
-        "cosech(x)·coth(x)·exp(cosech(x))·"
-        "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
-        "(cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x)))",
+        "-cosech(x)·coth(x)·exp(cosech(x))·"
+        "((cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x)) + "
+        "cosech(x)·(2·cosech(x)·(cosech(x) + 2) + coth²(x)))",
         "cosech(x)·exp(cosech(x))·"
-        "((-(cosech(x) + 1)·coth²(x) - cosech²(x))·"
-        "(cosech(x)·(-2·cosech(x)·(cosech(x) + 2) - coth²(x)) - "
-        "(cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x))) + "
+        "(((cosech(x) + 1)·coth²(x) + cosech²(x))·"
+        "((cosech(x) + 1)·((cosech(x) + 1)·coth²(x) + cosech²(x)) + "
+        "cosech(x)·(2·cosech(x)·(cosech(x) + 2) + coth²(x))) + "
         "cosech(x)·(2·(cosech(x) + 1)·"
-        "(cosech(x)·(cosech(x) + 6) + coth²(x)) + coth²(x) + cosech²(x))·coth²(x))"};
+        "(cosech(x)·(cosech(x) + 6) + coth²(x)) + cosech²(x) + coth²(x))·coth²(x))"};
     static const char *const exp_coth_hyperbolic_derivatives[4] = {
         "-cosech²(x)·exp(coth(x))", "cosech²(x)·exp(coth(x))·(2·coth(x) + cosech²(x))",
+        "-cosech²(x)·exp(coth(x))·"
+        "(2·(coth(x) + 1)·cosech²(x) + (2·coth(x) + cosech²(x))²)",
         "cosech²(x)·exp(coth(x))·"
-        "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
-        "2·(coth(x) + 1)·cosech²(x))",
-        "cosech²(x)·exp(coth(x))·"
-        "((-2·coth(x) - cosech²(x))·"
-        "((-2·coth(x) - cosech²(x))·(2·coth(x) + cosech²(x)) - "
-        "2·(coth(x) + 1)·cosech²(x)) + "
+        "((2·coth(x) + cosech²(x))·"
+        "(2·(coth(x) + 1)·cosech²(x) + (2·coth(x) + cosech²(x))²) + "
         "2·(2·(coth(x) + 1)·(3·coth(x) + cosech²(x)) + "
         "cosech²(x))·cosech²(x))"};
 
@@ -2628,7 +2625,7 @@ static void test_integrate_iterated_exp_unary_derivatives(void)
     assert_string_antiderivative_contains("{ -e^cos(x)*(-sin^2(x)*(sin^4(x) - 20*sin^2(x) + 16) + "
                                           "15*cos^3(x) + (15 - 45*sin^2(x))*cos^2(x) + "
                                           "(15*sin^4(x) - 75*sin^2(x) + 1)*cos(x)) }",
-                                          "sin(x)·exp(cos(x))·(cos(x)·(cos(x)·(cos(x)·(-cos(x) - 10) - 23) - 5) + 8)");
+                                          "sin(x)·exp(cos(x))·(8 - cos(x)·(cos(x)·(cos(x)·(cos(x) + 10) + 23) + 5))");
     assert_string_antiderivative_matches("{ -e^cos(x)*(-sin^2(x)*(sin^4(x) - 20*sin^2(x) + 16) + "
                                          "15*cos^3(x) + (15 - 45*sin^2(x))*cos^2(x) + "
                                          "(15*sin^4(x) - 75*sin^2(x) + 1)*cos(x)) }",

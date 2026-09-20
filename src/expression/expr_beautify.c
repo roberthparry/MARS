@@ -759,7 +759,11 @@ expr_t *expr_expand_preserved_for_display(const expr_t *expr)
     left = expr_expand_preserved_for_display(expr->a);
     if (!left)
         goto cleanup;
-    if (expr_is_arbitrary_function(expr)) {
+    if (expr_is_formal_derivative(expr)) {
+        rebuilt = expr_new_formal_derivative(left, expr->formal_wrt_count, expr->formal_wrts);
+        expr_free(left);
+        left = NULL;
+    } else if (expr_is_arbitrary_function(expr)) {
         rebuilt = expr_new_arbitrary_function(expr->name, left);
         expr_free(left);
         left = NULL;
@@ -2391,7 +2395,9 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
             left = expr_beautify_node(expr->a, rewrite_negative_roots);
             if (!left)
                 goto cleanup;
-            if (expr->ops->arity == EXPR_OP_BINARY) {
+            if (expr_is_formal_derivative(expr)) {
+                rebuilt = expr_new_formal_derivative(left, expr->formal_wrt_count, expr->formal_wrts);
+            } else if (expr->ops->arity == EXPR_OP_BINARY) {
                 right = expr_beautify_node(expr->b, rewrite_negative_roots);
                 rebuilt = right && expr->ops->apply_binary ? expr->ops->apply_binary(left, right) : NULL;
             } else {

@@ -2426,6 +2426,21 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
         return out;
     }
 
+    /* Extract a common syntactic minus from a sum, without assuming its terms are positive. */
+    if (expr_is_addsub(dv)) {
+        expr_t *left = expr_simplify_positive_part_if_negative(dv->a);
+        expr_t *right = expr_simplify_positive_part_if_negative(dv->b);
+        expr_t *out = NULL;
+
+        if (left && expr_is_op(dv, &ops_add) && right)
+            out = expr_add(left, right);
+        else if (left && expr_is_op(dv, &ops_sub) && !right)
+            out = expr_add(left, dv->b);
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+
     if (expr_is_mul(dv)) {
         expr_t *positive_left = expr_simplify_positive_part_if_negative(dv->a);
         expr_t *positive_right = expr_simplify_positive_part_if_negative(dv->b);

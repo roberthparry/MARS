@@ -132,13 +132,30 @@ variable are inverted algebraically.
 
 Inverse Laplace transforms use `@Linv`, `ℒ⁻¹`, or `InverseLaplace`, with the
 conventional source `s` and target `t`. An explicit source and target are accepted
-in the same positions as for the forward operator. The initial inverse rules
-cover linearity, repeated linear poles and quadratic denominators. They use the
+in the same positions as for the forward operator. The inverse rules cover
+linearity and partial fractions over products of linear and quadratic factors,
+including repeated factors. Nested rational sums, products, quotients and integer
+powers are first combined into a common fraction. Denominators retain their
+authored factors; powers of the source variable can also be extracted from an
+expanded polynomial. This is not a general high-degree polynomial factoriser.
+These rules use the
 causal unilateral convention: ordinary formulas describe the result for
 non-negative time, not an arbitrary two-sided inverse.
 Polynomial degree is limited to 16. Unproved symbolic pole separations,
 quadratic frequencies that cannot be established as zero or non-zero, and
 distributional inverses remain symbolic.
+
+For example, a rational result copied from Equation mode can be inverted directly:
+
+```text
+@Linv{-5*(-s-10/s^2-3)/(s*(s+4)+5)}
+```
+
+Unbound expression output:
+
+```text
+10t + exp(-2t)·(13·cos(t) + 11·sin(t)) - 8
+```
 
 For example, `@Linv((s-a)/((s-a)^2+1))` produces
 
@@ -242,6 +259,13 @@ symbolic functions. In this notation, `f^(n)(t)` means the derivative of order
 Small literal orders expand the initial-value terms; symbolic and larger orders
 retain a finite sum. Supplied bindings do not replace the order in the symbolic cards.
 
+Inside a forward transform, bare primes also establish a function of the source
+variable: the default is `t`, or the explicitly supplied source when present.
+All bare occurrences of that function name in the same operand are interpreted
+consistently, even those preceding its first derivative. Scalar coefficients and
+bare occurrences outside the transform retain their ordinary meanings. A bare name
+without any derivative notation remains a scalar; it is not implicitly a function.
+
 With $F(s)=\mathcal L\{f(t)\}(s)$, the rule is
 
 $$
@@ -263,6 +287,7 @@ variable, after the leading transform term, including in multiline TeX output.
 | Input | Unbound expression output |
 | --- | --- |
 | `@L{f'(t)}` | `s·ℒ(f(t), t, s) - f(0)` |
+| `@L{f'}` | `s·ℒ(f(t), t, s) - f(0)` |
 | `@L{f''(t)}` | `s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)` |
 | `@L{f^(n)(t)}` | `s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (nonnegative_integer(n))` |
 
@@ -282,11 +307,47 @@ the name $F$ is already present or when multiple initial-value integrals would
 make its meaning ambiguous.
 These identities apply where the transforms converge and the initial value is
 finite; they do not assert a convergence half-plane for an unspecified function.
+Integrating an evaluated transform with respect to its target variable retains
+the transform's convergence restrictions on the antiderivative.
 
 | Input | Unbound expression output |
 | --- | --- |
 | `@L{@S_0^t f(x) dx}` | `ℒ(f(t), t, s)/s` |
 | `@L{@S^t f(x) dx}` | `1/s·(ℒ(f(t), t, s) + ∫^0 f(x)·dx)` |
+
+### Laplace transforms of translated arbitrary functions
+
+An unspecified function name, including `u`, remains arbitrary: it is not an
+alias for the Heaviside unit step. For a real shift $a$, write
+$U(s)=\mathcal L\{u(t)\}(s)$. The unilateral translation rule is
+
+$$
+\mathcal L\{u(t-a)\}(s)
+=e^{-as}\left[U(s)+\int_{-a}^{0}e^{-sx}u(x)\,dx\right].
+$$
+
+The finite integral must exist, and the identity applies where the transforms
+converge. Negative $a$ gives a time advance, with the same oriented-integral
+formula. Symbolic shifts retain a real-parameter condition; literal complex
+shifts are left unevaluated. No numerical convergence half-plane is inferred
+for an unspecified function.
+
+Multiplication by $t^n$, for integer $1\le n\le64$, applies
+$(-1)^n d^n/ds^n$ to the transform. Derivatives involving unspecified transforms
+are retained in compact form. The function being transformed must not itself
+depend on the transform variable for this differentiation rule to apply.
+
+| Input | Unbound expression output |
+| --- | --- |
+| `@L{u(t-1/4)}` | `exp(-¼s)·(ℒ(u(t), t, s) + ∫^0_-¼ u(t)·exp(-st)·dt)` |
+| `@L{16t^2u(t-1/4)}` | `16·Dss(exp(-¼s)·(ℒ(u(t), t, s) + ∫^0_-¼ u(t)·exp(-st)·dt))` |
+
+Here `Dss` means the second derivative with respect to $s$. Rendered TeX uses a
+differential operator with its operand outside the fraction, keeping it full-sized.
+Only an additional causal assumption, $u(x)=0$ for $x<0$, removes the history
+integral for a non-negative delay. Such an assumption is not inferred from the
+function's name. Without it, the second example is not the elementary
+unit-step transform.
 
 ### Laplace function coverage
 

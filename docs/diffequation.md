@@ -105,8 +105,17 @@ is normalised to the formal derivative notation used internally:
 | :--- | :--- | :--- |
 | `y'(0) = 1` | `Dx(y)(0) = 1` | $\left.\dfrac{dy}{dx}\right\rvert_{x=0}=1$ |
 
-For ordinary differential equations in `x`, prime notation can also be used
-directly in the equation:
+Prime notation can also be used directly in an ordinary differential equation.
+An explicit independent-variable declaration takes precedence. Otherwise, an
+explicit derivative operator supplies the coordinate; without one, the parser
+uses `t` or `x` when exactly one occurs as a free symbol other than the dependent
+variable. Function names and constants do not count as coordinate evidence.
+Other symbols remain parameters. With neither coordinate present, the default
+is `x`, or `t` when `x` is the dependent variable. If both coordinates occur, or
+explicit operators name several coordinates, a prime is ambiguous: use the
+explicit declaration form or coordinate-labelled derivatives.
+
+For example:
 
 ```text
 y'' + 4y = e^x
@@ -115,6 +124,19 @@ y'' + 4y = e^x
 Normalised equation: `Dxx(y) + 4y = e^x`.
 
 $\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = e^{x} \\[1em] & y = \tfrac15 e^x+C_1\cos(2x)+C_2\sin(2x) \end{aligned}$
+
+The forcing term identifies `t` in this initial-value problem; the same
+coordinate is used for the equation and its initial conditions:
+
+```text
+y''+4y'+5y = 50t; y(0) = 5; y'(0) = -5
+```
+
+Output:
+
+```text
+y = 10t + 13·cos(t)·exp(-2t) + 11·sin(t)·exp(-2t) - 8
+```
 
 When `x` is the dependent variable, prime notation defaults to differentiation
 with respect to time so that the two variables do not collide:

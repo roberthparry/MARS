@@ -1976,8 +1976,33 @@ static void emit_formal_partial_denominator(const expr_t *f, sbuf_t *b)
     }
 }
 
+static bool display_contains_transform(const expr_t *expr)
+{
+    return expr && (expr_is_laplace_transform(expr) || display_contains_transform(expr->a) ||
+                    display_contains_transform(expr->b));
+}
+
 static void emit_formal_derivative_TeX(const expr_t *f, sbuf_t *b)
 {
+    /* Keep a transformed expression full-sized beside its differential operator. */
+    bool transform_operator = !expr_TeX_partial_derivatives_enabled() && f->formal_wrt_count > 0u &&
+                              display_contains_transform(f->a);
+    for (size_t i = 1u; transform_operator && i < f->formal_wrt_count; ++i)
+        transform_operator = expr_struct_eq(f->formal_wrts[0], f->formal_wrts[i]);
+    if (transform_operator) {
+        char order[32] = "";
+        if (f->formal_wrt_count > 1u)
+            snprintf(order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+        sbuf_puts(b, "\\frac{d");
+        sbuf_puts(b, order);
+        sbuf_puts(b, "}{d ");
+        emit_TeX_name(b, f->formal_wrts[0]->name ? f->formal_wrts[0]->name : "x");
+        sbuf_puts(b, order);
+        sbuf_puts(b, "}\\left[");
+        emit_TeX_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "\\right]");
+        return;
+    }
     if (expr_TeX_partial_derivatives_enabled()) {
         sbuf_puts(b, "\\frac{\\partial");
         if (f->formal_wrt_count > 1u) {
