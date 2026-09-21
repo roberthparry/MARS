@@ -1617,6 +1617,9 @@ const char *expr_transform_value_note(const expr_t *expr)
         return "This result is a distribution, not an ordinary pointwise function. "
                "Dirac impulses, principal values and finite parts do not have finite pointwise numerical values.";
     if (expr->ops == &ops_fourier || expr->ops == &ops_inverse_fourier) {
+        const char *specific = expr_fourier_value_note(expr);
+        if (specific)
+            return specific;
         expr_t *known = expr_fourier_result(expr);
         if (!known)
             return "Fourier transform left symbolic: no supported closed form has been established for this "

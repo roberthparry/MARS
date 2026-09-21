@@ -262,7 +262,7 @@ class FourierTests(unittest.TestCase):
     def test_log_affine_domains_and_finite_part_calculus(self):
         translated = self.fields("@F{ln(abs(x-2))}", "k")
         self.assertNotIn("Fourier(", translated["function"])
-        self.assertIn("exp(-2ik)", translated["unbound"])
+        self.assertIn("exp((-2i)k)", translated["unbound"])
         parameter = self.fields("@F{ln(abs(a*x+b))}", "k")
         self.assertNotIn("Fourier(", parameter["function"])
         self.assertIn("a", parameter["tex"])
@@ -280,7 +280,7 @@ class FourierTests(unittest.TestCase):
         self.assertIn("Fourier(", plain["function"])
         self.assertIn("Fourier(", self.fields("@F{u(t)}")["function"])
         shifted = self.fields("@F{f(t-2)}")
-        self.assertIn("exp(-2iω)", shifted["unbound"])
+        self.assertIn("exp((-2i)ω)", shifted["unbound"])
         self.assertNotIn("t = ?", shifted["function"])
         derivative = self.fields("@F{f'(t)}")
         self.assertIn("Fourier(", derivative["function"])

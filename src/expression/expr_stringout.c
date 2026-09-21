@@ -487,10 +487,14 @@ static int pow_base_needs_visible_parens(const expr_t *base)
 static int mul_factor_needs_visible_parens(const expr_t *factor)
 {
     number_t real;
-    int has_real_part;
+    number_t imaginary;
+    int needs_parens;
 
     if (factor && expr_is_const(factor) && expr_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
         if (factor->binding_expr->kind == EXPR_BINDING_EXPR_ADD || factor->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
+            return 1;
+        if (factor->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+            factor->binding_expr->u.unary_op.ops == &ops_neg)
             return 1;
         if (factor->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             factor->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
@@ -502,9 +506,12 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
         return 0;
 
     real = num_real_part(factor->c);
-    has_real_part = !num_eq(real, NUM_ZERO);
+    imaginary = num_imag_part(factor->c);
+    /* A trailing negative imaginary factor must not turn a product such as x*(-i) into x-i. */
+    needs_parens = !num_eq(real, NUM_ZERO) || num_lt(imaginary, NUM_ZERO);
+    num_destroy(&imaginary);
     num_destroy(&real);
-    return has_real_part;
+    return needs_parens;
 }
 
 static int add_rhs_needs_visible_parens(const expr_t *rhs)
@@ -584,17 +591,24 @@ static int is_atomic_for_mul(const expr_t *f);
 
 static void emit_expr_mul_separator_local(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
+    if (mul_factor_needs_visible_parens(right)) {
+        sbuf_puts(b, "·");
+        return;
+    }
     int left_atomic;
     int right_atomic;
 
     left_atomic = is_atomic_for_mul(left);
     right_atomic = is_atomic_for_mul(right);
+    /* Keep a symbolic factor and i separate: xi and pi are also parser aliases for Greek letters. */
+    bool imaginary_pair = right && expr_is_const(right) && num_eq(right->c, NUM_I) &&
+                          left && left->name && *left->name;
     /* An uncombined integer factor must not join preceding digits: 29*1 must not print as 291. */
     bool numeric_pair = expr_is_const(left) && (!left->name || !*left->name) &&
                         expr_is_const(right) && (!right->name || !*right->name) &&
                         num_is_real(left->c) && num_is_integer(right->c) &&
                         (!right->binding_expr || expr_binding_expr_is_numeric_literal(right->binding_expr));
-    if (numeric_pair || !(left_atomic && right_atomic))
+    if (imaginary_pair || numeric_pair || !(left_atomic && right_atomic))
         sbuf_puts(b, "·");
 }
 

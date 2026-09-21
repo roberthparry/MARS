@@ -4889,8 +4889,8 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn(r"\frac{2\mkern-2mu a\mkern-2mu s}{\left(s^{2} + a^{2}\right)^{2}}", fields["tex"])
         self.assertNotIn("Laplace(", fields["function"])
         self.assertIn("return @nan.", fields["function"])
-        self.assertIn("Re(s) > Re(ai)", fields["expression"].split("|", 1)[1])
-        self.assertIn("Re(s) > Re(-ai)", fields["expression"].split("|", 1)[1])
+        self.assertIn("Re(s) > Re(a·i)", fields["expression"].split("|", 1)[1])
+        self.assertIn("Re(s) > Re(-a·i)", fields["expression"].split("|", 1)[1])
 
     def test_laplace_time_weights_and_affine_phase_values(self) -> None:
         examples = (("t*sin(at)", "a=1", 4/25), ("sin(at)*t", "a=1", 4/25),
@@ -8439,7 +8439,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["full_display_TeX"], r"0 + \theta\mkern-2mu i")
-        self.assertEqual(payload["full_display_expression"], "{ 0 + θi | θ = π }")
+        self.assertEqual(payload["full_display_expression"], "{ 0 + θ·i | θ = π }")
         self.assertIn("return 0 + @theta.i.", payload["full_display_function"])
         self.assertIn("@theta = @pi", payload["full_display_function"])
         self.assertNotIn("θ", payload["full_display_function"].split("`", 2)[-1])
@@ -9309,7 +9309,7 @@ class ExpressionResultTests(unittest.TestCase):
             payload["full_display_TeX"],
             r"a^{2} - b^{2} + 2\mkern-2mu a\mkern-2mu b\mkern-2mu i",
         )
-        self.assertEqual(payload["full_display_expression"], "{ a² - b² + 2abi | ; a = ?, b = ? }")
+        self.assertEqual(payload["full_display_expression"], "{ a² - b² + 2ab·i | ; a = ?, b = ? }")
         self.assertIn("return a^2 - b^2 + 2.a.b.i.", payload["full_display_function"])
         self.assertNotIn("value", payload)
 
@@ -9373,7 +9373,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["full_display_TeX"], r"x + y\mkern-2mu i")
-        self.assertEqual(payload["full_display_expression"], "{ x + yi | x = ?, y = ? }")
+        self.assertEqual(payload["full_display_expression"], "{ x + y·i | x = ?, y = ? }")
         self.assertIn("return x + y.i.", payload["full_display_function"])
 
         bound_expression = "{ " + expression + " | x = 3, y = 2 }"
@@ -9395,7 +9395,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertEqual(bound_payload["full_display_TeX"], r"x + y\mkern-2mu i")
-        self.assertEqual(bound_payload["full_display_expression"], "{ x + yi | x = 3, y = 2 }")
+        self.assertEqual(bound_payload["full_display_expression"], "{ x + y·i | x = 3, y = 2 }")
         self.assertEqual(bound_payload["value"], "3 + 2i")
 
     @unittest.skipUnless(
@@ -9423,7 +9423,7 @@ class ExpressionResultTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + y\mkern-2mu i} + C")
-        self.assertEqual(payload["integral"], "∫dx = { 2·√(x + yi) + C | x = ?, y = ?; C = ? }")
+        self.assertEqual(payload["integral"], "∫dx = { 2·√(x + y·i) + C | x = ?, y = ?; C = ? }")
         self.assertIn("return 2.(x + y.i)^1/2 + C.", payload["full_display_integral_function"])
 
     @unittest.skipUnless(

@@ -152,12 +152,66 @@ static void test_finite_part_distribution(void)
     expr_free(x);
 }
 
+static void test_hyperbolic_fourier_domains_and_beta_symbol(void)
+{
+    NUM_SCOPE(scope);
+    const char *constants[] = {"@F{sinh(t)^0}", "{@F{sinh(a*t+b)^n} | ω=?; n=0}",
+                               "{@F{sinh(a*t+b)^n} | ω=?; a=0; b=1; n=-1/2}"};
+    for (size_t index = 0u; index < sizeof(constants) / sizeof(constants[0]); ++index) {
+        expr_t *parsed = expr_from_string(constants[index], NULL);
+        expr_t *simplified = parsed ? expr_simplify(parsed) : NULL;
+        char *text = simplified ? expr_to_string(simplified, style_EXPRESSION) : NULL;
+        ASSERT_TRUE(text && strstr(text, "δ("));
+        free(text);
+        expr_free(simplified);
+        expr_free(parsed);
+    }
+    const char *aliases[] = {"beta(x,y)", "B(x,y)", "Β(x,y)"};
+    for (size_t index = 0u; index < sizeof(aliases) / sizeof(aliases[0]); ++index) {
+        expr_t *parsed = expr_from_string(aliases[index], NULL);
+        char *text = parsed ? expr_to_string(parsed, style_LATEX) : NULL;
+        ASSERT_TRUE(text && strstr(text, "\\mathrm{B}"));
+        free(text);
+        expr_free(parsed);
+    }
+    expr_t *power = expr_from_string("{@F{sinh(t)^(-1/2)} | ω=0}", NULL);
+    ASSERT_TRUE(power != NULL);
+    if (power) {
+        number_t value = expr_eval(power);
+        number_t real = num_real_part(value), imaginary = num_imag_part(value);
+        double expected = tgamma(0.25)*tgamma(0.5)/(sqrt(2.0)*tgamma(0.75));
+        ASSERT_TRUE(fabs(num_to_double(real)-expected) < 1e-12);
+        ASSERT_TRUE(fabs(num_to_double(imaginary)+expected) < 1e-12);
+    }
+    expr_free(power);
+}
+
+static void test_inverse_hyperbolic_beta_spectra(void)
+{
+    const char *source = "@Finv{2^(-(n+1))*exp(i*b*ω/a)/abs(a)*"
+                         "(exp(i*@pi*n)*B(-(n+i*ω/a)/2,n+1)+B((i*ω/a-n)/2,n+1))}";
+    expr_t *parsed = expr_from_string(source, NULL);
+    expr_t *simplified = parsed ? expr_simplify(parsed) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_EXPRESSION) : NULL;
+    ASSERT_TRUE(text && strstr(text, "sinh(at + b)^n"));
+    ASSERT_TRUE(text && !strstr(text, "ℱ"));
+    ASSERT_TRUE(text && strstr(text, "Re(n + 1) > 0") && strstr(text, "Re(-n) > 0"));
+    expr_t *reparsed = text ? expr_from_string(text, NULL) : NULL;
+    ASSERT_TRUE(reparsed != NULL);
+    expr_free(reparsed);
+    free(text);
+    expr_free(simplified);
+    expr_free(parsed);
+}
+
 void test_fourier_and_signal_functions(void)
 {
     TEST_RUN_SUBTEST(test_signal_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_spectral_matrices, NULL);
     TEST_RUN_SUBTEST(test_signal_calculus_and_finite_sums, NULL);
     TEST_RUN_SUBTEST(test_finite_part_distribution, NULL);
+    TEST_RUN_SUBTEST(test_hyperbolic_fourier_domains_and_beta_symbol, NULL);
+    TEST_RUN_SUBTEST(test_inverse_hyperbolic_beta_spectra, NULL);
 }
 
 /* README examples from the qfloat, qcomplex, number and matrix module guides. */

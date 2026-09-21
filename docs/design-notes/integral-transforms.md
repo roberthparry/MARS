@@ -230,6 +230,8 @@ examples are in the [expression guide](../expression.md#fourier-transforms).
 | $e^{-a\lvert t\rvert}$ | $2a/(a^2+\omega^2)$ | Both directions, $\Re(a)>0$. Quadratic reciprocals also support real translations. |
 | $e^{-at}\operatorname{step}(t)$ | $1/(a+i\omega)$ | Both directions, $\Re(a)>0$; reversed gates and imaginary-rate linear reciprocals are also supported. |
 | $\operatorname{sech}(t)$ | $\pi\operatorname{sech}(\pi\omega/2)$ | Both directions; real affine arguments. |
+| $\sinh^n(t)$ | $2^{-(n+1)}[\mathrm B((-n+i\omega)/2,n+1)+e^{i\pi n}\mathrm B((-n-i\omega)/2,n+1)]$ | Both directions for $-1<\Re(n)<0$; principal powers and real affine arguments. Absolute sinh powers omit the phase factor. |
+| $\cosh^n(t)$ | $2^{-(n+1)}\mathrm B((-n+i\omega)/2,(-n-i\omega)/2)$ | Both directions for $\Re(n)<0$; real affine arguments. Reciprocal/sech powers are included. |
 | $J_n(t)$ | $2(-i)^n T_{\lvert n\rvert}(\omega)/\sqrt{1-\omega^2}$ for $\lvert\omega\rvert<1$, zero for $\lvert\omega\rvert>1$ | Integer $n$, including negative orders; real affine arguments in both directions. The inverse transform of $J_n$ uses coefficient $i^n/\pi$. Singular support edges have no finite pointwise value. |
 | $T_n(t)\operatorname{rect}(t/2)/\sqrt{1-t^2}$ | $\pi(-i)^nJ_n(\omega)$ | Non-negative integral $n$. The inverse coefficient is $i^n/2$. Recognised directly, including real affine arguments. |
 | $e^{-a^2t^2/2}\mathcal H_n(at)$ | $\sqrt{2\pi}(-i)^n e^{-\omega^2/(2a^2)}\mathcal H_n(\omega/a)/\lvert a\rvert$ | Non-negative integral $n$, real non-zero $a$; translations also supported. Inverse coefficient $i^n/(\sqrt{2\pi}\lvert a\rvert)$. $\mathcal H_n$ is physicists' Hermite, distinct from harmonic $H_n$. |

@@ -566,6 +566,55 @@ the singularity; scalar and matrix numerical APIs are therefore not provided.
 The Expression, Function and TeX cards retain the same distributional result.
 An unqualified complex `ln(x)` is different and remains unsupported here.
 
+### Hyperbolic powers and convergence
+
+For real $a\ne0$ and $b$, let $q=\omega/a$ and $A_\pm=(-n\pm iq)/2$.
+The principal-power convention gives
+
+$$
+\mathcal F\{\sinh^n(at+b)\}(\omega)
+=\frac{2^{-(n+1)}e^{ibq}}{|a|}
+\left[\mathrm B(A_+,n+1)+e^{i\pi n}\mathrm B(A_-,n+1)\right],
+\qquad -1<\Re(n)<0.
+$$
+
+The factor $e^{i\pi n}$ is the negative-half-line branch value; it must not be
+discarded for fractional or complex powers. Replacing the input by
+$|\sinh(at+b)|^n$ replaces this factor by one. For $\cosh^n(at+b)$, the bracket
+becomes $\mathrm B(A_+,A_-)$ and the convergence condition is $\Re(n)<0$.
+These formulas follow from [Euler's beta integral](https://dlmf.nist.gov/5.12.E1);
+the cosh pair also follows from [DLMF 5.12.7](https://dlmf.nist.gov/5.12.E7).
+Inverse transforms reverse the sign of $q$ and include $1/(2\pi)$, without
+conjugating the principal-power branch factor.
+
+The reverse beta-spectrum pairs are recognised as well: copying either complete
+spectrum above into `@Finv{...}` recovers its hyperbolic power, including the
+real scale, translation and principal branch. This works with serialised algebra,
+not just nested transform operators. The convergence conditions are retained;
+changing a beta argument or relative coefficient does not trigger the pair.
+
+Reciprocal forms and powers of `sech` and `cosech` are recognised too.
+For $\operatorname{cosech}^p(u)$ the effective sinh exponent is $n=-p$, but
+the branch factor is $e^{i\pi p}$, not $e^{-i\pi p}$.
+Supplied constant parameters are substituted before selecting a formula:
+zero exponent gives $2\pi\delta(\omega)$, and zero scale gives the transform
+of a constant whenever the constant itself is defined.
+
+Positive real part of the effective sinh/cosh exponent causes exponential
+growth, so neither an ordinary nor a tempered-distribution Fourier transform
+exists for real non-zero scale. For sinh powers, $\Re(n)\le-1$ instead gives a
+non-integrable singularity: any principal-value or finite-part prescription
+must be chosen explicitly, not inferred by continuing the beta formula.
+Unimplemented boundary cases with $\Re(n)=0$ remain symbolic. Unknown parameters
+retain the convergence conditions rather than being declared divergent.
+
+| Input | Output |
+| --- | --- |
+| `{@F{sinh(t)^(-1/2)} \| ω=0}` | Approximately $3.708149354602744-3.708149354602744i$ |
+| `@F{sinh(t)^2}` | Symbolic transform with an exponential-growth diagnostic: no ordinary or tempered-distribution Fourier transform. |
+| `@F{sinh(t)^(-1)}` | Symbolic transform with a non-integrable-singularity diagnostic; a regularisation prescription is required. |
+| `@Finv{(B(1/4+i*ω/2,1/2)-i*B(1/4-i*ω/2,1/2))/sqrt(2)}` | $\sinh(t)^{-1/2}$ on the principal branch, for real $t\ne0$. |
+
 ### Indexed Bessel transforms
 
 `J_n(x)` denotes `BesselJ(n,x)`, and `Y_n(x)` denotes `BesselY(n,x)`.
@@ -1633,7 +1682,9 @@ collision-free lookup tables rather than by a client-side rewrite.
 - `expr_t *expr_lambert_w(const expr_t *expr)` — branch-choosing Lambert W/ProductLog helper
 - `expr_t *expr_lambert_w0(const expr_t *expr)` — Lambert W principal branch W₀(x)
 - `expr_t *expr_lambert_wm1(const expr_t *expr)` — Lambert W branch W₋₁(x)
-- `expr_t *expr_beta(const expr_t *left, const expr_t *right)` — B(a, b)
+- `expr_t *expr_beta(const expr_t *left, const expr_t *right)` — $\mathrm B(a,b)$;
+  Expression style uses `B`, TeX uses $\mathrm B$, and Function style uses `beta`.
+  The parser accepts `beta`, `B`, and Greek capital beta `Β`.
 - `expr_t *expr_logbeta(const expr_t *left, const expr_t *right)` — ln B(a, b); Expression style writes
   `lnB(a, b)`, Function style writes `logbeta(a, b)`, and legacy `logbeta(a, b)` expression input remains accepted
 - `expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b)` — beta distribution PDF

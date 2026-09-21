@@ -2033,7 +2033,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ i^3*sinh(x) | x = ? }",
-            "{ -i·sinh(x) | x = NAN }",
+            "{ (-i)·sinh(x) | x = NAN }",
             "i^3*sinh(x) simplifies to -i*sinh(x)",
         },
         {
@@ -3073,7 +3073,7 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
          false},
         {"{ hypot(3,4)*x | x = NAN }", "{ hypot(3, 4)x | x = NAN }", "hypot(3, 4)", "hypot(3,4)*x preserves hypot(3,4)",
          false},
-        {"{ beta(2,3)*x | x = NAN }", "{ beta(2, 3)x | x = NAN }", "beta(2, 3)", "beta(2,3)*x preserves beta(2,3)",
+        {"{ beta(2,3)*x | x = NAN }", "{ B(2, 3)x | x = NAN }", "B(2, 3)", "beta(2,3)*x preserves B(2,3)",
          false},
         {"{ logbeta(2,3)*x | x = NAN }", "{ -ln(12)x | x = NAN }", "-ln(12)",
          "logbeta(2,3)*x rewrites exactly to -ln(12)", true},
@@ -4258,7 +4258,7 @@ static void test_symbolic_complex_square_expands_to_cartesian_form(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "a² - b² + 2abi");
+    TEST_ASSERT_STR_EQ(text, "a² - b² + 2ab·i");
 
     free(text);
     expr_free(beautified);

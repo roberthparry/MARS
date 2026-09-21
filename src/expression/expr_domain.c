@@ -253,9 +253,10 @@ static void domain_replace_constant(expr_t **node, const char *name, const expr_
     }
 }
 
-static expr_t *domain_specialise_copy(const expr_t *expr)
+/* Preserve the source transform until its supplied constants have selected the appropriate formula and domain. */
+expr_t *expr_transform_bound_constants(const expr_t *expr)
 {
-    expr_t *result = expr_clone(expr);
+    expr_t *result = NULL;
     expr_bindings_t *bindings = expr_bindings_from_expr_internal(expr);
     for (size_t index = 0u; index < expr_bindings_count(bindings); ++index) {
         expr_t *binding = expr_bindings_get(bindings, expr_bindings_name_at(bindings, index));
@@ -265,13 +266,24 @@ static expr_t *domain_specialise_copy(const expr_t *expr)
         if (num_is_finite(value)) {
             expr_t *replacement = binding->binding_expr ? expr_binding_expr_eval_expr(binding->binding_expr)
                                                        : expr_new_const(value);
-            if (replacement)
+            if (replacement) {
+                if (!result)
+                    result = expr_clone(expr);
                 domain_replace_constant(&result, binding->name, replacement);
+            }
             expr_free(replacement);
         }
         num_destroy(&value);
     }
     expr_bindings_free(bindings);
+    return result;
+}
+
+static expr_t *domain_specialise_copy(const expr_t *expr)
+{
+    expr_t *result = expr_transform_bound_constants(expr);
+    if (!result)
+        result = expr_clone(expr);
     expr_t *out = expr_beautify(result);
     expr_free(result);
     return out;
