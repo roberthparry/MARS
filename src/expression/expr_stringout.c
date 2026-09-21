@@ -3416,6 +3416,7 @@ static bool TeX_unary_has_bare_greek_argument(const expr_t *function)
         [EXPR_KIND_SINC]            = true,
         [EXPR_KIND_DELTA]           = true,
         [EXPR_KIND_PRINCIPAL_VALUE] = true,
+        [EXPR_KIND_FINITE_PART]     = true,
     };
     if (!function || explicit_argument[function->ops->kind])
         return false;

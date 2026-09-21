@@ -237,6 +237,8 @@ examples are in the [expression guide](../expression.md#fourier-transforms).
 | $1$ | $2\pi\delta(\omega)$ | Both directions, distributionally. |
 | $t^n$ | $2\pi i^n\delta^{(n)}(\omega)$ | Symbolic non-negative integral orders; inverse rule $(-i)^n\delta^{(n)}(t)$. |
 | $\operatorname{step}(t)$ | $\pi\delta(\omega)+\operatorname{PV}(1/(i\omega))$ | Both directions, retaining the principal value. |
+| $\ln\lvert t\rvert$ | $-\pi\operatorname{Fp}(1/\lvert\omega\rvert)-2\pi\gamma\delta(\omega)$ | Both directions; real non-zero affine scales and real translations. Unit-cutoff finite part, not ordinary division. |
+| $\operatorname{Fp}(1/\lvert t\rvert)$ | $-2(\ln\lvert\omega\rvert+\gamma)$ | Both directions, with the same unit cutoff; no pointwise value at the singularity. |
 | $\cos(at+b)$, $\sin(at+b)$, $e^{iat+b}$ | Shifted impulses with their phase factors | Both directions for real harmonic rates. |
 | $t^n f(t)$ | $i^n\partial_\omega^n\mathcal F\{f\}(\omega)$ | Integral $0\leq n\leq32$; formal derivatives retained when necessary. |
 | $f^{(n)}(t)$ | $(i\omega)^n\mathcal F\{f\}(\omega)$ | Known derivative orders and symbolic non-negative integral orders. |
@@ -246,8 +248,11 @@ Linearity, unary real affine changes, modulation, conjugation, duality and
 whole-line convolution/product identities are implemented in both directions.
 The Hermite–Gaussian family supports symbolic degree through the native
 script-H polynomial. General antiderivative identities remain unsupported.
-Chirps, impulse trains, non-integral-order and second-kind Bessel functions, regularised powers and logarithms,
-all listed two-dimensional pairs and all general-dimensional pairs remain
+The logarithmic distribution and its finite-part convention are defined in the
+[expression guide](../expression.md#logarithmic-distributions).
+Chirps, impulse trains, non-integral-order and second-kind Bessel functions,
+general regularised powers and complex-branch logarithms, all listed
+two-dimensional pairs and all general-dimensional pairs remain
 unsupported. These gaps must remain visible until independently tested rules
 replace their symbolic fallback.
 

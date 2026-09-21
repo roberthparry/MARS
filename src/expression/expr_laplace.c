@@ -1613,9 +1613,9 @@ const char *expr_transform_value_note(const expr_t *expr)
         expr_free(simplified);
         return note;
     }
-    if (expr->ops == &ops_delta || expr->ops == &ops_principal_value)
+    if (expr->ops == &ops_delta || expr->ops == &ops_principal_value || expr->ops == &ops_finite_part)
         return "This result is a distribution, not an ordinary pointwise function. "
-               "Dirac impulses and principal values do not have finite pointwise numerical values.";
+               "Dirac impulses, principal values and finite parts do not have finite pointwise numerical values.";
     if (expr->ops == &ops_fourier || expr->ops == &ops_inverse_fourier) {
         expr_t *known = expr_fourier_result(expr);
         if (!known)

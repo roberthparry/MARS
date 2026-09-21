@@ -529,9 +529,42 @@ not convergence proofs for arbitrary functions.
 Unsupported transforms remain symbolic with a native evaluation note.
 This is **partial coverage**, not the entire reference table: multidimensional
 transforms, circular-aperture disk transforms, chirps, impulse trains,
-non-integral-order or second-kind Bessel transforms, and regularised power or
-logarithmic families remain unsupported. See the
+non-integral-order or second-kind Bessel transforms, general regularised powers
+and complex-branch logarithmic families remain unsupported. See the
 [coverage inventory](design-notes/integral-transforms.md#fourier-acceptance-criteria).
+
+### Logarithmic distributions
+
+The absolute-value logarithm is supported in both Fourier directions, including
+real non-zero affine scales and real translations. The shorthand `ln|x|` has the
+same meaning as `ln(abs(x))`; absolute-value arguments without parentheses are
+also accepted for other registered unary functions in expression syntax.
+
+| Input | Output (real target coordinate) |
+| --- | --- |
+| `@F{ln\|x\|}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
+| `@F{ln(\|x\|)}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
+| `@F{ln(abs(x))}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
+| `@Finv{-@pi*finite_part(1/abs(ω))-2*@pi*@eulermascheroni*delta(ω)}` | $\ln\lvert t\rvert$ |
+
+`finite_part`, with alias `Fp` and public constructor `expr_finite_part`, denotes
+a Hadamard finite-part distribution. For the reciprocal absolute value, MARS
+uses a **unit cutoff**: for a Schwartz test function $\varphi$,
+
+$$
+\left\langle\operatorname{Fp}\!\left(\frac1{|k|}\right),\varphi\right\rangle
+=\int_{|k|<1}\frac{\varphi(k)-\varphi(0)}{|k|}\,dk
++\int_{|k|\ge1}\frac{\varphi(k)}{|k|}\,dk.
+$$
+
+This fixes the delta coefficient; changing the cutoff changes that coefficient.
+The reciprocal-absolute-value pair is implemented in both directions. Other
+finite-part operands are retained formally, without claiming transform support.
+Derivatives and unresolved integrals remain formal, and finite sums retain the
+distribution terms. No pointwise numerical value is assigned, even away from
+the singularity; scalar and matrix numerical APIs are therefore not provided.
+The Expression, Function and TeX cards retain the same distributional result.
+An unqualified complex `ln(x)` is different and remains unsupported here.
 
 ### Indexed Bessel transforms
 

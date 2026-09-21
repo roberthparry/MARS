@@ -565,6 +565,13 @@ expr_t *expr_sinc(const expr_t *argument);
 expr_t *expr_delta(const expr_t *argument);
 /** @brief Mark a singular expression as its Cauchy principal-value distribution. */
 expr_t *expr_principal_value(const expr_t *argument);
+/**
+ * @brief Mark a singular expression as a Hadamard finite-part distribution, with unit cutoff.
+ *
+ * For 1/abs(x), subtract the test function's value at zero inside abs(x) < 1.
+ * No pointwise numerical value is assigned. The argument is retained.
+ */
+expr_t *expr_finite_part(const expr_t *argument);
 expr_t *expr_ceil(const expr_t *expr);
 /**
  * @brief Construct a power with a constant numeric exponent.

@@ -319,13 +319,13 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1,
     0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 1, 0,
     0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -453,12 +453,12 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [186] = { .kw = "circ",                .arity = 1u,        .ops = &ops_circ,               .ufn = expr_circ },
     [187] = { .kw = "atan",                .arity = 1u,        .ops = &ops_atan,               .ufn = expr_atan },
     [188] = { .kw = "zeta",                .arity = UINT_MAX,  .ops = &ops_zeta,               .ufn = expr_zeta, .vfn = expr_zeta_from_args },
-    [194] = { .kw = "gammainclower",       .arity = 2u,        .ops = &ops_gammainc_lower,     .bfn = expr_gammainc_lower },
     [195] = { .kw = "archacoversin",       .arity = 1u,        .ops = &ops_archacoversin,      .ufn = expr_archacoversin },
     [196] = { .kw = "beta",                .arity = 2u,        .ops = &ops_beta,               .bfn = expr_beta },
     [197] = { .kw = "θ",                   .arity = 1u,        .ops = &ops_step,               .ufn = expr_step },
     [200] = { .kw = "gammainc_Q",          .arity = 2u,        .ops = &ops_gammainc_Q,         .bfn = expr_gammainc_Q },
     [201] = { .kw = "Ei",                  .arity = 1u,        .ops = &ops_Ei,                 .ufn = expr_Ei },
+    [202] = { .kw = "gammainclower",       .arity = 2u,        .ops = &ops_gammainc_lower,     .bfn = expr_gammainc_lower },
     [205] = { .kw = "arcsch",              .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
     [206] = { .kw = "cl₂",                 .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
     [208] = { .kw = "ordered_derivative",  .arity = 2u,        .ops = &ops_ordered_derivative, .bfn = expr_new_ordered_derivative },
@@ -474,6 +474,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [226] = { .kw = "HypergeometricpFq",   .arity = UINT_MAX,                                  .vfn = expr_hypergeometric_pFq_from_args },
     [227] = { .kw = "vercos",              .arity = 1u,        .ops = &ops_vercos,             .ufn = expr_vercos },
     [228] = { .kw = "productlog",          .arity = 1u,        .ops = &ops_lambert_w,          .ufn = expr_lambert_w },
+    [229] = { .kw = "finite_part",         .arity = 1u,        .ops = &ops_finite_part,        .ufn = expr_finite_part },
     [231] = { .kw = "lommels",             .arity = 3u,        .ops = &ops_lommel_s,           .tfn = expr_lommel_s },
     [238] = { .kw = "legendrechi",         .arity = 2u,        .ops = &ops_legendre_chi,       .bfn = expr_legendre_chi_xp },
     [240] = { .kw = "qdigamma",            .arity = 2u,        .ops = &ops_qdigamma,           .bfn = expr_qdigamma },
@@ -520,11 +521,11 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [314] = { .kw = "arccosec",            .arity = 1u,        .ops = &ops_acosec,             .ufn = expr_acosec },
     [315] = { .kw = "isprime",             .arity = 1u,        .ops = &ops_is_prime,           .ufn = expr_is_prime },
     [316] = { .kw = "next_prime",          .arity = 1u,        .ops = &ops_next_prime,         .ufn = expr_next_prime },
-    [317] = { .kw = "lommel_s",            .arity = 3u,        .ops = &ops_lommel_s,           .tfn = expr_lommel_s },
     [319] = { .kw = "Li2",                 .arity = 1u,        .ops = &ops_dilog,              .ufn = expr_dilog },
     [321] = { .kw = "InverseLaplace",      .arity = UINT_MAX,                                  .vfn = expr_inverse_laplace_from_args },
     [322] = { .kw = "prev_prime",          .arity = 1u,        .ops = &ops_prev_prime,         .ufn = expr_prev_prime },
     [324] = { .kw = "li",                  .arity = 1u,        .ops = &ops_Li,                 .ufn = expr_Li },
+    [325] = { .kw = "lommel_s",            .arity = 3u,        .ops = &ops_lommel_s,           .tfn = expr_lommel_s },
     [331] = { .kw = "bessel_y",            .arity = 2u,        .ops = &ops_bessel_y,           .bfn = expr_bessel_y },
     [332] = { .kw = "lcm",                 .arity = 2u,        .ops = &ops_lcm,                .bfn = expr_lcm },
     [338] = { .kw = "heaviside",           .arity = 1u,        .ops = &ops_step,               .ufn = expr_step },
@@ -533,13 +534,13 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [349] = { .kw = "XOR",                 .arity = 2u,        .ops = &ops_bit_xor,            .bfn = expr_bit_xor },
     [352] = { .kw = "@Finv",               .arity = UINT_MAX,                                  .vfn = expr_inverse_fourier_from_args },
     [353] = { .kw = "Γ",                   .arity = 1u,        .ops = &ops_gamma,              .ufn = expr_gamma },
-    [355] = { .kw = "gammaincupper",       .arity = 2u,        .ops = &ops_gammainc_upper,     .bfn = expr_gammainc_upper },
     [356] = { .kw = "Li",                  .arity = 1u,        .ops = &ops_Li,                 .ufn = expr_Li },
     [358] = { .kw = "W₀",                  .arity = 1u,        .ops = &ops_lambert_w0,         .ufn = expr_lambert_w0 },
     [359] = { .kw = "Laplace",             .arity = UINT_MAX,                                  .vfn = expr_laplace_from_args },
     [360] = { .kw = "SHR",                 .arity = 2u,        .ops = &ops_shr,                .bfn = expr_shr },
     [361] = { .kw = "ζ'",                  .arity = UINT_MAX,  .ops = &ops_zetap,              .ufn = expr_zetap, .vfn = expr_zetap_from_args },
     [362] = { .kw = "acosech",             .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
+    [363] = { .kw = "gammaincupper",       .arity = 2u,        .ops = &ops_gammainc_upper,     .bfn = expr_gammainc_upper },
     [366] = { .kw = "beta_pdf",            .arity = 3u,                                        .tfn = expr_beta_pdf },
     [367] = { .kw = "arccovercos",         .arity = 1u,        .ops = &ops_arccovercos,        .ufn = expr_arccovercos },
     [368] = { .kw = "BesselJ",             .arity = 2u,        .ops = &ops_bessel_j,           .bfn = expr_bessel_j },
@@ -608,6 +609,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [491] = { .kw = "covercos",            .arity = 1u,        .ops = &ops_covercos,           .ufn = expr_covercos },
     [492] = { .kw = "@L",                  .arity = UINT_MAX,                                  .vfn = expr_laplace_from_args },
     [493] = { .kw = "lambertw0",           .arity = 1u,        .ops = &ops_lambert_w0,         .ufn = expr_lambert_w0 },
+    [494] = { .kw = "Fp",                  .arity = 1u,        .ops = &ops_finite_part,        .ufn = expr_finite_part },
     [495] = { .kw = "haversin",            .arity = 1u,        .ops = &ops_haversin,           .ufn = expr_haversin },
     [498] = { .kw = "atan2",               .arity = 2u,        .ops = &ops_atan2,              .bfn = expr_atan2 },
     [499] = { .kw = "erfcinv",             .arity = 1u,        .ops = &ops_erfcinv,            .ufn = expr_erfcinv },
@@ -1411,7 +1413,9 @@ static int func_call_start_view(string_view_t text, size_t pos, const func_entry
         after = skip_function_call_space_view(text, after);
     const bool transform = entry->vfn == expr_laplace_from_args || entry->vfn == expr_inverse_laplace_from_args ||
                            entry->vfn == expr_fourier_from_args || entry->vfn == expr_inverse_fourier_from_args;
-    if (!expr_parse_view_peek_ascii(text, after, &c) || (c != '(' && !(transform && c == '{')))
+    const bool absolute_argument = entry->arity == 1u && syntax == EXPR_PARSE_EXPRESSION_SYNTAX;
+    if (!expr_parse_view_peek_ascii(text, after, &c) ||
+        (c != '(' && !(transform && c == '{') && !(absolute_argument && c == '|')))
         return 0;
 
     if (paren_pos_out)
@@ -3492,13 +3496,20 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                 }
                 return apply_integer_power_if_present(result, sup);
             } else {
-                expr_t *arg = parse_enclosed_addexpr(p, ')', "expected ')' after function argument");
+                unsigned char delimiter = 0u;
+                expr_parse_view_peek_ascii(text, paren_pos, &delimiter);
+                bool absolute_argument = delimiter == '|';
+                expr_t *arg = parse_enclosed_addexpr(p, absolute_argument ? '|' : ')',
+                                                    absolute_argument ? "expected '|' after function argument"
+                                                                      : "expected ')' after function argument");
                 expr_t *result;
                 bool inverse_applied = false;
                 number_t minus_one;
 
                 if (!arg)
                     return NULL;
+                if (absolute_argument)
+                    arg = apply_unary_preserving_constexpr(&ops_abs, arg, expr_abs);
                 if (inverse_power && !function_supports_inverse_power_notation(fe)) {
                     expr_free(arg);
                     set_error(p, "unsupported inverse-function notation");
