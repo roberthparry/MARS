@@ -315,7 +315,7 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2,
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+    0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -343,7 +343,7 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0,
     0, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0, 0, 1, 2,
     0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 6, 0, 0, 0, 7, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0
 };
 
 // clang-format off
@@ -423,11 +423,11 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [120] = { .kw = "Un",                  .arity = 2u,        .ops = &ops_chebyshev_u,        .bfn = expr_chebyshev_u },
     [124] = { .kw = "acsch",               .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
     [128] = { .kw = "mod",                 .arity = 2u,        .ops = &ops_mod,                .bfn = expr_mod },
-    [130] = { .kw = "normal_logpdf",       .arity = 1u,        .ops = &ops_normal_logpdf,      .ufn = expr_normal_logpdf },
     [131] = { .kw = "ChebyshevT",          .arity = 2u,        .ops = &ops_chebyshev_t,        .bfn = expr_chebyshev_t },
     [132] = { .kw = "principal_value",     .arity = 1u,        .ops = &ops_principal_value,    .ufn = expr_principal_value },
     [133] = { .kw = "appell_f1",           .arity = 6u,                                        .sfn = expr_appell_f1 },
     [134] = { .kw = "lnB",                 .arity = 2u,        .ops = &ops_logbeta,            .bfn = expr_logbeta },
+    [135] = { .kw = "normal_logpdf",       .arity = 1u,        .ops = &ops_normal_logpdf,      .ufn = expr_normal_logpdf },
     [140] = { .kw = "not",                 .arity = 1u,        .ops = &ops_bit_not,            .ufn = expr_bit_not },
     [142] = { .kw = "asech",               .arity = 1u,        .ops = &ops_asech,              .ufn = expr_asech },
     [143] = { .kw = "arcversin",           .arity = 1u,        .ops = &ops_arcversin,          .ufn = expr_arcversin },
@@ -483,6 +483,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [244] = { .kw = "harmonicpoly",        .arity = 2u,        .ops = &ops_harmonic_poly,      .bfn = expr_harmonic_poly },
     [246] = { .kw = "cubrt",               .arity = 1u,        .ops = &ops_cubrt,              .ufn = expr_cubrt },
     [247] = { .kw = "conj",                .arity = 1u,        .ops = &ops_conj,               .ufn = expr_conj },
+    [248] = { .kw = "Β",                   .arity = 2u,        .ops = &ops_beta,               .bfn = expr_beta },
     [253] = { .kw = "bessely",             .arity = 2u,        .ops = &ops_bessel_y,           .bfn = expr_bessel_y },
     [254] = { .kw = "LerchPhi",            .arity = 3u,        .ops = &ops_lerch_phi,          .tfn = expr_lerch_phi },
     [255] = { .kw = "gammainc_upper",      .arity = 2u,        .ops = &ops_gammainc_upper,     .bfn = expr_gammainc_upper },
@@ -557,6 +558,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [387] = { .kw = "hacoversin",          .arity = 1u,        .ops = &ops_hacoversin,         .ufn = expr_hacoversin },
     [388] = { .kw = "zeta2p",              .arity = 2u,        .ops = &ops_zatahp,             .bfn = expr_zatahp },
     [390] = { .kw = "or",                  .arity = 2u,        .ops = &ops_bit_or,             .bfn = expr_bit_or },
+    [393] = { .kw = "B",                   .arity = 2u,        .ops = &ops_beta,               .bfn = expr_beta },
     [394] = { .kw = "wn",                  .arity = 2u,        .ops = &ops_lambert_wn,         .bfn = expr_lambert_wn_xp },
     [395] = { .kw = "arcsec",              .arity = 1u,        .ops = &ops_asec,               .ufn = expr_asec },
     [396] = { .kw = "Derivative",          .arity = 2u,        .ops = &ops_ordered_derivative, .bfn = expr_new_ordered_derivative },

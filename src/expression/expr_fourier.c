@@ -1,209 +1,4 @@
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
-typedef struct {
-    expr_t **nodes;
-    size_t count, capacity;
-    expr_t *conditions;
-    bool failed;
-    bool inverse;
-} fourier_context_t;
-
-/* A local owning arena makes temporary formula construction explicit and exception-safe. */
-static expr_t *keep(fourier_context_t *c, expr_t *expr)
-{
-    if (!expr)
-        return NULL;
-    if (c->count == c->capacity) {
-        size_t capacity = c->capacity ? c->capacity * 2u : 64u;
-        expr_t **nodes = realloc(c->nodes, capacity * sizeof(*nodes));
-        if (!nodes) {
-            expr_free(expr);
-            c->failed = true;
-            return NULL;
-        }
-        c->nodes = nodes;
-        c->capacity = capacity;
-    }
-    c->nodes[c->count++] = expr;
-    return expr;
-}
-
-#define UNARY_HELPER(name)                                                                                              \
-    static expr_t *ft_##name(fourier_context_t *c, const expr_t *a) { return keep(c, expr_##name(a)); }
-#define BINARY_HELPER(name)                                                                                             \
-    static expr_t *ft_##name(fourier_context_t *c, const expr_t *a, const expr_t *b) { return keep(c, expr_##name(a, b)); }
-UNARY_HELPER(neg)
-UNARY_HELPER(exp)
-UNARY_HELPER(sqrt)
-UNARY_HELPER(sech)
-UNARY_HELPER(conj)
-UNARY_HELPER(rect)
-UNARY_HELPER(tri)
-UNARY_HELPER(sinc)
-UNARY_HELPER(delta)
-UNARY_HELPER(step)
-UNARY_HELPER(principal_value)
-UNARY_HELPER(finite_part)
-UNARY_HELPER(ln)
-BINARY_HELPER(add)
-BINARY_HELPER(sub)
-BINARY_HELPER(mul)
-BINARY_HELPER(div)
-BINARY_HELPER(pow_xp)
-BINARY_HELPER(chebyshev_t)
-BINARY_HELPER(hermite_h)
-#undef BINARY_HELPER
-#undef UNARY_HELPER
-
-static expr_t *integer(fourier_context_t *c, long n) { return keep(c, expr_const_long(n)); }
-static expr_t *constant(fourier_context_t *c, number_t n) { return keep(c, expr_new_const(n)); }
-static expr_t *pi_constant(fourier_context_t *c) { return keep(c, expr_new_named_const(NUM_PI, "@pi")); }
-static expr_t *clean(fourier_context_t *c, const expr_t *e) { return keep(c, expr_simplify(e)); }
-
-static bool match_power(fourier_context_t *c, const expr_t *f, const expr_t **base, const expr_t **power)
-{
-    if (expr_match_pow_expr(f, base, power))
-        return true;
-    if (f && f->ops == &ops_pow_d) {
-        *base = f->a;
-        *power = constant(c, f->c);
-        return true;
-    }
-    return false;
-}
-
-static bool uses(const expr_t *e, const expr_t *x)
-{
-    bool used = true;
-    expr_t *variable = (expr_t *)x;
-    return !expr_collect_var_usage(e, 1u, &variable, &used) || used;
-}
-
-static expr_t *ft_abs(fourier_context_t *c, const expr_t *e)
-{
-    if (expr_is_const(e) && !e->name) {
-        number_t value = num_abs(e->c);
-        expr_t *out = constant(c, value);
-        num_destroy(&value);
-        return out;
-    }
-    return keep(c, expr_abs(e));
-}
-
-static expr_t *fresh_variable(fourier_context_t *c, const expr_t *f, const expr_t *target)
-{
-    expr_bindings_t *bindings = expr_bindings_from_expr_internal(f);
-    expr_bindings_t *targets = expr_bindings_from_expr_internal(target);
-    char name[64];
-    for (unsigned n = 0u;; ++n) {
-        snprintf(name, sizeof(name), "_fourier_%u", n);
-        if (!expr_bindings_get(bindings, name) && !expr_bindings_get(targets, name))
-            break;
-    }
-    expr_t *out = keep(c, expr_new_named_var(NUM_NAN, name));
-    expr_bindings_free(targets);
-    expr_bindings_free(bindings);
-    return out;
-}
-
-static const expr_t *absolute_source(const expr_t *f, const expr_t *x)
-{
-    if (!f)
-        return NULL;
-    if (f->ops == &ops_abs && expr_struct_eq(f->a, x))
-        return f;
-    const expr_t *left = absolute_source(f->a, x);
-    return left ? left : absolute_source(f->b, x);
-}
-
-static bool literal_value(const expr_t *e, number_t *value)
-{
-    expr_bindings_t *bindings = expr_bindings_from_expr_internal(e);
-    bool literal = expr_bindings_count(bindings) == 0u;
-    expr_bindings_free(bindings);
-    if (literal)
-        *value = expr_eval(e);
-    return literal && num_is_finite(*value);
-}
-
-static bool positive(fourier_context_t *c, const expr_t *value)
-{
-    expr_t *bound = clean(c, value);
-    number_t n = NUM_NAN;
-    bool known = literal_value(bound, &n);
-    number_t real = num_real_part(n);
-    bool valid = !known || num_gt(real, NUM_ZERO);
-    num_destroy(&real);
-    num_destroy(&n);
-    if (!valid)
-        return false;
-    if (!known) {
-        expr_t *pair = expr_alloc(&ops_argument_list);
-        pair->a = expr_clone(bound);
-        pair->b = expr_alloc(&ops_argument_list);
-        pair->b->a = expr_const_zero();
-        pair->b->b = c->conditions;
-        c->conditions = pair;
-    }
-    return true;
-}
-
-static bool real_parameter(fourier_context_t *c, const expr_t *value)
-{
-    expr_t *test = keep(c, expr_new_unary_internal(&ops_real_parameter, expr_clone(value)));
-    return positive(c, test);
-}
-
-static expr_t *replace(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *value)
-{
-    return clean(c, keep(c, expr_substitute(f, x, value)));
-}
-
-/* Collect affine coefficients structurally; do not differentiate or sample free parameters. */
-static bool affine(fourier_context_t *c, const expr_t *f, const expr_t *x, expr_t **a, expr_t **b)
-{
-    if (!uses(f, x)) {
-        *a = integer(c, 0);
-        *b = keep(c, expr_clone(f));
-        return true;
-    }
-    if (expr_struct_eq(f, x)) {
-        *a = integer(c, 1);
-        *b = integer(c, 0);
-        return true;
-    }
-    expr_t *left_a = NULL, *left_b = NULL, *right_a = NULL, *right_b = NULL;
-    if ((f->ops == &ops_add || f->ops == &ops_sub) &&
-        affine(c, f->a, x, &left_a, &left_b) && affine(c, f->b, x, &right_a, &right_b)) {
-        *a = clean(c, f->ops == &ops_add ? ft_add(c, left_a, right_a) : ft_sub(c, left_a, right_a));
-        *b = clean(c, f->ops == &ops_add ? ft_add(c, left_b, right_b) : ft_sub(c, left_b, right_b));
-        return true;
-    }
-    if (f->ops == &ops_neg && affine(c, f->a, x, &left_a, &left_b)) {
-        *a = clean(c, ft_neg(c, left_a));
-        *b = clean(c, ft_neg(c, left_b));
-        return true;
-    }
-    if (f->ops == &ops_mul) {
-        const expr_t *coefficient = !uses(f->a, x) ? f->a : f->b;
-        const expr_t *dependent = coefficient == f->a ? f->b : f->a;
-        if (!uses(coefficient, x) && affine(c, dependent, x, &left_a, &left_b)) {
-            *a = clean(c, ft_mul(c, coefficient, left_a));
-            *b = clean(c, ft_mul(c, coefficient, left_b));
-            return true;
-        }
-    }
-    if (f->ops == &ops_div && !uses(f->b, x) && affine(c, f->a, x, &left_a, &left_b)) {
-        *a = clean(c, ft_div(c, left_a, f->b));
-        *b = clean(c, ft_div(c, left_b, f->b));
-        return true;
-    }
-    return false;
-}
+#include "expr_fourier_internal.h"
 
 static bool quadratic(fourier_context_t *c, const expr_t *f, const expr_t *x,
                       expr_t **a, expr_t **b, expr_t **d)
@@ -242,14 +37,6 @@ static expr_t *subformula(fourier_context_t *c, const expr_t *f, const expr_t *x
     }
     expr_free(saved);
     return out;
-}
-
-static const expr_t *exponent(const expr_t *f)
-{
-    if (f->ops == &ops_exp)
-        return f->a;
-    const expr_t *base = NULL, *power = NULL;
-    return expr_match_pow_expr(f, &base, &power) && expr_is_const(base) && num_eq(base->c, NUM_E) ? power : NULL;
 }
 
 static expr_t *differentiate(fourier_context_t *c, const expr_t *f, const expr_t *w, unsigned order)
@@ -391,6 +178,11 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (!uses(f, x))
         return ft_mul(c, ft_mul(c, two_pi, f), ft_delta(c, w));
+    if (f->ops == &ops_beta || f->ops == &ops_add || f->ops == &ops_sub) {
+        expr_t *pair = expr_fourier_beta_pair(c, f, x, w);
+        if (pair)
+            return pair;
+    }
     if (f->ops == &ops_add || f->ops == &ops_sub) {
         expr_t *left = subformula(c, f->a, x, w, depth);
         expr_t *right = subformula(c, f->b, x, w, depth);
@@ -644,6 +436,45 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     if (match_power(c, f, &base, &power) && base->ops == &ops_sinc &&
         expr_struct_eq(base->a, x) && expr_is_const(power) && num_eq(power->c, NUM_TWO))
         return ft_tri(c, ft_div(c, w, two_pi));
+    /* The two half-lines give Euler beta integrals. Do not analytically continue these formulas past
+     * their ordinary-convergence domain and silently substitute a distributional regularisation. */
+    const expr_t *hyperbolic_argument = NULL;
+    expr_t *hyperbolic_power = NULL, *branch_power = NULL;
+    bool singular = false;
+    if (expr_fourier_hyperbolic_parts(f, &hyperbolic_argument, &hyperbolic_power, &branch_power, &singular)) {
+        keep(c, hyperbolic_power);
+        if (branch_power)
+            keep(c, branch_power);
+        hyperbolic_power = clean(c, hyperbolic_power);
+        if (expr_const_is_zero(hyperbolic_power))
+            return ft_mul(c, two_pi, ft_delta(c, w));
+        expr_t *a = NULL, *b = NULL;
+        if (uses(hyperbolic_power, x) || !affine(c, hyperbolic_argument, x, &a, &b))
+            return NULL;
+        if (expr_const_is_zero(a))
+            return ft_mul(c, ft_mul(c, two_pi, replace(c, f, x, integer(c, 0))), ft_delta(c, w));
+        if (!real_parameter(c, a) || !real_parameter(c, b) || !positive(c, ft_abs(c, a)) ||
+            !positive(c, ft_neg(c, hyperbolic_power)) ||
+            (singular && !positive(c, ft_add(c, hyperbolic_power, one))))
+            return NULL;
+        expr_t *q = ft_div(c, w, a);
+        expr_t *iq = ft_mul(c, i, q);
+        expr_t *left = ft_div(c, ft_sub(c, iq, hyperbolic_power), two);
+        expr_t *right = ft_div(c, ft_sub(c, ft_neg(c, iq), hyperbolic_power), two);
+        expr_t *spectrum;
+        if (singular) {
+            expr_t *second = ft_add(c, one, hyperbolic_power);
+            /* The power's branch does not change when the Fourier kernel is reversed. */
+            expr_t *phase = branch_power ? ft_exp(c, ft_mul(c, ft_mul(c, constant(c, NUM_I), pi), branch_power))
+                                        : one;
+            spectrum = ft_add(c, ft_beta(c, left, second), ft_mul(c, phase, ft_beta(c, right, second)));
+        } else {
+            spectrum = ft_beta(c, left, right);
+        }
+        expr_t *scale = ft_pow_xp(c, two, ft_neg(c, ft_add(c, hyperbolic_power, one)));
+        expr_t *translation = ft_exp(c, ft_mul(c, iq, b));
+        return ft_div(c, ft_mul(c, ft_mul(c, scale, translation), spectrum), ft_abs(c, a));
+    }
     /* Affine changes also apply inside a source-independent power of a unary function. */
     const expr_t *unary = f;
     bool powered = match_power(c, f, &base, &power) && !uses(power, x) && base->a &&
@@ -693,6 +524,9 @@ expr_t *expr_fourier_result(const expr_t *transform)
 {
     if (!transform || (transform->ops != &ops_fourier && transform->ops != &ops_inverse_fourier))
         return NULL;
+    expr_t *specialised = expr_transform_bound_constants(transform);
+    if (specialised)
+        transform = specialised;
     fourier_context_t c = {.inverse = transform->ops == &ops_inverse_fourier};
     const expr_t *source = transform->b->a, *target = transform->b->b->a;
     expr_t *frequency = expr_is_var(target) ? keep(&c, expr_clone(target)) : fresh_variable(&c, transform->a, target);
@@ -722,7 +556,30 @@ expr_t *expr_fourier_result(const expr_t *transform)
     for (size_t n = 0u; n < c.count; ++n)
         expr_free(c.nodes[n]);
     free(c.nodes);
+    expr_free(specialised);
     return result;
+}
+
+/* Keep convergence diagnostics in the native engine, using the same family matcher as the formula builder. */
+const char *expr_fourier_value_note(const expr_t *transform)
+{
+    if (!transform || (transform->ops != &ops_fourier && transform->ops != &ops_inverse_fourier))
+        return NULL;
+    const expr_t *argument = NULL, *source = transform->b->a;
+    expr_t *power = NULL, *branch_power = NULL;
+    bool singular = false;
+    if (!expr_fourier_hyperbolic_parts(transform->a, &argument, &power, &branch_power, &singular))
+        return NULL;
+    fourier_context_t c = {0};
+    expr_t *rate = NULL, *offset = NULL;
+    const char *note = !uses(power, source) && affine(&c, argument, source, &rate, &offset)
+                           ? expr_fourier_hyperbolic_note(power, singular, rate, offset) : NULL;
+    for (size_t n = 0u; n < c.count; ++n)
+        expr_free(c.nodes[n]);
+    free(c.nodes);
+    expr_free(branch_power);
+    expr_free(power);
+    return note;
 }
 
 static number_t fourier_eval(expr_t *expr)

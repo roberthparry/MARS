@@ -402,6 +402,16 @@ expr_t *expr_fourier_from_args(size_t count, expr_t *const *args);
 expr_t *expr_inverse_fourier_from_args(size_t count, expr_t *const *args);
 /** Return a recognised Fourier formula, or NULL for an unsupported case. */
 expr_t *expr_fourier_result(const expr_t *transform);
+/** Match a hyperbolic power, returning a borrowed argument and owning effective and branch exponents. */
+bool expr_fourier_hyperbolic_parts(const expr_t *f, const expr_t **argument, expr_t **power,
+                                  expr_t **branch_power, bool *singular);
+/** Describe hyperbolic-power convergence for an affine argument and an effective sinh or cosh exponent. */
+const char *expr_fourier_hyperbolic_note(const expr_t *power, bool singular,
+                                        const expr_t *rate, const expr_t *offset);
+/** Return a Fourier-specific convergence or branch diagnostic, or NULL when none applies. */
+const char *expr_fourier_value_note(const expr_t *transform);
+/** Substitute supplied constant bindings before selecting a transform rule; return NULL if none are supplied. */
+expr_t *expr_transform_bound_constants(const expr_t *expr);
 /** Return whether an expression is a forward or inverse integral-transform operator. */
 bool expr_is_integral_transform(const expr_t *expr);
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
