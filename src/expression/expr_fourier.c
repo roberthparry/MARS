@@ -47,6 +47,8 @@ UNARY_HELPER(sinc)
 UNARY_HELPER(delta)
 UNARY_HELPER(step)
 UNARY_HELPER(principal_value)
+UNARY_HELPER(finite_part)
+UNARY_HELPER(ln)
 BINARY_HELPER(add)
 BINARY_HELPER(sub)
 BINARY_HELPER(mul)
@@ -59,6 +61,7 @@ BINARY_HELPER(hermite_h)
 
 static expr_t *integer(fourier_context_t *c, long n) { return keep(c, expr_const_long(n)); }
 static expr_t *constant(fourier_context_t *c, number_t n) { return keep(c, expr_new_const(n)); }
+static expr_t *pi_constant(fourier_context_t *c) { return keep(c, expr_new_named_const(NUM_PI, "@pi")); }
 static expr_t *clean(fourier_context_t *c, const expr_t *e) { return keep(c, expr_simplify(e)); }
 
 static bool match_power(fourier_context_t *c, const expr_t *f, const expr_t **base, const expr_t **power)
@@ -223,7 +226,7 @@ static expr_t *formal(fourier_context_t *c, const expr_t *f, const expr_t *x, co
     expr_t *args[] = {(expr_t *)f, (expr_t *)x, (expr_t *)w};
     expr_t *out = keep(c, c->inverse ? expr_inverse_fourier_from_args(3u, args)
                                     : expr_fourier_from_args(3u, args));
-    return c->inverse ? ft_mul(c, ft_mul(c, integer(c, 2), constant(c, NUM_PI)), out) : out;
+    return c->inverse ? ft_mul(c, ft_mul(c, integer(c, 2), pi_constant(c)), out) : out;
 }
 
 static expr_t *subformula(fourier_context_t *c, const expr_t *f, const expr_t *x,
@@ -290,11 +293,39 @@ static expr_t *remove_factor(fourier_context_t *c, const expr_t *f, const expr_t
     return keep(c, expr_clone(f));
 }
 
+/* Separate source-independent factors throughout products and quotients before matching transform pairs. */
+static bool split_scalar(fourier_context_t *c, const expr_t *f, const expr_t *x,
+                         expr_t **scalar, expr_t **dependent)
+{
+    if (f->ops == &ops_mul || f->ops == &ops_div) {
+        expr_t *left_scalar, *left, *right_scalar, *right;
+        bool left_split = split_scalar(c, f->a, x, &left_scalar, &left);
+        bool right_split = split_scalar(c, f->b, x, &right_scalar, &right);
+        if (left_split || right_split) {
+            bool divide = f->ops == &ops_div;
+            *scalar = clean(c, divide ? ft_div(c, left_scalar, right_scalar) : ft_mul(c, left_scalar, right_scalar));
+            *dependent = clean(c, divide ? ft_div(c, left, right) : ft_mul(c, left, right));
+            return true;
+        }
+    } else if (f->ops == &ops_neg) {
+        (void)split_scalar(c, f->a, x, scalar, dependent);
+        *scalar = clean(c, ft_neg(c, *scalar));
+        return true;
+    } else if (!uses(f, x)) {
+        *scalar = keep(c, expr_clone(f));
+        *dependent = integer(c, 1);
+        return true;
+    }
+    *scalar = integer(c, 1);
+    *dependent = keep(c, expr_clone(f));
+    return false;
+}
+
 static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w, unsigned depth)
 {
     if (!f || depth > 24u || c->failed)
         return NULL;
-    expr_t *one = integer(c, 1), *two = integer(c, 2), *pi = constant(c, NUM_PI), *i = constant(c, NUM_I);
+    expr_t *one = integer(c, 1), *two = integer(c, 2), *pi = pi_constant(c), *i = constant(c, NUM_I);
     if (c->inverse)
         i = clean(c, ft_neg(c, i));
     expr_t *two_pi = ft_mul(c, two, pi);
@@ -325,6 +356,31 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         expr_t *body = replace(c, f->a, f->b->a, reflect ? ft_neg(c, w) : w);
         return f->ops == &ops_fourier ? ft_mul(c, two_pi, body) : body;
     }
+    /* Unit-cutoff finite part: <Fp(1/|x|),phi> subtracts phi(0) for |x| < 1.
+     * Its even Fourier pair is -2(ln|w| + gamma), with the inverse normalisation applied by the caller. */
+    if (f->ops == &ops_finite_part) {
+        const expr_t *body = f->a;
+        if (body->ops == &ops_div && !uses(body->a, x) && body->b->ops == &ops_abs &&
+            expr_struct_eq(body->b->a, x)) {
+            expr_t *gamma = keep(c, expr_new_named_const(NUM_EULER_MASCHERONI, "@eulermascheroni"));
+            expr_t *logarithm = ft_add(c, ft_ln(c, ft_abs(c, w)), gamma);
+            return ft_neg(c, ft_mul(c, ft_mul(c, two, body->a), logarithm));
+        }
+        return NULL;
+    }
+    if (f->ops == &ops_log && f->a->ops == &ops_abs && uses(f, x)) {
+        expr_t *a = NULL, *b = NULL;
+        if (affine(c, f->a->a, x, &a, &b) && !expr_const_is_zero(a) &&
+            real_parameter(c, a) && real_parameter(c, b) && positive(c, ft_abs(c, a))) {
+            expr_t *regularised = ft_finite_part(c, ft_div(c, one, ft_abs(c, w)));
+            expr_t *gamma = keep(c, expr_new_named_const(NUM_EULER_MASCHERONI, "@eulermascheroni"));
+            expr_t *offset = ft_sub(c, ft_ln(c, ft_abs(c, a)), gamma);
+            expr_t *impulse = ft_mul(c, ft_mul(c, two_pi, offset), ft_delta(c, w));
+            expr_t *phase = ft_exp(c, ft_div(c, ft_mul(c, ft_mul(c, i, w), b), a));
+            return ft_sub(c, impulse, ft_mul(c, pi, ft_mul(c, phase, regularised)));
+        }
+        return NULL;
+    }
     if (f->ops == &ops_principal_value) {
         expr_t *coefficient = clean(c, ft_mul(c, f->a, x));
         if (coefficient && !uses(coefficient, x)) {
@@ -342,14 +398,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (f->ops == &ops_neg)
         return ft_neg(c, subformula(c, f->a, x, w, depth));
-    if (f->ops == &ops_mul) {
-        if (!uses(f->a, x))
-            return ft_mul(c, f->a, subformula(c, f->b, x, w, depth));
-        if (!uses(f->b, x))
-            return ft_mul(c, f->b, subformula(c, f->a, x, w, depth));
+    if (f->ops == &ops_mul || f->ops == &ops_div) {
+        expr_t *scalar, *dependent;
+        if (split_scalar(c, f, x, &scalar, &dependent) &&
+            (!expr_const_is_one(scalar) || !expr_struct_eq(dependent, f)))
+            return ft_mul(c, scalar, subformula(c, dependent, x, w, depth));
     }
-    if (f->ops == &ops_div && !uses(f->b, x))
-        return ft_div(c, subformula(c, f->a, x, w, depth), f->b);
     if (f->ops == &ops_conj)
         return ft_conj(c, subformula(c, f->a, x, ft_neg(c, w), depth));
     /* Recognise the compact Chebyshev spectrum as an actual Bessel pair, not only by nested duality. */
@@ -646,7 +700,7 @@ expr_t *expr_fourier_result(const expr_t *transform)
     if (out) {
         const expr_t *argument = target;
         if (c.inverse) {
-            out = ft_div(&c, out, ft_mul(&c, integer(&c, 2), constant(&c, NUM_PI)));
+            out = ft_div(&c, out, ft_mul(&c, integer(&c, 2), pi_constant(&c)));
         }
         bool depends_on_frequency = uses(out, frequency);
         if (expr_is_var(target))

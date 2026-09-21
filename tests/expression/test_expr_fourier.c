@@ -114,11 +114,50 @@ static void test_signal_calculus_and_finite_sums(void)
     expr_free(x);
 }
 
+static void test_finite_part_distribution(void)
+{
+    NUM_SCOPE(scope);
+    expr_t *x = expr_new_named_var(NUM_ONE, "x");
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *absolute = expr_abs(x);
+    expr_t *reciprocal = expr_div(one, absolute);
+    expr_t *distribution = expr_finite_part(reciprocal);
+    expr_free(reciprocal);
+    expr_free(absolute);
+    ASSERT_TRUE(distribution != NULL);
+    if (distribution) {
+        ASSERT_TRUE(num_is_nan(expr_eval(distribution)));
+        const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+        for (size_t n = 0u; n < sizeof(styles) / sizeof(styles[0]); ++n) {
+            char *text = expr_to_string(distribution, styles[n]);
+            ASSERT_TRUE(text && strstr(text, styles[n] == style_LATEX ? "operatorname{Fp}" : "finite_part"));
+            free(text);
+        }
+        expr_t *derivative = expr_create_deriv(distribution, x);
+        expr_t *primitive = expr_integrate(distribution, x);
+        expr_t *formal_primitive = expr_integral(distribution, x);
+        expr_t *sum = expr_new_finite_summation_range(distribution, x, one, one);
+        ASSERT_TRUE(derivative && num_is_nan(expr_eval(derivative)));
+        ASSERT_TRUE(primitive == NULL); /* No ordinary primitive is claimed for a distribution. */
+        ASSERT_TRUE(formal_primitive != NULL);
+        ASSERT_TRUE(sum && num_is_nan(expr_eval(sum)));
+        expr_free(sum);
+        expr_free(primitive);
+        expr_free(formal_primitive);
+        expr_free(derivative);
+    }
+    ASSERT_TRUE(expr_finite_part(NULL) == NULL);
+    expr_free(distribution);
+    expr_free(one);
+    expr_free(x);
+}
+
 void test_fourier_and_signal_functions(void)
 {
     TEST_RUN_SUBTEST(test_signal_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_spectral_matrices, NULL);
     TEST_RUN_SUBTEST(test_signal_calculus_and_finite_sums, NULL);
+    TEST_RUN_SUBTEST(test_finite_part_distribution, NULL);
 }
 
 /* README examples from the qfloat, qcomplex, number and matrix module guides. */

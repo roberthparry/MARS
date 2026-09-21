@@ -187,6 +187,7 @@ typedef enum {
     EXPR_KIND_SINC,
     EXPR_KIND_DELTA,
     EXPR_KIND_PRINCIPAL_VALUE,
+    EXPR_KIND_FINITE_PART,
     EXPR_KIND_REAL_DOMAIN,
     EXPR_KIND_NONNEGATIVE_INTEGER,
     EXPR_KIND_REAL_PARAMETER,
@@ -392,6 +393,7 @@ extern const expr_ops_t ops_circ;
 extern const expr_ops_t ops_sinc;
 extern const expr_ops_t ops_delta;
 extern const expr_ops_t ops_principal_value;
+extern const expr_ops_t ops_finite_part;
 /** Construct an integral transform with explicit or inferred variable mapping. */
 expr_t *expr_integral_transform_from_args(size_t count, expr_t *const *args, const expr_ops_t *ops);
 /** Construct a forward Fourier transform using angular frequency. */

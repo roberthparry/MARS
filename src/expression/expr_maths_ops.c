@@ -5381,6 +5381,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_SINC] = &ops_sinc,
         [EXPR_KIND_DELTA] = &ops_delta,
         [EXPR_KIND_PRINCIPAL_VALUE] = &ops_principal_value,
+        [EXPR_KIND_FINITE_PART] = &ops_finite_part,
         [EXPR_KIND_NEG] = &ops_neg,
         [EXPR_KIND_SIN] = &ops_sin,
         [EXPR_KIND_COS] = &ops_cos,
