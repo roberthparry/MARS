@@ -130,7 +130,7 @@ static void test_finite_part_distribution(void)
         const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
         for (size_t n = 0u; n < sizeof(styles) / sizeof(styles[0]); ++n) {
             char *text = expr_to_string(distribution, styles[n]);
-            ASSERT_TRUE(text && strstr(text, styles[n] == style_LATEX ? "operatorname{Fp}" : "finite_part"));
+            ASSERT_TRUE(text && strstr(text, "finite part"));
             free(text);
         }
         expr_t *derivative = expr_create_deriv(distribution, x);
@@ -204,12 +204,138 @@ static void test_inverse_hyperbolic_beta_spectra(void)
     expr_free(parsed);
 }
 
+static void test_distribution_function_qualifier_round_trips(void)
+{
+    const char *sources[] = {
+        "PV(1/x)", "finite_part(1/abs(x))", "PV(1/x)-1/x", "PV(1/x)+PV(1/x)",
+        "PV(1/x)+finite_part(1/x)", "PV(finite_part(1/x))", "finite_part(PV(1/x))",
+        "PV(PV(1/x))", "PV(1/x)^2", "1/PV(1/x)", "sin(PV(1/x))", "PV(1)",
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        expr_t *original = expr_from_string(sources[i], NULL);
+        char *function = original ? expr_to_string(original, style_FUNCTION) : NULL;
+        char *body = original ? expr_to_function_body(original) : NULL;
+        ASSERT_NOT_NULL(body);
+        ASSERT_TRUE(function && !strstr(function, "principal_value(") && !strstr(function, "finite_part("));
+        ASSERT_TRUE(body && !strstr(body, "principal_value(") && !strstr(body, "finite_part("));
+        expr_t *restored = body ? expr_from_function_body(body, NULL) : NULL;
+        ASSERT_TRUE(restored != NULL);
+        expr_t *expected_tree = original ? expr_beautify(original) : NULL;
+        expr_t *actual_tree = restored ? expr_beautify(restored) : NULL;
+        char *expected = expected_tree ? expr_to_string(expected_tree, style_UNBOUND) : NULL;
+        char *actual = actual_tree ? expr_to_string(actual_tree, style_UNBOUND) : NULL;
+        ASSERT_NOT_NULL(expected);
+        ASSERT_NOT_NULL(actual);
+        TEST_ASSERT_STR_EQ(actual, expected);
+        expr_free(actual_tree);
+        expr_free(expected_tree);
+        free(actual);
+        free(expected);
+        expr_free(restored);
+        free(body);
+        free(function);
+        expr_free(original);
+    }
+}
+
+static void test_mathematical_nonzero_domains(void)
+{
+    const char *sources[] = {
+        "tan(x) where (x ∈ ℝ; cos(x) ≠ 0)", "cot(x) where (x ∈ ℝ; sin(x) != 0)",
+        "1/x where (x!=0)", "1/(x-1) where (x!=1)", "1/x where (Re(abs(x))>0)",
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        expr_t *original = expr_from_string(sources[i], NULL);
+        ASSERT_NOT_NULL(original);
+        char *body = original ? expr_to_function_body(original) : NULL;
+        char *function = original ? expr_to_string(original, style_FUNCTION) : NULL;
+        ASSERT_TRUE(body && strstr(body, " != 0"));
+        ASSERT_TRUE(function && strstr(function, "if (") && strstr(function, " != 0"));
+        ASSERT_TRUE(function && !strstr(function, "principal value"));
+        expr_t *restored = body ? expr_from_function_body(body, NULL) : NULL;
+        ASSERT_NOT_NULL(restored);
+        char *expected = original ? expr_to_string(original, style_UNBOUND) : NULL;
+        char *actual = restored ? expr_to_string(restored, style_UNBOUND) : NULL;
+        TEST_ASSERT_STR_EQ(actual, expected);
+        free(actual);
+        free(expected);
+        free(function);
+        free(body);
+        expr_free(restored);
+        expr_free(original);
+    }
+}
+
+static void test_odd_hyperbolic_fourier_copy_and_rendering(void)
+{
+    const char *sources[] = {
+        "@F{tanh(x)}", "-i*@pi*x", "-2*i*@pi*x", "(1-i)*x", "x*(-i)", "(-i*x)^2",
+        "InverseFourier({-i*@pi*csch(@pi*k/2) | ; k=?; k ∈ ℝ; k ≠ 0},k,x)",
+        "@F{coth(x)}", "@Finv{-i*@pi*coth(@pi*k/2)}",
+        "@F{atan(x)}", "@Finv{-i*@pi*exp(-abs(k))/k}",
+        "@F{atanh(x)}", "@F{asin(x)}", "@F{acos(x)}",
+        "@F{gamma(1+i*x)}", "@Finv{2*@pi*exp(k-exp(k))}",
+        "@Finv{2*i*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*Dk(step(k)*ln(abs(k))))}",
+        "@pi^2*i", "@pi^2*cos(x)", "2*x", "1.25*x",
+        "@F{gamma(x)}", "@Finv{2*@pi*exp(k*Re(x)-exp(k))}",
+        "Fourier(gamma(x),Im(x),k)",
+    };
+    for (size_t index = 0u; index < sizeof(sources) / sizeof(sources[0]); ++index) {
+        expr_t *parsed = expr_from_string(sources[index], NULL);
+        expr_t *result = parsed ? expr_beautify(parsed) : NULL;
+        char *text = result ? expr_to_string(result, style_EXPRESSION) : NULL;
+        char *TeX = result ? expr_to_string(result, style_LATEX) : NULL;
+        char *body = result ? expr_to_function_body(result) : NULL;
+        ASSERT_NOT_NULL(text);
+        ASSERT_NOT_NULL(TeX);
+        expr_t *copy = text ? expr_from_string(text, NULL) : NULL;
+        ASSERT_NOT_NULL(copy);
+        expr_t *function_copy = NULL;
+        if (index == 0u || index >= 6u) {
+            function_copy = body ? expr_from_function_body(body, NULL) : NULL;
+            if (!function_copy)
+                fprintf(stderr, "Function round-trip failed for %s:\n%s\n", sources[index], body ? body : "(null)");
+            ASSERT_NOT_NULL(function_copy);
+        }
+        if (index < 3u) {
+            ASSERT_TRUE(text && !strstr(text, "(-i)") && !strstr(text, "(-2i)"));
+            ASSERT_TRUE(TeX && !strstr(TeX, "\\left(-i\\right)") && !strstr(TeX, "\\left(-2i\\right)"));
+        }
+        if (index == 0u)
+            ASSERT_TRUE(body && strstr(body, "k != 0"));
+        if (index == 6u)
+            ASSERT_TRUE(text && strstr(text, "tanh(x)") && !strstr(text, "k"));
+        if (index == 7u)
+            ASSERT_TRUE(body && strstr(body, "coth(") && strstr(body, "k != 0") && !strstr(body, "Fourier("));
+        if (index == 8u)
+            ASSERT_TRUE(body && strstr(body, "coth(x)") && strstr(body, "x != 0") && !strstr(body, "Fourier("));
+        if (index == 9u)
+            ASSERT_TRUE(body && strstr(body, "exp(") && strstr(body, "k != 0") && !strstr(body, "Fourier("));
+        if (index == 10u)
+            ASSERT_TRUE(body && strstr(body, "atan(x)") && !strstr(body, "x != 0") && !strstr(body, "Fourier("));
+        if (index >= 11u) {
+            ASSERT_TRUE(body && !strstr(body, "Fourier("));
+            ASSERT_TRUE(text && !strstr(text, ": principal value") && !strstr(text, ": finite part"));
+        }
+        expr_free(function_copy);
+        expr_free(copy);
+        free(body);
+        free(TeX);
+        free(text);
+        expr_free(result);
+        expr_free(parsed);
+    }
+}
+
 void test_fourier_and_signal_functions(void)
 {
     TEST_RUN_SUBTEST(test_signal_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_spectral_matrices, NULL);
     TEST_RUN_SUBTEST(test_signal_calculus_and_finite_sums, NULL);
     TEST_RUN_SUBTEST(test_finite_part_distribution, NULL);
+    TEST_RUN_SUBTEST(test_distribution_function_qualifier_round_trips, NULL);
+    TEST_RUN_SUBTEST(test_mathematical_nonzero_domains, NULL);
+    TEST_RUN_SUBTEST(test_odd_hyperbolic_fourier_copy_and_rendering, NULL);
     TEST_RUN_SUBTEST(test_hyperbolic_fourier_domains_and_beta_symbol, NULL);
     TEST_RUN_SUBTEST(test_inverse_hyperbolic_beta_spectra, NULL);
 }

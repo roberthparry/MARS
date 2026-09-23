@@ -228,3 +228,10 @@ expr_t *expr_finite_part(const expr_t *a)
 {
     return signal_new(&ops_finite_part, a);
 }
+
+/* Half-line reciprocals retain regularisation internally but display the evaluated quotient. */
+bool expr_is_half_line_finite_part(const expr_t *expr)
+{
+    return expr && expr->ops == &ops_finite_part && expr->a && expr->a->ops == &ops_div &&
+           expr->a->a && expr->a->a->ops == &ops_step;
+}

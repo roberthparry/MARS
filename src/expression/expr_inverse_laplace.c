@@ -36,11 +36,26 @@ static expr_t *inverse_clean(expr_t *owned)
     return out;
 }
 
-/* Only literal algebraic values establish non-zero divisors; variable bindings are never sampled. */
+/* Evaluate closed constants (including ln(10)), never numerically supplied free parameters. */
+static bool inverse_literal(const expr_t *f, number_t *value)
+{
+    if (!f)
+        return false;
+    expr_bindings_t *bindings = expr_bindings_from_expr_internal(f);
+    bool closed = expr_bindings_count(bindings) == 0u;
+    expr_bindings_free(bindings);
+    if (closed) {
+        num_destroy(value);
+        *value = expr_eval(f);
+    }
+    return closed && num_is_finite(*value);
+}
+
+/* Only closed constants establish non-zero divisors; variable bindings are never sampled. */
 static bool inverse_nonzero(const expr_t *f)
 {
     number_t value = NUM_ZERO;
-    bool valid = expr_match_const_value(f, &value) && num_is_finite(value) && !num_is_zero(value);
+    bool valid = inverse_literal(f, &value) && !num_is_zero(value);
     num_destroy(&value);
     return valid;
 }
@@ -863,14 +878,327 @@ static expr_t *inverse_logarithm(const expr_t *numerator, const expr_t *denomina
     return out;
 }
 
+static expr_t *inverse_rule(const expr_t *f, const expr_t *metadata);
+static expr_t *inverse_guarded(expr_t *formula, expr_t *conditions);
+
+/* Finite linearity preserves a compact spectrum and its bound index. Do not expand
+ * binomial rational sums into a common denominator before applying the inverse. */
+static expr_t *inverse_finite_sum(const expr_t *f, const expr_t *metadata)
+{
+    if (f->ops != &ops_summation || !f->b || f->b->ops != &ops_argument_list ||
+        !expr_is_var(f->b->a))
+        return NULL;
+    const expr_t *index = f->b->a;
+    const expr_t *limits = f->b->b;
+    const expr_t *lower = limits && limits->ops == &ops_argument_list ? limits->a : NULL;
+    const expr_t *upper = lower ? limits->b : limits;
+    if (!upper || expr_struct_eq(index, metadata->a) || expr_struct_eq(index, metadata->b->a))
+        return NULL;
+    number_t lo = NUM_ZERO, hi = NUM_ZERO;
+    long first = 0, last = 0, divisor = 0;
+    bool finite = (!lower || inverse_literal(lower, &lo)) && inverse_literal(upper, &hi) &&
+                  num_get_small_rational(lo, &first, &divisor) && divisor == 1 &&
+                  num_get_small_rational(hi, &last, &divisor) && divisor == 1 &&
+                  first >= -64 && first <= 64 && last >= -64 && last <= 64 && last - first <= 64;
+    num_destroy(&hi);
+    num_destroy(&lo);
+    if (!finite)
+        return NULL;
+    if (last < first)
+        return expr_const_zero();
+    expr_t *body = inverse_clean(inverse_rule(f->a, metadata));
+    if (!body)
+        return NULL;
+    const expr_t *term = body;
+    expr_t *conditions = NULL;
+    while (term->ops == &ops_real_domain) {
+        for (const expr_t *pair = term->b; pair; pair = pair->b->b) {
+            /* An index-dependent condition needs a quantified guard, not a free index. */
+            if (inverse_uses(pair->a, index) || inverse_uses(pair->b->a, index)) {
+                expr_free(conditions);
+                expr_free(body);
+                return NULL;
+            }
+            expr_t *copy = expr_alloc(&ops_argument_list);
+            copy->a = expr_clone(pair->a);
+            copy->b = expr_alloc(&ops_argument_list);
+            copy->b->a = expr_clone(pair->b->a);
+            copy->b->b = conditions;
+            conditions = copy;
+        }
+        term = term->a;
+    }
+    expr_t *zero = expr_const_zero();
+    expr_t *out = expr_new_finite_summation_range(term, index, lower ? lower : zero, upper);
+    expr_free(zero);
+    expr_free(body);
+    return inverse_guarded(out, conditions);
+}
+
+/* A parameter guard is retained unless closed arithmetic proves it. */
+static bool inverse_positive(const expr_t *value, bool real, expr_t **conditions)
+{
+    number_t n = NUM_ZERO;
+    bool known = inverse_literal(value, &n);
+    number_t part = num_real_part(n);
+    bool valid = !known || (num_gt(part, NUM_ZERO) && (!real || num_is_real(n)));
+    num_destroy(&part);
+    num_destroy(&n);
+    if (!valid || known)
+        return valid;
+    expr_t *pair = expr_alloc(&ops_argument_list);
+    pair->a = expr_clone(value);
+    pair->b = expr_alloc(&ops_argument_list);
+    pair->b->a = expr_const_zero();
+    pair->b->b = *conditions;
+    *conditions = pair;
+    if (real) {
+        pair = expr_alloc(&ops_argument_list);
+        pair->a = expr_new_unary_internal(&ops_real_parameter, expr_clone(value));
+        pair->b = expr_alloc(&ops_argument_list);
+        pair->b->a = expr_const_zero();
+        pair->b->b = *conditions;
+        *conditions = pair;
+    }
+    return true;
+}
+
+/* Both arguments are owned; keep the domain beside the recovered formula. */
+static expr_t *inverse_guarded(expr_t *formula, expr_t *conditions)
+{
+    if (!formula || !conditions) {
+        expr_free(conditions);
+        return formula;
+    }
+    expr_t *out = expr_alloc(&ops_real_domain);
+    out->a = formula;
+    out->b = conditions;
+    return out;
+}
+
+/* Preserve parameter restrictions but consume the Bromwich contour's source half-plane. */
+static expr_t *inverse_domain(const expr_t *f, const expr_t *metadata)
+{
+    const expr_t *s = metadata->a;
+    expr_t *conditions = NULL;
+    expr_t **tail = &conditions;
+    for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
+        if (expr_struct_eq(pair->a, s) && !inverse_uses(pair->b->a, s))
+            continue;
+        if (inverse_uses(pair->a, s) || inverse_uses(pair->b->a, s)) {
+            expr_free(conditions);
+            return NULL;
+        }
+        *tail = expr_alloc(&ops_argument_list);
+        (*tail)->a = expr_clone(pair->a);
+        (*tail)->b = expr_alloc(&ops_argument_list);
+        (*tail)->b->a = expr_clone(pair->b->a);
+        tail = &(*tail)->b->b;
+    }
+    return inverse_guarded(inverse_rule(f->a, metadata), conditions);
+}
+
+/* Separate scalar factors regardless of association, without distributing across sums. */
+static void inverse_scalar_parts(const expr_t *f, const expr_t *s, expr_t **scalar, expr_t **dependent)
+{
+    if (!inverse_uses(f, s)) {
+        *scalar = expr_clone(f);
+        *dependent = expr_const_one();
+        return;
+    }
+    if (f->ops == &ops_neg) {
+        inverse_scalar_parts(f->a, s, scalar, dependent);
+        expr_t *negative = inverse_clean(expr_neg(*scalar));
+        expr_free(*scalar);
+        *scalar = negative;
+        return;
+    }
+    if (f->ops == &ops_mul || f->ops == &ops_div) {
+        expr_t *as = NULL, *ad = NULL, *bs = NULL, *bd = NULL;
+        inverse_scalar_parts(f->a, s, &as, &ad);
+        inverse_scalar_parts(f->b, s, &bs, &bd);
+        bool product = f->ops == &ops_mul;
+        if (product || inverse_nonzero(bs)) {
+            *scalar = inverse_clean(product ? expr_mul(as, bs) : expr_div(as, bs));
+            *dependent = inverse_clean(product ? expr_mul(ad, bd) : expr_div(ad, bd));
+        }
+        expr_free(bd);
+        expr_free(bs);
+        expr_free(ad);
+        expr_free(as);
+        if (*scalar)
+            return;
+    }
+    *scalar = expr_const_one();
+    *dependent = expr_clone(f);
+}
+
+/* Principal powers of positive-real affine multiples: (a*s+b)^(-p), Re(p)>0. */
+static expr_t *inverse_fractional_power(const expr_t *f, const expr_t *s, const expr_t *t)
+{
+    bool reciprocal = f->ops == &ops_div && expr_const_is_one(f->a);
+    const expr_t *power = reciprocal ? f->b : f;
+    const expr_t *base = NULL, *exponent = NULL;
+    expr_t *p = NULL, *conditions = NULL, *out = NULL;
+    number_t constant = NUM_ZERO;
+    if (expr_match_pow_const(power, &base, &constant))
+        p = expr_new_const(constant);
+    else if (expr_match_pow_expr(power, &base, &exponent) && !inverse_uses(exponent, s))
+        p = expr_clone(exponent);
+    else if (power->ops == &ops_sqrt || power->ops == &ops_cubrt) {
+        base = power->a;
+        expr_t *one = expr_const_one();
+        expr_t *divisor = expr_const_long(power->ops == &ops_sqrt ? 2 : 3);
+        p = inverse_clean(expr_div(one, divisor));
+        expr_free(divisor);
+        expr_free(one);
+    }
+    num_destroy(&constant);
+    if (!p)
+        return NULL;
+    if (!reciprocal) {
+        expr_t *negative = inverse_clean(expr_neg(p));
+        expr_free(p);
+        p = negative;
+    }
+    inverse_poly_t affine = {0};
+    if (!inverse_poly_collect(base, s, &affine) || affine.degree != 1u ||
+        !inverse_positive(p, false, &conditions) || !inverse_positive(affine.coefficient[1], true, &conditions))
+        goto cleanup;
+    expr_t *one = expr_const_one();
+    expr_t *order = inverse_clean(expr_sub(p, one));
+    expr_t *monomial = expr_pow_xp(t, order);
+    expr_t *gamma = expr_gamma(p);
+    expr_t *scale = expr_pow_xp(affine.coefficient[1], p);
+    expr_t *denominator = expr_mul(gamma, scale);
+    expr_t *amplitude = expr_div(monomial, denominator);
+    expr_t *rate = expr_div(affine.coefficient[0], affine.coefficient[1]);
+    expr_t *product = expr_mul(rate, t);
+    expr_t *negative = expr_neg(product);
+    expr_t *envelope = expr_exp(negative);
+    out = inverse_clean(expr_mul(amplitude, envelope));
+    expr_free(envelope);
+    expr_free(negative);
+    expr_free(product);
+    expr_free(rate);
+    expr_free(amplitude);
+    expr_free(denominator);
+    expr_free(scale);
+    expr_free(gamma);
+    expr_free(monomial);
+    expr_free(order);
+    expr_free(one);
+cleanup:
+    inverse_poly_clear(&affine);
+    expr_free(p);
+    return inverse_guarded(out, conditions);
+}
+
+/* Extract one affine exponential from a product or quotient, preserving its remaining spectrum. */
+static bool inverse_delay_parts(const expr_t *f, const expr_t *s, expr_t **rate, expr_t **rest)
+{
+    if (f->ops == &ops_exp) {
+        inverse_poly_t affine = {0};
+        bool ok = inverse_poly_collect(f->a, s, &affine) && affine.degree == 1u;
+        if (ok) {
+            *rate = expr_clone(affine.coefficient[1]);
+            *rest = inverse_clean(expr_exp(affine.coefficient[0]));
+        }
+        inverse_poly_clear(&affine);
+        return ok;
+    }
+    if (f->ops != &ops_mul && f->ops != &ops_div && f->ops != &ops_neg)
+        return false;
+    expr_t *inner = NULL;
+    if (inverse_delay_parts(f->a, s, rate, &inner)) {
+        *rest = inverse_clean(f->ops == &ops_mul ? expr_mul(inner, f->b)
+                              : f->ops == &ops_div ? expr_div(inner, f->b) : expr_neg(inner));
+    } else if (f->b && inverse_delay_parts(f->b, s, rate, &inner)) {
+        *rest = inverse_clean(f->ops == &ops_mul ? expr_mul(f->a, inner) : expr_div(f->a, inner));
+        if (f->ops == &ops_div) {
+            expr_t *negative = inverse_clean(expr_neg(*rate));
+            expr_free(*rate);
+            *rate = negative;
+        }
+    }
+    expr_free(inner);
+    return *rest != NULL;
+}
+
+/* A causal extension is zero before its delay, not undefined there. A positive-time
+ * recovery guard therefore stays on t, whilst parameter guards remain unchanged. */
+static const expr_t *inverse_causal_body(const expr_t *f, const expr_t *t, expr_t **conditions)
+{
+    while (f && f->ops == &ops_real_domain) {
+        for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
+            bool positive_time = expr_struct_eq(pair->a, t) && expr_const_is_zero(pair->b->a);
+            bool real_time = pair->a->ops == &ops_real_parameter && expr_struct_eq(pair->a->a, t);
+            if (!positive_time && !real_time && (inverse_uses(pair->a, t) || inverse_uses(pair->b->a, t)))
+                return NULL;
+            expr_t *copy = expr_alloc(&ops_argument_list);
+            copy->a = expr_clone(pair->a);
+            copy->b = expr_alloc(&ops_argument_list);
+            copy->b->a = expr_clone(pair->b->a);
+            copy->b->b = *conditions;
+            *conditions = copy;
+        }
+        f = f->a;
+    }
+    return f;
+}
+
+/* L^-1{exp(-c*s)G(s)} = step(t-c)g(t-c), for a real causal delay c>0. */
+static expr_t *inverse_delay(const expr_t *f, const expr_t *metadata)
+{
+    const expr_t *s = metadata->a, *t = metadata->b->a;
+    expr_t *rate = NULL, *rest = NULL, *out = NULL, *conditions = NULL;
+    if (!inverse_delay_parts(f, s, &rate, &rest))
+        return NULL;
+    expr_t *delay = inverse_clean(expr_neg(rate));
+    if (inverse_positive(delay, true, &conditions)) {
+        expr_t *original = inverse_clean(inverse_rule(rest, metadata));
+        const expr_t *body = inverse_causal_body(original, t, &conditions);
+        if (body) {
+            expr_t *coordinate = inverse_clean(expr_sub(t, delay));
+            expr_t *shifted = expr_substitute(body, t, coordinate);
+            expr_t *step = expr_step(coordinate);
+            out = inverse_clean(expr_mul(step, shifted));
+            expr_free(step);
+            expr_free(shifted);
+            expr_free(coordinate);
+        }
+        expr_free(original);
+    }
+    expr_free(delay);
+    expr_free(rest);
+    expr_free(rate);
+    return inverse_guarded(out, conditions);
+}
+
 static expr_t *inverse_rule(const expr_t *f, const expr_t *metadata)
 {
     const expr_t *s = metadata->a;
     const expr_t *t = metadata->b->a;
     if (expr_const_is_zero(f))
         return expr_const_zero();
-    expr_t *out = NULL;
-    if (f->ops == &ops_div || f->ops == &ops_mul) {
+    if (f->ops == &ops_real_domain)
+        return inverse_domain(f, metadata);
+    expr_t *out = expr_inverse_laplace_gaussian_pair(f, s, t);
+    if (!out)
+        out = expr_inverse_laplace_special_pair(f, s, t);
+    if (!out)
+        out = expr_inverse_laplace_elementary_pair(f, s, t);
+    if (!out)
+        out = inverse_finite_sum(f, metadata);
+    if (!out)
+        out = inverse_delay(f, metadata);
+    if (out)
+        return out;
+    const expr_t *base = NULL;
+    long power = 0;
+    /* Both signs of an outer integer power may enclose a rational function.
+     * The recursive fraction collector already moves reciprocal factors correctly. */
+    if (f->ops == &ops_div || f->ops == &ops_mul || inverse_integer_power(f, &base, &power)) {
         expr_t *numerator = NULL, *denominator = NULL;
         inverse_fraction_parts(f, &numerator, &denominator);
         numerator = inverse_clean(numerator);
@@ -880,17 +1208,25 @@ static expr_t *inverse_rule(const expr_t *f, const expr_t *metadata)
         expr_free(denominator);
         expr_free(numerator);
     }
-    const expr_t *base = NULL;
-    long power = 0;
-    if (!out && inverse_integer_power(f, &base, &power) && power < 0) {
-        expr_t *one = expr_const_one();
-        expr_t *denominator = inverse_power(base, (size_t)-power);
-        out = inverse_rational(one, denominator, s, t);
-        expr_free(denominator);
-        expr_free(one);
-    }
+    /* Preserve established exact integer-pole output before trying general powers. */
+    if (!out)
+        out = inverse_fractional_power(f, s, t);
     if (out)
         return out;
+    if (f->ops == &ops_mul || f->ops == &ops_div || f->ops == &ops_neg) {
+        expr_t *scalar = NULL, *dependent = NULL;
+        inverse_scalar_parts(f, s, &scalar, &dependent);
+        if (!expr_const_is_one(scalar) && inverse_uses(dependent, s) && !expr_struct_eq(dependent, f)) {
+            expr_t *body = inverse_rule(dependent, metadata);
+            if (body)
+                out = inverse_clean(expr_mul(scalar, body));
+            expr_free(body);
+        }
+        expr_free(dependent);
+        expr_free(scalar);
+        if (out)
+            return out;
+    }
     if (f->ops == &ops_add || f->ops == &ops_sub) {
         expr_t *a = inverse_rule(f->a, metadata);
         expr_t *b = inverse_rule(f->b, metadata);
@@ -931,6 +1267,22 @@ static expr_t *inverse_rule(const expr_t *f, const expr_t *metadata)
         if (a)
             out = expr_div(a, f->b);
         expr_free(a);
+    } else if (f->ops == &ops_div && (f->a->ops == &ops_add || f->a->ops == &ops_sub)) {
+        /* Linearity also applies when a common denominator encloses the sum. */
+        expr_t *left = inverse_clean(expr_div(f->a->a, f->b));
+        expr_t *right = inverse_clean(expr_div(f->a->b, f->b));
+        expr_t *a = inverse_rule(left, metadata), *b = inverse_rule(right, metadata);
+        if (a || b) {
+            if (!a)
+                a = inverse_formal(left, metadata);
+            if (!b)
+                b = inverse_formal(right, metadata);
+            out = f->a->ops == &ops_add ? expr_add(a, b) : expr_sub(a, b);
+        }
+        expr_free(b);
+        expr_free(a);
+        expr_free(right);
+        expr_free(left);
     }
     return out;
 }

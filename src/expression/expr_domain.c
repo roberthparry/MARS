@@ -6,6 +6,13 @@
 
 static bool domain_numeric(const expr_t *expr);
 
+/* Recognise |z| > 0 as z != 0 without changing the predicate's evaluation. */
+const expr_t *expr_domain_nonzero_operand(const expr_t *condition)
+{
+    return condition && expr_is_op(condition->a, &ops_abs) && condition->b &&
+                   expr_const_is_zero(condition->b->a) ? condition->a->a : NULL;
+}
+
 static bool domain_same_value(const expr_t *left, const expr_t *right)
 {
     // Parsed conditions and inferred transform targets can have separate IDs for the same free name.
@@ -25,6 +32,8 @@ static number_t real_bound_eval(expr_t *expr)
 
 static expr_t *real_bound_new(const expr_t *value)
 {
+    if (value->ops == &ops_real_bound || value->ops == &ops_imag_coordinate)
+        return expr_clone(value);
     if (domain_numeric(value)) {
         number_t number = expr_eval(value);
         number_t real = num_is_finite(number) ? num_real_part(number) : num_clone(NUM_NAN);
@@ -49,6 +58,51 @@ const expr_ops_t ops_real_bound = {
     .eval = real_bound_eval, .kind = EXPR_KIND_REAL_BOUND, .arity = EXPR_OP_UNARY,
     .expression_name = "Re", .function_name = "realpart", .TeX_name = "\\operatorname{Re}",
     .apply_unary = real_bound_new, .simplify = real_bound_simplify,
+};
+
+/* Cartesian coordinates use the existing number-layer projections. They are not holomorphic derivatives. */
+expr_t *expr_real_coordinate(const expr_t *value)
+{
+    return real_bound_new(value);
+}
+
+static number_t imag_coordinate_eval(expr_t *expr)
+{
+    number_t value = expr_eval(expr->a);
+    number_t result = num_is_finite(value) ? num_imag_part(value) : num_clone(NUM_NAN);
+    num_destroy(&value);
+    return result;
+}
+
+/* Keep a complex coordinate intact while allowing its imaginary component to be integrated out. */
+expr_t *expr_imag_coordinate(const expr_t *value)
+{
+    if (value->ops == &ops_real_bound || value->ops == &ops_imag_coordinate)
+        return expr_const_zero();
+    if (domain_numeric(value)) {
+        number_t number = expr_eval(value);
+        number_t imag = num_is_finite(number) ? num_imag_part(number) : num_clone(NUM_NAN);
+        expr_t *result = expr_new_const(imag);
+        num_destroy(&imag);
+        num_destroy(&number);
+        return result;
+    }
+    return expr_new_unary_internal(&ops_imag_coordinate, expr_clone(value));
+}
+
+static expr_t *imag_coordinate_simplify(const expr_t *expr, expr_t *a, expr_t *b)
+{
+    (void)expr;
+    expr_t *result = expr_imag_coordinate(a);
+    expr_free(a);
+    expr_free(b);
+    return result;
+}
+
+const expr_ops_t ops_imag_coordinate = {
+    .eval = imag_coordinate_eval, .kind = EXPR_KIND_IMAG_COORDINATE, .arity = EXPR_OP_UNARY,
+    .expression_name = "Im", .function_name = "imagpart", .TeX_name = "\\operatorname{Im}",
+    .apply_unary = expr_imag_coordinate, .simplify = imag_coordinate_simplify,
 };
 
 static number_t real_parameter_eval(expr_t *expr)
@@ -313,7 +367,11 @@ char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
         return NULL;
     expr_t *operand = shifted_formal ? expr_clone(source->a) : domain_specialise_copy(source->a);
     char *body = expr_to_TeX_body(operand);
-    char *from = expr_to_TeX_body(source->b->a);
+    /* The integration coordinate is a symbol, even when copied with an unset binding. */
+    expr_t *coordinate = source->b->a->name ? expr_new_named_var(NUM_NAN, source->b->a->name)
+                                          : expr_clone(source->b->a);
+    char *from = expr_to_TeX_body(coordinate);
+    expr_free(coordinate);
     char *to = expr_to_TeX_body(source->b->b->a);
     char *rhs = expr_to_TeX_body(result);
     char *out = NULL;

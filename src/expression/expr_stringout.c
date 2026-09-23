@@ -313,14 +313,28 @@ static int expr_tostring_should_emit_binding_expr(const expr_t *f)
     return is_builtin_const && value_matches_builtin;
 }
 
-static void emit_atom(expr_t *f, sbuf_t *b)
+/* A numerical atom can print as a quotient or an imaginary product. Both need
+ * grouping in denominators and powers: a/2i would otherwise parse as (a/2)i. */
+static bool numeric_atom_needs_grouping(const expr_t *expr, const char *text, int parent_prec)
+{
+    return text && parent_prec > PREC_MUL &&
+           (strchr(text, '/') != NULL || (expr_is_const(expr) && !num_is_real(expr->c) &&
+                                         !num_eq(expr->c, NUM_I)));
+}
+
+static void emit_atom(expr_t *f, sbuf_t *b, int parent_prec)
 {
     if (expr_is_const(f)) {
         if (expr_tostring_should_emit_binding_expr(f)) {
             char *text = expr_binding_expr_to_string(f->binding_expr);
 
             if (text) {
+                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
+                if (grouped)
+                    sbuf_putc(b, '(');
                 sbuf_puts(b, text);
+                if (grouped)
+                    sbuf_putc(b, ')');
                 free(text);
             }
         } else if (f->name && *f->name) {
@@ -328,7 +342,12 @@ static void emit_atom(expr_t *f, sbuf_t *b)
         } else {
             char *text = expr_const_to_string_local(f);
             if (text) {
+                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
+                if (grouped)
+                    sbuf_putc(b, '(');
                 sbuf_puts(b, text);
+                if (grouped)
+                    sbuf_putc(b, ')');
                 free(text);
             }
         }
@@ -512,6 +531,20 @@ static int mul_factor_needs_visible_parens(const expr_t *factor)
     num_destroy(&imaginary);
     num_destroy(&real);
     return needs_parens;
+}
+
+/* A leading imaginary coefficient needs no grouping; a trailing negative factor still does. */
+static bool mul_coefficient_needs_parens(const expr_t *factor, bool leading)
+{
+    if (leading && expr_is_unnamed_const(factor) && !num_is_real(factor->c) &&
+        !expr_tostring_should_emit_binding_expr(factor)) {
+        number_t real = num_real_part(factor->c);
+        bool imaginary = num_is_zero(real);
+        num_destroy(&real);
+        if (imaginary)
+            return false;
+    }
+    return mul_factor_needs_visible_parens(factor);
 }
 
 static int add_rhs_needs_visible_parens(const expr_t *rhs)
@@ -2075,17 +2108,19 @@ static void emit_formal_derivative_TeX(const expr_t *f, sbuf_t *b)
         return;
     }
 
-    sbuf_puts(b, "\\operatorname{D}_{");
-    for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
-        const expr_t *wrt = f->formal_wrts[i];
-
-        if (i > 0u)
-            sbuf_putc(b, ' ');
-        emit_TeX_name(b, (wrt && wrt->name) ? wrt->name : "x");
+    /* The default mathematical display uses a differential fraction, not the parser's D-name.
+     * Keep the operand beside the operator so a composite expression remains full-sized. */
+    sbuf_puts(b, "\\frac{\\partial");
+    if (f->formal_wrt_count > 1u) {
+        char order[32];
+        snprintf(order, sizeof(order), "^{%zu}", f->formal_wrt_count);
+        sbuf_puts(b, order);
     }
-    sbuf_puts(b, "}\\left(");
+    sbuf_puts(b, "}{");
+    emit_formal_partial_denominator(f, b);
+    sbuf_puts(b, "}\\left[");
     emit_TeX_expr(f->a, b, PREC_LOWEST);
-    sbuf_puts(b, "\\right)");
+    sbuf_puts(b, "\\right]");
 }
 
 static void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b)
@@ -2146,15 +2181,23 @@ static void emit_argument_list_expr(const expr_t *f, sbuf_t *b)
 
 static void emit_formal_derivative_func(const expr_t *f, sbuf_t *b)
 {
-    sbuf_putc(b, 'D');
+    /* Nest coordinate groups in differentiation order; repeated coordinates share one order. */
     for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
-        const expr_t *wrt = f->formal_wrts[i];
-
-        emit_name_func(b, (wrt && wrt->name) ? wrt->name : "x");
+        if (i == 0u || !expr_struct_eq(f->formal_wrts[i - 1u], f->formal_wrts[i]))
+            sbuf_puts(b, "Derivative(");
     }
-    sbuf_putc(b, '(');
     emit_func(f->a, b, PREC_LOWEST);
-    sbuf_putc(b, ')');
+    for (size_t i = 0u; i < f->formal_wrt_count;) {
+        size_t end = i + 1u;
+        while (end < f->formal_wrt_count && expr_struct_eq(f->formal_wrts[i], f->formal_wrts[end]))
+            ++end;
+        sbuf_puts(b, ", ");
+        emit_name_func(b, f->formal_wrts[i]->name ? f->formal_wrts[i]->name : "x");
+        char order[32];
+        snprintf(order, sizeof(order), ", %zu)", end - i);
+        sbuf_puts(b, order);
+        i = end;
+    }
 }
 
 static void emit_arbitrary_function_func(const expr_t *f, sbuf_t *b)
@@ -3221,13 +3264,16 @@ static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (expr_is_op(f, &ops_div) && expr_is_negative(f->a)) {
+    if (expr_is_op(f, &ops_div) && expr_is_negative(f)) {
         int need = PREC_MUL < parent_prec;
         if (need)
             sbuf_putc(b, '(');
-        emit_expr_abs(f->a, b, PREC_MUL);
+        emit_factor_abs(f->a, b);
         sbuf_putc(b, '/');
-        emit_expr(f->b, b, PREC_POW);
+        if (expr_is_negative(f->b))
+            emit_expr_abs(f->b, b, PREC_POW);
+        else
+            emit_expr(f->b, b, PREC_POW);
         if (need)
             sbuf_putc(b, ')');
         return;
@@ -4330,21 +4376,27 @@ static void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (expr_is_op(f, &ops_div) && expr_is_negative(f->a)) {
+    if (expr_is_op(f, &ops_div) && expr_is_negative(f)) {
         if (emit_TeX_calculus_quotient(f, b, parent_prec, true))
             return;
         int need = PREC_MUL < parent_prec;
         if (need)
             sbuf_puts(b, "\\left(");
-        if (emit_TeX_rational_quotient(f->a, f->b, b, true, PREC_LOWEST)) {
+        if (expr_is_negative(f->a) && emit_TeX_rational_quotient(f->a, f->b, b, true, PREC_LOWEST)) {
             if (need)
                 sbuf_puts(b, "\\right)");
             return;
         }
         sbuf_puts(b, "\\frac{");
-        emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
+        if (expr_is_negative(f->a))
+            emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
+        else
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
         sbuf_puts(b, "}{");
-        emit_TeX_expr(f->b, b, PREC_LOWEST);
+        if (expr_is_negative(f->b))
+            emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
+        else
+            emit_TeX_expr(f->b, b, PREC_LOWEST);
         sbuf_putc(b, '}');
         if (need)
             sbuf_puts(b, "\\right)");
@@ -4456,6 +4508,13 @@ static const expr_t *TeX_postfix_factorial_argument(const expr_t *expr)
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     expr_cartesian_composition_t view;
+    const bool outermost = TeX_expression_depth == 0u;
+    expr_t *resolved = outermost && expr_is_integral_transform(f) ? expr_transform_result(f) : NULL;
+    if (resolved)
+        f = resolved;
+    expr_distribution_TeX_scope_t distribution;
+    if (outermost)
+        expr_distribution_TeX_begin(f, &distribution);
     const expr_t *saved_centre = TeX_shift_centre;
     const expr_t *centre = expr_display_symmetric_shift_centre(f);
     if (centre)
@@ -4477,8 +4536,11 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     } else {
         emit_TeX_expr_inner(f, b, parent_prec);
     }
+    if (outermost)
+        expr_distribution_TeX_end(&distribution, b);
     --TeX_expression_depth;
     TeX_shift_centre = saved_centre;
+    expr_free(resolved);
 }
 
 static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
@@ -4487,6 +4549,9 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         sbuf_puts(b, "0");
         return;
     }
+
+    if (expr_distribution_TeX_emit(f, b, parent_prec))
+        return;
 
     const expr_t *shift = NULL;
     bool subtract = false;
@@ -4507,6 +4572,12 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
             if (pair != f->b)
                 sbuf_puts(b, ",\\;");
+            const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+            if (nonzero) {
+                emit_TeX_expr(nonzero, b, PREC_LOWEST);
+                sbuf_puts(b, "\\ne 0");
+                continue;
+            }
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
                 emit_TeX_expr(pair->a->a, b, PREC_LOWEST);
                 sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "\\in\\mathbb{R}" : "\\in\\mathbb{Z}_{\\ge0}");
@@ -4517,6 +4588,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, ")>");
             emit_TeX_expr(pair->b->a, b, PREC_LOWEST);
         }
+        expr_distribution_TeX_conditions(f, b);
         sbuf_putc(b, ')');
         return;
     }
@@ -4713,6 +4785,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
         const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? TeX_unary_name(f->a) : NULL;
         if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
+            !expr_distribution_qualification(f->a) &&
             !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !expr_is_op(f->a, &ops_factorial) &&
             !TeX_postfix_factorial_argument(f->a) &&
             !strchr(unary_name ? unary_name : "", '^')) {
@@ -4801,10 +4874,11 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         for (int i = 0; i < n; i++) {
             if (i > 0)
                 emit_TeX_mul_separator(fac[i - 1], fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0 && sign > 0);
+            if (grouped)
                 sbuf_puts(b, "\\left(");
             emit_TeX_factor_abs(fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            if (grouped)
                 sbuf_puts(b, "\\right)");
         }
 
@@ -5023,6 +5097,10 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             const expr_t *lower = NULL;
             const expr_t *upper = NULL;
 
+            /* Delimit the whole aggregate when another factor can follow it. */
+            bool grouped = parent_prec >= PREC_MUL;
+            if (grouped)
+                sbuf_puts(b, "\\left(");
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
@@ -5049,6 +5127,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             TeX_index_domain = &scope;
             emit_TeX_expr(f->a, b, PREC_MUL);
             TeX_index_domain = scope.outer;
+            if (grouped)
+                sbuf_puts(b, "\\right)");
             return;
         }
         if (expr_is_op(f, &ops_qdigamma)) {
@@ -5182,6 +5262,9 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_distribution_expr_emit(f, b))
+        return;
+
     if (emit_expr_integral_cartesian(f, b, parent_prec))
         return;
 
@@ -5193,6 +5276,12 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
             if (pair != f->b)
                 sbuf_puts(b, "; ");
+            const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+            if (nonzero) {
+                emit_expr(nonzero, b, PREC_LOWEST);
+                sbuf_puts(b, " ≠ 0");
+                continue;
+            }
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
                 emit_expr(pair->a->a, b, PREC_LOWEST);
                 sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
@@ -5248,7 +5337,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
     /* Atoms */
     if (expr_is_const(f) || expr_is_var(f)) {
-        emit_atom((expr_t *)f, b);
+        emit_atom((expr_t *)f, b, parent_prec);
         return;
     }
 
@@ -5375,7 +5464,8 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         /* For unary functions raised to a power, write func²(arg)
          * rather than func(arg)² so the exponent binds to the function name.
          * Floor/ceiling keep their mathematical brackets: ⌊x⌋². */
-        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a)) {
+        if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
+            !expr_distribution_qualification(f->a)) {
             expr_t *inner = f->a;
             if (expr_is_op(inner, &ops_floor) || expr_is_op(inner, &ops_ceil)) {
                 emit_expr(inner, b, PREC_POW);
@@ -5478,10 +5568,11 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         for (int i = 0; i < n; i++) {
             if (i > 0)
                 emit_expr_mul_separator_local(fac[i - 1], fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0 && sign > 0);
+            if (grouped)
                 sbuf_putc(b, '(');
             emit_factor_abs(fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            if (grouped)
                 sbuf_putc(b, ')');
         }
 
@@ -5693,6 +5784,10 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             number_t upper_value = NUM_NAN;
             bool infinite = false;
 
+            /* Otherwise a following product or quotient is reparsed inside the sum. */
+            bool grouped = parent_prec >= PREC_MUL;
+            if (grouped)
+                sbuf_putc(b, '(');
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
@@ -5728,6 +5823,8 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_putc(b, ')');
             sbuf_putc(b, ' ');
             emit_expr(f->a, b, PREC_MUL);
+            if (grouped)
+                sbuf_putc(b, ')');
             num_destroy(&upper_value);
             return;
         }
@@ -5785,7 +5882,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Fallback */
-    emit_atom((expr_t *)f, b);
+    emit_atom((expr_t *)f, b, parent_prec);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -6003,6 +6100,19 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_half_line_finite_part(f)) {
+        emit_func(f->a, b, parent_prec);
+        return;
+    }
+    const char *qualification = expr_distribution_qualification(f);
+    if (qualification) {
+        sbuf_putc(b, '(');
+        emit_func(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, " : ");
+        sbuf_puts(b, qualification);
+        sbuf_putc(b, ')');
+        return;
+    }
 
     if (expr_is_addsub(f) && (display_series_remainder(f) || display_sum_has_transform(f)) &&
         emit_func_display_polynomial_sum(f, b, parent_prec))
@@ -6036,6 +6146,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
             if (pair != f->b)
                 sbuf_puts(b, "; ");
+            const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+            if (nonzero) {
+                emit_func(nonzero, b, PREC_LOWEST);
+                sbuf_puts(b, " != 0");
+                continue;
+            }
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
                 emit_func(pair->a->a, b, PREC_LOWEST);
                 sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
@@ -6073,7 +6189,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             char *text = expr_binding_expr_to_function_string(f->binding_expr);
 
             if (text) {
+                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
+                if (grouped)
+                    sbuf_putc(b, '(');
                 emit_func_fragment(b, text);
+                if (grouped)
+                    sbuf_putc(b, ')');
                 free(text);
             }
         } else if (f->name && *f->name) {
@@ -6087,7 +6208,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         else {
             char *text = expr_const_to_string_local(f);
             if (text) {
+                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
+                if (grouped)
+                    sbuf_putc(b, '(');
                 emit_func_fragment(b, text);
+                if (grouped)
+                    sbuf_putc(b, ')');
                 free(text);
             }
         }

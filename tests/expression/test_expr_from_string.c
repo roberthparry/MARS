@@ -441,6 +441,59 @@ static void test_differential_symbolic_call_syntax(void)
     expr_free(expr);
 }
 
+static void test_from_function_body_formal_derivatives(void)
+{
+    static const char *sources[] = {
+        "Derivative(step(k).ln(abs(k)), k, 1)",
+        "Derivative(delta(k), k, 3)",
+        "Derivative(Derivative(f(x, y), x, 2), y, 1)",
+        "Derivative(Derivative(Derivative(f(x, y), x, 1), y, 1), x, 1)",
+        "Derivative(delta(@omega), @omega, 2)",
+        "Derivative(f([frequency]), [frequency], 2)",
+        "Derivative(y, x, 1)",
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        expr_t *original = expr_from_function_body(sources[i], NULL);
+        ASSERT_NOT_NULL(original);
+        ASSERT_TRUE(expr_is_formal_derivative(original));
+        char *body = original ? expr_to_function_body(original) : NULL;
+        ASSERT_NOT_NULL(body);
+        TEST_ASSERT_STR_EQ(body, sources[i]);
+        expr_t *copy = body ? expr_from_function_body(body, NULL) : NULL;
+        ASSERT_NOT_NULL(copy);
+        ASSERT_TRUE(expr_is_formal_derivative(copy));
+        ASSERT_TRUE(expr_formal_derivative_order(copy) == expr_formal_derivative_order(original));
+        for (size_t j = 0u; j < expr_formal_derivative_order(original); ++j) {
+            char *before = expr_to_string(expr_formal_derivative_wrt_at(original, j), style_UNBOUND);
+            char *after = expr_to_string(expr_formal_derivative_wrt_at(copy, j), style_UNBOUND);
+            TEST_ASSERT_STR_EQ(after, before);
+            free(after);
+            free(before);
+        }
+        expr_free(copy);
+        free(body);
+        expr_free(original);
+    }
+    const char *invalid[] = {"Derivative(delta(k), 2, 1)", "Derivative(delta(k), k, -1)",
+                             "Derivative(delta(k), k, 1/2)", "Derivative(delta(k), k, n)",
+                             "Derivative(delta(k), k, 1, 2)"};
+    for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        expr_t *bad = expr_from_function_body(invalid[i], NULL);
+        ASSERT_NULL(bad);
+        expr_free(bad);
+    }
+    expr_t *zero = expr_from_function_body("Derivative(delta(k), k, 0)", NULL);
+    char *body = zero ? expr_to_function_body(zero) : NULL;
+    TEST_ASSERT_STR_EQ(body, "delta(k)");
+    free(body);
+    expr_free(zero);
+    expr_t *ordered = expr_from_function_body("Derivative(delta(k), n)", NULL);
+    body = ordered ? expr_to_function_body(ordered) : NULL;
+    TEST_ASSERT_STR_EQ(body, "Derivative(delta(k), n)");
+    free(body);
+    expr_free(ordered);
+}
+
 static void test_from_function_body_syntax(void)
 {
     /* Function syntax distinguishes calls from explicit multiplication. */
@@ -795,11 +848,11 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(scaled_product_text);
             ASSERT_NOT_NULL(scaled_product_function);
             ASSERT_NOT_NULL(scaled_product_round_trip);
-            TEST_ASSERT_STR_EQ(scaled_product_text, "x·Π_(k=1)^100 (1 - (x/(πk))²)");
+            TEST_ASSERT_STR_EQ(scaled_product_text, "x·(Π_(k=1)^100 (1 - (x/(πk))²))");
             ASSERT_NOT_NULL(strstr(scaled_product_function, "return x.product(k, 1, 100, 1 - (x/(@pi.k))^2)."));
             TEST_ASSERT_STR_EQ(scaled_product_TeX,
-                               "x\\mkern-2mu \\prod_{k=1}^{100}\\left(1 - \\left(\\frac{x}{\\pi\\mkern-2mu "
-                               "k}\\right)^{2}\\right)");
+                               "x\\mkern-2mu \\left(\\prod_{k=1}^{100}\\left(1 - \\left(\\frac{x}{\\pi\\mkern-2mu "
+                               "k}\\right)^{2}\\right)\\right)");
             expr_free(scaled_product_round_trip);
             free(scaled_product_function);
             free(scaled_product_text);
@@ -4365,5 +4418,6 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);
     TEST_RUN_SUBTEST(test_from_function_body_syntax, NULL);
+    TEST_RUN_SUBTEST(test_from_function_body_formal_derivatives, NULL);
     TEST_RUN_SUBTEST(test_differential_symbolic_call_syntax, NULL);
 }

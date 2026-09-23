@@ -454,6 +454,10 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
 
     if (!expr || !wrt)
         return NULL;
+    if (expr_is_one_sided_log(expr)) {
+        expr_t *variable = (expr_t *)wrt;
+        return expr_new_formal_derivative(expr, 1u, &variable);
+    }
     result = expr_create_deriv_impl(expr, wrt);
     linked = result ? expr_clone_linked_symbols(result, expr) : NULL;
     expr_free(result);

@@ -68,7 +68,41 @@ BINARY_HELPER(beta)
 static inline expr_t *integer(fourier_context_t *c, long n) { return keep(c, expr_const_long(n)); }
 static inline expr_t *constant(fourier_context_t *c, number_t n) { return keep(c, expr_new_const(n)); }
 static inline expr_t *pi_constant(fourier_context_t *c) { return keep(c, expr_new_named_const(NUM_PI, "@pi")); }
+static inline expr_t *euler_constant(fourier_context_t *c)
+{
+    expr_t *out = keep(c, expr_new_named_const(NUM_EULER_MASCHERONI, "@gamma"));
+    if (out)
+        out->binding_expr = expr_binding_expr_new_const(EXPR_BINDING_CONST_GAMMA);
+    return out;
+}
 static inline expr_t *clean(fourier_context_t *c, const expr_t *e) { return keep(c, expr_simplify(e)); }
+
+/* Reify literal coefficient provenance without substituting any named parameter or variable binding. */
+static inline void exact_literals_owned(expr_t **node)
+{
+    expr_t *f = *node;
+    if (!f)
+        return;
+    if (expr_is_unnamed_const(f) && f->binding_expr && !expr_binding_expr_is_numeric_literal(f->binding_expr)) {
+        expr_t *expanded = expr_expand_preserved_for_display(f);
+        if (expanded) {
+            *node = expanded;
+            expr_free(f);
+        }
+        return;
+    }
+    exact_literals_owned(&f->a);
+    exact_literals_owned(&f->b);
+    f->simplified = false;
+    f->simplify_epoch = 0u;
+}
+
+static inline expr_t *exact_literals(fourier_context_t *c, const expr_t *f)
+{
+    expr_t *out = expr_clone(f);
+    exact_literals_owned(&out);
+    return keep(c, out);
+}
 
 static inline bool match_power(fourier_context_t *c, const expr_t *f, const expr_t **base, const expr_t **power)
 {
@@ -89,6 +123,8 @@ static inline bool uses(const expr_t *e, const expr_t *x)
     return !expr_collect_var_usage(e, 1u, &variable, &used) || used;
 }
 
+static inline bool literal_value(const expr_t *e, number_t *value);
+
 static inline expr_t *ft_abs(fourier_context_t *c, const expr_t *e)
 {
     while (e && e->ops == &ops_neg)
@@ -99,6 +135,14 @@ static inline expr_t *ft_abs(fourier_context_t *c, const expr_t *e)
         num_destroy(&value);
         return out;
     }
+    /* Retain exact named constants such as pi while removing a provable real sign.
+     * A variable's supplied value must never determine the displayed algebra. */
+    number_t value = NUM_NAN;
+    bool known_real = literal_value(e, &value) && num_is_real(value);
+    bool negative = known_real && num_lt(value, NUM_ZERO);
+    num_destroy(&value);
+    if (known_real)
+        return negative ? clean(c, ft_neg(c, e)) : keep(c, expr_clone(e));
     return keep(c, expr_abs(e));
 }
 
@@ -140,6 +184,8 @@ static inline bool literal_value(const expr_t *e, number_t *value)
 
 static inline bool positive(fourier_context_t *c, const expr_t *value)
 {
+    if (value && value->ops == &ops_real_bound)
+        value = value->a;
     expr_t *bound = clean(c, value);
     number_t n = NUM_NAN;
     bool known = literal_value(bound, &n);
@@ -163,6 +209,8 @@ static inline bool positive(fourier_context_t *c, const expr_t *value)
 static inline bool real_parameter(fourier_context_t *c, const expr_t *value)
 {
     value = clean(c, value);
+    if (value && (value->ops == &ops_real_bound || value->ops == &ops_imag_coordinate))
+        return true;
     while (value && value->ops == &ops_neg)
         value = value->a;
     expr_t *test = keep(c, expr_new_unary_internal(&ops_real_parameter, expr_clone(value)));
@@ -226,5 +274,49 @@ static inline const expr_t *exponent(const expr_t *f)
 
 /** Match a complete hyperbolic beta spectrum, returning an arena-owned unnormalised Fourier result. */
 expr_t *expr_fourier_beta_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
+/** Recognise a condition excluding exactly the ordinary representative's periodic poles. */
+bool expr_fourier_periodic_pole_condition(const expr_t *body, const expr_t *condition);
+
+/** Match periodic functions and their impulse series, before inverse normalisation. */
+expr_t *expr_fourier_periodic_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
+/** Match real affine odd hyperbolic Fourier pairs, before inverse normalisation. */
+expr_t *expr_fourier_odd_hyperbolic_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
+/** Recognise the affine pole exclusion of a cosech or coth spectrum. */
+bool expr_fourier_odd_hyperbolic_pole_condition(fourier_context_t *c, const expr_t *f,
+                                              const expr_t *x, const expr_t *condition);
+
+/** Describe the singular-integral interpretation of a recognised odd hyperbolic pair. */
+const char *expr_fourier_odd_hyperbolic_note(const expr_t *transform);
+
+/** Match real affine arctangents and their exponentially damped reciprocal spectra. */
+expr_t *expr_fourier_atan_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
+/** Recognise the pole exclusion of a matched arctangent spectrum. */
+bool expr_fourier_atan_pole_condition(fourier_context_t *c, const expr_t *f,
+                                     const expr_t *x, const expr_t *condition);
+
+/** Describe the distributional interpretation of a recognised arctangent transform. */
+const char *expr_fourier_atan_note(const expr_t *transform);
+
+/** Match inverse trigonometric and hyperbolic boundary-value pairs, before inverse normalisation. */
+expr_t *expr_fourier_branch_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
+/** Recognise precisely the real endpoint exclusions of an atanh argument. */
+bool expr_fourier_branch_pole_condition(fourier_context_t *c, const expr_t *f, const expr_t *condition);
+
+/** Match vertical-line gamma transforms and their exponential spectra. */
+expr_t *expr_fourier_gamma_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+/** Recombine Cartesian components in recovered gamma arguments after a vertical-line inverse. */
+expr_t *expr_fourier_gamma_cartesian_result(fourier_context_t *c, const expr_t *result);
+
+/** Explain non-existence for a real affine gamma argument. */
+const char *expr_fourier_gamma_note(const expr_t *transform);
+
+/** Collect scalar factors and the combined exponent of a product or quotient of exponentials. */
+bool expr_fourier_exponential_factors(fourier_context_t *c, const expr_t *f, const expr_t *x,
+                                       expr_t **phase, expr_t **scale);
 
 #endif

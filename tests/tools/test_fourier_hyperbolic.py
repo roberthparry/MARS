@@ -181,10 +181,14 @@ class HyperbolicFourierTests(unittest.TestCase):
             self.assertIn("No ordinary Fourier transform", result["value_note"])
             self.assertIn("grows exponentially", result["value_note"])
             self.assertIn("Fourier(", result["function"])
-        for body in ("sinh(t)^(-1)", "sinh(t)^(-2)", "1/sinh(t)", "cosech(2*t+1)"):
+        for body in ("sinh(t)^(-2)", "cosech(t)^2"):
             result = fields("@F{"+body+"}")
             self.assertIn("non-integrable singularity", result["value_note"])
             self.assertIn("prescription", result["value_note"])
+        for body in ("sinh(t)^(-1)", "1/sinh(t)", "cosech(2*t+1)"):
+            result = fields("@F{"+body+"}")
+            self.assertNotIn("Fourier(", result["function"])
+            self.assertIn("symmetric cancellation", result["value_note"])
         symbolic = fields("@F{sinh(a*t+b)^2}")
         self.assertIn("For real non-zero scale", symbolic["value_note"])
         boundary = fields("@F{sinh(t)^i}")
@@ -221,8 +225,11 @@ class ZZHyperbolicFourierReadmeExamples(unittest.TestCase):
         self.assertIn("Fourier(", growing["function"])
         self.assertIn("grows exponentially", growing["value_note"])
         singular = fields("@F{sinh(t)^(-1)}")
-        self.assertIn("Fourier(", singular["function"])
-        self.assertIn("non-integrable singularity", singular["value_note"])
+        self.assertNotIn("Fourier(", singular["function"])
+        self.assertIn("tanh", singular["expression"])
+        self.assertIn("symmetric cancellation", singular["value_note"])
+        value = fields("{@F{sinh(t)^(-1)} | ω=0.4}")
+        self.assertLess(abs(number(value)+1j*math.pi*math.tanh(math.pi*0.4/2)), 1e-12)
 
     def test_readme_inverse_beta_spectrum(self):
         source = "@Finv{(B(1/4+i*ω/2,1/2)-i*B(1/4-i*ω/2,1/2))/sqrt(2)}"

@@ -50,7 +50,7 @@ string_t *expr_to_text_expr(const expr_t *f)
     } else {
         sbuf_putc(&b, '{');
         sbuf_putc(&b, ' ');
-        emit_expr(conditioned ? g->a : g, &b, PREC_LOWEST);
+        const expr_t *qualified = expr_distribution_expr_body(g, &b);
         sbuf_putc(&b, ' ');
         sbuf_putc(&b, '|');
         sbuf_putc(&b, ' ');
@@ -90,6 +90,12 @@ string_t *expr_to_text_expr(const expr_t *f)
             for (const expr_t *pair = g->b; pair; pair = pair->b->b) {
                 if (vl.count || cl.count || pair != g->b)
                     sbuf_puts(&b, "; ");
+                const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+                if (nonzero) {
+                    emit_expr(nonzero, &b, PREC_LOWEST);
+                    sbuf_puts(&b, " ≠ 0");
+                    continue;
+                }
                 if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
                     emit_expr(pair->a->a, &b, PREC_LOWEST);
                     sbuf_puts(&b, expr_is_op(pair->a, &ops_real_parameter) ? " ∈ ℝ" : " ∈ ℤ≥0");
@@ -100,6 +106,11 @@ string_t *expr_to_text_expr(const expr_t *f)
                 sbuf_puts(&b, ") > ");
                 emit_expr(pair->b->a, &b, PREC_LOWEST);
             }
+        }
+        if (qualified) {
+            if (vl.count || cl.count || conditioned)
+                sbuf_puts(&b, "; ");
+            expr_distribution_expr_caption(qualified, &b);
         }
         sbuf_putc(&b, ' ');
         sbuf_putc(&b, '}');

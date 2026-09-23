@@ -192,6 +192,7 @@ typedef enum {
     EXPR_KIND_NONNEGATIVE_INTEGER,
     EXPR_KIND_REAL_PARAMETER,
     EXPR_KIND_REAL_BOUND,
+    EXPR_KIND_IMAG_COORDINATE,
     EXPR_KIND_ARGUMENT_LIST,
     EXPR_KIND_COUNT
 } expr_op_kind_t;
@@ -378,6 +379,10 @@ extern const expr_ops_t ops_indexed_symbol;
 extern const expr_ops_t ops_summation;
 extern const expr_ops_t ops_product;
 extern const expr_ops_t ops_formal_derivative;
+/** Recognise a locally integrable one-sided logarithm whose derivative must remain distributional. */
+bool expr_is_one_sided_log(const expr_t *expr);
+/** Recognise a half-line reciprocal with the unit-cutoff finite-part convention. */
+bool expr_is_half_line_finite_part(const expr_t *expr);
 extern const expr_ops_t ops_ordered_derivative;
 /** Construct an ordinary derivative of a unary symbolic function with a symbolic order. */
 expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order);
@@ -420,10 +425,25 @@ expr_t *expr_transform_result(const expr_t *transform);
 expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args);
 /** Return a recognised inverse Laplace formula, or NULL when no rule applies. */
 expr_t *expr_inverse_laplace_result(const expr_t *transform);
+/** Recognise Gaussian and error-function inverse pairs from a spectral expression. */
+expr_t *expr_inverse_laplace_gaussian_pair(const expr_t *f, const expr_t *s, const expr_t *t);
+/** Recognise special-function inverse pairs from a spectral expression. */
+expr_t *expr_inverse_laplace_special_pair(const expr_t *f, const expr_t *s, const expr_t *t);
+/** Recognise elementary transcendental inverse pairs from a spectral expression. */
+expr_t *expr_inverse_laplace_elementary_pair(const expr_t *f, const expr_t *s, const expr_t *t);
 extern const expr_ops_t ops_real_domain;
 extern const expr_ops_t ops_nonnegative_integer;
 extern const expr_ops_t ops_real_parameter;
 extern const expr_ops_t ops_real_bound;
+extern const expr_ops_t ops_imag_coordinate;
+/** Construct the real coordinate retained when integrating along a vertical line. */
+expr_t *expr_real_coordinate(const expr_t *value);
+/** Construct the imaginary coordinate used to parameterise a vertical integration line. */
+expr_t *expr_imag_coordinate(const expr_t *value);
+/** Whether every occurrence of a symbol is confined to a fixed real-coordinate projection. */
+bool expr_transform_real_coordinate_only(const expr_t *expr, const expr_t *symbol);
+/** Return the operand of a non-zero domain condition, or NULL for other predicates. */
+const expr_t *expr_domain_nonzero_operand(const expr_t *condition);
 expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
 expr_t *expr_laplace_result(const expr_t *transform);
 expr_t *expr_laplace_from_args(size_t count, expr_t *const *args);
