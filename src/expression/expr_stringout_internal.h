@@ -61,6 +61,23 @@ char *binding_rhs_TeX_string_local(const expr_t *dv);
 char *binding_rhs_c_string_local(const expr_t *dv);
 
 /* Expression emitters. */
+typedef struct expr_distribution_TeX_scope {
+    const expr_t *root;
+    const expr_t *detached;
+    bool appended;
+    struct expr_distribution_TeX_scope *outer;
+} expr_distribution_TeX_scope_t;
+
+const char *expr_distribution_qualification(const expr_t *expr);
+bool expr_distribution_has_qualification(const expr_t *expr);
+const expr_t *expr_distribution_expr_body(const expr_t *root, sbuf_t *buffer);
+bool expr_distribution_expr_emit(const expr_t *expr, sbuf_t *buffer);
+void expr_distribution_expr_caption(const expr_t *expr, sbuf_t *buffer);
+void expr_distribution_TeX_begin(const expr_t *root, expr_distribution_TeX_scope_t *scope);
+void expr_distribution_TeX_end(expr_distribution_TeX_scope_t *scope, sbuf_t *buffer);
+bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *buffer, int parent_prec);
+void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *buffer);
+
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 /** Collect borrowed additive terms in display order, with their signs, within the supplied capacity. */

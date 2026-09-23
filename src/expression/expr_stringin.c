@@ -55,6 +55,8 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 
 #include "expr_bindings.h"
 #include "expr_maths.h"
@@ -62,6 +64,9 @@
 #include "expr_stringin_scan.h"
 #include "expression.h"
 #include "ustring.h"
+
+/* Restore detached bound-Expression qualifications before parsing the body. */
+bool expr_distribution_restore(string_t **body, string_t **conditions);
 
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */
@@ -266,7 +271,7 @@ static int can_start_factor(const expr_parse_state_t *p)
         return 0;
     if (c == ' ')
         return 0;
-    if (c == '[' || c == '(' || c == '@')
+    if (c == '[' || c == '(' || c == '{' || c == '@')
         return 1;
     if (isdigit(c) || c == '.')
         return 1;
@@ -311,6 +316,41 @@ static expr_t *parse_bessel_j_zero(const expr_t *argument)
     return result;
 }
 
+/* The explicit-coordinate overload serialises formal derivatives without inventing callable names.
+ * Keep the existing two-argument, symbolic-order form unchanged. */
+static expr_t *parse_derivative_function(size_t count, expr_t *const *args)
+{
+    if (count == 2u)
+        return expr_new_ordered_derivative(args[0], args[1]);
+    if (count != 3u || (!expr_is_var(args[1]) && !(expr_is_const(args[1]) && args[1]->name)))
+        return NULL;
+    number_t value = NUM_NAN;
+    long numerator = 0, denominator = 0;
+    bool valid = expr_match_const_value(args[2], &value) &&
+                 num_get_small_rational(value, &numerator, &denominator) && denominator == 1 && numerator >= 0;
+    num_destroy(&value);
+    if (!valid)
+        return NULL;
+    if (numerator == 0)
+        return expr_clone(args[0]);
+    size_t previous = expr_formal_derivative_order(args[0]);
+    size_t repeat = (size_t)numerator;
+    if (repeat > SIZE_MAX - previous || previous + repeat > SIZE_MAX / sizeof(expr_t *))
+        return NULL;
+    size_t order = previous + repeat;
+    expr_t **wrts = calloc(order, sizeof(*wrts));
+    if (!wrts)
+        return NULL;
+    for (size_t i = 0u; i < previous; ++i)
+        wrts[i] = (expr_t *)expr_formal_derivative_wrt_at(args[0], i);
+    for (size_t i = previous; i < order; ++i)
+        wrts[i] = args[1];
+    const expr_t *operand = previous ? expr_formal_derivative_dependent(args[0]) : args[0];
+    expr_t *out = expr_new_formal_derivative(operand, order, wrts);
+    free(wrts);
+    return out;
+}
+
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2,
@@ -318,12 +358,12 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0,
     0, 0, 0, 0, 0, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1,
     0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 1, 0,
-    0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 4, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
     1, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
@@ -337,13 +377,13 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 1, 3, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0,
     4, 3, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0,
-    2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1,
     0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1, 0, 3, 0,
     0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0,
     0, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0, 0, 1, 2,
     0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 6, 0, 0, 0, 7, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0,
 };
 
 // clang-format off
@@ -361,6 +401,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [ 10] = { .kw = "fibonacci",           .arity = 1u,        .ops = &ops_fibonacci,          .ufn = expr_fibonacci },
     [ 11] = { .kw = "step",                .arity = 1u,        .ops = &ops_step,               .ufn = expr_step },
     [ 12] = { .kw = "ceil",                .arity = 1u,        .ops = &ops_ceil,               .ufn = expr_ceil },
+    [ 13] = { .kw = "imagpart",            .arity = 1u,        .ops = &ops_imag_coordinate, .ufn = expr_imag_coordinate },
     [ 15] = { .kw = "acoth",               .arity = 1u,        .ops = &ops_acoth,              .ufn = expr_acoth },
     [ 16] = { .kw = "W0",                  .arity = 1u,        .ops = &ops_lambert_w0,         .ufn = expr_lambert_w0 },
     [ 17] = { .kw = "gamma",               .arity = 1u,        .ops = &ops_gamma,              .ufn = expr_gamma },
@@ -393,7 +434,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [ 71] = { .kw = "shr",                 .arity = 2u,        .ops = &ops_shr,                .bfn = expr_shr },
     [ 72] = { .kw = "factors",             .arity = 1u,        .ops = &ops_factors,            .ufn = expr_factors },
     [ 73] = { .kw = "logbetapdf",          .arity = 3u,                                        .tfn = expr_logbeta_pdf },
-    [ 74] = { .kw = "ℋ",                   .arity = 2u,        .ops = &ops_hermite_h,          .bfn = expr_hermite_h },
+    [ 74] = { .kw = "ℋ",                  .arity = 2u,        .ops = &ops_hermite_h,          .bfn = expr_hermite_h },
     [ 77] = { .kw = "cosec",               .arity = 1u,        .ops = &ops_cosec,              .ufn = expr_cosec },
     [ 78] = { .kw = "sin",                 .arity = 1u,        .ops = &ops_sin,                .ufn = expr_sin },
     [ 79] = { .kw = "asinh",               .arity = 1u,        .ops = &ops_asinh,              .ufn = expr_asinh },
@@ -461,7 +502,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [202] = { .kw = "gammainclower",       .arity = 2u,        .ops = &ops_gammainc_lower,     .bfn = expr_gammainc_lower },
     [205] = { .kw = "arcsch",              .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
     [206] = { .kw = "cl₂",                 .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
-    [208] = { .kw = "ordered_derivative",  .arity = 2u,        .ops = &ops_ordered_derivative, .bfn = expr_new_ordered_derivative },
+    [208] = { .kw = "ordered_derivative",  .arity = UINT_MAX,                                  .vfn = parse_derivative_function },
     [209] = { .kw = "gammainv",            .arity = 1u,        .ops = &ops_gammainv,           .ufn = expr_gammainv },
     [213] = { .kw = "SHL",                 .arity = 2u,        .ops = &ops_shl,                .bfn = expr_shl },
     [214] = { .kw = "J0",                  .arity = 1u,                                        .ufn = parse_bessel_j_zero },
@@ -470,6 +511,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [217] = { .kw = "pow",                 .arity = 2u,        .ops = &ops_pow,                .bfn = expr_pow_xp },
     [218] = { .kw = "Hn",                  .arity = 2u,        .ops = &ops_harmonic_poly,      .bfn = expr_harmonic_poly },
     [221] = { .kw = "tri",                 .arity = 1u,        .ops = &ops_tri,                .ufn = expr_tri },
+    [224] = { .kw = "imag_part",           .arity = 1u,        .ops = &ops_imag_coordinate, .ufn = expr_imag_coordinate },
     [225] = { .kw = "dilog",               .arity = 1u,        .ops = &ops_dilog,              .ufn = expr_dilog },
     [226] = { .kw = "HypergeometricpFq",   .arity = UINT_MAX,                                  .vfn = expr_hypergeometric_pFq_from_args },
     [227] = { .kw = "vercos",              .arity = 1u,        .ops = &ops_vercos,             .ufn = expr_vercos },
@@ -506,9 +548,11 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [285] = { .kw = "W_n",                 .arity = 2u,        .ops = &ops_lambert_wn,         .bfn = expr_lambert_wn_xp },
     [289] = { .kw = "@delta",              .arity = 1u,        .ops = &ops_delta,              .ufn = expr_delta },
     [291] = { .kw = "J₀",                  .arity = 1u,                                        .ufn = parse_bessel_j_zero },
+    [292] = { .kw = "realpart",            .arity = 1u,        .ops = &ops_real_bound, .ufn = expr_real_coordinate },
     [293] = { .kw = "arccot",              .arity = 1u,        .ops = &ops_acot,               .ufn = expr_acot },
     [294] = { .kw = "is_prime",            .arity = 1u,        .ops = &ops_is_prime,           .ufn = expr_is_prime },
     [295] = { .kw = "lauricella_f",        .arity = UINT_MAX,                                  .vfn = expr_lauricella_f_from_args },
+    [297] = { .kw = "Im",                  .arity = 1u,        .ops = &ops_imag_coordinate, .ufn = expr_imag_coordinate },
     [299] = { .kw = "exp",                 .arity = 1u,        .ops = &ops_exp,                .ufn = expr_exp },
     [301] = { .kw = "pfq",                 .arity = UINT_MAX,                                  .vfn = expr_hypergeometric_pFq_from_args },
     [302] = { .kw = "Cl₂",                 .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
@@ -546,28 +590,31 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [367] = { .kw = "arccovercos",         .arity = 1u,        .ops = &ops_arccovercos,        .ufn = expr_arccovercos },
     [368] = { .kw = "BesselJ",             .arity = 2u,        .ops = &ops_bessel_j,           .bfn = expr_bessel_j },
     [369] = { .kw = "ψq",                  .arity = 2u,        .ops = &ops_qdigamma,           .bfn = expr_qdigamma },
+    [370] = { .kw = "Re",                  .arity = 1u,        .ops = &ops_real_bound, .ufn = expr_real_coordinate },
     [374] = { .kw = "versin",              .arity = 1u,        .ops = &ops_versin,             .ufn = expr_versin },
+    [375] = { .kw = "real_part",           .arity = 1u,        .ops = &ops_real_bound, .ufn = expr_real_coordinate },
     [378] = { .kw = "f1",                  .arity = 6u,                                        .sfn = expr_appell_f1 },
     [379] = { .kw = "cl2",                 .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
     [380] = { .kw = "harmonic_poly",       .arity = 2u,        .ops = &ops_harmonic_poly,      .bfn = expr_harmonic_poly },
     [381] = { .kw = "erfinv",              .arity = 1u,        .ops = &ops_erfinv,             .ufn = expr_erfinv },
     [382] = { .kw = "xor",                 .arity = 2u,        .ops = &ops_bit_xor,            .bfn = expr_bit_xor },
-    [383] = { .kw = "chebyshev_u",         .arity = 2u,        .ops = &ops_chebyshev_u,        .bfn = expr_chebyshev_u },
     [384] = { .kw = "lerchphi",            .arity = 3u,        .ops = &ops_lerch_phi,          .tfn = expr_lerch_phi },
     [385] = { .kw = "normallogpdf",        .arity = 1u,        .ops = &ops_normal_logpdf,      .ufn = expr_normal_logpdf },
     [387] = { .kw = "hacoversin",          .arity = 1u,        .ops = &ops_hacoversin,         .ufn = expr_hacoversin },
-    [388] = { .kw = "zeta2p",              .arity = 2u,        .ops = &ops_zatahp,             .bfn = expr_zatahp },
     [390] = { .kw = "or",                  .arity = 2u,        .ops = &ops_bit_or,             .bfn = expr_bit_or },
+    [391] = { .kw = "zeta2p",              .arity = 2u,        .ops = &ops_zatahp,             .bfn = expr_zatahp },
     [393] = { .kw = "B",                   .arity = 2u,        .ops = &ops_beta,               .bfn = expr_beta },
     [394] = { .kw = "wn",                  .arity = 2u,        .ops = &ops_lambert_wn,         .bfn = expr_lambert_wn_xp },
     [395] = { .kw = "arcsec",              .arity = 1u,        .ops = &ops_asec,               .ufn = expr_asec },
-    [396] = { .kw = "Derivative",          .arity = 2u,        .ops = &ops_ordered_derivative, .bfn = expr_new_ordered_derivative },
+    [396] = { .kw = "Derivative",          .arity = UINT_MAX,                                  .vfn = parse_derivative_function },
+    [398] = { .kw = "chebyshev_u",         .arity = 2u,        .ops = &ops_chebyshev_u,        .bfn = expr_chebyshev_u },
     [403] = { .kw = "lambert_w0",          .arity = 1u,        .ops = &ops_lambert_w0,         .ufn = expr_lambert_w0 },
     [404] = { .kw = "Fourier",             .arity = UINT_MAX,                                  .vfn = expr_fourier_from_args },
     [405] = { .kw = "arcosech",            .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
     [406] = { .kw = "polygamma",           .arity = 2u,        .ops = &ops_polygamma,          .bfn = expr_polygamma_xp },
     [407] = { .kw = "prevprime",           .arity = 1u,        .ops = &ops_prev_prime,         .ufn = expr_prev_prime },
     [408] = { .kw = "cl",                  .arity = 2u,        .ops = &ops_clausen,            .bfn = expr_clausen_xp },
+    [409] = { .kw = "ℜ",                   .arity = 1u,        .ops = &ops_real_bound, .ufn = expr_real_coordinate },
     [410] = { .kw = "F_1",                 .arity = 6u,                                        .sfn = expr_appell_f1 },
     [411] = { .kw = "appellf1",            .arity = 6u,                                        .sfn = expr_appell_f1 },
     [412] = { .kw = "ℱ⁻¹",                 .arity = UINT_MAX,                                  .vfn = expr_inverse_fourier_from_args },
@@ -588,6 +635,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [440] = { .kw = "Cl",                  .arity = 2u,        .ops = &ops_clausen,            .bfn = expr_clausen_xp },
     [448] = { .kw = "gammaincq",           .arity = 2u,        .ops = &ops_gammainc_Q,         .bfn = expr_gammainc_Q },
     [449] = { .kw = "ℒ⁻¹",                 .arity = UINT_MAX,                                  .vfn = expr_inverse_laplace_from_args },
+    [451] = { .kw = "ℑ",                   .arity = 1u,        .ops = &ops_imag_coordinate, .ufn = expr_imag_coordinate },
     [452] = { .kw = "conjugate",           .arity = 1u,        .ops = &ops_conj,               .ufn = expr_conj },
     [453] = { .kw = "AND",                 .arity = 2u,        .ops = &ops_bit_and,            .bfn = expr_bit_and },
     [459] = { .kw = "sqrt",                .arity = 1u,        .ops = &ops_sqrt,               .ufn = expr_sqrt },
@@ -596,9 +644,9 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [465] = { .kw = "lambert_wm1",         .arity = 1u,        .ops = &ops_lambert_wm1,        .ufn = expr_lambert_wm1 },
     [468] = { .kw = "tanh",                .arity = 1u,        .ops = &ops_tanh,               .ufn = expr_tanh },
     [469] = { .kw = "Clausen",             .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
-    [470] = { .kw = "zatahp",              .arity = 2u,        .ops = &ops_zatahp,             .bfn = expr_zatahp },
     [471] = { .kw = "Tn",                  .arity = 2u,        .ops = &ops_chebyshev_t,        .bfn = expr_chebyshev_t },
     [472] = { .kw = "zetap",               .arity = UINT_MAX,  .ops = &ops_zetap,              .ufn = expr_zetap, .vfn = expr_zetap_from_args },
+    [473] = { .kw = "zatahp",              .arity = 2u,        .ops = &ops_zatahp,             .bfn = expr_zatahp },
     [475] = { .kw = "Φ",                   .arity = 3u,        .ops = &ops_lerch_phi,          .tfn = expr_lerch_phi },
     [480] = { .kw = "archavercos",         .arity = 1u,        .ops = &ops_archavercos,        .ufn = expr_archavercos },
     [481] = { .kw = "normal_cdf",          .arity = 1u,        .ops = &ops_normal_cdf,         .ufn = expr_normal_cdf },
@@ -2087,7 +2135,7 @@ static expr_t *const_node_from_binding_expr(expr_binding_expr_t *expr)
 
 static expr_t *apply_unary_preserving_constexpr(const expr_ops_t *ops, expr_t *arg, expr_t *(*fallback)(const expr_t *))
 {
-    if (ops && node_has_preserved_constexpr(arg)) {
+    if (ops && ops != &ops_principal_value && ops != &ops_finite_part && node_has_preserved_constexpr(arg)) {
         expr_binding_expr_t *child = expr_binding_expr_clone(arg->binding_expr);
         expr_binding_expr_t *expr =
             (ops == &ops_neg) ? expr_binding_expr_new_neg(child) : expr_binding_expr_new_unary_op(ops, child);
@@ -2228,6 +2276,38 @@ static expr_t *apply_factorial_postfix(expr_t *value)
     return apply_unary_preserving_constexpr(&ops_gamma, incremented, expr_gamma);
 }
 
+/* A qualification belongs to this syntactic occurrence, before any enclosing algebra is constructed. */
+static const expr_ops_t *parse_distribution_qualification(string_cursor_t *cursor)
+{
+    string_cursor_t *scan = string_cursor_clone(cursor);
+    if (!scan)
+        return NULL;
+    string_cursor_skip_spaces(scan);
+    const expr_ops_t *ops = NULL;
+    if (expr_parse_cursor_consume_char(scan, ':')) {
+        string_cursor_skip_spaces(scan);
+        const char *words[] = {"principal value", "finite part"};
+        const expr_ops_t *operators[] = {&ops_principal_value, &ops_finite_part};
+        size_t start = string_cursor_position(scan);
+        /* Two fixed grammatical alternatives, not a search over expression occurrences. */
+        for (size_t i = 0u; i < 2u; ++i) {
+            string_cursor_seek(scan, start);
+            bool matches = true;
+            for (const char *c = words[i]; *c && matches; ++c)
+                matches = expr_parse_cursor_consume_char(scan, *c);
+            string_cursor_skip_spaces(scan);
+            unsigned char closing = 0u;
+            if (matches && string_cursor_peek_ascii(scan, &closing) && closing == ')') {
+                ops = operators[i];
+                string_cursor_seek(cursor, string_cursor_position(scan));
+                break;
+            }
+        }
+    }
+    string_cursor_free(scan);
+    return ops;
+}
+
 static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p, char closing, const char *errmsg)
 {
     expr_t *inner;
@@ -2235,6 +2315,13 @@ static expr_t *parse_enclosed_addexpr(expr_parse_state_t *p, char closing, const
     expr_parse_skip_spaces(p);
     inner = parse_addexpr(p);
 
+    if (!inner)
+        return NULL;
+    const expr_ops_t *qualification = closing == ')' ? parse_distribution_qualification(p->cursor) : NULL;
+    if (qualification)
+        inner = apply_unary_preserving_constexpr(qualification, inner,
+                                                qualification == &ops_principal_value ? expr_principal_value
+                                                                                     : expr_finite_part);
     if (!inner)
         return NULL;
     expr_parse_skip_spaces(p);
@@ -3037,6 +3124,78 @@ not_call:
     return false;
 }
 
+/* A copied binding envelope is an atom, including its distribution qualifications. */
+static bool scan_bound_expression(string_cursor_t *cursor, string_view_t *body)
+{
+    string_cursor_t *scan = string_cursor_clone(cursor);
+    if (!scan)
+        return false;
+    size_t start = string_cursor_position(scan);
+    unsigned braces = 0u;
+    unsigned brackets = 0u;
+    unsigned char c = 0u;
+    if (!string_cursor_peek_ascii(scan, &c) || c != '{') {
+        string_cursor_free(scan);
+        return false;
+    }
+    while (!string_cursor_done(scan)) {
+        if (string_cursor_peek_ascii(scan, &c)) {
+            if (c == '[')
+                ++brackets;
+            else if (c == ']' && brackets)
+                --brackets;
+            else if (!brackets && c == '{')
+                ++braces;
+            else if (!brackets && c == '}' && --braces == 0u) {
+                string_cursor_next(scan);
+                *body = string_cursor_view_between(start, string_cursor_position(scan), cursor);
+                string_cursor_seek(cursor, string_cursor_position(scan));
+                string_cursor_free(scan);
+                return true;
+            }
+        }
+        string_cursor_next(scan);
+    }
+    string_cursor_free(scan);
+    return false;
+}
+
+static expr_t *parse_bound_expression(expr_parse_state_t *p)
+{
+    string_view_t view;
+    if (!scan_bound_expression(p->cursor, &view)) {
+        set_error(p, "expected complete bound expression");
+        return NULL;
+    }
+    string_t *text = string_from_view(&view);
+    expr_bindings_t *bindings = NULL;
+    expr_t *result = text ? expr_from_text(text, &bindings) : NULL;
+    string_free(text);
+    if (bindings) {
+        p->has_symbolic_derivative |= bindings->has_symbolic_derivative;
+        p->has_symbolic_integral |= bindings->has_symbolic_integral;
+        for (size_t i = 0u; result && p->syms && i < bindings->count; ++i) {
+            expr_binding_entry_t *entry = &bindings->entries[i];
+            expr_t *outer = lookup_symbol_text_normalised(p->syms, entry->name);
+            if (!outer) {
+                if (symtab_add_borrowed_text(p->syms, entry->name, entry->expr) != 0) {
+                    expr_free(result);
+                    result = NULL;
+                }
+            } else if (outer->ops == entry->expr->ops && num_is_nan(entry->expr->c)) {
+                /* Unset copied symbols refer to the enclosing symbol; supplied inner values retain their scope. */
+                expr_t *updated = expr_substitute(result, entry->expr, outer);
+                expr_free(result);
+                result = updated;
+            }
+        }
+    }
+    expr_bindings_free(bindings);
+    if (!result)
+        set_error(p, "invalid bound expression");
+    return result;
+}
+
 static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_literal)
 {
     NUM_SCOPE(scope);
@@ -3052,6 +3211,9 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
     }
     expr_parse_peek_ascii(p, &b);
     expr_parse_peek_value(p, &cp, &cp_len);
+
+    if (b == '{' && p->syntax == EXPR_PARSE_EXPRESSION_SYNTAX)
+        return parse_bound_expression(p);
 
     indexed_bessel_call_t bessel;
     if (scan_indexed_bessel_call(text, pos, p->syntax, &bessel)) {
@@ -3129,6 +3291,15 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
 
         if (len == 0u)
             len = special_len;
+        /* In Function syntax, the dot before a named/grouped factor is multiplication,
+         * not a decimal point belonging to the preceding coefficient or power. */
+        unsigned char last = 0u, next = 0u;
+        if (p->syntax == EXPR_PARSE_FUNCTION_SYNTAX && decimal_len > 1u && len >= decimal_len &&
+            expr_parse_view_peek_ascii(text, pos + decimal_len - 1u, &last) && last == '.' &&
+            expr_parse_view_peek_ascii(text, pos + decimal_len, &next) &&
+            (isalpha(next) || next == '_' || next == '@' || next == '(')) {
+            len = --decimal_len;
+        }
         if (!allow_ascii_rational_literal && decimal_len > 0u && len > decimal_len &&
             expr_parse_view_peek_ascii(text, pos + decimal_len, &b) && b == '/')
             len = decimal_len;
@@ -3334,6 +3505,8 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
                     return NULL;
                 }
                 result = fe->vfn(argument_count, arguments);
+                if (result && fe->vfn == parse_derivative_function)
+                    p->has_symbolic_derivative = true;
                 if (integral_transform) {
                     p->has_symbolic_integral = true;
                     if (result && result->b->b->a->name) {
@@ -3355,6 +3528,9 @@ static expr_t *parse_atom(expr_parse_state_t *p, bool allow_ascii_rational_liter
 
                     if (fe->vfn == expr_finite_sum_from_args)
                         message = "invalid finite summation";
+                    else if (fe->vfn == parse_derivative_function)
+                        message = "Derivative requires (function, order) or "
+                                  "(expression, coordinate, non-negative integer order)";
                     else if (fourier_transform)
                         message = "Fourier requires one source variable and a distinct target; unfamiliar coordinates need an explicit target";
                     else if (inverse_laplace)
@@ -3627,7 +3803,9 @@ static expr_t *parse_power_operand_mode(expr_parse_state_t *p, bool allow_ascii_
     if (!base)
         return NULL;
 
-    while (expr_parse_consume_char(p, '!')) {
+    unsigned char postfix_next = 0u;
+    while (!(expr_parse_view_peek_ascii(expr_parse_text(p), expr_parse_pos(p) + 1u, &postfix_next) &&
+             postfix_next == '=') && expr_parse_consume_char(p, '!')) {
         base = apply_factorial_postfix(base);
         if (!base)
             return NULL;
@@ -3859,7 +4037,23 @@ static expr_t *parse_where_clause(expr_parse_state_t *p, expr_t *body)
             expr_free(value);
             break;
         }
-        if (membership) {
+        expr_parse_skip_spaces(p);
+        bool nonzero = membership && (condition_rune(p, 0x2260u) ||
+                                     (condition_prefix(p, "!=") && condition_rune(p, '!') && condition_rune(p, '=')));
+        if (nonzero) {
+            expr_parse_skip_spaces(p);
+            expr_t *right = parse_addexpr(p);
+            if (!right) {
+                expr_free(value);
+                break;
+            }
+            expr_t *difference = expr_const_is_zero(right) ? expr_clone(value) : expr_sub(value, right);
+            expr_free(value);
+            expr_free(right);
+            value = expr_abs(difference);
+            expr_free(difference);
+            limit = expr_const_zero();
+        } else if (membership) {
             bool valid = condition_rune(p, 0x2208u); /* ∈ */
             real_condition = valid && condition_rune(p, 0x211du); /* ℝ */
             integer_condition = valid && !real_condition && condition_rune(p, 0x2124u) &&
@@ -3875,7 +4069,7 @@ static expr_t *parse_where_clause(expr_parse_state_t *p, expr_t *body)
             predicate->a = value;
             value = predicate;
             limit = expr_const_zero();
-        } else if (parse_condition_char(p, '>', "expected '>' in condition")) {
+        } else if (!nonzero && parse_condition_char(p, '>', "expected '>' in condition")) {
             expr_parse_skip_spaces(p);
             string_cursor_t *scan = string_cursor_clone(p->cursor);
             bool projection = scan && expr_parse_cursor_consume_char(scan, 'R') &&
@@ -4359,6 +4553,16 @@ static int collect_implicit_symbols(string_view_t text, symtab_t *syms, expr_par
         size_t pos = string_cursor_position(cursor);
         size_t special_len = scan_special_number_literal_len_view(text, pos);
 
+        if (parse_distribution_qualification(cursor))
+            continue;
+        string_view_t bound;
+        if (syntax == EXPR_PARSE_EXPRESSION_SYNTAX && scan_bound_expression(cursor, &bound)) {
+            /* Transform shorthand also uses braces; its free symbols still belong to this scope. */
+            if (has_top_level_equals(string_view_slice(bound, 1u, string_view_length(bound) - 2u)))
+                continue;
+            string_cursor_seek(cursor, pos);
+        }
+
         indexed_bessel_call_t bessel;
         if (scan_indexed_bessel_call(text, pos, syntax, &bessel)) {
             if (!string_view_is_empty(bessel.order) && collect_implicit_symbols(bessel.order, syms, syntax) < 0) {
@@ -4649,7 +4853,7 @@ static bool starts_membership_condition(string_view_t text)
             return false;
         if (!depth && (cp == '=' || cp == ';'))
             return false;
-        if (!depth && cp == 0x2208u)
+        if (!depth && (cp == 0x2208u || cp == 0x2260u || cp == '!' || cp == ':'))
             return true;
         if (cp == '(' || cp == '[')
             ++depth;
@@ -4953,23 +5157,36 @@ static expr_t *expr_from_string_view_impl(string_view_t source, expr_bindings_t 
         }
     }
 
-    expanded_expr = expr_expand_series_text(expr_view, series_TeX_out, expr_series_lookup_binding, &syms,
-                                            domain_specialised_out, NULL);
+    string_t *qualified_body = string_from_view(&expr_view);
+    string_t *condition_text = string_from_view(&conditions);
+    if (!qualified_body || !condition_text || !expr_distribution_restore(&qualified_body, &condition_text)) {
+        symtab_free(&syms);
+        string_free(qualified_body);
+        string_free(condition_text);
+        string_free(errmsg);
+        fprintf(stderr, "distribution qualification requires one explicitly grouped occurrence\n");
+        return NULL;
+    }
+    expanded_expr = expr_expand_series_text(string_view_all(qualified_body), series_TeX_out,
+                                            expr_series_lookup_binding, &syms, domain_specialised_out, NULL);
+    string_free(qualified_body);
     if (!expanded_expr) {
         symtab_free(&syms);
+        string_free(condition_text);
         string_free(errmsg);
         return NULL;
     }
     expr_view = string_view_all(expanded_expr);
 
     if (condition_pos != SIZE_MAX) {
-        string_t *condition_text = string_from_view(&conditions);
-        string_append_cstr(expanded_expr, " where (");
-        string_append_cstr(expanded_expr, string_c_str(condition_text));
-        string_append_cstr(expanded_expr, ")");
-        string_free(condition_text);
+        if (string_byte_length(condition_text)) {
+            string_append_cstr(expanded_expr, " where (");
+            string_append_cstr(expanded_expr, string_c_str(condition_text));
+            string_append_cstr(expanded_expr, ")");
+        }
         expr_view = string_view_all(expanded_expr);
     }
+    string_free(condition_text);
 
     if (collect_implicit_symbols(expr_view, &syms, syntax) < 0) {
         symtab_free(&syms);

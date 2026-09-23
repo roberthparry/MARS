@@ -700,7 +700,11 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
         for (const expr_t *pair = root->b; pair; pair = pair->b->b) {
             sbuf_t condition;
             sbuf_init(&condition);
-            if (expr_is_op(pair->a, &ops_real_parameter)) {
+            const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+            if (nonzero) {
+                emit_func(nonzero, &condition, PREC_ADD);
+                sbuf_puts(&condition, " != 0");
+            } else if (expr_is_op(pair->a, &ops_real_parameter)) {
                 sbuf_puts(&condition, "realpart(");
                 emit_func(pair->a->a, &condition, PREC_LOWEST);
                 sbuf_puts(&condition, ") == ");

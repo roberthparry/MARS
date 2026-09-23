@@ -385,6 +385,14 @@ char *expr_number_to_string_local(number_t value)
     int precision_override = expr_number_precision_local;
     char fmt[32];
 
+    /* A real-valued complex backend is still a real atom. Printing its zero
+     * imaginary part would introduce an ungrouped sum into products and powers. */
+    if (num_is_complex_backend(value) && num_is_real(value)) {
+        number_t real = num_real_part(value);
+        num_destroy(&value);
+        value = real;
+    }
+
     if (num_is_inf(value)) {
         if (num_get_sign(value) < 0) {
             num_destroy(&value);

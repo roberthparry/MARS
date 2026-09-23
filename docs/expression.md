@@ -140,10 +140,23 @@ authored factors; powers of the source variable can also be extracted from an
 expanded polynomial. This is not a general high-degree polynomial factoriser.
 These rules use the
 causal unilateral convention: ordinary formulas describe the result for
-non-negative time, not an arbitrary two-sided inverse.
-Polynomial degree is limited to 16. Unproved symbolic pole separations,
+positive time, not an arbitrary two-sided inverse.
+Rational polynomial degree is limited to 16. Unproved symbolic pole separations,
 quadratic frequencies that cannot be established as zero or non-zero, and
 distributional inverses remain symbolic.
+
+Copied forward formulas are also recognised for fractional powers, real causal
+delays, Gaussian and error functions, normal densities and cumulative
+distributions, exponential integrals, incomplete gamma functions, Bessel
+functions of the first kind and order-zero second kind, the supported
+hyperbolic and inverse-function pairs, staircases and Clausen functions.
+The Gaussian recogniser also handles frequency shifts and polynomial factors
+through degree two when their initial-value terms cancel. Special-function
+recognition checks the complete spectral expression rather than identifying
+a pair from a single function name. Parameter restrictions and principal-root
+or logarithmic branch choices remain attached to the recovered formula.
+This coverage does not imply that every algebraically equivalent rearrangement
+or every product of supported functions can be recognised.
 
 For example, a rational result copied from Equation mode can be inverted directly:
 
@@ -354,6 +367,14 @@ unit-step transform.
 The [forward transform tables](design-notes/integral-transforms.md#implemented-forward-laplace-transforms)
 give the corresponding formulas and convergence conditions.
 
+Round-trip regression tests invert copied spectral formulas rather than relying
+on cancellation of nested transform operators. They also reparse the recovered
+Expression output, so a formatting error cannot silently change its meaning.
+Recovery is on positive time for unilateral Laplace transforms and almost
+everywhere for ordinary Fourier transforms; singular results are compared as
+distributions. See [round-trip verification](design-notes/integral-transforms.md#round-trip-verification)
+for the scope and limitations of these checks.
+
 This inventory concerns the ordinary unilateral integral over real `t >= 0`.
 A singularity is not automatically an obstruction: logarithmic singularities
 are locally integrable, whereas a simple pole is not. Exponential damping
@@ -542,9 +563,9 @@ also accepted for other registered unary functions in expression syntax.
 
 | Input | Output (real target coordinate) |
 | --- | --- |
-| `@F{ln\|x\|}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
-| `@F{ln(\|x\|)}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
-| `@F{ln(abs(x))}` | $-\pi\bigl(\operatorname{Fp}(1/\lvert k\rvert)+2\gamma\delta(k)\bigr)$ |
+| `@F{ln\|x\|}` | $-\pi\bigl(1/\lvert k\rvert+2\gamma\delta(k)\bigr)\quad(1/\lvert k\rvert:\text{ finite part})$ |
+| `@F{ln(\|x\|)}` | $-\pi\bigl(1/\lvert k\rvert+2\gamma\delta(k)\bigr)\quad(1/\lvert k\rvert:\text{ finite part})$ |
+| `@F{ln(abs(x))}` | $-\pi\bigl(1/\lvert k\rvert+2\gamma\delta(k)\bigr)\quad(1/\lvert k\rvert:\text{ finite part})$ |
 | `@Finv{-@pi*finite_part(1/abs(ω))-2*@pi*@eulermascheroni*delta(ω)}` | $\ln\lvert t\rvert$ |
 
 `finite_part`, with alias `Fp` and public constructor `expr_finite_part`, denotes
@@ -603,8 +624,9 @@ of a constant whenever the constant itself is defined.
 Positive real part of the effective sinh/cosh exponent causes exponential
 growth, so neither an ordinary nor a tempered-distribution Fourier transform
 exists for real non-zero scale. For sinh powers, $\Re(n)\le-1$ instead gives a
-non-integrable singularity: any principal-value or finite-part prescription
-must be chosen explicitly, not inferred by continuing the beta formula.
+non-integrable singularity. The exponent $-1$ has the separate symmetric
+`csch` rule below; other principal-value or finite-part prescriptions are not
+inferred by continuing the beta formula.
 Unimplemented boundary cases with $\Re(n)=0$ remain symbolic. Unknown parameters
 retain the convergence conditions rather than being declared divergent.
 
@@ -612,8 +634,164 @@ retain the convergence conditions rather than being declared divergent.
 | --- | --- |
 | `{@F{sinh(t)^(-1/2)} \| ω=0}` | Approximately $3.708149354602744-3.708149354602744i$ |
 | `@F{sinh(t)^2}` | Symbolic transform with an exponential-growth diagnostic: no ordinary or tempered-distribution Fourier transform. |
-| `@F{sinh(t)^(-1)}` | Symbolic transform with a non-integrable-singularity diagnostic; a regularisation prescription is required. |
+| `@F{sinh(t)^(-1)}` | $-i\pi\tanh(\pi\omega/2)$, $\omega\in\mathbb R$. |
 | `@Finv{(B(1/4+i*ω/2,1/2)-i*B(1/4-i*ω/2,1/2))/sqrt(2)}` | $\sinh(t)^{-1/2}$ on the principal branch, for real $t\ne0$. |
+
+### Odd hyperbolic Fourier pairs
+
+The angular-frequency Fourier rules include the `tanh`–`csch` pair and the
+`coth`–`coth` pair in both directions, including real translations and real
+non-zero scales. `cosech`, reciprocal `sinh` and `tanh`, and equivalent
+`sinh`/`cosh` quotients are accepted too. These are distributional transform
+pairs: the transform operation uses symmetric cancellation at a `csch` or `coth` pole.
+The displayed numerical representatives have mathematical domain conditions;
+generated functions enforce those conditions with ordinary conditionals. No
+finite numerical value is assigned to the singular frequency of the `tanh`
+transform. Its inverse is `tanh(x)` on the whole real axis, including zero.
+The `coth` spectrum and its inverse instead exclude zero on their respective
+real axes; affine translations move the inverse's pole exclusion accordingly.
+
+| Input | Output |
+| --- | --- |
+| `@F{tanh(x)}` | $-i\pi\operatorname{csch}(\pi k/2)$, $k\in\mathbb R$, $k\ne0$. |
+| `@Finv{-i*@pi*csch(@pi*k/2)}` | $\tanh x$, $x\in\mathbb R$. |
+| `@Finv{-i*@pi/sinh(@pi*k/2)}` | $\tanh x$, $x\in\mathbb R$. |
+| `@F{coth(x)}` | $-i\pi\coth(\pi k/2)$, $k\in\mathbb R$, $k\ne0$. |
+| `@Finv{-i*@pi*coth(@pi*k/2)}` | $\coth x$, $x\in\mathbb R$, $x\ne0$. |
+
+The inverse recognises a newly parsed spectrum, including a copied full
+Expression card with its bindings and conditions. It does not depend on a
+nested forward-transform operator or retained transform history.
+
+### Arctangent Fourier pair
+
+The `atan` transform and its inverse use the same angular-frequency convention.
+The spectrum is distributional, with symmetric cancellation at zero; its
+numerical expression excludes zero. The inverse is defined for every real
+argument, including zero. Domain conditions remain mathematical predicates and
+are enforced by conditionals in Function output.
+
+| Input | Output |
+| --- | --- |
+| `@F{atan(x)}` | $-i\pi e^{-|k|}/k$, $k\in\mathbb R$, $k\ne0$. |
+| `@Finv{-i*@pi*exp(-abs(k))/k}` | $\arctan x$, $x\in\mathbb R$. |
+
+Real non-zero affine scales and real translations are supported. The inverse
+recognises independently entered spectra, including copied Expression cards
+with their bindings and conditions, split exponential factors, and reciprocal
+exponential notation. Exponentially damped reciprocal spectra may also carry
+a real modulation. Increasing exponentials and unrelated pole exclusions are
+not treated as this pair.
+
+### Inverse-function and gamma Fourier pairs
+
+`atanh`, `asin` and `acos` support both Fourier directions, real non-zero affine
+scales and real translations. Their whole-line transforms use MARS's complex
+boundary values: `atanh` and `asin` have positive imaginary parts on both real
+tails, and `acos` equals π/2 minus `asin`. These are tempered-distribution pairs,
+not absolutely convergent Fourier integrals.
+
+For the following table, let
+
+$$
+G(k)=2\pi i\left[(\ln 2-\gamma)\delta(k)
+ -J_0(k)\frac{\operatorname{step}(k)}{k}\right].
+$$
+
+The displayed half-line quotient uses a unit-cutoff finite part at zero: when
+integrating against a smooth test function, subtract its value at zero on the
+interval (0, 1). The native engine retains this convention internally, and the
+inverse recognises independently copied quotients with the same convention.
+Thus the derivative is evaluated without discarding its zero-frequency
+information. For a real affine scale a, the impulse correction becomes
+ln(2|a|) − γ when the cutoff is expressed in k. The evaluation note explains
+the convention; no English qualifications or `PV()` wrappers appear in the
+mathematical cards. Merely imposing k ≠ 0 on the full spectrum would incorrectly
+discard its impulse.
+
+| Input | Output, for real k |
+| --- | --- |
+| `@F{atanh(x)}` | $i\pi^2\delta(k)-2\pi i\operatorname{step}(k)\operatorname{sinc}(k/\pi)$ |
+| `@F{asin(x)}` | $G(k)$ |
+| `@F{acos(x)}` | $\pi^2\delta(k)-G(k)$ |
+
+Copy each resulting Expression card into `InverseFourier(result,k,x)` to
+recover, respectively, `atanh(x)` with x ∈ ℝ and 1 − x² ≠ 0, `asin(x)` with
+x ∈ ℝ, and `acos(x)` with x ∈ ℝ. The inverse recognises the actual formula,
+including its delta coefficient, rather than requiring nested transform calls.
+Adding a delta to the spectrum correctly adds 1/(2π) to the inverse.
+
+The gamma function on a vertical line has an ordinary Fourier pair:
+
+$$
+\mathcal F\{\Gamma(a+ibx)\}(k)
+ =\frac{2\pi}{|b|}\exp\bigl(ak/b-e^{k/b}\bigr),
+ \qquad \operatorname{Re}(a)>0,\quad b\in\mathbb R,\quad b\ne0.
+$$
+
+| Input | Output |
+| --- | --- |
+| `@F{gamma(1+i*x)}` | $2\pi\exp(k-e^k)$, k ∈ ℝ |
+| `@Finv{2*@pi*exp(k-exp(k))}` | $\Gamma(1+ix)$, x ∈ ℝ |
+
+The shorthand `@F{gamma(x)}` selects the vertical-line interpretation explicitly
+in its displayed operator: $\mathcal F_{\operatorname{Im}(x)\to k}$.
+The real coordinate is held fixed, with Re(x) > 0. This is the same family as
+Γ(a + iy), with a = Re(x) and y = Im(x); it is not integration along the real axis.
+
+| Input | Output |
+| --- | --- |
+| `@F{gamma(x)}` | $2\pi\exp(k\operatorname{Re}(x)-e^k)$, k ∈ ℝ, Re(x) > 0 |
+| `@Finv{2*@pi*exp(k*Re(x)-exp(k))}` | $\Gamma(x)$, Re(x) > 0 |
+
+The explicit coordinate spelling `Fourier(gamma(x),Im(x),k)` gives the same
+formula and conditions. Inversion of the copied spectrum infers Im(x) as its
+target coordinate, so the retained real-coordinate parameter reconstructs the
+original complex argument. Real affine gamma arguments also support explicit
+vertical-line coordinates. `Re`/`Im`, `realpart`/`imagpart`, `real_part`/`imag_part`
+and ℜ/ℑ are accepted coordinate spellings; Function style uses `realpart` and
+`imagpart`. Bare `xi` remains the Greek letter ξ: write `x*i` for multiplication
+by the imaginary unit.
+
+In contrast, the explicit real-axis request `Fourier(gamma(x),x,k)` returns `NAN` with a non-existence diagnostic:
+super-exponential growth on the positive real axis prevents an ordinary or
+tempered-distribution Fourier transform. Excluding the gamma poles cannot cure
+that growth. This diagnostic also covers real non-zero affine gamma arguments
+when the integration coordinate is on the real axis.
+No analytic continuation into a different transform framework is implied.
+
+### Periodic functions with real poles
+
+The Fourier transforms of `tan` and `cot` use symmetric Cauchy principal values
+at their periodic poles. These are tempered-distribution identities, not
+ordinary Fourier integrals. With the negative-exponential Fourier kernel,
+
+$$
+\mathcal F\{\tan x\}(k)
+ =2\pi i\sum_{n=1}^{\infty}(-1)^n
+   [\delta(k-2n)-\delta(k+2n)],
+$$
+
+$$
+\mathcal F\{\cot x\}(k)
+ =-2\pi i\sum_{n=1}^{\infty}
+   [\delta(k-2n)-\delta(k+2n)].
+$$
+
+Both directions recognise the actual impulse series, including a renamed bound
+index, real non-zero scaling and real translation. Inversion returns the original
+trigonometric function on its ordinary real domain: $\cos x\ne0$ for
+$\tan x$, and $\sin x\ne0$ for $\cot x$. These are mathematical predicates,
+not prose qualifications. Generated functions enforce the same conditions and
+can be evaluated away from the poles. The transform's singular-integral
+interpretation belongs to the transform operation, not the returned numerical
+value. Finite truncations or altered
+relative impulse weights are not mistaken for the infinite-series pair.
+
+| Input | Output |
+| --- | --- |
+| `@F{tan(x)}` | $2\pi i\sum_{n=1}^{\infty}(-1)^n[\delta(k-2n)-\delta(k+2n)]$, with real $k$ and a principal-value evaluation note. |
+| Copy that spectrum into `InverseFourier(spectrum,k,x)` | $\tan x$, with $x\in\mathbb R$ and $\cos x\ne0$. |
 
 ### Indexed Bessel transforms
 
@@ -766,6 +944,28 @@ available for the ordinary signal functions; step/pulse derivatives retain
 their boundary impulses. Sinc calculus uses entire representations that remain
 regular at zero. General principal-value integration remains symbolic.
 
+Principal-value and finite-part operators remain exact nodes internally. Expression
+and TeX output show their operands with term-specific interpretation qualifications,
+without function-call wrappers. For a single unambiguous occurrence, Expression
+output groups the operand and places its qualification after the binding bar,
+alongside domain conditions. Copy the complete Expression output: discarding the
+binding section also discards that qualification. The parser restores the operator
+on exactly one complete grouped occurrence before simplifying any surrounding
+algebra; missing or ambiguous targets are rejected.
+
+Multiple, nested or ambiguous occurrences retain local parenthesised qualifications
+in Expression output and scoped underbraces in TeX. Unbound output always keeps
+qualifications local, so it remains suitable for embedding in another expression.
+Function output also uses scoped parenthesised qualifications. The Function-body
+parser restores the same operators, including their nesting and occurrence scope;
+the original callable spellings remain accepted as input aliases.
+These are distribution interpretations, not evaluations as ordinary functions.
+
+| Input | Unbound output |
+| --- | --- |
+| `PV(1/x)` | `(1/x : principal value)` |
+| `Fp(1/abs(x))` | `(1/\|x\| : finite part)` |
+
 ### Checked Fourier examples
 
 These are exact native unbound outputs, exercised as README examples after the
@@ -778,7 +978,7 @@ TeX uses the corresponding mathematical notation.
 | `@Finv{exp(-ω^2)}` | `½·exp(-¼t²)/√(π) where (t ∈ ℝ)` |
 | `@F{rect(t)}` | `sinc(ω/(2π)) where (ω ∈ ℝ)` |
 | `@F{delta(t)}` | `1` |
-| `@F{step(t)}` | `principal_value(1/(iω)) + π·δ(ω) where (ω ∈ ℝ)` |
+| `@F{step(t)}` | `(1/(iω) : principal value) + π·δ(ω) where (ω ∈ ℝ)` |
 | `@F{1+t^n+delta(t)}` | `2π·(δ(ω) + i^n·Derivative(δ(ω), n)) + 1 where (ω ∈ ℝ; n ∈ ℤ≥0)` |
 | `@F{f(t)}` | `ℱ(f(t))` |
 
@@ -1815,6 +2015,21 @@ statements may share a line when whitespace separates them. Unknown scalars use
 `?`; `[]` and `[?]` both denote an
 unspecified array and are serialised canonically as `[?]`. Symbolic assignment
 values use input aliases such as `@pi`.
+
+Formal derivatives in Function style use the registered `Derivative` callable,
+with explicit coordinate and non-negative integer order. Repeated coordinates
+share an order; mixed derivatives nest calls in differentiation order. The
+three-argument form preserves an unevaluated derivative, including its coordinate
+metadata, rather than treating a dependent symbol as an unrelated constant.
+The existing two-argument form retains its symbolic-order meaning.
+
+| Expression input | Function-style body |
+| --- | --- |
+| `Dk(step(k)*ln(abs(k)))` | `Derivative(step(k).ln(abs(k)), k, 1)` |
+| `{Dkk(delta(k)) \| k=?}` | `Derivative(delta(k), k, 2)` |
+
+Expression and TeX styles retain their mathematical derivative notation;
+Function style does not generate variable-specific callable names such as `Dk`.
 
 Function style writes exact fractions in typeable ASCII `numerator/denominator`
 form. For example, a mathematical card may display `³⁄₁₁`, while the corresponding

@@ -186,9 +186,9 @@ class FourierTests(unittest.TestCase):
         self.assertEqual(self.fields("@F{delta(t)}")["unbound"], "1")
         self.assert_formula("@Finv{delta(ω)}", lambda _: 1/(2*math.pi), "t")
         step = self.fields("@F{step(t)}")
-        self.assertIn("principal_value", step["unbound"])
+        self.assertIn("principal value", step["unbound"])
         self.assertIn("δ(ω)", step["unbound"])
-        self.assertIn(r"\operatorname{PV}", step["tex"])
+        self.assertIn(r"\text{principal value}", step["tex"])
         self.assertIn("δ(ω)", self.fields("@F{1}")["unbound"])
         self.assertTrue(math.isnan(float(self.fields("delta(0)")["value"])))
 
@@ -197,10 +197,10 @@ class FourierTests(unittest.TestCase):
         for source in ("@F{ln|x|}", "@F{ln(|x|)}", "@F{ln(abs(x))}"):
             with self.subTest(source=source):
                 result = self.fields(source, "k")
-                self.assertEqual(result["tex"].split(r"\quad")[0], expected["tex"])
+                self.assertEqual(result["tex"].split(r"\quad")[0], expected["tex"].split(r"\quad")[0])
                 self.assertNotIn("Fourier(", result["function"])
-                self.assertIn("finite_part", result["expression"])
-                self.assertIn(r"\operatorname{Fp}", result["tex"])
+                self.assertIn("finite part", result["expression"])
+                self.assertIn(r"\text{finite part}", result["tex"])
                 self.assertIn("distribution", result["value_note"])
                 self.assertEqual(self.fields(result["expression"], "k")["tex"], result["tex"])
                 self.assertNotIn("const x", result["function"])
@@ -220,13 +220,13 @@ class FourierTests(unittest.TestCase):
                             lambda t: math.log(abs(t)), "t", points=(-2, -0.5, 0.3, 1.25))
         inverse = self.fields("@Finv{ln(abs(ω))}", "t")
         self.assertEqual(inverse["tex"].split(r"\quad")[0],
-                         r"-\frac{1}{2}\mkern-2mu \left(\operatorname{Fp}(\frac{1}{\left|t\right|})"
+                         r"-\frac{1}{2}\mkern-2mu \left(\frac{1}{\left|t\right|}"
                          r" + 2\mkern-2mu \gamma\mkern-2mu \delta(t)\right)")
         for alias in ("finite_part", "Fp"):
             result = self.fields(alias+"(1/abs(x))", "x")
             self.assertIn("distribution", result["value_note"])
             derivative = self.fields(alias+"(1/abs(x))", "x", "derivative")
-            self.assertIn("finite_part", derivative["function"])
+            self.assertIn(" : finite part", derivative["function"])
             for point in (0, 1):
                 value = self.fields("{"+alias+"(1/abs(x)) | x="+str(point)+"}", "x")
                 self.assertTrue(math.isnan(float(value.get("value", "nan"))))
@@ -248,13 +248,13 @@ class FourierTests(unittest.TestCase):
                 finite_part = 2*(integrate(lambda u: math.expm1(-width*math.exp(2*u)), -32, 0)
                                  +integrate(lambda u: math.exp(-width*math.exp(2*u)), 0, 6))
                 action = result["unbound"].split(" where ")[0]
-                action = action.replace("finite_part(1/|k|)", "("+repr(finite_part)+")").replace("δ(k)", "1")
+                action = action.replace("(1/|k| : finite part)", "("+repr(finite_part)+")").replace("δ(k)", "1")
                 actual = float(self.fields(action, "k")["value"])
                 expected = integrate(lambda u: 2*math.sqrt(math.pi/width)*(u+math.log(abs(scale)))
                                      *math.exp(u-math.exp(2*u)/(4*width)), -32, 6)
                 self.assertAlmostEqual(actual, expected, places=8)
                 inverse_action = inverse["unbound"].split(" where ")[0]
-                inverse_action = inverse_action.replace("finite_part(1/|t|)", "("+repr(finite_part)+")")
+                inverse_action = inverse_action.replace("(1/|t| : finite part)", "("+repr(finite_part)+")")
                 inverse_action = inverse_action.replace("δ(t)", "1")
                 self.assertAlmostEqual(float(self.fields(inverse_action, "t")["value"]),
                                        expected/(2*math.pi), places=8)
@@ -262,7 +262,7 @@ class FourierTests(unittest.TestCase):
     def test_log_affine_domains_and_finite_part_calculus(self):
         translated = self.fields("@F{ln(abs(x-2))}", "k")
         self.assertNotIn("Fourier(", translated["function"])
-        self.assertIn("exp((-2i)k)", translated["unbound"])
+        self.assertIn("exp(-2ik)", translated["unbound"])
         parameter = self.fields("@F{ln(abs(a*x+b))}", "k")
         self.assertNotIn("Fourier(", parameter["function"])
         self.assertIn("a", parameter["tex"])
@@ -270,17 +270,17 @@ class FourierTests(unittest.TestCase):
         for source in ("@F{ln(abs(i*x))}", "@F{finite_part(1/abs(x)^2)}"):
             self.assertIn("Fourier(", self.fields(source, "k")["function"])
         summed = self.fields("sum(n,1,2,finite_part(n/abs(x)))", "x")
-        self.assertIn("finite_part", summed["function"])
+        self.assertIn(" : finite part", summed["function"])
         self.assertIn("distribution", summed["value_note"])
         primitive = self.fields("@S finite_part(1/abs(x)) dx", "x")
-        self.assertIn("finite_part", primitive["function"])
+        self.assertIn(" : finite part", primitive["function"])
 
     def test_arbitrary_functions_and_scope(self):
         plain = self.fields("@F{f(t)}")
         self.assertIn("Fourier(", plain["function"])
         self.assertIn("Fourier(", self.fields("@F{u(t)}")["function"])
         shifted = self.fields("@F{f(t-2)}")
-        self.assertIn("exp((-2i)ω)", shifted["unbound"])
+        self.assertIn("exp(-2iω)", shifted["unbound"])
         self.assertNotIn("t = ?", shifted["function"])
         derivative = self.fields("@F{f'(t)}")
         self.assertIn("Fourier(", derivative["function"])
@@ -401,7 +401,11 @@ class FourierTests(unittest.TestCase):
         for name in ("delta", "step", "rect", "tri", "circ", "sinc", "PV"):
             for suffix in ("", "^2"):
                 fields = self.fields(name+"(ω)"+suffix)
-                self.assertIn("(\\omega)", fields["tex"])
+                if name == "PV":
+                    self.assertIn(r"\text{principal value}", fields["tex"])
+                    self.assertNotIn(r"\operatorname{PV}", fields["tex"])
+                else:
+                    self.assertIn("(\\omega)", fields["tex"])
 
     def test_gaussian_against_independent_quadrature(self):
         # Composite Simpson quadrature tests the kernel sign independently of the symbolic rule.
@@ -430,7 +434,7 @@ class ZZFourierReadmeExamples(unittest.TestCase):
         for source in ("@F{ln|x|}", "@F{ln(|x|)}", "@F{ln(abs(x))}"):
             fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "k", "evaluate")
             self.assertEqual(code, 0, raw)
-            self.assertEqual(fields["unbound"], "-π·(finite_part(1/|k|) + 2γ·δ(k)) where (k ∈ ℝ)")
+            self.assertEqual(fields["unbound"], "-π·((1/|k| : finite part) + 2γ·δ(k)) where (k ∈ ℝ)")
         source = "@Finv{-@pi*finite_part(1/abs(ω))-2*@pi*@eulermascheroni*delta(ω)}"
         fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "t", "evaluate")
         self.assertEqual(code, 0, raw)
@@ -452,7 +456,7 @@ class ZZFourierReadmeExamples(unittest.TestCase):
             ("@Finv{exp(-ω^2)}", "½·exp(-¼t²)/√(π) where (t ∈ ℝ)"),
             ("@F{rect(t)}", "sinc(ω/(2π)) where (ω ∈ ℝ)"),
             ("@F{delta(t)}", "1"),
-            ("@F{step(t)}", "principal_value(1/(iω)) + π·δ(ω) where (ω ∈ ℝ)"),
+            ("@F{step(t)}", "(1/(iω) : principal value) + π·δ(ω) where (ω ∈ ℝ)"),
             ("@F{1+t^n+delta(t)}", "2π·(δ(ω) + i^n·Derivative(δ(ω), n)) + 1 where (ω ∈ ℝ; n ∈ ℤ≥0)"),
             ("@F{f(t)}", "ℱ(f(t))"),
         )

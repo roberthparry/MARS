@@ -641,7 +641,8 @@ done:
     return out;
 }
 
-/* Retain larger binomial expansions as sums so beautification does not combine many rational terms. */
+/* Keep every binomial expansion bounded and unevaluated: even four explicit rational
+ * terms can trigger expensive common-denominator beautification for an unbound target. */
 static expr_t *elementary_hyperbolic_sum(const expr_t *base, const expr_t *rate, const expr_t *offset,
                                          long order, const expr_t *t, const expr_t *s,
                                          number_t *bound, expr_t **conditions)
@@ -707,7 +708,7 @@ static expr_t *elementary_hyperbolic_sum(const expr_t *base, const expr_t *rate,
     return out;
 }
 
-/* Small powers use the core's affine exponential rules; larger powers retain a finite sum. */
+/* Construct the spectral finite sum directly, without recursively transforming an expanded power. */
 static expr_t *elementary_hyperbolic_power(const expr_t *f, const expr_t *t, const expr_t *s,
                                            number_t *bound, expr_t **conditions)
 {
@@ -724,43 +725,28 @@ static expr_t *elementary_hyperbolic_power(const expr_t *f, const expr_t *t, con
     if (!valid)
         return NULL;
     expr_t *rate = NULL, *offset = NULL;
-    bool affine = elementary_affine(base->a, t, &rate, &offset);
-    if (affine && order > 4) {
-        expr_t *out = elementary_hyperbolic_sum(base, rate, offset, order, t, s, bound, conditions);
-        expr_free(offset);
-        expr_free(rate);
-        return out;
+    expr_t *out = NULL;
+    if (elementary_affine(base->a, t, &rate, &offset)) {
+        if (order == 0 || expr_is_exact_zero(rate)) {
+            expr_t *initial = base->ops->apply_unary(offset);
+            expr_t *n = expr_const_long(order);
+            expr_t *constant = order == 0 ? expr_const_one() : expr_pow_xp(initial, n);
+            expr_t *value = expr_beautify(constant);
+            out = expr_div(value, s);
+            if (expr_is_exact_zero(value)) {
+                num_destroy(bound);
+                *bound = num_clone(NUM_NINF);
+            }
+            expr_free(value);
+            expr_free(constant);
+            expr_free(n);
+            expr_free(initial);
+        } else {
+            out = elementary_hyperbolic_sum(base, rate, offset, order, t, s, bound, conditions);
+        }
     }
     expr_free(offset);
     expr_free(rate);
-    if (!affine)
-        return NULL;
-    expr_t *sum = NULL;
-    long binomial = 1;
-    for (long k = 0; k <= order; ++k) {
-        expr_t *harmonic = expr_const_long(order - 2 * k);
-        expr_t *argument = expr_mul(harmonic, base->a);
-        expr_t *exponential = expr_exp(argument);
-        long signed_weight = base->ops == &ops_sinh && k % 2 ? -binomial : binomial;
-        expr_t *weight = expr_const_long(signed_weight);
-        expr_t *term = expr_mul(weight, exponential);
-        expr_t *next = sum ? expr_add(sum, term) : expr_clone(term);
-        expr_free(sum);
-        sum = next;
-        expr_free(term);
-        expr_free(weight);
-        expr_free(exponential);
-        expr_free(argument);
-        expr_free(harmonic);
-        if (k < order)
-            binomial = binomial * (order - k) / (k + 1);
-    }
-    expr_t *scale = expr_const_long(1L << order);
-    expr_t *reduced = expr_div(sum, scale);
-    expr_t *out = elementary_reduced(reduced, t, s, bound, conditions);
-    expr_free(reduced);
-    expr_free(scale);
-    expr_free(sum);
     return out;
 }
 

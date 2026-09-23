@@ -593,6 +593,32 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
             }
             return value;
         }
+        /* Parameter substitution and coordinate renaming must reach the derivative operand too.
+         * A numerical evaluation point is not a new differentiation coordinate. */
+        size_t order = expr_formal_derivative_order(expr);
+        bool coordinate = false;
+        for (size_t j = 0u; j < order; ++j) {
+            const expr_t *wrt = expr_formal_derivative_wrt_at(expr, j);
+            coordinate |= wrt == needle || expr_is_same_named_leaf_for_substitution(wrt, needle);
+        }
+        if (!coordinate || expr_is_var(replacement)) {
+            expr_t **wrts = calloc(order, sizeof(*wrts));
+            left = expr_substitute(dependent, needle, replacement);
+            if (!wrts || !left) {
+                free(wrts);
+                expr_free(left);
+                return NULL;
+            }
+            for (size_t j = 0u; j < order; ++j) {
+                const expr_t *wrt = expr_formal_derivative_wrt_at(expr, j);
+                bool match = wrt == needle || expr_is_same_named_leaf_for_substitution(wrt, needle);
+                wrts[j] = (expr_t *)(match ? replacement : wrt);
+            }
+            out = expr_new_formal_derivative(left, order, wrts);
+            expr_free(left);
+            free(wrts);
+            return out;
+        }
         return expr_clone(expr);
     }
 

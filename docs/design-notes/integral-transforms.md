@@ -238,9 +238,19 @@ examples are in the [expression guide](../expression.md#fourier-transforms).
 | $\delta(t)$ | $1$ | Both directions; real non-zero affine scaling and translations. |
 | $1$ | $2\pi\delta(\omega)$ | Both directions, distributionally. |
 | $t^n$ | $2\pi i^n\delta^{(n)}(\omega)$ | Symbolic non-negative integral orders; inverse rule $(-i)^n\delta^{(n)}(t)$. |
-| $\operatorname{step}(t)$ | $\pi\delta(\omega)+\operatorname{PV}(1/(i\omega))$ | Both directions, retaining the principal value. |
-| $\ln\lvert t\rvert$ | $-\pi\operatorname{Fp}(1/\lvert\omega\rvert)-2\pi\gamma\delta(\omega)$ | Both directions; real non-zero affine scales and real translations. Unit-cutoff finite part, not ordinary division. |
-| $\operatorname{Fp}(1/\lvert t\rvert)$ | $-2(\ln\lvert\omega\rvert+\gamma)$ | Both directions, with the same unit cutoff; no pointwise value at the singularity. |
+| $\operatorname{step}(t)$ | $\pi\delta(\omega)+1/(i\omega)$ | Both directions; $1/(i\omega)$: principal value. |
+| $\ln\lvert t\rvert$ | $-\pi/\lvert\omega\rvert-2\pi\gamma\delta(\omega)$ | Both directions; $1/\lvert\omega\rvert$: unit-cutoff finite part, not ordinary division. Real non-zero affine scales and real translations. |
+| $1/\lvert t\rvert$, finite part | $-2(\ln\lvert\omega\rvert+\gamma)$ | Both directions, with the same unit cutoff; no pointwise value at the singularity. |
+| $\tan t$ | $2\pi i\sum_{n=1}^{\infty}(-1)^n[\delta(\omega-2n)-\delta(\omega+2n)]$ | Both directions; $\tan t$: symmetric principal value at every pole. Real non-zero affine scales and real translations. |
+| $\cot t$ | $-2\pi i\sum_{n=1}^{\infty}[\delta(\omega-2n)-\delta(\omega+2n)]$ | Both directions; $\cot t$: symmetric principal value at every pole. Real non-zero affine scales and real translations. |
+| $\tanh t$ | $-i\pi\operatorname{csch}(\pi\omega/2)$ | Both directions; numerical spectrum for real $\omega\ne0$. Copied inverses recover $\tanh t$ for all real $t$. Real non-zero affine scales and real translations. |
+| $\operatorname{csch}t$ | $-i\pi\tanh(\pi\omega/2)$ | Both directions, with symmetric cancellation at the source pole. Reciprocal `sinh` notation is also recognised. |
+| $\coth t$ | $-i\pi\coth(\pi\omega/2)$ | Both directions, with symmetric cancellation at both poles. Numerical spectrum for real $\omega\ne0$; inverse for real $t\ne0$. Real affine arguments and reciprocal `tanh` notation. |
+| $\operatorname{atanh}t$ | $i\pi^2\delta(\omega)-2\pi i\operatorname{step}(\omega)\operatorname{sinc}(\omega/\pi)$ | Both directions, with MARS's complex real-axis boundary values; real affine arguments and copied spectra. |
+| $\arcsin t$, $\arccos t$ | Bessel-weighted $\operatorname{step}(\omega)/\omega$, plus the exact delta correction | Both directions. Half-line quotients retain a unit-cutoff finite part internally; copied spectra use the same convention. See the expression guide. |
+| $\Gamma(a+ibt)$ | $2\pi\exp(a\omega/b-e^{\omega/b})/|b|$ | Both directions for $\operatorname{Re}(a)>0$, real $b\ne0$. Explicit real-axis gamma requests receive a non-existence diagnostic. |
+| $\Gamma(x)$ along $\operatorname{Re}(x)>0$ | $2\pi\exp(k\operatorname{Re}(x)-e^k)$ | Shorthand selects $\operatorname{Im}(x)\to k$, with the real coordinate fixed. A copied inverse reconstructs $\Gamma(x)$ on that half-plane. |
+| $\arctan t$ | $-i\pi e^{-|\omega|}/\omega$ | Both directions, with symmetric cancellation at zero in the spectrum. Numerical spectrum for real $\omega\ne0$; inverse for all real $t$. Real affine arguments and independently copied spectra. |
 | $\cos(at+b)$, $\sin(at+b)$, $e^{iat+b}$ | Shifted impulses with their phase factors | Both directions for real harmonic rates. |
 | $t^n f(t)$ | $i^n\partial_\omega^n\mathcal F\{f\}(\omega)$ | Integral $0\leq n\leq32$; formal derivatives retained when necessary. |
 | $f^{(n)}(t)$ | $(i\omega)^n\mathcal F\{f\}(\omega)$ | Known derivative orders and symbolic non-negative integral orders. |
@@ -252,11 +262,38 @@ The Hermite–Gaussian family supports symbolic degree through the native
 script-H polynomial. General antiderivative identities remain unsupported.
 The logarithmic distribution and its finite-part convention are defined in the
 [expression guide](../expression.md#logarithmic-distributions).
-Chirps, impulse trains, non-integral-order and second-kind Bessel functions,
+Chirps, general impulse trains beyond the tangent/cotangent pairs, non-integral-order and second-kind Bessel functions,
 general regularised powers and complex-branch logarithms, all listed
 two-dimensional pairs and all general-dimensional pairs remain
 unsupported. These gaps must remain visible until independently tested rules
 replace their symbolic fallback.
+
+### Round-trip verification
+
+A round trip must invert the actual spectral formula, not merely cancel nested
+transform operators. The regression inventory in
+`tests/tools/test_transform_round_trips.py` serialises the forward result,
+parses it as fresh inverse-transform input, then serialises and reparses the
+recovered function as well. This checks the native Expression rendering as
+well as the inverse rule. Fourier pairs are also checked in the opposite order.
+Family-specific tests supplement these checks with independent numerical
+integration and distributional identities.
+
+Recovery means mathematical equivalence on the appropriate domain, not identical
+spelling. The unilateral Laplace transform determines the function for positive
+time, not its negative-time history. Ordinary Fourier inversion determines a
+function almost everywhere; at jumps, symmetric inversion recovers the average
+of its one-sided limits. Changing isolated point values therefore cannot be
+detected by either ordinary transform. Impulses, their derivatives, principal
+values and finite parts must be compared as distributions, not as finite
+pointwise numbers. Parameter restrictions and branch choices remain part of a
+transform pair and must survive serialisation.
+
+The inventory is a regression check for implemented families, not a claim that
+arbitrary input expressions have closed-form transforms or that a finite set of
+numerical samples proves a symbolic identity. Unsupported cases must remain
+explicitly symbolic; a round-trip test must not accept that fallback as a
+successful closed-form inverse.
 
 ### Convolution identities
 
@@ -327,7 +364,7 @@ $\sigma>\lvert a\rvert$, respectively.
 | `abs`: $\lvert at+b\rvert$, no positive zero | $\epsilon(a/s^2+b/s)$ | Known real $a,b$, $\epsilon=\operatorname{sgn}(b)$ if $b\ne0$, otherwise $\operatorname{sgn}(a)$; $\sigma>0$ |
 | `abs`: $\lvert at+b\rvert$, $ab<0$ | $\operatorname{sgn}(b)(a/s^2+b/s)+2\lvert a\rvert e^{sb/a}/s^2$ | Known real $a,b$, positive zero $-b/a$; $\sigma>0$ |
 | `conj`: $\overline{at+b}$ | $\overline a/s^2+\overline b/s$ | $\sigma>0$; $s$ is not conjugated |
-| `realpart`: $\operatorname{Re}(at+b)$ | $\operatorname{Re}(a)/s^2+\operatorname{Re}(b)/s$ | $\sigma>0$ |
+| Native real-part operator: $\operatorname{Re}(at+b)$ | $\operatorname{Re}(a)/s^2+\operatorname{Re}(b)/s$ | $\sigma>0$; `realpart` is not a callable Expression parser alias |
 | `floor`: $\lfloor at\rfloor$ | $1/[s(e^{s/a}-1)]$ | Known real $a>0,\ \sigma>0$ |
 | `ceil`: $\lceil at\rceil$ | $1/[s(1-e^{-s/a})]$ | Known real $a>0,\ \sigma>0$ |
 

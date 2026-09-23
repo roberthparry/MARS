@@ -815,9 +815,11 @@ static number_t binding_number_from_exact_decimal_string(const string_t *text)
 
 static number_t binding_number_from_string(const string_t *text)
 {
-    if (text && string_view_equals_literal(string_view_all(text), "∞"))
+    if (text && (string_view_equals_literal(string_view_all(text), "∞") ||
+                 string_view_equals_literal(string_view_all(text), "@inf")))
         return num_clone(NUM_INF);
-    if (text && string_view_equals_literal(string_view_all(text), "-∞"))
+    if (text && (string_view_equals_literal(string_view_all(text), "-∞") ||
+                 string_view_equals_literal(string_view_all(text), "-@inf")))
         return num_clone(NUM_NINF);
     if (binding_number_string_is_exact_decimal(text))
         return binding_number_from_exact_decimal_string(text);

@@ -252,7 +252,7 @@ static char *TeX_wrapped_body_inner(const expr_t *expr, size_t line_limit)
         line_limit = 110u;
 
     one_line = TeX_body_for_node(expr, PREC_LOWEST);
-    if (!one_line || strlen(one_line) <= line_limit)
+    if (!one_line || strlen(one_line) <= line_limit || expr_distribution_has_qualification(expr))
         return one_line;
 
     wrapped = TeX_wrapped_mul_with_additive_factor(expr, line_limit);

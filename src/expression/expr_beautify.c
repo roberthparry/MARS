@@ -745,7 +745,7 @@ expr_t *expr_expand_preserved_for_display(const expr_t *expr)
     if (!expr)
         return NULL;
     if (expr->ops && expr->ops->arity == EXPR_OP_ATOM) {
-        if (expr->binding_expr && !expr_binding_expr_is_numeric_literal(expr->binding_expr) &&
+        if (expr_is_unnamed_const(expr) && expr->binding_expr && !expr_binding_expr_is_numeric_literal(expr->binding_expr) &&
             expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(expr->binding_expr)) {
             expanded = expr_binding_expr_eval_expr(expr->binding_expr);
             rebuilt = expanded ? expr_expand_preserved_for_display(expanded) : NULL;

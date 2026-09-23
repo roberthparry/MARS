@@ -127,6 +127,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
             if (pair->a->ops == &ops_real_parameter && expr_struct_eq(pair->a->a, x))
                 continue;
+            if (uses(pair->a, x) && expr_const_is_zero(pair->b->a) &&
+                (expr_fourier_periodic_pole_condition(f->a, pair->a) ||
+                 expr_fourier_odd_hyperbolic_pole_condition(c, f->a, x, pair->a) ||
+                 expr_fourier_branch_pole_condition(c, f->a, pair->a) ||
+                 expr_fourier_atan_pole_condition(c, f->a, x, pair->a)))
+                continue;
             if (uses(pair->a, x) || uses(pair->b->a, x))
                 return NULL;
             expr_t *copy = expr_alloc(&ops_argument_list);
@@ -149,7 +155,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         const expr_t *body = f->a;
         if (body->ops == &ops_div && !uses(body->a, x) && body->b->ops == &ops_abs &&
             expr_struct_eq(body->b->a, x)) {
-            expr_t *gamma = keep(c, expr_new_named_const(NUM_EULER_MASCHERONI, "@eulermascheroni"));
+            expr_t *gamma = euler_constant(c);
             expr_t *logarithm = ft_add(c, ft_ln(c, ft_abs(c, w)), gamma);
             return ft_neg(c, ft_mul(c, ft_mul(c, two, body->a), logarithm));
         }
@@ -160,13 +166,19 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         if (affine(c, f->a->a, x, &a, &b) && !expr_const_is_zero(a) &&
             real_parameter(c, a) && real_parameter(c, b) && positive(c, ft_abs(c, a))) {
             expr_t *regularised = ft_finite_part(c, ft_div(c, one, ft_abs(c, w)));
-            expr_t *gamma = keep(c, expr_new_named_const(NUM_EULER_MASCHERONI, "@eulermascheroni"));
+            expr_t *gamma = euler_constant(c);
             expr_t *offset = ft_sub(c, ft_ln(c, ft_abs(c, a)), gamma);
             expr_t *impulse = ft_mul(c, ft_mul(c, two_pi, offset), ft_delta(c, w));
             expr_t *phase = ft_exp(c, ft_div(c, ft_mul(c, ft_mul(c, i, w), b), a));
             return ft_sub(c, impulse, ft_mul(c, pi, ft_mul(c, phase, regularised)));
         }
         return NULL;
+    }
+    if (f->ops == &ops_tan || f->ops == &ops_cot || f->ops == &ops_principal_value ||
+        f->ops == &ops_summation || f->ops == &ops_add || f->ops == &ops_sub) {
+        expr_t *pair = expr_fourier_periodic_pair(c, f, x, w);
+        if (pair)
+            return pair;
     }
     if (f->ops == &ops_principal_value) {
         expr_t *coefficient = clean(c, ft_mul(c, f->a, x));
@@ -178,6 +190,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (!uses(f, x))
         return ft_mul(c, ft_mul(c, two_pi, f), ft_delta(c, w));
+    expr_t *branch_pair = expr_fourier_branch_pair(c, f, x, w);
+    if (branch_pair)
+        return branch_pair;
+    expr_t *gamma_pair = expr_fourier_gamma_pair(c, f, x, w);
+    if (gamma_pair)
+        return gamma_pair;
     if (f->ops == &ops_beta || f->ops == &ops_add || f->ops == &ops_sub) {
         expr_t *pair = expr_fourier_beta_pair(c, f, x, w);
         if (pair)
@@ -198,6 +216,17 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (f->ops == &ops_conj)
         return ft_conj(c, subformula(c, f->a, x, ft_neg(c, w), depth));
+    if (f->ops == &ops_atan || f->ops == &ops_mul || f->ops == &ops_div) {
+        expr_t *pair = expr_fourier_atan_pair(c, f, x, w);
+        if (pair)
+            return pair;
+    }
+    if (f->ops == &ops_tanh || f->ops == &ops_cosech || f->ops == &ops_coth || f->ops == &ops_div ||
+        f->ops == &ops_pow || f->ops == &ops_pow_d) {
+        expr_t *pair = expr_fourier_odd_hyperbolic_pair(c, f, x, w);
+        if (pair)
+            return pair;
+    }
     /* Recognise the compact Chebyshev spectrum as an actual Bessel pair, not only by nested duality. */
     if (f->ops == &ops_div && (f->a->ops == &ops_mul || f->a->ops == &ops_rect)) {
         const expr_t *numerator = f->a;
@@ -303,14 +332,18 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         return derivative ? ft_mul(c, ft_pow_xp(c, i, integer(c, order)), derivative) : NULL;
     }
     const expr_t *monomial_base = NULL, *monomial_order = NULL;
-    if (match_power(c, f, &monomial_base, &monomial_order) && expr_struct_eq(monomial_base, x) &&
-        !uses(monomial_order, x)) {
+    expr_t *monomial_scale = NULL, *monomial_offset = NULL;
+    if (match_power(c, f, &monomial_base, &monomial_order) && !uses(monomial_order, x) &&
+        affine(c, monomial_base, x, &monomial_scale, &monomial_offset) && expr_const_is_zero(monomial_offset)) {
         expr_t *integer_order = keep(c, expr_new_unary_internal(&ops_nonnegative_integer, expr_clone(monomial_order)));
         if (!positive(c, integer_order))
             return NULL;
         expr_t *impulse = ft_delta(c, w);
         expr_t *derivative = keep(c, expr_new_ordered_derivative(impulse, monomial_order));
-        return derivative ? ft_mul(c, ft_mul(c, two_pi, ft_pow_xp(c, i, monomial_order)), derivative) : NULL;
+        /* Integral powers permit complex scalar extraction without a branch choice.
+         * This also recognises the (i*w)^n spectrum of an impulse derivative. */
+        expr_t *coefficient = ft_pow_xp(c, clean(c, ft_mul(c, i, monomial_scale)), monomial_order);
+        return derivative ? ft_mul(c, ft_mul(c, two_pi, coefficient), derivative) : NULL;
     }
     const expr_t *arg = exponent(f);
     if (arg) {
@@ -530,17 +563,32 @@ expr_t *expr_fourier_result(const expr_t *transform)
     fourier_context_t c = {.inverse = transform->ops == &ops_inverse_fourier};
     const expr_t *source = transform->b->a, *target = transform->b->b->a;
     expr_t *frequency = expr_is_var(target) ? keep(&c, expr_clone(target)) : fresh_variable(&c, transform->a, target);
-    expr_t *out = formula(&c, transform->a, source, frequency, 0u);
+    /* Copied coefficients retain exact symbolic provenance (notably 2*pi*i).
+     * Expose it before scalar extraction, rather than folding it into an opaque complex number. */
+    expr_t *input = exact_literals(&c, transform->a);
+    if (source->ops == &ops_imag_coordinate) {
+        /* Integrate along z = Re(z) + i*y, retaining Re(z) as an independent parameter. */
+        expr_t *line_parameter = fresh_variable(&c, input, target);
+        expr_t *real = keep(&c, expr_real_coordinate(source->a));
+        expr_t *point = ft_add(&c, real, ft_mul(&c, constant(&c, NUM_I), line_parameter));
+        input = replace(&c, input, source->a, point);
+        source = line_parameter;
+    }
+    expr_t *out = formula(&c, input, source, frequency, 0u);
     if (out) {
         const expr_t *argument = target;
         if (c.inverse) {
             out = ft_div(&c, out, ft_mul(&c, integer(&c, 2), pi_constant(&c)));
         }
         bool depends_on_frequency = uses(out, frequency);
-        if (expr_is_var(target))
-            out = clean(&c, out);
-        else
+        if (expr_is_var(target)) {
+            /* Reify exact constant arithmetic before cancelling the Fourier normalisation;
+             * otherwise preserved coefficients such as 2*pi remain opaque to cancellation. */
+            out = clean(&c, exact_literals(&c, clean(&c, out)));
+        } else
             out = contains_formal_derivative(out) ? NULL : replace(&c, out, frequency, argument);
+        if (out && target->ops == &ops_imag_coordinate)
+            out = expr_fourier_gamma_cartesian_result(&c, out);
         if (out && depends_on_frequency && !real_parameter(&c, target))
             out = constant(&c, NUM_NAN);
         if (out && c.conditions) {
@@ -565,6 +613,35 @@ const char *expr_fourier_value_note(const expr_t *transform)
 {
     if (!transform || (transform->ops != &ops_fourier && transform->ops != &ops_inverse_fourier))
         return NULL;
+    const char *odd_hyperbolic_note = expr_fourier_odd_hyperbolic_note(transform);
+    if (odd_hyperbolic_note)
+        return odd_hyperbolic_note;
+    const char *atan_note = expr_fourier_atan_note(transform);
+    if (atan_note)
+        return atan_note;
+    const char *gamma_note = expr_fourier_gamma_note(transform);
+    if (gamma_note)
+        return gamma_note;
+    if (transform->a->ops == &ops_asin || transform->a->ops == &ops_acos) {
+        expr_t *known = expr_fourier_result(transform);
+        bool supported = known != NULL;
+        expr_free(known);
+        if (supported)
+            return "This Fourier pair is distributional. Half-line reciprocal quotients use a unit-cutoff "
+                   "finite part at zero. The native engine and inverse matcher preserve that convention and "
+                   "the displayed impulse coefficient; numerical quotients apply only away from zero.";
+    }
+    const expr_t *periodic = transform->a;
+    if (periodic->ops == &ops_principal_value)
+        periodic = periodic->a;
+    if (periodic->ops == &ops_tan || periodic->ops == &ops_cot) {
+        expr_t *known = expr_fourier_result(transform);
+        bool supported = known != NULL;
+        expr_free(known);
+        if (supported)
+            return "The periodic poles are interpreted as symmetric Cauchy principal values. "
+                   "The impulse series and its inverse are distributional, not ordinary Fourier integrals.";
+    }
     const expr_t *argument = NULL, *source = transform->b->a;
     expr_t *power = NULL, *branch_power = NULL;
     bool singular = false;
