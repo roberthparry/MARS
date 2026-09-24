@@ -131,7 +131,8 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
                 (expr_fourier_periodic_pole_condition(f->a, pair->a) ||
                  expr_fourier_odd_hyperbolic_pole_condition(c, f->a, x, pair->a) ||
                  expr_fourier_branch_pole_condition(c, f->a, pair->a) ||
-                 expr_fourier_atan_pole_condition(c, f->a, x, pair->a)))
+                 expr_fourier_atan_pole_condition(c, f->a, x, pair->a) ||
+                 expr_fourier_asinh_pole_condition(c, f->a, x, pair->a)))
                 continue;
             if (uses(pair->a, x) || uses(pair->b->a, x))
                 return NULL;
@@ -216,6 +217,11 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (f->ops == &ops_conj)
         return ft_conj(c, subformula(c, f->a, x, ft_neg(c, w), depth));
+    if (f->ops == &ops_asinh || f->ops == &ops_mul || f->ops == &ops_div) {
+        expr_t *pair = expr_fourier_asinh_pair(c, f, x, w);
+        if (pair)
+            return pair;
+    }
     if (f->ops == &ops_atan || f->ops == &ops_mul || f->ops == &ops_div) {
         expr_t *pair = expr_fourier_atan_pair(c, f, x, w);
         if (pair)

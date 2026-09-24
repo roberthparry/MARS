@@ -121,7 +121,7 @@ bool expr_fourier_atan_pole_condition(fourier_context_t *c, const expr_t *f,
 /* Keep distributional interpretation outside the expression's mathematical conditions. */
 const char *expr_fourier_atan_note(const expr_t *transform)
 {
-    if (transform->a->ops != &ops_atan)
+    if (transform->a->ops != &ops_atan && transform->a->ops != &ops_asinh)
         return NULL;
     expr_t *specialised = expr_transform_bound_constants(transform);
     if (specialised)
@@ -129,8 +129,10 @@ const char *expr_fourier_atan_note(const expr_t *transform)
     fourier_context_t c = {.inverse = transform->ops == &ops_inverse_fourier};
     expr_t *rate = NULL, *offset = NULL;
     const expr_t *source = transform->b->a;
+    expr_t *(*pair)(fourier_context_t *, const expr_t *, const expr_t *, const expr_t *) =
+        transform->a->ops == &ops_atan ? expr_fourier_atan_pair : expr_fourier_asinh_pair;
     bool matched = affine(&c, transform->a->a, source, &rate, &offset) && !expr_const_is_zero(rate) &&
-                   expr_fourier_atan_pair(&c, transform->a, source, transform->b->b->a) && !c.failed;
+                   pair(&c, transform->a, source, transform->b->b->a) && !c.failed;
     expr_free(c.conditions);
     for (size_t n = 0u; n < c.count; ++n)
         expr_free(c.nodes[n]);

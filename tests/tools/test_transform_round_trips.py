@@ -38,6 +38,8 @@ FOURIER_SOURCES = {
     "csch": "csch(t)",
     "coth": "coth(t)",
     "arctangent": "atan(t)",
+    "inverse_hyperbolic_sine": "asinh(t)",
+    "inverse_hyperbolic_cosine": "acosh(t)",
     "inverse_hyperbolic_tangent": "atanh(t)",
     "arcsine": "asin(t)",
     "arccosine": "acos(t)",

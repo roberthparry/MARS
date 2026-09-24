@@ -293,12 +293,17 @@ const char *expr_fourier_odd_hyperbolic_note(const expr_t *transform);
 
 /** Match real affine arctangents and their exponentially damped reciprocal spectra. */
 expr_t *expr_fourier_atan_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+/** Match real affine inverse hyperbolic sines and their modified-Bessel reciprocal spectra. */
+expr_t *expr_fourier_asinh_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+/** Recognise precisely the zero-frequency exclusion of an inverse-hyperbolic-sine spectrum. */
+bool expr_fourier_asinh_pole_condition(fourier_context_t *c, const expr_t *f,
+                                      const expr_t *x, const expr_t *condition);
 
 /** Recognise the pole exclusion of a matched arctangent spectrum. */
 bool expr_fourier_atan_pole_condition(fourier_context_t *c, const expr_t *f,
                                      const expr_t *x, const expr_t *condition);
 
-/** Describe the distributional interpretation of a recognised arctangent transform. */
+/** Describe the distributional interpretation of a recognised atan or asinh transform. */
 const char *expr_fourier_atan_note(const expr_t *transform);
 
 /** Match inverse trigonometric and hyperbolic boundary-value pairs, before inverse normalisation. */

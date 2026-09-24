@@ -5192,7 +5192,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
             return;
         }
-        if (expr_is_op(f, &ops_bessel_j) || expr_is_op(f, &ops_bessel_y)) {
+        if (expr_is_op(f, &ops_bessel_j) || expr_is_op(f, &ops_bessel_y) || expr_is_op(f, &ops_bessel_k)) {
             sbuf_puts(b, f->ops->TeX_name);
             sbuf_puts(b, "_{");
             emit_TeX_expr(f->a, b, PREC_LOWEST);

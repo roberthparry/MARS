@@ -1,10 +1,12 @@
 #include "expr_fourier_internal.h"
 
-/* The real-axis boundary values used by MARS have positive imaginary parts on both tails. */
+/* MARS's real-axis asin and atanh values have positive imaginary parts on both tails;
+ * acos = pi/2 - asin and acosh = i acos on this same real-axis boundary. */
 typedef expr_t *(*branch_function_t)(const expr_t *);
 static const branch_function_t branch_functions[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ASIN]  = expr_asin,
     [EXPR_KIND_ACOS]  = expr_acos,
+    [EXPR_KIND_ACOSH] = expr_acosh,
     [EXPR_KIND_ATANH] = expr_atanh,
 };
 
@@ -46,11 +48,17 @@ static expr_t *branch_spectrum(fourier_context_t *c, expr_op_kind_t kind, const 
         expr_t *kernel = ft_mul(c, keep(c, expr_bessel_j(integer(c, 0), q)), reciprocal);
         expr_t *gamma = euler_constant(c);
         expr_t *correction = ft_sub(c, ft_ln(c, ft_mul(c, integer(c, 2), ft_abs(c, rate))), gamma);
-        out = ft_mul(c, ft_mul(c, i, two_pi),
-                     ft_sub(c, ft_mul(c, correction, impulse),
-                            ft_mul(c, ft_div(c, signed_rate, ft_abs(c, rate)), ft_mul(c, phase, kernel))));
-        if (kind == EXPR_KIND_ACOS)
-            out = ft_sub(c, ft_mul(c, ft_mul(c, pi, pi), impulse), out);
+        expr_t *regularised = ft_sub(c, ft_mul(c, correction, impulse),
+                                     ft_mul(c, ft_div(c, signed_rate, ft_abs(c, rate)), ft_mul(c, phase, kernel)));
+        expr_t *cosine_impulse = ft_mul(c, ft_mul(c, pi, pi), impulse);
+        if (kind == EXPR_KIND_ACOSH) {
+            /* acosh = i acos: cancel i*i before constructing the spectral sum. */
+            out = ft_add(c, ft_mul(c, i, cosine_impulse), ft_mul(c, two_pi, regularised));
+        } else {
+            out = ft_mul(c, ft_mul(c, i, two_pi), regularised);
+            if (kind == EXPR_KIND_ACOS)
+                out = ft_sub(c, cosine_impulse, out);
+        }
     }
     return clean(c, out);
 }
@@ -263,6 +271,14 @@ static expr_t *branch_inverse(fourier_context_t *c, const expr_t *f, const expr_
         kind = EXPR_KIND_ACOS;
         scale = ft_neg(c, scale);
         constant_part = integer(c, 0);
+        /* Prefer the real multiple of acosh to an imaginary multiple of acos. This also
+         * recognises inverse-first spectra, whose scalar includes the Fourier normalisation. */
+        expr_t *hyperbolic_scale = clean(c, ft_mul(c, minus_i, scale));
+        number_t value = NUM_ZERO;
+        if (literal_value(hyperbolic_scale, &value) && num_is_real(value) && num_is_finite(value)) {
+            kind = EXPR_KIND_ACOSH;
+            scale = hyperbolic_scale;
+        }
     }
     expr_t *body = keep(c, branch_functions[kind](argument));
     if (kind == EXPR_KIND_ATANH &&
@@ -278,8 +294,13 @@ expr_t *expr_fourier_branch_pair(fourier_context_t *c, const expr_t *f, const ex
     if (!function)
         return branch_inverse(c, f, x, w);
     expr_t *rate = NULL, *offset = NULL;
-    if (!affine(c, f->a, x, &rate, &offset) || expr_const_is_zero(rate) ||
-        !real_parameter(c, rate) || !real_parameter(c, offset) || !positive(c, ft_abs(c, rate)))
+    if (!affine(c, f->a, x, &rate, &offset))
+        return NULL;
+    if (expr_const_is_zero(rate)) {
+        expr_t *body = keep(c, function(offset));
+        return ft_mul(c, ft_mul(c, integer(c, 2), pi_constant(c)), ft_mul(c, body, ft_delta(c, w)));
+    }
+    if (!real_parameter(c, rate) || !real_parameter(c, offset) || !positive(c, ft_abs(c, rate)))
         return NULL;
     return branch_spectrum(c, f->ops->kind, rate, offset, w);
 }

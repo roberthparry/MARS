@@ -683,12 +683,44 @@ exponential notation. Exponentially damped reciprocal spectra may also carry
 a real modulation. Increasing exponentials and unrelated pole exclusions are
 not treated as this pair.
 
+### Inverse hyperbolic sine Fourier pair
+
+The `asinh` spectrum uses the modified Bessel function $K_0$. With the same
+angular-frequency convention, the supported pair is:
+
+| Input | Output |
+| --- | --- |
+| `@F{asinh(x)}` | $-2iK_0(|k|)/k$, $k\in\mathbb R$, $k\ne0$. |
+| `@Finv{-2i*K0(abs(k))/k}` | $\operatorname{asinh}(x)$, $x\in\mathbb R$. |
+
+Real non-zero affine scales and real translations work in both directions,
+including independently copied spectra and their mathematical conditions.
+The zero-frequency singularity is interpreted by symmetric cancellation;
+the inverse is defined at zero, where it returns zero. The numerical spectrum
+uses a non-zero frequency condition, emitted as a conditional in Function style.
+This follows by differentiating `asinh` and applying the
+[DLMF cosine-transform identity for K₀](https://dlmf.nist.gov/10.32.E6).
+
+Modified Bessel K accepts `besselk`, `bessel_k` and `BesselK` with order and
+argument; indexed `K_n` and `Kₙ` calls are also supported. `K0`, `K_0` and `K₀`
+denote order zero. Function output uses the registered `besselk` function,
+and TeX uses the conventional indexed K. Numeric evaluation supports real and
+complex orders and non-zero arguments on the principal branch, with guarded
+series for magnitudes up to 1000. Outside this implemented numerical range it
+returns `NAN`, rather than an unverified approximation. The qfloat interface
+requires a positive argument. Argument derivatives, finite sums and
+integer-order affine primitives for $|n|\le64$ are supported; matrix evaluation uses spectral
+functional calculus on diagonalisable numeric square matrices.
+
 ### Inverse-function and gamma Fourier pairs
 
-`atanh`, `asin` and `acos` support both Fourier directions, real non-zero affine
+`atanh`, `asin`, `acos` and `acosh` support both Fourier directions, real non-zero affine
 scales and real translations. Their whole-line transforms use MARS's complex
 boundary values: `atanh` and `asin` have positive imaginary parts on both real
-tails, and `acos` equals π/2 minus `asin`. These are tempered-distribution pairs,
+tails, `acos` equals π/2 minus `asin`, and `acosh(x)` equals `i*acos(x)` for real x.
+The latter agrees with the upper-bank real-axis values of the
+[principal inverse hyperbolic cosine](https://dlmf.nist.gov/4.37).
+These are tempered-distribution pairs,
 not absolutely convergent Fourier integrals.
 
 For the following table, let
@@ -714,10 +746,13 @@ discard its impulse.
 | `@F{atanh(x)}` | $i\pi^2\delta(k)-2\pi i\operatorname{step}(k)\operatorname{sinc}(k/\pi)$ |
 | `@F{asin(x)}` | $G(k)$ |
 | `@F{acos(x)}` | $\pi^2\delta(k)-G(k)$ |
+| `@F{acosh(x)}` | $i\pi^2\delta(k)-iG(k)$ |
 
 Copy each resulting Expression card into `InverseFourier(result,k,x)` to
 recover, respectively, `atanh(x)` with x ∈ ℝ and 1 − x² ≠ 0, `asin(x)` with
-x ∈ ℝ, and `acos(x)` with x ∈ ℝ. The inverse recognises the actual formula,
+x ∈ ℝ, `acos(x)` with x ∈ ℝ, and `acosh(x)` with x ∈ ℝ (including x = ±1).
+The last pair uses the complex branch on x < 1, not a zero extension of the real-valued restriction.
+The inverse recognises the actual formula,
 including its delta coefficient, rather than requiring nested transform calls.
 Adding a delta to the spectrum correctly adds 1/(2π) to the inverse.
 

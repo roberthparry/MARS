@@ -308,6 +308,14 @@ typedef struct {
     variadic_fn vfn;
 } func_entry_t;
 
+static expr_t *parse_bessel_k_zero(const expr_t *argument)
+{
+    expr_t *order = expr_const_zero();
+    expr_t *result = expr_bessel_k(order, argument);
+    expr_free(order);
+    return result;
+}
+
 static expr_t *parse_bessel_j_zero(const expr_t *argument)
 {
     expr_t *order = expr_const_zero();
@@ -364,7 +372,7 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 1, 0,
     0, 0, 4, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
     1, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -372,13 +380,13 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 2, 0,
     0, 1, 0, 0, 0, 3, 3, 1, 2, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+    0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0,
     0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 1, 3, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0,
     4, 3, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0,
     2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1,
-    0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 1, 0, 0, 0, 0,
+    0, 0, 3, 0, 0, 0, 0, 2, 1, 0, 0, 1, 0, 1, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1, 0, 3, 0,
     0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0,
     0, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0, 0, 1, 2,
@@ -485,6 +493,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [163] = { .kw = "E1",                  .arity = 1u,        .ops = &ops_E1,                 .ufn = expr_E1 },
     [164] = { .kw = "polylog",             .arity = 2u,        .ops = &ops_polylog,            .bfn = expr_polylog_xp },
     [165] = { .kw = "and",                 .arity = 2u,        .ops = &ops_bit_and,            .bfn = expr_bit_and },
+    [166] = { .kw = "besselk",             .arity = 2u,        .ops = &ops_bessel_k,           .bfn = expr_bessel_k },
     [167] = { .kw = "lambertwm1",          .arity = 1u,        .ops = &ops_lambert_wm1,        .ufn = expr_lambert_wm1 },
     [171] = { .kw = "sum",                 .arity = UINT_MAX,                                  .vfn = expr_finite_sum_from_args },
     [172] = { .kw = "F₁",                  .arity = 6u,                                        .sfn = expr_appell_f1 },
@@ -500,6 +509,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [200] = { .kw = "gammainc_Q",          .arity = 2u,        .ops = &ops_gammainc_Q,         .bfn = expr_gammainc_Q },
     [201] = { .kw = "Ei",                  .arity = 1u,        .ops = &ops_Ei,                 .ufn = expr_Ei },
     [202] = { .kw = "gammainclower",       .arity = 2u,        .ops = &ops_gammainc_lower,     .bfn = expr_gammainc_lower },
+    [204] = { .kw = "K0",                  .arity = 1u,                                        .ufn = parse_bessel_k_zero },
     [205] = { .kw = "arcsch",              .arity = 1u,        .ops = &ops_acosech,            .ufn = expr_acosech },
     [206] = { .kw = "cl₂",                 .arity = 1u,        .ops = &ops_clausen2,           .ufn = expr_clausen2 },
     [208] = { .kw = "ordered_derivative",  .arity = UINT_MAX,                                  .vfn = parse_derivative_function },
@@ -519,6 +529,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [229] = { .kw = "finite_part",         .arity = 1u,        .ops = &ops_finite_part,        .ufn = expr_finite_part },
     [231] = { .kw = "lommels",             .arity = 3u,        .ops = &ops_lommel_s,           .tfn = expr_lommel_s },
     [238] = { .kw = "legendrechi",         .arity = 2u,        .ops = &ops_legendre_chi,       .bfn = expr_legendre_chi_xp },
+    [239] = { .kw = "K_0",                 .arity = 1u,                                        .ufn = parse_bessel_k_zero },
     [240] = { .kw = "qdigamma",            .arity = 2u,        .ops = &ops_qdigamma,           .bfn = expr_qdigamma },
     [242] = { .kw = "lambertwn",           .arity = 2u,        .ops = &ops_lambert_wn,         .bfn = expr_lambert_wn_xp },
     [243] = { .kw = "Heaviside",           .arity = 1u,        .ops = &ops_step,               .ufn = expr_step },
@@ -559,6 +570,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [303] = { .kw = "acsc",                .arity = 1u,        .ops = &ops_acosec,             .ufn = expr_acosec },
     [304] = { .kw = "logpdf",              .arity = 1u,        .ops = &ops_logpdf,             .ufn = expr_logpdf },
     [305] = { .kw = "trigamma",            .arity = 1u,        .ops = &ops_trigamma,           .ufn = expr_trigamma },
+    [306] = { .kw = "bessel_k",            .arity = 2u,        .ops = &ops_bessel_k,           .bfn = expr_bessel_k },
     [309] = { .kw = "log10",               .arity = 1u,        .ops = &ops_log10,              .ufn = expr_log10 },
     [311] = { .kw = "w",                   .arity = 1u,        .ops = &ops_lambert_w,          .ufn = expr_lambert_w },
     [312] = { .kw = "DiracDelta",          .arity = 1u,        .ops = &ops_delta,              .ufn = expr_delta },
@@ -633,6 +645,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [438] = { .kw = "arcoth",              .arity = 1u,        .ops = &ops_acoth,              .ufn = expr_acoth },
     [439] = { .kw = "coth",                .arity = 1u,        .ops = &ops_coth,               .ufn = expr_coth },
     [440] = { .kw = "Cl",                  .arity = 2u,        .ops = &ops_clausen,            .bfn = expr_clausen_xp },
+    [443] = { .kw = "K₀",                  .arity = 1u,                                        .ufn = parse_bessel_k_zero },
     [448] = { .kw = "gammaincq",           .arity = 2u,        .ops = &ops_gammainc_Q,         .bfn = expr_gammainc_Q },
     [449] = { .kw = "ℒ⁻¹",                 .arity = UINT_MAX,                                  .vfn = expr_inverse_laplace_from_args },
     [451] = { .kw = "ℑ",                   .arity = 1u,        .ops = &ops_imag_coordinate, .ufn = expr_imag_coordinate },
@@ -652,6 +665,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [481] = { .kw = "normal_cdf",          .arity = 1u,        .ops = &ops_normal_cdf,         .ufn = expr_normal_cdf },
     [482] = { .kw = "δ",                   .arity = 1u,        .ops = &ops_delta,              .ufn = expr_delta },
     [483] = { .kw = "J_0",                 .arity = 1u,                                        .ufn = parse_bessel_j_zero },
+    [484] = { .kw = "BesselK",             .arity = 2u,        .ops = &ops_bessel_k,           .bfn = expr_bessel_k },
     [487] = { .kw = "archacovercos",       .arity = 1u,        .ops = &ops_archacovercos,      .ufn = expr_archacovercos },
     [488] = { .kw = "LommelS",             .arity = 3u,        .ops = &ops_lommel_s,           .tfn = expr_lommel_s },
     [489] = { .kw = "normalpdf",           .arity = 1u,        .ops = &ops_normal_pdf,         .ufn = expr_normal_pdf },
@@ -3044,6 +3058,7 @@ static bool scan_indexed_bessel_call(string_view_t text, size_t pos, expr_parse_
     static const struct { const expr_ops_t *ops; binary_fn construct; } families[128] = {
         ['J'] = { &ops_bessel_j, expr_bessel_j },
         ['Y'] = { &ops_bessel_y, expr_bessel_y },
+        ['K'] = { &ops_bessel_k, expr_bessel_k },
         ['T'] = { &ops_chebyshev_t, expr_chebyshev_t },
         ['U'] = { &ops_chebyshev_u, expr_chebyshev_u },
     };

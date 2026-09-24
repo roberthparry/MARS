@@ -119,6 +119,7 @@ typedef enum {
     EXPR_KIND_LEGENDRE_CHI,
     EXPR_KIND_BESSEL_J,
     EXPR_KIND_BESSEL_Y,
+    EXPR_KIND_BESSEL_K,
     EXPR_KIND_LOMMEL_S,
     EXPR_KIND_LOMMEL_S_PACK,
     EXPR_KIND_APPELL_F1,
@@ -554,6 +555,7 @@ extern const expr_ops_t ops_lerch_phi_pack;
 extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
+extern const expr_ops_t ops_bessel_k;
 extern const expr_ops_t ops_lommel_s;
 extern const expr_ops_t ops_lommel_s_pack;
 extern const expr_ops_t ops_appell_f1;

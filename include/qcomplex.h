@@ -363,6 +363,8 @@ qcomplex_t qc_erfc(qcomplex_t z);                          /**< complementary er
 qcomplex_t qc_erfinv(qcomplex_t z);                        /**< inverse error function */
 qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse complementary error function */
 qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
+/** @brief Principal modified Bessel K for complex order and non-zero argument; unsupported ranges return NaN. */
+qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
 qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
 /**

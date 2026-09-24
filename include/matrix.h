@@ -1443,6 +1443,8 @@ matrix_t *mat_erfc(const matrix_t *A);
 matrix_t *mat_erfinv(const matrix_t *A);
 matrix_t *mat_erfcinv(const matrix_t *A);
 matrix_t *mat_gamma(const matrix_t *A);
+/** @brief Apply K_order to a diagonalisable numeric square matrix through spectral functional calculus. */
+matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
 matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
 /**
