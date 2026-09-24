@@ -9,7 +9,7 @@ from test_fourier_tanh import algebra, fields, number, simpson
 
 class BranchFourierTests(unittest.TestCase):
     def test_copied_branch_round_trips(self):
-        for function in ("atanh", "asin", "acos"):
+        for function in ("atanh", "asin", "acos", "acosh"):
             for argument in ("x", "2*x+1", "-2*x+1", "x/2-1/3", "a*x+b"):
                 for forward, inverse in (("Fourier", "InverseFourier"), ("InverseFourier", "Fourier")):
                     source = f"{function}({argument})"
@@ -19,7 +19,7 @@ class BranchFourierTests(unittest.TestCase):
                             restored = fields(f"{inverse}({copied},k,x)", "x")
                             self.assertNotIn("Fourier(", restored["function"])
                             self.assertNotIn("k =", restored["expression"])
-                            for point in (-2.3, -0.2, 0, 0.7, 2.3):
+                            for point in (-2.3, -1, -0.2, 0, 0.7, 1, 2.3):
                                 bound = restored["expression"].replace("x = NAN", f"x = {point}")
                                 bound = bound.replace("a = NAN", "a = -2").replace("b = NAN", "b = 0.3")
                                 expected = fields("{"+source+f" | x={point}; a=-2; b=0.3"+"}", "x")
@@ -30,7 +30,7 @@ class BranchFourierTests(unittest.TestCase):
                                     self.assertLess(abs(number(actual)-number(expected)), 2e-12)
 
     def test_full_distribution_and_mathematical_notation(self):
-        for function in ("atanh", "asin", "acos"):
+        for function in ("atanh", "asin", "acos", "acosh"):
             result = fields(f"@F{{{function}(x)}}")
             self.assertIn("δ(k)", result["expression"])
             self.assertNotIn("k ≠ 0", result["expression"])
@@ -54,6 +54,7 @@ class BranchFourierTests(unittest.TestCase):
             ("i*@pi^2*delta(k)-2*i*@pi*step(k)*sinc(k/@pi)", "atanh(x)"),
             ("2*i*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*step(k)/k)", "asin(x)"),
             ("@pi^2*delta(k)-2*i*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*step(k)/k)", "acos(x)"),
+            ("i*@pi^2*delta(k)+2*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*step(k)/k)", "acosh(x)"),
         )
         for spectrum, original in cases:
             with self.subTest(original=original):
@@ -75,6 +76,42 @@ class BranchFourierTests(unittest.TestCase):
                 actual = fields(result["expression"].replace("x = NAN", f"x = {point}"), "x")
                 expected = fields(f"asin({rate}*({point}))", "x")
                 self.assertLess(abs(number(actual)-number(expected)), 2e-12)
+
+    def test_acosh_boundary_values_and_constants(self):
+        for point in (-3, -1, -0.5, 0, 0.5, 1, 3):
+            with self.subTest(point=point):
+                expected = cmath.acosh(complex(point, 0))
+                self.assertLess(abs(number(fields(f"acosh({point})"))-expected), 2e-12)
+        for function in ("acosh", "acos", "asin", "atanh"):
+            for offset in (0, 2):
+                source = f"{function}(0*x+{offset})"
+                spectrum = fields(f"Fourier({source},x,k)")
+                self.assertNotIn("Fourier(", spectrum["function"])
+                inverse = fields("{InverseFourier("+algebra(spectrum)+",k,x) | x=0}", "x")
+                self.assertLess(abs(number(inverse)-number(fields(f"{function}({offset})"))), 2e-12)
+        for source in ("acosh(x+i)", "acosh(i*x)", "acosh(x^2)"):
+            self.assertIn("Fourier(", fields(f"Fourier({source},x,k)")["function"])
+
+    def test_acosh_distribution_against_gaussian_test_functions(self):
+        # Check the full distribution independently, including the impulse and one-sided cutoff.
+        # phi(k)=(1+c*k)*exp(-k^2) has Fourier transform sqrt(pi)*(1-i*c*x/2)*exp(-x^2/4).
+        def j0(x):
+            term = total = 1.0
+            for n in range(1, 60):
+                term *= -x*x/(4*n*n)
+                total += term
+            return total
+        for odd in (0, -0.3, 0.4):
+            low = simpson(lambda k: odd if k == 0 else
+                          (j0(k)*(1+odd*k)*math.exp(-k*k)-1)/k, 0, 1)
+            high = simpson(lambda k: j0(k)*(1+odd*k)*math.exp(-k*k)/k, 1, 12)
+            spectral = 2*math.pi*(math.log(2)-0.5772156649015328606-low-high)+1j*math.pi**2
+            tails = 2*simpson(lambda u: u*math.sinh(u)*math.exp(-math.cosh(u)**2/4), 0, 6)
+            interior_odd = simpson(lambda u: math.sin(u)*math.cos(u)*(u-math.pi/2)
+                                  *math.exp(-math.cos(u)**2/4), 0, math.pi/2)
+            exterior_odd = -math.pi*math.exp(-0.25)
+            original = math.sqrt(math.pi)*(tails+odd*(interior_odd+exterior_odd))+1j*math.pi**2
+            self.assertLess(abs(spectral-original), 2e-10)
 
     def test_asin_distribution_against_gaussian_test_function(self):
         # Independently test the zero-frequency normalisation against phi(k)=exp(-k^2).
@@ -141,10 +178,22 @@ class ZZBranchFourierReadmeExamples(unittest.TestCase):
 
     def test_readme_branch_fourier_round_trips(self):
         # README examples: docs/expression.md, inverse-function and gamma Fourier pairs.
-        for function in ("atanh", "asin", "acos"):
+        for function in ("atanh", "asin", "acos", "acosh"):
             spectrum = fields(f"@F{{{function}(x)}}")
             result = fields("InverseFourier("+spectrum["expression"]+",k,x)", "x")
             self.assertEqual(algebra(result), function+"(x)")
+
+    def test_readme_acosh_spectrum(self):
+        # README examples: docs/expression.md, acosh row using G(k) defined above the table.
+        spectrum = fields("@F{acosh(x)}")
+        self.assertNotIn("Fourier(", spectrum["function"])
+        self.assertIn("@eulermascheroni", spectrum["function"])
+        self.assertIn("δ(k)", spectrum["expression"])
+        # Expanded i*(pi^2*delta-G): the two imaginary factors are already cancelled.
+        expected = "i*@pi^2*delta(k)+2*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*step(k)/k)"
+        difference = fields(f"({algebra(spectrum)})-({expected})")
+        # Compare distributions algebraically, without assigning pointwise values to impulses.
+        self.assertEqual(algebra(difference), "0")
 
 
 if __name__ == "__main__":

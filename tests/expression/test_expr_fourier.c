@@ -2,6 +2,38 @@
 #include "matrix.h"
 #include "qcomplex.h"
 
+static void test_modified_bessel_k_numeric_layers(void)
+{
+    NUM_SCOPE(scope);
+    const double expected = 0.42102443824070833334;
+    ASSERT_TRUE(fabs(qf_to_double(qf_bessel_k(QF_ZERO, QF_ONE))-expected) < 1e-15);
+    qcomplex_t complex_value = qc_bessel_k(QC_ZERO, QC_ONE);
+    ASSERT_TRUE(fabs(qf_to_double(qc_real(complex_value))-expected) < 1e-15);
+    ASSERT_TRUE(qf_eq(qc_imag(complex_value), QF_ZERO));
+    ASSERT_TRUE(fabs(num_to_double(num_bessel_k(NUM_ZERO, NUM_ONE))-expected) < 1e-15);
+    ASSERT_TRUE(qf_isnan(qf_bessel_k(QF_ZERO, QF_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_bessel_k(NUM_ZERO, NUM_ZERO)));
+    number_t diagonal[] = {NUM_ONE, NUM_TWO};
+    matrix_t *a = mat_create_diagonal(2u, diagonal), *result = mat_bessel_k(a, &NUM_ZERO);
+    ASSERT_NOT_NULL(result);
+    if (result) {
+        ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 0, 0))-expected) < 1e-15);
+        ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 1, 1))-0.11389387274953343565) < 1e-15);
+        ASSERT_TRUE(num_is_zero(mat_get_num(result, 0, 1)));
+    }
+    mat_free(result);
+    mat_free(a);
+    a = mat_from_string("(3/2, 1/2; 1/2, 3/2)");
+    result = mat_bessel_k(a, &NUM_ZERO);
+    ASSERT_NOT_NULL(result);
+    if (result) {
+        ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 0, 0))-(expected+0.11389387274953343565)/2) < 1e-15);
+        ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 0, 1))-(0.11389387274953343565-expected)/2) < 1e-15);
+    }
+    mat_free(result);
+    mat_free(a);
+}
+
 static void test_signal_numeric_layers(void)
 {
     NUM_SCOPE(scope);
@@ -273,7 +305,9 @@ static void test_odd_hyperbolic_fourier_copy_and_rendering(void)
         "InverseFourier({-i*@pi*csch(@pi*k/2) | ; k=?; k ∈ ℝ; k ≠ 0},k,x)",
         "@F{coth(x)}", "@Finv{-i*@pi*coth(@pi*k/2)}",
         "@F{atan(x)}", "@Finv{-i*@pi*exp(-abs(k))/k}",
-        "@F{atanh(x)}", "@F{asin(x)}", "@F{acos(x)}",
+        "@F{asinh(x)}", "@Finv{-2*i*K0(abs(k))/k}", "K_n(x)",
+        "@F{atanh(x)}", "@F{asin(x)}", "@F{acos(x)}", "@F{acosh(x)}",
+        "@Finv{i*@pi^2*delta(k)+2*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*step(k)/k)}",
         "@F{gamma(1+i*x)}", "@Finv{2*@pi*exp(k-exp(k))}",
         "@Finv{2*i*@pi*((ln(2)-@eulermascheroni)*delta(k)-besselj(0,k)*Dk(step(k)*ln(abs(k))))}",
         "@pi^2*i", "@pi^2*cos(x)", "2*x", "1.25*x",
@@ -329,6 +363,7 @@ static void test_odd_hyperbolic_fourier_copy_and_rendering(void)
 
 void test_fourier_and_signal_functions(void)
 {
+    TEST_RUN_SUBTEST(test_modified_bessel_k_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_spectral_matrices, NULL);
     TEST_RUN_SUBTEST(test_signal_calculus_and_finite_sums, NULL);

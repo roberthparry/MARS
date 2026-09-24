@@ -761,6 +761,8 @@ expr_t *expr_causal_convolve(const expr_t *left, const expr_t *right, const expr
 expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
+/** @brief Construct the principal modified Bessel function K_order(argument). */
+expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
 expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument);
 expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,

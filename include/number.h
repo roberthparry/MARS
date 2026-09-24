@@ -1028,6 +1028,8 @@ number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const
                                 const number_t argument);
 number_t num_legendre_chi(const number_t order, const number_t number);
 number_t num_bessel_j(const number_t order, const number_t argument);
+/** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
+number_t num_bessel_k(const number_t order, const number_t argument);
 number_t num_bessel_y(const number_t order, const number_t argument);
 number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument);
 number_t num_gammainv(const number_t number);

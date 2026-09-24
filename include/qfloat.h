@@ -1408,6 +1408,8 @@ qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
 
 /** @brief Bessel function of the first kind J_order(argument), for real order. */
 qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
+/** @brief Modified Bessel K for real order and positive argument; unsupported ranges return NaN. */
+qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
 
 /** @brief Bessel function of the second kind Y_order(argument), for real order. */
 qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
