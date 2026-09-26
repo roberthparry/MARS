@@ -187,6 +187,7 @@ typedef enum {
     EXPR_KIND_CIRC,
     EXPR_KIND_SINC,
     EXPR_KIND_DELTA,
+    EXPR_KIND_ANALYTIC_DELTA,
     EXPR_KIND_PRINCIPAL_VALUE,
     EXPR_KIND_FINITE_PART,
     EXPR_KIND_REAL_DOMAIN,
@@ -384,6 +385,8 @@ extern const expr_ops_t ops_formal_derivative;
 bool expr_is_one_sided_log(const expr_t *expr);
 /** Recognise a half-line reciprocal with the unit-cutoff finite-part convention. */
 bool expr_is_half_line_finite_part(const expr_t *expr);
+/** Evaluate a distributional derivative only where its ordinary restriction is defined. */
+number_t expr_distribution_derivative_eval(expr_t *expr);
 extern const expr_ops_t ops_ordered_derivative;
 /** Construct an ordinary derivative of a unary symbolic function with a symbolic order. */
 expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order);
@@ -398,6 +401,9 @@ extern const expr_ops_t ops_tri;
 extern const expr_ops_t ops_circ;
 extern const expr_ops_t ops_sinc;
 extern const expr_ops_t ops_delta;
+extern const expr_ops_t ops_analytic_delta;
+/** Identify analytic evaluation functionals within an expression tree. */
+bool expr_fourier_has_analytic_functional(const expr_t *expr);
 extern const expr_ops_t ops_principal_value;
 extern const expr_ops_t ops_finite_part;
 /** Construct an integral transform with explicit or inferred variable mapping. */

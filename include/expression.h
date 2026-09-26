@@ -561,15 +561,25 @@ expr_t *expr_tri(const expr_t *argument);
 expr_t *expr_circ(const expr_t *argument);
 /** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
 expr_t *expr_sinc(const expr_t *argument);
-/** @brief Construct a Dirac distribution; no pointwise value is assigned at its support. */
+/** @brief Construct a Dirac distribution, evaluating to zero off its support and NAN on it. */
 expr_t *expr_delta(const expr_t *argument);
-/** @brief Mark a singular expression as its Cauchy principal-value distribution. */
+/**
+ * @brief Construct an analytic evaluation functional, not a real Dirac distribution.
+ *
+ * With argument w-z, its action on an entire test function phi is phi(z).
+ * The Fourier rules require a monic affine argument. Numerical evaluation is always NAN:
+ * this functional has no pointwise values, even away from its complex evaluation point.
+ * The argument is retained; the caller owns the returned expression.
+ */
+expr_t *expr_analytic_delta(const expr_t *argument);
+/** @brief Mark a Cauchy principal-value distribution, evaluating its regular part away from singularities. */
 expr_t *expr_principal_value(const expr_t *argument);
 /**
  * @brief Mark a singular expression as a Hadamard finite-part distribution, with unit cutoff.
  *
  * For 1/abs(x), subtract the test function's value at zero inside abs(x) < 1.
- * No pointwise numerical value is assigned. The argument is retained.
+ * Numerical evaluation returns the regular part away from singularities and NAN at singularities.
+ * The argument and its distributional interpretation are retained in symbolic operations.
  */
 expr_t *expr_finite_part(const expr_t *argument);
 expr_t *expr_ceil(const expr_t *expr);

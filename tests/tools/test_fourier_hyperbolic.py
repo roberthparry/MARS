@@ -176,11 +176,13 @@ class HyperbolicFourierTests(unittest.TestCase):
                 self.assertLess(abs(number(result)-quadrature(-0.5, -0.7, 2, 0.3, inverse, sinh=False)), 2e-9)
 
     def test_growth_and_singularities_are_not_unsupported_formula_notes(self):
-        for body in ("sinh(t)", "sinh(t)^2", "sinh(2*t+1)^(1/2)", "cosh(t)^3", "sech(t)^(-2)"):
+        for body in ("sinh(2*t+1)^(1/2)", "abs(sinh(t))^(1/2)", "sinh(t)^(1+i)"):
             result = fields("@F{"+body+"}")
             self.assertIn("No ordinary Fourier transform", result["value_note"])
             self.assertIn("grows exponentially", result["value_note"])
-            self.assertIn("Fourier(", result["function"])
+            self.assertNotIn("Fourier(", result["function"])
+            self.assertEqual(result["value"], "NAN")
+            self.assertIn("return NAN.", result["function"])
         for body in ("sinh(t)^(-2)", "cosech(t)^2"):
             result = fields("@F{"+body+"}")
             self.assertIn("non-integrable singularity", result["value_note"])
@@ -190,7 +192,8 @@ class HyperbolicFourierTests(unittest.TestCase):
             self.assertNotIn("Fourier(", result["function"])
             self.assertIn("symmetric cancellation", result["value_note"])
         symbolic = fields("@F{sinh(a*t+b)^2}")
-        self.assertIn("For real non-zero scale", symbolic["value_note"])
+        self.assertIn("Extended Fourier transform", symbolic["value_note"])
+        self.assertIn("analytic_delta(", symbolic["function"])
         boundary = fields("@F{sinh(t)^i}")
         self.assertNotIn("No ordinary Fourier transform", boundary["value_note"])
         complex_scale = fields("@F{sinh(i*t)^2}")
@@ -206,13 +209,35 @@ class HyperbolicFourierTests(unittest.TestCase):
         constant = fields("@F{sinh(0*t+1)^(-1/2)}")
         self.assertIn("δ(ω)", constant["expression"])
         self.assertNotIn("Fourier(", constant["function"])
-        for exponent, fragment in ((2, "grows exponentially"), (-2, "non-integrable singularity")):
+        for exponent, fragment in ((2, "Extended Fourier transform"), (-2, "non-integrable singularity")):
             result = fields(f"{{@F{{sinh(a*t+b)^n}} | ω=?; a=1; b=0; n={exponent}}}")
             self.assertIn(fragment, result["value_note"])
         bound = fields("{@F{sinh(a*t+b)^n} | ω=?; a=-2; b=1; n=-1/2}")
         self.assertNotIn("Fourier(", bound["function"])
         self.assertNotIn("const n", bound["function"])
         self.assertEqual(fields(bound["expression"])["tex"], bound["tex"])
+
+    def test_proven_growth_is_rejected_in_both_directions(self):
+        for operator in ("Fourier", "InverseFourier"):
+            for body in ("sinh(x)^(1/2)", "abs(sinh(x))^(1/2)", "sinh(x)^(1+i)"):
+                for binding in (False, True):
+                    with self.subTest(operator=operator, body=body, binding=binding):
+                        source = f"{operator}({body},x,k)"
+                        if binding:
+                            source = "{"+source+" | k=1}"
+                        result = fields(source, "k")
+                        self.assertEqual(result["value"], "NAN")
+                        self.assertNotIn("Fourier(", result["function"])
+                        self.assertIn("grows exponentially", result["value_note"])
+        for body in ("sinh(0*x)", "sinh(x)^0", "cosh(0*x+1)"):
+            result = fields(f"Fourier({body},x,k)", "k")
+            self.assertNotIn("grows exponentially", result.get("value_note", ""))
+            self.assertNotIn("return @nan.", result["function"].split("else")[0])
+        unknown = fields("@F{c*sinh(x)}", "k")
+        self.assertIn("analytic_delta(", unknown["function"])
+        self.assertEqual(number(fields("{Fourier(c*sinh(x),x,k) | k=1; c=0}", "k")), 0)
+        cancelled = fields("{Fourier(sinh(x)-sinh(x),x,k) | k=1}", "k")
+        self.assertEqual(number(cancelled), 0)
 
 
 class ZZHyperbolicFourierReadmeExamples(unittest.TestCase):
@@ -222,8 +247,9 @@ class ZZHyperbolicFourierReadmeExamples(unittest.TestCase):
         result = fields("{@F{sinh(t)^(-1/2)} | ω=0}")
         self.assertLess(abs(number(result)-complex(3.708149354602744, -3.708149354602744)), 1e-14)
         growing = fields("@F{sinh(t)^2}")
-        self.assertIn("Fourier(", growing["function"])
-        self.assertIn("grows exponentially", growing["value_note"])
+        self.assertNotIn("Fourier(", growing["function"])
+        self.assertEqual(growing["value"], "NAN")
+        self.assertIn("Extended Fourier transform", growing["value_note"])
         singular = fields("@F{sinh(t)^(-1)}")
         self.assertNotIn("Fourier(", singular["function"])
         self.assertIn("tanh", singular["expression"])

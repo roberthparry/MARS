@@ -158,7 +158,7 @@ static void test_finite_part_distribution(void)
     expr_free(absolute);
     ASSERT_TRUE(distribution != NULL);
     if (distribution) {
-        ASSERT_TRUE(num_is_nan(expr_eval(distribution)));
+        ASSERT_TRUE(num_eq(expr_eval(distribution), NUM_ONE));
         const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
         for (size_t n = 0u; n < sizeof(styles) / sizeof(styles[0]); ++n) {
             char *text = expr_to_string(distribution, styles[n]);
@@ -169,10 +169,10 @@ static void test_finite_part_distribution(void)
         expr_t *primitive = expr_integrate(distribution, x);
         expr_t *formal_primitive = expr_integral(distribution, x);
         expr_t *sum = expr_new_finite_summation_range(distribution, x, one, one);
-        ASSERT_TRUE(derivative && num_is_nan(expr_eval(derivative)));
+        ASSERT_TRUE(derivative && num_eq(expr_eval(derivative), NUM_NEG_ONE));
         ASSERT_TRUE(primitive == NULL); /* No ordinary primitive is claimed for a distribution. */
         ASSERT_TRUE(formal_primitive != NULL);
-        ASSERT_TRUE(sum && num_is_nan(expr_eval(sum)));
+        ASSERT_TRUE(sum && num_eq(expr_eval(sum), NUM_ONE));
         expr_free(sum);
         expr_free(primitive);
         expr_free(formal_primitive);
@@ -180,6 +180,46 @@ static void test_finite_part_distribution(void)
     }
     ASSERT_TRUE(expr_finite_part(NULL) == NULL);
     expr_free(distribution);
+    expr_free(one);
+    expr_free(x);
+}
+
+static void test_distribution_regular_rebinding(void)
+{
+    NUM_SCOPE(scope);
+    expr_t *x = expr_new_named_var(NUM_ONE, "x"), *one = expr_new_const(NUM_ONE);
+    expr_t *reciprocal = expr_div(one, x), *delta = expr_delta(x);
+    expr_t *principal = expr_principal_value(reciprocal), *finite = expr_finite_part(reciprocal);
+    expr_t *delta_derivative = expr_create_deriv(delta, x), *finite_derivative = expr_create_deriv(finite, x);
+    ASSERT_NOT_NULL(delta_derivative);
+    ASSERT_NOT_NULL(finite_derivative);
+    const number_t points[] = {NUM_ONE, NUM_ZERO, NUM_NEG_ONE, NUM_TWO, NUM_ZERO};
+    for (size_t index = 0u; index < sizeof(points) / sizeof(points[0]); ++index) {
+        expr_set_val(x, points[index]);
+        if (num_is_zero(points[index])) {
+            ASSERT_TRUE(num_is_nan(expr_eval(delta)));
+            ASSERT_TRUE(num_is_nan(expr_eval(principal)));
+            ASSERT_TRUE(num_is_nan(expr_eval(finite)));
+            ASSERT_TRUE(num_is_nan(expr_eval(delta_derivative)));
+            ASSERT_TRUE(num_is_nan(expr_eval(finite_derivative)));
+        } else {
+            number_t expected = num_div(NUM_ONE, points[index]);
+            ASSERT_TRUE(num_is_zero(expr_eval(delta)));
+            ASSERT_TRUE(num_eq(expr_eval(principal), expected));
+            ASSERT_TRUE(num_eq(expr_eval(finite), expected));
+            ASSERT_TRUE(num_is_zero(expr_eval(delta_derivative)));
+            ASSERT_TRUE(num_eq(expr_eval(finite_derivative), num_neg(num_mul(expected, expected))));
+        }
+        char *body = expr_to_function_body(delta);
+        ASSERT_TRUE(body && strstr(body, "delta(x)"));
+        free(body);
+    }
+    expr_free(finite_derivative);
+    expr_free(delta_derivative);
+    expr_free(finite);
+    expr_free(principal);
+    expr_free(delta);
+    expr_free(reciprocal);
     expr_free(one);
     expr_free(x);
 }
@@ -361,13 +401,82 @@ static void test_odd_hyperbolic_fourier_copy_and_rendering(void)
     }
 }
 
+static void test_analytic_evaluation_functional(void)
+{
+    NUM_SCOPE(scope);
+    expr_t *x = expr_new_named_var(NUM_ONE, "x");
+    expr_t *i = expr_new_const(NUM_I);
+    expr_t *argument = expr_add(x, i);
+    expr_t *functional = expr_analytic_delta(argument);
+    expr_t *derivative = expr_create_deriv(functional, x);
+    expr_t *primitive = expr_integrate(functional, x);
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *sum = expr_new_finite_summation_range(functional, x, one, one);
+    ASSERT_TRUE(functional && num_is_nan(expr_eval(functional)));
+    ASSERT_TRUE(derivative && num_is_nan(expr_eval(derivative)));
+    ASSERT_TRUE(sum && num_is_nan(expr_eval(sum)));
+    ASSERT_TRUE(primitive == NULL); /* No ordinary step-function primitive for complex evaluation. */
+    char *body = expr_to_string(functional, style_FUNCTION);
+    char *TeX = expr_to_string(functional, style_LATEX);
+    ASSERT_TRUE(body && strstr(body, "analytic_delta("));
+    ASSERT_TRUE(TeX && strstr(TeX, "\\delta(") && !strstr(TeX, "\\delta_"));
+    free(TeX);
+    free(body);
+    expr_free(sum);
+    expr_free(one);
+    expr_free(primitive);
+    expr_free(derivative);
+    expr_free(functional);
+    expr_free(argument);
+    expr_free(i);
+    expr_free(x);
+}
+
+static void test_imaginary_additive_parentheses(void)
+{
+    NUM_SCOPE(scope);
+    expr_t *x = expr_new_named_var(NUM_ONE, "x");
+    const number_t coefficients[] = {NUM_I, NUM_NEG_I, num_mul(NUM_TWO, NUM_I), num_mul(NUM_TWO, NUM_NEG_I)};
+    const char *expected[] = {"x + i", "x - i", "x + 2i", "x - 2i"};
+    for (size_t index = 0u; index < sizeof(coefficients) / sizeof(coefficients[0]); ++index) {
+        expr_t *coefficient = expr_new_const(coefficients[index]);
+        expr_t *sum = expr_add(x, coefficient);
+        expr_t *difference = expr_sub(x, coefficient);
+        const expr_t *expressions[] = {sum, difference};
+        for (size_t operation = 0u; operation < 2u; ++operation) {
+            const expr_t *expression = expressions[operation];
+            char *text = expr_to_string(expression, style_UNBOUND);
+            char *TeX = expr_to_string(expression, style_LATEX);
+            char *body = expr_to_function_body(expression);
+            TEST_ASSERT_STR_EQ(text, expected[index ^ operation]);
+            ASSERT_TRUE(TeX && !strstr(TeX, "\\left("));
+            expr_t *copy = body ? expr_from_function_body(body, NULL) : NULL;
+            ASSERT_NOT_NULL(copy);
+            char *copied = copy ? expr_to_string(copy, style_UNBOUND) : NULL;
+            TEST_ASSERT_STR_EQ(copied, text);
+            free(copied);
+            expr_free(copy);
+            free(body);
+            free(TeX);
+            free(text);
+        }
+        expr_free(difference);
+        expr_free(sum);
+        expr_free(coefficient);
+    }
+    expr_free(x);
+}
+
 void test_fourier_and_signal_functions(void)
 {
+    TEST_RUN_SUBTEST(test_imaginary_additive_parentheses, NULL);
+    TEST_RUN_SUBTEST(test_analytic_evaluation_functional, NULL);
     TEST_RUN_SUBTEST(test_modified_bessel_k_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_numeric_layers, NULL);
     TEST_RUN_SUBTEST(test_signal_spectral_matrices, NULL);
     TEST_RUN_SUBTEST(test_signal_calculus_and_finite_sums, NULL);
     TEST_RUN_SUBTEST(test_finite_part_distribution, NULL);
+    TEST_RUN_SUBTEST(test_distribution_regular_rebinding, NULL);
     TEST_RUN_SUBTEST(test_distribution_function_qualifier_round_trips, NULL);
     TEST_RUN_SUBTEST(test_mathematical_nonzero_domains, NULL);
     TEST_RUN_SUBTEST(test_odd_hyperbolic_fourier_copy_and_rendering, NULL);

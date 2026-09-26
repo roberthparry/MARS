@@ -108,6 +108,30 @@ static bool split_scalar(fourier_context_t *c, const expr_t *f, const expr_t *x,
     return false;
 }
 
+/* Only literal real-affine parameters establish growth independently of future bindings. */
+static bool proven_hyperbolic_growth(fourier_context_t *c, const expr_t *f, const expr_t *x)
+{
+    const expr_t *argument = NULL;
+    expr_t *power = NULL, *branch = NULL, *a = NULL, *b = NULL;
+    bool singular = false;
+    if (!expr_fourier_hyperbolic_parts(f, &argument, &power, &branch, &singular))
+        return false;
+    keep(c, power);
+    if (branch)
+        keep(c, branch);
+    number_t rate = NUM_NAN, offset = NUM_NAN, order = NUM_NAN;
+    bool growing = !uses(power, x) && affine(c, argument, x, &a, &b) &&
+                   literal_value(a, &rate) && literal_value(b, &offset) && literal_value(power, &order) &&
+                   num_is_real(rate) && !num_is_zero(rate) && num_is_real(offset);
+    number_t real_order = num_real_part(order);
+    growing = growing && num_gt(real_order, NUM_ZERO);
+    num_destroy(&real_order);
+    num_destroy(&order);
+    num_destroy(&offset);
+    num_destroy(&rate);
+    return growing;
+}
+
 static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w, unsigned depth)
 {
     if (!f || depth > 24u || c->failed)
@@ -191,6 +215,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     }
     if (!uses(f, x))
         return ft_mul(c, ft_mul(c, two_pi, f), ft_delta(c, w));
+    expr_t *analytic_pair = expr_fourier_analytic_pair(c, f, x, w);
+    if (analytic_pair)
+        return analytic_pair;
+    /* Non-monic or nonlinear evaluation arguments have no implicit Dirac scaling rule. */
+    if (f->ops == &ops_analytic_delta)
+        return NULL;
     expr_t *branch_pair = expr_fourier_branch_pair(c, f, x, w);
     if (branch_pair)
         return branch_pair;
@@ -212,8 +242,19 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     if (f->ops == &ops_mul || f->ops == &ops_div) {
         expr_t *scalar, *dependent;
         if (split_scalar(c, f, x, &scalar, &dependent) &&
-            (!expr_const_is_one(scalar) || !expr_struct_eq(dependent, f)))
+            (!expr_const_is_one(scalar) || !expr_struct_eq(dependent, f))) {
+            if (expr_const_is_zero(scalar))
+                return integer(c, 0);
+            if (proven_hyperbolic_growth(c, dependent, x) &&
+                !expr_fourier_analytic_pair(c, dependent, x, w)) {
+                number_t multiplier = NUM_NAN;
+                bool known = literal_value(scalar, &multiplier);
+                num_destroy(&multiplier);
+                if (!known)
+                    return NULL; /* A future zero coefficient must still give the zero transform. */
+            }
             return ft_mul(c, scalar, subformula(c, dependent, x, w, depth));
+        }
     }
     if (f->ops == &ops_conj)
         return ft_conj(c, subformula(c, f->a, x, ft_neg(c, w), depth));
@@ -364,6 +405,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         }
         if (affine(c, arg, x, &a, &b)) {
             expr_t *frequency = clean(c, ft_neg(c, ft_mul(c, i, a)));
+            number_t value = NUM_NAN;
+            bool complex_frequency = literal_value(frequency, &value) && !num_is_real(value);
+            num_destroy(&value);
+            if (complex_frequency)
+                return ft_mul(c, ft_mul(c, two_pi, ft_exp(c, b)),
+                              ft_analytic_delta(c, ft_sub(c, w, frequency)));
             if (!real_parameter(c, frequency))
                 return NULL;
             return ft_mul(c, ft_mul(c, two_pi, ft_exp(c, b)), ft_delta(c, ft_sub(c, w, frequency)));
@@ -492,6 +539,11 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
             return NULL;
         if (expr_const_is_zero(a))
             return ft_mul(c, ft_mul(c, two_pi, replace(c, f, x, integer(c, 0))), ft_delta(c, w));
+        if (proven_hyperbolic_growth(c, f, x)) {
+            /* Undefined transforms cannot be distributed through sums or unknown scalar factors:
+             * the original functions might cancel, or the scalar might be zero. */
+            return depth == 0u ? constant(c, NUM_NAN) : NULL;
+        }
         if (!real_parameter(c, a) || !real_parameter(c, b) || !positive(c, ft_abs(c, a)) ||
             !positive(c, ft_neg(c, hyperbolic_power)) ||
             (singular && !positive(c, ft_add(c, hyperbolic_power, one))))
@@ -572,6 +624,12 @@ expr_t *expr_fourier_result(const expr_t *transform)
     /* Copied coefficients retain exact symbolic provenance (notably 2*pi*i).
      * Expose it before scalar extraction, rather than folding it into an opaque complex number. */
     expr_t *input = exact_literals(&c, transform->a);
+    /* Establish exact cancellation before testing the individual summands for existence. */
+    if (input->ops == &ops_add || input->ops == &ops_sub) {
+        expr_t *reduced = clean(&c, keep(&c, expr_clone(input)));
+        if (expr_const_is_zero(reduced))
+            input = reduced;
+    }
     if (source->ops == &ops_imag_coordinate) {
         /* Integrate along z = Re(z) + i*y, retaining Re(z) as an independent parameter. */
         expr_t *line_parameter = fresh_variable(&c, input, target);

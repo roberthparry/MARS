@@ -10,17 +10,67 @@ static const signal_numeric_fn signal_numeric[EXPR_KIND_COUNT] = {
     [EXPR_KIND_SINC] = num_sinc,
 };
 
+/* The regular restriction of a real Dirac distribution vanishes off its support. */
+static number_t delta_regular_value(number_t argument)
+{
+    return num_clone(num_is_real(argument) && num_is_finite(argument) && !num_is_zero(argument) ? NUM_ZERO : NUM_NAN);
+}
+
+/* Regularisation changes the singularity, not finite values away from it. */
+static number_t distribution_regular_value(number_t argument)
+{
+    return num_clone(num_is_finite(argument) ? argument : NUM_NAN);
+}
+
+/* Evaluation only: do not let numerical bindings erase distribution nodes during simplification. */
+static const signal_numeric_fn distribution_numeric[EXPR_KIND_COUNT] = {
+    [EXPR_KIND_DELTA]           = delta_regular_value,
+    [EXPR_KIND_PRINCIPAL_VALUE] = distribution_regular_value,
+    [EXPR_KIND_FINITE_PART]     = distribution_regular_value,
+};
+
 static number_t signal_eval(expr_t *expr)
 {
     number_t x = expr_eval(expr->a);
     signal_numeric_fn evaluate = signal_numeric[expr->ops->kind];
+    if (!evaluate)
+        evaluate = distribution_numeric[expr->ops->kind];
     number_t out = evaluate ? evaluate(x) : num_clone(NUM_NAN);
     num_destroy(&x);
     return out;
 }
 
+/* Differentiate only the regular restriction, retaining the original distributional derivative tree. */
+number_t expr_distribution_derivative_eval(expr_t *expr)
+{
+    const expr_t *source = expr->a;
+    if (!source || !distribution_numeric[source->ops->kind])
+        return num_clone(NUM_NAN);
+    number_t value = expr_eval(source);
+    bool regular = num_is_finite(value);
+    num_destroy(&value);
+    if (!regular)
+        return num_clone(NUM_NAN);
+    if (source->ops == &ops_delta)
+        return num_clone(NUM_ZERO);
+    expr_t *body = expr_clone(source->a);
+    for (size_t index = 0u; body && index < expr->formal_wrt_count; ++index) {
+        expr_t *derivative = expr_create_deriv(body, expr->formal_wrts[index]);
+        expr_free(body);
+        body = derivative;
+    }
+    value = body ? expr_eval(body) : num_clone(NUM_NAN);
+    expr_free(body);
+    if (num_is_finite(value))
+        return value;
+    num_destroy(&value);
+    return num_clone(NUM_NAN);
+}
+
 static expr_t *signal_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 {
+    if (expr->ops == &ops_analytic_delta)
+        return expr_simplify_passthrough(expr, a, b);
     if (a && expr->ops != &ops_step && expr->ops != &ops_principal_value && expr->ops != &ops_finite_part) {
         expr_t *positive = expr_simplify_positive_part_if_negative(a);
         if (positive) {
@@ -77,7 +127,8 @@ static expr_t *signal_deriv(expr_t *expr)
     const expr_t *wrt = expr_current_wrt_internal();
     if (!wrt)
         return NULL;
-    if (expr->ops == &ops_delta || expr->ops == &ops_principal_value || expr->ops == &ops_finite_part) {
+    if (expr->ops == &ops_delta || expr->ops == &ops_analytic_delta ||
+        expr->ops == &ops_principal_value || expr->ops == &ops_finite_part) {
         expr_t *variable = (expr_t *)wrt;
         return expr_new_formal_derivative(expr, 1u, &variable);
     }
@@ -133,7 +184,7 @@ static expr_t *ramp(const expr_t *x, bool squared)
 
 static expr_t *signal_integrate(const expr_t *expr, const expr_t *wrt)
 {
-    if (expr->ops == &ops_principal_value || expr->ops == &ops_finite_part)
+    if (expr->ops == &ops_principal_value || expr->ops == &ops_finite_part || expr->ops == &ops_analytic_delta)
         return NULL;
     expr_t *rate = expr_create_deriv(expr->a, wrt);
     bool used = true;
@@ -193,6 +244,7 @@ SIGNAL_OP(tri, EXPR_KIND_TRI, "tri", "\\operatorname{tri}");
 SIGNAL_OP(circ, EXPR_KIND_CIRC, "circ", "\\operatorname{circ}");
 SIGNAL_OP(sinc, EXPR_KIND_SINC, "sinc", "\\operatorname{sinc}");
 SIGNAL_OP(delta, EXPR_KIND_DELTA, "δ", "\\delta");
+SIGNAL_OP(analytic_delta, EXPR_KIND_ANALYTIC_DELTA, "analytic_delta", "\\delta");
 SIGNAL_OP(principal_value, EXPR_KIND_PRINCIPAL_VALUE, "principal_value", "\\operatorname{PV}");
 SIGNAL_OP(finite_part, EXPR_KIND_FINITE_PART, "finite_part", "\\operatorname{Fp}");
 #undef SIGNAL_OP
@@ -215,15 +267,17 @@ expr_t *expr_tri(const expr_t *a) { return signal_new(&ops_tri, a); }
 expr_t *expr_circ(const expr_t *a) { return signal_new(&ops_circ, a); }
 /* Construct the entire normalised sinc function. */
 expr_t *expr_sinc(const expr_t *a) { return signal_new(&ops_sinc, a); }
-/* Construct a Dirac distribution without inventing a pointwise value. */
+/* Construct a Dirac distribution, retaining its support while evaluating to zero elsewhere. */
 expr_t *expr_delta(const expr_t *a) { return signal_new(&ops_delta, a); }
+/* Construct a complex evaluation functional without assigning it pointwise values. */
+expr_t *expr_analytic_delta(const expr_t *a) { return signal_new(&ops_analytic_delta, a); }
 /* Preserve the principal-value interpretation through expression operations. */
 expr_t *expr_principal_value(const expr_t *a)
 {
     return signal_new(&ops_principal_value, a);
 }
 
-/* Preserve the unit-cutoff finite-part interpretation without assigning a pointwise value. */
+/* Preserve the unit-cutoff finite-part interpretation, evaluating only its regular restriction. */
 expr_t *expr_finite_part(const expr_t *a)
 {
     return signal_new(&ops_finite_part, a);

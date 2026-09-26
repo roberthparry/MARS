@@ -30,8 +30,7 @@ static number_t eval_var(expr_t *dv)
 
 static number_t eval_formal_derivative(expr_t *dv)
 {
-    (void)dv;
-    return num_clone(NUM_NAN);
+    return expr_distribution_derivative_eval(dv);
 }
 
 static number_t eval_arbitrary_function(expr_t *dv)
@@ -82,8 +81,18 @@ static expr_t *simplify_ordered_derivative(const expr_t *expr, expr_t *a, expr_t
     return out;
 }
 
+static number_t eval_ordered_derivative(expr_t *expr)
+{
+    if (expr->a->ops != &ops_delta)
+        return num_clone(NUM_NAN);
+    number_t order = expr_eval(expr->b);
+    bool valid = num_is_real(order) && num_is_finite(order) && num_is_integer(order) && num_ge(order, NUM_ZERO);
+    num_destroy(&order);
+    return valid ? expr_eval(expr->a) : num_clone(NUM_NAN);
+}
+
 const expr_ops_t ops_ordered_derivative = {
-    .eval = eval_arbitrary_function, .deriv = deriv_ordered_derivative,
+    .eval = eval_ordered_derivative, .deriv = deriv_ordered_derivative,
     .reverse = expr_reverse_not_differentiable, .kind = EXPR_KIND_ORDERED_DERIVATIVE,
     .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
     .expression_name = "ordered_derivative", .function_name = "ordered_derivative",
