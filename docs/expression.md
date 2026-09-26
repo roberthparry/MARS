@@ -2132,6 +2132,23 @@ they denote the modulus `sqrt(z*z^*)`. An unmatched bar is a syntax error.
 These function names are resolved by the native expression parser's
 collision-free lookup tables rather than by a client-side rewrite.
 
+The function registry remains an inline, one-entry-per-line table in
+`src/expression/expr_stringin.c`. Its 318 registered spellings occupy 318
+distinct slots. Lookup samples six fixed byte positions, reads one
+displacement and probes one entry; it does not scan the registry, follow
+collision chains or retry neighbouring slots. The final exact spelling
+comparison rejects unregistered names even when their sampled characters
+match a registered keyword. Keywords are bounded to 18 encoded bytes.
+Unicode samples use the native string-view API rather than exposing storage.
+
+The parser recognises call delimiters and power notation separately from
+keyword lookup. It does not hash every ordinary prefix, and atom parsing
+reuses the resolved function entry. The four call-only spellings retain their
+existing visibility and use a separate direct dispatch rather than a scan.
+The native parser tests verify every registered slot and guard unknown,
+overlong and malformed names. Adding an alias requires updating the hash
+placement and displacement data together, while retaining the aligned layout.
+
 ### Special Functions (owning)
 
 - `expr_t *expr_abs(const expr_t *expr)` — absolute value

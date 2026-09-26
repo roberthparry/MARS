@@ -38,6 +38,32 @@ To refresh only a subset of those docs, pass one or more target names:
 tools/render/bench-docs/update_bench_docs.sh qfloat qcomplex
 ```
 
+## Expression Parser Benchmark
+
+`bench/expression/bench_expr_parse.c` measures the public parser, including
+construction and disposal of the resulting expression. It reports seven-sample
+median, minimum and maximum nanoseconds per parse for ASCII calls, Unicode
+aliases, non-function expressions and function-power notation. Run variants
+sequentially on the same machine; allocator state, processor frequency and
+other workloads can affect the measurements.
+
+The following README example builds the benchmark without running timings,
+then verifies that every workload parses:
+
+```sh
+make -j1 build/release/bench/expression/bench_expr_parse
+build/release/bench/expression/bench_expr_parse --check
+```
+
+Output after the build messages:
+
+```text
+parser benchmark: 24 inputs verified
+```
+
+Omitting `--check` measures the workloads with 1,000 iterations per sample;
+an optional positive integer selects the iteration count instead.
+
 ## Output Units
 
 Current benchmark output reports robust per-call timing estimates rather than a
