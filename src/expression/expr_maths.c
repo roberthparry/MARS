@@ -590,10 +590,6 @@ number_t eval_bessel_j(expr_t *dv)
 {
     return expr_eval_binary_num(dv, num_bessel_j);
 }
-number_t eval_bessel_y(expr_t *dv)
-{
-    return expr_eval_binary_num(dv, num_bessel_y);
-}
 number_t eval_lommel_s_pack(expr_t *dv)
 {
     (void)dv;
@@ -2260,10 +2256,6 @@ expr_t *deriv_bessel_j(expr_t *dv)
     return deriv_bessel_argument(dv, expr_bessel_j);
 }
 
-expr_t *deriv_bessel_y(expr_t *dv)
-{
-    return deriv_bessel_argument(dv, expr_bessel_y);
-}
 
 expr_t *deriv_lommel_s_pack(expr_t *dv)
 {

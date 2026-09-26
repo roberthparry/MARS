@@ -321,10 +321,26 @@ first argument. The real Hurwitz implementation requires a positive shift
 - `qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)` — Bessel function of the first kind J_order(argument), for real order and argument
 - `qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument)` — Bessel function of the second kind Y_order(argument), for real order and argument
 
-These functions are implemented entirely in qfloat arithmetic.  Integer
-orders use the defining series and recurrence relations; non-integer real
-orders use the defining series and the standard J/Y connection formula.
-The qfloat layer has no dependency on MPFR.
+The J function uses qfloat arithmetic. The Y function delegates to the
+[guarded number-layer evaluator](number.md#bessel-y) and rounds its
+multiprecision result to double-double precision. Integer orders use MPFR;
+non-integer orders use the J/Y connection formula with extra precision near
+integer orders. Orders must have magnitude at most 1000. Non-integer orders
+also require arguments at most 1000; integer orders support larger finite
+positive arguments. Negative arguments return NaN: use
+[`qc_bessel_y`](qcomplex.md#bessel-y) for their principal complex values.
+At zero argument, negative half-integer orders return zero; other orders,
+including Y₀, return NaN. Non-finite inputs and exhausted numerical guards
+also return NaN.
+
+```c
+qfloat_t value = qf_bessel_y(QF_ZERO, QF_ONE);
+printf("Y_0(1) = %.15f\n", qf_to_double(value));
+```
+
+```text
+Y_0(1) = 0.088256964215677
+```
 
 **Lommel function**
 
@@ -404,6 +420,94 @@ qf_printf("0F0(0.2) = %.34q\n", value);
 
 ```text
 0F0(0.2) = 1.221402758160169833921071994639675
+```
+
+### Modified Bessel I
+
+`qf_bessel_i(order, argument)` evaluates the real modified Bessel function of
+the first kind, including `I_0(x)` by passing order zero. Positive arguments
+accept any finite real order. Negative arguments require integral order and
+obey `I_n(-x) = (-1)^n I_n(x)`. Negative integer orders satisfy `I_-n(x) = I_n(x)`;
+their vanishing initial reciprocal-gamma coefficients are handled explicitly.
+At zero, order zero gives one, positive orders and negative integer orders
+give zero, and other orders return NaN.
+
+The implementation uses [DLMF 10.25.2](https://dlmf.nist.gov/10.25.E2), sharing
+the [guarded number-layer series](number.md#modified-bessel-i) and complex
+gamma calculation with Struve L. Both input magnitudes must be at most 1000.
+Non-finite inputs, non-real branches, undefined zero limits and exhausted
+numerical guards return NaN. Work precision is limited to 65536 bits and the
+forward sum to series index 20000. Results are unscaled; final qfloat conversion
+can overflow to infinity or underflow to zero. There is no asymptotic kernel.
+
+```c
+qfloat_t bessel = qf_bessel_i(QF_ZERO, QF_ONE);
+qf_printf("I_0(1) = %.16q\n", bessel);
+```
+
+```text
+I_0(1) = 1.2660658777520083
+```
+
+### Ordinary Struve H
+
+`qf_struve_h(order, argument)` evaluates the unscaled ordinary Struve function
+`H_order(argument)`. Positive arguments accept finite real orders. Negative
+arguments require integral orders, with `H_n(-x) = (-1)^(n+1) H_n(x)`; use
+[qcomplex](qcomplex.md#ordinary-struve-h) for other negative arguments.
+
+The [guarded number-layer series](number.md#ordinary-struve-h) follows
+[DLMF 11.2.1](https://dlmf.nist.gov/11.2.E1), with alternating coefficients
+and the correct shifted-seed sign. Negative half-integer orders retain the
+non-zero tail after reciprocal-gamma zeros. At zero, orders greater than
+`-1` and orders `-3/2, -5/2, ...` give zero; order `-1` gives `2/pi`.
+Other zero limits return NaN.
+
+Both input magnitudes must be at most 1000. The shared kernel rejects work
+above 65536 bits, series beyond index 20000, non-finite inputs, non-real
+branches, unresolved zeros and failed convergence or cancellation guards.
+These failures and number-layer exponent overflow/underflow return NaN.
+Final double-double conversion can overflow to infinity or underflow to
+zero. No scaled or large-argument asymptotic evaluator is provided; the
+input bounds do not guarantee success at every point.
+
+```c
+qfloat_t ordinary = qf_struve_h(QF_ZERO, QF_ONE);
+qf_printf("H_0(1) = %.15q\n", ordinary);
+```
+
+```text
+H_0(1) = 0.568656627048288
+```
+
+### Modified Struve L
+
+`qf_struve_l(order, argument)` evaluates the real modified Struve function
+`L_order(argument)`. Positive arguments accept any finite real order; negative
+arguments require integral order, with parity `L_n(-x) = (-1)^(n+1) L_n(x)`.
+Use [the complex API](qcomplex.md#modified-struve-l) for other negative arguments.
+
+The implementation follows [DLMF 11.2.2](https://dlmf.nist.gov/11.2.E2), using
+the [number-layer guarded series](number.md#modified-struve-l) and rounding to
+double-double precision. In particular, orders `-3/2, -5/2, ...` retain the
+non-zero tail after the initial reciprocal-gamma coefficients vanish.
+At zero, the result is zero for orders greater than `-1` and for these
+exceptional half-integers; order `-1` gives `2/pi`. Other zero limits return NaN.
+
+Both input magnitudes must be at most 1000. Non-finite inputs, non-real
+branches, undefined zero limits, exhausted convergence or cancellation guards,
+and number-layer exponent overflow or underflow return NaN. Final conversion
+to qfloat can overflow to infinity or underflow to zero. These are unscaled
+values; there is no asymptotic large-argument implementation. The numerical
+kernel uses MPFR/MPC internally, as does `qf_bessel_k`.
+
+```c
+qfloat_t value = qf_struve_l(QF_ZERO, QF_ONE);
+qf_printf("L_0(1) = %.16q\n", value);
+```
+
+```text
+L_0(1) = 0.7102431859378909
 ```
 
 ### Formatted Output

@@ -572,67 +572,36 @@ done:
     return out;
 }
 
-/* H0 uses the existing entire 1F2 primitive; positive q keeps Y0 off its cut. The formula is valid
- * throughout Re(s)>0, but num_bessel_y currently has no complex evaluator, so non-real s yields NaN. */
-static expr_t *elementary_asinh_rule(const expr_t *f, const expr_t *t, const expr_t *s,
-                                     number_t *bound, expr_t **conditions)
+/* Inverse circular and hyperbolic pairs retain the origin branch and the real rate sign. */
+static expr_t *elementary_inverse_arc_rule(const expr_t *f, const expr_t *t, const expr_t *s,
+                                                number_t *bound, expr_t **conditions)
 {
     (void)conditions;
     expr_t *rate = NULL, *offset = NULL, *out = NULL;
     number_t value = NUM_NAN;
+    bool circular = f->ops == &ops_asin || f->ops == &ops_acos;
+    bool cosine = f->ops == &ops_acosh || f->ops == &ops_acos;
     if (!elementary_affine(f->a, t, &rate, &offset) || !expr_is_exact_zero(offset) ||
         !elementary_constant(rate, &value) || !num_is_real(value))
         goto done;
     if (num_is_zero(value)) {
-        num_destroy(bound);
-        *bound = num_clone(NUM_NINF);
-        out = expr_const_zero();
+        if (cosine) {
+            expr_t *zero = expr_const_zero();
+            expr_t *at_origin = f->ops->apply_unary(zero);
+            out = expr_div(at_origin, s);
+            expr_free(at_origin);
+            expr_free(zero);
+        } else {
+            num_destroy(bound);
+            *bound = num_clone(NUM_NINF);
+            out = expr_const_zero();
+        }
         goto done;
     }
     expr_t *q = elementary_absolute(rate);
-    expr_t *z = expr_div(s, q);
-    expr_t *zero = expr_const_zero();
-    expr_t *one = expr_const_one();
-    expr_t *two = expr_const_long(2);
-    expr_t *three = expr_const_long(3);
-    expr_t *four = expr_const_long(4);
-    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
-    expr_t *three_halves = expr_div(three, two);
-    expr_t *square = expr_mul(z, z);
-    expr_t *negative_square = expr_neg(square);
-    expr_t *argument = expr_div(negative_square, four);
-    const expr_t *upper[] = {one};
-    const expr_t *lower[] = {three_halves, three_halves};
-    expr_t *hypergeometric = expr_hypergeometric_pFq(1u, upper, 2u, lower, argument);
-    expr_t *twice_z = expr_mul(two, z);
-    expr_t *scale = expr_div(twice_z, pi);
-    expr_t *struve = expr_mul(scale, hypergeometric);
-    expr_t *bessel = expr_bessel_y(zero, z);
-    expr_t *difference = expr_sub(struve, bessel);
-    expr_t *numerator = expr_mul(pi, difference);
-    expr_t *denominator = expr_mul(two, s);
-    expr_t *positive = expr_div(numerator, denominator);
-    out = num_cmp(value, NUM_ZERO) < 0 ? expr_neg(positive) : expr_clone(positive);
-    expr_free(positive);
-    expr_free(denominator);
-    expr_free(numerator);
-    expr_free(difference);
-    expr_free(bessel);
-    expr_free(struve);
-    expr_free(scale);
-    expr_free(twice_z);
-    expr_free(hypergeometric);
-    expr_free(argument);
-    expr_free(negative_square);
-    expr_free(square);
-    expr_free(three_halves);
-    expr_free(pi);
-    expr_free(four);
-    expr_free(three);
-    expr_free(two);
-    expr_free(one);
-    expr_free(zero);
-    expr_free(z);
+    bool negative = num_cmp(value, NUM_ZERO) < 0;
+    out = circular ? expr_laplace_invcircular_formula(s, q, cosine, negative)
+                   : expr_laplace_invhyper_formula(s, q, cosine, negative);
     expr_free(q);
 done:
     num_destroy(&value);
@@ -768,7 +737,10 @@ static const elementary_rule_fn elementary_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ATAN      ] = elementary_arctangent_rule,
     [EXPR_KIND_ACOT      ] = elementary_arctangent_rule,
     [EXPR_KIND_ATANH     ] = elementary_atanh_rule,
-    [EXPR_KIND_ASINH     ] = elementary_asinh_rule,
+    [EXPR_KIND_ASIN      ] = elementary_inverse_arc_rule,
+    [EXPR_KIND_ACOS      ] = elementary_inverse_arc_rule,
+    [EXPR_KIND_ASINH     ] = elementary_inverse_arc_rule,
+    [EXPR_KIND_ACOSH     ] = elementary_inverse_arc_rule,
     [EXPR_KIND_LOG       ] = elementary_logarithm_rule,
     [EXPR_KIND_LOG10     ] = elementary_logarithm_rule,
     [EXPR_KIND_POW       ] = elementary_hyperbolic_power,

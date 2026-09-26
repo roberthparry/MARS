@@ -38,21 +38,18 @@ static expr_t *bessel_k_deriv(expr_t *e)
     return result;
 }
 
-/* The K0 primitive uses entire hypergeometric forms of the modified Struve functions. */
+/* The K0 primitive uses the native modified Struve functions. */
 static expr_t *zero_primitive(const expr_t *z)
 {
-    expr_t *one = expr_const_one(), *zero = expr_const_zero(), *half = expr_new_const(NUM_HALF);
-    expr_t *three_halves = expr_add(one, half), *square = expr_mul(z, z), *four = expr_const_long(4);
-    expr_t *q = expr_div(square, four);
-    const expr_t *upper[] = {one}, *lower0[] = {half, three_halves}, *lower1[] = {three_halves, three_halves};
-    expr_t *h0 = expr_hypergeometric_pFq(1, upper, 2, lower0, q);
-    expr_t *h1 = expr_hypergeometric_pFq(1, upper, 2, lower1, q);
+    expr_t *one = expr_const_one(), *zero = expr_const_zero(), *minus_one = expr_const_long(-1);
+    expr_t *l0 = expr_struve_l(zero, z), *lm1 = expr_struve_l(minus_one, z);
     expr_t *k0 = expr_bessel_k(zero, z), *k1 = expr_bessel_k(one, z);
-    expr_t *a = expr_mul(z, k0), *b = expr_mul(square, k1);
-    expr_t *left = expr_mul(a, h0), *right = expr_mul(b, h1), *result = expr_add(left, right);
-    expr_free(right); expr_free(left); expr_free(b); expr_free(a); expr_free(k1); expr_free(k0);
-    expr_free(h1); expr_free(h0); expr_free(q); expr_free(four); expr_free(square);
-    expr_free(three_halves); expr_free(half); expr_free(zero); expr_free(one);
+    expr_t *left = expr_mul(k0, lm1), *right = expr_mul(k1, l0), *sum = expr_add(left, right);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi"), *pi_z = expr_mul(pi, z);
+    expr_t *scale = expr_div_num(pi_z, &NUM_TWO), *result = expr_mul(scale, sum);
+    expr_free(scale); expr_free(pi_z); expr_free(pi); expr_free(sum); expr_free(right); expr_free(left);
+    expr_free(k1); expr_free(k0); expr_free(lm1); expr_free(l0);
+    expr_free(minus_one); expr_free(zero); expr_free(one);
     return result;
 }
 

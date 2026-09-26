@@ -1104,6 +1104,10 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_erfinv(A)` | Matrix inverse error function |
 | `mat_erfcinv(A)` | Matrix inverse complementary error function |
 | `mat_gamma(A)` | Matrix gamma function |
+| `mat_bessel_i(A, order)` | Principal modified Bessel matrix function I_order(A), including I₀ and Jordan blocks |
+| `mat_bessel_y(A, order)` | Principal ordinary Bessel matrix function Y_order(A), including Y₀ and analytic Jordan terms |
+| `mat_struve_h(A, order)` | Principal ordinary Struve matrix function H_order(A), using its alternating matrix series |
+| `mat_struve_l(A, order)` | Principal modified Struve matrix function L_order(A), including Jordan blocks |
 | `mat_lgamma(A)` | Matrix log gamma function |
 | `mat_digamma(A)` | Matrix digamma function (psi) |
 | `mat_qdigamma(A, q)` | Matrix q-digamma function ψ_q(A), using the convergent Lambert matrix series and reciprocal-q continuation |
@@ -1127,6 +1131,188 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_Ei(A)` | Matrix exponential integral Ei |
 | `mat_Li(A)` | Principal matrix logarithmic integral Li(A) = Ei(log(A)) |
 | `mat_E1(A)` | Matrix exponential integral E1 |
+
+#### Ordinary Bessel Y
+
+`matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order)` evaluates
+the Bessel function of the second kind by analytic matrix functional calculus.
+Use `&NUM_ZERO` for `Y₀(A)`. Real or complex orders and numeric or supported
+symbolic square matrices are accepted. Numeric entries and the order must
+be finite. The spectrum must avoid zero and lie in an analytic domain of
+the principal scalar branch; this restriction also applies to subsequent
+symbolic bindings.
+
+Diagonal numeric matrices call `num_bessel_y(order, argument)` on their
+diagonal entries. Other numeric matrices use a Hermite interpolation
+polynomial, with Schur eigenvalues where needed. Repeated eigenvalues use
+analytic derivatives from the scalar Bessel order recurrence, including
+every required Jordan term and separated repeated eigenvalues. Symbolic
+results retain bindings through the shared symbolic matrix machinery.
+Neither path applies the function entrywise.
+
+The function returns an owning matrix, released with `mat_free`, or NULL
+for invalid numeric inputs, failed decomposition, non-finite scalar values
+or unsupported symbolic structures. As with other spectral methods,
+closely clustered numerical eigenvalues can reduce interpolation accuracy.
+Complex coverage and working precision depend on the scalar Number backend.
+
+For `A = I + N`, where `N² = 0`, `Y₀(A) = Y₀(1)I − Y₁(1)N`:
+
+```c
+number_t values[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
+matrix_t *A = mat_create(2, 2, values);
+matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+
+if (y0) {
+    number_t entry = mat_get_num(y0, 0, 1);
+    printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+    num_destroy(&entry);
+}
+mat_free(y0);
+mat_free(A);
+```
+
+Output:
+
+```text
+Y_0(A)[0,1] = 0.781213
+```
+
+#### Ordinary Struve H
+
+`matrix_t *mat_struve_h(const matrix_t *A, const number_t *order)` evaluates
+the ordinary Struve function using the shared cylindrical matrix machinery.
+It accepts finite real or complex orders and numeric or supported symbolic
+square matrices. Numeric entries must be finite. Results retain symbolic
+bindings, and Jordan blocks retain all required derivative terms.
+
+The defining matrix series alternates in powers of `A²/4`, unlike the
+modified Struve L series. Initial reciprocal-gamma zeros at exceptional
+negative half-orders are skipped with the correct sign. Integer orders at
+least −1 permit zero eigenvalues; other orders require a nonsingular matrix
+whose spectrum lies in an analytic domain of the principal scalar branch.
+Diagonal matrices use `num_struve_h(order, argument)` on their diagonal entries.
+
+The result is an owning matrix, released with `mat_free`, or NULL for invalid
+inputs, unavailable matrix powers, failed convergence or unsupported symbolic
+structures. The numeric series shares the 4096-term limit and
+precision-dependent norm bound with `mat_struve_l`.
+
+For a nilpotent matrix with `A⁴ = 0`, `H₀(A) = (2/π)(A − A³/9)`:
+
+```c
+number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO,
+                     NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO,
+                     NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
+                     NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
+matrix_t *A = mat_create(4, 4, values);
+matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
+
+if (h0) {
+    number_t entry = mat_get_num(h0, 0, 3);
+    printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+    num_destroy(&entry);
+}
+mat_free(h0);
+mat_free(A);
+```
+
+Output:
+
+```text
+H_0(A)[0,3] = -0.070736
+```
+
+#### Modified Bessel I
+
+`matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order)` evaluates
+the modified Bessel function of the first kind. The finite real or complex
+scalar order is the second API argument; use `&NUM_ZERO` for `I₀(A)`.
+Numeric and supported symbolic square matrices use analytic functional
+calculus, with the same shared matrix series and symbolic reconstruction as
+`mat_struve_l`. Symbolic results retain their bindings, including the
+derivative terms required by Jordan blocks.
+
+All integer orders permit zero eigenvalues. Negative integer orders are
+normalised by `I₋ₙ(A) = Iₙ(A)`, so they remain regular on singular matrices.
+For other orders the matrix must be nonsingular and its spectrum must lie in
+an analytic domain of the principal branch. Diagonal numeric matrices call
+`num_bessel_i(order, argument)` on their diagonal entries; other entries
+remain zero.
+
+The function returns an owning matrix, released with `mat_free`, or NULL
+for invalid inputs, unavailable matrix powers, unsupported symbolic
+structures or failed convergence. The shared numeric series has a limit of
+4096 terms and a precision-dependent norm bound.
+
+For a nilpotent matrix with `A³ = 0`, `I₀(A) = I + A²/4`:
+
+```c
+number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO,
+                     NUM_ZERO, NUM_ZERO, NUM_ONE,
+                     NUM_ZERO, NUM_ZERO, NUM_ZERO};
+matrix_t *A = mat_create(3, 3, values);
+matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
+
+if (I0) {
+    number_t entry = mat_get_num(I0, 0, 2);
+    printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+    num_destroy(&entry);
+}
+mat_free(I0);
+mat_free(A);
+```
+
+Output:
+
+```text
+I_0(A)[0,2] = 0.250000
+```
+
+#### Modified Struve L
+
+`matrix_t *mat_struve_l(const matrix_t *A, const number_t *order)` evaluates
+the modified Struve function with a finite real or complex scalar order.
+The input must be a square matrix; numeric entries must be finite. The result
+is an owning matrix, released with `mat_free`. Supported symbolic matrices
+retain their bindings through the shared symbolic functional calculus,
+including Jordan blocks; unsupported symbolic structures return NULL.
+
+This is analytic matrix functional calculus. Diagonal entries use
+`num_struve_l(order, argument)`, and diagonalisable matrices can use the
+same spectral reconstruction as `mat_bessel_k`. The defining
+[modified Struve series](https://dlmf.nist.gov/11.2#E2) is evaluated with
+matrix powers, so repeated eigenvalues and Jordan blocks retain all the
+required derivative terms. Integer orders at least −1 admit zero eigenvalues.
+Other orders require a nonsingular matrix, and fractional powers use the
+principal branch; the spectrum must lie in a domain where that branch is analytic.
+
+The series uses a precision-dependent norm bound and a limit of 4096 terms.
+Unavailable matrix powers, non-finite scalar results, failed convergence and
+invalid inputs return NULL. Spectral reconstruction may produce constant
+expression entries, which can be read with `mat_get_num`.
+
+For a nilpotent matrix with `A² = 0`, the order-zero result is `L₀(A) = 2A/π`:
+
+```c
+number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
+matrix_t *A = mat_create(2, 2, values);
+matrix_t *L = mat_struve_l(A, &NUM_ZERO);
+
+if (L) {
+    number_t entry = mat_get_num(L, 0, 1);
+    printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+    num_destroy(&entry);
+}
+mat_free(L);
+mat_free(A);
+```
+
+Output:
+
+```text
+L_0(A)[0,1] = 0.636620
+```
 
 #### Clausen functions
 

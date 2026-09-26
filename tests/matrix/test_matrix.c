@@ -177,6 +177,95 @@ static void test_readme_example_string_quantum(void)
 }
 
 /* ------------------------------------------------------------------ tests_main */
+/* README example: docs/matrix.md, modified Struve L on a nilpotent matrix. */
+static void test_readme_example_struve_l(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(2, 2, values);
+    matrix_t *L = mat_struve_l(A, &NUM_ZERO);
+
+    check_bool("README Struve L example produces a matrix", L != NULL);
+    if (L) {
+        number_t entry = mat_get_num(L, 0, 1);
+        char output[80];
+
+        snprintf(output, sizeof(output), "L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        check_bool("README Struve L output matches the guide", strcmp(output, "L_0(A)[0,1] = 0.636620\n") == 0);
+        printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(L);
+    mat_free(A);
+}
+
+/* README example: docs/matrix.md, modified Bessel I0 on a nilpotent matrix. */
+static void test_readme_example_bessel_i(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ONE,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(3, 3, values);
+    matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
+
+    check_bool("README Bessel I0 example produces a matrix", I0 != NULL);
+    if (I0) {
+        number_t entry = mat_get_num(I0, 0, 2);
+        char output[80];
+
+        snprintf(output, sizeof(output), "I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+        check_bool("README Bessel I0 output matches the guide", strcmp(output, "I_0(A)[0,2] = 0.250000\n") == 0);
+        printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(I0);
+    mat_free(A);
+}
+
+/* README example: docs/matrix.md, ordinary Struve H0 on a nilpotent matrix. */
+static void test_readme_example_struve_h(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(4, 4, values);
+    matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
+
+    check_bool("README Struve H0 example produces a matrix", h0 != NULL);
+    if (h0) {
+        number_t entry = mat_get_num(h0, 0, 3);
+        char output[80];
+
+        snprintf(output, sizeof(output), "H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+        check_bool("README Struve H0 output matches the guide", strcmp(output, "H_0(A)[0,3] = -0.070736\n") == 0);
+        printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(h0);
+    mat_free(A);
+}
+
+/* README example: docs/matrix.md, ordinary Bessel Y0 on a Jordan block. */
+static void test_readme_example_bessel_y(void)
+{
+    number_t values[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *A = mat_create(2, 2, values);
+    matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+
+    check_bool("README Bessel Y0 example produces a matrix", y0 != NULL);
+    if (y0) {
+        number_t entry = mat_get_num(y0, 0, 1);
+        char output[80];
+
+        snprintf(output, sizeof(output), "Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        check_bool("README Bessel Y0 output matches the guide", strcmp(output, "Y_0(A)[0,1] = 0.781213\n") == 0);
+        printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(y0);
+    mat_free(A);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Core");
@@ -199,6 +288,10 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_hermitian_eigendecomposition, readme_examples,
                                   "matrix,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_string_quantum, readme_examples, "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_struve_l, readme_examples, "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_bessel_i, readme_examples, "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_struve_h, readme_examples, "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_bessel_y, readme_examples, "matrix,readme,output");
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

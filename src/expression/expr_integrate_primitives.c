@@ -97,103 +97,134 @@ cleanup:
     return ok;
 }
 
+/* Guard the defining Lommel series before constructing either member of its derivative recurrence. */
+static bool lommel_parameters_regular(number_t mu, number_t nu)
+{
+    NUM_SCOPE(scope);
+    number_t sum = num_add(mu, nu), difference = num_sub(mu, nu);
+    number_t plus = num_add_long(sum, 1), minus = num_add_long(difference, 1);
+    number_t lower_plus = num_div(num_add_long(sum, 3), NUM_TWO);
+    number_t lower_minus = num_div(num_add_long(difference, 3), NUM_TWO);
+    if (!num_is_finite(plus) || !num_is_finite(minus) || num_is_zero(plus) || num_is_zero(minus) ||
+        !num_is_finite(lower_plus) || !num_is_finite(lower_minus))
+        return false;
+    return !(num_is_real(lower_plus) && num_is_integer(lower_plus) && num_le(lower_plus, NUM_ZERO)) &&
+           !(num_is_real(lower_minus) && num_is_integer(lower_minus) && num_le(lower_minus, NUM_ZERO));
+}
+
+static expr_t *bessel_lommel_primitive(number_t mu, const expr_t *order, const expr_t *z,
+                                      expr_t *(*builder)(const expr_t *, const expr_t *))
+{
+    NUM_SCOPE(scope);
+    if (!order || !expr_is_const(order) || order->name || !num_is_finite(order->c) ||
+        !lommel_parameters_regular(mu, order->c))
+        return NULL;
+    number_t shifted_coefficient = num_add_long(num_add(mu, order->c), -1);
+    if (!num_is_zero(shifted_coefficient) &&
+        !lommel_parameters_regular(num_add_long(mu, -1), num_add_long(order->c, -1)))
+        return NULL;
+
+    /* Lagrange's identity: d{z[C_nu s'_(mu,nu) - C'_nu s_(mu,nu)]}/dz = z^mu C_nu. */
+    expr_t *mu_expr = expr_new_const(mu), *lower_order = expr_add_long(order, -1);
+    expr_t *upper_order = expr_add_long(order, 1), *c = builder(order, z);
+    expr_t *lower = builder(lower_order, z), *upper = builder(upper_order, z);
+    expr_t *difference = expr_sub(lower, upper), *derivative = expr_div_num(difference, &NUM_TWO);
+    expr_t *lommel = expr_lommel_s(mu_expr, order, z);
+    expr_t *lommel_derivative = expr_lommel_s_argument_derivative_expansion(mu_expr, order, z);
+    expr_t *left = expr_mul(c, lommel_derivative), *right = expr_mul(derivative, lommel);
+    expr_t *wronskian = expr_sub(left, right), *result = expr_mul(z, wronskian);
+    expr_free(wronskian); expr_free(right); expr_free(left); expr_free(lommel_derivative); expr_free(lommel);
+    expr_free(derivative); expr_free(difference); expr_free(upper); expr_free(lower); expr_free(c);
+    expr_free(upper_order); expr_free(lower_order); expr_free(mu_expr);
+    return result;
+}
+
+/* DLMF 10.22.2 at order zero applies to both J and Y; use the native Struve H nodes. */
+static expr_t *bessel_zero_primitive(const expr_t *z, expr_t *(*builder)(const expr_t *, const expr_t *))
+{
+    expr_t *zero = expr_const_zero(), *one = expr_const_one(), *minus_one = expr_const_long(-1);
+    expr_t *c0 = builder(zero, z), *c1 = builder(one, z);
+    expr_t *h0 = expr_struve_h(zero, z), *hm1 = expr_struve_h(minus_one, z);
+    expr_t *left = expr_mul(c0, hm1), *right = expr_mul(c1, h0), *sum = expr_add(left, right);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi"), *pi_z = expr_mul(pi, z);
+    expr_t *scale = expr_div_num(pi_z, &NUM_TWO), *result = expr_mul(scale, sum);
+    expr_free(scale); expr_free(pi_z); expr_free(pi); expr_free(sum); expr_free(right); expr_free(left);
+    expr_free(hm1); expr_free(h0); expr_free(c1); expr_free(c0);
+    expr_free(minus_one); expr_free(one); expr_free(zero);
+    return result;
+}
+
+static expr_t *bessel_integer_primitive(const expr_t *order, const expr_t *z,
+                                       expr_t *(*builder)(const expr_t *, const expr_t *))
+{
+    NUM_SCOPE(scope);
+    if (!order || !expr_is_const(order) || order->name || !num_is_finite(order->c) ||
+        !num_is_real(order->c) || !num_is_integer(order->c))
+        return NULL;
+    bool negative = num_lt(order->c, NUM_ZERO);
+    number_t magnitude = negative ? num_neg(order->c) : num_clone(order->c);
+    number_t limit = num_create_from_long(64);
+    if (num_gt(magnitude, limit))
+        return NULL;
+    long degree = (long)num_to_double(magnitude);
+    expr_t *primitive = NULL;
+    if (degree % 2) {
+        expr_t *zero = expr_const_zero(), *c0 = builder(zero, z);
+        primitive = expr_neg(c0);
+        expr_free(c0); expr_free(zero);
+    } else {
+        primitive = bessel_zero_primitive(z, builder);
+    }
+    /* The bounded recurrence F_n = F_(n-2) - 2 C_(n-1) covers all supported integral orders. */
+    for (long n = degree % 2 + 2; n <= degree && primitive; n += 2) {
+        expr_t *index = expr_const_long(n - 1), *c = builder(index, z), *twice = expr_mul_num(c, &NUM_TWO);
+        expr_t *next = expr_sub(primitive, twice);
+        expr_free(twice); expr_free(c); expr_free(index); expr_free(primitive);
+        primitive = next;
+    }
+    if (negative && degree % 2)
+        primitive = expr_negate_owned(primitive);
+    return primitive;
+}
+
 static expr_t *integrate_bessel_kind_rule(const expr_t *expr, const expr_t *wrt, const expr_ops_t *expected_ops,
                                           expr_t *(*builder)(const expr_t *, const expr_t *))
 {
     NUM_SCOPE(scope);
-    expr_t *coefficient = NULL;
-    expr_t *exponent = NULL;
-    expr_t *mu_expr = NULL;
-    expr_t *negative_inverse_power_expr = NULL;
-    expr_t *coefficient_power = NULL;
-    expr_t *outside = NULL;
-    expr_t *one = NULL;
-    expr_t *lower_order = NULL;
-    expr_t *upper_order = NULL;
-    expr_t *j = NULL;
-    expr_t *j_lower = NULL;
-    expr_t *j_upper = NULL;
-    expr_t *j_difference = NULL;
-    expr_t *j_prime = NULL;
-    expr_t *lommel = NULL;
-    expr_t *lommel_prime = NULL;
-    expr_t *left_product = NULL;
-    expr_t *right_product = NULL;
-    expr_t *wronskian = NULL;
-    expr_t *weighted_wronskian = NULL;
-    expr_t *result = NULL;
-    expr_t *out = NULL;
-    number_t coefficient_value = num_new();
-    number_t power_value = num_new();
-    number_t inverse_power = num_new();
-    number_t mu = num_new();
-    number_t negative_inverse_power = num_new();
-
     if (!expr || !wrt || !expr->a || !expr->b || !expected_ops || !builder || !expr_is_op(expr, expected_ops) ||
-        depends_on_wrt(expr->a, wrt) || !match_numeric_wrt_monomial_primitives(expr->b, wrt, &coefficient, &exponent) ||
-        !expr_match_const_value(coefficient, &coefficient_value) || !expr_match_const_value(exponent, &power_value) ||
-        !num_is_exact(coefficient_value) || !num_is_real(coefficient_value) || !num_gt(coefficient_value, NUM_ZERO) ||
-        !num_is_exact(power_value) || !num_is_real(power_value) || num_is_zero(power_value))
-        goto cleanup;
+        depends_on_wrt(expr->a, wrt))
+        return NULL;
+    expr_t *order = expr_simplify(expr->a), *rate = expr_simplify_owned(expr_create_deriv(expr->b, wrt));
+    if (rate && expr_is_const(rate) && !rate->name && num_is_finite(rate->c) && !num_is_zero(rate->c)) {
+        expr_t *primitive = bessel_integer_primitive(order, expr->b, builder);
+        if (!primitive)
+            primitive = bessel_lommel_primitive(NUM_ZERO, order, expr->b, builder);
+        expr_t *result = expr_div(primitive, rate);
+        expr_free(primitive); expr_free(rate); expr_free(order);
+        return simplify_owned(result);
+    }
+    expr_free(rate);
 
-    /* For z=a*x^p and mu=1/p-1, the Lommel equation and Lagrange's
-     * identity give
-     *
-     * d/dz { z[J_nu(z)s'_(mu,nu)(z)-J'_nu(z)s_(mu,nu)(z)] }
-     *     = z^mu J_nu(z).
-     *
-     * Substituting z=a*x^p supplies the remaining factor a^(-1/p)/p. */
-    inverse_power = num_inv(power_value);
-    mu = num_sub(inverse_power, NUM_ONE);
-    negative_inverse_power = num_neg(inverse_power);
-
-    mu_expr = expr_new_const(mu);
-    negative_inverse_power_expr = expr_new_const(negative_inverse_power);
-    coefficient_power =
-        (coefficient && negative_inverse_power_expr) ? expr_pow_xp(coefficient, negative_inverse_power_expr) : NULL;
-    outside = (coefficient_power && exponent) ? expr_div(coefficient_power, exponent) : NULL;
-
-    one = expr_new_const(NUM_ONE);
-    lower_order = one ? expr_sub(expr->a, one) : NULL;
-    upper_order = one ? expr_add(expr->a, one) : NULL;
-    j = builder(expr->a, expr->b);
-    j_lower = lower_order ? builder(lower_order, expr->b) : NULL;
-    j_upper = upper_order ? builder(upper_order, expr->b) : NULL;
-    j_difference = (j_lower && j_upper) ? expr_sub(j_lower, j_upper) : NULL;
-    j_prime = j_difference ? expr_div_num(j_difference, &NUM_TWO) : NULL;
-    lommel = mu_expr ? expr_lommel_s(mu_expr, expr->a, expr->b) : NULL;
-    lommel_prime = mu_expr ? expr_lommel_s_argument_derivative_expansion(mu_expr, expr->a, expr->b) : NULL;
-    left_product = (j && lommel_prime) ? expr_mul(j, lommel_prime) : NULL;
-    right_product = (j_prime && lommel) ? expr_mul(j_prime, lommel) : NULL;
-    wronskian = (left_product && right_product) ? expr_sub(left_product, right_product) : NULL;
-    weighted_wronskian = wronskian ? expr_mul(expr->b, wronskian) : NULL;
-    result = (outside && weighted_wronskian) ? expr_mul(outside, weighted_wronskian) : NULL;
-    out = simplify_owned(result);
-    result = NULL;
-
-cleanup:
-    expr_free(result);
-    expr_free(weighted_wronskian);
-    expr_free(wronskian);
-    expr_free(right_product);
-    expr_free(left_product);
-    expr_free(lommel_prime);
-    expr_free(lommel);
-    expr_free(j_prime);
-    expr_free(j_difference);
-    expr_free(j_upper);
-    expr_free(j_lower);
-    expr_free(j);
-    expr_free(upper_order);
-    expr_free(lower_order);
-    expr_free(one);
-    expr_free(outside);
-    expr_free(coefficient_power);
-    expr_free(negative_inverse_power_expr);
-    expr_free(mu_expr);
-    expr_free(exponent);
-    expr_free(coefficient);
-    return out;
+    expr_t *coefficient = NULL, *exponent = NULL, *result = NULL;
+    number_t coefficient_value = num_new(), power_value = num_new();
+    if (match_numeric_wrt_monomial_primitives(expr->b, wrt, &coefficient, &exponent) &&
+        expr_match_const_value(coefficient, &coefficient_value) && expr_match_const_value(exponent, &power_value) &&
+        num_is_exact(coefficient_value) && num_is_real(coefficient_value) && num_is_finite(coefficient_value) &&
+        num_gt(coefficient_value, NUM_ZERO) && num_is_exact(power_value) && num_is_real(power_value) &&
+        num_is_finite(power_value) && !num_is_zero(power_value)) {
+        /* For z=a*x^p, mu=1/p-1 and the remaining substitution factor is a^(-1/p)/p.
+         * Keep the existing positive-scale restriction so fractional powers retain their original branch. */
+        number_t inverse_power = num_inv(power_value), mu = num_sub(inverse_power, NUM_ONE);
+        number_t negative_inverse_power = num_neg(inverse_power);
+        expr_t *primitive = bessel_lommel_primitive(mu, order, expr->b, builder);
+        expr_t *coefficient_power = expr_pow(coefficient, &negative_inverse_power);
+        expr_t *outside = expr_div(coefficient_power, exponent);
+        result = expr_mul(outside, primitive);
+        expr_free(outside); expr_free(coefficient_power); expr_free(primitive);
+    }
+    num_destroy(&power_value); num_destroy(&coefficient_value);
+    expr_free(exponent); expr_free(coefficient); expr_free(order);
+    return simplify_owned(result);
 }
 
 expr_t *integrate_bessel_j_rule(const expr_t *expr, const expr_t *wrt)

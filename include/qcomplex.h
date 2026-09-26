@@ -363,8 +363,38 @@ qcomplex_t qc_erfc(qcomplex_t z);                          /**< complementary er
 qcomplex_t qc_erfinv(qcomplex_t z);                        /**< inverse error function */
 qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse complementary error function */
 qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
+/**
+ * @brief Evaluate principal Bessel Y for real or complex order and argument, including Y_0.
+ *
+ * The negative real axis takes its upper-bank value. Evaluation uses guarded arbitrary precision before
+ * rounding to qcomplex. Negative half-integer orders return zero at the origin; other zero limits,
+ * unsupported numerical ranges and exhausted guards return NaN. See docs/qcomplex.md.
+ */
+qcomplex_t qc_bessel_y(qcomplex_t order, qcomplex_t argument);
 /** @brief Principal modified Bessel K for complex order and non-zero argument; unsupported ranges return NaN. */
 qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
+/**
+ * @brief Evaluate principal modified Bessel I for complex order and argument, including I_0.
+ *
+ * The negative real axis takes the upper-bank value, and I_-n = I_n for integral n. Input magnitudes
+ * above 1000, undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md.
+ */
+qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument);
+/**
+ * @brief Evaluate the principal modified Struve function L_order(argument) for complex order and argument.
+ *
+ * The negative real axis takes the upper-bank value. Finite inputs with magnitudes at most 1000 are supported;
+ * undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md for numerical limits.
+ */
+qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument);
+/**
+ * @brief Evaluate principal ordinary Struve H for complex order and argument.
+ *
+ * Uses the principal power of the original argument; the negative real axis takes the upper-bank value.
+ * Input magnitudes above 1000, undefined zero limits and exhausted numerical guards return NaN.
+ * See docs/qcomplex.md for numerical limits and exceptional negative half-integer orders.
+ */
+qcomplex_t qc_struve_h(qcomplex_t order, qcomplex_t argument);
 qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
 /**

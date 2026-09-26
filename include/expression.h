@@ -771,8 +771,60 @@ expr_t *expr_causal_convolve(const expr_t *left, const expr_t *right, const expr
 expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a);
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
+/**
+ * @brief Construct the principal modified Bessel function I_order(argument).
+ *
+ * Negative integral orders use I_-n = I_n. Fixed-order argument derivatives and reverse-mode argument
+ * derivatives are supported; derivatives involving the order remain formal (NAN in reverse mode).
+ * Affine antiderivatives require a finite numerical order and a known non-zero numerical slope.
+ * Non-integral powers retain the principal branch; primitives apply on a domain avoiding its cut and poles.
+ * @param order Order expression; it is retained.
+ * @param argument Argument expression; it is retained.
+ * @return A newly allocated expression, or NULL for a missing operand.
+ */
+expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument);
 /** @brief Construct the principal modified Bessel function K_order(argument). */
 expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
+/**
+ * @brief Construct the principal modified Struve function L_order(argument).
+ *
+ * Fixed-order argument derivatives are supported; derivatives involving the order remain formal.
+ * Specialise symbolic orders before differentiating at zero; their unspecialised recurrence contains a quotient.
+ * Reverse-mode argument derivatives are supported; the unavailable order derivative is NAN.
+ * Affine antiderivatives require a finite numerical order and a known non-zero numerical slope.
+ * Negative even integral orders, whose primitives require logarithmic terms, remain formal.
+ * Non-integral powers retain the principal branch; primitives apply on a domain avoiding its cut and poles.
+ * @param order Order expression; it is retained.
+ * @param argument Argument expression; it is retained.
+ * @return A newly allocated expression, or NULL for a missing operand or allocation failure.
+ */
+expr_t *expr_struve_l(const expr_t *order, const expr_t *argument);
+/**
+ * @brief Construct the principal ordinary Struve function H_order(argument).
+ *
+ * Fixed-order argument derivatives and reverse-mode argument derivatives are supported; derivatives involving
+ * the order remain formal (NAN in reverse mode). Specialise symbolic orders before differentiating at zero.
+ * Affine primitives require a finite numerical order and a known non-zero numerical slope. Negative even integral
+ * orders, whose primitives require logarithmic terms, remain formal. Negative half-integral orders use the
+ * shifted Bessel J series with its parity sign. Non-integral powers retain the principal branch; primitives
+ * apply on a domain avoiding the branch cut and poles.
+ * @param order Order expression; it is retained.
+ * @param argument Argument expression; it is retained.
+ * @return A newly allocated expression, or NULL for a missing operand.
+ */
+expr_t *expr_struve_h(const expr_t *order, const expr_t *argument);
+/**
+ * @brief Construct the principal Bessel function of the second kind Y_order(argument).
+ *
+ * Fixed-order argument derivatives and reverse-mode derivatives use adjacent native Y orders, including
+ * negative half-integral orders, and inherit the numeric backend's origin convention. Order derivatives
+ * remain formal (NAN in reverse mode). Numerical affine slopes and integral orders of magnitude at most 64 have
+ * native Struve H primitives; other supported numerical orders and monomial arguments use guarded Lommel
+ * primitives. All primitives are local to a domain avoiding the principal branch cut and singularities.
+ * @param order Order expression; it is retained.
+ * @param argument Argument expression; it is retained.
+ * @return A newly allocated expression, or NULL for a missing operand.
+ */
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
 expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument);
 expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,

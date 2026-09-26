@@ -120,6 +120,9 @@ typedef enum {
     EXPR_KIND_BESSEL_J,
     EXPR_KIND_BESSEL_Y,
     EXPR_KIND_BESSEL_K,
+    EXPR_KIND_BESSEL_I,
+    EXPR_KIND_STRUVE_L,
+    EXPR_KIND_STRUVE_H,
     EXPR_KIND_LOMMEL_S,
     EXPR_KIND_LOMMEL_S_PACK,
     EXPR_KIND_APPELL_F1,
@@ -458,6 +461,10 @@ expr_t *expr_laplace_formula(const expr_t *transform, number_t *abscissa, expr_t
 /** Build a supported elementary transform, retaining sufficient convergence conditions. */
 expr_t *expr_laplace_elementary_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                    number_t *bound, expr_t **conditions);
+/** Construct the principal inverse-hyperbolic Laplace pair for a positive real rate magnitude. */
+expr_t *expr_laplace_invhyper_formula(const expr_t *s, const expr_t *rate, bool cosine, bool negative);
+/** Construct the inverse-circular Laplace pair for a positive real rate magnitude, retaining real-cut values. */
+expr_t *expr_laplace_invcircular_formula(const expr_t *s, const expr_t *rate, bool cosine, bool negative);
 /** Build a supported special-function transform, retaining sufficient convergence conditions. */
 expr_t *expr_laplace_special_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                number_t *bound, expr_t **conditions);
@@ -562,6 +569,15 @@ extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
 extern const expr_ops_t ops_bessel_k;
+extern const expr_ops_t ops_bessel_i;
+/** Expand a finite numerical Bessel I order into its principal hypergeometric form, reflecting negative integers. */
+expr_t *expr_bessel_i_hypergeometric(const expr_t *order, const expr_t *argument);
+extern const expr_ops_t ops_struve_l;
+extern const expr_ops_t ops_struve_h;
+/** Expand a finite numerical Struve H order into its alternating hypergeometric form, or return NULL at poles. */
+expr_t *expr_struve_h_hypergeometric(const expr_t *order, const expr_t *argument);
+/** Expand a finite numerical Struve order into its principal hypergeometric form, or return NULL at parameter poles. */
+expr_t *expr_struve_l_hypergeometric(const expr_t *order, const expr_t *argument);
 extern const expr_ops_t ops_lommel_s;
 extern const expr_ops_t ops_lommel_s_pack;
 extern const expr_ops_t ops_appell_f1;

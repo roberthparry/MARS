@@ -492,7 +492,10 @@ their existing backend-specific precision and representation.
 | `num_harmonic_poly(degree, x)` | Evaluates the finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k; the degree must be an exact non-negative integer. |
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
 | `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
+| `num_bessel_i(ν, x)` | Evaluates the principal modified Bessel function `Iν(x)`, including `I₀(x)` at order zero. |
 | `num_bessel_y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |
+| `num_struve_l(ν, x)` | Evaluates the principal modified Struve function `Lν(x)` for real or complex inputs. |
+| `num_struve_h(ν, x)` | Evaluates the principal ordinary Struve function `Hν(x)` for real or complex inputs. |
 | `num_lommel_s(μ, ν, x)` | Evaluates the Lommel function `sμ,ν(x)`. |
 | `num_appell_f1(a, b1, b2, c, x, y)` | Evaluates the two-variable Appell `F₁` hypergeometric function. |
 | `num_lauricella_f(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
@@ -511,6 +514,217 @@ arbitrary-precision inputs retain their native precision. Nonreal inputs use
 the [holomorphic Clausen continuation](qcomplex.md#clausen-functions),
 including its exclusion of nonreal points on `Re(z) = 2*k*pi`. Order zero
 and non-finite inputs return NaN. Each call returns an owning number.
+
+### Bessel Y
+
+`num_bessel_y(order, argument)` returns an owning principal Bessel function
+of the second kind, including Y₀. Real and complex inputs use MPFR/MPC at
+the greatest input precision; exact inputs contribute the current default
+precision. The calculation does not change the input values or the default
+precision setting. Positive real arguments and real orders return real
+numbers; other non-zero arguments can return complex numbers.
+
+The branch is `-pi < arg(z) <= pi`. An exactly negative real argument uses
+the upper bank even if its imaginary zero is negative. Approaching the cut
+from below gives the lower-bank limit. For integer `n`,
+`Y_-n(z) = (-1)^n*Y_n(z)` and
+`Y_n(-x+i0) = (-1)^n*(Y_n(x)+2*i*J_n(x))`, where `x > 0`.
+At the origin, negative half-integer orders have the finite value zero.
+Other origin values, including Y₀, return NaN.
+
+Integer orders and real arguments use MPFR. Complex integer-order values
+use the logarithmic and harmonic-number series, avoiding division by
+`sin(pi*order)`. Non-integer orders use the J/Y connection formula and the
+native arbitrary-precision I series, with rotations towards the right
+half-plane and explicit principal-branch phase corrections. Extra bits
+resolve orders close to integers. The series checks its remaining tail
+and accumulated cancellation before returning a value.
+
+Order magnitudes must be at most 1000. Complex arguments and non-integer
+orders also require argument magnitude at most 1000. Real arguments with
+integer orders can exceed that argument limit. Work precision is limited
+to 65536 bits, including any nested I evaluation; series stop after 20000
+terms. Non-finite inputs, unresolved cancellation, unsupported ranges and
+exhausted guards return NaN. Results are unscaled. The qfloat and qcomplex
+wrappers additionally have the exponent range of their component type.
+
+```c
+NUM_SCOPE(scope);
+number_t value = num_bessel_y(NUM_ZERO, NUM_ONE);
+printf("Y_0(1) = %.15f\n", num_to_double(value));
+```
+
+```text
+Y_0(1) = 0.088256964215677
+```
+
+The example rounds only its displayed output to double precision. See also
+the [qfloat](qfloat.md) and [qcomplex](qcomplex.md#bessel-y) APIs.
+
+### Modified Bessel I
+
+`num_bessel_i(order, argument)` returns an owning number containing the
+unscaled modified Bessel function of the first kind. Order zero selects
+`I_0(z)`. Real, complex, exact rational and fixed-precision inputs use the
+widest input precision; exact inputs contribute the current default precision.
+The result is a multiprecision real or complex number, except for exact
+zero-argument limits. Inputs and the default precision setting are preserved.
+The [qfloat](qfloat.md#modified-bessel-i) and
+[qcomplex](qcomplex.md#modified-bessel-i) APIs round this same kernel.
+
+The defining series, from [DLMF 10.25.2](https://dlmf.nist.gov/10.25.E2), is
+
+$$
+I_\nu(z)=\sum_{k=0}^{\infty}
+\frac{(z/2)^{\nu+2k}}{\Gamma(k+1)\Gamma(k+\nu+1)}.
+$$
+
+Its principal power uses `-pi < arg(z) <= pi`. An exactly negative real
+argument takes the upper-bank value irrespective of signed zero. Real
+integral orders give real results on either real half-axis; other real
+orders can give complex results on the negative axis. The shifted series
+retains the non-zero tail at negative integer orders, satisfying
+`I_-n(z) = I_n(z)`, and preserves small coefficients at nearby orders.
+
+At zero, order zero gives one; orders with positive real part and negative
+integer orders give zero. Other zero limits return NaN, including purely
+imaginary non-zero orders and negative non-integral real orders.
+
+Bessel I and [Struve L](#modified-struve-l) share one guarded series engine
+and private multiprecision complex gamma calculation. Both input magnitudes
+must be at most 1000. Work precision adds 96 bits plus
+`ceil(4*(abs(order)+abs(argument)))`, with additional bits near non-positive
+half-integers, and may not exceed 65536 bits. The forward sum stops by series
+index 20000. Tail and cancellation checks reject unresolved values, and
+exponent overflow/underflow or non-finite inputs return NaN. These bounds
+describe supported numerical coverage, not a guarantee of convergence at
+every point. No scaled or large-argument asymptotic evaluator is provided.
+
+```c
+NUM_SCOPE(scope);
+number_t bessel = num_bessel_i(NUM_ZERO, NUM_ONE);
+num_printf("I_0(1) = %.16n\n", bessel);
+```
+
+```text
+I_0(1) = 1.266065877752008
+```
+
+### Ordinary Struve H
+
+`num_struve_h(order, argument)` returns an owning number containing the
+unscaled principal ordinary Struve function. Real and complex orders and
+arguments are accepted, including exact integer and rational inputs. The
+result retains the greater input precision; exact inputs contribute the
+current default precision. Neither inputs nor the default precision setting
+are changed. Results use multiprecision real or complex storage, except for
+exact zero limits. The [qfloat](qfloat.md#ordinary-struve-h) and
+[qcomplex](qcomplex.md#ordinary-struve-h) APIs round the same kernel.
+
+The defining series is
+
+$$
+\mathbf H_\nu(z)=\sum_{k=0}^{\infty}
+\frac{(-1)^k(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.
+$$
+
+See [DLMF 11.2.1](https://dlmf.nist.gov/11.2.E1). The principal power uses
+the original argument, with `-pi < arg(z) <= pi`; the negative axis itself
+uses the upper bank, irrespective of signed zero. Integral real orders
+give real results on either real half-axis. Other orders can produce
+complex values for negative real arguments.
+
+H shares the guarded gamma and series engine with [Struve L](#modified-struve-l)
+and [Bessel I](#modified-bessel-i). It negates the recurrence's squared
+argument and includes the shifted seed's `(-1)^k` factor, rather than using
+a branch-sensitive power rotation. Backwards multiplication crosses
+reciprocal-gamma zeros without division by poles. In particular,
+`H_(-m-1/2)(z) = (-1)^m J_(m+1/2)(z)` for integers `m >= 0`.
+Nearby orders retain their small, non-zero coefficients. Complex gamma
+coefficients use the guarded multiprecision expansion, not a fixed-precision
+complex gamma fallback.
+
+At zero, `Re(order) > -1` and real orders `-3/2, -5/2, ...` give zero;
+real order `-1` gives `2/pi`. Other zero limits return NaN, including
+divergent real cases and oscillatory complex cases.
+
+Finite input magnitudes are limited to 1000. Work precision adds 96 bits
+plus `ceil(4*(abs(order)+abs(argument)))` and extra bits near non-positive
+half-integer orders, up to 65536 total bits. The forward series is limited
+to index 20000. Decreasing term ratios bound the remaining tail; the absolute
+term sum checks cancellation, including the alternating real-axis case.
+Failed numerical guards, unresolved zeros and exponent overflow/underflow
+return NaN. There is no scaled or asymptotic evaluator, so the input bounds
+do not guarantee success at every point.
+
+```c
+NUM_SCOPE(scope);
+number_t ordinary = num_struve_h(NUM_ZERO, NUM_ONE);
+num_printf("H_0(1) = %.15n\n", ordinary);
+```
+
+```text
+H_0(1) = 0.568656627048288
+```
+
+### Modified Struve L
+
+`num_struve_l(order, argument)` returns an owning number containing the
+unscaled principal modified Struve function. It accepts real and complex
+orders and arguments, including exact integers and rationals, and uses the
+greater input precision; exact inputs contribute the current default
+precision. Inputs and the default precision setting are preserved. The result
+uses a multiprecision real or complex backend, except for exact zero limits.
+The [qfloat](qfloat.md#modified-struve-l) and
+[qcomplex](qcomplex.md#modified-struve-l) entry points round this same kernel.
+
+The defining series is
+
+$$
+\mathbf L_\nu(z)=\sum_{k=0}^{\infty}
+\frac{(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.
+$$
+
+See [DLMF 11.2.2](https://dlmf.nist.gov/11.2.E2). The principal power uses
+`-pi < arg(z) <= pi`; the negative real axis itself takes the upper-bank
+value, irrespective of signed zero. Real integral orders give real values
+on either real half-axis. Real non-integral orders can give complex results
+on the negative axis.
+
+The series shares its engine with [Bessel I](#modified-bessel-i) and is
+seeded where both gamma arguments have positive real parts,
+then summed backwards and forwards. Consequently reciprocal-gamma poles
+contribute zero coefficients, rather than making the function undefined.
+In particular, `L_(-m-1/2)(z) = I_(m+1/2)(z)` for integers `m >= 0`.
+Nearby orders retain their small, non-zero coefficients. Complex gamma factors
+use a private shifted Stirling expansion with a remainder bound, based on
+[DLMF 5.11](https://dlmf.nist.gov/5.11); they do not pass through fixed-precision
+complex gamma dispatch.
+
+At `z = 0`, the result is zero for `Re(order) > -1` and real orders
+`-3/2, -5/2, ...`; real order `-1` gives `2/pi`. Other zero limits return NaN,
+including divergent real cases and oscillatory complex cases.
+
+Numerical coverage is restricted to finite inputs with `abs(order) <= 1000`
+and `abs(argument) <= 1000`. Work precision adds 96 guard bits plus
+`ceil(4*(abs(order)+abs(argument)))`, with extra bits for the distance of
+non-positive orders from half-integers. Work above 65536 bits is rejected.
+The forward sum is limited to series index 20000. A decreasing ratio bounds
+the remaining tail, and the absolute term sum checks whether cancellation
+has consumed the guard precision. Failure of these checks, unresolved zeros,
+or exponent overflow/underflow returns NaN. There is no scaled or asymptotic
+large-argument evaluator, and the finite input bounds do not guarantee that
+every point passes the numerical guards.
+
+```c
+NUM_SCOPE(scope);
+number_t value = num_struve_l(NUM_ZERO, NUM_ONE);
+num_printf("L_0(1) = %.16n\n", value);
+```
+
+```text
+L_0(1) = 0.7102431859378909
+```
 
 ### Exact Integer and Number-Theory Functions
 

@@ -268,6 +268,127 @@ excluded and return NaN. In the central strip, order one is
 argument gives `(-1)^n*Cl_(n-1)(z)`. Order zero and non-finite inputs return
 NaN. `qc_clausen2` uses the same branch and domain for order two.
 
+### Bessel Y
+
+`qc_bessel_y(order, argument)` evaluates the principal Bessel function of
+the second kind for real or complex orders and arguments, including Y₀.
+It uses the [native arbitrary-precision evaluator](number.md#bessel-y),
+then rounds the real and imaginary components to qfloat precision.
+The branch is `-pi < arg(z) <= pi`; an exactly negative real argument
+takes the upper-bank value, including a negative imaginary zero.
+Values approaching the cut from below retain their lower-bank limit.
+Negative integer orders obey `Y_-n(z) = (-1)^n*Y_n(z)`.
+
+Negative half-integer orders return zero at the origin; other zero limits,
+including Y₀, return NaN. Order magnitudes must be at most 1000.
+Non-integer orders or genuinely complex arguments also require argument
+magnitude at most 1000. Larger real arguments are supported for integer
+orders. Non-finite inputs and exhausted numerical guards return NaN.
+The shared evaluator limits work precision to 65536 bits and series to
+20000 terms; unscaled output remains subject to qfloat's exponent range.
+
+```c
+qcomplex_t value = qc_bessel_y(QC_ZERO, QC_ONE);
+printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+```
+
+```text
+Y_0(1) = 0.088256964215677 + 0i
+```
+
+### Modified Bessel I
+
+`qc_bessel_i(order, argument)` evaluates the principal modified Bessel
+function of the first kind for complex orders and arguments. Order zero
+selects `I_0(z)`. The leading power `(z/2)^order` uses
+`-pi < arg(z) <= pi`; an exactly negative real argument takes the upper-bank
+value, including negative imaginary zero. Approaching from below gives the
+lower-bank limit. Integral orders have no cut and satisfy `I_-n(z) = I_n(z)`.
+See [DLMF 10.25.2](https://dlmf.nist.gov/10.25.E2).
+
+At zero, order zero gives one, `Re(order) > 0` and negative integer orders
+give zero, and other orders return NaN, including non-zero imaginary orders.
+The [number-layer kernel](number.md#modified-bessel-i) preserves complex
+coefficient precision before rounding to qcomplex. It shares its gamma and
+series machinery with Struve L and accepts input magnitudes at most 1000.
+Work above 65536 bits, series beyond index 20000, non-finite inputs,
+undefined zero limits and exhausted numerical guards return NaN. Results
+are unscaled and conversion remains subject to qfloat's exponent range;
+there is no asymptotic large-argument implementation.
+
+```c
+qcomplex_t bessel = qc_bessel_i(QC_ZERO, QC_ONE);
+qc_printf("I_0(1) = %.16z\n", bessel);
+```
+
+```text
+I_0(1) = 1.2660658777520083
+```
+
+### Ordinary Struve H
+
+`qc_struve_h(order, argument)` accepts finite complex orders and arguments
+and returns the unscaled principal ordinary Struve function. The leading
+power `(z/2)^(order+1)` uses `-pi < arg(z) <= pi`. Exactly negative real
+arguments use the upper bank, even with negative imaginary zero; approaches
+from below give the lower-bank limit. Integral orders have no branch cut.
+
+The [number-layer kernel](number.md#ordinary-struve-h) evaluates the
+alternating series in [DLMF 11.2.1](https://dlmf.nist.gov/11.2.E1) directly,
+without rotating an argument across a power branch. Orders `-3/2, -5/2, ...`
+retain their non-zero tail after reciprocal-gamma zeros. At zero, the result
+is zero for `Re(order) > -1` and these exceptional half-integers; real order
+`-1` gives `2/pi`. Other zero limits, including oscillatory complex limits,
+return NaN.
+
+Both input magnitudes must be at most 1000. Work above 65536 bits, series
+beyond index 20000, non-finite inputs, unresolved zeros, exhausted numerical
+guards and number-layer exponent overflow/underflow return NaN. Results
+are rounded to complex double-double and remain subject to qfloat's exponent
+range. No scaled or asymptotic kernel is provided, and not every point
+inside the input bounds is guaranteed to pass the numerical guards.
+
+```c
+qcomplex_t ordinary = qc_struve_h(QC_ZERO, QC_ONE);
+qc_printf("H_0(1) = %.15z\n", ordinary);
+```
+
+```text
+H_0(1) = 0.568656627048288
+```
+
+### Modified Struve L
+
+`qc_struve_l(order, argument)` accepts finite complex orders and arguments.
+It evaluates the principal value, with the power `(z/2)^(order+1)` defined
+using `-pi < arg(z) <= pi`. An exactly negative real argument takes the upper
+bank, including an imaginary component of negative zero; approaching from
+below gives the lower-bank limit. Integral orders have no branch cut.
+This convention follows [DLMF 11.2.2](https://dlmf.nist.gov/11.2.E2).
+
+The [number-layer implementation](number.md#modified-struve-l) supplies a
+guarded multiprecision result before conversion to complex double-double.
+Orders `-3/2, -5/2, ...` include the non-zero series tail after the initial
+reciprocal-gamma zeros. At zero the result is zero when `Re(order) > -1` or
+the order is one of these negative half-integers; real order `-1` gives `2/pi`.
+All remaining zero limits, including `Re(order) = -1` with non-zero imaginary
+part, return NaN.
+
+Both input magnitudes must be at most 1000. Non-finite inputs, exhausted
+convergence or cancellation guards, and number-layer exponent overflow or
+underflow return NaN. Conversion of the unscaled result to qcomplex remains
+subject to qfloat's exponent range. No large-argument asymptotic kernel is
+provided. See the number guide for the work-precision and iteration limits.
+
+```c
+qcomplex_t value = qc_struve_l(QC_ZERO, QC_ONE);
+qc_printf("L_0(1) = %.16z\n", value);
+```
+
+```text
+L_0(1) = 0.7102431859378909
+```
+
 ### Utility
 
 | Function | Description |

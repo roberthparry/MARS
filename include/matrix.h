@@ -1445,6 +1445,54 @@ matrix_t *mat_erfcinv(const matrix_t *A);
 matrix_t *mat_gamma(const matrix_t *A);
 /** @brief Apply K_order to a diagonalisable numeric square matrix through spectral functional calculus. */
 matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
+/**
+ * @brief Evaluate the principal modified Bessel matrix function I_order(A), including I_0(A).
+ *
+ * Uses analytic functional calculus for numeric and supported symbolic square matrices, including Jordan blocks.
+ * Integer orders admit zero eigenvalues and satisfy I_-n(A) = I_n(A). Other orders require a nonsingular matrix
+ * whose spectrum lies in an analytic domain of the principal scalar branch. Symbolic bindings are retained.
+ *
+ * @param A Numeric or symbolic square matrix.
+ * @param order Finite real or complex scalar order.
+ * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
+ */
+matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order);
+/**
+ * @brief Evaluate the principal Bessel matrix function Y_order(A), including Y_0(A).
+ *
+ * Uses analytic matrix functional calculus, with Hermite interpolation for numeric matrices and retained bindings
+ * for supported symbolic matrices. Repeated eigenvalues use analytic derivatives, including higher Jordan terms.
+ * The spectrum must avoid zero and lie in an analytic domain of the principal scalar branch.
+ *
+ * @param A Numeric or symbolic nonsingular square matrix; numeric entries must be finite.
+ * @param order Finite real or complex scalar order.
+ * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
+ */
+matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order);
+/**
+ * @brief Evaluate the principal ordinary Struve matrix function H_order(A).
+ *
+ * Uses the alternating analytic matrix series, including Jordan blocks, and retains supported symbolic bindings.
+ * Integer orders at least -1 permit zero eigenvalues. Other orders require a nonsingular matrix whose spectrum
+ * lies in an analytic domain of the principal scalar branch.
+ *
+ * @param A Numeric or symbolic square matrix; numeric entries must be finite.
+ * @param order Finite real or complex scalar order.
+ * @return A newly allocated matrix, or NULL for invalid inputs, unavailable powers or failed convergence.
+ */
+matrix_t *mat_struve_h(const matrix_t *A, const number_t *order);
+/**
+ * @brief Evaluate the principal modified Struve matrix function L_order(A).
+ *
+ * Uses analytic functional calculus, including a matrix power series for repeated eigenvalues and Jordan blocks.
+ * The spectrum must lie in an analytic domain of the scalar branch. Integer orders at least -1 permit zero
+ * eigenvalues; other orders require a nonsingular matrix. Supported symbolic matrices retain their bindings.
+ *
+ * @param A Numeric or symbolic square matrix; numeric entries must be finite.
+ * @param order Finite real or complex scalar order.
+ * @return A newly allocated matrix, or NULL for invalid inputs, unavailable powers or failed convergence.
+ */
+matrix_t *mat_struve_l(const matrix_t *A, const number_t *order);
 matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
 /**

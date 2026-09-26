@@ -21,6 +21,19 @@ matrix_t *mat_number_unary_taylor_from_expr(const matrix_t *A, expr_t *(*build_e
 matrix_t *mat_apply_scalar_callbacks(const matrix_t *A, void (*number_f)(void *, const void *),
                                     void (*expression_f)(void *, const void *));
 
+typedef number_t (*mat_cylindrical_number_fn)(const number_t order, const number_t argument);
+typedef expr_t *(*mat_cylindrical_expression_fn)(const expr_t *order, const expr_t *argument);
+
+/** Evaluate a cylindrical family using shared numeric and symbolic functional calculus. */
+matrix_t *mat_cylindrical_function(const matrix_t *A, const number_t *order, bool struve, bool alternating,
+                                  mat_cylindrical_number_fn number_function,
+                                  mat_cylindrical_expression_fn expression_function);
+
+/** Evaluate a cylindrical function on supported symbolic matrices, retaining their bindings. */
+matrix_t *mat_cylindrical_symbolic(const matrix_t *A, const number_t *order,
+                                  mat_cylindrical_number_fn number_function,
+                                  mat_cylindrical_expression_fn expression_function);
+
 /* ============================================================
    Element kinds
    ============================================================ */
