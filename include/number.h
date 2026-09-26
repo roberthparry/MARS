@@ -1030,6 +1030,37 @@ number_t num_legendre_chi(const number_t order, const number_t number);
 number_t num_bessel_j(const number_t order, const number_t argument);
 /** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
 number_t num_bessel_k(const number_t order, const number_t argument);
+/**
+ * @brief Evaluate principal modified Bessel I, returning an owning number at the widest input precision.
+ *
+ * Supports real and complex orders and arguments, including I_0 and I_-n = I_n for integral n.
+ * The negative real axis takes the upper-bank value. Input magnitudes above 1000, undefined zero limits,
+ * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md.
+ */
+number_t num_bessel_i(const number_t order, const number_t argument);
+/**
+ * @brief Evaluate the principal modified Struve function L_order(argument), returning an owning number.
+ *
+ * Real and complex inputs use guarded multiprecision series, including negative half-integer orders.
+ * The negative real axis takes the upper-bank value. Input magnitudes above 1000, undefined zero limits,
+ * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md for details.
+ */
+number_t num_struve_l(const number_t order, const number_t argument);
+/**
+ * @brief Evaluate principal ordinary Struve H, returning an owning number at the widest input precision.
+ *
+ * Supports complex orders and arguments, including vanishing reciprocal-gamma coefficients at negative
+ * half-integer orders. The negative real axis takes the upper-bank value. Input magnitudes above 1000,
+ * undefined zero limits or exhausted numerical guards return NaN. See docs/number.md for numerical limits.
+ */
+number_t num_struve_h(const number_t order, const number_t argument);
+/**
+ * @brief Evaluate principal Bessel Y, returning an owning number at the widest input precision.
+ *
+ * Supports real and complex inputs, including Y_0 and negative integer orders. At zero argument, negative
+ * half-integer orders return zero; other orders return NaN. Exact negative real arguments take the upper-bank
+ * value. Non-finite inputs, unsupported ranges and exhausted guards return NaN. See docs/number.md.
+ */
 number_t num_bessel_y(const number_t order, const number_t argument);
 number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument);
 number_t num_gammainv(const number_t number);

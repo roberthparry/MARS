@@ -790,10 +790,6 @@ void expr_reverse_bessel_j(const expr_t *dv, const number_t *out_bar, number_t *
     expr_reverse_bessel(dv, out_bar, a_bar, b_bar, num_bessel_j);
 }
 
-void expr_reverse_bessel_y(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
-{
-    expr_reverse_bessel(dv, out_bar, a_bar, b_bar, num_bessel_y);
-}
 
 void expr_reverse_parameter_pack(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {

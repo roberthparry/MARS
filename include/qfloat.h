@@ -1408,10 +1408,41 @@ qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
 
 /** @brief Bessel function of the first kind J_order(argument), for real order. */
 qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
+/**
+ * @brief Evaluate the real modified Bessel function I_order(argument), including I_0.
+ *
+ * Negative arguments require integral order, and I_-n = I_n for integral n. Finite inputs with magnitudes
+ * at most 1000 are supported. Undefined zero limits and exhausted numerical guards return NaN.
+ * See docs/qfloat.md for precision and range limits.
+ */
+qfloat_t qf_bessel_i(qfloat_t order, qfloat_t argument);
 /** @brief Modified Bessel K for real order and positive argument; unsupported ranges return NaN. */
 qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
 
-/** @brief Bessel function of the second kind Y_order(argument), for real order. */
+/**
+ * @brief Evaluate the real modified Struve function L_order(argument).
+ *
+ * Negative arguments require integral order. Finite inputs with magnitudes at most 1000 are supported;
+ * singular zero limits, non-real results and exhausted numerical guards return NaN. Negative half-integer
+ * orders include their vanishing reciprocal-gamma coefficients. See docs/qfloat.md for numerical limits.
+ */
+qfloat_t qf_struve_l(qfloat_t order, qfloat_t argument);
+/**
+ * @brief Evaluate the real ordinary Struve function H_order(argument).
+ *
+ * Negative arguments require integral order. Negative half-integer orders include their vanishing
+ * reciprocal-gamma coefficients. Input magnitudes above 1000, undefined zero limits and exhausted
+ * numerical guards return NaN. See docs/qfloat.md for precision and range limits.
+ */
+qfloat_t qf_struve_h(qfloat_t order, qfloat_t argument);
+
+/**
+ * @brief Evaluate Bessel Y_order(argument) for real order and non-negative argument, including Y_0.
+ *
+ * Guarded multiprecision evaluation is rounded to qfloat. Negative half-integer orders return zero at the
+ * origin. Other zero limits, negative arguments, non-finite inputs and exhausted guards return NaN.
+ * See docs/qfloat.md for numerical range limits.
+ */
 qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
 
 /**

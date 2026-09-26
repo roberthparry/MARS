@@ -17,9 +17,8 @@ static void assert_number_close_text(const char *label, number_t got, const char
     printf("    want = %s\n", want_text);
     printf("    tolerance = %s\n", tolerance_text);
     printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
-    ASSERT_TRUE(num_lt(error, tolerance));
-
     string_free(error_text);
+    ASSERT_TRUE(num_lt(error, tolerance));
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
@@ -38,10 +37,9 @@ static void assert_number_close_number(const char *label, number_t got, number_t
     printf("    want = %s\n", want_text ? string_c_str(want_text) : "(num_to_string failed)");
     printf("    tolerance = %s\n", tolerance_text);
     printf("    error    = %s\n\n", error_text ? string_c_str(error_text) : "(num_to_string failed)");
-    ASSERT_TRUE(num_lt(error, tolerance));
-
     string_free(error_text);
     string_free(want_text);
+    ASSERT_TRUE(num_lt(error, tolerance));
     num_destroy(&tolerance);
     num_destroy(&error);
     num_destroy(&diff);
@@ -144,11 +142,328 @@ static void test_number_clausen(void)
     ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
 }
 
+static void restore_modified_test_precision(size_t *precision)
+{
+    (void)num_set_default_prec_bits(*precision);
+}
+
+static void test_number_bessel_i(void)
+{
+    NUM_SCOPE(scope);
+    __attribute__((cleanup(restore_modified_test_precision))) size_t saved_precision = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_digits(90u), 0);
+    size_t precision = num_get_default_prec_bits();
+    number_t x = num_create_from_string("1.25");
+    number_t pi = num_const_prec(NUM_PI, precision);
+    number_t scale = num_sqrt(num_div(NUM_TWO, num_mul(pi, x)));
+    number_t half = num_create_from_frac(1, 2);
+    number_t value = num_bessel_i(half, x);
+    ASSERT_TRUE(num_get_prec_bits(value) >= precision);
+    assert_number_close_number("80-digit Bessel I_1/2", value, num_mul(scale, num_sinh(x)), "1e-80");
+    assert_number_close_number("80-digit Bessel I_-1/2", num_bessel_i(num_neg(half), x),
+                               num_mul(scale, num_cosh(x)), "1e-80");
+    assert_number_close_number("80-digit Bessel I0/I1 Wronskian",
+                               num_add(num_mul(num_bessel_i(NUM_ZERO, x), num_bessel_k(NUM_ONE, x)),
+                                       num_mul(num_bessel_i(NUM_ONE, x), num_bessel_k(NUM_ZERO, x))),
+                               num_div(NUM_ONE, x), "1e-80");
+    assert_number_close_number("80-digit I0 imaginary-axis cancellation",
+                               num_bessel_i(NUM_ZERO, num_create_from_string("80i")),
+                               num_bessel_j(NUM_ZERO, num_create_from_long(80)), "1e-80");
+    number_t complex_z = num_create_from_string("1.25 + 0.75i");
+    for (long n = 0; n <= 6; ++n) {
+        number_t order = num_create_from_long(n);
+        number_t positive = num_bessel_i(order, complex_z);
+        assert_number_close_number("80-digit I_-n = I_n", num_bessel_i(num_neg(order), complex_z),
+                                   positive, "1e-80");
+        assert_number_close_number("80-digit integral Bessel I parity", num_bessel_i(order, num_neg(complex_z)),
+                                   n % 2 ? num_neg(positive) : positive, "1e-80");
+        ASSERT_TRUE(num_eq(num_bessel_i(num_neg(order), NUM_ZERO), n ? NUM_ZERO : NUM_ONE));
+    }
+    /* A 10^120 denominator exceeds the 90-digit rational budget. Keep construction and evaluation
+     * at 160 digits so the displacement survives before the guarded kernel receives the order. */
+    ASSERT_EQ_INT(num_set_default_prec_digits(160u), 0);
+    number_t epsilon = num_pow_int(num_create_from_long(10), -120);
+    number_t tiny = num_create_from_string("1e-100");
+    number_t above_order = num_add(NUM_NEG_ONE, epsilon);
+    number_t below_order = num_sub(NUM_NEG_ONE, epsilon);
+    ASSERT_TRUE(num_is_exact(epsilon));
+    ASSERT_TRUE(num_is_exact(above_order) && num_is_exact(below_order));
+    ASSERT_TRUE(num_eq(num_sub(above_order, NUM_NEG_ONE), epsilon));
+    ASSERT_TRUE(num_eq(num_sub(NUM_NEG_ONE, below_order), epsilon));
+    number_t leading = num_div(num_mul(NUM_TWO, epsilon), tiny);
+    assert_number_close_number("Bessel I near negative integer retains first coefficient",
+                               num_div(num_bessel_i(above_order, tiny), leading), NUM_ONE, "1e-75");
+    assert_number_close_number("Bessel I opposite side of negative integer",
+                               num_div(num_bessel_i(below_order, tiny), leading), NUM_NEG_ONE, "1e-75");
+    ASSERT_EQ_INT(num_set_default_prec_bits(precision), 0);
+
+    number_t nu = num_create_from_string("0.25 + 0.375i");
+    number_t small_z = num_create_from_string("1e-60");
+    number_t left = num_bessel_i(nu, small_z);
+    number_t right = num_bessel_i(num_neg(nu), small_z);
+    number_t pi_nu = num_mul(pi, nu);
+    ASSERT_TRUE(num_get_prec_bits(left) >= precision);
+    /* Gamma reflection yields an elementary reference; omitted terms are O(z^2). */
+    assert_number_close_number("80-digit complex-order Bessel I gamma reflection", num_mul(left, right),
+                               num_div(num_sin(pi_nu), pi_nu), "1e-80");
+    number_t complex_value = num_bessel_i(nu, complex_z);
+    assert_number_close_number("80-digit Bessel I complex-order recurrence",
+                               num_sub(num_bessel_i(num_sub(nu, NUM_ONE), complex_z),
+                                       num_bessel_i(num_add(nu, NUM_ONE), complex_z)),
+                               num_mul(num_div(num_mul(NUM_TWO, nu), complex_z), complex_value), "1e-80");
+    assert_number_close_number("80-digit Bessel I conjugation", num_bessel_i(num_conj(nu), num_conj(complex_z)),
+                               num_conj(complex_value), "1e-80");
+    number_t phase = num_exp(num_mul(num_create_from_string("i"), pi_nu));
+    number_t positive = num_bessel_i(nu, x);
+    assert_number_close_number("80-digit Bessel I upper bank", num_bessel_i(nu, num_neg(x)),
+                               num_mul(phase, positive), "1e-80");
+    number_t below_cut = num_sub(num_neg(x), num_create_from_string("1e-85i"));
+    assert_number_close_number("80-digit Bessel I lower bank", num_bessel_i(nu, below_cut),
+                               num_div(positive, phase), "1e-80");
+    number_t backends[] = {num_create_from_double(1.0), num_create_from_qfloat(QF_ONE),
+                           num_create_from_qcomplex(QC_ONE), num_create_from_long(1), num_create_from_frac(1, 1)};
+    for (size_t k = 0; k < sizeof(backends) / sizeof(backends[0]); ++k) {
+        number_t result = num_bessel_i(num_create_from_qfloat(QF_ZERO), backends[k]);
+        assert_number_close_text("I0 backend promotion", result, "1.2660658777520083355982446252147175", "1e-28");
+        ASSERT_TRUE(num_is_real(result));
+        ASSERT_TRUE(num_eq(backends[k], NUM_ONE));
+    }
+    ASSERT_TRUE(num_is_zero(num_bessel_i(nu, NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(num_create_from_string("i"), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(num_neg(half), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(NUM_NAN, x)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(NUM_ZERO, NUM_INF)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(num_create_from_long(1001), x)));
+    ASSERT_TRUE(num_is_nan(num_bessel_i(NUM_ZERO, num_create_from_long(1001))));
+    ASSERT_TRUE(num_eq(nu, num_create_from_string("0.25 + 0.375i")));
+    ASSERT_TRUE(num_eq(x, num_create_from_string("1.25")));
+    ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
+}
+
+static void test_number_struve_l(void)
+{
+    NUM_SCOPE(scope);
+    __attribute__((cleanup(restore_modified_test_precision))) size_t saved_precision = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_digits(90u), 0);
+    size_t precision = num_get_default_prec_bits();
+    number_t x = num_create_from_string("1.25");
+    number_t pi = num_const_prec(NUM_PI, precision);
+    number_t scale = num_sqrt(num_div(NUM_TWO, num_mul(pi, x)));
+    number_t minus_half = num_create_from_frac(-1, 2);
+    number_t minus_three_halves = num_create_from_frac(-3, 2);
+    number_t actual = num_struve_l(minus_half, x);
+    ASSERT_TRUE(num_get_prec_bits(actual) >= precision);
+    assert_number_close_number("80-digit Struve L_-1/2", actual, num_mul(scale, num_sinh(x)), "1e-80");
+    assert_number_close_number("80-digit Struve L_1/2", num_struve_l(NUM_HALF, x),
+                               num_mul(scale, num_sub(num_cosh(x), NUM_ONE)), "1e-80");
+    number_t previous = num_mul(scale, num_sinh(x));
+    number_t current = num_mul(scale, num_sub(num_cosh(x), num_div(num_sinh(x), x)));
+    for (long j = 1; j <= 6; ++j) {
+        number_t alpha = num_create_from_frac(2 * j + 1, 2);
+        number_t value = num_struve_l(num_neg(alpha), x);
+        assert_number_close_number("80-digit negative half-integer Struve L", value, current, "1e-80");
+        number_t next = num_sub(previous, num_mul(num_div(num_mul(NUM_TWO, alpha), x), current));
+        previous = current;
+        current = next;
+    }
+
+    /* A tiny displacement from a reciprocal-gamma zero dominates at a sufficiently small argument.
+     * Its 10^120 denominator needs a larger rational budget than the surrounding 90-digit checks. */
+    ASSERT_EQ_INT(num_set_default_prec_digits(160u), 0);
+    number_t epsilon = num_pow_int(num_create_from_long(10), -120);
+    number_t tiny = num_create_from_string("1e-100");
+    number_t near_order = num_add(minus_three_halves, epsilon);
+    number_t below_order = num_sub(minus_three_halves, epsilon);
+    ASSERT_TRUE(num_is_exact(epsilon));
+    ASSERT_TRUE(num_is_exact(near_order) && num_is_exact(below_order));
+    ASSERT_TRUE(num_eq(num_sub(near_order, minus_three_halves), epsilon));
+    ASSERT_TRUE(num_eq(num_sub(minus_three_halves, below_order), epsilon));
+    number_t leading = num_mul(num_mul(epsilon, num_sqrt(num_div(NUM_TWO, tiny))),
+                               num_div(NUM_TWO, num_sqrt(pi)));
+    number_t near_value = num_struve_l(near_order, tiny);
+    assert_number_close_number("near gamma zero keeps the non-vanishing first term",
+                               num_div(near_value, leading), NUM_ONE, "1e-75");
+    number_t below = num_struve_l(below_order, tiny);
+    assert_number_close_number("opposite side of gamma zero has the correct sign",
+                               num_div(below, leading), NUM_NEG_ONE, "1e-75");
+    ASSERT_TRUE(num_gt(num_struve_l(minus_three_halves, tiny), NUM_ZERO));
+    ASSERT_EQ_INT(num_set_default_prec_bits(precision), 0);
+
+    /* Gamma reflection supplies an independent elementary reference for genuinely complex orders.
+     * Dividing by z keeps this a relative check: the neglected Struve terms are O(z^2). */
+    number_t nu = num_create_from_string("0.25 + 0.375i");
+    number_t z = num_create_from_string("1e-60");
+    number_t b = num_add(nu, NUM_ONE_AND_HALF);
+    number_t partner = num_sub(NUM_NEG_ONE, nu);
+    number_t left = num_struve_l(nu, z);
+    number_t right = num_struve_l(partner, z);
+    number_t reflection = num_div(num_mul(NUM_TWO, num_sin(num_mul(pi, b))),
+                                 num_mul(num_sub(NUM_ONE, b), num_mul(pi, pi)));
+    ASSERT_TRUE(num_get_prec_bits(left) >= precision);
+    ASSERT_TRUE(num_get_prec_bits(right) >= precision);
+    assert_number_close_number("80-digit complex-order Struve gamma reflection",
+                               num_div(num_mul(left, right), z), reflection, "1e-80");
+    number_t complex_z = num_create_from_string("1.25 + 0.75i");
+    number_t complex_value = num_struve_l(nu, complex_z);
+    ASSERT_TRUE(num_get_prec_bits(complex_value) >= precision);
+    assert_number_close_number("80-digit Struve complex-order conjugation",
+                               num_struve_l(num_conj(nu), num_conj(complex_z)), num_conj(complex_value), "1e-80");
+    number_t imaginary_pi = num_mul(num_create_from_string("i"), pi);
+    number_t phase = num_exp(num_mul(imaginary_pi, num_add(nu, NUM_ONE)));
+    number_t positive = num_struve_l(nu, x);
+    assert_number_close_number("80-digit Struve upper bank", num_struve_l(nu, num_neg(x)),
+                               num_mul(phase, positive), "1e-80");
+    number_t cut_offset = num_create_from_string("1e-85i");
+    assert_number_close_number("80-digit Struve lower bank", num_struve_l(nu, num_sub(num_neg(x), cut_offset)),
+                               num_div(positive, phase), "1e-80");
+
+    /* The imaginary axis makes the defining series alternate, exercising cancellation guards. */
+    number_t imaginary_z = num_create_from_string("80i");
+    number_t imaginary_scale = num_sqrt(num_div(NUM_TWO, num_mul(pi, imaginary_z)));
+    assert_number_close_number("80-digit Struve imaginary-axis cancellation",
+                               num_struve_l(minus_half, imaginary_z),
+                               num_mul(imaginary_scale, num_sinh(imaginary_z)), "1e-80");
+    number_t backends[] = {num_create_from_double(1.0), num_create_from_qfloat(QF_ONE),
+                           num_create_from_qcomplex(QC_ONE), num_create_from_long(1),
+                           num_create_from_frac(1, 1)};
+    for (size_t k = 0; k < sizeof(backends) / sizeof(backends[0]); ++k) {
+        number_t value = num_struve_l(num_create_from_qfloat(QF_ZERO), backends[k]);
+        assert_number_close_text("Struve L backend promotion", value,
+                                 "0.7102431859378908887385266778116507", "1e-28");
+        ASSERT_TRUE(num_is_real(value));
+        ASSERT_TRUE(num_eq(backends[k], NUM_ONE));
+    }
+    assert_number_close_number("Struve L_-1(0)", num_struve_l(NUM_NEG_ONE, NUM_ZERO),
+                               num_div(NUM_TWO, pi), "1e-80");
+    ASSERT_TRUE(num_is_zero(num_struve_l(minus_three_halves, NUM_ZERO)));
+    ASSERT_TRUE(num_is_zero(num_struve_l(nu, NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(num_create_from_string("-1 + i"), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(num_create_from_long(-2), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(NUM_NAN, x)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(NUM_ZERO, NUM_INF)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(num_create_from_long(1001), x)));
+    ASSERT_TRUE(num_is_nan(num_struve_l(NUM_ZERO, num_create_from_long(1001))));
+    ASSERT_TRUE(num_eq(nu, num_create_from_string("0.25 + 0.375i")));
+    ASSERT_TRUE(num_eq(x, num_create_from_string("1.25")));
+    ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
+}
+
+static void test_number_struve_h(void)
+{
+    NUM_SCOPE(scope);
+    __attribute__((cleanup(restore_modified_test_precision))) size_t saved_precision = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_digits(90u), 0);
+    size_t precision = num_get_default_prec_bits();
+    number_t x = num_create_from_string("1.25");
+    number_t pi = num_const_prec(NUM_PI, precision);
+    number_t scale = num_sqrt(num_div(NUM_TWO, num_mul(pi, x)));
+    number_t minus_half = num_create_from_frac(-1, 2);
+    number_t minus_three_halves = num_create_from_frac(-3, 2);
+    number_t actual = num_struve_h(minus_half, x);
+    ASSERT_TRUE(num_get_prec_bits(actual) >= precision);
+    assert_number_close_number("80-digit H_-1/2", actual, num_mul(scale, num_sin(x)), "1e-80");
+    assert_number_close_number("80-digit H_1/2", num_struve_h(NUM_HALF, x),
+                               num_mul(scale, num_sub(NUM_ONE, num_cos(x))), "1e-80");
+    number_t previous = num_mul(scale, num_sin(x));
+    number_t current = num_mul(scale, num_sub(num_cos(x), num_div(num_sin(x), x)));
+    for (long j = 1; j <= 6; ++j) {
+        number_t alpha = num_create_from_frac(2 * j + 1, 2);
+        assert_number_close_number("80-digit H negative half-integer", num_struve_h(num_neg(alpha), x),
+                                   current, "1e-80");
+        number_t next = num_sub(num_neg(previous), num_mul(num_div(num_mul(NUM_TWO, alpha), x), current));
+        previous = current;
+        current = next;
+    }
+
+    /* Retain the exact 10^120 denominator throughout construction and evaluation. */
+    ASSERT_EQ_INT(num_set_default_prec_digits(160u), 0);
+    number_t epsilon = num_pow_int(num_create_from_long(10), -120);
+    number_t tiny = num_create_from_string("1e-100");
+    number_t near_order = num_add(minus_three_halves, epsilon);
+    number_t below_order = num_sub(minus_three_halves, epsilon);
+    ASSERT_TRUE(num_is_exact(epsilon));
+    ASSERT_TRUE(num_is_exact(near_order) && num_is_exact(below_order));
+    ASSERT_TRUE(num_eq(num_sub(near_order, minus_three_halves), epsilon));
+    ASSERT_TRUE(num_eq(num_sub(minus_three_halves, below_order), epsilon));
+    number_t leading = num_mul(num_mul(epsilon, num_sqrt(num_div(NUM_TWO, tiny))),
+                               num_div(NUM_TWO, num_sqrt(pi)));
+    assert_number_close_number("H near reciprocal-gamma zero retains the first term",
+                               num_div(num_struve_h(near_order, tiny), leading), NUM_ONE, "1e-75");
+    assert_number_close_number("H opposite side of reciprocal-gamma zero",
+                               num_div(num_struve_h(below_order, tiny), leading), NUM_NEG_ONE, "1e-75");
+    ASSERT_TRUE(num_lt(num_struve_h(minus_three_halves, tiny), NUM_ZERO));
+    ASSERT_EQ_INT(num_set_default_prec_bits(precision), 0);
+
+    /* Independent complex gamma reflection reference; neglected terms are O(z^2). */
+    number_t nu = num_create_from_string("0.25 + 0.375i");
+    number_t z = num_create_from_string("1e-60");
+    number_t b = num_add(nu, NUM_ONE_AND_HALF);
+    number_t partner = num_sub(NUM_NEG_ONE, nu);
+    number_t left = num_struve_h(nu, z);
+    number_t right = num_struve_h(partner, z);
+    number_t reflection = num_div(num_mul(NUM_TWO, num_sin(num_mul(pi, b))),
+                                 num_mul(num_sub(NUM_ONE, b), num_mul(pi, pi)));
+    ASSERT_TRUE(num_get_prec_bits(left) >= precision);
+    ASSERT_TRUE(num_get_prec_bits(right) >= precision);
+    assert_number_close_number("80-digit H complex-order gamma reflection",
+                               num_div(num_mul(left, right), z), reflection, "1e-80");
+    number_t complex_z = num_create_from_string("1.25 + 0.75i");
+    number_t complex_value = num_struve_h(nu, complex_z);
+    ASSERT_TRUE(num_get_prec_bits(complex_value) >= precision);
+    assert_number_close_number("80-digit H complex-order conjugation",
+                               num_struve_h(num_conj(nu), num_conj(complex_z)), num_conj(complex_value), "1e-80");
+    number_t phase = num_exp(num_mul(num_mul(num_create_from_string("i"), pi), num_add(nu, NUM_ONE)));
+    number_t positive = num_struve_h(nu, x);
+    assert_number_close_number("80-digit H upper bank", num_struve_h(nu, num_neg(x)),
+                               num_mul(phase, positive), "1e-80");
+    number_t cut_offset = num_create_from_string("1e-85i");
+    assert_number_close_number("80-digit H lower bank", num_struve_h(nu, num_sub(num_neg(x), cut_offset)),
+                               num_div(positive, phase), "1e-80");
+    const char *points[] = {"1.25 + 0.75i", "-1.25 + 0.75i", "-1.25 - 0.75i", "1.25 - 0.75i"};
+    for (size_t k = 0; k < sizeof(points) / sizeof(points[0]); ++k) {
+        number_t point = num_create_from_string(points[k]);
+        number_t factor = num_sqrt(num_div(NUM_TWO, num_mul(pi, point)));
+        assert_number_close_number("80-digit H complex half-order branch", num_struve_h(minus_half, point),
+                                   num_mul(factor, num_sin(point)), "1e-80");
+        assert_number_close_number("80-digit H complex exceptional order", num_struve_h(minus_three_halves, point),
+                                   num_mul(factor, num_sub(num_cos(point), num_div(num_sin(point), point))), "1e-80");
+    }
+    number_t large = num_create_from_long(80);
+    number_t large_scale = num_sqrt(num_div(NUM_TWO, num_mul(pi, large)));
+    assert_number_close_number("80-digit H real-axis cancellation", num_struve_h(minus_half, large),
+                               num_mul(large_scale, num_sin(large)), "1e-80");
+    number_t backends[] = {num_create_from_double(1.0), num_create_from_qfloat(QF_ONE),
+                           num_create_from_qcomplex(QC_ONE), num_create_from_long(1), num_create_from_frac(1, 1)};
+    number_t reference = num_struve_h(NUM_ZERO, NUM_ONE);
+    for (size_t k = 0; k < sizeof(backends) / sizeof(backends[0]); ++k) {
+        number_t value = num_struve_h(num_create_from_qfloat(QF_ZERO), backends[k]);
+        assert_number_close_number("H backend promotion", value, reference, "1e-28");
+        ASSERT_TRUE(num_is_real(value));
+        ASSERT_TRUE(num_eq(backends[k], NUM_ONE));
+    }
+    assert_number_close_number("H_-1(0)", num_struve_h(NUM_NEG_ONE, NUM_ZERO), num_div(NUM_TWO, pi), "1e-80");
+    ASSERT_TRUE(num_is_zero(num_struve_h(minus_three_halves, NUM_ZERO)));
+    ASSERT_TRUE(num_is_zero(num_struve_h(nu, NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(num_create_from_string("-1 + i"), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(num_create_from_long(-2), NUM_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(NUM_NAN, x)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(NUM_ZERO, NUM_INF)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(num_create_from_long(1001), x)));
+    ASSERT_TRUE(num_is_nan(num_struve_h(NUM_ZERO, num_create_from_long(1001))));
+    ASSERT_TRUE(num_eq(nu, num_create_from_string("0.25 + 0.375i")));
+    ASSERT_TRUE(num_eq(x, num_create_from_string("1.25")));
+    ASSERT_EQ_INT(num_get_default_prec_bits(), precision);
+}
+
 void run_number_special_function_tests(void)
 {
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     test_number_clausen();
+    TEST_RUN_SUBTEST(test_number_struve_l, "number,struve,precision");
+    TEST_RUN_SUBTEST(test_number_struve_h, "number,struve,precision");
+    TEST_RUN_SUBTEST(test_number_bessel_i, "number,bessel,precision");
+    TEST_RUN_SUBTEST(run_number_bessel_y_tests, "number,bessel-y,precision");
 
     {
         number_t zero = num_create_from_string("0");

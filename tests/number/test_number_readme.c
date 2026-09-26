@@ -139,10 +139,47 @@ static void number_readme_complex_example(void)
     ASSERT_EQ_INT(num_set_default_prec_digits(saved_digits), 0);
 }
 
+static void number_readme_struve_l_example(void)
+{
+    /* README example: modified Struve L (docs/number.md). */
+    NUM_SCOPE(scope);
+    number_t value = num_struve_l(NUM_ZERO, NUM_ONE);
+    num_printf("L_0(1) = %.16n\n", value);
+    char output[80];
+    num_sprintf(output, sizeof(output), "L_0(1) = %.16n", value);
+    ASSERT_TRUE(strcmp(output, "L_0(1) = 0.7102431859378909") == 0);
+}
+
+static void number_readme_bessel_i_example(void)
+{
+    /* README example: modified Bessel I (docs/number.md). */
+    NUM_SCOPE(scope);
+    number_t bessel = num_bessel_i(NUM_ZERO, NUM_ONE);
+    num_printf("I_0(1) = %.16n\n", bessel);
+    char output[80];
+    num_sprintf(output, sizeof(output), "I_0(1) = %.16n", bessel);
+    ASSERT_TRUE(strcmp(output, "I_0(1) = 1.266065877752008") == 0);
+}
+
+static void number_readme_struve_h_example(void)
+{
+    /* README example: ordinary Struve H (docs/number.md). */
+    NUM_SCOPE(scope);
+    number_t ordinary = num_struve_h(NUM_ZERO, NUM_ONE);
+    num_printf("H_0(1) = %.15n\n", ordinary);
+    char output[80];
+    num_sprintf(output, sizeof(output), "H_0(1) = %.15n", ordinary);
+    ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0);
+}
+
 void run_number_readme_example_tests(void)
 {
     number_readme_rational_basic();
     number_readme_binomial_cardinality();
     number_readme_multiprecision_example();
     number_readme_complex_example();
+    number_readme_struve_l_example();
+    number_readme_bessel_i_example();
+    number_readme_struve_h_example();
+    run_number_bessel_y_readme_tests();
 }

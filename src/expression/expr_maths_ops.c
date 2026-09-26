@@ -4739,19 +4739,6 @@ const expr_ops_t ops_bessel_j = {.eval = eval_bessel_j,
                                  .integrate = expr_integrate_dispatch_primitive,
                                  .simplify = expr_simplify_binary_operator,
                                  .fold_const_unary = NULL};
-const expr_ops_t ops_bessel_y = {.eval = eval_bessel_y,
-                                 .deriv = deriv_bessel_y,
-                                 .reverse = expr_reverse_bessel_y,
-                                 .kind = EXPR_KIND_BESSEL_Y,
-                                 .arity = EXPR_OP_BINARY,
-                                 .expression_name = "BesselY",
-                                 .function_name = "bessely",
-                                 .TeX_name = "Y",
-                                 .apply_unary = NULL,
-                                 .apply_binary = expr_bessel_y,
-                                 .integrate = expr_integrate_dispatch_primitive,
-                                 .simplify = expr_simplify_binary_operator,
-                                 .fold_const_unary = NULL};
 const expr_ops_t ops_lommel_s = {.eval = eval_lommel_s,
                                  .deriv = deriv_lommel_s,
                                  .reverse = expr_reverse_lommel_s,
@@ -5834,10 +5821,6 @@ expr_t *expr_legendre_chi(unsigned int order, const expr_t *a)
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)
 {
     return expr_math_wrap_binary(&ops_bessel_j, order, argument);
-}
-expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)
-{
-    return expr_math_wrap_binary(&ops_bessel_y, order, argument);
 }
 
 expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)

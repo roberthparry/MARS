@@ -881,7 +881,9 @@
         "test_reverse_lauricella_variables": true,
         "test_reverse_matches_symbolic_composite": true,
         "test_reverse_qdigamma_arguments": true,
-        "test_reverse_special_function_arguments": true
+        "test_reverse_special_function_arguments": true,
+        "test_reverse_modified_cylindrical_arguments": true,
+        "test_reverse_bessel_y_complex_arguments": true
       }
     }
   },
@@ -1301,7 +1303,11 @@
     "readme_examples": {
       "enabled": true,
       "test_readme_example_hermitian_eigendecomposition": true,
-      "test_readme_example_string_quantum": true
+      "test_readme_example_string_quantum": true,
+      "test_readme_example_bessel_i": true,
+      "test_readme_example_struve_l": true,
+      "test_readme_example_bessel_y": true,
+      "test_readme_example_struve_h": true
     },
     "tests": {
       "enabled": true,
@@ -1493,7 +1499,20 @@
     "test_mat_typeof": true,
     "test_matrix_function_structure_preservation": true,
     "test_number_function_matrix_parity": true,
-    "test_number_matrix_functions": true
+    "test_number_matrix_functions": true,
+    "test_mat_bessel_i_nilpotent": true,
+    "test_mat_bessel_i_numeric": true,
+    "test_mat_cylindrical_symbolic": true,
+    "test_mat_struve_l_diagonal": true,
+    "test_mat_struve_l_invalid": true,
+    "test_mat_struve_l_jordan": true,
+    "test_mat_struve_l_nondiagonal": true,
+    "test_mat_bessel_y_invalid": true,
+    "test_mat_bessel_y_jordan": true,
+    "test_mat_bessel_y_numeric": true,
+    "test_mat_ordinary_cylindrical_symbolic": true,
+    "test_mat_struve_h_nilpotent": true,
+    "test_mat_struve_h_numeric": true
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_printf_smoke": true,
@@ -1554,10 +1573,25 @@
       }
     }
   },
+  "tests/number/test_number_special_functions.c": {
+    "tests": {
+      "enabled": true,
+      "run_number_special_function_tests": {
+        "enabled": true,
+        "test_number_bessel_i": true,
+        "test_number_struve_l": true,
+        "run_number_bessel_y_tests": true,
+        "test_number_struve_h": true
+      }
+    }
+  },
   "tests/qcomplex/test_qcomplex.c": {
     "readme_examples": {
       "enabled": true,
-      "example_euler_identity": true
+      "example_euler_identity": true,
+      "example_bessel_i": true,
+      "example_struve_l": true,
+      "example_struve_h": true
     },
     "tests": {
       "enabled": true,
@@ -1591,7 +1625,10 @@
         "test_lambert_wn": true,
         "test_normal": true,
         "test_polylog": true,
-        "test_productlog": true
+        "test_productlog": true,
+        "test_bessel_i": true,
+        "test_struve_l": true,
+        "test_struve_h": true
       },
       "test_trig_group": {
         "enabled": true,
@@ -1807,7 +1844,10 @@
         "enabled": true,
         "test_qf_bessel_half_order_identities": true,
         "test_qf_bessel_integer_order_values": true,
-        "test_qf_bessel_order_recurrence": true
+        "test_qf_bessel_order_recurrence": true,
+        "test_qf_bessel_i": true,
+        "test_qf_struve_l": true,
+        "test_qf_struve_h": true
       },
       "test_gammainc_Ei_E1": {
         "enabled": true,

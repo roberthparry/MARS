@@ -1326,8 +1326,138 @@ static void test_trig_group(void)
     TEST_RUN_SUBTEST(test_hyperbolic, NULL);
 }
 
+static void test_bessel_i(void)
+{
+    qcomplex_t points[] = {qcz(1.25, 0.75), qcz(-1.25, 0.75), qcz(-1.25, -0.75), qci(3.0)};
+    for (size_t k = 0; k < sizeof(points) / sizeof(points[0]); ++k) {
+        qcomplex_t z = points[k];
+        qcomplex_t scale = qc_sqrt(qc_div(qcr(2.0), qc_mul(qc_make(QF_PI, QF_ZERO), z)));
+        check_qc("I_1/2 complex identity", qc_bessel_i(qcr(0.5), z), qc_mul(scale, qc_sinh(z)), 1e-27);
+        check_qc("I_-1/2 complex identity", qc_bessel_i(qcr(-0.5), z), qc_mul(scale, qc_cosh(z)), 1e-27);
+        check_qc("I_-3 = I_3 at complex argument", qc_bessel_i(qcr(-3.0), z), qc_bessel_i(qcr(3.0), z), 1e-27);
+        qcomplex_t nu = qcz(0.25, 0.375);
+        qcomplex_t value = qc_bessel_i(nu, z);
+        check_qc("Bessel I complex-order conjugation", qc_bessel_i(qc_conj(nu), qc_conj(z)), qc_conj(value), 1e-27);
+        check_qc("Bessel I complex-order recurrence",
+                 qc_sub(qc_bessel_i(qc_sub(nu, QC_ONE), z), qc_bessel_i(qc_add(nu, QC_ONE), z)),
+                 qc_mul(qc_div(qc_mul(qcr(2.0), nu), z), value), 1e-26);
+    }
+    check_qc("I_0(i) = J_0(1)", qc_bessel_i(QC_ZERO, qci(1.0)),
+             qc_make(qf_bessel_j(QF_ZERO, QF_ONE), QF_ZERO), 1e-28);
+    qcomplex_t nu = qcz(0.25, 0.375);
+    qcomplex_t phase = qc_exp(qc_mul(qci(1.0), qc_mul(qc_make(QF_PI, QF_ZERO), nu)));
+    qcomplex_t positive = qc_bessel_i(nu, qcr(1.25));
+    check_qc("Bessel I upper bank", qc_bessel_i(nu, qcr(-1.25)), qc_mul(phase, positive), 1e-26);
+    check_qc("Bessel I signed zero uses upper bank", qc_bessel_i(nu, qcz(-1.25, -0.0)),
+             qc_mul(phase, positive), 1e-26);
+    check_qc("Bessel I lower bank limit", qc_bessel_i(nu, qcz(-1.25, -1e-28)), qc_div(positive, phase), 1e-25);
+    check_qc("I_0(0) = 1", qc_bessel_i(QC_ZERO, QC_ZERO), QC_ONE, 1e-30);
+    check_qc("I_-2(0) = 0", qc_bessel_i(qcr(-2.0), QC_ZERO), QC_ZERO, 1e-30);
+    check_qc("complex-order I zero limit", qc_bessel_i(nu, QC_ZERO), QC_ZERO, 1e-30);
+    TEST_ASSERT_TRUE(qc_isnan(qc_bessel_i(qci(1.0), QC_ZERO)), "Bessel I oscillatory zero limit rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_bessel_i(QC_NAN, QC_ONE)), "Bessel I NaN order rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_bessel_i(qcr(1001.0), QC_ONE)), "Bessel I order range guard");
+}
+
+static void test_struve_l(void)
+{
+    qcomplex_t points[] = {qcz(1.25, 0.75), qcz(-1.25, 0.75), qcz(-1.25, -0.75), qci(3.0)};
+    for (size_t k = 0; k < sizeof(points) / sizeof(points[0]); ++k) {
+        qcomplex_t z = points[k];
+        qcomplex_t scale = qc_sqrt(qc_div(qcr(2.0), qc_mul(qc_make(QF_PI, QF_ZERO), z)));
+        check_qc("L_-1/2 complex identity", qc_struve_l(qcr(-0.5), z), qc_mul(scale, qc_sinh(z)), 1e-27);
+        check_qc("L_1/2 complex identity", qc_struve_l(qcr(0.5), z),
+                 qc_mul(scale, qc_sub(qc_cosh(z), QC_ONE)), 1e-27);
+        check_qc("L_-3/2 reciprocal-gamma zero", qc_struve_l(qcr(-1.5), z),
+                 qc_mul(scale, qc_sub(qc_cosh(z), qc_div(qc_sinh(z), z))), 1e-27);
+        qcomplex_t nu = qcz(0.25, 0.375);
+        check_qc("Struve complex-order conjugation", qc_struve_l(qc_conj(nu), qc_conj(z)),
+                 qc_conj(qc_struve_l(nu, z)), 1e-27);
+    }
+    qcomplex_t nu = qcz(0.25, 0.375);
+    qcomplex_t phase = qc_exp(qc_mul(qci(1.0), qc_mul(qc_make(QF_PI, QF_ZERO), qc_add(nu, QC_ONE))));
+    qcomplex_t positive = qc_struve_l(nu, qcr(1.25));
+    check_qc("Struve upper bank", qc_struve_l(nu, qcr(-1.25)), qc_mul(phase, positive), 1e-26);
+    check_qc("Struve cut signed zero uses upper bank", qc_struve_l(nu, qcz(-1.25, -0.0)),
+             qc_mul(phase, positive), 1e-26);
+    check_qc("Struve lower bank limit", qc_struve_l(nu, qcz(-1.25, -1e-28)),
+             qc_div(positive, phase), 1e-25);
+    check_qc("Struve upper bank limit", qc_struve_l(nu, qcz(-1.25, 1e-28)),
+             qc_mul(positive, phase), 1e-25);
+    check_qc("complex-order zero limit", qc_struve_l(nu, QC_ZERO), QC_ZERO, 1e-30);
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_l(qcz(-1.0, 1.0), QC_ZERO)), "oscillatory zero limit rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_l(qcr(-2.0), QC_ZERO)), "divergent zero limit rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_l(QC_NAN, QC_ONE)), "NaN order rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_l(qcr(1001.0), QC_ONE)), "order range guard");
+}
+
+static void test_struve_h(void)
+{
+    qcomplex_t points[] = {qcz(1.25, 0.75), qcz(-1.25, 0.75), qcz(-1.25, -0.75), qcz(1.25, -0.75), qci(3.0)};
+    for (size_t k = 0; k < sizeof(points) / sizeof(points[0]); ++k) {
+        qcomplex_t z = points[k];
+        qcomplex_t scale = qc_sqrt(qc_div(qcr(2.0), qc_mul(qc_make(QF_PI, QF_ZERO), z)));
+        check_qc("H_-1/2 complex identity", qc_struve_h(qcr(-0.5), z), qc_mul(scale, qc_sin(z)), 1e-27);
+        check_qc("H_1/2 complex identity", qc_struve_h(qcr(0.5), z),
+                 qc_mul(scale, qc_sub(QC_ONE, qc_cos(z))), 1e-27);
+        check_qc("H_-3/2 reciprocal-gamma zero", qc_struve_h(qcr(-1.5), z),
+                 qc_mul(scale, qc_sub(qc_cos(z), qc_div(qc_sin(z), z))), 1e-27);
+        qcomplex_t nu = qcz(0.25, 0.375);
+        check_qc("H complex-order conjugation", qc_struve_h(qc_conj(nu), qc_conj(z)),
+                 qc_conj(qc_struve_h(nu, z)), 1e-27);
+    }
+    qcomplex_t nu = qcz(0.25, 0.375);
+    qcomplex_t phase = qc_exp(qc_mul(qci(1.0), qc_mul(qc_make(QF_PI, QF_ZERO), qc_add(nu, QC_ONE))));
+    qcomplex_t positive = qc_struve_h(nu, qcr(1.25));
+    check_qc("H upper bank", qc_struve_h(nu, qcr(-1.25)), qc_mul(phase, positive), 1e-26);
+    check_qc("H signed zero uses upper bank", qc_struve_h(nu, qcz(-1.25, -0.0)),
+             qc_mul(phase, positive), 1e-26);
+    check_qc("H lower bank limit", qc_struve_h(nu, qcz(-1.25, -1e-28)), qc_div(positive, phase), 1e-25);
+    check_qc("H upper bank limit", qc_struve_h(nu, qcz(-1.25, 1e-28)), qc_mul(phase, positive), 1e-25);
+    check_qc("H_0(i) = i L_0(1)", qc_struve_h(QC_ZERO, qci(1.0)),
+             qc_mul(qci(1.0), qc_struve_l(QC_ZERO, QC_ONE)), 1e-28);
+    check_qc("H complex-order zero limit", qc_struve_h(nu, QC_ZERO), QC_ZERO, 1e-30);
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_h(qcz(-1.0, 1.0), QC_ZERO)), "H oscillatory zero limit rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_h(qcr(-2.0), QC_ZERO)), "H divergent zero limit rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_h(QC_NAN, QC_ONE)), "H NaN order rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_struve_h(qcr(1001.0), QC_ONE)), "H order range guard");
+}
+
+static void example_struve_h(void)
+{
+    /* README example: ordinary Struve H (docs/qcomplex.md). */
+    qcomplex_t ordinary = qc_struve_h(QC_ZERO, QC_ONE);
+    qc_printf("H_0(1) = %.15z\n", ordinary);
+    char output[80];
+    qc_sprintf(output, sizeof(output), "H_0(1) = %.15z", ordinary);
+    TEST_ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0, "Struve H README output");
+}
+
+static void example_struve_l(void)
+{
+    /* README example: modified Struve L (docs/qcomplex.md). */
+    qcomplex_t value = qc_struve_l(QC_ZERO, QC_ONE);
+    qc_printf("L_0(1) = %.16z\n", value);
+    char output[80];
+    qc_sprintf(output, sizeof(output), "L_0(1) = %.16z", value);
+    TEST_ASSERT_TRUE(strcmp(output, "L_0(1) = 0.7102431859378909") == 0, "Struve L README output");
+}
+
+static void example_bessel_i(void)
+{
+    /* README example: modified Bessel I (docs/qcomplex.md). */
+    qcomplex_t bessel = qc_bessel_i(QC_ZERO, QC_ONE);
+    qc_printf("I_0(1) = %.16z\n", bessel);
+    char output[80];
+    qc_sprintf(output, sizeof(output), "I_0(1) = %.16z", bessel);
+    TEST_ASSERT_TRUE(strcmp(output, "I_0(1) = 1.2660658777520083") == 0, "Bessel I README output");
+}
+
 static void test_special_group(void)
 {
+    TEST_RUN_SUBTEST(test_bessel_i, NULL);
+    TEST_RUN_SUBTEST(test_struve_l, NULL);
+    TEST_RUN_SUBTEST(test_struve_h, NULL);
     TEST_RUN_SUBTEST(test_erf, NULL);
     TEST_RUN_SUBTEST(test_erfinv, NULL);
     TEST_RUN_SUBTEST(test_gamma, NULL);
@@ -1533,6 +1663,9 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_util_group, tests, NULL);
     TEST_RUN_IN_GROUP(test_from_string, tests, NULL);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_euler_identity, readme_examples, "qcomplex,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_struve_l, readme_examples, "qcomplex,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_bessel_i, readme_examples, "qcomplex,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_struve_h, readme_examples, "qcomplex,readme,output");
 
     return TESTS_EXIT_CODE();
 }

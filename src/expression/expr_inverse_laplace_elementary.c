@@ -11,7 +11,7 @@ typedef struct {
     expr_t **nodes;
     size_t count, capacity;
     const expr_t *f, *s, *t;
-    bool failed;
+    bool failed, exact_pair;
 } elementary_pair_t;
 
 static expr_t *elementary_keep(elementary_pair_t *c, expr_t *e)
@@ -356,6 +356,17 @@ static expr_t *elementary_normalise_sums(elementary_pair_t *c, const expr_t *f, 
         return elementary_keep(c, expr_clone(f));
     if (f->ops == &ops_summation)
         return elementary_keep(c, expr_clone(f));
+    static expr_t *(*const expansions[])(const expr_t *, const expr_t *) = {
+        [EXPR_KIND_STRUVE_H] = expr_struve_h_hypergeometric,
+        [EXPR_KIND_STRUVE_L] = expr_struve_l_hypergeometric,
+        [EXPR_KIND_BESSEL_I] = expr_bessel_i_hypergeometric,
+    };
+    size_t kind = (size_t)f->ops->kind;
+    if (kind < sizeof(expansions) / sizeof(expansions[0]) && expansions[kind]) {
+        expr_t *expanded = elementary_keep(c, expansions[kind](f->a, f->b));
+        if (expanded)
+            return elementary_normalise_sums(c, expanded, depth + 1u);
+    }
     expr_t *out = elementary_keep(c, expr_clone(f));
     if (out->a) {
         expr_free(out->a);
@@ -552,6 +563,8 @@ static expr_t *elementary_verify(elementary_pair_t *c, const expr_t *candidate, 
     }
     if (expr_const_is_zero(scale))
         return NULL;
+    if (c->exact_pair && (!expr_const_is_one(scale) || !expr_const_is_zero(offset)))
+        return NULL;
     expr_t *body = elementary_clean(c, elementary_add(c, elementary_mul(c, scale, candidate), offset));
     expr_t *zero = elementary_integer(c, 0);
     expr_t *domain_args[] = {body, (expr_t *)c->t, zero};
@@ -728,19 +741,58 @@ static expr_t *elementary_inverse_circular(elementary_pair_t *c, const expr_t *n
     return out;
 }
 
-/* Y_0(s/q) is only a feature of the asinh pair here: the Struve/hypergeometric companion must
+/* Reconstruct a frequency-shifted candidate, then verify the complete forward spectrum. */
+static expr_t *elementary_shifted_hyperbolic_candidate(elementary_pair_t *c, const expr_ops_t *ops,
+                                                      const expr_t *rate, const expr_t *shift,
+                                                      const expr_t *feature)
+{
+    expr_t *argument = elementary_clean(c, elementary_mul(c, rate, c->t));
+    expr_t *candidate = elementary_keep(c, ops->apply_unary(argument));
+    if (!expr_const_is_zero(shift)) {
+        expr_t *exponent = elementary_clean(c, elementary_neg(c, elementary_mul(c, shift, c->t)));
+        expr_t *factor = elementary_keep(c, expr_exp(exponent));
+        candidate = elementary_mul(c, factor, candidate);
+    }
+    return elementary_verify(c, candidate, feature);
+}
+
+/* Y_0(s/q) and K_0(s/q) are only features here: the Struve/hypergeometric companion must
  * also be present. This does not implement or intercept the inverse Bessel family itself. */
-static expr_t *elementary_inverse_asinh(elementary_pair_t *c, const expr_t *node)
+static expr_t *elementary_inverse_hyperbolic(elementary_pair_t *c, const expr_t *node)
 {
     if (!expr_const_is_zero(node->a))
         return NULL;
     expr_t *slope = NULL, *offset = NULL;
-    if (!elementary_affine(c, node->b, &slope, &offset) || !expr_const_is_zero(offset))
+    if (!elementary_affine(c, node->b, &slope, &offset))
         return NULL;
     expr_t *rate = elementary_clean(c, elementary_div(c, elementary_integer(c, 1), slope));
     if (!elementary_literal_real(rate, true))
         return NULL;
-    return elementary_unary_candidate(c, &ops_asinh, rate, node);
+    bool cosine = node->ops == &ops_bessel_k;
+    expr_t *shift = elementary_clean(c, elementary_div(c, offset, slope));
+    if (cosine) {
+        /* Six bounded alternatives distinguish identical Bessel features by their complete
+         * spectra, before the general scalar/offset matcher can replace a circular function
+         * with an equivalent affine expression in acosh. */
+        static const expr_ops_t *const families[] = {&ops_acosh, &ops_asin, &ops_acos};
+        expr_t *rates[] = {rate, elementary_clean(c, elementary_neg(c, rate))};
+        c->exact_pair = true;
+        for (size_t family = 0u; family < sizeof(families) / sizeof(families[0]); ++family) {
+            for (size_t sign = 0u; sign < 2u; ++sign) {
+                expr_t *exact = elementary_shifted_hyperbolic_candidate(c, families[family], rates[sign], shift, node);
+                if (exact) {
+                    c->exact_pair = false;
+                    return exact;
+                }
+            }
+        }
+        c->exact_pair = false;
+    }
+    expr_t *out = elementary_shifted_hyperbolic_candidate(c, cosine ? &ops_acosh : &ops_asinh, rate, shift, node);
+    if (!out && cosine)
+        out = elementary_shifted_hyperbolic_candidate(c, &ops_acosh, elementary_clean(c, elementary_neg(c, rate)),
+                                                       shift, node);
+    return out;
 }
 
 typedef expr_t *(*elementary_feature_fn)(elementary_pair_t *, const expr_t *);
@@ -751,7 +803,8 @@ static const elementary_feature_fn elementary_features[EXPR_KIND_COUNT] = {
     [EXPR_KIND_POW_D   ] = elementary_staircase,
     [EXPR_KIND_E1      ] = elementary_inverse_circular,
     [EXPR_KIND_EI      ] = elementary_inverse_circular,
-    [EXPR_KIND_BESSEL_Y] = elementary_inverse_asinh,
+    [EXPR_KIND_BESSEL_Y] = elementary_inverse_hyperbolic,
+    [EXPR_KIND_BESSEL_K] = elementary_inverse_hyperbolic,
 };
 
 /* Traversal is linear in the input tree, not in the transform catalogue. Stop at the first

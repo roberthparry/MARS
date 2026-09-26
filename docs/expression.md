@@ -405,7 +405,8 @@ All three symbolic cards use the same native expression and conditions.
 | `abs`, `conj` | Homogeneous linear arguments; absolute values additionally cover known real affine arguments, including a zero crossing. |
 | `floor`, `ceil` | Homogeneous arguments with known real rates, including negative and zero rates. |
 | `atan`, `acot` | Homogeneous arguments with known real rates, using exponential integrals and the native inverse-cotangent branch. |
-| `asinh` | Homogeneous arguments with known real rates, using a hypergeometric representation of the Struve function and order-zero Bessel Y. |
+| `asinh` | Homogeneous arguments with known real rates, using native order-zero Struve H and Bessel Y. |
+| `acosh` | Homogeneous arguments with known real rates, including negative and zero rates; native Bessel K, Bessel I and Struve L retain the principal complex branch. |
 | `atanh` | Homogeneous arguments with real rates, including symbolic rates guarded as real and non-zero; exponential integrals retain the native complex boundary value beyond the branch points. Zero rates give zero. |
 | `erf`, `erfc` | Affine arguments; Gaussian decay conditions are retained for complex scales. |
 | `normal_pdf`, `pdf` | Affine Gaussian density; quadratic decay gives an entire transform in `s`. |
@@ -422,10 +423,84 @@ integer powers of `t` multiplying a supported function reuse these formulas.
 Constants, including zero, retain their existing transforms. This does not
 mean that arbitrary compositions of supported functions are supported.
 
-The symbolic `asinh` formula is valid on its stated half-plane, but its Bessel-Y
-factor currently lacks a complex numeric backend. Complex `s` therefore retains
-the formula without a numerical Value-card result. Real positive `s` is checked
-numerically. This implementation limitation is not a convergence restriction.
+The `asinh` formula uses the native ordinary Struve and Bessel functions:
+
+$$
+\mathcal L\{\operatorname{asinh}(t)\}(s)
+=\frac{\pi}{2s}\left[\mathbf H_0(s)-Y_0(s)\right],
+\qquad \operatorname{Re}(s)>0.
+$$
+
+Both functions support complex numerical arguments, so targets in the right
+half-plane can be evaluated within their documented numerical limits.
+Function output uses `struveh(0,s)` and `bessely(0,s)`; Expression output
+uses `𝐇₀(s)` and `Y₀(s)`. Independently copied spectra, including the older
+expanded hypergeometric form, retain their inverse transform.
+
+For the principal branch, the unilateral Laplace transform includes
+`acosh(t)=i*acos(t)` on $0\le t<1$, not just the real tail above $t=1$:
+
+$$
+\mathcal L\{\operatorname{acosh}(t)\}(s)
+=\frac{K_0(s)}{s}+\frac{i\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right],
+\qquad \operatorname{Re}(s)>0.
+$$
+
+Here $\mathbf L_0$ is the native modified Struve function, written
+`struvel(0,z)` in Function output. The native modified Bessel function
+$I_0(z)$ is written `besseli(0,z)` in Function output.
+Both representations preserve the same algebra and copied-expression inverses.
+For example, `@L{acosh(t)}` has the following unbound Expression output:
+
+```text
+1/s·(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s))) where (Re(s) > 0)
+```
+
+Real and complex targets in the stated half-plane are supported
+by the numerical functions, subject to their existing precision and range limits.
+
+For a known non-zero real rate $a$, put $q=|a|$ and $z=s/q$. The formula is
+
+$$
+\mathcal L\{\operatorname{acosh}(at)\}(s)
+=\frac{K_0(z)}{s}
+ +\frac{i\pi}{2s}\left[1-\operatorname{sign}(a)
+ \left(I_0(z)-\mathbf L_0(z)\right)\right],
+\qquad \operatorname{Re}(s)>0.
+$$
+
+A zero rate gives $i\pi/(2s)$ on the same half-plane. Unspecified rates,
+non-real rates and shifted source arguments remain symbolic. Supplied constant
+rates are specialised; numerical bindings on free variables are not.
+The inverse recognises freshly parsed complete spectra, including scalar
+multiples, constant offsets and exponential frequency shifts. Both
+inverse-hyperbolic pairs verify their full forward formula before accepting a
+match; a Bessel term without its companion is not sufficient.
+
+The inverse-circular functions use the same native special functions:
+
+$$
+\mathcal L\{\operatorname{asin}(t)\}(s)
+=\frac{\pi}{2s}\left[I_0(s)-\mathbf L_0(s)\right]+\frac{iK_0(s)}{s},
+\qquad \operatorname{Re}(s)>0,
+$$
+
+$$
+\mathcal L\{\operatorname{acos}(t)\}(s)
+=\frac{\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right]-\frac{iK_0(s)}{s},
+\qquad \operatorname{Re}(s)>0.
+$$
+
+These formulas retain MARS's real-cut values: for $t>1$,
+$\operatorname{asin}(t)=\pi/2+i\operatorname{acosh}(t)$ and
+$\operatorname{acos}(t)=-i\operatorname{acosh}(t)$.
+For a known non-zero real rate $a$, replace each special-function argument by
+$s/|a|$ and multiply $I_0-\mathbf L_0$ by $\operatorname{sign}(a)$;
+the $K_0$ term keeps its sign. At zero rate, the sine pair is zero and the
+cosine pair is $\pi/(2s)$. The same restrictions on unspecified rates,
+non-real rates and shifted source arguments apply as for `acosh`.
+Freshly parsed complete spectra invert to the corresponding circular function;
+scalar multiples, constant offsets and exponential frequency shifts are supported.
 
 `log` and `lg` are common-logarithm parser aliases; `ln` is the natural-logarithm
 spelling. The C constructor `expr_log` denotes the natural logarithm.
@@ -453,7 +528,7 @@ additional special functions, parameter conditions or continuation machinery.
 | Functions | Remaining issue |
 | --- | --- |
 | `asin`, `acos`, `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. |
-| `acosh`, `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
+| `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
 | `arcversin`, `arcvercos`, `arccoversin`, `arccovercos`, `archaversin`, `archavercos`, `archacoversin`, `archacovercos` | Reduce to inverse circular functions, so their branch restrictions carry over. |
 | `hypot` | Polynomial reductions can work; the general transform needs further radical-function rules. |
 | `lgamma` | Logarithmic origin and `t*log(t)` growth allow a transform, but no general closed form is implemented. |
@@ -498,6 +573,9 @@ They are exercised after the ordinary regression tests as README examples.
 | `{@L(E1(t)) \| s=1}` | `0.693147180559945` |
 | `{@L(bessel_j(1,t)) \| s=1}` | `0.292893218813452` |
 | `{@L(atanh(t)) \| s=1}` | `0.646761122779130 + 0.577863674895461i` |
+| `{@L{acosh(t)} \| s=1}` | `0.421024438240708 + 0.697712084144029i` |
+| `{@L{asin(t)} \| s=1}` | `0.873084242650868 + 0.421024438240708i` |
+| `{@L{acos(t)} \| s=1}` | `0.697712084144029 - 0.421024438240708i` |
 
 #### Formula references
 
@@ -508,6 +586,9 @@ in [DLMF §10.22](https://dlmf.nist.gov/10.22). Incomplete-gamma formulas follow
 by interchanging their defining integral with the Laplace integral on the
 stated absolute-convergence domain. Gaussian formulas follow by completing
 the square and analytic continuation within the stated decay domain.
+The principal `acosh` formula follows by integration by parts, using the
+modified-Bessel integrals in [DLMF §10.32](https://dlmf.nist.gov/10.32)
+and modified-Struve integrals in [DLMF §11.5](https://dlmf.nist.gov/11.5).
 
 ## Fourier transforms
 
@@ -732,6 +813,103 @@ exponential notation. Exponentially damped reciprocal spectra may also carry
 a real modulation. Increasing exponentials and unrelated pole exclusions are
 not treated as this pair.
 
+### Bessel Y function
+
+`expr_bessel_y(order, argument)` constructs the principal Bessel function
+of the second kind. Besides `bessely`, `bessel_y` and `BesselY`,
+the parser accepts indexed `Y_n(z)` and the order-zero aliases `Y0(z)`,
+`Y_0(z)` and `Y₀(z)`. Expression output uses `Y₀(z)` for order zero,
+TeX uses $Y_0(z)$, and Function output calls `bessely(0,z)`.
+
+Numerical real and complex orders and non-zero arguments use the principal
+branch; order zero is singular at the origin. See the number and qcomplex guides for
+precision, branch-cut and range limits. Fixed-order argument derivatives,
+supported primitives and finite sums retain native function nodes.
+
+README examples (Value-card outputs, rounded):
+
+| Input | Output |
+| --- | --- |
+| `Y0(1)` | `0.088256964215677` |
+| `{Dx(Y0(x)) \| x=1}` | `0.781212821300289` |
+
+### Ordinary Struve function
+
+`expr_struve_h(order, argument)` constructs the principal ordinary Struve
+function $\mathbf H_\nu(z)$. The parser accepts `struve_h`, `struveh`,
+`StruveH` and `𝐇` with two arguments, indexed `H_n(z)` and `𝐇_n(z)`,
+and the order-zero aliases `H0(z)`, `H_0(z)`, `H₀(z)` and `𝐇₀(z)`.
+The Hermite polynomial retains its distinct `ℋ` symbol.
+Expression output uses `𝐇₀(z)` or a braced symbolic index; Function output
+uses `struveh(n,z)`; TeX uses $\mathbf H_n(z)$.
+
+The defining alternating reciprocal-gamma series preserves the principal
+power branch, including exceptional negative half-integer orders.
+Fixed-order derivatives, numerical-order affine primitives and finite sums
+are supported. Varying-order derivatives and primitive parameter poles
+retain their formal representation. See the numerical and matrix guides
+for the corresponding APIs, branch conventions and numerical limits.
+The definitions follow [DLMF §11.2](https://dlmf.nist.gov/11.2).
+
+README examples (Value-card outputs, rounded):
+
+| Input | Output |
+| --- | --- |
+| `H0(1)` | `0.568656627048288` |
+| `{Dx(H0(x)) \| x=0}` | `0.636619772367581` |
+
+### Modified Struve function
+
+`expr_struve_l(order, argument)` constructs the principal modified Struve
+function $\mathbf L_\nu(z)$. The parser accepts `struve_l`, `struvel`,
+`StruveL` and `𝐋` with two arguments, indexed `L_n(z)` and `𝐋_n(z)`,
+and the order-zero aliases `L0(z)`, `L_0(z)`, `L₀(z)` and `𝐋₀(z)`.
+Expression output uses indexed Unicode notation such as `𝐋₀(z)` (or `𝐋_{n}(z)`
+for a symbolic order), Function output uses
+`struvel(n,z)`, and TeX uses $\mathbf L_n(z)$.
+
+The numerical layers evaluate the defining reciprocal-gamma series on the
+principal branch, including its exceptional negative half-integer orders.
+Fixed-order argument derivatives use the Struve recurrences, including
+$\mathbf L_0'(0)=2/\pi$. Order-dependent differentiation remains a formal
+derivative. Affine primitives are available for numerical orders and non-zero
+numerical slopes when the hypergeometric primitive has no parameter pole;
+negative half-integers use a shifted series, while negative even integer
+orders retain a formal integral. Finite sums use the usual native summation
+machinery. See the numerical and matrix module guides for their API and limits.
+
+README examples (Value-card outputs, rounded):
+
+| Input | Output |
+| --- | --- |
+| `struve_l(0,1)` | `0.710243185937891` |
+| `{Dx(L0(x)) \| x=0}` | `0.636619772367581` |
+
+Definitions and recurrences follow [DLMF §11.2](https://dlmf.nist.gov/11.2)
+and [DLMF §11.4](https://dlmf.nist.gov/11.4).
+
+### Modified Bessel I function
+
+`expr_bessel_i(order, argument)` constructs the principal modified Bessel
+function $I_\nu(z)$. The parser accepts `bessel_i`, `besseli` and `BesselI`
+with two arguments, indexed `I_n(z)`, and the order-zero aliases `I0(z)`,
+`I_0(z)` and `I₀(z)`. Expression output uses `I₀(z)` for order zero and
+`I_{n}(z)` for a symbolic order, Function
+output uses `bessel_i(n,z)`, and TeX uses $I_n(z)$.
+
+Negative integer orders use $I_{-n}(z)=I_n(z)$. Fixed-order argument
+derivatives and numerical-order affine primitives are supported, with formal
+fallback for varying orders or singular primitive parameters. Finite sums
+use the native summation machinery. Numerical branches, precision limits
+and matrix functional calculus are described in the corresponding module guides.
+
+README examples (Value-card outputs, rounded):
+
+| Input | Output |
+| --- | --- |
+| `I0(1)` | `1.266065877752008` |
+| `{Dx(I0(x)) \| x=0}` | `0` |
+
 ### Inverse hyperbolic sine Fourier pair
 
 The `asinh` spectrum uses the modified Bessel function $K_0$. With the same
@@ -752,7 +930,10 @@ This follows by differentiating `asinh` and applying the
 
 Modified Bessel K accepts `besselk`, `bessel_k` and `BesselK` with order and
 argument; indexed `K_n` and `Kₙ` calls are also supported. `K0`, `K_0` and `K₀`
-denote order zero. Function output uses the registered `besselk` function,
+denote order zero. Expression output uses Unicode integer subscripts, such as
+`K₀(z)`, consistently with `J₀(z)`, `Y₀(z)`, `I₀(z)` and `𝐋₀(z)`.
+Other orders use parseable braced indices, for example `K_{n}(z)`.
+Function output uses the registered `besselk` function,
 and TeX uses the conventional indexed K. Numeric evaluation supports real and
 complex orders and non-zero arguments on the principal branch, with guarded
 series for magnitudes up to 1000. Outside this implemented numerical range it
@@ -2145,7 +2326,7 @@ canonicalised to `[sqrt(2)]`, but Function-style output does not generate the
 
 Built-in function names in `style_FUNCTION` use canonical concatenated lowercase
 spellings, such as `normalpdf`, `gammainclower`, `besselj`, `lerchphi`,
-`hypergeometricpfq`, and the bit operations `and`, `or`, `xor`, `not`, `shl`,
+`besseli`, `besselk`, `struveh`, `struvel`, `hypergeometricpfq`, and the bit operations `and`, `or`, `xor`, `not`, `shl`,
 and `shr`. Existing mixed-case and underscore spellings remain accepted as
 Expression input aliases and retain their mathematical rendering in other
 styles.

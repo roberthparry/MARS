@@ -296,6 +296,46 @@ static void assert_reverse_matches_symbolic(expr_t *function, size_t variable_co
     free(wrt);
 }
 
+static void test_reverse_modified_cylindrical_arguments(void)
+{
+    const double orders[] = {0.0, 1.0, -1.0, -1.5, 0.25};
+    for (size_t i = 0u; i < sizeof(orders) / sizeof(orders[0]); ++i) {
+        expr_t *order = test_expr_new_const_d(orders[i]);
+        expr_t *x = test_expr_new_named_var_d(1.2, "x");
+        expr_t *bessel = expr_bessel_i(order, x), *struve = expr_struve_l(order, x);
+        expr_t *ordinary = expr_struve_h(order, x);
+        expr_t *variables[] = {x};
+        assert_reverse_matches_symbolic(bessel, 1u, variables);
+        assert_reverse_matches_symbolic(struve, 1u, variables);
+        assert_reverse_matches_symbolic(ordinary, 1u, variables);
+        if (orders[i] == 0.0 || orders[i] == 1.0 || orders[i] == -1.0) {
+            expr_set_val(x, NUM_ZERO);
+            assert_reverse_matches_symbolic(bessel, 1u, variables);
+            assert_reverse_matches_symbolic(struve, 1u, variables);
+            assert_reverse_matches_symbolic(ordinary, 1u, variables);
+        }
+        expr_free(ordinary); expr_free(struve); expr_free(bessel); expr_free(x); expr_free(order);
+    }
+}
+
+static void test_reverse_bessel_y_complex_arguments(void)
+{
+    const double orders[] = {0.0, 1.0, -0.5, -1.5, -2.5, 0.25};
+    number_t value = num_create_from_string("1+i");
+    for (size_t i = 0u; i < sizeof(orders) / sizeof(orders[0]); ++i) {
+        expr_t *order = test_expr_new_const_d(orders[i]);
+        expr_t *x = test_expr_new_named_var_d(1.0, "x");
+        expr_set_val(x, value);
+        expr_t *function = expr_bessel_y(order, x), *variables[] = {x};
+        number_t evaluated = expr_eval(function);
+        ASSERT_TRUE(num_is_finite(evaluated));
+        num_destroy(&evaluated);
+        assert_reverse_matches_symbolic(function, 1u, variables);
+        expr_free(function); expr_free(x); expr_free(order);
+    }
+    num_destroy(&value);
+}
+
 static void test_reverse_special_function_arguments(void)
 {
     expr_t *order = test_expr_new_const_d(0.25);
@@ -426,6 +466,8 @@ void test_reverse_mode(void)
     TEST_RUN_SUBTEST(test_reverse_gradient_polynomial_num, NULL);
     TEST_RUN_SUBTEST(test_reverse_gradient_complex_number_t, NULL);
     TEST_RUN_SUBTEST(test_reverse_special_function_arguments, NULL);
+    TEST_RUN_SUBTEST(test_reverse_modified_cylindrical_arguments, NULL);
+    TEST_RUN_SUBTEST(test_reverse_bessel_y_complex_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_qdigamma_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_hypergeometric_argument, NULL);
     TEST_RUN_SUBTEST(test_reverse_appell_variables, NULL);

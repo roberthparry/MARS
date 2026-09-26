@@ -173,7 +173,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         invalid = self.fields("{Laplace(ln(2*t+3),t,s) | s=0}")
         self.assertEqual(invalid["value"], "NAN")
 
-    def test_asinh_hypergeometric_formula_real_rates(self):
+    def test_asinh_struve_formula_real_rates(self):
         for rate in (1, -1, 2, -2):
             with self.subTest(rate=rate):
                 expected = quadrature(lambda t: math.asinh(rate*t), 2)
@@ -182,16 +182,17 @@ class LaplaceElementaryTests(unittest.TestCase):
         invalid = self.fields("{Laplace(asinh(t),t,s) | s=0}")
         self.assertEqual(invalid["value"], "NAN")
 
-    def test_asinh_complex_targets_retain_formula_with_unsupported_numeric_value(self):
-        # This transform exists for Re(s)>0. Its current Bessel Y primitive has no complex backend;
-        # retain the correct symbolic result without promising a numerical complex evaluation.
+    def test_asinh_complex_targets_against_quadrature(self):
+        # The native Struve H and Bessel Y backends retain the transform's complex half-plane.
         for rate in (1, -1, 2, -2):
             for target in ("2+i", "2-i"):
                 with self.subTest(rate=rate, target=target):
                     fields = self.fields("{Laplace(asinh(c*t),t,s) | s=" + target + "; c=" + str(rate) + "}")
                     self.assertNotIn("Laplace(", fields["function"])
                     self.assertIn("bessely(", fields["function"])
-                    self.assertEqual(fields["value"], "NAN")
+                    self.assertIn("struveh(", fields["function"])
+                    expected = quadrature(lambda t: math.asinh(rate*t), complex(target.replace("i", "j")))
+                    self.assertLess(abs(self.value(fields)-expected), 2e-10)
 
     def test_small_integer_hyperbolic_powers(self):
         for name, function in (("sinh", math.sinh), ("cosh", math.cosh)):

@@ -96,10 +96,7 @@ number_t num_bessel_k(const number_t order, const number_t argument)
     double size = num_to_double(num_abs(argument)), degree = num_to_double(num_abs(order));
     if (!isfinite(size) || !isfinite(degree) || size > 1000 || degree > 1000)
         return num_clone(NUM_NAN);
-    size_t precision = num_is_exact(argument) ? num_get_default_prec_bits() : num_get_effective_prec_bits(argument);
-    size_t order_precision = num_is_exact(order) ? num_get_default_prec_bits() : num_get_effective_prec_bits(order);
-    if (order_precision > precision)
-        precision = order_precision;
+    size_t precision = number_cylindrical_precision(order, argument);
     size_t work = precision + 96u + (size_t)ceil(4*(size+degree));
     bool integral = num_is_real(order) && num_is_integer(order);
     /* Near integral orders the two gamma terms cancel; retain the distance's significant bits. */

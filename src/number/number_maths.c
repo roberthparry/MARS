@@ -335,56 +335,6 @@ done:
     return status;
 }
 
-static int number_mpfr_bessel_y(mpfr_ptr out, mpfr_srcptr order, mpfr_srcptr argument, mpfr_rnd_t rounding)
-{
-    mpfr_prec_t work_precision;
-    mpfr_t nu, x, negative_nu, j_positive, j_negative;
-    mpfr_t pi_nu, sine, cosine, numerator;
-    long integer_order;
-    int status = -1;
-
-    if (!out || !order || !argument)
-        return -1;
-    if (mpfr_nan_p(order) || mpfr_nan_p(argument)) {
-        mpfr_set_nan(out);
-        return 0;
-    }
-    if (number_bessel_integer_order(order, &integer_order)) {
-        mpfr_yn(out, integer_order, argument, rounding);
-        return 0;
-    }
-    if (mpfr_sgn(argument) <= 0 || mpfr_inf_p(argument)) {
-        mpfr_set_nan(out);
-        return 0;
-    }
-
-    work_precision = number_bessel_work_precision(out, order, argument) + 64;
-    mpfr_inits2(work_precision, nu, x, negative_nu, j_positive, j_negative, pi_nu, sine, cosine, numerator,
-                (mpfr_ptr)0);
-    mpfr_set(nu, order, MPFR_RNDN);
-    mpfr_set(x, argument, MPFR_RNDN);
-    mpfr_neg(negative_nu, nu, MPFR_RNDN);
-    if (number_mpfr_bessel_j(j_positive, nu, x, MPFR_RNDN) != 0 ||
-        number_mpfr_bessel_j(j_negative, negative_nu, x, MPFR_RNDN) != 0)
-        goto done;
-
-    mpfr_const_pi(pi_nu, MPFR_RNDN);
-    mpfr_mul(pi_nu, pi_nu, nu, MPFR_RNDN);
-    mpfr_sin_cos(sine, cosine, pi_nu, MPFR_RNDN);
-    if (mpfr_zero_p(sine))
-        goto done;
-    mpfr_mul(numerator, cosine, j_positive, MPFR_RNDN);
-    mpfr_sub(numerator, numerator, j_negative, MPFR_RNDN);
-    mpfr_div(out, numerator, sine, rounding);
-    status = 0;
-
-done:
-    if (status != 0)
-        mpfr_set_nan(out);
-    mpfr_clears(nu, x, negative_nu, j_positive, j_negative, pi_nu, sine, cosine, numerator, (mpfr_ptr)0);
-    return status;
-}
-
 static mpfr_prec_t number_lommel_work_precision(mpfr_srcptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument)
 {
     mpfr_prec_t precision = mpfr_get_prec(out);
@@ -631,19 +581,9 @@ static int number_mpfr_bessel_j_mut(mpfr_t order, const mpfr_t argument)
     return number_mpfr_bessel_j(order, order, argument, MPFR_RNDN);
 }
 
-static int number_mpfr_bessel_y_mut(mpfr_t order, const mpfr_t argument)
-{
-    return number_mpfr_bessel_y(order, order, argument, MPFR_RNDN);
-}
-
 static double number_double_bessel_j(double order, double argument)
 {
     return qf_to_double(qf_bessel_j(qf_from_double(order), qf_from_double(argument)));
-}
-
-static double number_double_bessel_y(double order, double argument)
-{
-    return qf_to_double(qf_bessel_y(qf_from_double(order), qf_from_double(argument)));
 }
 
 static int number_mpfr_lommel_s_mut(mpfr_t mu, const mpfr_t nu, const mpfr_t argument)
@@ -6172,12 +6112,6 @@ number_t num_bessel_j(const number_t order, const number_t argument)
 {
     return number_apply_binary_math_with_double(order, argument, number_double_bessel_j, qf_bessel_j, NULL,
                                                 number_mpfr_bessel_j_mut, NULL);
-}
-
-number_t num_bessel_y(const number_t order, const number_t argument)
-{
-    return number_apply_binary_math_with_double(order, argument, number_double_bessel_y, qf_bessel_y, NULL,
-                                                number_mpfr_bessel_y_mut, NULL);
 }
 
 number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument)

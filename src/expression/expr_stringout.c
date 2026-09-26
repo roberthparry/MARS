@@ -3540,6 +3540,21 @@ static const char *expr_unary_name(const expr_t *f)
     return expr_ops_expression_name(f->ops);
 }
 
+/* Share indexed mathematical notation across the cylindrical function families. */
+static const char *expr_cylindrical_symbol(const expr_t *f)
+{
+    static const char *const symbols[] = {
+        [EXPR_KIND_BESSEL_J] = "J",
+        [EXPR_KIND_BESSEL_Y] = "Y",
+        [EXPR_KIND_BESSEL_K] = "K",
+        [EXPR_KIND_BESSEL_I] = "I",
+        [EXPR_KIND_STRUVE_L] = "𝐋",
+        [EXPR_KIND_STRUVE_H] = "𝐇",
+    };
+    size_t kind = (size_t)f->ops->kind;
+    return kind < sizeof(symbols) / sizeof(symbols[0]) ? symbols[kind] : NULL;
+}
+
 static int expr_polygamma_order(const expr_t *f, long *order)
 {
     return f && expr_is_op(f, &ops_polygamma) && f->a && expr_is_const(f->a) &&
@@ -4083,6 +4098,11 @@ static bool TeX_contains_calculus(const expr_t *f);
 static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
     const expr_t *right_power_base = NULL;
+
+    if (expr_is_op(right, &ops_hypergeometric_pFq)) {
+        sbuf_puts(b, " \\cdot ");
+        return;
+    }
 
     if (TeX_contains_calculus(left) && TeX_contains_calculus(right)) {
         sbuf_puts(b, " \\cdot ");
@@ -5209,7 +5229,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
             return;
         }
-        if (expr_is_op(f, &ops_bessel_j) || expr_is_op(f, &ops_bessel_y) || expr_is_op(f, &ops_bessel_k)) {
+        if (expr_cylindrical_symbol(f)) {
             sbuf_puts(b, f->ops->TeX_name);
             sbuf_puts(b, "_{");
             emit_TeX_expr(f->a, b, PREC_LOWEST);
@@ -5843,6 +5863,23 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (grouped)
                 sbuf_putc(b, ')');
             num_destroy(&upper_value);
+            return;
+        }
+        const char *cylindrical_symbol = expr_cylindrical_symbol(f);
+        if (cylindrical_symbol) {
+            long order;
+            sbuf_puts(b, cylindrical_symbol);
+            if (f->a && expr_is_const(f->a) && !f->a->name &&
+                expr_try_get_small_integer_exponent(f->a->c, &order) && order != LONG_MIN) {
+                emit_subscript_int(b, order);
+            } else {
+                sbuf_puts(b, "_{");
+                emit_expr(f->a, b, PREC_LOWEST);
+                sbuf_putc(b, '}');
+            }
+            sbuf_putc(b, '(');
+            emit_expr(f->b, b, PREC_LOWEST);
+            sbuf_putc(b, ')');
             return;
         }
         if (expr_has_polygamma_order(f)) {
