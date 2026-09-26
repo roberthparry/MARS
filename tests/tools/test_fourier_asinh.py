@@ -15,7 +15,7 @@ def k_integral(order, argument):
 class AsinhFourierTests(unittest.TestCase):
     def test_basic_pair_and_numeric_domain(self):
         result = fields("@F{asinh(x)}")
-        self.assertNotIn("Fourier(", result["function"])
+        self.assertNotIn("fourier(", result["function"])
         self.assertIn("k ≠ 0", result["expression"])
         self.assertIn("k ∈ ℝ", result["expression"])
         self.assertIn("k != 0", result["function"])
@@ -38,7 +38,7 @@ class AsinhFourierTests(unittest.TestCase):
                 spectrum = fields(f"{forward}(asinh({argument}),x,k)")
                 for copied in (algebra(spectrum), spectrum["expression"]):
                     result = fields(f"{inverse}("+copied+",k,x)", "x")
-                    self.assertNotIn("Fourier(", result["function"])
+                    self.assertNotIn("fourier(", result["function"])
                     self.assertNotIn("x != 0", result["function"])
                     for x in (-0.4, 0, 0.7):
                         bound = result["expression"].replace("x = NAN", f"x = {x}")
@@ -50,7 +50,7 @@ class AsinhFourierTests(unittest.TestCase):
         for condition in ("a ∈ ℝ", "b ∈ ℝ", "a ≠ 0", "k ≠ 0"):
             self.assertIn(condition, spectrum["expression"])
         restored = fields("InverseFourier("+spectrum["expression"]+",k,x)", "x")
-        self.assertNotIn("Fourier(", restored["function"])
+        self.assertNotIn("fourier(", restored["function"])
         for a in (-2, 0.5, 2):
             copied = restored["expression"].replace("x = NAN", "x = 0.3")
             copied = copied.replace("a = NAN", f"a = {a}").replace("b = NAN", "b = 0.2")
@@ -67,7 +67,7 @@ class AsinhFourierTests(unittest.TestCase):
         for source in ("@F{asinh(i*x)}", "@F{asinh(x+i)}", "@Finv{K0(abs(k))/k^2}",
                        "@Finv{K0(-abs(k))/k}", "@Finv{K_1(abs(k))/k}",
                        "InverseFourier(K0(abs(k))/k where (k-1 != 0),k,x)"):
-            self.assertIn("Fourier(", fields(source, "x")["function"])
+            self.assertIn("fourier(", fields(source, "x")["function"])
         self.assertEqual(number(fields("@F{asinh(0*x)}")), 0)
 
     def test_inverse_by_independent_integral(self):

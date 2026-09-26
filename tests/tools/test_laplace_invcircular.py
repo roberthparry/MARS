@@ -43,7 +43,7 @@ class InverseCircularLaplaceTests(AcoshHelpers, unittest.TestCase):
                         source = "Laplace(" + name + "(" + str(rate) + "*t),t,s)"
                         forward = self.fields(source)
                         bound = self.fields("{" + source + " | s=" + text + "}")
-                        self.assertNotIn("Laplace(", forward["function"])
+                        self.assertNotIn("laplace(", forward["function"])
                         self.assertEqual(forward["tex"], bound["tex"])
                         self.assertLess(abs(self.value(bound)-reference(name, rate, s)), 3e-10)
 
@@ -78,15 +78,15 @@ class InverseCircularLaplaceTests(AcoshHelpers, unittest.TestCase):
                 result = self.fields("{Laplace(" + name + "(t),t,s) | s=" + s + "}")
                 self.assertEqual(result["value"], "NAN")
             result = self.fields("{Laplace(" + name + "(c*t),t,s) | s=2; c=-2}")
-            self.assertNotIn("Laplace(", result["function"])
+            self.assertNotIn("laplace(", result["function"])
             self.assertLess(abs(self.value(result)-reference(name, -2, 2)), 3e-10)
             free = self.fields("{Laplace(" + name + "(c*t),t,s) | c=-2, s=2}")
-            self.assertIn("Laplace(", free["function"])
+            self.assertIn("laplace(", free["function"])
             zero = self.fields("{Laplace(" + name + "(0*t),t,s) | s=2}")
             self.assertLess(abs(self.value(zero)-(0 if name == "asin" else math.pi/4)), 1e-14)
             for argument in ("c*t", "i*t", "t+1"):
                 result = self.fields("Laplace(" + name + "(" + argument + "),t,s)")
-                self.assertIn("Laplace(", result["function"])
+                self.assertIn("laplace(", result["function"])
 
     def test_rendering_and_native_branch_values(self):
         for name in ("asin", "acos"):

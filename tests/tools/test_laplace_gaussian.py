@@ -33,7 +33,7 @@ class LaplaceGaussianTests(unittest.TestCase):
                     fields = self.evaluate("{" + source + " | s=2}")
                     numerator = 2*rate**2 + (4 if function == "cos" else 0)
                     expected = numerator/(2*(4+4*rate**2))
-                    self.assertNotIn("Laplace(", fields["function"])
+                    self.assertNotIn("laplace(", fields["function"])
                     self.assertAlmostEqual(float(fields["value"]), expected, places=13)
                     copied = self.evaluate("{" + fields["unbound"] + " | s=2}")
                     self.assertAlmostEqual(float(copied["value"]), expected, places=13)
@@ -43,7 +43,7 @@ class LaplaceGaussianTests(unittest.TestCase):
         fields = self.evaluate("@L{sin((@pi*t)/2)^n}")
         self.assertIn("sum(", fields["function"])
         self.assertIn("@pi", fields["function"])
-        self.assertIn("Laplace(", self.evaluate("@L{sin((@pi*t^2)/2)^2}")["function"])
+        self.assertIn("laplace(", self.evaluate("@L{sin((@pi*t^2)/2)^2}")["function"])
 
     def test_public_mathematical_function_inventory_is_audited(self):
         import re
@@ -81,7 +81,7 @@ class LaplaceGaussianTests(unittest.TestCase):
             for source in ("exp(-t^2)", "e^(-t^2)"):
                 fields = self.evaluate("{@L("+source+") | s="+str(target)+"}")
                 self.assertAlmostEqual(float(fields["value"]), expected, places=13)
-                self.assertNotIn("Laplace(", fields["function"])
+                self.assertNotIn("laplace(", fields["function"])
                 self.assertNotIn("Re(s)", fields["expression"])
         fields = self.evaluate("{@L(exp(-(2*t+1)^2)) | s=1}")
         z = 1.25
@@ -100,12 +100,12 @@ class LaplaceGaussianTests(unittest.TestCase):
         for operand, target, expected in cases:
             with self.subTest(operand=operand, target=target):
                 fields = self.evaluate("{@L("+operand+") | s="+str(target)+"}")
-                self.assertNotIn("Laplace(", fields["function"])
+                self.assertNotIn("laplace(", fields["function"])
                 self.assertAlmostEqual(float(fields["value"]), expected, places=13)
 
     def test_symbolic_gaussian_guards_and_derivative(self):
         fields = self.evaluate("@L(exp(-a*t^2))")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         self.assertIn("realpart(a) > 0", fields["function"])
         self.assertNotIn("realpart(s)", fields["function"])
         fields = self.evaluate("{@L(exp(-a*t^2)) | s=1; a=-1}")

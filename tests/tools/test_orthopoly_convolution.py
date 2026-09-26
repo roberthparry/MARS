@@ -91,7 +91,7 @@ class PolynomialConvolutionTests(unittest.TestCase):
             for n in (0, 1, 3):
                 expression = f"{operator}{{Tn({n},{source})*rect({source}/2)/sqrt(1-{source}^2)}}"
                 fields = self.fields(expression, target)
-                self.assertNotIn("Fourier(", fields["function"], fields)
+                self.assertNotIn("fourier(", fields["function"], fields)
                 actual = self.value("{"+expression+" | "+target+"=0.7}", target)
                 bessel = sum((-1)**k*(0.7/2)**(2*k+n)/(math.factorial(k)*math.factorial(k+n)) for k in range(18))
                 expected = (1j**n/2 if inverse else math.pi*(-1j)**n)*bessel

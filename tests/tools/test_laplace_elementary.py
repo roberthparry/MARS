@@ -46,7 +46,7 @@ class LaplaceElementaryTests(unittest.TestCase):
     def assert_transform(self, operand, target, expected, constants="", places=9):
         bindings = "s=" + target + ("; " + constants if constants else "")
         fields = self.fields("{Laplace(" + operand + ",t,s) | " + bindings + "}")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         actual = self.value(fields)
         self.assertAlmostEqual(actual.real, complex(expected).real, places=places)
         self.assertAlmostEqual(actual.imag, complex(expected).imag, places=places)
@@ -70,7 +70,7 @@ class LaplaceElementaryTests(unittest.TestCase):
 
     def test_circular_symbolic_rate_preserves_complex_domain(self):
         fields = self.fields("Laplace(versin(c*t),t,s)")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         self.assertIn("Re(s)", fields["expression"])
         copied = self.fields("{" + fields["unbound"] + " | s=3; c=1+i}")
         expected = quadrature(lambda t: 1-cmath.cos((1+1j)*t), 3)
@@ -96,7 +96,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         fields = self.fields("Laplace(sech(c*t),t,s)")
         self.assertIn("digamma(", fields["function"])
         self.assertIn("sqrt(", fields["function"])
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         copied = self.fields(fields["expression"])
         self.assertEqual(copied["unbound"], fields["unbound"])
         for rate, numeric_rate in (("1+i", 1+1j), ("-1-i", -1-1j)):
@@ -119,7 +119,7 @@ class LaplaceElementaryTests(unittest.TestCase):
                 self.assert_transform(operand, "2", 1+math.exp(-3))
         self.assert_transform("abs(a*t+b)", "2", 0.5, "a=-2, b=0")
         fields = self.fields("Laplace(abs(c*t),t,s)")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         self.assertIn("c", fields["function"])
 
     def test_conjugation_does_not_conjugate_the_transform_variable(self):
@@ -127,7 +127,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         expected = (1-2j)/(target*target) + (3+1j)/target
         self.assert_transform("conj((1+2i)*t+3-i)", "2+i", expected)
         fields = self.fields("Laplace(conj(a*t+b),t,s)")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         copied = self.fields("{" + fields["unbound"] + " | s=2+i; a=1+2i, b=3-i}")
         self.assertAlmostEqual(self.value(copied).real, expected.real, places=12)
         self.assertAlmostEqual(self.value(copied).imag, expected.imag, places=12)
@@ -188,7 +188,7 @@ class LaplaceElementaryTests(unittest.TestCase):
             for target in ("2+i", "2-i"):
                 with self.subTest(rate=rate, target=target):
                     fields = self.fields("{Laplace(asinh(c*t),t,s) | s=" + target + "; c=" + str(rate) + "}")
-                    self.assertNotIn("Laplace(", fields["function"])
+                    self.assertNotIn("laplace(", fields["function"])
                     self.assertIn("bessely(", fields["function"])
                     self.assertIn("struveh(", fields["function"])
                     expected = quadrature(lambda t: math.asinh(rate*t), complex(target.replace("i", "j")))
@@ -210,7 +210,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         shifted = quadrature(lambda t: math.cosh(t+0.25)**5, 7, end=24)
         self.assert_transform("cosh(t+1/4)^5", "7", shifted)
         fields = self.fields("Laplace(cosh(c*t)^2,t,s)")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         valid = self.fields("{" + fields["unbound"] + " | s=3; c=-1}")
         self.assertAlmostEqual(self.value(valid).real, 7/15, places=12)
         invalid = self.fields("{" + fields["unbound"] + " | s=1; c=1}")
@@ -228,7 +228,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         for operand in cases:
             with self.subTest(operand=operand):
                 fields = self.fields("Laplace(" + operand + ",t,s)")
-                self.assertIn("Laplace(", fields["function"])
+                self.assertIn("laplace(", fields["function"])
 
     def test_atanh_real_rates_and_complex_targets(self):
         # Independent integration: t=(1 +/- u^2)/|c| removes the logarithmic endpoint.
@@ -259,7 +259,7 @@ class LaplaceElementaryTests(unittest.TestCase):
 
     def test_atanh_symbolic_guard_round_trip_and_zero(self):
         fields = self.fields("@L{atanh(ct)}")
-        self.assertNotIn("Laplace(", fields["function"])
+        self.assertNotIn("laplace(", fields["function"])
         self.assertIn("realpart(c) == c", fields["function"])
         self.assertIn(r"\in\mathbb{R}", fields["tex"])
         self.assertIn(r"\frac{1}{2\mkern-2mu s}\,\left[", fields["tex"])
@@ -271,7 +271,7 @@ class LaplaceElementaryTests(unittest.TestCase):
         invalid = self.fields("{"+fields["unbound"]+" | s=1; c=i}")
         self.assertEqual(invalid["value"], "NAN")
         self.assert_transform("atanh(0*t)", "-1", 0)
-        self.assertIn("Laplace(", self.fields("@L(atanh(i*t))")["function"])
+        self.assertIn("laplace(", self.fields("@L(atanh(i*t))")["function"])
 
 
 if __name__ == "__main__":

@@ -94,7 +94,7 @@ class StruveHTests(unittest.TestCase):
                          "@pi*(struve_h(0,s)-bessely(0,s))/(2*s)",
                          "@pi*(2*s/@pi*hypergeometricpfq(1,2,1,3/2,3/2,-s^2/4)-bessely(0,s))/(2*s)"):
             inverse = fields("InverseLaplace("+spectrum+",s,t)")
-            self.assertNotIn("InverseLaplace(", inverse["function"])
+            self.assertNotIn("inverselaplace(", inverse["function"])
             self.assertIn("asinh(t)", inverse["function"])
 
 

@@ -749,11 +749,11 @@ static expr_t *fourier_deriv(expr_t *expr)
 
 const expr_ops_t ops_fourier = {
     .eval = fourier_eval, .deriv = fourier_deriv, .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ", .function_name = "Fourier",
+    .kind = EXPR_KIND_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ", .function_name = "fourier",
     .TeX_name = "\\mathcal{F}", .simplify = fourier_simplify,
 };
 const expr_ops_t ops_inverse_fourier = {
     .eval = fourier_eval, .deriv = fourier_deriv, .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INVERSE_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ⁻¹", .function_name = "InverseFourier",
+    .kind = EXPR_KIND_INVERSE_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ⁻¹", .function_name = "inversefourier",
     .TeX_name = "\\mathcal{F}^{-1}", .simplify = fourier_simplify,
 };

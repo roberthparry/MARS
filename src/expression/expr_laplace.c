@@ -1597,7 +1597,7 @@ static expr_t *laplace_deriv(expr_t *transform)
 const expr_ops_t ops_laplace = {
     .eval = laplace_eval, .deriv = laplace_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_LAPLACE, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
-    .expression_name = "ℒ", .function_name = "Laplace", .TeX_name = "\\mathcal{L}",
+    .expression_name = "ℒ", .function_name = "laplace", .TeX_name = "\\mathcal{L}",
     .simplify = laplace_simplify,
 };
 

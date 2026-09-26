@@ -380,15 +380,15 @@ static void test_odd_hyperbolic_fourier_copy_and_rendering(void)
         if (index == 6u)
             ASSERT_TRUE(text && strstr(text, "tanh(x)") && !strstr(text, "k"));
         if (index == 7u)
-            ASSERT_TRUE(body && strstr(body, "coth(") && strstr(body, "k != 0") && !strstr(body, "Fourier("));
+            ASSERT_TRUE(body && strstr(body, "coth(") && strstr(body, "k != 0") && !strstr(body, "fourier("));
         if (index == 8u)
-            ASSERT_TRUE(body && strstr(body, "coth(x)") && strstr(body, "x != 0") && !strstr(body, "Fourier("));
+            ASSERT_TRUE(body && strstr(body, "coth(x)") && strstr(body, "x != 0") && !strstr(body, "fourier("));
         if (index == 9u)
-            ASSERT_TRUE(body && strstr(body, "exp(") && strstr(body, "k != 0") && !strstr(body, "Fourier("));
+            ASSERT_TRUE(body && strstr(body, "exp(") && strstr(body, "k != 0") && !strstr(body, "fourier("));
         if (index == 10u)
-            ASSERT_TRUE(body && strstr(body, "atan(x)") && !strstr(body, "x != 0") && !strstr(body, "Fourier("));
+            ASSERT_TRUE(body && strstr(body, "atan(x)") && !strstr(body, "x != 0") && !strstr(body, "fourier("));
         if (index >= 11u) {
-            ASSERT_TRUE(body && !strstr(body, "Fourier("));
+            ASSERT_TRUE(body && !strstr(body, "fourier("));
             ASSERT_TRUE(text && !strstr(text, ": principal value") && !strstr(text, ": finite part"));
         }
         expr_free(function_copy);

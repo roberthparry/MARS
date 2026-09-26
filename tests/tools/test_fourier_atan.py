@@ -14,7 +14,7 @@ class AtanFourierTests(unittest.TestCase):
                 result = fields("{"+operator+"(atan(x),x,k) | k="+str(point)+"}")
                 expected = coefficient*math.exp(-abs(point))/point
                 self.assertLess(abs(number(result)-expected), 1e-12)
-                self.assertNotIn("Fourier(", result["function"])
+                self.assertNotIn("fourier(", result["function"])
 
     def test_copied_formulas_round_trip(self):
         for argument in ("x", "2*x+1", "-2*x+1", "x/2-1/3"):
@@ -24,7 +24,7 @@ class AtanFourierTests(unittest.TestCase):
                 for copied in (algebra(spectrum), spectrum["expression"]):
                     with self.subTest(argument=argument, direction=forward, copied=copied):
                         result = fields(f"{inverse}("+copied+",k,x)", "x")
-                        self.assertNotIn("Fourier(", result["function"])
+                        self.assertNotIn("fourier(", result["function"])
                         self.assertNotIn("k =", result["expression"])
                         for point in (-0.3, 0, 0.7):
                             bound = result["expression"].replace("x = NAN", "x = "+str(point))
@@ -38,7 +38,7 @@ class AtanFourierTests(unittest.TestCase):
         for condition in ("a ∈ ℝ", "b ∈ ℝ", "a ≠ 0", "k ≠ 0"):
             self.assertIn(condition, spectrum["expression"])
         restored = fields("InverseFourier("+spectrum["expression"]+",k,x)", "x")
-        self.assertNotIn("Fourier(", restored["function"])
+        self.assertNotIn("fourier(", restored["function"])
         for rate, offset in ((2, 0.3), (-2, 0.3), (0.5, -0.2)):
             result = fields("{Fourier(atan(a*x+b),x,k) | k=0.7; a="+str(rate)+"; b="+str(offset)+"}")
             expected = -1j*math.pi*math.copysign(1, rate)*cmath.exp(-0.7/abs(rate)+1j*0.7*offset/rate)/0.7
@@ -97,7 +97,7 @@ class AtanFourierTests(unittest.TestCase):
         for source in ("@F{atan(i*x)}", "@F{atan(x+i)}", "@Finv{exp(abs(k))/k}",
                        "@Finv{exp(-abs(k))/k^2}",
                        "InverseFourier(exp(-abs(k))/k where (k-1 ≠ 0),k,x)"):
-            self.assertIn("Fourier(", fields(source, "x")["function"])
+            self.assertIn("fourier(", fields(source, "x")["function"])
 
 
 class ZZAtanFourierReadmeExamples(unittest.TestCase):

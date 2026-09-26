@@ -162,8 +162,8 @@ class TransformRoundTripTests(unittest.TestCase):
         for forward, inverse, frequency, orders, points in cases:
             spectrum = algebra(fields(f"{forward}(t^n,t,{frequency})", frequency))
             restored = fields(f"{inverse}({spectrum},{frequency},t)", "t")
-            self.assertNotIn("Fourier(", restored["function"])
-            self.assertNotIn("Laplace(", restored["function"])
+            self.assertNotIn("fourier(", restored["function"])
+            self.assertNotIn("laplace(", restored["function"])
             for order in orders:
                 for point in points:
                     with self.subTest(direction=forward, order=order, point=point):
@@ -192,12 +192,12 @@ class TransformRoundTripTests(unittest.TestCase):
 
     def check_round_trip(self, source, forward, inverse, frequency, points):
         transformed = fields(f"{forward}({source},t,{frequency})", frequency)
-        self.assertNotIn("Fourier(", transformed["function"])
-        self.assertNotIn("Laplace(", transformed["function"])
+        self.assertNotIn("fourier(", transformed["function"])
+        self.assertNotIn("laplace(", transformed["function"])
         spectrum = algebra(transformed)
         restored = fields(f"{inverse}({spectrum},{frequency},t)", "t")
-        self.assertNotIn("Fourier(", restored["function"], restored["expression"])
-        self.assertNotIn("Laplace(", restored["function"], restored["expression"])
+        self.assertNotIn("fourier(", restored["function"], restored["expression"])
+        self.assertNotIn("laplace(", restored["function"], restored["expression"])
         recovered = algebra(restored)
         # Reparse the inverse result too: a correct internal tree can be rendered incorrectly.
         for point in points:

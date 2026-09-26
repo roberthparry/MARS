@@ -525,8 +525,8 @@ not claimed by these ordinary-integral tables.
 The parser accepts both these canonical forms and the typeable `@L`, `@Linv`,
 `@F`, and `@Finv` aliases, so expression-style output remains round-trippable.
 If script-letter output is unavailable, the textual fallbacks are
-`Laplace(...)`, `InverseLaplace(...)`, `Fourier(...)`, and
-`InverseFourier(...)`.
+`laplace(...)`, `inverselaplace(...)`, `fourier(...)`, and
+`inversefourier(...)`.
 
 Inferred variables remain omitted; an explicit source variable is preserved.
 The third parameter is included only when it is explicit or differs from the

@@ -28,7 +28,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
 
     def assert_inverse(self, spectrum, expected, points=(0.2, 0.7, 1.6)):
         inverse = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         recovered = self.algebra(inverse)
         for time in points:
             with self.subTest(spectrum=spectrum, time=time):
@@ -51,7 +51,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
         for source, expected in cases:
             with self.subTest(source=source):
                 forward = self.fields("Laplace("+source+",t,s)", "s")
-                self.assertNotIn("Laplace(", forward["function"])
+                self.assertNotIn("laplace(", forward["function"])
                 self.assert_inverse(self.algebra(forward), expected)
 
     def test_independent_fractional_and_shifted_spectra(self):
@@ -83,7 +83,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
         self.assert_inverse("((s+1)/s^2)^2", lambda t: t+t*t+t**3/6)
         self.assert_inverse("((s+1)^2)^(-2)", lambda t: t**3*math.exp(-t)/6)
         forward = self.fields("Laplace(causal_convolve(t,t,t),t,s)", "s")
-        self.assertNotIn("Laplace(", forward["function"])
+        self.assertNotIn("laplace(", forward["function"])
         self.assert_inverse(self.algebra(forward), lambda t: t**3/6)
 
     def test_unbound_hyperbolic_powers_round_trip_through_every_supported_order(self):
@@ -93,7 +93,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
             for order in range(17):
                 with self.subTest(name=name, order=order):
                     forward = self.fields(f"Laplace({name}(t)^{order},t,s)", "s")
-                    self.assertNotIn("Laplace(", forward["function"])
+                    self.assertNotIn("laplace(", forward["function"])
                     if order > 1:
                         self.assertIn("sum(", forward["function"])
                     self.assert_inverse(self.algebra(forward), lambda t: function(t)**order)
@@ -104,7 +104,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
                 with self.subTest(name=name, order=order, rate=rate):
                     source = f"{name}({rate}*t+({offset}))^{order}"
                     forward = self.fields("Laplace("+source+",t,s)", "s")
-                    self.assertNotIn("Laplace(", forward["function"])
+                    self.assertNotIn("laplace(", forward["function"])
                     self.assert_inverse(self.algebra(forward), lambda t: function(rate*t+offset)**order)
                     # The original spectral conditions, not a stripped test formula,
                     # must reject targets to the left of n*abs(Re(a)).
@@ -132,10 +132,10 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
 
     def test_symbolic_power_and_delay_keep_their_domains(self):
         power = self.fields("@Linv{s^(-p)}")
-        self.assertNotIn("InverseLaplace(", power["function"])
+        self.assertNotIn("inverselaplace(", power["function"])
         self.assertIn("Re(p) > 0", power["expression"])
         delay = self.fields("@Linv{exp(-c*s)/s^2}")
-        self.assertNotIn("InverseLaplace(", delay["function"])
+        self.assertNotIn("inverselaplace(", delay["function"])
         self.assertIn("Re(c) > 0", delay["expression"])
         self.assertIn("c ∈ ℝ", delay["expression"])
         for time in (0.2, 0.8):
@@ -146,7 +146,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
         # Binding blocks are top-level syntax; use an inline domain inside the transform.
         spectrum = "(s^(-p) where (Re(s)>0; Re(p)>0))"
         result = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         self.assertIn("Re(p) > 0", result["expression"])
         self.assertNotIn("Re(s)", result["expression"])
 
@@ -154,7 +154,7 @@ class InverseLaplaceGeneralTests(unittest.TestCase):
         for spectrum in ("s^(1/2)", "1/(-s+2)^(1/2)", "exp(s)/s", "exp(-i*s)/s"):
             with self.subTest(spectrum=spectrum):
                 result = self.fields("@Linv{"+spectrum+"}")
-                self.assertIn("InverseLaplace(", result["function"])
+                self.assertIn("inverselaplace(", result["function"])
 
 
 if __name__ == "__main__":

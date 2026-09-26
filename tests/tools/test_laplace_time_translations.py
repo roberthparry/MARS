@@ -18,7 +18,7 @@ class LaplaceTimeTranslationTests(unittest.TestCase):
 
     def test_delayed_function_retains_history(self):
         fields = self.fields("@L{u(t-1/4)}")
-        self.assertIn("Laplace(u(t), t, s)", fields["function"])
+        self.assertIn("laplace(u(t), t, s)", fields["function"])
         self.assertIn("integral(-1/4, 0, u(t).exp(-s.t), t)", fields["function"])
         self.assertIn("exp(-1/4.s)", fields["function"])
         self.assertNotIn("realpart(s)", fields["function"])
@@ -28,14 +28,14 @@ class LaplaceTimeTranslationTests(unittest.TestCase):
 
     def test_weighted_translation_and_factor_association(self):
         expected = self.fields("@L{16t^2u(t-1/4)}")
-        self.assertIn("16.Derivative(", expected["function"])
+        self.assertIn("16.derivative(", expected["function"])
         self.assertIn(", s, 2)", expected["function"])
         self.assertIn(r"\frac{d^{2}}{d s^{2}}\left[", expected["tex"])
         self.assertIn("integral(-1/4, 0,", expected["function"])
         for source in ("@L{16*(t^2*u(t-1/4))}", "@L{u(t-1/4)*(16*t^2)}"):
             self.assertEqual(self.fields(source)["tex"], expected["tex"])
         copied = self.fields(expected["unbound"])
-        self.assertIn("Derivative(Laplace(u(t), t, s), s, 2)", copied["function"])
+        self.assertIn("derivative(laplace(u(t), t, s), s, 2)", copied["function"])
         self.assertIn("integral(-1/4, 0,", copied["function"])
 
     def test_zero_shift_advances_and_function_names(self):
@@ -44,12 +44,12 @@ class LaplaceTimeTranslationTests(unittest.TestCase):
         self.assertIn("exp(2.s)", fields["function"])
         self.assertIn("integral(2, 0, g(t).exp(-s.t), t)", fields["function"])
         fields = self.fields("@L{t*u(t)}")
-        self.assertIn("-Derivative(Laplace(u(t), t, s), s, 1)", fields["function"])
+        self.assertIn("-derivative(laplace(u(t), t, s), s, 1)", fields["function"])
         self.assertNotIn("integral(", fields["function"])
 
     def test_symbolic_shift_and_explicit_variables(self):
         fields = self.fields("@L(u(x-a),x,p)")
-        self.assertIn("Laplace(u(x), x, p)", fields["function"])
+        self.assertIn("laplace(u(x), x, p)", fields["function"])
         self.assertIn("integral(-a, 0, u(x).exp(-p.x), x)", fields["function"])
         self.assertIn(r"\in\mathbb{R}", fields["tex"])
         self.assertNotIn("realpart(p) >", fields["function"])
@@ -60,7 +60,7 @@ class LaplaceTimeTranslationTests(unittest.TestCase):
 
     def test_derivative_order_limits_and_symbolic_bindings(self):
         fields = self.fields("@L{t^3*u(t-1)}")
-        self.assertIn("-Derivative(", fields["function"])
+        self.assertIn("-derivative(", fields["function"])
         self.assertIn(", s, 3)", fields["function"])
         self.assertIn(r"\frac{d^{3}}{d s^{3}}", fields["tex"])
         fields = self.fields("@L{t^64*u(t-1)}")
@@ -68,7 +68,7 @@ class LaplaceTimeTranslationTests(unittest.TestCase):
         fields = self.fields("@L{t^65*u(t-1)}")
         self.assertNotIn("integral(", fields["function"])
         fields = self.fields("{@L{t^2*u(t-a)} | s=3; a=1/4}")
-        self.assertIn("Derivative(", fields["function"])
+        self.assertIn("derivative(", fields["function"])
         self.assertIn(", s, 2)", fields["function"])
         self.assertIn("integral(-a, 0,", fields["function"])
         self.assertIn(r"\int_{-a}^{0}", fields["tex"])

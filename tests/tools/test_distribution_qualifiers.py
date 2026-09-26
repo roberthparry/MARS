@@ -174,7 +174,7 @@ class DistributionQualifierTests(unittest.TestCase):
         spectrum = self.fields("{@F{acosh(x)} | k=1}", "k")
         inverse = self.fields("InverseFourier("+spectrum["expression"]+",k,x)")
         self.assertIn("acosh(x)", inverse["expression"])
-        self.assertNotIn("Fourier(", inverse["function"])
+        self.assertNotIn("fourier(", inverse["function"])
         for point, expected in ((1, 0), (0, 0.5j*math.pi), (-1, 1j*math.pi)):
             bound = inverse["expression"].replace("x = NAN", f"x = {point}")
             self.assertLess(abs(self.value(self.fields(bound))-expected), 2e-12)

@@ -26,7 +26,7 @@ class AnalyticFourierTests(unittest.TestCase):
         copied = spectrum("sinh(t)")
         recovered = fields("@Finv{"+copied+"}", "t")
         self.assertIn("sinh(t)", recovered["expression"])
-        self.assertNotIn("Fourier(", recovered["function"])
+        self.assertNotIn("fourier(", recovered["function"])
 
     def test_finite_exponential_families_round_trip_both_directions(self):
         cases = ("sinh(z)", "cosh(z)", "sinh(2*z+1)", "cosh(-2*z+1)",
@@ -43,7 +43,7 @@ class AnalyticFourierTests(unittest.TestCase):
                     for point in (-0.7, 0.4):
                         result = fields("{"+opposite+"{"+copied+"} | "+source+"="+str(point)+"}", source)
                         expected = fields("{"+body+" | "+source+"="+str(point)+"}", source)
-                        self.assertNotIn("Fourier(", result["function"])
+                        self.assertNotIn("fourier(", result["function"])
                         self.assertLess(abs(number(result)-number(expected)), 1e-11)
 
     def test_evaluation_action_and_duality(self):
@@ -70,7 +70,7 @@ class AnalyticFourierTests(unittest.TestCase):
     def test_no_unsupported_delta_scaling_or_non_entire_extension(self):
         for body in ("analytic_delta(2*ω+i)", "analytic_delta(ω^2+i)", "delta(ω+i)"):
             result = fields("@Finv{"+body+"}", "t")
-            self.assertTrue("Fourier(" in result["function"] or result["value"] == "NAN")
+            self.assertTrue("fourier(" in result["function"] or result["value"] == "NAN")
         for body in ("sinh(t)^(1/2)", "sinh(t)^(1+i)", "exp(t^2)"):
             result = fields("@F{"+body+"}")
             self.assertNotIn("analytic_delta", result["expression"])
@@ -114,7 +114,7 @@ class ZZAnalyticFourierReadmeExamples(unittest.TestCase):
         self.assertIn("analytic_delta", result["expression"])
         recovered = fields("@Finv{@pi*(analytic_delta(ω+i)-analytic_delta(ω-i))}", "t")
         self.assertIn("sinh(t)", recovered["expression"])
-        self.assertNotIn("Fourier(", recovered["function"])
+        self.assertNotIn("fourier(", recovered["function"])
 
 
 if __name__ == "__main__":

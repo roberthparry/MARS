@@ -17,7 +17,7 @@ class BranchFourierTests(unittest.TestCase):
                     for copied in (algebra(spectrum), spectrum["expression"]):
                         with self.subTest(source=source, direction=forward, copied=copied):
                             restored = fields(f"{inverse}({copied},k,x)", "x")
-                            self.assertNotIn("Fourier(", restored["function"])
+                            self.assertNotIn("fourier(", restored["function"])
                             self.assertNotIn("k =", restored["expression"])
                             for point in (-2.3, -1, -0.2, 0, 0.7, 1, 2.3):
                                 bound = restored["expression"].replace("x = NAN", f"x = {point}")
@@ -71,7 +71,7 @@ class BranchFourierTests(unittest.TestCase):
             spectrum = (f"2*i*@pi*((ln(2)-@eulermascheroni)*delta(k)"
                         f"-({rate}/abs({rate}))*besselj(0,k/({rate}))*Dk(step(k/({rate}))*ln(abs(k/({rate})))))")
             result = fields(f"InverseFourier({spectrum},k,x)", "x")
-            self.assertNotIn("Fourier(", result["function"])
+            self.assertNotIn("fourier(", result["function"])
             for point in (-1.3, 0, 1.3):
                 actual = fields(result["expression"].replace("x = NAN", f"x = {point}"), "x")
                 expected = fields(f"asin({rate}*({point}))", "x")
@@ -86,11 +86,11 @@ class BranchFourierTests(unittest.TestCase):
             for offset in (0, 2):
                 source = f"{function}(0*x+{offset})"
                 spectrum = fields(f"Fourier({source},x,k)")
-                self.assertNotIn("Fourier(", spectrum["function"])
+                self.assertNotIn("fourier(", spectrum["function"])
                 inverse = fields("{InverseFourier("+algebra(spectrum)+",k,x) | x=0}", "x")
                 self.assertLess(abs(number(inverse)-number(fields(f"{function}({offset})"))), 2e-12)
         for source in ("acosh(x+i)", "acosh(i*x)", "acosh(x^2)"):
-            self.assertIn("Fourier(", fields(f"Fourier({source},x,k)")["function"])
+            self.assertIn("fourier(", fields(f"Fourier({source},x,k)")["function"])
 
     def test_acosh_distribution_against_gaussian_test_functions(self):
         # Check the full distribution independently, including the impulse and one-sided cutoff.
@@ -134,11 +134,11 @@ class BranchFourierTests(unittest.TestCase):
         for argument in ("1+i*x", "2+2*i*x", "1-2*i*x", "a+i*x", "1+i/3+i*x"):
             for forward, inverse in (("Fourier", "InverseFourier"), ("InverseFourier", "Fourier")):
                 spectrum = fields(f"{forward}(gamma({argument}),x,k)")
-                self.assertNotIn("Fourier(", spectrum["function"])
+                self.assertNotIn("fourier(", spectrum["function"])
                 for copied in (algebra(spectrum), spectrum["expression"]):
                     with self.subTest(argument=argument, direction=forward):
                         result = fields(f"{inverse}({copied},k,x)", "x")
-                        self.assertNotIn("Fourier(", result["function"])
+                        self.assertNotIn("fourier(", result["function"])
                         for point in (-0.7, 0, 1.2):
                             bound = result["expression"].replace("x = NAN", f"x = {point}").replace("a = NAN", "a = 2")
                             expected = fields("{gamma("+argument+f") | x={point}; a=2"+"}", "x")
@@ -155,14 +155,14 @@ class BranchFourierTests(unittest.TestCase):
             result = fields("Fourier("+source+",x,k)")
             self.assertEqual(result["value"], "NAN")
             self.assertIn("no ordinary or tempered-distribution", result["value_note"])
-            self.assertNotIn("Fourier(", result["function"])
+            self.assertNotIn("fourier(", result["function"])
         result = fields("@F{gamma(a+i*b*x)}")
         self.assertIn("Re(a) > 0", result["expression"])
         self.assertIn("b ∈ ℝ", result["expression"])
         self.assertIn("b ≠ 0", result["expression"])
         for source in ("@F{gamma(-1+i*x)}", "@F{asin(x+i)}", "@F{atanh(i*x)}",
                        "@Finv{exp(k+exp(k))}"):
-            self.assertIn("Fourier(", fields(source)["function"])
+            self.assertIn("fourier(", fields(source)["function"])
 
 
 class ZZBranchFourierReadmeExamples(unittest.TestCase):
@@ -186,7 +186,7 @@ class ZZBranchFourierReadmeExamples(unittest.TestCase):
     def test_readme_acosh_spectrum(self):
         # README examples: docs/expression.md, acosh row using G(k) defined above the table.
         spectrum = fields("@F{acosh(x)}")
-        self.assertNotIn("Fourier(", spectrum["function"])
+        self.assertNotIn("fourier(", spectrum["function"])
         self.assertIn("@eulermascheroni", spectrum["function"])
         self.assertIn("δ(k)", spectrum["expression"])
         # Expanded i*(pi^2*delta-G): the two imaginary factors are already cancelled.
