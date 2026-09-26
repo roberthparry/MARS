@@ -320,6 +320,23 @@ static void test_from_string_function_hash(void)
     number_t unset_value;
 
     ASSERT_TRUE(expr_stringin_function_hash_is_valid());
+    {
+        /* Unknown names may share all sampled hash positions with a real keyword.
+         * The final spelling check must still reject them, including invalid UTF-8. */
+        static const char *const misses[] = {
+            "arccXversin", "normXlcdf", "sin_unknown_function_name", "\xCE", "\x80sin", "Si", "Ci",
+        };
+        expr_t *argument = expr_from_string("x", NULL);
+        ASSERT_NOT_NULL(argument);
+        for (size_t i = 0u; i < sizeof(misses) / sizeof(misses[0]); ++i) {
+            const char *canonical = NULL;
+            expr_t *result = expr_apply_unary_function(misses[i], argument, &canonical);
+            ASSERT_TRUE(result == NULL);
+            ASSERT_TRUE(canonical == NULL);
+            expr_free(result);
+        }
+        expr_free(argument);
+    }
     for (size_t i = 0u; i < sizeof(lowercase_alias_inputs) / sizeof(lowercase_alias_inputs[0]); ++i) {
         expr_t *alias = expr_from_string(lowercase_alias_inputs[i], NULL);
 
