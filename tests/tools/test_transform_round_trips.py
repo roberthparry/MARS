@@ -2,7 +2,7 @@
 
 Compare values away from jumps and singularities. Unilateral Laplace recovery
 only determines positive time. Distributional pairs have separate tests: Dirac
-impulses must never be tested by assigning them a finite pointwise value.
+impulses must never be assigned a finite pointwise value on their support.
 """
 
 import math

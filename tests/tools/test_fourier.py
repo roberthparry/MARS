@@ -229,7 +229,10 @@ class FourierTests(unittest.TestCase):
             self.assertIn(" : finite part", derivative["function"])
             for point in (0, 1):
                 value = self.fields("{"+alias+"(1/abs(x)) | x="+str(point)+"}", "x")
-                self.assertTrue(math.isnan(float(value.get("value", "nan"))))
+                if point == 0:
+                    self.assertTrue(math.isnan(float(value.get("value", "nan"))))
+                else:
+                    self.assertEqual(float(value["value"]), 1)
 
     def test_log_fourier_action_on_gaussian_test_functions(self):
         # Independent weak-transform check, not pointwise evaluation of a distribution.

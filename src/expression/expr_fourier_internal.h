@@ -50,6 +50,7 @@ UNARY_HELPER(rect)
 UNARY_HELPER(tri)
 UNARY_HELPER(sinc)
 UNARY_HELPER(delta)
+UNARY_HELPER(analytic_delta)
 UNARY_HELPER(step)
 UNARY_HELPER(principal_value)
 UNARY_HELPER(finite_part)
@@ -271,6 +272,9 @@ static inline const expr_t *exponent(const expr_t *f)
     const expr_t *base = NULL, *power = NULL;
     return expr_match_pow_expr(f, &base, &power) && expr_is_const(base) && num_eq(base->c, NUM_E) ? power : NULL;
 }
+
+/** Match finite exponential spectra and complex evaluation functionals before normalisation. */
+expr_t *expr_fourier_analytic_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
 
 /** Match a complete hyperbolic beta spectrum, returning an arena-owned unnormalised Fourier result. */
 expr_t *expr_fourier_beta_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);

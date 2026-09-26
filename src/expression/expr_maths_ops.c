@@ -5380,6 +5380,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_CIRC] = &ops_circ,
         [EXPR_KIND_SINC] = &ops_sinc,
         [EXPR_KIND_DELTA] = &ops_delta,
+        [EXPR_KIND_ANALYTIC_DELTA] = &ops_analytic_delta,
         [EXPR_KIND_PRINCIPAL_VALUE] = &ops_principal_value,
         [EXPR_KIND_FINITE_PART] = &ops_finite_part,
         [EXPR_KIND_REAL_BOUND] = &ops_real_bound,

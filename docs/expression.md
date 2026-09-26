@@ -542,7 +542,8 @@ non-negative-integer condition. `Derivative` (also `ordered_derivative`)
 preserves an unspecified unary function or Dirac delta and its derivative order
 separately; the derivative is taken with respect to that function's argument.
 Other built-in functions continue to use ordinary derivative notation. Delta derivatives are
-rendered as $\delta^{(n)}$ in TeX and remain distributions, not numerical values.
+rendered as $\delta^{(n)}$ in TeX and remain distributional expressions. Their regular
+restrictions evaluate to zero off the impulse support; no finite value is assigned on it.
 These identities assume the relevant
 ordinary transform or tempered-distribution interpretation exists; they are
 not convergence proofs for arbitrary functions.
@@ -581,10 +582,15 @@ $$
 This fixes the delta coefficient; changing the cutoff changes that coefficient.
 The reciprocal-absolute-value pair is implemented in both directions. Other
 finite-part operands are retained formally, without claiming transform support.
-Derivatives and unresolved integrals remain formal, and finite sums retain the
-distribution terms. No pointwise numerical value is assigned, even away from
-the singularity; scalar and matrix numerical APIs are therefore not provided.
-The Expression, Function and TeX cards retain the same distributional result.
+Derivatives and unresolved integrals retain their distributional form, and finite
+sums retain the distribution terms. Numerical evaluation uses the ordinary
+restriction away from singularities: an impulse contributes zero off its support,
+and a principal-value or finite-part term evaluates its finite regular part.
+At a singularity, or with required bindings unset, the Value card remains absent.
+Distributional derivatives likewise evaluate their regular derivatives where these
+can be established. Scalar and matrix distribution APIs are not provided.
+The Expression, Function and TeX cards retain the distributional result, including
+its impulse and regularisation terms, so numerical evaluation does not change its inverse.
 An unqualified complex `ln(x)` is different and remains unsupported here.
 
 ### Hyperbolic powers and convergence
@@ -623,7 +629,10 @@ of a constant whenever the constant itself is defined.
 
 Positive real part of the effective sinh/cosh exponent causes exponential
 growth, so neither an ordinary nor a tempered-distribution Fourier transform
-exists for real non-zero scale. For sinh powers, $\Re(n)\le-1$ instead gives a
+exists for real non-zero scale. Finite exponential sums have the separate
+analytic-functional extension described below. Other proven growing cases return
+`NAN` with an explicit non-existence diagnostic, rather than an unevaluated transform.
+For sinh powers, $\Re(n)\le-1$ instead gives a
 non-integrable singularity. The exponent $-1$ has the separate symmetric
 `csch` rule below; other principal-value or finite-part prescriptions are not
 inferred by continuing the beta formula.
@@ -633,9 +642,49 @@ retain the convergence conditions rather than being declared divergent.
 | Input | Output |
 | --- | --- |
 | `{@F{sinh(t)^(-1/2)} \| ω=0}` | Approximately $3.708149354602744-3.708149354602744i$ |
-| `@F{sinh(t)^2}` | Symbolic transform with an exponential-growth diagnostic: no ordinary or tempered-distribution Fourier transform. |
+| `@F{sinh(t)^2}` | $\frac{\pi}{2}[\delta(\omega+2i)+\delta(\omega-2i)-2\delta(\omega)]$, an analytic-functional spectrum with no pointwise value. |
 | `@F{sinh(t)^(-1)}` | $-i\pi\tanh(\pi\omega/2)$, $\omega\in\mathbb R$. |
 | `@Finv{(B(1/4+i*ω/2,1/2)-i*B(1/4-i*ω/2,1/2))/sqrt(2)}` | $\sinh(t)^{-1/2}$ on the principal branch, for real $t\ne0$. |
+
+### Analytic-functional Fourier extension
+
+Finite sums of affine exponentials can be transformed beyond the ordinary and
+tempered-distribution Fourier domains. MARS represents evaluation at a complex
+frequency with a separate expression node, `analytic_delta`, rendered with the
+usual $\delta$ symbol. In this extended interpretation its definition is
+
+$$
+\langle\delta(\omega-z),\phi(\omega)\rangle=\phi(z),
+\qquad z\in\mathbb C,\quad\phi\in\mathcal H(\mathbb C),
+$$
+
+where $\mathcal H(\mathbb C)$ is the space of entire functions. This is not a
+Dirac delta evaluated at a complex number, nor a convergent integral over the
+real line. The evaluation note explicitly identifies the extended interpretation.
+The aliases `AnalyticDelta` and `δℂ` construct the same node; Function output
+uses the parser-supported `analytic_delta` spelling.
+
+| Input | Output |
+| --- | --- |
+| `@F{sinh(t)}` | $\pi[\delta(\omega+i)-\delta(\omega-i)]$, $\omega\in\mathbb R$. |
+| `@Finv{@pi*(analytic_delta(ω+i)-analytic_delta(ω-i))}` | $\sinh(t)$, $t\in\mathbb R$. |
+
+Inversion applies the functional to $e^{i\omega t}/(2\pi)$, giving
+$(e^t-e^{-t})/2$. Both transform directions support affine `sinh` and `cosh`,
+their non-negative integer powers through order 32, and equivalent negative
+integer powers of the reciprocal functions. Non-real frequency shifts of affine
+exponentials use the same representation. This does not analytically continue
+the beta-function rules for fractional hyperbolic powers.
+
+The implemented evaluation arguments must be monic affine expressions in the
+transform variable; nonlinear arguments and implicit scaling of a complex
+evaluation functional are not inferred. Symbolic differentiation and finite
+sums preserve these nodes. No ordinary step-function primitive is assigned.
+There is no corresponding numerical scalar or matrix function: an analytic
+functional has no pointwise value, including away from its evaluation point.
+The Value card therefore remains absent for its spectrum; the recovered input
+function can be evaluated normally. Ordinary `delta` retains its existing real
+distribution semantics.
 
 ### Odd hyperbolic Fourier pairs
 
@@ -968,16 +1017,29 @@ Their definitions are:
 | `tri(x)` | $\max(1-\lvert x\rvert,0)$ for real arguments. Alias: `Λ`. |
 | `circ(x)` | The even, unit-radius profile: one for $\lvert x\rvert<1$, zero outside, one half at either endpoint. Applied to a single real coordinate this is an interval, **not a two-dimensional disk transform**. |
 | `sinc(x)` | $\sin(\pi x)/(\pi x)$ with the removable value one at zero; entire for complex arguments. |
-| `delta(x)` | The Dirac distribution, with no invented finite pointwise value. Aliases: `δ`, `@delta`, `DiracDelta`. Expression output uses `δ(x)`; Function output uses `delta(x)`. |
+| `delta(x)` | The Dirac distribution: numerical evaluation gives zero for finite non-zero real arguments, and no finite pointwise value at zero. Aliases: `δ`, `@delta`, `DiracDelta`. Expression output uses `δ(x)`; Function output uses `delta(x)`. |
 | `principal_value(x)` | An explicit principal-value interpretation, not a pointwise numerical regularisation. Alias: `PV`. |
 
 The real piecewise functions reject non-real scalar arguments. Distributional
-functions intentionally have no ordinary numeric or matrix API. In particular,
+functions have no standalone scalar or matrix API; expression evaluation can
+evaluate their ordinary restrictions away from singularities. In particular,
 `u(t)` remains an arbitrary function and is never silently interpreted as a step.
 Differentiation, affine-argument primitives and finite numerical sums are
 available for the ordinary signal functions; step/pulse derivatives retain
 their boundary impulses. Sinc calculus uses entire representations that remain
 regular at zero. General principal-value integration remains symbolic.
+
+Numerical evaluation affects only the Value card. These examples leave the full
+symbolic spectrum intact, including the impulse at zero needed by the inverse:
+
+| Input | Value-card output |
+| --- | --- |
+| `{@F{acosh(x)} \| k=1}` | `-4.8078788612688259965…` |
+| `{@F{acosh(x)} \| k=-1}` | `0` |
+| `{@F{ln(abs(x))} \| k=2}` | `-1.5707963267948966192…` |
+
+At k = 0 these spectra have no finite pointwise value. No impulse or finite-part
+term is removed from the mathematical cards to obtain the values above.
 
 Principal-value and finite-part operators remain exact nodes internally. Expression
 and TeX output show their operands with term-specific interpretation qualifications,

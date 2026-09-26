@@ -547,10 +547,26 @@ static bool mul_coefficient_needs_parens(const expr_t *factor, bool leading)
     return mul_factor_needs_visible_parens(factor);
 }
 
+/* Addition emits the leading sign separately; a pure imaginary coefficient is then a single term.
+ * Products still need grouping around trailing negative factors, and a+bi still needs grouping. */
+static bool additive_const_needs_visible_parens(const expr_t *constant)
+{
+    if (!constant || !expr_is_const(constant))
+        return false;
+    if (expr_tostring_should_emit_binding_expr(constant))
+        return mul_factor_needs_visible_parens(constant);
+    if (num_is_real(constant->c))
+        return false;
+    number_t real = num_real_part(constant->c);
+    bool grouped = !num_is_zero(real);
+    num_destroy(&real);
+    return grouped;
+}
+
 static int add_rhs_needs_visible_parens(const expr_t *rhs)
 {
-    if ((rhs && expr_is_const(rhs) && mul_factor_needs_visible_parens(rhs)) ||
-        (expr_is_neg(rhs) && rhs->a && expr_is_const(rhs->a) && mul_factor_needs_visible_parens(rhs->a)))
+    if (additive_const_needs_visible_parens(rhs) ||
+        (expr_is_neg(rhs) && additive_const_needs_visible_parens(rhs->a)))
         return 1;
 
     if (rhs && expr_is_const(rhs) && expr_tostring_should_emit_binding_expr(rhs) && rhs->binding_expr) {
@@ -3475,6 +3491,7 @@ static bool TeX_unary_has_bare_greek_argument(const expr_t *function)
         [EXPR_KIND_CIRC]            = true,
         [EXPR_KIND_SINC]            = true,
         [EXPR_KIND_DELTA]           = true,
+        [EXPR_KIND_ANALYTIC_DELTA]  = true,
         [EXPR_KIND_PRINCIPAL_VALUE] = true,
         [EXPR_KIND_FINITE_PART]     = true,
     };
@@ -4410,7 +4427,7 @@ static bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
 {
     const expr_t *constant = expr_is_neg(expr) ? expr->a : expr;
 
-    return constant && expr_is_const(constant) && mul_factor_needs_visible_parens(constant);
+    return additive_const_needs_visible_parens(constant);
 }
 
 static bool emit_TeX_expr_abs_needs_visible_add_parens(const expr_t *expr)

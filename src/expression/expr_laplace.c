@@ -1607,6 +1607,10 @@ const char *expr_transform_value_note(const expr_t *expr)
 {
     if (!expr)
         return NULL;
+    if (!expr_is_integral_transform(expr) && expr_fourier_has_analytic_functional(expr))
+        return "Extended Fourier transform: analytic_delta(w-z) acts by phi(z) on entire test functions. "
+               "This is a complex evaluation functional, not a real Dirac distribution or an ordinary "
+               "Fourier integral. It has no pointwise numerical values; inversion uses its analytic action.";
     if (expr->ops == &ops_convolution || expr->ops == &ops_causal_convolution) {
         expr_t *simplified = expr_simplify(expr);
         const char *note = simplified && simplified->ops != expr->ops ? expr_transform_value_note(simplified) : NULL;
@@ -1615,12 +1619,20 @@ const char *expr_transform_value_note(const expr_t *expr)
     }
     if (expr->ops == &ops_delta || expr->ops == &ops_principal_value || expr->ops == &ops_finite_part)
         return "This result is a distribution, not an ordinary pointwise function. "
-               "Dirac impulses, principal values and finite parts do not have finite pointwise numerical values.";
+               "Its regular part can be evaluated away from singularities. "
+               "No finite pointwise value is assigned at an impulse or singularity; all required bindings must be set.";
     if (expr->ops == &ops_fourier || expr->ops == &ops_inverse_fourier) {
-        const char *specific = expr_fourier_value_note(expr);
-        if (specific)
-            return specific;
         expr_t *known = expr_fourier_result(expr);
+        if (known && !expr_is_integral_transform(known) && expr_fourier_has_analytic_functional(known)) {
+            const char *note = expr_transform_value_note(known);
+            expr_free(known);
+            return note;
+        }
+        const char *specific = expr_fourier_value_note(expr);
+        if (specific) {
+            expr_free(known);
+            return specific;
+        }
         if (!known)
             return "Fourier transform left symbolic: no supported closed form has been established for this "
                    "function and its parameters. This does not establish non-existence of its transform.";

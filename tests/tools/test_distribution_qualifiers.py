@@ -1,5 +1,6 @@
 """Occurrence-specific native distribution notation and copied Expression round trips."""
 
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -92,12 +93,91 @@ class DistributionQualifierTests(unittest.TestCase):
                 _, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "x", "evaluate")
                 self.assertNotEqual(code, 0, raw)
 
-    def test_distribution_has_no_pointwise_value(self):
+    def test_distribution_regular_values_preserve_symbolic_nodes(self):
         for operator in ("PV", "finite_part"):
-            for operand in ("1", "1/x"):
+            for operand, expected in (("1", 1), ("1/x", 0.5), ("i/x", 0.5j)):
                 result = self.fields("{"+operator+"("+operand+") | x=2}")
-                self.assertIn(" : principal value" if operator == "PV" else " : finite part", result["function"])
-                self.assertIn(result.get("value", "NAN").upper(), ("NAN", ""))
+                if operand != "1":
+                    self.assertIn(" : principal value" if operator == "PV" else " : finite part", result["function"])
+                self.assertEqual(self.value(result), expected)
+                self.assertNotIn("value_note", result)
+            for point in ("0", "?", "NAN", "inf"):
+                # Infinity is not a finite coordinate at which to evaluate an impulse.
+                source = "delta(x)" if point == "inf" else operator+"(1/x)"
+                result = self.fields("{"+source+" | x="+point+"}")
+                self.assertEqual(result["value"], "NAN")
+
+    @staticmethod
+    def value(result):
+        return complex(result["value"].replace(" ", "").replace("i", "j"))
+
+    def test_impulse_support_and_derivatives(self):
+        for source in ("delta(x-2)", "delta(3*x-6)", "Derivative(delta(x-2),3)",
+                       "Derivative(delta(x-2),x,1)", "Derivative(delta(x-2),x,2)",
+                       "Derivative(delta(x-2),n)"):
+            for point in (-1, 0, 2, 3):
+                with self.subTest(source=source, point=point):
+                    result = self.fields("{"+source+f" | x={point}; n=3"+"}")
+                    if point == 2:
+                        self.assertEqual(result["value"], "NAN")
+                    else:
+                        self.assertEqual(self.value(result), 0)
+                    self.assertIn("δ(", result["expression"])
+        for point in ("?", "i", "inf"):
+            self.assertEqual(self.fields("{delta(x) | x="+point+"}")["value"], "NAN")
+        for order in ("?", "-1", "1/2", "i"):
+            self.assertEqual(self.fields("{Derivative(delta(x),n) | x=2; n="+order+"}")["value"], "NAN")
+        self.assertEqual(self.value(self.fields("delta(1)")), 0)
+
+    def test_regularised_derivatives_and_finite_sums(self):
+        for source, expected in (("Derivative(PV(1/x),x,1)", -0.25),
+                                 ("Derivative(finite_part(1/abs(x)),x,1)", -0.25),
+                                 ("Derivative(PV(1/x),x,2)", 0.25),
+                                 ("sum(n,1,2,finite_part(n/abs(x)))", 1.5)):
+            with self.subTest(source=source):
+                result = self.fields("{"+source+" | x=2}")
+                self.assertEqual(self.value(result), expected)
+                self.assertEqual(self.fields("{"+source+" | x=0}")["value"], "NAN")
+        # Do not drop the original pole when differentiating a constant-numerator reciprocal.
+        self.assertEqual(self.fields("{Derivative(PV(1/x),x,1) | x=?}")["value"], "NAN")
+
+    def test_transform_values_off_singular_support(self):
+        for source, point, expected in (
+                ("@F{acosh(x)}", 1, -4.807878861268826),
+                ("@F{acosh(x)}", -1, 0),
+                ("@F{asin(x)}", 1, -4.807878861268826j),
+                ("@F{acos(x)}", 1, 4.807878861268826j),
+                ("@F{atanh(x)}", 1, -2j*math.pi*math.sin(1)),
+                ("@F{ln(abs(x))}", 2, -math.pi/2),
+                ("@F{step(x)}", 2, -0.5j),
+                ("@F{1}", 2, 0),
+                ("@F{x^3}", 2, 0),
+                ("@F{sin(x)}", 2, 0)):
+            # The constant input needs an explicit source coordinate; other inputs infer x -> k.
+            formula = "Fourier(1,x,k)" if source == "@F{1}" else source
+            with self.subTest(source=source, point=point):
+                unbound = self.fields(formula, "k")
+                bound = self.fields("{"+formula+f" | k={point}"+"}", "k")
+                self.assertLess(abs(self.value(bound)-expected), 2e-12)
+                self.assertNotIn("value_note", bound)
+                self.assertEqual(bound["tex"], unbound["tex"])
+                self.assertEqual(bound["unbound"], unbound["unbound"])
+                copied = self.fields(bound["expression"], "k")
+                self.assertLess(abs(self.value(copied)-expected), 2e-12)
+        for formula, point in (("@F{acosh(x)}", 0), ("@F{ln(abs(x))}", 0),
+                               ("@F{step(x)}", 0), ("@F{sin(x)}", 1), ("@F{cos(2*x)}", -2)):
+            result = self.fields("{"+formula+f" | k={point}"+"}", "k")
+            self.assertEqual(result["value"], "NAN")
+            self.assertIn("singular", result["value_note"])
+
+    def test_bound_spectrum_retains_inverse_information(self):
+        spectrum = self.fields("{@F{acosh(x)} | k=1}", "k")
+        inverse = self.fields("InverseFourier("+spectrum["expression"]+",k,x)")
+        self.assertIn("acosh(x)", inverse["expression"])
+        self.assertNotIn("Fourier(", inverse["function"])
+        for point, expected in ((1, 0), (0, 0.5j*math.pi), (-1, 1j*math.pi)):
+            bound = inverse["expression"].replace("x = NAN", f"x = {point}")
+            self.assertLess(abs(self.value(self.fields(bound))-expected), 2e-12)
 
     def test_complete_copied_expression_inside_transform(self):
         for source in ("finite_part(1/abs(x))", "PV(tan(x))"):
@@ -121,6 +201,15 @@ class DistributionQualifierTests(unittest.TestCase):
 
 
 class ZZDistributionQualifierReadmeExamples(unittest.TestCase):
+    def test_readme_distribution_regular_values(self):
+        # README examples: docs/expression.md, numerical evaluation of distributions.
+        for source, expected in (("{@F{acosh(x)} | k=1}", -4.807878861268826),
+                                 ("{@F{acosh(x)} | k=-1}", 0),
+                                 ("{@F{ln(abs(x))} | k=2}", -math.pi/2)):
+            result, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "k", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertLess(abs(DistributionQualifierTests.value(result)-expected), 2e-12)
+
     def test_readme_distribution_notation(self):
         # README examples: docs/expression.md; deliberately run after ordinary tests.
         for source, expected in (("PV(1/x)", "(1/x : principal value)"),
