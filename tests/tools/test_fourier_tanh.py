@@ -43,7 +43,7 @@ class TanhFourierTests(unittest.TestCase):
                 for point in (-1.1, 0.4, 1.3):
                     with self.subTest(operator=operator, function=function, point=point):
                         result = fields("{"+source+f" | k={point}"+"}")
-                        self.assertNotIn("Fourier(", result["function"])
+                        self.assertNotIn("fourier(", result["function"])
                         self.assertLess(abs(number(result)-coefficient*dual(point)), 1e-12)
 
     def test_numerical_domain_and_conditional(self):
@@ -70,7 +70,7 @@ class TanhFourierTests(unittest.TestCase):
                     for copied in (algebra(spectrum), spectrum["expression"]):
                         with self.subTest(function=function, argument=argument, direction=forward, copied=copied):
                             result = fields(f"{inverse}("+copied+",k,x)", "x")
-                            self.assertNotIn("Fourier(", result["function"])
+                            self.assertNotIn("fourier(", result["function"])
                             self.assertIn(r"k\to x", result["transform_identity_TeX"])
                             self.assertNotIn("NAN", result["transform_identity_TeX"])
                             for point in (-0.3, 0.7):
@@ -91,7 +91,7 @@ class TanhFourierTests(unittest.TestCase):
             self.assertEqual(fields("@Finv{"+spectrum+"}", "x")["tex"], expected["tex"])
         for source in ("csch(x)", "cosech(x)", "1/sinh(x)", "sinh(x)^(-1)"):
             result = fields("@F{"+source+"}")
-            self.assertNotIn("Fourier(", result["function"])
+            self.assertNotIn("fourier(", result["function"])
             self.assertNotIn("k ≠ 0", result["expression"])
 
     def test_symbolic_scale_shift_and_copied_inverse(self):
@@ -100,7 +100,7 @@ class TanhFourierTests(unittest.TestCase):
             for condition in ("a ∈ ℝ", "b ∈ ℝ", "a ≠ 0"):
                 self.assertIn(condition, spectrum["expression"])
             restored = fields("InverseFourier("+spectrum["expression"]+",k,x)", "x")
-            self.assertNotIn("Fourier(", restored["function"])
+            self.assertNotIn("fourier(", restored["function"])
             for rate, offset in ((2, 0.3), (-2, 0.3), (0.5, -0.2)):
                 source = "{Fourier("+function+"(a*x+b),x,k) | k=0.7; a="+str(rate)+"; b="+str(offset)+"}"
                 result = fields(source)
@@ -156,7 +156,7 @@ class TanhFourierTests(unittest.TestCase):
     def test_unrelated_domains_and_nonreal_rates_are_not_accepted(self):
         for source in ("Fourier(csch(x) where (x-1 ≠ 0),x,k)", "@F{tanh(i*x)}", "@F{csch(x+i)}",
                        "Fourier(coth(x) where (x-1 ≠ 0),x,k)", "@F{coth(i*x)}", "@F{coth(x+i)}"):
-            self.assertIn("Fourier(", fields(source)["function"])
+            self.assertIn("fourier(", fields(source)["function"])
 
     def test_zero_rate_is_a_constant_transform(self):
         result = fields("@F{tanh(0*x+1)}")

@@ -5,7 +5,7 @@
 ## Laplace transforms
 
 Expression mode accepts the forward unilateral Laplace operator `@L`, its
-canonical spelling `ℒ`, and the function spelling `Laplace`. The source variable
+canonical spelling `ℒ`, and the function spelling `laplace` (also `Laplace`). The source variable
 defaults to the free variable `t` when present, otherwise it is inferred when
 exactly one free variable is present. Other symbols remain parameters for the
 transform without changing their binding kinds. An explicit source overrides
@@ -180,7 +180,7 @@ $$
 The Function card returns `exp(a*t)*cos(t)` (using MARS multiplication syntax),
 and numerical bindings `a=2`, `t=0.5` give approximately `2.385516730959136`.
 An unknown input such as `@Linv(F(s),s,x)` remains `ℒ⁻¹(F(s), s, x)`;
-its Function representation is `InverseLaplace(F(s), s, x)`.
+its Function representation is `inverselaplace(F(s), s, x)`.
 Unsupported inverse transforms remain symbolic; this is not a numerical
 Bromwich-integral implementation.
 
@@ -191,7 +191,7 @@ $F(s):=\mathcal L\{f(t)\}(s)$ and the restriction
 $s-a\in\operatorname{ROC}(F)$. Here ROC denotes the region of convergence;
 no numerical bound is assumed for an unspecified function.
 The corresponding unbound Expression output is `ℒ(f(t), t, s - a)` and the
-Function return expression is `Laplace(f(t), t, s - a)`, so neither relies on an
+Function return expression is `laplace(f(t), t, s - a)`, so neither relies on an
 undefined global function named `F`. These evaluated transform arguments are
 accepted as input. Known base transforms are evaluated and their convergence
 restrictions shifted with the formula.
@@ -2133,7 +2133,7 @@ These function names are resolved by the native expression parser's
 collision-free lookup tables rather than by a client-side rewrite.
 
 The function registry remains an inline, one-entry-per-line table in
-`src/expression/expr_stringin.c`. Its 318 registered spellings occupy 318
+`src/expression/expr_stringin.c`. Its 323 registered spellings occupy 323
 distinct slots. Lookup samples six fixed byte positions, reads one
 displacement and probes one entry; it does not scan the registry, follow
 collision chains or retry neighbouring slots. The final exact spelling
@@ -2311,20 +2311,34 @@ statements may share a line when whitespace separates them. Unknown scalars use
 unspecified array and are serialised canonically as `[?]`. Symbolic assignment
 values use input aliases such as `@pi`.
 
-Formal derivatives in Function style use the registered `Derivative` callable,
+Formal derivatives in Function style use the registered lowercase `derivative` callable,
 with explicit coordinate and non-negative integer order. Repeated coordinates
 share an order; mixed derivatives nest calls in differentiation order. The
 three-argument form preserves an unevaluated derivative, including its coordinate
 metadata, rather than treating a dependent symbol as an unrelated constant.
-The existing two-argument form retains its symbolic-order meaning.
+The existing two-argument form retains its symbolic-order meaning. The input
+aliases `Derivative` and `ordered_derivative` remain accepted.
 
 | Expression input | Function-style body |
 | --- | --- |
-| `Dk(step(k)*ln(abs(k)))` | `Derivative(step(k).ln(abs(k)), k, 1)` |
-| `{Dkk(delta(k)) \| k=?}` | `Derivative(delta(k), k, 2)` |
+| `Dk(step(k)*ln(abs(k)))` | `derivative(step(k).ln(abs(k)), k, 1)` |
+| `{Dkk(delta(k)) \| k=?}` | `derivative(delta(k), k, 2)` |
 
 Expression and TeX styles retain their mathematical derivative notation;
 Function style does not generate variable-specific callable names such as `Dk`.
+
+Integral transforms likewise use lowercase Function-style callables. The
+capitalised spellings remain input aliases. Each call takes the operand, source
+coordinate and target coordinate in that order, with the source locally bound.
+Resolved transforms render their resulting algebra; unresolved transforms retain
+these calls without changing their mathematical conditions or normalisation.
+
+| Input | Function-style body |
+| --- | --- |
+| `Fourier(f(t), t, @omega)` | `fourier(f(t), t, @omega)` |
+| `InverseFourier(F(@omega), @omega, t)` | `inversefourier(F(@omega), @omega, t)` |
+| `Laplace(f(t), t, s)` | `laplace(f(t), t, s)` |
+| `InverseLaplace(F(s), s, t)` | `inverselaplace(F(s), s, t)` |
 
 Function style writes exact fractions in typeable ASCII `numerator/denominator`
 form. For example, a mathematical card may display `³⁄₁₁`, while the corresponding

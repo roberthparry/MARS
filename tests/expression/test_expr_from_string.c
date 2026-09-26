@@ -321,6 +321,29 @@ static void test_from_string_function_hash(void)
 
     ASSERT_TRUE(expr_stringin_function_hash_is_valid());
     {
+        /* Capitalised transform inputs canonicalise to lowercase Function calls. */
+        static const struct { const char *source; const char *body; } transforms[] = {
+            {"Fourier(f(t), t, @omega)", "fourier(f(t), t, @omega)"},
+            {"InverseFourier(F(@omega), @omega, t)", "inversefourier(F(@omega), @omega, t)"},
+            {"Laplace(f(t), t, s)", "laplace(f(t), t, s)"},
+            {"InverseLaplace(F(s), s, t)", "inverselaplace(F(s), s, t)"},
+        };
+        for (size_t i = 0u; i < sizeof(transforms) / sizeof(transforms[0]); ++i) {
+            expr_t *original = expr_from_function_body(transforms[i].source, NULL);
+            ASSERT_NOT_NULL(original);
+            char *body = original ? expr_to_function_body(original) : NULL;
+            TEST_ASSERT_STR_EQ(body, transforms[i].body);
+            expr_t *copy = body ? expr_from_function_body(body, NULL) : NULL;
+            ASSERT_NOT_NULL(copy);
+            char *copied_body = copy ? expr_to_function_body(copy) : NULL;
+            TEST_ASSERT_STR_EQ(copied_body, transforms[i].body);
+            free(copied_body);
+            expr_free(copy);
+            free(body);
+            expr_free(original);
+        }
+    }
+    {
         /* Unknown names may share all sampled hash positions with a real keyword.
          * The final spelling check must still reject them, including invalid UTF-8. */
         static const char *const misses[] = {
@@ -461,13 +484,13 @@ static void test_differential_symbolic_call_syntax(void)
 static void test_from_function_body_formal_derivatives(void)
 {
     static const char *sources[] = {
-        "Derivative(step(k).ln(abs(k)), k, 1)",
-        "Derivative(delta(k), k, 3)",
-        "Derivative(Derivative(f(x, y), x, 2), y, 1)",
-        "Derivative(Derivative(Derivative(f(x, y), x, 1), y, 1), x, 1)",
-        "Derivative(delta(@omega), @omega, 2)",
-        "Derivative(f([frequency]), [frequency], 2)",
-        "Derivative(y, x, 1)",
+        "derivative(step(k).ln(abs(k)), k, 1)",
+        "derivative(delta(k), k, 3)",
+        "derivative(derivative(f(x, y), x, 2), y, 1)",
+        "derivative(derivative(derivative(f(x, y), x, 1), y, 1), x, 1)",
+        "derivative(delta(@omega), @omega, 2)",
+        "derivative(f([frequency]), [frequency], 2)",
+        "derivative(y, x, 1)",
     };
     for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
         expr_t *original = expr_from_function_body(sources[i], NULL);
@@ -491,22 +514,34 @@ static void test_from_function_body_formal_derivatives(void)
         free(body);
         expr_free(original);
     }
-    const char *invalid[] = {"Derivative(delta(k), 2, 1)", "Derivative(delta(k), k, -1)",
-                             "Derivative(delta(k), k, 1/2)", "Derivative(delta(k), k, n)",
-                             "Derivative(delta(k), k, 1, 2)"};
+    /* Legacy input aliases still round-trip through the lowercase canonical form. */
+    static const char *const aliases[] = {
+        "Derivative(delta(k), k, 2)", "ordered_derivative(delta(k), k, 2)",
+    };
+    for (size_t i = 0u; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
+        expr_t *legacy = expr_from_function_body(aliases[i], NULL);
+        ASSERT_NOT_NULL(legacy);
+        char *canonical = legacy ? expr_to_function_body(legacy) : NULL;
+        TEST_ASSERT_STR_EQ(canonical, "derivative(delta(k), k, 2)");
+        free(canonical);
+        expr_free(legacy);
+    }
+    const char *invalid[] = {"derivative(delta(k), 2, 1)", "derivative(delta(k), k, -1)",
+                             "derivative(delta(k), k, 1/2)", "derivative(delta(k), k, n)",
+                             "derivative(delta(k), k, 1, 2)"};
     for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         expr_t *bad = expr_from_function_body(invalid[i], NULL);
         ASSERT_NULL(bad);
         expr_free(bad);
     }
-    expr_t *zero = expr_from_function_body("Derivative(delta(k), k, 0)", NULL);
+    expr_t *zero = expr_from_function_body("derivative(delta(k), k, 0)", NULL);
     char *body = zero ? expr_to_function_body(zero) : NULL;
     TEST_ASSERT_STR_EQ(body, "delta(k)");
     free(body);
     expr_free(zero);
-    expr_t *ordered = expr_from_function_body("Derivative(delta(k), n)", NULL);
+    expr_t *ordered = expr_from_function_body("derivative(delta(k), n)", NULL);
     body = ordered ? expr_to_function_body(ordered) : NULL;
-    TEST_ASSERT_STR_EQ(body, "Derivative(delta(k), n)");
+    TEST_ASSERT_STR_EQ(body, "derivative(delta(k), n)");
     free(body);
     expr_free(ordered);
 }

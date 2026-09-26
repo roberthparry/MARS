@@ -37,7 +37,7 @@ class GammaContourTests(unittest.TestCase):
             for forward, inverse in (("Fourier", "InverseFourier"), ("InverseFourier", "Fourier")):
                 result = fields(f"{forward}(gamma({argument}),Im(x),k)")
                 restored = fields(f"{inverse}("+result["expression"]+",k,Im(x))", "x")
-                self.assertNotIn("Fourier(", restored["function"])
+                self.assertNotIn("fourier(", restored["function"])
                 for point in ("0.2+0.7i", "0.1-0.4i"):
                     actual = number(fields(restored["expression"].replace("x = NAN", f"x = {point}"), "x"))
                     expected = number(fields("{gamma("+argument+") | x="+point+"}", "x"))

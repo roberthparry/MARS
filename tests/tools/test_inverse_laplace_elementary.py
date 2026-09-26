@@ -29,7 +29,7 @@ class InverseLaplaceElementaryTests(unittest.TestCase):
     def check_inverse(self, spectrum, expected, points=(0.19, 0.71, 1.31)):
         source = "InverseLaplace(" + spectrum + ",s,t)"
         inverse = self.fields(source)
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         restored = self.body(inverse)
         for point in points:
             with self.subTest(spectrum=spectrum, time=point):
@@ -43,7 +43,7 @@ class InverseLaplaceElementaryTests(unittest.TestCase):
 
     def check_round_trip(self, source, expected, points=(0.19, 0.71, 1.31)):
         forward = self.fields("Laplace(" + source + ",t,s)", "s")
-        self.assertNotIn("Laplace(", forward["function"])
+        self.assertNotIn("laplace(", forward["function"])
         return self.check_inverse(self.body(forward), expected, points)
 
     def test_real_scaled_staircases(self):
@@ -87,7 +87,7 @@ class InverseLaplaceElementaryTests(unittest.TestCase):
             with self.subTest(source=source):
                 forward = self.fields("Laplace("+source+",t,s)", "s")
                 inverse = self.fields("InverseLaplace("+self.body(forward)+",s,t)")
-                self.assertNotIn("InverseLaplace(", inverse["function"])
+                self.assertNotIn("inverselaplace(", inverse["function"])
                 self.assertNotRegex(self.body(inverse), r"(?:\+|-)\s*0\s*i")
                 self.assertNotRegex(inverse["tex"], r"(?:\+|-)\s*0\s*i")
 
@@ -117,7 +117,7 @@ class InverseLaplaceElementaryTests(unittest.TestCase):
                         f"+{coefficient}*i*@pi*exp(-s/2))/(2*s)")
             with self.subTest(coefficient=coefficient):
                 result = self.fields("InverseLaplace("+spectrum+",s,t)")
-                if "InverseLaplace(" not in result["function"]:
+                if "inverselaplace(" not in result["function"]:
                     # Other inverse rules may legitimately resolve this as atanh plus
                     # a delayed constant. If they do, its cut value must be different.
                     self.check_inverse(spectrum, lambda t: self.native_atanh(2*t).real +

@@ -29,11 +29,11 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
 
     def check_round_trip(self, source, expected, points=(0, 0.2, 0.75, 1.5)):
         forward = self.fields("Laplace(" + source + ",t,s)", "s")
-        self.assertNotIn("Laplace(", forward["function"])
+        self.assertNotIn("laplace(", forward["function"])
         spectrum = self.body(forward)
         inverse_source = "InverseLaplace(" + spectrum + ",s,t)"
         recovered = self.fields(inverse_source)
-        self.assertNotIn("InverseLaplace(", recovered["function"])
+        self.assertNotIn("inverselaplace(", recovered["function"])
         # Also reparse the inverse's displayed result; evaluating the inverse operator alone
         # would miss a sign, parenthesis or coefficient lost by serialisation.
         restored = self.body(recovered)
@@ -88,7 +88,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         for spectrum, expected in cases:
             with self.subTest(spectrum=spectrum):
                 result = self.fields("InverseLaplace("+spectrum+",s,t)")
-                self.assertNotIn("InverseLaplace(", result["function"])
+                self.assertNotIn("inverselaplace(", result["function"])
                 for point in (0, 0.3, 1.1):
                     actual = self.value(self.fields("{"+self.body(result)+f" | t={point}"+"}"))
                     self.assertLess(abs(actual-expected(point)), 2e-12)
@@ -96,7 +96,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         different = ("exp(s^2/(4*(-1/sqrt(2))^2)+s^2/100000000000000000000)"
                      "*erfc(s/(2*sqrt((-1/sqrt(2))^2)))/s")
         result = self.fields("InverseLaplace("+different+",s,t)")
-        self.assertIn("InverseLaplace(", result["function"])
+        self.assertIn("inverselaplace(", result["function"])
 
     def test_copied_polynomial_weighted_gaussians(self):
         cases = (
@@ -139,7 +139,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         for spectrum, expected in cases:
             with self.subTest(spectrum=spectrum):
                 result = self.fields("InverseLaplace("+spectrum+",s,t)")
-                self.assertNotIn("InverseLaplace(", result["function"])
+                self.assertNotIn("inverselaplace(", result["function"])
                 for point in (0, 0.4, 1.25):
                     actual = self.value(self.fields("{"+self.body(result)+f" | t={point}"+"}"))
                     self.assertLess(abs(actual-expected(point)), 2e-12)
@@ -148,7 +148,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         source = "exp(-k*t)*erf(t)"
         spectrum = self.body(self.fields("Laplace("+source+",t,s)", "s"))
         result = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         for rate in ("2", "-1", "i/2"):
             bindings = f" | t=0.4; k={rate}"
             expected = self.value(self.fields("{"+source+bindings+"}"))
@@ -160,7 +160,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         spectrum = ("sqrt(@pi)/2*exp((s^2-1)/4)*(cos(s/2)-i*sin(s/2))"
                     "*erfc((s-i)/2)")
         result = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         for point in (0, 0.3, 1.1):
             actual = self.value(self.fields("{"+self.body(result)+f" | t={point}"+"}"))
             self.assertLess(abs(actual-cmath.exp(-point*point+1j*point)), 2e-12)
@@ -169,7 +169,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         spectrum = ("(erf(b)+a/sqrt(a^2)*exp(s^2/(4*a^2)+b*s/a)"
                     "*erfc(s/(2*sqrt(a^2))+b*sqrt(a^2)/a))/s")
         result = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         for scale in (-2, 2):
             bindings = f" | t=0.3; a={scale}; b=1"
             actual = self.value(self.fields("{"+self.body(result)+bindings+"}"))
@@ -183,15 +183,15 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
                 result = self.fields("InverseLaplace("+spectrum+",s,t)")
                 # These spectra retain an impulse at the origin. Until distributional
                 # Laplace inverses are represented, the result must stay unresolved.
-                self.assertIn("InverseLaplace(", result["function"])
+                self.assertIn("inverselaplace(", result["function"])
 
     def test_independently_written_kernel_and_its_integral(self):
         # L^-1{exp((c*s+d)^2)*erfc(c*s+d)} for c=1/4, d=1.
         spectrum = "exp((s/4+1)^2)*erfc(s/4+1)"
         inverse = self.fields("InverseLaplace(" + spectrum + ",s,t)")
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         integral = self.fields("InverseLaplace((" + spectrum + ")/s,s,t)")
-        self.assertNotIn("InverseLaplace(", integral["function"])
+        self.assertNotIn("inverselaplace(", integral["function"])
         for point in (0.1, 0.5, 1):
             expected = 4/math.sqrt(math.pi)*math.exp(-4*point*point-4*point)
             actual = self.value(self.fields("{" + self.body(inverse) + f" | t={point}" + "}"))
@@ -205,7 +205,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         forward = self.fields("Laplace("+source+",t,s)", "s")
         spectrum = self.body(forward)
         recovered = self.fields("InverseLaplace("+spectrum+",s,t)")
-        self.assertNotIn("InverseLaplace(", recovered["function"])
+        self.assertNotIn("inverselaplace(", recovered["function"])
         self.assertIn("realpart", recovered["function"])
         for a, b, d in (("2", "3", "-1"), ("1+i/2", "i", "0")):
             bindings = f" | t=0.4; a={a}; b={b}; d={d}"
@@ -225,7 +225,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
             spectrum = self.body(self.fields("Laplace("+source+",t,s)", "s"))
             inverse = "InverseLaplace("+spectrum+",s,t)"
             result = self.fields(inverse)
-            self.assertNotIn("InverseLaplace(", result["function"])
+            self.assertNotIn("inverselaplace(", result["function"])
             for scale in (2, -2):
                 bindings = f" | t=0.4; a={scale}; b=1"
                 actual = self.value(self.fields("{"+self.body(result)+bindings+"}"))
@@ -242,7 +242,7 @@ class InverseLaplaceGaussianTests(unittest.TestCase):
         ):
             with self.subTest(spectrum=spectrum):
                 fields = self.fields("InverseLaplace("+spectrum+",s,t)")
-                self.assertIn("InverseLaplace(", fields["function"])
+                self.assertIn("inverselaplace(", fields["function"])
 
 
 if __name__ == "__main__":

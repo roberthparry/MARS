@@ -19,7 +19,7 @@ class FourierTests(unittest.TestCase):
 
     def assert_formula(self, source, expected, variable="ω", points=(0, 0.3, 1.25)):
         result = self.fields(source, variable)
-        self.assertNotIn("Fourier(", result["function"], result)
+        self.assertNotIn("fourier(", result["function"], result)
         for point in points:
             with self.subTest(source=source, point=point):
                 actual = self.fields("{" + source + " | " + variable + "=" + str(point) + "}", variable)
@@ -39,7 +39,7 @@ class FourierTests(unittest.TestCase):
             with self.subTest(indexed=indexed):
                 self.assertEqual(self.fields(indexed, "x")["tex"], self.fields(canonical, "x")["tex"])
         fields = self.fields("@F{J_n(x)}", "k")
-        self.assertNotIn("Fourier(", fields["function"])
+        self.assertNotIn("fourier(", fields["function"])
         self.assertIn("const n", fields["function"])
         self.assertNotIn("const J", fields["function"])
         self.assertNotIn("x = ?", fields["function"])
@@ -57,7 +57,7 @@ class FourierTests(unittest.TestCase):
                 for coordinate in (-1.5, -0.7, 0.2, 0.6, 1.5):
                     expression = "{"+operator+"{J_n("+source+")} | "+target+"="+str(coordinate)+"; n="+str(order)+"}"
                     fields = self.fields(expression, target)
-                    self.assertNotIn("Fourier(", fields["function"])
+                    self.assertNotIn("fourier(", fields["function"])
                     actual = complex(fields["value"].replace(" ", "").replace("i", "j"))
                     expected = (factor*math.cos(order*math.acos(coordinate))/math.sqrt(1-coordinate**2)
                                 if abs(coordinate) < 1 else 0j)
@@ -67,7 +67,7 @@ class FourierTests(unittest.TestCase):
             self.assertTrue(math.isnan(float(fields["value"])))
             self.assertIn("singularities", fields["value_note"])
         for order in ("1/2", "i"):
-            self.assertIn("Fourier(", self.fields("@F{J_{"+order+"}(x)}", "k")["function"])
+            self.assertIn("fourier(", self.fields("@F{J_{"+order+"}(x)}", "k")["function"])
 
     def test_bessel_specialised_order_simplifies_absolute_value(self):
         for inverse in (False, True):
@@ -96,7 +96,7 @@ class FourierTests(unittest.TestCase):
         for body in forms:
             with self.subTest(body=body):
                 fields = self.fields("@Finv{"+body+"}", "t")
-                self.assertNotIn("InverseFourier(", fields["function"])
+                self.assertNotIn("inversefourier(", fields["function"])
                 self.assertIn("besselj(5, t)", fields["function"])
                 self.assertIn("J_{5}", fields["tex"])
                 self.assertEqual(self.fields(fields["expression"], "t")["tex"], fields["tex"])
@@ -126,7 +126,7 @@ class FourierTests(unittest.TestCase):
                     text += ("; "+bindings if bindings else "")+"}"
                     with self.subTest(source=text):
                         fields = self.fields(text, target)
-                        self.assertNotIn("Fourier(", fields["function"])
+                        self.assertNotIn("fourier(", fields["function"])
                         actual = complex(fields["value"].replace(" ", "").replace("i", "j"))
                         self.assertLess(abs(actual-expected(point)), 1e-11)
 
@@ -198,7 +198,7 @@ class FourierTests(unittest.TestCase):
             with self.subTest(source=source):
                 result = self.fields(source, "k")
                 self.assertEqual(result["tex"].split(r"\quad")[0], expected["tex"].split(r"\quad")[0])
-                self.assertNotIn("Fourier(", result["function"])
+                self.assertNotIn("fourier(", result["function"])
                 self.assertIn("finite part", result["expression"])
                 self.assertIn(r"\text{finite part}", result["tex"])
                 self.assertIn("distribution", result["value_note"])
@@ -207,7 +207,7 @@ class FourierTests(unittest.TestCase):
         for function in ("ln", "sin", "cos", "exp", "sqrt"):
             self.assertEqual(self.fields(function+"|x|", "x")["tex"],
                              self.fields(function+"(abs(x))", "x")["tex"])
-        self.assertIn("Fourier(", self.fields("@F{ln(x)}", "k")["function"])
+        self.assertIn("fourier(", self.fields("@F{ln(x)}", "k")["function"])
 
     def test_finite_part_fourier_pair_and_inverse(self):
         gamma = 0.5772156649015328606
@@ -264,14 +264,14 @@ class FourierTests(unittest.TestCase):
 
     def test_log_affine_domains_and_finite_part_calculus(self):
         translated = self.fields("@F{ln(abs(x-2))}", "k")
-        self.assertNotIn("Fourier(", translated["function"])
+        self.assertNotIn("fourier(", translated["function"])
         self.assertIn("exp(-2ik)", translated["unbound"])
         parameter = self.fields("@F{ln(abs(a*x+b))}", "k")
-        self.assertNotIn("Fourier(", parameter["function"])
+        self.assertNotIn("fourier(", parameter["function"])
         self.assertIn("a", parameter["tex"])
         self.assertIn("b", parameter["tex"])
         for source in ("@F{ln(abs(i*x))}", "@F{finite_part(1/abs(x)^2)}"):
-            self.assertIn("Fourier(", self.fields(source, "k")["function"])
+            self.assertIn("fourier(", self.fields(source, "k")["function"])
         summed = self.fields("sum(n,1,2,finite_part(n/abs(x)))", "x")
         self.assertIn(" : finite part", summed["function"])
         self.assertIn("distribution", summed["value_note"])
@@ -280,13 +280,13 @@ class FourierTests(unittest.TestCase):
 
     def test_arbitrary_functions_and_scope(self):
         plain = self.fields("@F{f(t)}")
-        self.assertIn("Fourier(", plain["function"])
-        self.assertIn("Fourier(", self.fields("@F{u(t)}")["function"])
+        self.assertIn("fourier(", plain["function"])
+        self.assertIn("fourier(", self.fields("@F{u(t)}")["function"])
         shifted = self.fields("@F{f(t-2)}")
         self.assertIn("exp(-2iω)", shifted["unbound"])
         self.assertNotIn("t = ?", shifted["function"])
         derivative = self.fields("@F{f'(t)}")
-        self.assertIn("Fourier(", derivative["function"])
+        self.assertIn("fourier(", derivative["function"])
         self.assertNotIn("f(0)", derivative["unbound"])
         nested = self.fields("@F(@F(f(t),t,ω),t,x)")
         self.assertIn("δ(x)", nested["unbound"])
@@ -316,11 +316,11 @@ class FourierTests(unittest.TestCase):
         bound = self.fields("{"+source+" | ω=1; a=2}")
         self.assertAlmostEqual(float(bound["value"]), math.sqrt(math.pi/2)*math.exp(-1/8), places=12)
         self.assertNotIn("a = ?", bound["function"])
-        self.assertIn("Fourier(", self.fields("@F{exp(t^2)}")["function"])
+        self.assertIn("fourier(", self.fields("@F{exp(t^2)}")["function"])
 
     def assert_symbolic_formula(self, source, expected, variable="ω"):
         result = self.fields(source, variable)
-        self.assertNotIn("Fourier(", result["function"], result)
+        self.assertNotIn("fourier(", result["function"], result)
         for point in (-1.25, 0, 0.75):
             with self.subTest(source=source, point=point):
                 check = "{abs(("+source+")-("+expected+")) | "+variable+"="+str(point)+"}"
@@ -377,19 +377,19 @@ class FourierTests(unittest.TestCase):
 
     def test_symbolic_polynomial_distributions(self):
         fields = self.fields("@F{1+t^n+delta(t)}")
-        self.assertNotIn("Fourier(", fields["function"])
+        self.assertNotIn("fourier(", fields["function"])
         self.assertIn("Derivative(δ(ω), n)", fields["expression"])
         self.assertIn("n ∈ ℤ≥0", fields["expression"])
         self.assertIn("delta(@omega)", fields["function"])
-        self.assertIn("Derivative(delta(@omega), n)", fields["function"])
+        self.assertIn("derivative(delta(@omega), n)", fields["function"])
         self.assertIn(r"\delta(\omega)", fields["tex"])
         self.assertIn(r"\delta^{(n)}\left(\omega\right)", fields["tex"])
         inverse = self.fields("@Finv{ω^n}", "t")
         self.assertIn("(-i)^n·Derivative(δ(t), n)", inverse["unbound"])
         for source in ("@F{t^33}", "@Finv{ω^33}"):
-            self.assertNotIn("Fourier(", self.fields(source)["function"])
+            self.assertNotIn("fourier(", self.fields(source)["function"])
         for order in ("-1", "1/2"):
-            self.assertIn("Fourier(", self.fields("@F{t^("+order+")}")["function"])
+            self.assertIn("fourier(", self.fields("@F{t^("+order+")}")["function"])
         for order in (0, 1, 2, 3, 33):
             for operator, source, target, factor in (("@F", "t", "ω", "1"),
                                                      ("@Finv", "ω", "t", "1/(2*pi)")):

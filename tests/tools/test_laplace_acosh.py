@@ -55,7 +55,7 @@ class AcoshHelpers:
 
     def check_inverse(self, spectrum, expected):
         inverse = self.fields("InverseLaplace(" + spectrum + ",s,t)", "t")
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         for t in (0.19, 0.5, 1, 1.31, 3):
             value = self.value(self.fields("{" + self.body(inverse) + f" | t={t}" + "}", "t"))
             self.assertLess(abs(value - expected(t)), 2e-11 * (1 + abs(expected(t))))
@@ -68,7 +68,7 @@ class AcoshLaplaceTests(AcoshHelpers, unittest.TestCase):
             for text, s in (("2", 2), ("1+i", 1+1j)):
                 with self.subTest(rate=rate, s=s):
                     result = self.fields("{Laplace(acosh(" + str(rate) + "*t),t,s) | s=" + text + "}")
-                    self.assertNotIn("Laplace(", result["function"])
+                    self.assertNotIn("laplace(", result["function"])
                     self.assertLess(abs(self.value(result)-reference(rate, s)), 2e-10)
                     # Free target bindings never leak into the displayed formula.
                     unbound = self.fields("Laplace(acosh(" + str(rate) + "*t),t,s)")
@@ -76,7 +76,7 @@ class AcoshLaplaceTests(AcoshHelpers, unittest.TestCase):
 
     def test_constant_parameter_and_half_plane(self):
         result = self.fields("{Laplace(acosh(c*t),t,s) | s=2; c=-2}")
-        self.assertNotIn("Laplace(", result["function"])
+        self.assertNotIn("laplace(", result["function"])
         self.assertLess(abs(self.value(result)-reference(-2, 2)), 2e-10)
         for s in ("0", "-1", "i"):
             result = self.fields("{Laplace(acosh(t),t,s) | s=" + s + "}")
@@ -88,7 +88,7 @@ class AcoshLaplaceTests(AcoshHelpers, unittest.TestCase):
         for argument in ("c*t", "i*t", "t+1"):
             with self.subTest(argument=argument):
                 result = self.fields("Laplace(acosh(" + argument + "),t,s)")
-                self.assertIn("Laplace(", result["function"])
+                self.assertIn("laplace(", result["function"])
 
     def test_unicode_spectrum_notation(self):
         forward = self.fields("@L{acosh(t)}")
@@ -115,7 +115,7 @@ class AcoshLaplaceTests(AcoshHelpers, unittest.TestCase):
     def test_incomplete_companion_is_not_acosh(self):
         # K0 alone represents only the real tail, not the principal function below t=1.
         inverse = self.fields("InverseLaplace(besselk(0,s)/s,s,t)", "t")
-        if "InverseLaplace(" not in inverse["function"]:
+        if "inverselaplace(" not in inverse["function"]:
             result = self.fields("{" + self.body(inverse) + " | t=1/2}", "t")
             self.assertGreater(abs(self.value(result)-cmath.acosh(0.5)), 0.1)
 

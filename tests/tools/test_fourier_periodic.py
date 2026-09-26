@@ -29,10 +29,10 @@ def numerical(source, point, bindings=""):
 class PeriodicFourierTests(unittest.TestCase):
     def copied_inverse(self, source, forward="Fourier", inverse="InverseFourier"):
         spectrum = fields(f"{forward}({source},t,ω)")
-        self.assertNotIn("Fourier(", spectrum["function"])
+        self.assertNotIn("fourier(", spectrum["function"])
         self.assertIn("\\sum", spectrum["tex"])
         result = fields(f"{inverse}("+algebra(spectrum)+",ω,t)", "t")
-        self.assertNotIn("Fourier(", result["function"])
+        self.assertNotIn("fourier(", result["function"])
         self.assertNotIn("principal_value(", result["tex"])
         self.assertIn("≠ 0", result["expression"])
         for card in ("expression", "tex", "function"):
@@ -55,7 +55,7 @@ class PeriodicFourierTests(unittest.TestCase):
                                             1e-12*(1+abs(expected)))
                         # Copy the complete domain before transforming again.
                         repeated = fields(f"{forward}("+result["expression"]+",t,ω)")
-                        self.assertNotIn("Fourier(", repeated["function"])
+                        self.assertNotIn("fourier(", repeated["function"])
 
     def test_symbolic_real_scale_and_shift(self):
         for function in ("tan", "cot"):
@@ -74,7 +74,7 @@ class PeriodicFourierTests(unittest.TestCase):
             for inverse in ("@Finv{"+algebra(spectrum)+"}",
                             "InverseFourier("+algebra(spectrum)+","+frequency+","+coordinate+")"):
                 result = fields(inverse, coordinate)
-                self.assertNotIn("Fourier(", result["function"])
+                self.assertNotIn("fourier(", result["function"])
                 self.assertIn("tan("+coordinate+")", result["expression"])
                 self.assertIn("cos("+coordinate+") ≠ 0", result["expression"])
                 self.assertNotIn("principal value", result["function"])
@@ -105,7 +105,7 @@ class PeriodicFourierTests(unittest.TestCase):
 
     def test_arbitrary_domain_restrictions_are_not_discarded(self):
         result = fields("Fourier(tan(t) where (Re(t)>0),t,ω)")
-        self.assertIn("Fourier(", result["function"])
+        self.assertIn("fourier(", result["function"])
 
     def test_parameter_pole_conditions_are_retained(self):
         result = fields("Fourier(tan(a) where (a ∈ ℝ; cos(a) ≠ 0),t,ω)")
@@ -130,7 +130,7 @@ class PeriodicFourierTests(unittest.TestCase):
             term = f"{weight}*(delta(ω-2*j)-delta(ω+2*j))"
             spectrum = coefficient+"*sum(j,1,@inf,"+term+")"
             result = fields("InverseFourier("+spectrum+",ω,t)", "t")
-            self.assertNotIn("Fourier(", result["function"])
+            self.assertNotIn("fourier(", result["function"])
             self.assertIn(function+"(t)", result["expression"])
 
     def test_fourier_coefficients_by_independent_quadrature(self):
@@ -174,7 +174,7 @@ class PeriodicFourierTests(unittest.TestCase):
         spectrum = fields("Fourier(tan(t+n),t,ω)")
         self.assertNotIn("Σ_(n=", spectrum["expression"])
         restored = fields("InverseFourier("+algebra(spectrum)+",ω,t)", "t")
-        self.assertNotIn("Fourier(", restored["function"])
+        self.assertNotIn("fourier(", restored["function"])
         self.assertIn("n", restored["expression"])
 
     def test_principal_value_diagnostic(self):
@@ -186,7 +186,7 @@ class PeriodicFourierTests(unittest.TestCase):
     def test_nonreal_rates_do_not_use_real_pole_prescription(self):
         for source in ("tan(i*t)", "cot(t+i)"):
             result = fields("Fourier("+source+",t,ω)")
-            self.assertIn("Fourier(", result["function"])
+            self.assertIn("fourier(", result["function"])
             self.assertNotIn("\\sum", result["tex"])
 
 
@@ -200,7 +200,7 @@ class ZZPeriodicReadmeExamples(unittest.TestCase):
         self.assertIn("tan(x)", inverse["expression"])
         self.assertIn("cos(x) ≠ 0", inverse["expression"])
         self.assertNotIn("principal value", inverse["expression"])
-        self.assertNotIn("Fourier(", inverse["function"])
+        self.assertNotIn("fourier(", inverse["function"])
 
 
 if __name__ == "__main__":

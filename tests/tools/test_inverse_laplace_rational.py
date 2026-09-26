@@ -29,7 +29,7 @@ class InverseLaplaceRationalTests(unittest.TestCase):
             with self.subTest(operand=operand):
                 fields = self.fields("@Linv{" + operand + "}")
                 self.assertEqual(fields["unbound"], expected)
-                self.assertNotIn("InverseLaplace(", fields["function"])
+                self.assertNotIn("inverselaplace(", fields["function"])
                 self.assertIn(" = ", fields["transform_identity_TeX"])
                 self.assertEqual(self.fields(fields["unbound"])["tex"], fields["tex"])
         solved, raw, code = mars_lab.run_equation_lab_fields(
@@ -66,7 +66,7 @@ class InverseLaplaceRationalTests(unittest.TestCase):
         for operand, expected in cases:
             with self.subTest(operand=operand):
                 symbolic = self.fields("@Linv{" + operand + "}")
-                self.assertNotIn("InverseLaplace(", symbolic["function"])
+                self.assertNotIn("inverselaplace(", symbolic["function"])
                 for time in (0, 0.5, 1.25):
                     actual = self.fields("{@Linv{" + operand + "} | t=" + str(time) + "}")
                     self.assertAlmostEqual(float(actual["value"]), expected(time), places=12)
@@ -74,7 +74,7 @@ class InverseLaplaceRationalTests(unittest.TestCase):
     def test_higher_repeated_quadratics_round_trip_and_series(self):
         for power in (4, 8):
             inverse = self.fields("@Linv{1/(s^2+1)^" + str(power) + "}")
-            self.assertNotIn("InverseLaplace(", inverse["function"])
+            self.assertNotIn("inverselaplace(", inverse["function"])
             # Independent convergent series from s^(-2m)*(1+s^(-2))^(-m).
             for time in (0.5, 1.25):
                 expected = sum((-1)**k*math.comb(power+k-1, k)*time**(2*power+2*k-1)
@@ -88,7 +88,7 @@ class InverseLaplaceRationalTests(unittest.TestCase):
     def test_parameters_and_explicit_coordinates(self):
         source = "@Linv((a*p+b)/(p*(p^2+1)),p,x)"
         symbolic = self.fields(source)
-        self.assertNotIn("InverseLaplace(", symbolic["function"])
+        self.assertNotIn("inverselaplace(", symbolic["function"])
         for a, b in ((2, 3), (-3, 1)):
             bound = self.fields("{" + source + " | x=0.75; a=" + str(a) + ",b=" + str(b) + "}")
             self.assertAlmostEqual(float(bound["value"]), a*math.sin(0.75)+b*(1-math.cos(0.75)), places=12)
@@ -104,7 +104,7 @@ class InverseLaplaceRationalTests(unittest.TestCase):
         for source in ("@Linv{1/((s-a)*(s-b)*(s^2+1))}", "@Linv{1/(s^2+a)^2}",
                        "@Linv{(s+1)/s}", "@Linv{1/(s^2+1)^9}"):
             with self.subTest(source=source):
-                self.assertIn("InverseLaplace(", self.fields(source)["function"])
+                self.assertIn("inverselaplace(", self.fields(source)["function"])
 
 
 class ZZInverseLaplaceRationalReadmeExamples(unittest.TestCase):

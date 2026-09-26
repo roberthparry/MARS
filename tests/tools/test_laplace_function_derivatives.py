@@ -28,7 +28,7 @@ class LaplaceFunctionDerivativeTests(unittest.TestCase):
     def test_linearity_combines_derivatives_and_unknown_functions(self):
         fields = self.fields("@L{y''(t)+4*y'(t)+5*y(t)-50*t}")
         self.assertIn("ℒ(y(t), t, s)", fields["unbound"])
-        self.assertNotIn("Laplace(y''", fields["function"])
+        self.assertNotIn("laplace(y''", fields["function"])
         self.assertIn("y'(0)", fields["function"])
         self.assertIn("y(0)", fields["function"])
         self.assertIn(" = ", fields["transform_identity_TeX"])
@@ -39,7 +39,7 @@ class LaplaceFunctionDerivativeTests(unittest.TestCase):
         self.assertAlmostEqual(float(result["value"]), -8.25, places=13)
         for source in ("@L{2*u(t)+3*v(t)}", "@L{-u(t)}", "@L{u(t)/2}"):
             result = self.fields(source)
-            self.assertIn("Laplace(u(t), t, s)", result["function"])
+            self.assertIn("laplace(u(t), t, s)", result["function"])
             self.assertNotIn("realpart(s)", result["function"])
 
     def test_bare_prime_shorthand_matches_explicit_functions(self):
@@ -120,7 +120,7 @@ class LaplaceFunctionDerivativeTests(unittest.TestCase):
 
     def test_explicit_variables_and_hygienic_sum_index(self):
         fields = self.fields("@L(f^(k)(x),x,p)")
-        self.assertIn("Laplace(f(x), x, p)", fields["function"])
+        self.assertIn("laplace(f(x), x, p)", fields["function"])
         self.assertIn("sum(j,", fields["function"])
         self.assertIn("f^(j)(0)", fields["function"])
 

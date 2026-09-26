@@ -215,7 +215,7 @@ class LaplaceSpecialTests(unittest.TestCase):
     def assert_transform(self, operand, target, expected, bindings=""):
         source = "{Laplace(" + operand + ",t,s) | s=" + literal(target) + bindings + "}"
         fields, raw = self.evaluate(source)
-        self.assertNotIn("Laplace(", fields["function"], raw)
+        self.assertNotIn("laplace(", fields["function"], raw)
         try:
             scalar = re.sub(r"\s+", "", fields["value"]).replace("−", "-").replace("i", "j")
             actual = complex(scalar)
@@ -304,7 +304,7 @@ class LaplaceSpecialTests(unittest.TestCase):
             with self.subTest(operand=operand):
                 fields, raw = self.evaluate("Laplace(" + operand + ",t,s)")
                 compact = re.sub(r"\s+", "", raw)
-                self.assertNotIn("Laplace(", fields["function"], raw)
+                self.assertNotIn("laplace(", fields["function"], raw)
                 self.assertIn(guard, compact)
                 self.assertIn("realpart(s)>0", compact)
         # Bind v as a free variable, so the guard remains active at evaluation.
@@ -319,13 +319,13 @@ class LaplaceSpecialTests(unittest.TestCase):
             with self.subTest(operand=operand):
                 fields, raw = self.evaluate("Laplace(" + operand + ",t,s)")
                 compact = re.sub(r"\s+", "", raw)
-                self.assertNotIn("Laplace(", fields["function"], raw)
+                self.assertNotIn("laplace(", fields["function"], raw)
                 self.assertIn("realpart(a)>0", compact)
                 self.assertIn("realpart(s)>0", compact)
                 if operand != "E1(a*t)":
                     self.assertIn("realpart(v)>0", compact)
         fields, raw = self.evaluate("{Laplace(E1(a*t),t,s) | s=?; a=?}")
-        self.assertNotIn("Laplace(", fields["function"], raw)
+        self.assertNotIn("laplace(", fields["function"], raw)
         self.assertIn("realpart(a)>0", re.sub(r"\s+", "", raw))
         for operand in ("E1(a*t)", "gammainc_lower(1/2,a*t)", "gammainc_Q(2,a*t)"):
             for rate in ("0", "-1", "i", "-1+i"):
@@ -402,7 +402,7 @@ class LaplaceSpecialTests(unittest.TestCase):
         for order in (9, 16, 31, 32):
             with self.subTest(order=order):
                 fields, raw = self.evaluate(f"Laplace(Cl({order},t),t,s)")
-                self.assertNotIn("Laplace(", fields["function"], raw)
+                self.assertNotIn("laplace(", fields["function"], raw)
                 self.assertIn("sum(", fields["function"], raw)
                 self.assertLess(len(fields["function"]), 2000, raw)
         # Both a target called j and a supplied rate called j must stay outside
@@ -412,14 +412,14 @@ class LaplaceSpecialTests(unittest.TestCase):
         self.assert_transform("Cl(31,j*t)", target, expected, "; j=3/2")
         expected, _ = clausen_fourier_reference(32, 1.0, target)
         fields, raw = self.evaluate("{Laplace(Cl(32,t),t,j) | j=" + literal(target) + "}")
-        self.assertNotIn("Laplace(", fields["function"], raw)
+        self.assertNotIn("laplace(", fields["function"], raw)
         actual = complex(re.sub(r"\s+", "", fields["value"]).replace("−", "-").replace("i", "j"))
         self.assertLessEqual(abs(actual - expected), 3e-9 * max(1.0, abs(expected)), raw)
 
     def test_clausen_frequency_guard_and_unsupported_parameters(self):
         for operand in ("Cl(1,t)", "clausen2(t)", "Cl(3,t)", "Cl(32,-2*t)"):
             fields, raw = self.evaluate("Laplace(" + operand + ",t,s)")
-            self.assertNotIn("Laplace(", fields["function"], raw)
+            self.assertNotIn("laplace(", fields["function"], raw)
             self.assertIn("realpart(s)>0", re.sub(r"\s+", "", raw))
             for target in ("0", "-1", "i"):
                 with self.subTest(operand=operand, target=target):
@@ -429,11 +429,11 @@ class LaplaceSpecialTests(unittest.TestCase):
                         "clausen2(a*t)", "clausen2(i*t)", "Cl(3,(1+i)*t)", "clausen2(t+1)"):
             with self.subTest(operand=operand):
                 fields, raw = self.evaluate("Laplace(" + operand + ",t,s)")
-                self.assertIn("Laplace(", fields["function"], raw)
+                self.assertIn("laplace(", fields["function"], raw)
         for source in ("{Laplace(Cl(n,t),t,s) | s=2,n=3}",
                        "{Laplace(clausen2(a*t),t,s) | s=2,a=1}"):
             fields, raw = self.evaluate(source)
-            self.assertIn("Laplace(", fields["function"], raw)
+            self.assertIn("laplace(", fields["function"], raw)
 
     def test_conservative_frequency_domain_rejects_boundary_and_left_half_plane(self):
         for operand, target in (("E1(t)", "0"), ("E1(t)", "-1/2"),
@@ -456,9 +456,9 @@ class LaplaceSpecialTests(unittest.TestCase):
         for operand in operands:
             with self.subTest(operand=operand):
                 fields, raw = self.evaluate("Laplace(" + operand + ",t,s)")
-                self.assertIn("Laplace(", fields["function"], raw)
+                self.assertIn("laplace(", fields["function"], raw)
         fields, raw = self.evaluate("{Laplace(Ei(c*t),t,s) | s=2,c=1}")
-        self.assertIn("Laplace(", fields["function"], raw)
+        self.assertIn("laplace(", fields["function"], raw)
 
 
 if __name__ == "__main__":

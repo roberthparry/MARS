@@ -42,7 +42,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
 
     def assert_inverse(self, spectrum, expected):
         inverse = self.fields("InverseLaplace(" + spectrum + ",s,t)")
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         restored = self.body(inverse)
         # Reparse the inverse result as well: correct internal algebra must not
         # conceal an incorrect sign, branch or grouping in expression output.
@@ -55,7 +55,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
 
     def assert_round_trip(self, source, expected):
         forward = self.fields("Laplace(" + source + ",t,s)", "s")
-        self.assertNotIn("return Laplace(", forward["function"])
+        self.assertNotIn("return laplace(", forward["function"])
         # No nested transform node or source-function metadata survives this string.
         spectrum = self.body(forward)
         return self.assert_inverse(spectrum, expected)
@@ -117,7 +117,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
     def test_copied_gamma_spectrum_and_symbolic_conditions(self):
         self.assert_inverse("(2/(s+2))^(3/2)/s", lambda t: incomplete_gamma(1.5, 2*t, False)/math.gamma(1.5))
         result = self.fields("InverseLaplace((a/(s+a))^v/s,s,t)")
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         self.assertIn("Re(v) > 0", result["expression"])
         self.assertIn("Re(a) > 0", result["expression"])
         self.assertNotIn("Re(s)", result["expression"])
@@ -131,7 +131,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
         )
         for spectrum, source in spectra:
             inverse = self.fields("InverseLaplace(" + spectrum + ",s,t)")
-            self.assertNotIn("InverseLaplace(", inverse["function"])
+            self.assertNotIn("inverselaplace(", inverse["function"])
             self.assertIn("gammaincq(", inverse["function"])
             self.assertNotIn("gammaincp(", inverse["function"])
             for time in (50, 100):
@@ -148,7 +148,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
         )
         for spectrum, source in spectra:
             inverse = self.fields("InverseLaplace(" + spectrum + ",s,t)")
-            self.assertNotIn("InverseLaplace(", inverse["function"])
+            self.assertNotIn("inverselaplace(", inverse["function"])
             self.assertIn("gammaincp(", inverse["function"])
             self.assertNotIn("gammaincq(", inverse["function"])
             # Keep the source's own value non-zero at the Lab's requested precision;
@@ -171,7 +171,7 @@ class InverseLaplaceSpecialTests(unittest.TestCase):
     def test_constant_parameters_are_specialised(self):
         source = "{InverseLaplace((a/(s+a))^v/s,s,t) | t=?; a=2; v=3/2}"
         result = self.fields(source)
-        self.assertNotIn("InverseLaplace(", result["function"])
+        self.assertNotIn("inverselaplace(", result["function"])
         self.assertNotIn("Re(v)", result["expression"])
         self.assertNotIn("Re(a)", result["expression"])
 

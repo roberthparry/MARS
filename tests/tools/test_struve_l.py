@@ -113,7 +113,7 @@ class StruveLTests(unittest.TestCase):
         self.assertIn("struvel(0,", result["function"])
         body = result["expression"].split(" | ")[0].removeprefix("{ ")
         inverse = fields("InverseLaplace("+body+",s,t)")
-        self.assertNotIn("InverseLaplace(", inverse["function"])
+        self.assertNotIn("inverselaplace(", inverse["function"])
         self.assertIn("acosh(t)", inverse["function"])
 
     def test_general_hypergeometric_notation(self):

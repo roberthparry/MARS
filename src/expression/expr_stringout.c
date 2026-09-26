@@ -1959,7 +1959,7 @@ static void emit_ordered_derivative(const expr_t *f, sbuf_t *b, int style)
     const char *name = f->a->name;
     bool builtin = !expr_is_arbitrary_function(f->a);
     if (builtin && style != 2) {
-        sbuf_puts(b, "Derivative(");
+        sbuf_puts(b, style == 1 ? "derivative(" : "Derivative(");
         const expr_t *expanded = function_temporary_context.expanded_node;
         if (style == 1)
             function_temporary_context.expanded_node = f->a;
@@ -2200,7 +2200,7 @@ static void emit_formal_derivative_func(const expr_t *f, sbuf_t *b)
     /* Nest coordinate groups in differentiation order; repeated coordinates share one order. */
     for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
         if (i == 0u || !expr_struct_eq(f->formal_wrts[i - 1u], f->formal_wrts[i]))
-            sbuf_puts(b, "Derivative(");
+            sbuf_puts(b, "derivative(");
     }
     emit_func(f->a, b, PREC_LOWEST);
     for (size_t i = 0u; i < f->formal_wrt_count;) {
