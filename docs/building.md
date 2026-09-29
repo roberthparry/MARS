@@ -180,7 +180,10 @@ make test
 
 The normal build also runs `check-native-numeric-boundaries`. This guard checks
 both source references and undefined object symbols to ensure that the qfloat
-and qcomplex modules remain independent of MPFR and MPC:
+and qcomplex modules do not include MPFR/MPC headers or call their APIs directly.
+Bessel Y/I/K and Struve H/L deliberately delegate through the public number API;
+their kernels use MPFR/MPC inside the number module. The guard enforces that
+module boundary, not independence from transitive multiprecision dependencies:
 
 ```sh
 make check-native-numeric-boundaries

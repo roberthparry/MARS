@@ -493,6 +493,7 @@ their existing backend-specific precision and representation.
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
 | `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
 | `num_bessel_i(ν, x)` | Evaluates the principal modified Bessel function `Iν(x)`, including `I₀(x)` at order zero. |
+| `num_bessel_k(ν, x)` | Evaluates the principal modified Bessel function `Kν(x)` for real or complex order and non-zero argument. |
 | `num_bessel_y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |
 | `num_struve_l(ν, x)` | Evaluates the principal modified Struve function `Lν(x)` for real or complex inputs. |
 | `num_struve_h(ν, x)` | Evaluates the principal ordinary Struve function `Hν(x)` for real or complex inputs. |
@@ -561,6 +562,29 @@ Y_0(1) = 0.088256964215677
 The example rounds only its displayed output to double precision. See also
 the [qfloat](qfloat.md) and [qcomplex](qcomplex.md#bessel-y) APIs.
 
+### Modified Bessel K
+
+`num_bessel_k(order, argument)` returns an owning number containing the
+principal modified Bessel function of the second kind. Both operands may be
+real or complex. Non-finite operands, a zero argument, or an operand magnitude
+greater than 1000 return NaN. Real orders with positive real arguments return
+real values; other supported arguments follow the principal logarithm and power
+branches and may return complex values. The input values are not modified.
+
+The result uses the greatest input precision, with exact inputs contributing
+the current default precision, including exact Cartesian components. Evaluation
+adds working precision for cancellation and proximity to integer orders, then
+rounds the result back to the requested precision. Integer orders use harmonic
+series for K₀ and K₁ followed by recurrence; non-integer orders use two reduced
+I-series with gamma factors. Each series is limited to 20000 iterations; failure
+to converge returns NaN. The near-integer guard also rejects an unrepresentable
+distance estimate or a required distance correction above 65536 bits. This is
+not a uniform 65536-bit cap on the total working precision.
+
+The qfloat and qcomplex interfaces delegate to this evaluator and round to
+double-double components. Symbolic argument derivatives, affine primitives and
+finite sums belong to the [expression layer](expression.md#inverse-hyperbolic-sine-fourier-pair).
+
 ### Modified Bessel I
 
 `num_bessel_i(order, argument)` returns an owning number containing the
@@ -574,10 +598,7 @@ The [qfloat](qfloat.md#modified-bessel-i) and
 
 The defining series, from [DLMF 10.25.2](https://dlmf.nist.gov/10.25.E2), is
 
-$$
-I_\nu(z)=\sum_{k=0}^{\infty}
-\frac{(z/2)^{\nu+2k}}{\Gamma(k+1)\Gamma(k+\nu+1)}.
-$$
+$\quad\begin{array}{l}\displaystyle I_\nu(z)=\sum_{k=0}^{\infty} \frac{(z/2)^{\nu+2k}}{\Gamma(k+1)\Gamma(k+\nu+1)}.\end{array}$
 
 Its principal power uses `-pi < arg(z) <= pi`. An exactly negative real
 argument takes the upper-bank value irrespective of signed zero. Real
@@ -623,10 +644,7 @@ exact zero limits. The [qfloat](qfloat.md#ordinary-struve-h) and
 
 The defining series is
 
-$$
-\mathbf H_\nu(z)=\sum_{k=0}^{\infty}
-\frac{(-1)^k(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.
-$$
+$\quad\begin{array}{l}\displaystyle \mathbf H_\nu(z)=\sum_{k=0}^{\infty} \frac{(-1)^k(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.\end{array}$
 
 See [DLMF 11.2.1](https://dlmf.nist.gov/11.2.E1). The principal power uses
 the original argument, with `-pi < arg(z) <= pi`; the negative axis itself
@@ -680,10 +698,7 @@ The [qfloat](qfloat.md#modified-struve-l) and
 
 The defining series is
 
-$$
-\mathbf L_\nu(z)=\sum_{k=0}^{\infty}
-\frac{(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.
-$$
+$\quad\begin{array}{l}\displaystyle \mathbf L_\nu(z)=\sum_{k=0}^{\infty} \frac{(z/2)^{\nu+1+2k}}{\Gamma(k+3/2)\Gamma(k+\nu+3/2)}.\end{array}$
 
 See [DLMF 11.2.2](https://dlmf.nist.gov/11.2.E2). The principal power uses
 `-pi < arg(z) <= pi`; the negative real axis itself takes the upper-bank

@@ -24,7 +24,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   transcendent families
   (~31–32 decimal digits of precision)
 - **`qcomplex_t`** — double-double complex arithmetic and complex
-  special-function families without an MPFR or MPC dependency
+  special-function families; Bessel Y/I/K and Struve H/L use guarded
+  multiprecision kernels through the number layer
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values
   or symbolic `expr_t *` entries, with native matrix-expression parsing,
   symbolic powers, ordered higher and mixed derivatives and antiderivatives,

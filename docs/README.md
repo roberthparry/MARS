@@ -59,6 +59,7 @@ This directory contains the longer module documentation for MARS.
 ## Design Notes
 
 - [Ophelia expression language](./design-notes/expression-language.md)
+- [Integral transform syntax and implemented pairs](./design-notes/integral-transforms.md)
 - [Lerch transcendent support](./design-notes/lerch-transcendent.md)
 - [Future differential-equation work](./design-notes/differential-equations.md)
 - [Literate comments and notebook output](./design-notes/literate-comments-and-notebooks.md)

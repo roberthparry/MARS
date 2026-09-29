@@ -123,7 +123,7 @@ y'' + 4y = e^x
 
 Normalised equation: `Dxx(y) + 4y = e^x`.
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = e^{x} \\[1em] & y = \tfrac15 e^x+C_1\cos(2x)+C_2\sin(2x) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = e^{x} \\[1em] & y = \tfrac15 e^x+C_1\cos(2x)+C_2\sin(2x) \end{aligned}\end{array}$
 
 The forcing term identifies `t` in this initial-value problem; the same
 coordinate is used for the equation and its initial conditions:
@@ -147,7 +147,7 @@ x'' + x = 0
 
 Normalised equation: `Dtt(x) + x = 0`.
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} x}{d t^{2}} + x = 0 \\[1em] & x = C_1\cos t+C_2\sin t \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} x}{d t^{2}} + x = 0 \\[1em] & x = C_1\cos t+C_2\sin t \end{aligned}\end{array}$
 
 The standard forms `dy/dx`, `d²y/dx²`, and `d³y/dx³` are accepted as
 equivalent input aliases. In the Mars Lab, ordinary derivatives are displayed
@@ -234,7 +234,7 @@ More generally, for any literal positive integer `n` up to 64,
 (D^2 + @omega^2)^n x = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \left(\frac{d^2}{dt^2}+\omega^2\right)^n x = 0 \\[1em] & x = \left(\sum_{k=0}^{n-1} C_{k+1}t^k\right)\cos(\omega t) + \left(\sum_{k=0}^{n-1} C_{n+k+1}t^k\right)\sin(\omega t) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \left(\frac{d^2}{dt^2}+\omega^2\right)^n x = 0 \\[1em] & x = \left(\sum_{k=0}^{n-1} C_{k+1}t^k\right)\cos(\omega t) + \left(\sum_{k=0}^{n-1} C_{n+k+1}t^k\right)\sin(\omega t) \end{aligned}\end{array}$
 
 Here `n` describes the general family; an entered operator power must be a
 literal integer so MARS can construct the corresponding order `2n` equation.
@@ -249,7 +249,7 @@ Additive forcing terms are solved independently and then combined:
 y'' + 4y = e^x + x^3
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = e^{x} + x^{3} \\[1em] & y = \tfrac15 e^x+\tfrac14 x^3-\tfrac38 x+C_1\cos(2x)+C_2\sin(2x) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = e^{x} + x^{3} \\[1em] & y = \tfrac15 e^x+\tfrac14 x^3-\tfrac38 x+C_1\cos(2x)+C_2\sin(2x) \end{aligned}\end{array}$
 
 Autonomous first-order equations that are quadratic in the derivative can
 produce multiple implicit branches and a singular solution:
@@ -258,7 +258,7 @@ produce multiple implicit branches and a singular solution:
 (y')^2 = y' + 2y
 ```
 
-$\displaystyle\quad \begin{aligned} & \left(\frac{d y}{d x}\right)^{2} = \frac{d y}{d x} + 2\mkern-2mu y \\[1em] & \begin{aligned} x &= \tfrac12\left(\sqrt{8y+1}-\ln\left\lvert\tfrac12(\sqrt{8y+1}+1)\right\rvert+1\right)+C,\\ x &= \tfrac12\left(1-\sqrt{8y+1}-\ln\left\lvert\tfrac12(1-\sqrt{8y+1})\right\rvert\right)+C,\\ y &= 0. \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \left(\frac{d y}{d x}\right)^{2} = \frac{d y}{d x} + 2\mkern-2mu y \\[1em] & \begin{aligned} x &= \tfrac12\left(\sqrt{8y+1}-\ln\left\lvert\tfrac12(\sqrt{8y+1}+1)\right\rvert+1\right)+C,\\ x &= \tfrac12\left(1-\sqrt{8y+1}-\ln\left\lvert\tfrac12(1-\sqrt{8y+1})\right\rvert\right)+C,\\ y &= 0. \end{aligned} \end{aligned}\end{array}$
 
 Exact third-order nonlinear forms can be integrated once and linearised. For
 example,
@@ -267,7 +267,7 @@ example,
 y''' + y''*y' = 3x^2
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} + \frac{d^{2} y}{d x^{2}}\mkern-2mu \frac{d y}{d x} = 3\mkern-2mu x^{2} \\[1em] & \begin{aligned} y &= 2\ln\left\lvert\sum_{n=0}^{\infty} c_n x^n\right\rvert,\\ c_0 &= C_2,\qquad c_1 = C_3,\qquad c_{-1}=c_{-2}=c_{-3}=0,\\ c_{n+2} &= \frac{C_1c_n+c_{n-3}}{2(n+2)(n+1)}. \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} + \frac{d^{2} y}{d x^{2}}\mkern-2mu \frac{d y}{d x} = 3\mkern-2mu x^{2} \\[1em] & \begin{aligned} y &= 2\ln\left\lvert\sum_{n=0}^{\infty} c_n x^n\right\rvert,\\ c_0 &= C_2,\qquad c_1 = C_3,\qquad c_{-1}=c_{-2}=c_{-3}=0,\\ c_{n+2} &= \frac{C_1c_n+c_{n-3}}{2(n+2)(n+1)}. \end{aligned} \end{aligned}\end{array}$
 
 Here the original left side is
 $\frac{d}{dx}\bigl(y''+\tfrac12(y')^2\bigr)$. After one integration, the substitution
@@ -320,11 +320,11 @@ second-order ODE, rather than matching a catalogue of known generators.
 The equation must be linear in its highest derivative so that it can be
 normalised locally, where the leading coefficient is non-zero.
 
-$\displaystyle\quad y''=f(x,y,p),\qquad p=y',\qquad D=\partial_x+p\partial_y+f\partial_p.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad y''=f(x,y,p),\qquad p=y',\qquad D=\partial_x+p\partial_y+f\partial_p.\end{array}$
 
 For a point generator, the components $\xi$ and $\eta$ depend on $x,y$, not on $p$:
 
-$\displaystyle\quad \begin{aligned} &G=\xi(x,y)\partial_x+\eta(x,y)\partial_y,\\[0.5em] &\eta^{(1)}=D\eta-pD\xi,\qquad \eta^{(2)}=D\eta^{(1)}-fD\xi,\\[0.5em] &\eta^{(2)}-\xi f_x-\eta f_y-\eta^{(1)}f_p=0.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} &G=\xi(x,y)\partial_x+\eta(x,y)\partial_y,\\[0.5em] &\eta^{(1)}=D\eta-pD\xi,\qquad \eta^{(2)}=D\eta^{(1)}-fD\xi,\\[0.5em] &\eta^{(2)}-\xi f_x-\eta f_y-\eta^{(1)}f_p=0.\end{aligned}\end{array}$
 
 The final line is the **determining equation**. MARS can construct it with
 unknown functions, or substitute supplied components and verify their residual.
@@ -347,11 +347,11 @@ equation's symmetry algebra.
 For example, the free-particle equation yields eight generators at degree two,
 in agreement with the [linearisation notes](<books/Applied Differential Equations/02-linearisation-of-non-linear-odes.md>):
 
-$\displaystyle\quad \begin{aligned} &y''=0,\\[0.5em] &(\xi,\eta)\in\operatorname{span}\{(1,0),(x,0),(y,0),(0,1),(0,x),(0,y),(x^2,xy),(xy,y^2)\}.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} &y''=0,\\[0.5em] &(\xi,\eta)\in\operatorname{span}\{(1,0),(x,0),(y,0),(0,1),(0,x),(0,y),(x^2,xy),(xy,y^2)\}.\end{aligned}\end{array}$
 
 MARS also computes both Lie–Tressé relative invariants symbolically:
 
-$\displaystyle\quad \begin{aligned} &I_1=f_{pppp},\\[0.5em] &I_2=D^2f_{pp}-4Df_{yp}-f_pDf_{pp}+6f_{yy}-3f_yf_{pp}+4f_pf_{yp}.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} &I_1=f_{pppp},\\[0.5em] &I_2=D^2f_{pp}-4Df_{yp}-f_pDf_{pp}+6f_{yy}-3f_yf_{pp}+4f_pf_{yp}.\end{aligned}\end{array}$
 
 Both must vanish identically for local point-linearisation. Their value at one
 point is not sufficient. A non-zero invariant rules out that linearisation,
@@ -376,7 +376,7 @@ $\displaystyle\quad \frac{d^2y}{dx^2}=\frac{dp}{dx}
 
 Substituting $y'=p$ and $y''=p\,dp/dy$ into the original equation gives
 
-$\displaystyle\quad p\frac{dp}{dy}=-3yp-y^4.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad p\frac{dp}{dy}=-3yp-y^4.\end{array}$
 
 `de_lie_autonomous_reduction()` constructs this first-order equation for any
 supported autonomous normal form. Using $y$ as a local coordinate requires
@@ -462,14 +462,14 @@ the canonical expression and unbound output form.
 
 For the constant-coefficient transport equation
 
-$\displaystyle\quad a\frac{\partial u}{\partial x}+b\frac{\partial u}{\partial y}=q,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad a\frac{\partial u}{\partial x}+b\frac{\partial u}{\partial y}=q,\end{array}$
 
 the characteristic invariant is $bx-ay$. For $q=0$, the value of `u`
 is constant along each characteristic. With explicit data on $y=y_0$, the
 solver transports the boundary expression along those curves. The example
 above therefore gives:
 
-$\displaystyle\quad u = (x-2y)^2.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u = (x-2y)^2.\end{array}$
 
 Boundary data on a constant-`x` line is supported as well:
 
@@ -482,7 +482,7 @@ Boundary data on a constant-`x` line is supported as well:
 }
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial u}{\partial x} + 3\mkern-2mu \frac{\partial u}{\partial y} = 0 \\[1em] & u = e^{y-3x} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial u}{\partial x} + 3\mkern-2mu \frac{\partial u}{\partial y} = 0 \\[1em] & u = e^{y-3x} \end{aligned}\end{array}$
 
 Affine parameterised boundary curves are supported when they are
 non-characteristic. For example:
@@ -491,7 +491,7 @@ non-characteristic. For example:
 Dx(z) + Dy(z) = 2*z*(x+y); z(x, 1-x) = x^2
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial z}{\partial x} + \frac{\partial z}{\partial y} = 2\mkern-2mu z\mkern-2mu \left(x + y\right) \\[1em] & z = \tfrac14(x-y+1)^2\exp\!\left(\tfrac12\bigl((x+y)^2-1\bigr)\right) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial z}{\partial x} + \frac{\partial z}{\partial y} = 2\mkern-2mu z\mkern-2mu \left(x + y\right) \\[1em] & z = \tfrac14(x-y+1)^2\exp\!\left(\tfrac12\bigl((x+y)^2-1\bigr)\right) \end{aligned}\end{array}$
 
 Here $x+y$ changes along each characteristic while $y-x$ is invariant. The
 boundary curve $y=1-x$ determines the formerly arbitrary function of that
@@ -513,7 +513,7 @@ orders are accepted and their coefficients are combined. For example:
 z_xx - 3z_yx + 2z_yy = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} - 3\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 2\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 0 \\[1em] & z = F(x+y)+G(2x+y) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} - 3\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 2\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 0 \\[1em] & z = F(x+y)+G(2x+y) \end{aligned}\end{array}$
 
 Here the operator factors as $(\partial_x-\partial_y)(\partial_x-2\partial_y)$. The native equation solver
 supplies the quadratic roots, including exact surds and complex roots.
@@ -529,7 +529,7 @@ solution. For example:
 z_xx + 5z_yx + 6z_yy = 2e^(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu e^{x - y} \\[1em] & z = F(y-3x)+G(y-2x)+e^{x-y} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu e^{x - y} \\[1em] & z = F(y-3x)+G(y-2x)+e^{x-y} \end{aligned}\end{array}$
 
 For exponential forcing $f=Ke^{ax+by+d}$, applying the operator
 multiplies `f` by $Aa^2+Bab+Cb^2$. When this is non-zero, division by
@@ -567,7 +567,7 @@ phases with coordinate multipliers. For example:
 z_xx + 5z_yx + 6z_yy = 2tanh(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tanh(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)\\ &+\tfrac12\operatorname{Li}_2\!\left(-e^{2(y-x)}\right)-(x-y)\ln 2+\tfrac12(x-y)^2. \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tanh(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)\\ &+\tfrac12\operatorname{Li}_2\!\left(-e^{2(y-x)}\right)-(x-y)\ln 2+\tfrac12(x-y)^2. \end{aligned} \end{aligned}\end{array}$
 
 Both integrations use the native expression integrator. Its general rule for
 the logarithm of a hyperbolic cosine uses the existing dilogarithm `Li2`
@@ -588,7 +588,7 @@ rule for logarithms of sine and cosine:
 z_xx + 5z_yx + 6z_yy = 2tan(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tan(x - y) \\[1em] & z = F(y-3x)+G(y-2x)+\tfrac12\operatorname{Cl}_2(2x-2y+\pi)+(x-y)\ln 2 \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tan(x - y) \\[1em] & z = F(y-3x)+G(y-2x)+\tfrac12\operatorname{Cl}_2(2x-2y+\pi)+(x-y)\ln 2 \end{aligned}\end{array}$
 
 This is a real closed form on each region between consecutive poles
 $x-y=\pi/2+k\pi$; no solution is asserted across those singularities.
@@ -601,7 +601,7 @@ Inverse-hyperbolic-tangent forcing has an elementary closed form:
 z_xx + 5z_yx + 6z_yy = 2atanh(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tanh^{-1}(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)-\tfrac12 x+\tfrac12 y\\ &+\tfrac12(x-y)\ln\bigl(1-(x-y)^2\bigr) +\tfrac12\bigl((x-y)^2+1\bigr)\operatorname{atanh}(x-y). \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \tanh^{-1}(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)-\tfrac12 x+\tfrac12 y\\ &+\tfrac12(x-y)\ln\bigl(1-(x-y)^2\bigr) +\tfrac12\bigl((x-y)^2+1\bigr)\operatorname{atanh}(x-y). \end{aligned} \end{aligned}\end{array}$
 
 The particular solution is real for $\lvert x-y\rvert<1$. Both integrations use
 the native expression integrator, whose quadratic-denominator rule selects
@@ -614,12 +614,12 @@ Inverse-cosine forcing likewise has an elementary closed form:
 z_xx + 5z_yx + 6z_yy = 2acos(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \cos^{-1}(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)-\tfrac12\arcsin(x-y)\\ &+\tfrac14\arccos(x-y)\bigl(2(x-y)^2-1\bigr) -\tfrac34(x-y)\sqrt{1-(x-y)^2}. \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \cos^{-1}(x - y) \\[1em] & \begin{aligned} z &={} F(y-3x)+G(y-2x)-\tfrac12\arcsin(x-y)\\ &+\tfrac14\arccos(x-y)\bigl(2(x-y)^2-1\bigr) -\tfrac34(x-y)\sqrt{1-(x-y)^2}. \end{aligned} \end{aligned}\end{array}$
 
 Writing $s=x-y$ and absorbing an additive constant into the arbitrary
 functions, its particular solution is
 
-$\displaystyle\quad \frac{(2s^2+1)\arccos(s)-3s\sqrt{1-s^2}}{4}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{(2s^2+1)\arccos(s)-3s\sqrt{1-s^2}}{4}.\end{array}$
 
 This is real for $|s|<1$. Inverse-sine forcing uses the same native integration
 and radical-simplification rules; neither family needs PDE-specific calculus.
@@ -630,7 +630,7 @@ Absolute-value forcing also has a real closed form:
 z_xx + 5z_yx + 6z_yy = 2abs(x-y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \left|x - y\right| \\[1em] & z = F(y-3x)+G(y-2x)+\tfrac16(x-y)^2\lvert x-y\rvert \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} z}{\partial x^{2}} + 5\mkern-2mu \frac{\partial^{2} z}{\partial x\,\partial y} + 6\mkern-2mu \frac{\partial^{2} z}{\partial y^{2}} = 2\mkern-2mu \left|x - y\right| \\[1em] & z = F(y-3x)+G(y-2x)+\tfrac16(x-y)^2\lvert x-y\rvert \end{aligned}\end{array}$
 
 The particular solution is $|x-y|^3/6$, written equivalently as
 $(x-y)^2|x-y|/6$. It is twice continuously differentiable, including at
@@ -640,7 +640,7 @@ absolute-value rules; the PDE solver needs no special case.
 
 Variable coefficients are supported for the radial Euler family
 
-$\displaystyle\quad A(x^2z_{xx}+2xyz_{xy}+y^2z_{yy})+B(xz_x+yz_y)+Cz=0,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad A(x^2z_{xx}+2xyz_{xy}+y^2z_{yy})+B(xz_x+yz_y)+Cz=0,\end{array}$
 
 where $A$, $B$ and $C$ are finite real numeric constants and $A\ne0$.
 Writing $E=x\partial_x+y\partial_y$, the second-order radial operator is
@@ -648,7 +648,7 @@ $E^2-E$. On the local chart $x>0$, the coordinates $r=\ln(x)$ and
 $\eta=y/x$ turn $E$ into $\partial_r$. At each fixed ray $\eta$, the PDE
 therefore becomes the ordinary equation
 
-$\displaystyle\quad A z_{rr}+(B-A)z_r+Cz=0.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad A z_{rr}+(B-A)z_r+Cz=0.\end{array}$
 
 The native equation solver supplies the roots of $Am(m-1)+Bm+C=0$.
 Distinct roots give $x^{m_1}F(\eta)+x^{m_2}G(\eta)$; a repeated root gives
@@ -686,7 +686,7 @@ u_{tt}-c^2u_{xx}=f(x,t),\qquad u(x,t_0)=g(x),\qquad u_t(x,t_0)=h(x),\quad c>0,$
 
 Mars combines d'Alembert's formula with Duhamel's principle:
 
-$\displaystyle\quad u(x,t)=\tfrac12\bigl[g(x+c(t-t_0))+g(x-c(t-t_0))\bigr]+\frac1{2c}\int_{x-c(t-t_0)}^{x+c(t-t_0)}h(\xi)\,d\xi+\frac1{2c}\int_{t_0}^{t}\int_{x-c(t-s)}^{x+c(t-s)}f(\xi,s)\,d\xi\,ds.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=\tfrac12\bigl[g(x+c(t-t_0))+g(x-c(t-t_0))\bigr]+\frac1{2c}\int_{x-c(t-t_0)}^{x+c(t-t_0)}h(\xi)\,d\xi+\frac1{2c}\int_{t_0}^{t}\int_{x-c(t-s)}^{x+c(t-s)}f(\xi,s)\,d\xi\,ds.\end{array}$
 
 The first two terms propagate the supplied initial data. The final term
 accounts for the forcing inside the characteristic triangle; it and its first
@@ -697,7 +697,7 @@ as symbolic functions, without specifying elementary expressions:
 u_tt - c^2u_xx = f(x,t); u(x, 0) = g(x); u_t(x,0) = h(x)
 ```
 
-$\displaystyle\quad u(x,t)=\tfrac12\bigl[g(x+ct)+g(x-ct)\bigr]+\frac1{2c}\int_{x-ct}^{x+ct}h(\xi)\,d\xi+\frac1{2c}\int_0^t\int_{x-c(t-s)}^{x+c(t-s)}f(\xi,s)\,d\xi\,ds.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=\tfrac12\bigl[g(x+ct)+g(x-ct)\bigr]+\frac1{2c}\int_{x-ct}^{x+ct}h(\xi)\,d\xi+\frac1{2c}\int_0^t\int_{x-c(t-s)}^{x+c(t-s)}f(\xi,s)\,d\xi\,ds.\end{array}$
 
 The equation card retains the arguments in $f(x,t)$, and the solution retains
 the arguments of every function call. These are genuine symbolic function
@@ -716,7 +716,7 @@ zero displacement averages and zero velocity or forcing integrals. For example:
 u_tt - u_xx = f(x)*cos(t); u(x,0) = 0; u_t(x,0) = 0
 ```
 
-$\displaystyle\quad u(x,t)=\frac12\int_0^t\int_{x-(t-s)}^{x+(t-s)}\cos(s)f(\xi)\,d\xi\,ds.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=\frac12\int_0^t\int_{x-(t-s)}^{x+(t-s)}\cos(s)f(\xi)\,d\xi\,ds.\end{array}$
 
 Only the forcing contribution remains; neither $\tfrac12(0+0)$ nor $0/2$
 is displayed. Non-zero initial-data contributions retain their paired
@@ -732,7 +732,7 @@ u_tt - 4u_xx = x*t; u(x,0) = x^2; u_t(x,0) = 1
 u = ⅙·(t³x + 24t² + 6t + 6x²)
 ```
 
-$\displaystyle\quad u(x,t)=x^2+4t^2+t+\frac16xt^3.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=x^2+4t^2+t+\frac16xt^3.\end{array}$
 
 This satisfies $u_{tt}-4u_{xx}=xt$, $u(x,0)=x^2$ and $u_t(x,0)=1$.
 Polynomial integrals are evaluated exactly, and other elementary primitives
@@ -744,7 +744,7 @@ unsupported:
 u_tt - u_xx = exp(cosh(x)+t^2); u(x,0) = sin(x); u_t(x,0) = exp(cosh(x))
 ```
 
-$\displaystyle\quad u(x,t)=\tfrac12\bigl[\sin(x+t)+\sin(x-t)\bigr]+\frac12\int_{x-t}^{x+t}e^{\cosh(\xi)}\,d\xi+\frac12\int_0^t\int_{x-(t-s)}^{x+(t-s)}e^{\cosh(\xi)+s^2}\,d\xi\,ds.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=\tfrac12\bigl[\sin(x+t)+\sin(x-t)\bigr]+\frac12\int_{x-t}^{x+t}e^{\cosh(\xi)}\,d\xi+\frac12\int_0^t\int_{x-(t-s)}^{x+(t-s)}e^{\cosh(\xi)+s^2}\,d\xi\,ds.\end{array}$
 
 The result has status `DE_SOLVE_STATUS_SOLVED` and solver
 `DE_SOLVER_DALEMBERT_DUHAMEL`; this includes exact integral representations,
@@ -781,10 +781,7 @@ terms, renamed coordinates and nonzero real numerical coefficient scalings.
 For `A*u_t + B*u*u_x + C*u_xxx = 0`, with known finite real nonzero constants
 `A`, `B` and `C`, `DE_SOLVER_KDV_SOLITARY_WAVE` returns the zero-background family
 
-\[
-u(x,t)=\frac{12C}{B}k^2\operatorname{sech}^2\!\left(k\left(x-\frac{4C}{A}k^2t-x_0\right)\right),
-\qquad k>0,\quad x_0\in\mathbb{R}.
-\]
+$\quad\begin{array}{l}\displaystyle u(x,t)=\frac{12C}{B}k^2\operatorname{sech}^2\!\left(k\left(x-\frac{4C}{A}k^2t-x_0\right)\right), \qquad k>0,\quad x_0\in\mathbb{R}.\end{array}$
 
 This is a particular solitary-wave family, **not the general solution**.
 Both native plain-text and TeX output retain that qualification and the
@@ -837,11 +834,7 @@ Singular travelling-wave family (not the general solution): u = (v·cosech²(½n
 
 Equivalently,
 
-\[
-u(x,t)=\left[v\,\operatorname{csch}^{2}\!\left(
-\frac{n\sqrt v}{2}(x-vt-x_0)\right)\right]^{1/n},
-\qquad n\in\mathbb Z_{>0},\quad v>0,\quad x_0\in\mathbb R.
-\]
+$\quad\begin{array}{l}\displaystyle u(x,t)=\left[v\,\operatorname{csch}^{2}\!\left( \frac{n\sqrt v}{2}(x-vt-x_0)\right)\right]^{1/n}, \qquad n\in\mathbb Z_{>0},\quad v>0,\quad x_0\in\mathbb R.\end{array}$
 
 Use the **positive real root**, on either real region excluding the moving
 singularity \(x=vt+x_0\). This is not a globally smooth soliton and not the
@@ -876,11 +869,7 @@ u_t - u_xx + au = 0; u(x,0)=0; u(0,t)=g(t)
 
 For real constant `a`, continuous locally bounded `g` and `g(0)=0`, the output is
 
-\[
-u(x,t)=\frac{x}{2\sqrt\pi}\int_0^t
-(t-s)^{-3/2}\exp\!\left(-\frac{x^2}{4(t-s)}-a(t-s)\right)g(s)\,ds,
-\qquad x>0,\quad t>0.
-\]
+$\quad\begin{array}{l}\displaystyle u(x,t)=\frac{x}{2\sqrt\pi}\int_0^t (t-s)^{-3/2}\exp\!\left(-\frac{x^2}{4(t-s)}-a(t-s)\right)g(s)\,ds, \qquad x>0,\quad t>0.\end{array}$
 
 The solution decays at spatial infinity, is bounded on finite time strips,
 and has zero initial trace for each positive `x`. The boundary value is
@@ -913,9 +902,9 @@ constant coefficient, not the dependent variable `u`:
 u_t + Uu_x + u_xx + u_xxxx = 0; u(x,0) = f(x)
 ```
 
-$\displaystyle\quad \frac{\partial u}{\partial t}+U\frac{\partial u}{\partial x}+\frac{\partial^2u}{\partial x^2}+\frac{\partial^4u}{\partial x^4}=0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial u}{\partial t}+U\frac{\partial u}{\partial x}+\frac{\partial^2u}{\partial x^2}+\frac{\partial^4u}{\partial x^4}=0\end{array}$
 
-$\displaystyle\quad u(x,t)=\frac1\pi\int_{-\infty}^{\infty} f(\xi)\left[\int_0^{\infty}e^{t(k^2-k^4)}\cos\!\bigl(k(x-\xi)-Ukt\bigr)\,dk\right]d\xi,\qquad t>0.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u(x,t)=\frac1\pi\int_{-\infty}^{\infty} f(\xi)\left[\int_0^{\infty}e^{t(k^2-k^4)}\cos\!\bigl(k(x-\xi)-Ukt\bigr)\,dk\right]d\xi,\qquad t>0.\end{array}$
 
 This is an exact integral representation on the whole real spatial line, for
 finite real `U` and Schwartz initial data: smooth functions whose derivatives
@@ -1012,7 +1001,7 @@ the general solution using arbitrary analytic functions `F` and `G`:
 phi_xx + phi_yy = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} \phi}{\partial x^{2}} + \frac{\partial^{2} \phi}{\partial y^{2}} = 0 \\[1em] & \phi = F(x+iy)+G(x-iy) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} \phi}{\partial x^{2}} + \frac{\partial^{2} \phi}{\partial y^{2}} = 0 \\[1em] & \phi = F(x+iy)+G(x-iy) \end{aligned}\end{array}$
 
 This is the general local complex-variable family for the two-dimensional
 Laplace equation. The solver recognises the equation from its derivative
@@ -1027,7 +1016,7 @@ The equivalent polar form is recognised structurally as well:
 phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial^{2} \phi}{\partial r^{2}} + \frac{\frac{\partial \phi}{\partial r}}{r} + \frac{\frac{\partial^{2} \phi}{\partial \theta^{2}}}{r^{2}} = 0 \\[1em] & \phi = F(re^{i\theta})+G(re^{-i\theta}) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial^{2} \phi}{\partial r^{2}} + \frac{\frac{\partial \phi}{\partial r}}{r} + \frac{\frac{\partial^{2} \phi}{\partial \theta^{2}}}{r^{2}} = 0 \\[1em] & \phi = F(re^{i\theta})+G(re^{-i\theta}) \end{aligned}\end{array}$
 
 Here `phi_thetatheta` uses the same Greek-name table as `@theta` and is
 normalised to the second partial derivative with respect to `θ`. A space
@@ -1066,7 +1055,7 @@ When `p` is nonzero and `q(x,y)` is polynomial, Mars inverts the transport
 operator directly. If $D=a\partial_x+b\partial_y$, then repeated applications of `D`
 eventually annihilate the polynomial, so
 
-$\displaystyle\quad (D+p)^{-1}q$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad (D+p)^{-1}q\end{array}$
 
 is evaluated as a finite derivative series. This avoids introducing an
 unevaluated characteristic integral for an elementary polynomial solution.
@@ -1087,12 +1076,12 @@ is again accepted only after substitution into the complete PDE. For example,
 Dx(z) + 2*Dy(z) = tanh(x+y)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{\partial z}{\partial x} + 2\mkern-2mu \frac{\partial z}{\partial y} = \tanh(x + y) \\[1em] & z = F(y-2x)+\tfrac13\ln\bigl(\cosh(x+y)\bigr) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{\partial z}{\partial x} + 2\mkern-2mu \frac{\partial z}{\partial y} = \tanh(x + y) \\[1em] & z = F(y-2x)+\tfrac13\ln\bigl(\cosh(x+y)\bigr) \end{aligned}\end{array}$
 
 The homogeneous constant-transport and constant-forcing rules extend to any
 number of independent variables. For
 
-$\displaystyle\quad \sum_{j=1}^{n}a_j\frac{\partial u}{\partial x_j}+pu=q,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \sum_{j=1}^{n}a_j\frac{\partial u}{\partial x_j}+pu=q,\end{array}$
 
 Mars chooses a nonzero transport direction as the characteristic parameter
 and constructs the other `n - 1` independent invariants. The arbitrary
@@ -1107,9 +1096,9 @@ depending only on that parameter. For example:
 u_t + u_x + y*u_y = sin(t)
 ```
 
-$\displaystyle\quad \frac{\partial u}{\partial t}+\frac{\partial u}{\partial x}+y\frac{\partial u}{\partial y}=\sin(t)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial u}{\partial t}+\frac{\partial u}{\partial x}+y\frac{\partial u}{\partial y}=\sin(t)\end{array}$
 
-$\displaystyle\quad u=F(x-t,ye^{-t})-\cos(t)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u=F(x-t,ye^{-t})-\cos(t)\end{array}$
 
 Along characteristics, $dx/dt=1$, $dy/dt=y$ and $du/dt=\sin(t)$.
 Thus $x-t$ and $ye^{-t}$ are invariant, and integrating the forcing gives
@@ -1127,9 +1116,9 @@ The affine rates and offsets may also depend on the chosen parameter:
 f_t + xf_x + 3t^2 f_y = 0
 ```
 
-$\displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+3t^2\frac{\partial f}{\partial y}=0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+3t^2\frac{\partial f}{\partial y}=0\end{array}$
 
-$\displaystyle\quad f=F(xe^{-t},y-t^3)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad f=F(xe^{-t},y-t^3)\end{array}$
 
 Here $dx/dt=x$, $dy/dt=3t^2$ and $df/dt=0$, so $xe^{-t}$ and $y-t^3$
 are invariant. `F` is an arbitrary differentiable function of both invariants;
@@ -1154,9 +1143,9 @@ Symbolic constant parameters can occur in these time-dependent coefficients:
 u_t +(α + βt)u_x + γe^tu_y = 0
 ```
 
-$\displaystyle\quad \frac{\partial u}{\partial t}+(\alpha+\beta t)\frac{\partial u}{\partial x}+\gamma e^t\frac{\partial u}{\partial y}=0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial u}{\partial t}+(\alpha+\beta t)\frac{\partial u}{\partial x}+\gamma e^t\frac{\partial u}{\partial y}=0\end{array}$
 
-$\displaystyle\quad u=F\!\left(\tfrac12(2x-2\alpha t-\beta t^2),y-\gamma e^t\right)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u=F\!\left(\tfrac12(2x-2\alpha t-\beta t^2),y-\gamma e^t\right)\end{array}$
 
 Here $\alpha$, $\beta$ and $\gamma$ are constant parameters, not additional
 independent coordinates. Integrating $dx/dt=\alpha+\beta t$ and
@@ -1171,9 +1160,9 @@ Triangular coupled characteristic flows are supported too:
 f_t + xf_x + (x+t) f_y = t^3
 ```
 
-$\displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+(x+t)\frac{\partial f}{\partial y}=t^3$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial f}{\partial t}+x\frac{\partial f}{\partial x}+(x+t)\frac{\partial f}{\partial y}=t^3\end{array}$
 
-$\displaystyle\quad f=F\!\left(xe^{-t},\tfrac12(2y-2x-t^2)\right)+\tfrac14t^4$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad f=F\!\left(xe^{-t},\tfrac12(2y-2x-t^2)\right)+\tfrac14t^4\end{array}$
 
 Along a characteristic, $dx/dt=x$ and $dy/dt=x+t$. Thus $xe^{-t}$ is
 constant, and $d(y-x)/dt=t$ gives the second invariant $y-x-t^2/2$.
@@ -1202,9 +1191,9 @@ Triangular linear characteristic fields are supported as well. For example:
 x*u_x + (x+y)*u_y = 1
 ```
 
-$\displaystyle\quad x\frac{\partial u}{\partial x}+(x+y)\frac{\partial u}{\partial y}=1$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad x\frac{\partial u}{\partial x}+(x+y)\frac{\partial u}{\partial y}=1\end{array}$
 
-$\displaystyle\quad u=F\!\left(\frac{y}{x}-\ln|x|\right)+\ln|x|,\qquad x\ne0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u=F\!\left(\frac{y}{x}-\ln|x|\right)+\ln|x|,\qquad x\ne0\end{array}$
 
 The characteristic equations are $dx/ds=x$, $dy/ds=x+y$ and $du/ds=1$.
 Consequently, $d(y/x)/ds=1$ and $d\ln|x|/ds=1$, so
@@ -1235,13 +1224,13 @@ Gradient-only nonlinear equations also admit characteristic envelopes. For examp
 u_x + u_x u_y = 1
 ```
 
-$\displaystyle\quad \frac{\partial u}{\partial x}+\frac{\partial u}{\partial x}\cdot\frac{\partial u}{\partial y}=1$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{\partial u}{\partial x}+\frac{\partial u}{\partial x}\cdot\frac{\partial u}{\partial y}=1\end{array}$
 
 The native result distinguishes two families:
 
-$\displaystyle\quad u=ax+\left(\frac1a-1\right)y+F(a),\qquad H=x-\frac{y}{a^2}+F'(a)=0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u=ax+\left(\frac1a-1\right)y+F(a),\qquad H=x-\frac{y}{a^2}+F'(a)=0\end{array}$
 
-$\displaystyle\quad u=ax+\left(\frac1a-1\right)y+b,\qquad a\ne0$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u=ax+\left(\frac1a-1\right)y+b,\qquad a\ne0\end{array}$
 
 The first is a **local envelope**: `F` is an arbitrary twice continuously differentiable
 function, and `a` is determined jointly with `u` by `H = 0`, not treated as a
@@ -1279,7 +1268,7 @@ Autonomous nonlinear transport also has an implicit characteristic solution:
 u_y + u*u_x = 0
 ```
 
-$\displaystyle\quad u = F(x-uy)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad u = F(x-uy)\end{array}$
 
 Here `F` is an arbitrary differentiable function, not a specified initial
 profile. Along a characteristic, $dx/dy=u$ and $du/dy=0$, so both `u` and
@@ -1350,7 +1339,7 @@ For example:
 (y-z)z_x - (z-x)z_y = x-y
 ```
 
-$\displaystyle\quad \begin{aligned} & \left(y - z\right)\mkern-2mu \frac{\partial z}{\partial x} - \left(z - x\right)\mkern-2mu \frac{\partial z}{\partial y} = x - y \\[1em] & F(x-y+z,x^2-y^2+z^2) = 0. \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \left(y - z\right)\mkern-2mu \frac{\partial z}{\partial x} - \left(z - x\right)\mkern-2mu \frac{\partial z}{\partial y} = x - y \\[1em] & F(x-y+z,x^2-y^2+z^2) = 0. \end{aligned}\end{array}$
 
 For a separable field $a(x)\frac{\partial u}{\partial x}+b(y)\frac{\partial u}{\partial y}$, Mars integrates the coordinate
 potentials $A'(x)=1/a(x)$ and $B'(y)=1/b(y)$. Their difference $B-A$ is a
@@ -1367,7 +1356,7 @@ example, the following PDE differentiates with respect to `x` and `t`, with
 zz_x - zz_t = y-x
 ```
 
-$\displaystyle\quad \begin{aligned} & z\mkern-2mu \frac{\partial z}{\partial x} - z\mkern-2mu \frac{\partial z}{\partial t} = y - x \\[1em] & z = \pm\sqrt{F(-t-x)+2xy-x^2}. \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & z\mkern-2mu \frac{\partial z}{\partial x} - z\mkern-2mu \frac{\partial z}{\partial t} = y - x \\[1em] & z = \pm\sqrt{F(-t-x)+2xy-x^2}. \end{aligned}\end{array}$
 
 Setting $w=z^2$ gives $\frac{\partial w}{\partial x}-\frac{\partial w}{\partial t}=2(y-x)$. The arbitrary-function term
 is constant along this characteristic direction, and $2xy-x^2$ supplies a
@@ -1405,7 +1394,7 @@ A missing derivative in one coordinate makes that coordinate a parameter:
 Dy(z) + 2*y*z = x*y^3
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d z}{d y} + 2\mkern-2mu y\mkern-2mu z = x\mkern-2mu y^{3} \\[1em] & z = \tfrac{x}{2}(y^2-1)+F(x)e^{-y^2} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d z}{d y} + 2\mkern-2mu y\mkern-2mu z = x\mkern-2mu y^{3} \\[1em] & z = \tfrac{x}{2}(y^2-1)+F(x)e^{-y^2} \end{aligned}\end{array}$
 
 `F` is a genuine arbitrary-function expression node. It renders in plain and
 TeX output, participates in substitution, and differentiates by the chain
@@ -1475,7 +1464,7 @@ For example:
 Dx(y) = x*y^2; y(0) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} = x\mkern-2mu y^{2} \\[1em] & y = -\frac{1}{\tfrac12 x^2-1} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} = x\mkern-2mu y^{2} \\[1em] & y = -\frac{1}{\tfrac12 x^2-1} \end{aligned}\end{array}$
 
 and:
 
@@ -1483,7 +1472,7 @@ and:
 Dx(y) + y = x*y^2; y(0) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} + y = x\mkern-2mu y^{2} \\[1em] & y = \frac{1}{x+1} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} + y = x\mkern-2mu y^{2} \\[1em] & y = \frac{1}{x+1} \end{aligned}\end{array}$
 
 A non-separable equation that requires an integrating factor is:
 
@@ -1491,7 +1480,7 @@ A non-separable equation that requires an integrating factor is:
 Dx(y) + y/x = x^2; y(1) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} + \frac{y}{x} = x^{2} \\[1em] & y = \frac{x^4+3}{4x} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} + \frac{y}{x} = x^{2} \\[1em] & y = \frac{x^4+3}{4x} \end{aligned}\end{array}$
 
 Here $P(x)=1/x$, so $\mu(x)=x$. Variable coefficients are not restricted to
 rational functions; for example:
@@ -1500,7 +1489,7 @@ rational functions; for example:
 Dx(y) + 2*x*y = exp(-x^2); y(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} + 2\mkern-2mu x\mkern-2mu y = e^{-x^{2}} \\[1em] & y = \frac{x}{e^{x^2}} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} + 2\mkern-2mu x\mkern-2mu y = e^{-x^{2}} \\[1em] & y = \frac{x}{e^{x^2}} \end{aligned}\end{array}$
 
 If the weighted forcing has no supported closed form, the solution remains
 exact:
@@ -1509,21 +1498,21 @@ exact:
 Dx(y) + y = exp(cosh(x)); y(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} + y = e^{\cosh(x)} \\[1em] & y = e^{-x}\int^x e^{\cosh(t)+t}\,dt \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} + y = e^{\cosh(x)} \\[1em] & y = e^{-x}\int^x e^{\cosh(t)+t}\,dt \end{aligned}\end{array}$
 
 ## First-Order Homogeneous Equations
 
 For an equation of the form
 
-$\displaystyle\quad \frac{dy}{dx}=F\!\left(\frac{y}{x}\right)$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{dy}{dx}=F\!\left(\frac{y}{x}\right)\end{array}$
 
 the solver substitutes $y=ux$, so that
 
-$\displaystyle\quad \frac{dy}{dx}=u+x\frac{du}{dx}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{dy}{dx}=u+x\frac{du}{dx}.\end{array}$
 
 It then solves the separable relation
 
-$\displaystyle\quad \frac{du}{F(u)-u}=\frac{dx}{x}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{du}{F(u)-u}=\frac{dx}{x}.\end{array}$
 
 For example:
 
@@ -1531,7 +1520,7 @@ For example:
 Dx(y) = y/x + x/y; y(1) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \frac{y}{x} + \frac{x}{y} \\[1em] & \tfrac12\left(\frac{y}{x}\right)^2 = \ln\lvert x\rvert+\tfrac12 \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \frac{y}{x} + \frac{x}{y} \\[1em] & \tfrac12\left(\frac{y}{x}\right)^2 = \ln\lvert x\rvert+\tfrac12 \end{aligned}\end{array}$
 
 Homogeneous solutions may be implicit when the resulting relation cannot be
 inverted uniquely without introducing branches. An initial condition at
@@ -1541,11 +1530,11 @@ $x=0$ is not accepted by this reduction because $y/x$ is undefined there.
 
 When the right-hand side depends on a single affine combination,
 
-$\displaystyle\quad \frac{dy}{dx}=F(ax+by+c),$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{dy}{dx}=F(ax+by+c),\end{array}$
 
 the solver uses
 
-$\displaystyle\quad \begin{aligned}u&=ax+by+c,\\ \frac{du}{dx}&=a+bF(u).\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned}u&=ax+by+c,\\ \frac{du}{dx}&=a+bF(u).\end{aligned}\end{array}$
 
 The transformed equation is separable. For example:
 
@@ -1553,7 +1542,7 @@ The transformed equation is separable. For example:
 Dx(y) = (x + y)^2; y(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \left(x + y\right)^{2} \\[1em] & \arctan(x+y) = x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \left(x + y\right)^{2} \\[1em] & \arctan(x+y) = x \end{aligned}\end{array}$
 
 The same solver handles a nonlinear function of the ratio of two
 non-parallel affine expressions. It first translates their intersection to
@@ -1563,7 +1552,7 @@ the origin, then applies the homogeneous substitution. For example:
 Dx(y) = ((y - 1)/(x + 2))^2 + (y - 1)/(x + 2)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \frac{y - 1}{x + 2} + \left(\frac{y - 1}{x + 2}\right)^{2} \\[1em] & -\frac{x+2}{y-1} = \ln\lvert x+2\rvert+C \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d y}{d x} = \frac{y - 1}{x + 2} + \left(\frac{y - 1}{x + 2}\right)^{2} \\[1em] & -\frac{x+2}{y-1} = \ln\lvert x+2\rvert+C \end{aligned}\end{array}$
 
 As with the homogeneous solver, these reductions generally produce implicit
 solutions because solving explicitly for `y` may require branch choices.
@@ -1572,11 +1561,11 @@ solutions because solving explicitly for `y` may require branch choices.
 
 For a nonsingular transformation
 
-$\displaystyle\quad \begin{aligned}Y&=ax+by,\\ X&=cx+dy.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned}Y&=ax+by,\\ X&=cx+dy.\end{aligned}\end{array}$
 
 the solver computes
 
-$\displaystyle\quad \frac{dY}{dX}=\frac{a+b\,dy/dx}{c+d\,dy/dx}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{dY}{dX}=\frac{a+b\,dy/dx}{c+d\,dy/dx}.\end{array}$
 
 It substitutes the inverse transformation into the original right-hand side
 and accepts the candidate only when the resulting equation in $X,Y$ is
@@ -1593,11 +1582,11 @@ y(0) = 0
 
 With $X=x+y$ and $Y=x-y$, this becomes
 
-$\displaystyle\quad \frac{dY}{dX}=Xe^Y,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{dY}{dX}=Xe^Y,\end{array}$
 
 and the returned solution is
 
-$\displaystyle\quad \tfrac12(x+y)^2 = 1-e^{y-x}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \tfrac12(x+y)^2 = 1-e^{y-x}.\end{array}$
 
 The solver implementations are separated by differential-equation family:
 
@@ -1627,15 +1616,15 @@ between the shared entry point and the PDE solvers.
 
 For a regular second-order linear equation
 
-$\displaystyle\quad A(x)\frac{d^2y}{dx^2}+B(x)\frac{dy}{dx}+C(x)y=R(x),$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad A(x)\frac{d^2y}{dx^2}+B(x)\frac{dy}{dx}+C(x)y=R(x),\end{array}$
 
 the solver constructs the multiplier
 
-$\displaystyle\quad \mu(x)=\exp\!\left(\int\frac{B(x)-A'(x)}{A(x)}\,dx\right).$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \mu(x)=\exp\!\left(\int\frac{B(x)-A'(x)}{A(x)}\,dx\right).\end{array}$
 
 With $p=\mu A$, the equation becomes the self-adjoint relation
 
-$\displaystyle\quad \frac{d}{dx}\left(p(x)\frac{dy}{dx}\right)+\mu(x)C(x)y=\mu(x)R(x).$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{d}{dx}\left(p(x)\frac{dy}{dx}\right)+\mu(x)C(x)y=\mu(x)R(x).\end{array}$
 
 This Sturm–Liouville normalisation is valid on intervals where $A(x)\ne0$.
 It is a canonical representation, not a promise that arbitrary coefficient
@@ -1644,11 +1633,11 @@ functions possess an elementary closed-form basis.
 For a homogeneous equation in normal form, the solver recognises the affine
 Riccati factorisation
 
-$\displaystyle\quad \begin{aligned}y''-\bigl(\alpha(x)^2+\alpha'(x)\bigr)y&=0,\\ \alpha(x)&=ax+b,\qquad a>0.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned}y''-\bigl(\alpha(x)^2+\alpha'(x)\bigr)y&=0,\\ \alpha(x)&=ax+b,\qquad a>0.\end{aligned}\end{array}$
 
 This is
 
-$\displaystyle\quad \bigl(D+\alpha(x)\bigr)\bigl(D-\alpha(x)\bigr)y=0,\qquad D=\frac{d}{dx}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \bigl(D+\alpha(x)\bigr)\bigl(D-\alpha(x)\bigr)y=0,\qquad D=\frac{d}{dx}.\end{array}$
 
 The first basis function is $\exp\!\left(\int\alpha(x)\,dx\right)$; reduction of order
 produces the second, which simplifies to an `erf` expression for affine
@@ -1658,7 +1647,7 @@ $\alpha$. For example:
 y'' - (x^2+1)*y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y\mkern-2mu \left(x^{2} + 1\right) = 0 \\[1em] & y = e^{x^2/2}\bigl(C_1+C_2\operatorname{erf}(x)\bigr) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y\mkern-2mu \left(x^{2} + 1\right) = 0 \\[1em] & y = e^{x^2/2}\bigl(C_1+C_2\operatorname{erf}(x)\bigr) \end{aligned}\end{array}$
 
 With initial conditions, the arbitrary constants are eliminated in the same
 way as for a constant-coefficient problem:
@@ -1667,23 +1656,23 @@ way as for a constant-coefficient problem:
 y'' - (x^2+1)*y = 0; y(0) = 1; y'(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y\mkern-2mu \left(x^{2} + 1\right) = 0 \\[1em] & y = e^{x^2/2} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y\mkern-2mu \left(x^{2} + 1\right) = 0 \\[1em] & y = e^{x^2/2} \end{aligned}\end{array}$
 
 For a homogeneous positive power-law potential,
 
-$\displaystyle\quad y''+ax^my=0,\qquad a>0,\quad m=1,2,\ldots$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad y''+ax^my=0,\qquad a>0,\quad m=1,2,\ldots\end{array}$
 
 the solver derives
 
-$\displaystyle\quad \begin{aligned}\nu&=\frac{1}{m+2},\\ z&=2\nu\sqrt{a}\,x^{1/(2\nu)},\\ y&=\sqrt{x}\,u(z),\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned}\nu&=\frac{1}{m+2},\\ z&=2\nu\sqrt{a}\,x^{1/(2\nu)},\\ y&=\sqrt{x}\,u(z),\end{aligned}\end{array}$
 
 which reduces the equation to Bessel's equation
 
-$\displaystyle\quad z^2u''+zu'+(z^2-\nu^2)u=0.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad z^2u''+zu'+(z^2-\nu^2)u=0.\end{array}$
 
 It therefore returns the rule-generated basis
 
-$\displaystyle\quad y=\sqrt{x}\bigl(C_1J_{-\nu}(z)+C_2J_\nu(z)\bigr).$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad y=\sqrt{x}\bigl(C_1J_{-\nu}(z)+C_2J_\nu(z)\bigr).\end{array}$
 
 For example:
 
@@ -1691,22 +1680,22 @@ For example:
 y'' + x²*y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + x^{2}\mkern-2mu y = 0 \\[1em] & y = \sqrt{x}\left(C_1J_{-1/4}\!\left(\tfrac12 x^2\right)+C_2J_{1/4}\!\left(\tfrac12 x^2\right)\right) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + x^{2}\mkern-2mu y = 0 \\[1em] & y = \sqrt{x}\left(C_1J_{-1/4}\!\left(\tfrac12 x^2\right)+C_2J_{1/4}\!\left(\tfrac12 x^2\right)\right) \end{aligned}\end{array}$
 
 Here $J_\nu(z)$ denotes `BesselJ(ν, z)`.
 
 The same derived substitution handles monomial forcing rather than rejecting
 the equation at the homogeneous boundary. For
 
-$\displaystyle\quad y''+ax^my=bx^n,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad y''+ax^my=bx^n,\end{array}$
 
 put
 
-$\displaystyle\quad \begin{aligned}p&=\frac{m+2}{2},\\ \mu&=\frac{2n-m+1}{m+2},\\ K&=\frac{b}{p^2}\left(\frac{p}{\sqrt{a}}\right)^{\mu+1}.\end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned}p&=\frac{m+2}{2},\\ \mu&=\frac{2n-m+1}{m+2},\\ K&=\frac{b}{p^2}\left(\frac{p}{\sqrt{a}}\right)^{\mu+1}.\end{aligned}\end{array}$
 
 The transformed equation is the inhomogeneous Bessel equation
 
-$\displaystyle\quad z^2u''+zu'+(z^2-\nu^2)u=Kz^{\mu+1},$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad z^2u''+zu'+(z^2-\nu^2)u=Kz^{\mu+1},\end{array}$
 
 so the rule adds the Lommel particular solution $KS_{\mu,\nu}(z)$. For
 example:
@@ -1715,7 +1704,7 @@ example:
 y'' + x³*y = x
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + x^{3}\mkern-2mu y = x \\[1em] & \begin{aligned} y = \sqrt{x}\Bigl(&C_1J_{-1/5}\!\left(\tfrac25 x^{5/2}\right) +C_2J_{1/5}\!\left(\tfrac25 x^{5/2}\right)\\ &+\tfrac25 S_{0,1/5}\!\left(\tfrac25 x^{5/2}\right)\Bigr). \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + x^{3}\mkern-2mu y = x \\[1em] & \begin{aligned} y = \sqrt{x}\Bigl(&C_1J_{-1/5}\!\left(\tfrac25 x^{5/2}\right) +C_2J_{1/5}\!\left(\tfrac25 x^{5/2}\right)\\ &+\tfrac25 S_{0,1/5}\!\left(\tfrac25 x^{5/2}\right)\Bigr). \end{aligned} \end{aligned}\end{array}$
 
 Here $S_{\mu,\nu}(z)$ denotes `LommelS(μ, ν, z)`.
 
@@ -1724,7 +1713,7 @@ eliminated symbolically.
 
 The constant-coefficient second-order family is
 
-$\displaystyle\quad a\frac{d^2y}{dx^2}+b\frac{dy}{dx}+cy=0,$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad a\frac{d^2y}{dx^2}+b\frac{dy}{dx}+cy=0,\end{array}$
 
 where `a`, `b`, and `c` are constant. The solver uses the Liouville normal
 form, equivalently the roots of $ar^2+br+c=0$. It treats distinct
@@ -1738,19 +1727,19 @@ For example:
 Dxx(y) = y; y(0) = 1; y'(0) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} = y \\[1em] & y = e^x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} = y \\[1em] & y = e^x \end{aligned}\end{array}$
 
 ```text
 Dxx(y) + 2*Dx(y) + y = 0; y(0) = 1; y'(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 2\mkern-2mu \frac{d y}{d x} + y = 0 \\[1em] & y = (x+1)e^{-x} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + 2\mkern-2mu \frac{d y}{d x} + y = 0 \\[1em] & y = (x+1)e^{-x} \end{aligned}\end{array}$
 
 ```text
 Dxx(y) + y = 0; y(0) = 0; y'(0) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = \sin x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = \sin x \end{aligned}\end{array}$
 
 If a variable-coefficient equation is successfully normalised but the
 module cannot yet construct its fundamental solution basis, `de_solve(...)`
@@ -1838,13 +1827,13 @@ and reports **Local series**, preserving the distinction from an exact solve.
 
 For
 
-$\displaystyle\quad a_n\frac{d^ny}{dx^n}+\cdots+a_1\frac{dy}{dx}+a_0y=f(x),$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad a_n\frac{d^ny}{dx^n}+\cdots+a_1\frac{dy}{dx}+a_0y=f(x),\end{array}$
 
 the solver constructs $P(r)=a_nr^n+\cdots+a_1r+a_0$ and obtains all
 of its roots through the equation module. A real root `r` of multiplicity `m`
 contributes
 
-$\displaystyle\quad e^{rx},\quad xe^{rx},\quad\ldots,\quad x^{m-1}e^{rx}.$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad e^{rx},\quad xe^{rx},\quad\ldots,\quad x^{m-1}e^{rx}.\end{array}$
 
 A conjugate pair $\alpha\pm\beta i$ contributes the equivalent real sine/cosine basis.
 This works above degree four as well; it does not depend on radical formulae.
@@ -1863,7 +1852,7 @@ For example, distinct real roots give:
 Dxxx(y) - 6*Dxx(y) + 11*Dx(y) - 6*y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - 6\mkern-2mu \frac{d^{2} y}{d x^{2}} + 11\mkern-2mu \frac{d y}{d x} - 6\mkern-2mu y = 0 \\[1em] & y = C_1e^{3x}+C_2e^{2x}+C_3e^x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - 6\mkern-2mu \frac{d^{2} y}{d x^{2}} + 11\mkern-2mu \frac{d y}{d x} - 6\mkern-2mu y = 0 \\[1em] & y = C_1e^{3x}+C_2e^{2x}+C_3e^x \end{aligned}\end{array}$
 
 A repeated real root gives:
 
@@ -1871,7 +1860,7 @@ A repeated real root gives:
 Dxxx(y) - 3*Dxx(y) + 3*Dx(y) - y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - 3\mkern-2mu \frac{d^{2} y}{d x^{2}} + 3\mkern-2mu \frac{d y}{d x} - y = 0 \\[1em] & y = e^x(C_3x^2+C_2x+C_1) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - 3\mkern-2mu \frac{d^{2} y}{d x^{2}} + 3\mkern-2mu \frac{d y}{d x} - y = 0 \\[1em] & y = e^x(C_3x^2+C_2x+C_1) \end{aligned}\end{array}$
 
 Mixed real and complex roots give:
 
@@ -1879,7 +1868,7 @@ Mixed real and complex roots give:
 Dxxx(y) - Dxx(y) + Dx(y) - y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d^{2} y}{d x^{2}} + \frac{d y}{d x} - y = 0 \\[1em] & y = C_1e^x+C_2\cos x+C_3\sin x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d^{2} y}{d x^{2}} + \frac{d y}{d x} - y = 0 \\[1em] & y = C_1e^x+C_2\cos x+C_3\sin x \end{aligned}\end{array}$
 
 A repeated complex-conjugate pair gives:
 
@@ -1887,7 +1876,7 @@ A repeated complex-conjugate pair gives:
 Dxxxx(y) + 2*Dxx(y) + y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{4} y}{d x^{4}} + 2\mkern-2mu \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = C_1\cos x+C_2\sin x+C_3x\cos x+C_4x\sin x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{4} y}{d x^{4}} + 2\mkern-2mu \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = C_1\cos x+C_2\sin x+C_3x\cos x+C_4x\sin x \end{aligned}\end{array}$
 
 The sixth-order example exercises real and complex roots together:
 
@@ -1895,7 +1884,7 @@ The sixth-order example exercises real and complex roots together:
 Dxxxxxx(y) - 4*Dxxxx(y) - Dxx(y) + 4*y = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{6} y}{d x^{6}} - 4\mkern-2mu \frac{d^{4} y}{d x^{4}} - \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = 0 \\[1em] & \begin{aligned} y &={} C_1e^x+C_2e^{2x}+C_3e^{-x}+C_4e^{-2x}\\ &+C_5\cos x+C_6\sin x. \end{aligned} \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{6} y}{d x^{6}} - 4\mkern-2mu \frac{d^{4} y}{d x^{4}} - \frac{d^{2} y}{d x^{2}} + 4\mkern-2mu y = 0 \\[1em] & \begin{aligned} y &={} C_1e^x+C_2e^{2x}+C_3e^{-x}+C_4e^{-2x}\\ &+C_5\cos x+C_6\sin x. \end{aligned} \end{aligned}\end{array}$
 
 Nonhomogeneous equations retain the complementary arbitrary constants:
 
@@ -1903,7 +1892,7 @@ Nonhomogeneous equations retain the complementary arbitrary constants:
 Dxx(y) - y = exp(2*x)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y = e^{2\mkern-2mu x} \\[1em] & y = \tfrac13\left(e^{2x}+3C_1e^x+3C_2e^{-x}\right) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y = e^{2\mkern-2mu x} \\[1em] & y = \tfrac13\left(e^{2x}+3C_1e^x+3C_2e^{-x}\right) \end{aligned}\end{array}$
 
 Forcing is not restricted to second order:
 
@@ -1911,7 +1900,7 @@ Forcing is not restricted to second order:
 Dxxx(y) - Dx(y) = exp(2*x)
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d y}{d x} = e^{2\mkern-2mu x} \\[1em] & y = \tfrac16\left(e^{2x}+6C_2+6C_1e^x+6C_3e^{-x}\right) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d y}{d x} = e^{2\mkern-2mu x} \\[1em] & y = \tfrac16\left(e^{2x}+6C_2+6C_1e^x+6C_3e^{-x}\right) \end{aligned}\end{array}$
 
 Complete initial conditions determine all of those constants. Examples
 include:
@@ -1921,20 +1910,20 @@ Dxxx(y) - Dx(y) = 0;
 y(0) = 1; y'(0) = 1; y''(0) = 1
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d y}{d x} = 0 \\[1em] & y = e^x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{3} y}{d x^{3}} - \frac{d y}{d x} = 0 \\[1em] & y = e^x \end{aligned}\end{array}$
 
 ```text
 Dxxxx(y) + 2*Dxx(y) + y = 0;
 y(0) = 1; y'(0) = 0; y''(0) = -1; y'''(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{4} y}{d x^{4}} + 2\mkern-2mu \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = \cos x \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{4} y}{d x^{4}} + 2\mkern-2mu \frac{d^{2} y}{d x^{2}} + y = 0 \\[1em] & y = \cos x \end{aligned}\end{array}$
 
 ```text
 Dxx(y) - y = exp(2*x); y(0) = 0; y'(0) = 0
 ```
 
-$\displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y = e^{2\mkern-2mu x} \\[1em] & y = \tfrac16\left(2e^{2x}-3e^x+e^{-x}\right) \end{aligned}$
+$\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d^{2} y}{d x^{2}} - y = e^{2\mkern-2mu x} \\[1em] & y = \tfrac16\left(2e^{2x}-3e^x+e^{-x}\right) \end{aligned}\end{array}$
 
 ## Example: Solving a Separable ODE
 
@@ -1976,31 +1965,22 @@ solution = y = exp(½x²)
 
 For the modified Emden equation
 
-$$
-y''+3yy'+y^3=0,
-$$
+$\quad\begin{array}{l}\displaystyle y''+3yy'+y^3=0,\end{array}$
 
 introduce an auxiliary function $u(x)$ by setting $y=u^{-1}u'$ on an interval
 where $u\ne0$. The left-hand side becomes
 
-$$
-y''+3yy'+y^3=u^{-1}u'''.
-$$
+$\quad\begin{array}{l}\displaystyle y''+3yy'+y^3=u^{-1}u'''.\end{array}$
 
 The equation therefore reduces to $u'''=0$, so $u=Ax^2+Bx+C$. Substituting
 back gives
 
-$$
-y(x)=\frac{2Ax+B}{Ax^2+Bx+C}.
-$$
+$\quad\begin{array}{l}\displaystyle y(x)=\frac{2Ax+B}{Ax^2+Bx+C}.\end{array}$
 
 A common non-zero factor in $A,B,C$ cancels. For $A\ne0$, divide through by
 $A$ and write $C_1=B/A$, $C_2=C/A$. MARS returns this two-constant family:
 
-$$
-y(x)=\frac{2x+C_1}{x^2+C_1x+C_2},
-\qquad x^2+C_1x+C_2\ne0.
-$$
+$\quad\begin{array}{l}\displaystyle y(x)=\frac{2x+C_1}{x^2+C_1x+C_2}, \qquad x^2+C_1x+C_2\ne0.\end{array}$
 
 The unnormalised form also includes $y=1/(x+C_0)$ when $A=0$, $B\ne0$, and
 $y=0$ when $A=B=0$, $C\ne0$. These are not represented by finite constants
@@ -2009,10 +1989,7 @@ in MARS's normalised family.
 The reported $\mathrm{SL}(3,\mathbb{R})$ symmetry also admits the local point
 transformation
 
-$$
-X=x-\frac{1}{y},\qquad Y=\frac{x}{y}-\frac{x^2}{2},
-\qquad \frac{d^2Y}{dX^2}=0,
-$$
+$\quad\begin{array}{l}\displaystyle X=x-\frac{1}{y},\qquad Y=\frac{x}{y}-\frac{x^2}{2}, \qquad \frac{d^2Y}{dX^2}=0,\end{array}$
 
 where $y\ne0$ and $X$ can serve as the independent variable. This is an
 alternative linearisation; it is not an additional step needed for the

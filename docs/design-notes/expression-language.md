@@ -181,7 +181,7 @@ domain's target in that same argument order.
 
 These lowercase, concatenated names are the agreed canonical Function-style
 spellings. The capitalised names `Fourier`, `InverseFourier`, `Laplace` and
-`InverseLaplace` remain accepted input aliases for compatibility. Function-style
+`InverseLaplace` are also accepted input aliases. Function-style
 rendering emits the resolved transformed expression when available, otherwise
 the explicit transform call. Retain MARS's Fourier normalisation, unilateral
 Laplace convention, convergence conditions and domain restrictions. Both resolved
@@ -221,10 +221,7 @@ y = inverselaplace(Y,s,t).
 Expected effect: these assignments emit no output. The solve result assigned to
 `Y` is the expression
 
-\[
-\frac{5s+15+50/s^2}{s^2+4s+5},
-\qquad s\ne0,\quad s^2+4s+5\ne0.
-\]
+$\quad\begin{array}{l}\displaystyle \frac{5s+15+50/s^2}{s^2+4s+5}, \qquad s\ne0,\quad s^2+4s+5\ne0.\end{array}$
 
 The final assignment applies the inverse Laplace transform directly to that
 expression and stores the resulting expression in `y`. No extraction from a

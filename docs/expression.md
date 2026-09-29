@@ -64,11 +64,9 @@ conditions. Orders up to 64 are expanded by repeated differentiation; unsupporte
 orders remain symbolic. Supplied constant integer orders are accepted.
 Error functions and their complements accept affine arguments. With
 $q=\sqrt{a^2}$ on the principal branch, the error-function transform is
-$$
-\mathcal L\{\operatorname{erf}(at+b)\}
-=\frac{\operatorname{erf}(b)+(a/q)e^{s^2/(4a^2)+sb/a}
-\operatorname{erfc}(s/(2q)+bq/a)}{s}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{erf}(at+b)\} =\frac{\operatorname{erf}(b)+(a/q)e^{s^2/(4a^2)+sb/a} \operatorname{erfc}(s/(2q)+bq/a)}{s}.\end{array}$
+
 The sufficient conditions are $\operatorname{Re}(s)>0$ and
 $\operatorname{Re}(a^2)>0$; both signs of non-zero real rates are covered.
 The complementary transform is one over the target variable minus this result.
@@ -95,17 +93,11 @@ non-negative integer; negative, fractional and non-real values fail that conditi
 
 For example, `@L(cos(t)^n,t)` gives the finite-sum result
 
-$$
-\frac{1}{2^n}\sum_{k=0}^{n}\binom{n}{k}
-\frac{s}{s^2+(n-2k)^2},\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{1}{2^n}\sum_{k=0}^{n}\binom{n}{k} \frac{s}{s^2+(n-2k)^2},\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
 
 Similarly, `@L(sin(t)^n,t)` gives
 
-$$
-\frac{1}{(2i)^n}\sum_{k=0}^{n}\frac{(-1)^k\binom{n}{k}}{s-i(n-2k)},
-\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{1}{(2i)^n}\sum_{k=0}^{n}\frac{(-1)^k\binom{n}{k}}{s-i(n-2k)}, \qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
 
 The renderer currently expresses the binomial coefficients using gamma functions.
 Both sums are exact; their integer-order restrictions survive copying through the
@@ -119,9 +111,7 @@ Recognised transforms simplify to a native formula with convergence restrictions
 Both Laplace directions accept braces as well as parentheses. For example,
 `@L{ln(t)}` gives
 
-$$
-\mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+\ln(s)}{s},\qquad \operatorname{Re}(s)>0,
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+\ln(s)}{s},\qquad \operatorname{Re}(s)>0,\end{array}$
 
 where $\gamma$ is the Euler–Mascheroni constant. At `s=1`, the value is
 approximately `-0.5772156649015329`.
@@ -172,10 +162,7 @@ Unbound expression output:
 
 For example, `@Linv((s-a)/((s-a)^2+1))` produces
 
-$$
-\mathcal{L}^{-1}_{s\to t}\left\{\frac{s-a}{(s-a)^2+1}\right\}
-= e^{at}\cos(t).
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\left\{\frac{s-a}{(s-a)^2+1}\right\} = e^{at}\cos(t).\end{array}$
 
 The Function card returns `exp(a*t)*cos(t)` (using MARS multiplication syntax),
 and numerical bindings `a=2`, `t=0.5` give approximately `2.385516730959136`.
@@ -225,19 +212,13 @@ implemented formulas, proven obstructions and well-defined cases still left symb
 Hyperbolic tangent, unlike tangent, has a supported digamma transform. For real
 $c>0$ and $\operatorname{Re}(s)>0$,
 
-$$
-\mathcal L\{\tanh(ct)\}
-=\frac1s-\frac{\psi(1+s/(4c))-\psi(1/2+s/(4c))}{2c}.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\tanh(ct)\} =\frac1s-\frac{\psi(1+s/(4c))-\psi(1/2+s/(4c))}{2c}.\end{array}$
 
 The native result uses the equivalent symmetric form
 $[2\psi(z+1/2)-\psi(z)-\psi(z+1)]/(4c)$, where $z=s/(4c)$.
 Applying the digamma recurrence before differentiation removes cancelling terms:
 
-$$
-\frac{d}{ds}\mathcal L\{\tanh(ct)\}
-=\frac{2\psi^{(1)}(z+1/2)-\psi^{(1)}(z)-\psi^{(1)}(z+1)}{16c^2}.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{d}{ds}\mathcal L\{\tanh(ct)\} =\frac{2\psi^{(1)}(z+1/2)-\psi^{(1)}(z)-\psi^{(1)}(z+1)}{16c^2}.\end{array}$
 
 Negative real coefficients follow by oddness, and a zero coefficient gives
 zero without a condition on `s`. With an unspecified coefficient the formula
@@ -281,10 +262,7 @@ without any derivative notation remains a scalar; it is not implicitly a functio
 
 With $F(s)=\mathcal L\{f(t)\}(s)$, the rule is
 
-$$
-\mathcal L\{f^{(n)}(t)\}(s)
-=s^n F(s)-\sum_{k=0}^{n-1}s^{n-1-k}f^{(k)}(0^+).
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{f^{(n)}(t)\}(s) =s^n F(s)-\sum_{k=0}^{n-1}s^{n-1-k}f^{(k)}(0^+).\end{array}$
 
 This assumes the required derivatives, finite right-hand initial limits and
 vanishing exponentially weighted boundary terms at infinity. No numerical
@@ -334,10 +312,7 @@ An unspecified function name, including `u`, remains arbitrary: it is not an
 alias for the Heaviside unit step. For a real shift $a$, write
 $U(s)=\mathcal L\{u(t)\}(s)$. The unilateral translation rule is
 
-$$
-\mathcal L\{u(t-a)\}(s)
-=e^{-as}\left[U(s)+\int_{-a}^{0}e^{-sx}u(x)\,dx\right].
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{u(t-a)\}(s) =e^{-as}\left[U(s)+\int_{-a}^{0}e^{-sx}u(x)\,dx\right].\end{array}$
 
 The finite integral must exist, and the identity applies where the transforms
 converge. Negative $a$ gives a time advance, with the same oriented-integral
@@ -407,6 +382,7 @@ All three symbolic cards use the same native expression and conditions.
 | `atan`, `acot` | Homogeneous arguments with known real rates, using exponential integrals and the native inverse-cotangent branch. |
 | `asinh` | Homogeneous arguments with known real rates, using native order-zero Struve H and Bessel Y. |
 | `acosh` | Homogeneous arguments with known real rates, including negative and zero rates; native Bessel K, Bessel I and Struve L retain the principal complex branch. |
+| `asin`, `acos` | Homogeneous arguments with known real rates, including negative and zero rates; native Bessel I, Struve L and Bessel K retain MARS's complex real-cut values. Unspecified rates, non-real rates and shifted source arguments remain symbolic. |
 | `atanh` | Homogeneous arguments with real rates, including symbolic rates guarded as real and non-zero; exponential integrals retain the native complex boundary value beyond the branch points. Zero rates give zero. |
 | `erf`, `erfc` | Affine arguments; Gaussian decay conditions are retained for complex scales. |
 | `normal_pdf`, `pdf` | Affine Gaussian density; quadratic decay gives an entire transform in `s`. |
@@ -425,11 +401,7 @@ mean that arbitrary compositions of supported functions are supported.
 
 The `asinh` formula uses the native ordinary Struve and Bessel functions:
 
-$$
-\mathcal L\{\operatorname{asinh}(t)\}(s)
-=\frac{\pi}{2s}\left[\mathbf H_0(s)-Y_0(s)\right],
-\qquad \operatorname{Re}(s)>0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asinh}(t)\}(s) =\frac{\pi}{2s}\left[\mathbf H_0(s)-Y_0(s)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
 
 Both functions support complex numerical arguments, so targets in the right
 half-plane can be evaluated within their documented numerical limits.
@@ -440,11 +412,7 @@ expanded hypergeometric form, retain their inverse transform.
 For the principal branch, the unilateral Laplace transform includes
 `acosh(t)=i*acos(t)` on $0\le t<1$, not just the real tail above $t=1$:
 
-$$
-\mathcal L\{\operatorname{acosh}(t)\}(s)
-=\frac{K_0(s)}{s}+\frac{i\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right],
-\qquad \operatorname{Re}(s)>0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(t)\}(s) =\frac{K_0(s)}{s}+\frac{i\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
 
 Here $\mathbf L_0$ is the native modified Struve function, written
 `struvel(0,z)` in Function output. The native modified Bessel function
@@ -461,13 +429,7 @@ by the numerical functions, subject to their existing precision and range limits
 
 For a known non-zero real rate $a$, put $q=|a|$ and $z=s/q$. The formula is
 
-$$
-\mathcal L\{\operatorname{acosh}(at)\}(s)
-=\frac{K_0(z)}{s}
- +\frac{i\pi}{2s}\left[1-\operatorname{sign}(a)
- \left(I_0(z)-\mathbf L_0(z)\right)\right],
-\qquad \operatorname{Re}(s)>0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(at)\}(s) =\frac{K_0(z)}{s} +\frac{i\pi}{2s}\left[1-\operatorname{sign}(a) \left(I_0(z)-\mathbf L_0(z)\right)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
 
 A zero rate gives $i\pi/(2s)$ on the same half-plane. Unspecified rates,
 non-real rates and shifted source arguments remain symbolic. Supplied constant
@@ -479,17 +441,9 @@ match; a Bessel term without its companion is not sufficient.
 
 The inverse-circular functions use the same native special functions:
 
-$$
-\mathcal L\{\operatorname{asin}(t)\}(s)
-=\frac{\pi}{2s}\left[I_0(s)-\mathbf L_0(s)\right]+\frac{iK_0(s)}{s},
-\qquad \operatorname{Re}(s)>0,
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asin}(t)\}(s) =\frac{\pi}{2s}\left[I_0(s)-\mathbf L_0(s)\right]+\frac{iK_0(s)}{s}, \qquad \operatorname{Re}(s)>0,\end{array}$
 
-$$
-\mathcal L\{\operatorname{acos}(t)\}(s)
-=\frac{\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right]-\frac{iK_0(s)}{s},
-\qquad \operatorname{Re}(s)>0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acos}(t)\}(s) =\frac{\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right]-\frac{iK_0(s)}{s}, \qquad \operatorname{Re}(s)>0.\end{array}$
 
 These formulas retain MARS's real-cut values: for $t>1$,
 $\operatorname{asin}(t)=\pi/2+i\operatorname{acosh}(t)$ and
@@ -527,7 +481,7 @@ additional special functions, parameter conditions or continuation machinery.
 
 | Functions | Remaining issue |
 | --- | --- |
-| `asin`, `acos`, `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. |
+| `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. The supported `asin` and `acos` pairs and their remaining argument restrictions are described above. |
 | `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
 | `arcversin`, `arcvercos`, `arccoversin`, `arccovercos`, `archaversin`, `archavercos`, `archacoversin`, `archacovercos` | Reduce to inverse circular functions, so their branch restrictions carry over. |
 | `hypot` | Polynomial reductions can work; the general transform needs further radical-function rules. |
@@ -596,11 +550,7 @@ Expression mode supports native one-dimensional `@F` and `@Finv` operators,
 also named `ℱ`/`Fourier` and `ℱ⁻¹`/`InverseFourier`. Parentheses and braces are
 accepted. The non-unitary angular-frequency convention is
 
-$$
-\mathcal F\{f\}(\omega)=\int_{-\infty}^{\infty}f(t)e^{-i\omega t}\,dt,
-\qquad
-\mathcal F^{-1}\{G\}(t)=\frac{1}{2\pi}\int_{-\infty}^{\infty}G(\omega)e^{i\omega t}\,d\omega.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{f\}(\omega)=\int_{-\infty}^{\infty}f(t)e^{-i\omega t}\,dt, \qquad \mathcal F^{-1}\{G\}(t)=\frac{1}{2\pi}\int_{-\infty}^{\infty}G(\omega)e^{i\omega t}\,d\omega.\end{array}$
 
 Both coordinates are real. Default coordinate pairs are `t`/`ω`, `x`/`k`,
 `y`/`m` and `z`/`n`; inverse transforms reverse the pair. The three-argument
@@ -654,11 +604,7 @@ also accepted for other registered unary functions in expression syntax.
 a Hadamard finite-part distribution. For the reciprocal absolute value, MARS
 uses a **unit cutoff**: for a Schwartz test function $\varphi$,
 
-$$
-\left\langle\operatorname{Fp}\!\left(\frac1{|k|}\right),\varphi\right\rangle
-=\int_{|k|<1}\frac{\varphi(k)-\varphi(0)}{|k|}\,dk
-+\int_{|k|\ge1}\frac{\varphi(k)}{|k|}\,dk.
-$$
+$\quad\begin{array}{l}\displaystyle \left\langle\operatorname{Fp}\!\left(\frac1{|k|}\right),\varphi\right\rangle =\int_{|k|<1}\frac{\varphi(k)-\varphi(0)}{|k|}\,dk +\int_{|k|\ge1}\frac{\varphi(k)}{|k|}\,dk.\end{array}$
 
 This fixes the delta coefficient; changing the cutoff changes that coefficient.
 The reciprocal-absolute-value pair is implemented in both directions. Other
@@ -679,12 +625,7 @@ An unqualified complex `ln(x)` is different and remains unsupported here.
 For real $a\ne0$ and $b$, let $q=\omega/a$ and $A_\pm=(-n\pm iq)/2$.
 The principal-power convention gives
 
-$$
-\mathcal F\{\sinh^n(at+b)\}(\omega)
-=\frac{2^{-(n+1)}e^{ibq}}{|a|}
-\left[\mathrm B(A_+,n+1)+e^{i\pi n}\mathrm B(A_-,n+1)\right],
-\qquad -1<\Re(n)<0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\sinh^n(at+b)\}(\omega) =\frac{2^{-(n+1)}e^{ibq}}{|a|} \left[\mathrm B(A_+,n+1)+e^{i\pi n}\mathrm B(A_-,n+1)\right], \qquad -1<\Re(n)<0.\end{array}$
 
 The factor $e^{i\pi n}$ is the negative-half-line branch value; it must not be
 discarded for fractional or complex powers. Replacing the input by
@@ -734,16 +675,15 @@ tempered-distribution Fourier domains. MARS represents evaluation at a complex
 frequency with a separate expression node, `analytic_delta`, rendered with the
 usual $\delta$ symbol. In this extended interpretation its definition is
 
-$$
-\langle\delta(\omega-z),\phi(\omega)\rangle=\phi(z),
-\qquad z\in\mathbb C,\quad\phi\in\mathcal H(\mathbb C),
-$$
+$\quad\begin{array}{l}\displaystyle \langle\delta(\omega-z),\phi(\omega)\rangle=\phi(z), \qquad z\in\mathbb C,\quad\phi\in\mathcal H(\mathbb C),\end{array}$
 
 where $\mathcal H(\mathbb C)$ is the space of entire functions. This is not a
 Dirac delta evaluated at a complex number, nor a convergent integral over the
 real line. The evaluation note explicitly identifies the extended interpretation.
-The aliases `AnalyticDelta` and `δℂ` construct the same node; Function output
-uses the parser-supported `analytic_delta` spelling.
+The public constructor `expr_analytic_delta(argument)` retains its argument and
+returns an owning expression, or `NULL` for a missing argument. Release the
+result with `expr_free`. Function output uses the parser-supported
+`analytic_delta` spelling.
 
 | Input | Output |
 | --- | --- |
@@ -895,7 +835,8 @@ function $I_\nu(z)$. The parser accepts `bessel_i`, `besseli` and `BesselI`
 with two arguments, indexed `I_n(z)`, and the order-zero aliases `I0(z)`,
 `I_0(z)` and `I₀(z)`. Expression output uses `I₀(z)` for order zero and
 `I_{n}(z)` for a symbolic order, Function
-output uses `bessel_i(n,z)`, and TeX uses $I_n(z)$.
+output uses `besseli(n,z)`, and TeX uses $I_n(z)$. The underscored spelling
+`bessel_i` remains an accepted input alias.
 
 Negative integer orders use $I_{-n}(z)=I_n(z)$. Fixed-order argument
 derivatives and numerical-order affine primitives are supported, with formal
@@ -928,7 +869,10 @@ uses a non-zero frequency condition, emitted as a conditional in Function style.
 This follows by differentiating `asinh` and applying the
 [DLMF cosine-transform identity for K₀](https://dlmf.nist.gov/10.32.E6).
 
-Modified Bessel K accepts `besselk`, `bessel_k` and `BesselK` with order and
+The public constructor `expr_bessel_k(order, argument)` retains both operands
+and returns an owning expression, or `NULL` if either operand is missing.
+Release the result with `expr_free`. Modified Bessel K accepts `besselk`,
+`bessel_k` and `BesselK` with order and
 argument; indexed `K_n` and `Kₙ` calls are also supported. `K0`, `K_0` and `K₀`
 denote order zero. Expression output uses Unicode integer subscripts, such as
 `K₀(z)`, consistently with `J₀(z)`, `Y₀(z)`, `I₀(z)` and `𝐋₀(z)`.
@@ -939,8 +883,13 @@ complex orders and non-zero arguments on the principal branch, with guarded
 series for magnitudes up to 1000. Outside this implemented numerical range it
 returns `NAN`, rather than an unverified approximation. The qfloat interface
 requires a positive argument. Argument derivatives, finite sums and
-integer-order affine primitives for $|n|\le64$ are supported; matrix evaluation uses spectral
-functional calculus on diagonalisable numeric square matrices.
+integer-order affine primitives for $|n|\le64$ are supported. Derivatives that
+involve the order retain a formal derivative. Matrix evaluation uses spectral
+functional calculus on diagonalisable numeric square matrices. See the
+[number-layer API](number.md#modified-bessel-k),
+[qfloat wrapper](qfloat.md#modified-bessel-k),
+[qcomplex wrapper](qcomplex.md#modified-bessel-k) and
+[matrix API](matrix.md#modified-bessel-k) for their numerical contracts.
 
 ### Inverse-function and gamma Fourier pairs
 
@@ -955,10 +904,7 @@ not absolutely convergent Fourier integrals.
 
 For the following table, let
 
-$$
-G(k)=2\pi i\left[(\ln 2-\gamma)\delta(k)
- -J_0(k)\frac{\operatorname{step}(k)}{k}\right].
-$$
+$\quad\begin{array}{l}\displaystyle G(k)=2\pi i\left[(\ln 2-\gamma)\delta(k) -J_0(k)\frac{\operatorname{step}(k)}{k}\right].\end{array}$
 
 The displayed half-line quotient uses a unit-cutoff finite part at zero: when
 integrating against a smooth test function, subtract its value at zero on the
@@ -988,11 +934,7 @@ Adding a delta to the spectrum correctly adds 1/(2π) to the inverse.
 
 The gamma function on a vertical line has an ordinary Fourier pair:
 
-$$
-\mathcal F\{\Gamma(a+ibx)\}(k)
- =\frac{2\pi}{|b|}\exp\bigl(ak/b-e^{k/b}\bigr),
- \qquad \operatorname{Re}(a)>0,\quad b\in\mathbb R,\quad b\ne0.
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\Gamma(a+ibx)\}(k) =\frac{2\pi}{|b|}\exp\bigl(ak/b-e^{k/b}\bigr), \qquad \operatorname{Re}(a)>0,\quad b\in\mathbb R,\quad b\ne0.\end{array}$
 
 | Input | Output |
 | --- | --- |
@@ -1031,17 +973,9 @@ The Fourier transforms of `tan` and `cot` use symmetric Cauchy principal values
 at their periodic poles. These are tempered-distribution identities, not
 ordinary Fourier integrals. With the negative-exponential Fourier kernel,
 
-$$
-\mathcal F\{\tan x\}(k)
- =2\pi i\sum_{n=1}^{\infty}(-1)^n
-   [\delta(k-2n)-\delta(k+2n)],
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\tan x\}(k) =2\pi i\sum_{n=1}^{\infty}(-1)^n [\delta(k-2n)-\delta(k+2n)],\end{array}$
 
-$$
-\mathcal F\{\cot x\}(k)
- =-2\pi i\sum_{n=1}^{\infty}
-   [\delta(k-2n)-\delta(k+2n)].
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\cot x\}(k) =-2\pi i\sum_{n=1}^{\infty} [\delta(k-2n)-\delta(k+2n)].\end{array}$
 
 Both directions recognise the actual impulse series, including a renamed bound
 index, real non-zero scaling and real translation. Inversion returns the original
@@ -1068,13 +1002,7 @@ The indexed notation does not imply Fourier support for second-kind Bessel funct
 
 For $n\in\mathbb Z$, the angular-frequency transform is
 
-$$
-\mathcal F_{x\to k}\{J_n(x)\}=
-\begin{cases}
-2(-i)^n T_{|n|}(k)/\sqrt{1-k^2},&|k|<1,\\
-0,&|k|>1.
-\end{cases}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal F_{x\to k}\{J_n(x)\}= \begin{cases} 2(-i)^n T_{|n|}(k)/\sqrt{1-k^2},&|k|<1,\\ 0,&|k|>1. \end{cases}\end{array}$
 
 The inverse transform of $J_n(\omega)$ has the same compact support in $t$,
 with coefficient $i^n/\pi$ instead of $2(-i)^n$. These rules follow from
@@ -1141,16 +1069,12 @@ it is the physicists' $H_n$ in the reference transform table.
 
 `convolve(f(t),g(t),t)` denotes whole-line convolution:
 
-$$
-(f*g)(t)=\int_{-\infty}^{\infty}f(\tau)g(t-\tau)\,d\tau.
-$$
+$\quad\begin{array}{l}\displaystyle (f*g)(t)=\int_{-\infty}^{\infty}f(\tau)g(t-\tau)\,d\tau.\end{array}$
 
 `causal_convolve(f(t),g(t),t)` denotes the zero-based convolution used by
 unilateral Laplace transforms:
 
-$$
-(f*_+g)(t)=\int_0^t f(\tau)g(t-\tau)\,d\tau.
-$$
+$\quad\begin{array}{l}\displaystyle (f*_+g)(t)=\int_0^t f(\tau)g(t-\tau)\,d\tau.\end{array}$
 
 The aliases are `convolution` and `causal_convolution`; C constructors are
 `expr_convolve` and `expr_causal_convolve`. The third argument is an explicit
@@ -2181,7 +2105,7 @@ placement and displacement data together, while retaining the aligned layout.
   Expression style uses `B`, TeX uses $\mathrm B$, and Function style uses `beta`.
   The parser accepts `beta`, `B`, and Greek capital beta `Β`.
 - `expr_t *expr_logbeta(const expr_t *left, const expr_t *right)` — ln B(a, b); Expression style writes
-  `lnB(a, b)`, Function style writes `logbeta(a, b)`, and legacy `logbeta(a, b)` expression input remains accepted
+  `lnB(a, b)`, Function style writes `logbeta(a, b)`, and `logbeta(a, b)` is also accepted as expression input
 - `expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b)` — beta distribution PDF
 - `expr_t *expr_logbeta_pdf(const expr_t *x, const expr_t *a, const expr_t *b)` — log beta distribution PDF
 - `expr_t *expr_binomial(const expr_t *n, const expr_t *k)` — binomial coefficient

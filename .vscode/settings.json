@@ -170,7 +170,8 @@
     },
     "markdown.styles": [
         "docs/books/ESAA/preview.css",
-        "docs/books/Applied Differential Equations/preview.css"
+        "docs/books/Applied Differential Equations/preview.css",
+        "docs/preview.css"
     ],
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,

@@ -49,7 +49,7 @@ currently remains a transparent by-value struct.
 - trigonometric, versine/haversine, and hyperbolic functions (and their inverses)
 - special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
-  Lauricella F_D, Appell F₁, Riemann and Hurwitz zeta, and the normal
+  Lauricella F_D, Appell F₁, Bessel J/Y/I/K, Struve H/L, Riemann and Hurwitz zeta, and the normal
   distribution
 - polar form conversion
 - parsing from string
@@ -296,6 +296,19 @@ printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc
 Y_0(1) = 0.088256964215677 + 0i
 ```
 
+### Modified Bessel K
+
+`qc_bessel_k(order, argument)` evaluates the principal modified Bessel function
+of the second kind for finite real or complex operands and a non-zero argument.
+Both operand magnitudes must be at most 1000. A zero argument, non-finite input,
+unsupported magnitude or exhausted numerical guard produces a NaN result.
+
+The wrapper calls [the number-layer evaluator](number.md#modified-bessel-k)
+and rounds its real and imaginary components to qfloat precision. Complex branch
+values are preserved rather than routing every real argument through the
+positive-argument-only qfloat wrapper. The public result remains `qcomplex_t`;
+the working multiprecision representation is internal to the number layer.
+
 ### Modified Bessel I
 
 `qc_bessel_i(order, argument)` evaluates the principal modified Bessel
@@ -454,12 +467,11 @@ qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);
 ## Implementation Notes
 
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
-- **Special functions:** For real arguments where `qc_imag(z) == 0`, all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximise accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
+- **Special functions:** Real-valued fast paths are used where the function's domain and branch permit them. Real arguments can still require complex results. Bessel Y/I/K and Struve H/L use guarded number-layer evaluators for real and complex inputs before rounding to double-double components. Numerical range and convergence limits are documented with each family.
 - **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
 - **Lambert W, incomplete gamma, exponential integrals, polylogarithms and the hypergeometric families:** Use iterative or dynamically converged series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values. Appell F₁ delegates to the two-variable Lauricella F_D implementation.
 - **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.
-- **Fast paths:** For all functions, if the imaginary part is zero, the real-valued `qf_` implementation is used for maximum speed and accuracy.
-- **Numeric boundary:** `qcomplex_t` is implemented in terms of `qfloat_t` and does not include, call or link against MPFR or MPC. Multiprecision promotion belongs to `number_t`.
+- **Numeric boundary:** Storage and core arithmetic use `qfloat_t`. The qcomplex module has no direct MPFR/MPC includes or calls, but the delegated special functions depend indirectly on those libraries through `number_t`. Multiprecision work stays behind the number module's public API; it does not change the public qcomplex representation.
 
 If you need details about the implementation of a specific function or want to know about accuracy in a particular region of the complex plane, see the source code or contact the maintainers.
 

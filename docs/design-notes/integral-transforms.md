@@ -140,31 +140,17 @@ Fourier transform.
 
 The forward Laplace transform is unilateral:
 
-$$
-\mathcal{L}\{f(t)\}(s)
-  = \int_0^\infty e^{-st} f(t)\,dt
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}\{f(t)\}(s) = \int_0^\infty e^{-st} f(t)\,dt\end{array}$
 
 The inverse Laplace transform is the Bromwich integral:
 
-$$
-\mathcal{L}^{-1}\{F(s)\}(t)
-  = \frac{1}{2\pi i}
-    \int_{\gamma-i\infty}^{\gamma+i\infty} e^{st}F(s)\,ds
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}\{F(s)\}(t) = \frac{1}{2\pi i} \int_{\gamma-i\infty}^{\gamma+i\infty} e^{st}F(s)\,ds\end{array}$
 
 The Fourier transform uses angular spatial frequency and the convention:
 
-$$
-\mathcal{F}\{f(x)\}(k)
-  = \int_{-\infty}^{\infty} f(x)e^{-ikx}\,dx
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}\{f(x)\}(k) = \int_{-\infty}^{\infty} f(x)e^{-ikx}\,dx\end{array}$
 
-$$
-\mathcal{F}^{-1}\{F(k)\}(x)
-  = \frac{1}{2\pi}
-    \int_{-\infty}^{\infty} F(k)e^{ikx}\,dk
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}^{-1}\{F(k)\}(x) = \frac{1}{2\pi} \int_{-\infty}^{\infty} F(k)e^{ikx}\,dk\end{array}$
 
 This fixes the sign and normalisation rather than making them implicit
 implementation choices.
@@ -365,7 +351,7 @@ $\sigma>\lvert a\rvert$, respectively.
 | `abs`: $\lvert at+b\rvert$, no positive zero | $\epsilon(a/s^2+b/s)$ | Known real $a,b$, $\epsilon=\operatorname{sgn}(b)$ if $b\ne0$, otherwise $\operatorname{sgn}(a)$; $\sigma>0$ |
 | `abs`: $\lvert at+b\rvert$, $ab<0$ | $\operatorname{sgn}(b)(a/s^2+b/s)+2\lvert a\rvert e^{sb/a}/s^2$ | Known real $a,b$, positive zero $-b/a$; $\sigma>0$ |
 | `conj`: $\overline{at+b}$ | $\overline a/s^2+\overline b/s$ | $\sigma>0$; $s$ is not conjugated |
-| Native real-part operator: $\operatorname{Re}(at+b)$ | $\operatorname{Re}(a)/s^2+\operatorname{Re}(b)/s$ | $\sigma>0$; `realpart` is not a callable Expression parser alias |
+| `realpart`: $\operatorname{Re}(at+b)$ | $\operatorname{Re}(a)/s^2+\operatorname{Re}(b)/s$ | $\sigma>0$; the source coordinate is real |
 | `floor`: $\lfloor at\rfloor$ | $1/[s(e^{s/a}-1)]$ | Known real $a>0,\ \sigma>0$ |
 | `ceil`: $\lceil at\rceil$ | $1/[s(1-e^{-s/a})]$ | Known real $a>0,\ \sigma>0$ |
 
@@ -380,10 +366,7 @@ Here $\psi$ denotes digamma. Define $q=\sqrt{a^2}$ and $z=s/(4q)$;
 for known real $a\ne0$, MARS simplifies $q$ to $\lvert a\rvert$.
 For the inverse-function rows, put
 
-$$
-A(a,s)=\frac{e^{-is/a}E_1(-is/a)-e^{is/a}E_1(is/a)}{2is}
-\qquad (a>0).
-$$
+$\quad\begin{array}{l}\displaystyle A(a,s)=\frac{e^{-is/a}E_1(-is/a)-e^{is/a}E_1(is/a)}{2is} \qquad (a>0).\end{array}$
 
 | Expression function / source $f(t)$ | Transform $F(s)$ | Conditions / supported form |
 | --- | --- | --- |
@@ -407,28 +390,44 @@ integral of its derivative. Complex rates and shifted arguments remain symbolic.
 The [inverse-hyperbolic branch definitions](https://dlmf.nist.gov/4.37)
 explain why specifying the cut boundary matters.
 
-The Struve function in the `asinh` row is represented using the existing
-hypergeometric constructor:
-$\mathbf H_0(x)=(2x/\pi)\,{}_1F_2(1;3/2,3/2;-x^2/4)$.
-The symbolic formula permits complex $s$, but its Bessel-Y factor currently
-has no complex numerical backend.
+The `asinh` row uses the native ordinary Struve and Bessel-Y constructors.
+Function output uses `struveh(0,z)` and `bessely(0,z)`; Expression output uses
+`𝐇₀(z)` and `Y₀(z)`. Both functions have real and complex numerical support,
+subject to their documented precision, branch and range limits. The older
+hypergeometric representation
+$\mathbf H_0(z)=(2z/\pi)\,{}_1F_2(1;3/2,3/2;-z^2/4)$ remains accepted in
+independently copied inverse spectra; it is not the current forward rendering.
+See [ordinary Struve H](../expression.md#ordinary-struve-function) and
+[Bessel Y](../number.md#bessel-y) for the native functions.
+
+The remaining implemented inverse-circular and inverse-hyperbolic pairs use
+native modified Bessel and Struve functions. For known real $a\ne0$, put
+$q=|a|$, $w=s/q$ and $D=\operatorname{sgn}(a)[I_0(w)-\mathbf L_0(w)]$:
+
+| Expression function / source $f(t)$ | Transform $F(s)$ | Conditions / supported form |
+| --- | --- | --- |
+| `acosh`: $\operatorname{acosh}(at)$ | $K_0(w)/s+i\pi(1-D)/(2s)$ | $\sigma>0$; $a=0$ gives $i\pi/(2s)$ |
+| `asin`: $\arcsin(at)$ | $\pi D/(2s)+iK_0(w)/s$ | $\sigma>0$; $a=0$ gives zero |
+| `acos`: $\arccos(at)$ | $\pi(1-D)/(2s)-iK_0(w)/s$ | $\sigma>0$; $a=0$ gives $\pi/(2s)$ |
+
+These are full unilateral transforms, including the complex-valued portions of
+MARS's real-axis branches, not transforms restricted to the functions' real-valued
+intervals. Unspecified rates, non-real rates and shifted source arguments remain
+symbolic. Function output uses `besseli`, `besselk` and `struvel`; Expression
+output uses $I_0$, $K_0$ and $\mathbf L_0$. Real and complex targets in the stated
+half-plane can be evaluated within the numerical functions' supported limits.
+Freshly parsed complete spectra invert to their corresponding source functions,
+including supported scalar multiples, constant offsets and exponential frequency
+shifts. See [Laplace function coverage](../expression.md#laplace-function-coverage)
+for the branch conventions and parameter-specialisation rules.
 
 ### Gaussian, error and normal functions
 
 Define the two shared expressions
 
-$$
-G(A,B,D;s)=\frac{\sqrt\pi}{2\sqrt A}
- e^{D+(s-B)^2/(4A)}
- \operatorname{erfc}\!\left(\frac{s-B}{2\sqrt A}\right),
-$$
+$\quad\begin{array}{l}\displaystyle G(A,B,D;s)=\frac{\sqrt\pi}{2\sqrt A} e^{D+(s-B)^2/(4A)} \operatorname{erfc}\!\left(\frac{s-B}{2\sqrt A}\right),\end{array}$
 
-$$
-R(a,b;s)=\frac{a}{\sqrt{a^2}}\,
- e^{s^2/(4a^2)+bs/a}
- \operatorname{erfc}\!\left(\frac{s}{2\sqrt{a^2}}+
-                           \frac{b\sqrt{a^2}}{a}\right).
-$$
+$\quad\begin{array}{l}\displaystyle R(a,b;s)=\frac{a}{\sqrt{a^2}}\, e^{s^2/(4a^2)+bs/a} \operatorname{erfc}\!\left(\frac{s}{2\sqrt{a^2}}+ \frac{b\sqrt{a^2}}{a}\right).\end{array}$
 
 Here $\phi(x)=e^{-x^2/2}/\sqrt{2\pi}$ and
 $\Phi(x)=\operatorname{erfc}(-x/\sqrt2)/2$.
@@ -469,11 +468,7 @@ In the Bessel rows, write $r=\sqrt{s^2+a^2}$ and $u=a/(s+r)$.
 MARS uses the sine Fourier series for even Clausen orders and the cosine
 series for odd orders. For $1\le p\le32$, put $k=\lfloor(p-1)/2\rfloor$,
 
-$$
-D(z)=\frac{\psi(1+iz)+\psi(1-iz)+2\gamma}{2},\qquad
-N_p(z)=(-1)^kD(z)+
-\sum_{j=1}^{k}(-1)^{j-1}\zeta(2k+3-2j)z^{2k+2-2j}.
-$$
+$\quad\begin{array}{l}\displaystyle D(z)=\frac{\psi(1+iz)+\psi(1-iz)+2\gamma}{2},\qquad N_p(z)=(-1)^kD(z)+ \sum_{j=1}^{k}(-1)^{j-1}\zeta(2k+3-2j)z^{2k+2-2j}.\end{array}$
 
 The sum is zero when $k=0$.
 
@@ -556,23 +551,15 @@ TeX output uses conventional calligraphic operators:
 
 renders as:
 
-$$
-\mathcal{L}_{t\to s}\{f(t)\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}_{t\to s}\{f(t)\}\end{array}$
 
 The remaining operators render as:
 
-$$
-\mathcal{L}^{-1}_{s\to t}\{F(s)\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\{F(s)\}\end{array}$
 
-$$
-\mathcal{F}_{x\to k}\{f(x)\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}_{x\to k}\{f(x)\}\end{array}$
 
-$$
-\mathcal{F}^{-1}_{k\to x}\{F(k)\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}^{-1}_{k\to x}\{F(k)\}\end{array}$
 
 The variable mapping is retained in rendered output because it is part of the
 operation, particularly in expressions containing several free variables.

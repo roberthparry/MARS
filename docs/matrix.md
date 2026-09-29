@@ -1105,6 +1105,7 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_erfcinv(A)` | Matrix inverse complementary error function |
 | `mat_gamma(A)` | Matrix gamma function |
 | `mat_bessel_i(A, order)` | Principal modified Bessel matrix function I_order(A), including I₀ and Jordan blocks |
+| `mat_bessel_k(A, order)` | Principal modified Bessel matrix function K_order(A), using spectral functional calculus |
 | `mat_bessel_y(A, order)` | Principal ordinary Bessel matrix function Y_order(A), including Y₀ and analytic Jordan terms |
 | `mat_struve_h(A, order)` | Principal ordinary Struve matrix function H_order(A), using its alternating matrix series |
 | `mat_struve_l(A, order)` | Principal modified Struve matrix function L_order(A), including Jordan blocks |
@@ -1222,6 +1223,20 @@ Output:
 ```text
 H_0(A)[0,3] = -0.070736
 ```
+
+#### Modified Bessel K
+
+`mat_bessel_k(A, order)` takes a square matrix and a pointer to a finite scalar
+order, in that order, and returns a newly allocated matrix. Release it with
+`mat_free`. The operation reconstructs the matrix function from scalar spectral
+values; it is not elementwise application. A missing or non-finite order, or a
+matrix unsupported by the shared spectral mapper, returns `NULL`.
+
+The supported numerical path requires a diagonalisable square matrix. Unlike
+the Bessel I and Struve series paths, this constructor does not add a separate
+Jordan-block expansion. Each scalar spectral value obeys the principal branch
+and numerical limits of [Bessel K](number.md#modified-bessel-k), including the
+singularity at zero. Symbolic input matrices are not accepted by this mapper.
 
 #### Modified Bessel I
 
