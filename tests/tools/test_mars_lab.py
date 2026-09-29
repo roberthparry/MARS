@@ -4033,7 +4033,7 @@ solutions y = final
 
         self.assertEqual(payload["status"], "solved")
         self.assertEqual(payload["solver"], "power-law Bessel")
-        self.assertIn("BesselJ(-¼, ½·x^2)", payload["solutions"])
+        self.assertIn("J_{-¼}(½·x^2)", payload["solutions"])
         self.assertIn(r"J_{-\frac{1}{4}}", payload["solutions_TeX"])
         self.assertEqual(payload["solutions_wrapped_TeX"], payload["solutions_TeX"])
         self.assertIn(r"\sqrt{x}\mkern-2mu \left(C_{1}\mkern-2mu J_{-\frac{1}{4}}", payload["solutions_TeX"])
@@ -10548,7 +10548,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         )
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(diffequation["solver"], "power-law Bessel")
-        self.assertIn("BesselJ(-¼, ½·x^2)", diffequation["solutions"])
+        self.assertIn("J_{-¼}(½·x^2)", diffequation["solutions"])
 
         matrix, raw, returncode = mars_lab.run_matrix_lab_fields(
             scratch / "matrix_lab",

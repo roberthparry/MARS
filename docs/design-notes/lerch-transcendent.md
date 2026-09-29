@@ -5,37 +5,19 @@
 
 MARS supports the Lerch transcendent
 
-$$
-\Phi(z, s, a) = \sum_{k=0}^{\infty} \frac{z^k}{(k+a)^s}.
-$$
+$\quad\begin{array}{l}\displaystyle \Phi(z, s, a) = \sum_{k=0}^{\infty} \frac{z^k}{(k+a)^s}.\end{array}$
 
 One motivating symbolic-integration case is
 
-$$
-\int \sum_{k=1}^{n} \cosh(kx)\,dx
-= \sum_{k=1}^{n} \frac{\sinh(kx)}{k} + C.
-$$
+$\quad\begin{array}{l}\displaystyle \int \sum_{k=1}^{n} \cosh(kx)\,dx = \sum_{k=1}^{n} \frac{\sinh(kx)}{k} + C.\end{array}$
 
 The finite sum can alternatively be represented as
 
-$$
-\frac{1}{2}\left[
-\operatorname{Li}_1(e^x)-\operatorname{Li}_1(e^{-x})
--e^{(n+1)x}\Phi(e^x,1,n+1)
-+e^{-(n+1)x}\Phi(e^{-x},1,n+1)
-\right] + C.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{1}{2}\left[ \operatorname{Li}_1(e^x)-\operatorname{Li}_1(e^{-x}) -e^{(n+1)x}\Phi(e^x,1,n+1) +e^{-(n+1)x}\Phi(e^{-x},1,n+1) \right] + C.\end{array}$
 
 The corresponding weighted cosh sum is
 
-$$
-\sum_{k=1}^{n}\frac{\cosh(kx)}{k}
-=\frac{1}{2}\left[
-\operatorname{Li}_1(e^x)+\operatorname{Li}_1(e^{-x})
--e^{(n+1)x}\Phi(e^x,1,n+1)
--e^{-(n+1)x}\Phi(e^{-x},1,n+1)
-\right].
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\frac{\cosh(kx)}{k} =\frac{1}{2}\left[ \operatorname{Li}_1(e^x)+\operatorname{Li}_1(e^{-x}) -e^{(n+1)x}\Phi(e^x,1,n+1) -e^{-(n+1)x}\Phi(e^{-x},1,n+1) \right].\end{array}$
 
 MARS Lab displays the Lerch representation whenever either weighted
 hyperbolic sum is recognised. Consequently, a result produced quickly for a
@@ -98,10 +80,7 @@ For each weighted hyperbolic identity, the simplifier recognises the complete
 Li₁/Lerch expression as the finite source sum. Differentiating the weighted
 sinh form therefore returns the existing finite-cosh identity
 
-$$
-\sum_{k=1}^{n}\cosh(kx)
-=\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\cosh(kx) =\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)},\end{array}$
 
 rather than exposing the term-by-term derivative of the special-function
 representation. The weighted cosh form correspondingly returns the existing

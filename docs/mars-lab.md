@@ -102,10 +102,7 @@ progressions, including inputs such as
 series closed form and uses its continuous value at removable singularities
 such as `x = 0`. Integrating the cosine progression produces
 
-$$
-\frac{H_n(e^{ix})-H_n(e^{-ix})}{2i}+C,
-\qquad H_n(z)=\sum_{k=1}^{n}\frac{z^k}{k}.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{H_n(e^{ix})-H_n(e^{-ix})}{2i}+C, \qquad H_n(z)=\sum_{k=1}^{n}\frac{z^k}{k}.\end{array}$
 
 Expression input accepts `Hn(n,z)`, `harmonic_poly(n,z)`, and `harmonicpoly(n,z)`. The Function card
 uses `harmonicpoly`, and the same native node supports repeated symbolic
@@ -124,20 +121,14 @@ Formal `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
 use the same native geometric-series identities as recognised ellipsis input.
 For example, with supplied `x` and `n`, `@Z_(k=1)^n sin(kx)` displays
 
-$$
-\sum_{k=1}^{n}\sin(kx)
-=\frac{\sin(nx/2)\sin((n+1)x/2)}{\sin(x/2)},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\sin(kx) =\frac{\sin(nx/2)\sin((n+1)x/2)}{\sin(x/2)},\end{array}$
 
 and supplies its numerical Value without iterating through a large upper
 bound.
 
 The exponential progression is geometric as well:
 
-$$
-\sum_{k=1}^{n}e^{kx}
-=\frac{e^x}{e^x-1}\left(e^{nx}-1\right).
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}e^{kx} =\frac{e^x}{e^x-1}\left(e^{nx}-1\right).\end{array}$
 
 For `{ @Z_(k=1)^n exp(kx) | x=2; n=100000 }`, MARS Lab displays that
 identity, Expression style emits
@@ -149,20 +140,14 @@ At `x = 0`, MARS evaluates the removable limit directly and returns `n`.
 The exponential-sine progression is the imaginary part of a complex geometric
 series, so MARS also reduces it without iterating through its terms:
 
-$$
-\sum_{k=1}^{n}e^{kx}\sin(kx)
-=\frac{e^x\left(\sin x-e^{nx}\sin((n+1)x)+e^{(n+1)x}\sin(nx)\right)}
-       {1-2e^x\cos x+e^{2x}}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}e^{kx}\sin(kx) =\frac{e^x\left(\sin x-e^{nx}\sin((n+1)x)+e^{(n+1)x}\sin(nx)\right)} {1-2e^x\cos x+e^{2x}}.\end{array}$
 
 For `{ @Z_(k=1)^n exp(kx)sin(kx) | x=1; n=100000000 }`, the Value begins
 `1.804482674473709321302888821113364953E+43429448` at 128-digit precision.
 
 Products inside logarithms reduce the corresponding logarithmic progression:
 
-$$
-\sum_{k=1}^{n}\ln(kx)=n\ln(x)+\ln\Gamma(n+1).
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\ln(kx)=n\ln(x)+\ln\Gamma(n+1).\end{array}$
 
 For `{ @Z_(k=1)^n ln(kx) | x=2; n=100000 }`, Expression style emits
 `n·ln(x) + lnΓ(n + 1)`, Function style emits `n.ln(x) + lgamma(n + 1)`, and the
@@ -171,10 +156,7 @@ Value is
 
 Because `log` denotes the common logarithm, it remains distinct from `ln`:
 
-$$
-\sum_{k=1}^{n}\lg(kx)
-=n\lg(x)+\frac{\ln\Gamma(n+1)}{\ln(10)}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\lg(kx) =n\lg(x)+\frac{\ln\Gamma(n+1)}{\ln(10)}.\end{array}$
 
 For `{ @Z_(k=1)^n log(kx) | x=2; n=100000 }`, the parseable result is
 `n·lg(x) + lnΓ(n + 1)/ln(10)` and the Value is
@@ -184,10 +166,7 @@ The summand function now owns any exact finite-progression reducer. This keeps
 the recogniser independent of function names and lets related functions reuse
 the same mathematics. For example,
 
-$$
-\sum_{k=1}^{n}\operatorname{versin}(kx)
-=n-\frac{\sin(nx/2)\cos((n+1)x/2)}{\sin(x/2)}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{versin}(kx) =n-\frac{\sin(nx/2)\cos((n+1)x/2)}{\sin(x/2)}.\end{array}$
 
 For `{ @Z_(k=1)^n versin(kx) | x=2; n=100000 }`, Expression style emits
 `n - sin(nx/2)·cos(x/2·(n + 1))/sin(x/2)` and the Value is
@@ -211,10 +190,7 @@ remains a formal sum.
 Positive integer scaling also gives exact homogeneous progressions. In
 particular,
 
-$$
-\sum_{k=1}^{n}\sqrt{kx}
-=\sqrt{x}\left(\zeta(-1/2)-\zeta(-1/2,n+1)\right).
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\sqrt{kx} =\sqrt{x}\left(\zeta(-1/2)-\zeta(-1/2,n+1)\right).\end{array}$
 
 For `{ @Z_(k=1)^n sqrt(kx) | x=2; n=100000 }`, Expression style emits
 `√(x)·(ζ(-1/2) - ζ(-1/2, n + 1))` and the Value is
@@ -229,11 +205,7 @@ domain-required specialisation `x·n/2·(n + 1)` and the Value is `10000100000`.
 A proved small rational step `x = p/q` has a repeating residue pattern. Writing
 `m = floor(n/q)` and `r = mod(n, q)`, MARS reduces
 
-$$
-\sum_{k=1}^{n}\left\lfloor\frac{pk}{q}\right\rfloor
-=m\left(\frac{pq(m-1)}{2}+p+\frac{(p-1)(q-1)}{2}+pr\right)
-+\sum_{s=1}^{r}\left\lfloor\frac{ps}{q}\right\rfloor .
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\left\lfloor\frac{pk}{q}\right\rfloor =m\left(\frac{pq(m-1)}{2}+p+\frac{(p-1)(q-1)}{2}+pr\right) +\sum_{s=1}^{r}\left\lfloor\frac{ps}{q}\right\rfloor .\end{array}$
 
 The native expression expands the last sum into no more than `q - 1` residue
 indicators, so it never conceals a large term-by-term loop. For
@@ -260,10 +232,7 @@ parseable Expression representation back to the editor while retaining the
 supplied bindings. Differentiating the copied weighted-sinh form recognises the
 identity from which it came and returns
 
-$$
-\sum_{k=1}^{n}\cosh(kx)
-=\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\cosh(kx) =\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)}.\end{array}$
 
 The Value card evaluates the combined weighted sum through a stable native
 path rather than exposing the large cancelling imaginary parts of individual
@@ -313,10 +282,7 @@ weighted sum.
 The captured editor input is `1+1/2^p+1/3^p+...+1/n^p`; its binding boxes
 supply `p = 2.5` and `n = 100`. MARS recognises
 
-$$
-\sum_{k=1}^{n}\frac{1}{k^p}
-=\zeta(p)-\zeta(p,n+1),
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\frac{1}{k^p} =\zeta(p)-\zeta(p,n+1),\end{array}$
 
 and the supplied bindings produce approximately
 `1.3408255697514640082147074818471`. At `p = 1`, MARS uses the harmonic
@@ -337,10 +303,7 @@ A finite tangent progression is shown with its q-digamma identity rather than
 pretending that a large explicit summation was performed symbolically. MARS
 uses the reduced identity
 
-$$
-\sum_{k=1}^{n}\tan(kx)
-=in+\frac{\psi_{e^{4ix}}(1)-\psi_{e^{4ix}}(n+1)-\psi_{e^{2ix}}(1)+\psi_{e^{2ix}}(n+1)}{x}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\tan(kx) =in+\frac{\psi_{e^{4ix}}(1)-\psi_{e^{4ix}}(n+1)-\psi_{e^{2ix}}(1)+\psi_{e^{2ix}}(n+1)}{x}.\end{array}$
 
 The Expression and Function cards show the same q-digamma formula. The Value
 card evaluates the recognised finite combination by a stable native real sum:
@@ -351,35 +314,19 @@ identity, bindings and value.
 Inverse circular and inverse hyperbolic progressions use log-gamma identities
 where those identities are genuinely shorter than the original sum. Define
 
-$$
-D_n(s)=\ln\Gamma(n+1+s)-\ln\Gamma(1+s)
-      +\ln\Gamma(1-s)-\ln\Gamma(n+1-s).
-$$
+$\quad\begin{array}{l}\displaystyle D_n(s)=\ln\Gamma(n+1+s)-\ln\Gamma(1+s) +\ln\Gamma(1-s)-\ln\Gamma(n+1-s).\end{array}$
 
 Then MARS uses
 
-$$
-\sum_{k=1}^{n}\operatorname{acot}(kx)=\frac{D_n(i/x)}{2i},
-\qquad
-\sum_{k=1}^{n}\operatorname{acoth}(kx)=\frac{D_n(1/x)}{2},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{acot}(kx)=\frac{D_n(i/x)}{2i}, \qquad \sum_{k=1}^{n}\operatorname{acoth}(kx)=\frac{D_n(1/x)}{2},\end{array}$
 
 and
 
-$$
-\sum_{k=1}^{n}\operatorname{atanh}(kx)
-=\frac{n\left(\ln x-\ln(-x)\right)+D_n(1/x)}{2}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{atanh}(kx) =\frac{n\left(\ln x-\ln(-x)\right)+D_n(1/x)}{2}.\end{array}$
 
 For real non-zero `x`, arctangent uses the sign-aware complex-shift log-gamma identity
 
-$$
-\sum_{k=1}^{n}\operatorname{atan}(kx)
-=\frac{n\pi x}{2|x|}+\frac{i}{2}\left(
-\ln\Gamma\left(n+1+\frac{i}{x}\right)-\ln\Gamma\left(1+\frac{i}{x}\right)
-+\ln\Gamma\left(1-\frac{i}{x}\right)-\ln\Gamma\left(n+1-\frac{i}{x}\right)
-\right).
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{atan}(kx) =\frac{n\pi x}{2|x|}+\frac{i}{2}\left( \ln\Gamma\left(n+1+\frac{i}{x}\right)-\ln\Gamma\left(1+\frac{i}{x}\right) +\ln\Gamma\left(1-\frac{i}{x}\right)-\ln\Gamma\left(n+1-\frac{i}{x}\right) \right).\end{array}$
 
 This uses `ln(-ix) - ln(ix) = -iπx/|x|`, keeps the imaginary unit out of the
 denominator, and preserves the principal-logarithm branches for positive and
@@ -391,10 +338,7 @@ removable numerical singularity without hiding the symbolic identity.
 
 Differentiating the arctangent progression uses the compact conjugate-pair form
 
-$$
-\frac{\psi(n+1+i/x)-\psi(1+i/x)+\psi(n+1-i/x)-\psi(1-i/x)}{2x^2}
-=\sum_{k=1}^{n}\frac{k}{1+k^2x^2}.
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\psi(n+1+i/x)-\psi(1+i/x)+\psi(n+1-i/x)-\psi(1-i/x)}{2x^2} =\sum_{k=1}^{n}\frac{k}{1+k^2x^2}.\end{array}$
 
 MARS evaluates its complex digamma terms through the active arbitrary-precision
 backend and returns the mathematically real result. At 386 requested digits,
@@ -428,11 +372,7 @@ progression reaches `kx = 1` or `kx = -1`.
 The corresponding hyperbolic-tangent progression uses a real q-digamma
 identity. With `q = exp(-2x)`, MARS uses
 
-$$
-\sum_{k=1}^{n}\tanh(kx)
-=n-\frac{2}{\log q}\left(\psi_q(1)-\psi_q(n+1)\right)
-+\frac{4}{\log(q^2)}\left(\psi_{q^2}(1)-\psi_{q^2}(n+1)\right).
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\tanh(kx) =n-\frac{2}{\log q}\left(\psi_q(1)-\psi_q(n+1)\right) +\frac{4}{\log(q^2)}\left(\psi_{q^2}(1)-\psi_{q^2}(n+1)\right).\end{array}$
 
 For example, `{ @Z_(k=1)^n tanh(kx) | x=2; n=100000 }` displays this
 identity in Rendered TeX, uses `ψq` in Expression style and `qdigamma` in
@@ -444,49 +384,27 @@ same value.
 The cotangent, secant and cosecant families use the same native q-digamma
 machinery. Write
 
-$$
-D_q(a,n)=\psi_q(a)-\psi_q(a+n).
-$$
+$\quad\begin{array}{l}\displaystyle D_q(a,n)=\psi_q(a)-\psi_q(a+n).\end{array}$
 
 Then the cotangent pair is
 
-$$
-\sum_{k=1}^{n}\cot(kx)=-in-\frac{2i}{\log q}D_q(1,n),\qquad q=e^{2ix},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\cot(kx)=-in-\frac{2i}{\log q}D_q(1,n),\qquad q=e^{2ix},\end{array}$
 
-$$
-\sum_{k=1}^{n}\coth(kx)=n+\frac{2}{\log q}D_q(1,n),\qquad q=e^{-2x}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\coth(kx)=n+\frac{2}{\log q}D_q(1,n),\qquad q=e^{-2x}.\end{array}$
 
 The cosecant pair follows from
 `cosec(y) = cot(y/2) - cot(y)` and
 `cosech(y) = coth(y/2) - coth(y)`:
 
-$$
-\sum_{k=1}^{n}\operatorname{cosec}(kx)
-=-\frac{2i}{\log q}D_q(1,n)+\frac{2i}{\log(q^2)}D_{q^2}(1,n),
-\qquad q=e^{ix},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{cosec}(kx) =-\frac{2i}{\log q}D_q(1,n)+\frac{2i}{\log(q^2)}D_{q^2}(1,n), \qquad q=e^{ix},\end{array}$
 
-$$
-\sum_{k=1}^{n}\operatorname{cosech}(kx)
-=\frac{2}{\log q}D_q(1,n)-\frac{2}{\log(q^2)}D_{q^2}(1,n),
-\qquad q=e^{-x}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{cosech}(kx) =\frac{2}{\log q}D_q(1,n)-\frac{2}{\log(q^2)}D_{q^2}(1,n), \qquad q=e^{-x}.\end{array}$
 
 Finally, let `a = pi*i/(2*ln(q))`. The secant identities are
 
-$$
-\sum_{k=1}^{n}\sec(kx)
-=\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right),
-\qquad q=e^{ix},
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\sec(kx) =\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right), \qquad q=e^{ix},\end{array}$
 
-$$
-\sum_{k=1}^{n}\operatorname{sech}(kx)
-=\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right),
-\qquad q=e^{-x}.
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{sech}(kx) =\frac{i}{\log q}\left(D_q(1-a,n)-D_q(1+a,n)\right), \qquad q=e^{-x}.\end{array}$
 
 MARS displays each identity in Rendered TeX, writes `ψq` in Expression style
 and `qdigamma` in Function style, and recovers the original finite sum when the
@@ -582,11 +500,7 @@ enabled, returns the rule-derived working shown in the **Solver** card.
 
 The captured input is `y'' + x^2y = 0`. The output is the Bessel basis
 
-<div align="left">
-
-$y = \sqrt{x}\left(C_1 J_{-1/4}\!\left(\frac{x^2}{2}\right) + C_2 J_{1/4}\!\left(\frac{x^2}{2}\right)\right).$
-
-</div>
+$\quad\begin{array}{l}\displaystyle y = \sqrt{x}\left(C_1 J_{-1/4}\!\left(\frac{x^2}{2}\right) + C_2 J_{1/4}\!\left(\frac{x^2}{2}\right)\right).\end{array}$
 
 [![MARS Lab differential-equation mode solving a power-law Bessel equation](images/mars-lab/differential-equation.png?v=20260814-3)](images/mars-lab/differential-equation.png?v=20260814-3)
 

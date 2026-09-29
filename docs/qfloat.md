@@ -43,7 +43,7 @@ maintained after every operation.
   versine/haversine family, and inverses
 - special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma,
   exponential integrals, polylogarithms, generalised hypergeometric pFq,
-  Lauricella F_D, Appell F₁, Bessel J/Y, Lommel s, Riemann and Hurwitz zeta,
+  Lauricella F_D, Appell F₁, Bessel J/Y/I/K, Struve H/L, Lommel s, Riemann and Hurwitz zeta,
   and the normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
@@ -389,11 +389,7 @@ The Clausen functions take angles in radians and are `2*pi`-periodic. For a
 positive integer order, even orders use the sine Fourier series and odd orders
 use the cosine Fourier series:
 
-$$
-\operatorname{Cl}_{2m}(\theta)=\sum_{k=1}^{\infty}\frac{\sin(k\theta)}{k^{2m}},
-\qquad
-\operatorname{Cl}_{2m-1}(\theta)=\sum_{k=1}^{\infty}\frac{\cos(k\theta)}{k^{2m-1}}.
-$$
+$\quad\begin{array}{l}\displaystyle \operatorname{Cl}_{2m}(\theta)=\sum_{k=1}^{\infty}\frac{\sin(k\theta)}{k^{2m}}, \qquad \operatorname{Cl}_{2m-1}(\theta)=\sum_{k=1}^{\infty}\frac{\cos(k\theta)}{k^{2m-1}}.\end{array}$
 
 Order one is `-ln(2*abs(sin(theta/2)))`, with logarithmic poles at multiples
 of `2*pi`. Higher orders are continuous on the real axis. Evaluation uses
@@ -408,7 +404,9 @@ in native real arithmetic. Order zero and non-finite angles return NaN.
 
 The defining series use convergence tests and grow temporary storage only as
 needed; they do not reserve a fixed maximum-sized term array. The qfloat
-implementation remains independent of MPFR and MPC.
+hypergeometric implementation remains independent of MPFR and MPC. This does
+not describe every special function: Bessel Y/I/K and Struve H/L delegate to
+guarded number-layer kernels that use multiprecision internally.
 
 Input and output for a simple pFq identity:
 
@@ -421,6 +419,19 @@ qf_printf("0F0(0.2) = %.34q\n", value);
 ```text
 0F0(0.2) = 1.221402758160169833921071994639675
 ```
+
+### Modified Bessel K
+
+`qf_bessel_k(order, argument)` evaluates K of a finite real order at a positive
+real argument. Both input magnitudes must be at most 1000. Zero or negative
+arguments, non-finite operands and exhausted numerical guards return `QF_NAN`.
+Use [the complex API](qcomplex.md#modified-bessel-k) when a complex branch value
+is required.
+
+The wrapper calls [the number-layer evaluator](number.md#modified-bessel-k),
+which uses guarded multiprecision internally, and rounds its result to qfloat.
+The public result remains a double-double value; it does not acquire an
+arbitrary-precision representation.
 
 ### Modified Bessel I
 
