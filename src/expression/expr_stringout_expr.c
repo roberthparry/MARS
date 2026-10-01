@@ -14,7 +14,7 @@ static string_t *expr_text_from_owned_c_string(char *raw)
     return text;
 }
 
-string_t *expr_to_text_expr(const expr_t *f)
+static string_t *expr_to_text_expr_mode(const expr_t *f, bool preserve_root_symbol)
 {
     sbuf_t b;
     autoname_table_t vnames;
@@ -24,7 +24,8 @@ string_t *expr_to_text_expr(const expr_t *f)
     expr_t *resolved = NULL;
     string_t *out;
 
-    if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
+    if (f && f->binding_expr && !expr_is_const(f) && !(preserve_root_symbol && expr_is_var(f)) &&
+        !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
 
     if (expr_is_integral_transform(f)) {
@@ -123,6 +124,18 @@ string_t *expr_to_text_expr(const expr_t *f)
     autoname_restore(&vnames);
     expr_free(resolved);
     return out;
+}
+
+/* Render a standalone expression using its normal binding-value semantics. */
+string_t *expr_to_text_expr(const expr_t *expr)
+{
+    return expr_to_text_expr_mode(expr, false);
+}
+
+/* Retain a bound root variable when rendering an entry of a larger mathematical object. */
+string_t *expr_to_text_symbolic(const expr_t *expr)
+{
+    return expr_to_text_expr_mode(expr, true);
 }
 
 static void emit_conditioned_bindings(sbuf_t *buffer, const varlist_t *bindings)

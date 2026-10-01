@@ -808,7 +808,7 @@ static int mat_split_expr_repr(const expr_t *expr, string_t **expr_out, string_t
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
-    tmp_text = expr_to_text(expr, style_EXPRESSION);
+    tmp_text = expr_to_text_symbolic(expr);
     if (!tmp_text)
         return -1;
 
@@ -879,7 +879,7 @@ static int mat_expr_TeX_parts_text(const expr_t *expr, string_t **expr_out, stri
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (expr_to_TeX_parts(expr, &expression_text, &bindings) != 0)
+    if (expr_to_TeX_symbolic_parts(expr, &expression_text, &bindings) != 0)
         return -1;
 
     *expr_out = mat_string_from_owned_cstr(expression_text);
@@ -1242,6 +1242,21 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         }
     }
 
+    /* Append factor-only bindings without changing the established entry-binding order. */
+    if (ok && beautification.common_factor) {
+        string_t *factor_body = NULL;
+        string_t *factor_bindings = NULL;
+
+        if (mat_split_expr_repr(beautification.common_factor, &factor_body, &factor_bindings) != 0)
+            ok = 0;
+        else
+            mat_collect_expr_bindings(beautification.common_factor, &var_bindings, &nvar_bindings,
+                                     &capvar_bindings, &const_bindings, &nconst_bindings, &capconst_bindings,
+                                     factor_bindings);
+        string_free(factor_body);
+        string_free(factor_bindings);
+    }
+
     if (!ok) {
         string_free(out.text);
         out.text = string_new_with("<expr matrix>");
@@ -1380,11 +1395,7 @@ static int mat_append_function_binding_name(string_t *out, const mat_bindings_t 
 static int mat_append_function_binding_value(string_t *out, mat_bindings_t *bindings, size_t index)
 {
     expr_t *binding = mat_bindings_expr_at(bindings, index);
-    expr_t *value_expr = NULL;
     number_t value;
-    string_t *text;
-    string_t *function_text = NULL;
-    int rc;
 
     if (!binding)
         return -1;
@@ -1393,16 +1404,14 @@ static int mat_append_function_binding_value(string_t *out, mat_bindings_t *bind
         num_destroy(&value);
         return string_append_char(out, '?');
     }
-    text = num_to_string(value);
     num_destroy(&value);
+    char *text = expr_binding_to_function_value(binding);
+
     if (!text)
         return -1;
-    value_expr = expr_from_string(string_c_str(text), NULL);
-    function_text = value_expr ? expr_to_function_body_text(value_expr) : NULL;
-    rc = string_append_string(out, function_text ? function_text : text);
-    string_free(function_text);
-    expr_free(value_expr);
-    string_free(text);
+    int rc = string_append_cstr(out, text);
+
+    free(text);
     return rc;
 }
 

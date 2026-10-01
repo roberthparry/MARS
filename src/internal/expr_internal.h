@@ -269,6 +269,15 @@ const expr_t *expr_integral_upper_bound_expr(const expr_t *integral);
  */
 bool expr_verify_antiderivative_real_internal(const expr_t *primitive, const expr_t *integrand, const expr_t *wrt);
 void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset);
+
+/** @brief Set a scalar binding from authored text, retaining its exact algebra; return false on invalid input. */
+bool expr_set_binding_value_text(expr_t *expr, const string_t *text);
+
+/** @brief Copy a scalar binding's value and exact metadata without changing the destination's identity. */
+bool expr_copy_binding_value(expr_t *destination, const expr_t *source);
+
+/** @brief Return an owning Function-style binding value, retaining exact algebra, or NULL on failure. */
+char *expr_binding_to_function_value(const expr_t *expr);
 bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
 expr_t *expr_explicit_root_base(const expr_t *expr, long *order_out);
 bool expr_explicit_root_order(const expr_t *expr, long *order_out);
@@ -337,6 +346,10 @@ string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
 int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
+/** @brief Render expression text with bindings, retaining a bound root variable symbolically. */
+string_t *expr_to_text_symbolic(const expr_t *expr);
+/** @brief Render owning TeX body and bindings separately, retaining a bound root variable symbolically. */
+int expr_to_TeX_symbolic_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial);

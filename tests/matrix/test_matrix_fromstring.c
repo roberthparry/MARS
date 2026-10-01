@@ -1345,8 +1345,46 @@ static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
     mat_free(A);
 }
 
+static void test_mat_from_function_body_with_symbols(void)
+{
+    expr_t *x = test_expr_new_named_var_d(2.0, "x");
+    expr_t *square = expr_mul(x, x);
+    const char *names[] = {"inputValue", "v₁"};
+    expr_t *symbols[] = {x, square};
+    matrix_t *matrix = mat_from_function_body_with_symbols("v1.(inputValue, 1; 2, v1)", names, symbols, 2u);
+    const double expected[][4] = {{8, 4, 8, 16}, {27, 9, 18, 81}};
+
+    check_bool("Function matrix parsed with shared scalar symbols", matrix != NULL);
+    for (size_t pass = 0u; matrix && pass < 2u; ++pass) {
+        test_expr_set_val_d(x, 2.0 + (double)pass);
+        for (size_t index = 0u; index < 4u; ++index) {
+            number_t got = mat_get_num(matrix, index / 2u, index % 2u);
+            check_bool("Function matrix retains scalar dependencies", num_to_double(got) == expected[pass][index]);
+            num_destroy(&got);
+        }
+    }
+    expr_free(square);
+    expr_free(x);
+    if (matrix) {
+        number_t got = mat_get_num(matrix, 1u, 1u);
+        check_bool("Function matrix owns its scalar references", num_to_double(got) == 81.0);
+        num_destroy(&got);
+    }
+    mat_free(matrix);
+
+    const char *invalid[] = {"1", "(1, 2; 3)", "(1,2).(3,4)", "(1,2) + (3;4)", "(1,)", "((1,2)"};
+    for (size_t index = 0u; index < sizeof(invalid) / sizeof(invalid[0]); ++index) {
+        matrix = mat_from_function_body_with_symbols(invalid[index], NULL, NULL, 0u);
+        check_bool("invalid Function matrix rejected", matrix == NULL);
+        mat_free(matrix);
+    }
+    check_bool("NULL Function matrix rejected", mat_from_function_body_with_symbols(NULL, NULL, NULL, 0u) == NULL);
+    check_bool("missing Function symbols rejected", mat_from_function_body_with_symbols("(x)", NULL, NULL, 1u) == NULL);
+}
+
 void run_matrix_fromstring_tests(void)
 {
+    TEST_RUN_CASE(test_mat_from_function_body_with_symbols, NULL);
     TEST_RUN_CASE(test_mat_from_string_numeric_num_real, NULL);
     TEST_RUN_CASE(test_mat_from_string_numeric_num_complex, NULL);
     TEST_RUN_CASE(test_mat_from_string_compact_columns, NULL);

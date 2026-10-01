@@ -245,6 +245,48 @@ void expr_set_val(expr_t *expr, number_t value)
     expr->simplify_epoch = 0;
 }
 
+/* Keep the authored binding alongside its numerical value for native result formatting. */
+bool expr_set_binding_value_text(expr_t *expr, const string_t *text)
+{
+    if (!expr || !text || (expr->ops != &ops_var && !(expr->ops == &ops_const && expr->name && *expr->name)))
+        return false;
+    expr_binding_expr_t *binding = expr_binding_expr_parse_view(string_view_all(text), NULL);
+
+    if (!binding)
+        return false;
+    binding = expr_binding_expr_simplify(binding);
+    if (!binding)
+        return false;
+    number_t value = expr_binding_expr_eval(binding);
+
+    expr_set_val(expr, value);
+    expr_binding_expr_free(expr->binding_expr);
+    expr->binding_expr = binding;
+    num_destroy(&value);
+    return true;
+}
+
+/* Copy exact binding metadata before updating a possibly identical destination node. */
+bool expr_copy_binding_value(expr_t *destination, const expr_t *source)
+{
+    if (!destination || !source ||
+        (destination->ops != &ops_var && !(destination->ops == &ops_const && destination->name && *destination->name)))
+        return false;
+    if (destination == source)
+        return true;
+    expr_binding_expr_t *binding = source->binding_expr ? expr_binding_expr_clone(source->binding_expr) : NULL;
+
+    if (source->binding_expr && !binding)
+        return false;
+    number_t value = expr_get_val(source);
+
+    expr_set_val(destination, value);
+    expr_binding_expr_free(destination->binding_expr);
+    destination->binding_expr = binding;
+    num_destroy(&value);
+    return true;
+}
+
 void expr_set_name(expr_t *expr, const char *name)
 {
     if (!expr)

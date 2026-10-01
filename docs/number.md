@@ -380,7 +380,7 @@ owning `number_t`.
 | `num_neg(x)` | Returns the additive inverse `-x`. |
 | `num_add_long(x, n)` | Adds the machine integer `n` without requiring the caller to construct a `number_t`. |
 | `num_mul_long(x, n)` | Multiplies by the machine integer `n`. |
-| `num_pow(x, y)` | Returns the principal value of `x` raised to the `y` power. |
+| `num_pow(x, y)` | Returns the principal value of `x` raised to the `y` power, including complex results for negative real bases and non-integer exponents on inexact backends. |
 | `num_pow_int(x, n)` | Raises `x` to an integer power; negative powers return the reciprocal of the corresponding positive power. |
 | `num_ldexp(x, n)` | Multiplies `x` by the exact binary scale `2^n`. |
 | `num_mul_pow10(x, n)` | Multiplies `x` by the decimal scale `10^n`. |

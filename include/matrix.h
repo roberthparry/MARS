@@ -287,6 +287,19 @@ matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
 matrix_t *mat_from_text_expr(const string_t *text, mat_bindings_t **bnd_out);
 
 /**
+ * @brief Parse a generated matrix Function return body with borrowed scalar symbols.
+ *
+ * Accepts parenthesised matrix literals, scalar prefactors, matrix sums, differences and products.
+ * Entries and prefactors use Function-style scalar syntax, including bare multi-character names.
+ * Supplied expressions retain their algebraic dependencies; they are not replaced by numerical snapshots.
+ * Names are unique canonical binding names, as returned by expr_bindings_name_at(); every referenced variable
+ * must be supplied. The names and symbols arrays are borrowed and contain @p nsymbols entries. The returned matrix
+ * owns its references and must be released with mat_free(). Returns NULL for invalid or unsupported input.
+ */
+matrix_t *mat_from_function_body_with_symbols(const char *source, const char *const *names,
+                                             expr_t *const *symbols, size_t nsymbols);
+
+/**
  * @brief Parse and evaluate a complete matrix expression from a C string.
  *
  * In addition to matrix literals accepted by mat_from_string_expr(), this parser accepts grouped unary signs,

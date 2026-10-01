@@ -29,6 +29,7 @@ typedef struct {
     bool used_in_expr;
     bool owns_symbol;
     number_t value;
+    string_t *value_text;
     expr_t *symbol;
 } matrix_symbol_t;
 
@@ -406,6 +407,7 @@ static int symbol_vec_add(symbol_vec_t *v, string_t *name, bool is_constant, boo
     v->items[v->count].used_in_expr = false;
     v->items[v->count].owns_symbol = false;
     v->items[v->count].value = value;
+    v->items[v->count].value_text = NULL;
     v->items[v->count].symbol = NULL;
     v->count++;
     return 0;
@@ -415,6 +417,7 @@ static void symbol_vec_free(symbol_vec_t *v)
 {
     for (size_t i = 0; i < v->count; ++i) {
         string_free(v->items[i].name);
+        string_free(v->items[i].value_text);
         num_destroy(&v->items[i].value);
         if (v->items[i].owns_symbol && v->items[i].symbol)
             expr_free(v->items[i].symbol);
@@ -1187,12 +1190,11 @@ static int mf_parse_binding_section_text(const string_t *text, symbol_vec_t *sym
             string_free(value_text);
             goto cleanup;
         }
-        string_free(value_text);
-
         found = symbol_vec_find(symbols, name);
         if (found >= 0) {
             if (symbols->items[found].has_value && has_value) {
                 string_free(name);
+                string_free(value_text);
                 num_destroy(&value);
                 goto cleanup;
             }
@@ -1200,6 +1202,8 @@ static int mf_parse_binding_section_text(const string_t *text, symbol_vec_t *sym
             symbols->items[found].has_value = has_value;
             num_destroy(&symbols->items[found].value);
             symbols->items[found].value = value;
+            string_free(symbols->items[found].value_text);
+            symbols->items[found].value_text = value_text;
             if (has_value && symbols->items[found].symbol) {
                 expr_set_val(symbols->items[found].symbol, value);
             }
@@ -1207,9 +1211,11 @@ static int mf_parse_binding_section_text(const string_t *text, symbol_vec_t *sym
         } else {
             if (symbol_vec_add(symbols, name, in_constants, has_value, value) != 0) {
                 string_free(name);
+                string_free(value_text);
                 num_destroy(&value);
                 goto cleanup;
             }
+            symbols->items[symbols->count - 1u].value_text = value_text;
         }
     }
 
@@ -1308,6 +1314,9 @@ static int mf_build_symbolic_matrix(string_t **entries, size_t rows, size_t cols
             num_destroy(&init);
 
         if (!symbols->items[i].symbol)
+            ok = 0;
+        else if (symbols->items[i].has_value && symbols->items[i].value_text &&
+                 !expr_set_binding_value_text(symbols->items[i].symbol, symbols->items[i].value_text))
             ok = 0;
         names[active] = symbols->items[i].name;
         refs[active] = symbols->items[i].symbol;
@@ -2108,6 +2117,136 @@ static const char *mf_expression_sum_operator(const char *start, const char *end
     }
 
     return NULL;
+}
+
+typedef struct {
+    const char *const *names;
+    expr_t *const *symbols;
+    size_t count;
+} mf_function_scope_t;
+
+static matrix_t *mf_function_literal(const char *start, const char *end, const mf_function_scope_t *scope)
+{
+    char *source = mf_expression_duplicate_range(start, end);
+    string_t *body = source ? string_new_with(source) : NULL;
+    string_t **entries = NULL;
+    size_t rows = 0u, cols = 0u;
+    matrix_t *matrix = NULL;
+
+    free(source);
+    if (!body || mf_parse_matrix_body_text(body, &entries, &rows, &cols) != 0)
+        goto cleanup;
+    matrix = mat_new_expr(rows, cols);
+    for (size_t index = 0u; matrix && index < rows * cols; ++index) {
+        expr_t *entry = expr_from_function_body_with_symbols(string_c_str(entries[index]), scope->names,
+                                                             scope->symbols, scope->count);
+        if (!entry) {
+            mat_free(matrix);
+            matrix = NULL;
+            break;
+        }
+        mat_set(matrix, index / cols, index % cols, &entry);
+        expr_free(entry);
+    }
+
+cleanup:
+    for (size_t index = 0u; entries && index < rows * cols; ++index)
+        string_free(entries[index]);
+    free(entries);
+    string_free(body);
+    return matrix;
+}
+
+static matrix_t *mf_function_scale(const matrix_t *matrix, const expr_t *factor)
+{
+    size_t rows = mat_get_row_count(matrix), cols = mat_get_col_count(matrix);
+    matrix_t *result = factor ? mat_new_expr(rows, cols) : NULL;
+
+    for (size_t index = 0u; result && index < rows * cols; ++index) {
+        expr_t *entry = NULL;
+        mat_get(matrix, index / cols, index % cols, &entry);
+        expr_t *product = entry ? expr_mul(factor, entry) : NULL;
+        if (!product) {
+            mat_free(result);
+            result = NULL;
+            break;
+        }
+        mat_set(result, index / cols, index % cols, &product);
+        expr_free(product);
+    }
+    return result;
+}
+
+static matrix_t *mf_function_scale_span(const matrix_t *matrix, const char *start, const char *end,
+                                         const mf_function_scope_t *scope)
+{
+    char *source = mf_expression_duplicate_range(start, end);
+    expr_t *factor = source ? expr_from_function_body_with_symbols(source, scope->names, scope->symbols, scope->count)
+                            : NULL;
+    matrix_t *result = factor ? mf_function_scale(matrix, factor) : NULL;
+    expr_free(factor);
+    free(source);
+    return result;
+}
+
+static matrix_t *mf_function_body(const char *start, const char *end, const mf_function_scope_t *scope, size_t depth)
+{
+    matrix_t *left = NULL, *right = NULL, *result = NULL;
+
+    mf_expression_trim_span(&start, &end);
+    if (start == end || depth >= 32u)
+        return NULL;
+    const char *sum = mf_expression_sum_operator(start, end);
+    const char *product = sum ? NULL : mf_expression_product_operator(start, end);
+    if (sum) {
+        left = mf_function_body(start, sum, scope, depth + 1u);
+        right = mf_function_body(sum + 1, end, scope, depth + 1u);
+        if (left && right && mat_get_row_count(left) == mat_get_row_count(right) &&
+            mat_get_col_count(left) == mat_get_col_count(right))
+            result = *sum == '+' ? mat_add(left, right) : mat_sub(left, right);
+    } else if (product) {
+        left = mf_function_body(start, product, scope, depth + 1u);
+        right = mf_function_body(product + 1, end, scope, depth + 1u);
+        if (left && right) {
+            bool left_scalar = mat_get_row_count(left) == 1u && mat_get_col_count(left) == 1u;
+            bool right_scalar = mat_get_row_count(right) == 1u && mat_get_col_count(right) == 1u;
+            if (left_scalar || right_scalar) {
+                expr_t *factor = NULL;
+                mat_get(left_scalar ? left : right, 0u, 0u, &factor);
+                result = mf_function_scale(left_scalar ? right : left, factor);
+            } else if (mat_get_col_count(left) == mat_get_row_count(right)) {
+                result = mat_mul(left, right);
+            }
+        } else if (right) {
+            result = mf_function_scale_span(right, start, product, scope);
+        } else if (left) {
+            result = mf_function_scale_span(left, product + 1, end, scope);
+        }
+    } else if (*start == '+' || *start == '-') {
+        left = mf_function_body(start + 1, end, scope, depth + 1u);
+        result = left && *start == '-' ? mat_neg(left) : left;
+        if (*start == '+')
+            left = NULL;
+    } else {
+        if (*start == '(' && mf_expression_matching_parenthesis(start, end) == end - 1 &&
+            !mf_expression_parentheses_enclose_matrix_literal(start, end - 1))
+            result = mf_function_body(start + 1, end - 1, scope, depth + 1u);
+        if (!result)
+            result = mf_function_literal(start, end, scope);
+    }
+    mat_free(left);
+    mat_free(right);
+    return result;
+}
+
+/* Parse generated matrix bodies using the same scalar symbols as their calling programme. */
+matrix_t *mat_from_function_body_with_symbols(const char *source, const char *const *names,
+                                             expr_t *const *symbols, size_t nsymbols)
+{
+    if (!source || (nsymbols && (!names || !symbols)))
+        return NULL;
+    const mf_function_scope_t scope = {.names = names, .symbols = symbols, .count = nsymbols};
+    return mf_function_body(source, source + strlen(source), &scope, 0u);
 }
 
 static matrix_t *mf_expression_parse_literal(const char *start, const char *end, const char *binding_start,
