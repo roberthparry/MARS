@@ -34,9 +34,9 @@ static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
 static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
-static number_t eval_formal_series_component(expr_t *dv)
+static number_t eval_formal_series_component(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return num_clone(NUM_NAN);
 }
 
@@ -84,7 +84,7 @@ static expr_t *expr_finite_cosech_progression_closed_form(const expr_t *upper, c
 static bool expr_finite_weighted_hyperbolic_parts(const expr_t *expr, const expr_t **upper_out,
                                                    const expr_t **step_out,
                                                    expr_finite_weighted_hyperbolic_kind_t *kind_out);
-static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value);
+static number_t eval_finite_weighted_hyperbolic(expr_t *expr, long upper_value);
 static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_value);
 static number_t eval_finite_exponential_progression(const expr_t *expr, long upper_value);
 static number_t eval_finite_zero_atan_progression(const expr_t *expr);
@@ -264,7 +264,7 @@ cleanup:
     return result;
 }
 
-static number_t eval_finite_summation(expr_t *dv)
+static number_t eval_finite_summation(expr_t *expr)
 {
     const long maximum_terms = 10000L;
     const long maximum_streamed_terms = 100000L;
@@ -279,10 +279,10 @@ static number_t eval_finite_summation(expr_t *dv)
     long lower_value;
     long upper_value;
 
-    if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
+    if (!expr || !expr->a || !expr_is_op(expr->b, &ops_argument_list))
         return num_clone(NUM_NAN);
     {
-        expr_t *closed = expr_sgn_sum_closed_form(dv);
+        expr_t *closed = expr_sgn_sum_closed_form(expr);
 
         if (closed) {
             number_t value = expr_eval(closed);
@@ -292,7 +292,7 @@ static number_t eval_finite_summation(expr_t *dv)
         }
     }
     {
-        expr_t *closed = expr_clausen_sum_closed_form(dv);
+        expr_t *closed = expr_clausen_sum_closed_form(expr);
 
         if (closed) {
             number_t value = expr_eval(closed);
@@ -303,7 +303,7 @@ static number_t eval_finite_summation(expr_t *dv)
     }
     {
         expr_t *order = NULL;
-        expr_t *closed = expr_infinite_power_sum_closed_form(dv, &order);
+        expr_t *closed = expr_infinite_power_sum_closed_form(expr, &order);
 
         if (closed) {
             number_t argument = expr_eval(order);
@@ -318,8 +318,8 @@ static number_t eval_finite_summation(expr_t *dv)
             return value;
         }
     }
-    index = dv->b->a;
-    upper = dv->b->b;
+    index = expr->b->a;
+    upper = expr->b->b;
     if (expr_is_op(upper, &ops_argument_list)) {
         lower = upper->a;
         upper = upper->b;
@@ -330,9 +330,9 @@ static number_t eval_finite_summation(expr_t *dv)
         return num_clone(NUM_NAN);
 
     /* Reduce identities inside the summand before any term-by-term evaluation can occur. */
-    simplified_term = expr_simplify(dv->a);
-    if (simplified_term && !expr_struct_eq(simplified_term, dv->a)) {
-        simplified_sum = expr_math_wrap_binary(&ops_summation, simplified_term, dv->b);
+    simplified_term = expr_simplify(expr->a);
+    if (simplified_term && !expr_struct_eq(simplified_term, expr->a)) {
+        simplified_sum = expr_math_wrap_binary(&ops_summation, simplified_term, expr->b);
         expr_free(simplified_term);
         if (simplified_sum) {
             number_t result = expr_eval(simplified_sum);
@@ -344,10 +344,10 @@ static number_t eval_finite_summation(expr_t *dv)
         expr_free(simplified_term);
     }
     if (upper_value >= lower_value && upper_value - lower_value >= maximum_terms) {
-        expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(dv) : NULL;
+        expr_t *closed_form = lower_value == 1L ? expr_finite_progression_closed_form(expr) : NULL;
 
         if (lower_value == 1L) {
-            number_t inverse_pole_value = eval_finite_inverse_progression_pole(dv, upper_value);
+            number_t inverse_pole_value = eval_finite_inverse_progression_pole(expr, upper_value);
 
             if (num_is_inf(inverse_pole_value)) {
                 expr_free(closed_form);
@@ -356,7 +356,7 @@ static number_t eval_finite_summation(expr_t *dv)
             num_destroy(&inverse_pole_value);
         }
         if (lower_value == 1L) {
-            number_t zero_atan_value = eval_finite_zero_atan_progression(dv);
+            number_t zero_atan_value = eval_finite_zero_atan_progression(expr);
 
             if (num_is_finite(zero_atan_value)) {
                 expr_free(closed_form);
@@ -365,7 +365,7 @@ static number_t eval_finite_summation(expr_t *dv)
             num_destroy(&zero_atan_value);
         }
         if (lower_value == 1L) {
-            number_t atan_value = eval_finite_atan_progression(dv, upper_value);
+            number_t atan_value = eval_finite_atan_progression(expr, upper_value);
 
             if (num_is_finite(atan_value)) {
                 expr_free(closed_form);
@@ -374,7 +374,7 @@ static number_t eval_finite_summation(expr_t *dv)
             num_destroy(&atan_value);
         }
         if (lower_value == 1L) {
-            number_t exponential_value = eval_finite_exponential_progression(dv, upper_value);
+            number_t exponential_value = eval_finite_exponential_progression(expr, upper_value);
 
             if (num_is_finite(exponential_value)) {
                 expr_free(closed_form);
@@ -383,7 +383,7 @@ static number_t eval_finite_summation(expr_t *dv)
             num_destroy(&exponential_value);
         }
         if (lower_value == 1L) {
-            number_t progression_value = eval_finite_qdigamma_progression(dv, upper_value);
+            number_t progression_value = eval_finite_qdigamma_progression(expr, upper_value);
 
             if (num_is_finite(progression_value)) {
                 expr_free(closed_form);
@@ -411,14 +411,14 @@ static number_t eval_finite_summation(expr_t *dv)
             num_destroy(&closed_value);
         }
         if (lower_value == 1L) {
-            number_t inverse_value = eval_finite_inverse_progression(dv, upper_value);
+            number_t inverse_value = eval_finite_inverse_progression(expr, upper_value);
 
             if (num_is_finite(inverse_value))
                 return inverse_value;
             num_destroy(&inverse_value);
         }
         if (lower_value == 1L) {
-            number_t weighted_value = eval_finite_weighted_hyperbolic(dv, upper_value);
+            number_t weighted_value = eval_finite_weighted_hyperbolic(expr, upper_value);
 
             if (!num_is_nan(weighted_value))
                 return weighted_value;
@@ -430,7 +430,7 @@ static number_t eval_finite_summation(expr_t *dv)
 
     /* Reuse one private summand tree; changing its index invalidates cached values without rebuilding it. */
     local_index = expr_new_var(NUM_ZERO);
-    local_term = local_index ? expr_substitute(dv->a, index, local_index) : NULL;
+    local_term = local_index ? expr_substitute(expr->a, index, local_index) : NULL;
     if (!local_term) {
         expr_free(local_index);
         return num_clone(NUM_NAN);
@@ -462,7 +462,7 @@ static number_t eval_finite_summation(expr_t *dv)
     return sum;
 }
 
-static number_t eval_finite_product(expr_t *dv)
+static number_t eval_finite_product(expr_t *expr)
 {
     const long maximum_terms = 1000000L;
     expr_t *index;
@@ -472,10 +472,10 @@ static number_t eval_finite_product(expr_t *dv)
     long lower_value;
     long upper_value;
 
-    if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
+    if (!expr || !expr->a || !expr_is_op(expr->b, &ops_argument_list))
         return num_clone(NUM_NAN);
-    index = dv->b->a;
-    upper = dv->b->b;
+    index = expr->b->a;
+    upper = expr->b->b;
     if (expr_is_op(upper, &ops_argument_list)) {
         lower = upper->a;
         upper = upper->b;
@@ -491,7 +491,7 @@ static number_t eval_finite_product(expr_t *dv)
     for (long value = lower_value; value <= upper_value; ++value) {
         number_t index_value = num_create_from_long(value);
         expr_t *index_expression = expr_new_const(index_value);
-        expr_t *factor_expression = index_expression ? expr_substitute(dv->a, index, index_expression) : NULL;
+        expr_t *factor_expression = index_expression ? expr_substitute(expr->a, index, index_expression) : NULL;
         number_t factor;
         number_t updated;
 
@@ -515,33 +515,33 @@ static number_t eval_finite_product(expr_t *dv)
     return product;
 }
 
-static expr_t *deriv_indexed_symbol(expr_t *dv)
+static expr_t *deriv_indexed_symbol(expr_t *expr)
 {
-    expr_t *index_derivative = expr_get_dx_internal(dv->b);
+    expr_t *index_derivative = expr_get_dx_internal(expr->b);
     expr_t *out = index_derivative && expr_is_exact_zero(index_derivative) ? expr_new_const(NUM_ZERO) : NULL;
 
     expr_free(index_derivative);
     return out;
 }
 
-static expr_t *deriv_summation(expr_t *dv)
+static expr_t *deriv_summation(expr_t *expr)
 {
-    expr_t *raw_derivative = expr_get_dx_internal(dv->a);
+    expr_t *raw_derivative = expr_get_dx_internal(expr->a);
     expr_t *term_derivative = raw_derivative ? expr_simplify(raw_derivative) : NULL;
-    expr_t *out = term_derivative ? expr_new_summation(term_derivative, dv->b) : NULL;
+    expr_t *out = term_derivative ? expr_new_summation(term_derivative, expr->b) : NULL;
 
     expr_free(raw_derivative);
     expr_free(term_derivative);
     return out;
 }
 
-static expr_t *deriv_product(expr_t *dv)
+static expr_t *deriv_product(expr_t *expr)
 {
-    expr_t *raw_derivative = expr_get_dx_internal(dv->a);
+    expr_t *raw_derivative = expr_get_dx_internal(expr->a);
     expr_t *factor_derivative = raw_derivative ? expr_simplify(raw_derivative) : NULL;
-    expr_t *log_derivative = factor_derivative ? expr_div(factor_derivative, dv->a) : NULL;
-    expr_t *sum = log_derivative ? expr_new_summation(log_derivative, dv->b) : NULL;
-    expr_t *product = sum ? expr_new_product(dv->a, dv->b) : NULL;
+    expr_t *log_derivative = factor_derivative ? expr_div(factor_derivative, expr->a) : NULL;
+    expr_t *sum = log_derivative ? expr_new_summation(log_derivative, expr->b) : NULL;
+    expr_t *product = sum ? expr_new_product(expr->a, expr->b) : NULL;
     expr_t *out = product ? expr_mul(product, sum) : NULL;
 
     expr_free(product);
@@ -977,7 +977,7 @@ cleanup:
     return matched;
 }
 
-static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value)
+static number_t eval_finite_weighted_hyperbolic(expr_t *expr, long upper_value)
 {
     const expr_t *upper;
     const expr_t *step_expr;
@@ -993,7 +993,7 @@ static number_t eval_finite_weighted_hyperbolic(expr_t *dv, long upper_value)
     expr_finite_weighted_hyperbolic_kind_t kind;
     const long maximum_tail_terms = 10000L;
 
-    if (!expr_finite_weighted_hyperbolic_parts(dv, &upper, &step_expr, &kind) || upper_value < 1L)
+    if (!expr_finite_weighted_hyperbolic_parts(expr, &upper, &step_expr, &kind) || upper_value < 1L)
         return num_clone(NUM_NAN);
     (void)upper;
     step = expr_eval(step_expr);

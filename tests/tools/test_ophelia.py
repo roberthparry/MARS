@@ -756,6 +756,54 @@ output(expr(a)).
         self.assertEqual(float(self.run_programme(
             "expression expr(@omega) { return @omega^2. }\n@omega = 3.\noutput(expr(@omega)).\n")), 9)
 
+    def test_bracketed_scalar_names_and_late_bindings(self):
+        self.assertEqual(self.run_programme(
+            "[distance] = [speed].[time]. [speed] = 3, [time] = 4. output([distance])."), "12")
+        for name in ("[time]", "[elapsed time]", "[sqrt(2)]", "[x>y]", "[a,b]", "[a&&b]"):
+            with self.subTest(name=name):
+                source = ("expression expr(" + name + ", const [offset]) { "
+                          "if (" + name + " > 0) { return " + name + " + [offset]. } "
+                          "else { return @nan. } }\n" + name + " = 3. const [offset] = 4.\n"
+                          "output(expr(" + name + ", [offset])).")
+                self.assertEqual(self.run_programme(source), "7")
+
+    def test_bracketed_generated_scalar_cards(self):
+        for name in ("[radius]", "[elapsed time]", "[sqrt(2)]"):
+            source = "{ " + name + "^2 | " + name + "=3 }"
+            with self.subTest(name=name):
+                fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40)
+                self.assertEqual(code, 0, raw)
+                self.assertEqual(self.run_programme(mars_lab.function_for_display(fields["function"])), "9")
+
+    def test_function_output_uses_bare_multicharacter_symbols(self):
+        for name in ("time", "radius", "frequency", "distance", "speed"):
+            with self.subTest(name=name):
+                source = "{ [" + name + "]^2 | [" + name + "]=3 }"
+                fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40)
+                self.assertEqual(code, 0, raw)
+                self.assertIn("[" + name + "]", fields["expression"])
+                programme = fields["function"]
+                self.assertIn("expression expr(" + name + ")", programme)
+                self.assertIn("return " + name + "^2.", programme)
+                self.assertIn(name + " = 3.", programme)
+                self.assertNotIn("[" + name + "]", programme)
+                self.assertEqual(self.run_programme(programme), "9")
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "{x+[offset] | x=3; [offset]=?}", 40)
+        self.assertEqual(code, 0, raw)
+        self.assertIn("const offset", fields["function"])
+        self.assertNotIn("[offset]", fields["function"])
+        self.assertEqual(self.run_programme(fields["function"].replace("const offset = ?.", "const offset = 4.")), "7")
+
+    def test_function_output_keeps_necessary_identifier_quoting(self):
+        for name in ("return", "output", "const", "where", "theta", "elapsed time", "sqrt(2)"):
+            with self.subTest(name=name):
+                source = "{ [" + name + "]^2 | [" + name + "]=3 }"
+                fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40)
+                self.assertEqual(code, 0, raw)
+                self.assertIn("[" + name + "]", fields["function"])
+                self.assertEqual(self.run_programme(fields["function"]), "9")
+
     def test_unsupported_and_malformed_programmes(self):
         for source in (
             "matrix expr() { return [1,2]. } output(expr()).",
@@ -763,6 +811,7 @@ output(expr(a)).
             "expression expr(x) { return expr(x). } x=1. output(expr(x)).",
             "while (1) { output(1). }",
             "x = 1", "output(1*2).", "output(1). \x00",
+            "[time = 1.", "output([time).", "output([time]]).", "[a}b] = 1.",
         ):
             with self.subTest(source=source):
                 result = subprocess.run([str(BINARY)], input=source, text=True, capture_output=True, timeout=10)
@@ -1027,7 +1076,7 @@ output(expr(t)).
     return equation(26.Y = 320/9).
 }
 `` Y = ?
-output(solve(equ(Y))).
+outputa(solve(equ(Y))).
 """
         result = subprocess.run([str(BINARY), "40"], input=source, text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)

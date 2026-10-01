@@ -519,18 +519,113 @@ static char *solution_pair_rhs_text(number_t value, int precision, bool use_TeX)
     char *text = NULL;
 
     if (real_text && imaginary_text) {
+        if (strcmp(imaginary_text, "1") == 0)
+            imaginary_text[0] = '\0';
         size_t size = strlen(real_text) + strlen(imaginary_text) + 32u;
 
         text = malloc(size);
         if (text)
             snprintf(text, size, "%s %s %s%s", real_text, use_TeX ? "\\pm" : "±", imaginary_text,
-                     use_TeX ? "\\mkern-2mu i" : "i");
+                     use_TeX && *imaginary_text ? "\\mkern-2mu i" : "i");
     }
     free(imaginary_text);
     free(real_text);
     num_destroy(&magnitude);
     num_destroy(&imaginary);
     num_destroy(&real);
+    return text;
+}
+
+static char *solution_symbolic_pair_text(const equation_solutions_t *solutions, const size_t *order, size_t index,
+                                         bool use_TeX)
+{
+    const equation_t *first = ordered_solution_at(solutions, order, index);
+    const equation_t *second = index + 1u < equ_solutions_count(solutions)
+        ? ordered_solution_at(solutions, order, index + 1u) : NULL;
+    expr_t *real = NULL, *imaginary = NULL, *other_real = NULL, *other_imaginary = NULL;
+    expr_t *negative = NULL, *scaled_real = NULL, *scaled_imaginary = NULL, *imaginary_unit = NULL, *term = NULL;
+    const expr_t *numerator = NULL, *denominator = NULL, *other_numerator = NULL, *other_denominator = NULL;
+    number_t literal = NUM_NAN, imaginary_value = NUM_NAN;
+    bool has_imaginary = false, other_has_imaginary = false;
+    char *real_text = NULL, *imaginary_text = NULL, *denominator_text = NULL, *text = NULL;
+
+    number_t other_literal = NUM_NAN;
+    bool numeric_pair = first && second && expr_match_const_value(equ_rhs(first), &literal) &&
+                        expr_match_const_value(equ_rhs(second), &other_literal);
+    num_destroy(&other_literal);
+    /* Pair expression trees, never approximate values or parameterised families. */
+    if (!first || !second || numeric_pair || equ_lhs(first) != equ_lhs(second) ||
+        expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
+        expr_has_unbound_parameters(equ_rhs(second), 0u, NULL) ||
+        !expr_cartesian_parts_for_display(equ_rhs(first), &real, &imaginary, &has_imaginary) ||
+        !expr_cartesian_parts_for_display(equ_rhs(second), &other_real, &other_imaginary, &other_has_imaginary) ||
+        !has_imaginary || !other_has_imaginary)
+        goto cleanup;
+    expr_t *raw_negative = expr_neg(other_imaginary);
+    negative = raw_negative ? expr_simplify(raw_negative) : NULL;
+    expr_free(raw_negative);
+    if (!negative || !expr_simplify_same_factor(real, other_real) ||
+        !expr_simplify_same_factor(imaginary, negative))
+        goto cleanup;
+    imaginary_value = expr_eval(imaginary);
+    if (!num_is_real(imaginary_value) || !num_is_finite(imaginary_value) || num_is_zero(imaginary_value))
+        goto cleanup;
+    if (num_sign(imaginary_value) < 0) {
+        expr_t *positive = expr_neg(imaginary);
+        expr_free(imaginary);
+        imaginary = expr_simplify(positive);
+        expr_free(positive);
+    }
+
+    if (expr_match_div_expr(equ_rhs(first), &numerator, &denominator) &&
+        expr_match_div_expr(equ_rhs(second), &other_numerator, &other_denominator) &&
+        expr_simplify_same_factor(denominator, other_denominator)) {
+        expr_t *raw_real = expr_mul(real, denominator);
+        expr_t *raw_imaginary = expr_mul(imaginary, denominator);
+        scaled_real = raw_real ? expr_simplify(raw_real) : NULL;
+        scaled_imaginary = raw_imaginary ? expr_simplify(raw_imaginary) : NULL;
+        expr_free(raw_imaginary);
+        expr_free(raw_real);
+        denominator_text = use_TeX ? expr_to_TeX_body(denominator) : expr_text_dup(denominator, style_UNBOUND);
+        if (!denominator_text)
+            goto cleanup;
+    } else {
+        scaled_real = expr_clone(real);
+        scaled_imaginary = expr_clone(imaginary);
+    }
+    imaginary_unit = expr_new_named_const(NUM_I, "i");
+    num_destroy(&literal);
+    bool unit = expr_match_const_value(scaled_imaginary, &literal) && num_is_one(literal);
+    term = unit ? expr_clone(imaginary_unit) : expr_mul(imaginary_unit, scaled_imaginary);
+    real_text = use_TeX ? expr_to_TeX_body(scaled_real) : expr_text_dup(scaled_real, style_UNBOUND);
+    imaginary_text = use_TeX ? expr_to_TeX_body(term) : expr_text_dup(term, style_UNBOUND);
+    if (!real_text || !imaginary_text)
+        goto cleanup;
+    size_t size = strlen(real_text) + strlen(imaginary_text) + (denominator_text ? strlen(denominator_text) : 0u) + 48u;
+    text = malloc(size);
+    if (text) {
+        if (denominator_text)
+            snprintf(text, size, use_TeX ? "\\frac{%s \\pm %s}{%s}" : "(%s ± %s)/%s",
+                     real_text, imaginary_text, denominator_text);
+        else
+            snprintf(text, size, "%s %s %s", real_text, use_TeX ? "\\pm" : "±", imaginary_text);
+    }
+
+cleanup:
+    free(denominator_text);
+    free(imaginary_text);
+    free(real_text);
+    expr_free(term);
+    expr_free(imaginary_unit);
+    expr_free(scaled_imaginary);
+    expr_free(scaled_real);
+    expr_free(negative);
+    expr_free(other_imaginary);
+    expr_free(other_real);
+    expr_free(imaginary);
+    expr_free(real);
+    num_destroy(&imaginary_value);
+    num_destroy(&literal);
     return text;
 }
 
@@ -600,10 +695,16 @@ static void print_solutions(const equation_solutions_t *solutions, expr_bindings
         number_t pair = NUM_NAN;
         bool paired = compact && name && solution_conjugate_pair(solutions, order, i, &pair);
         char *pair_text = paired ? solution_pair_rhs_text(pair, precision, false) : NULL;
+        bool symbolic_pair = false;
+
+        if (!pair_text && compact && name) {
+            pair_text = solution_symbolic_pair_text(solutions, order, i, false);
+            symbolic_pair = pair_text != NULL;
+        }
 
         if (pair_text) {
             printf("%s%s %s %s\n", i == 0u ? heading : "            ", name,
-                   num_is_exact(pair) ? "=" : "≈", pair_text);
+                   symbolic_pair || num_is_exact(pair) ? "=" : "≈", pair_text);
             free(pair_text);
             num_destroy(&pair);
             ++i;
@@ -636,10 +737,16 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
         number_t pair = NUM_NAN;
         bool paired = name && solution_conjugate_pair(solutions, order, i, &pair);
         char *pair_TeX = paired ? solution_pair_rhs_text(pair, 0, true) : NULL;
+        bool symbolic_pair = false;
+
+        if (!pair_TeX && name) {
+            pair_TeX = solution_symbolic_pair_text(solutions, order, i, true);
+            symbolic_pair = pair_TeX != NULL;
+        }
 
         if (pair_TeX) {
             printf("%s%s &%s %s", i == 0u ? first_separator : " \\\\\n", name,
-                   num_is_exact(pair) ? "=" : "\\approx", pair_TeX);
+                   symbolic_pair || num_is_exact(pair) ? "=" : "\\approx", pair_TeX);
             free(pair_TeX);
             num_destroy(&pair);
             ++i;

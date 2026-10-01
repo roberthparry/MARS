@@ -1,6 +1,7 @@
 import datetime as py_datetime
 import cmath
 import decimal
+import json
 import math
 import re
 import shutil
@@ -20,6 +21,68 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_native_binding_names_round_trip_through_editor_and_function(self) -> None:
+        names = (
+            "lastIndexOfTopLevel", "indexOfTopLevel", "bindingParts", "expressionForEditor",
+            "expressionBodyForEditor", "expressionWithBindings", "expressionWithVisibleBindings",
+            "compareBindingNames", "splitTopLevel", "replaceBindingValueInExpression",
+            "replaceBindingKindInExpression", "sortedAssignmentParts",
+        )
+        functions = "\n".join(
+            re.search(r"^    function " + name + r"\([\s\S]*?(?=^    (?:async )?function )",
+                      mars_lab.INDEX_HTML, re.MULTILINE).group(0) for name in names
+        )
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        for name, function_name in (("[time]", "time"), ("[radius]", "radius"),
+                                    ("[theta]", "[theta]"), ("[elapsed time]", "[elapsed time]"),
+                                    ("ω", "@omega"), ("x₁", "x₁")):
+            with self.subTest(name=name):
+                source = f"gamma(a+i{name})"
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    mars_lab.DEFAULT_BIN, source, 40, "x", "bindings")
+                self.assertEqual(code, 0, raw)
+                bindings = mars_lab.mars_binding_values(fields.get("bindings"))
+                self.assertIn(name, [binding["name"] for binding in bindings])
+                payload = mars_lab.prepare_evaluation_fields(
+                    mars_lab.DEFAULT_BIN, fields, source, 40, False, "x", "bindings")
+                self.assertIn(name, [binding["name"] for binding in payload["binding_values"]])
+                script = functions + "\nconst source = " + json.dumps(source) + ";\n"
+                script += "const bindings = " + json.dumps(bindings) + ";\n"
+                script += "const name = " + json.dumps(name) + ";\n"
+                script += r'''
+                    let text = expressionWithVisibleBindings(source, bindings);
+                    const unset = text;
+                    text = replaceBindingValueInExpression(text, 'variable', name, '0');
+                    text = replaceBindingValueInExpression(text, 'constant', 'a', '1');
+                    const bound = text;
+                    text = replaceBindingKindInExpression(text, name, 'constant');
+                    text = replaceBindingKindInExpression(text, name, 'variable');
+                    const result = JSON.stringify([unset, bound, text]);
+                    if (typeof print === 'function') print(result); else console.log(result);
+                '''
+                completed = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+                self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+                unset, bound, toggled = json.loads(completed.stdout)
+                self.assertIn(f"{name} = ?", unset)
+                self.assertIn(f"{name} = 0", bound)
+                for expression in (unset, bound, toggled):
+                    fields, raw, code = mars_lab.run_mars_lab_fields(
+                        mars_lab.DEFAULT_BIN, expression, 40, "x", "evaluate")
+                    self.assertEqual(code, 0, raw)
+                    if expression != unset:
+                        self.assertEqual(fields["value"], "1")
+                function = mars_lab.function_for_result_card(
+                    payload["full_display_function"],
+                    [{**binding, "value": "1" if binding["name"] == "a" else "0"} for binding in bindings],
+                    binding_function_names=fields.get("binding_function_names", ""))
+                self.assertIn(f"{function_name} = 0.", function)
+                programme = subprocess.run(
+                    [str(ROOT / "build/release/scratch/ophelia"), "40"],
+                    input=function, text=True, capture_output=True, timeout=10)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertEqual(decimal.Decimal(programme.stdout.strip()), 1)
+
     def test_calculus_result_bindings_display_unknowns_as_question_marks(self) -> None:
         names = ("derivativeExpressionFromLine", "integralExpressionFromLine", "expressionForEditor")
         functions = "\n".join(
@@ -55,6 +118,7 @@ class BindingEnvelopeTests(unittest.TestCase):
     def test_binding_clear_button_commits_unset_value_and_restores_focus(self) -> None:
         names = (
             "renderVariableValues", "queueBindingInputCommit", "commitBindingInput",
+            "bindingDisplayName", "renderDerivativeButtons",
             "normalisedBindingInputValue", "replaceBindingValueInExpression", "bindingParts",
             "lastIndexOfTopLevel", "indexOfTopLevel", "splitTopLevel", "isUnsetBindingValue",
             "displayValueForBinding", "fullValueForBinding", "compareBindingNames",
@@ -73,6 +137,10 @@ class BindingEnvelopeTests(unittest.TestCase):
                     this.listeners = {};
                     this.classList = {add() {}, remove() {}};
                 }
+                get textContent() {
+                    return this.text || this.children.map(child => typeof child === 'string' ? child : child.textContent).join('');
+                }
+                set textContent(value) { this.text = value; this.children = []; }
                 append(...children) { this.children.push(...children); }
                 appendChild(child) { this.append(child); }
                 replaceChildren() { this.children = []; }
@@ -88,6 +156,11 @@ class BindingEnvelopeTests(unittest.TestCase):
             }
             const document = {createElement: tag => new Element(tag)};
             const variableValues = new Element('div'), expr = new Element('textarea');
+            const derivativeButtons = new Element('div');
+            let currentDifferentiable = true, calculusCall, toggledBinding;
+            const takeDerivative = name => { calculusCall = ['derivative', name]; };
+            const takeIntegral = name => { calculusCall = ['integral', name]; };
+            const toggleBindingKind = binding => { toggledBinding = binding; };
             let bindingValueCache, currentBindingKinds, fullExpressionText, saved, historyUpdates = 0;
             let pendingExpressionBindingCommit = Promise.resolve(), mode = 'expression';
             const currentMode = () => mode;
@@ -102,6 +175,38 @@ class BindingEnvelopeTests(unittest.TestCase):
                 {name: 'ω', kind: 'variable', value: '?'}
             ]);
             async function test() {
+                for (const name of ['[time]', '[elapsed time]', '[theta]', 'ω', 'x₁']) {
+                    const displayName = name.startsWith('[') ? name.slice(1, -1) : name;
+                    for (const kind of ['variable', 'constant']) {
+                        fullExpressionText = kind === 'variable'
+                            ? `{ ${name} | ${name} = 77 }` : `{ ${name} | ; ${name} = 77 }`;
+                        const binding = {name, kind, value: '77'};
+                        renderVariableValues([binding]);
+                        const label = variableValues.querySelectorAll('.variable-value-name')[0];
+                        const input = variableValues.querySelectorAll('.binding-value-input')[0];
+                        const clear = variableValues.querySelectorAll('.binding-value-clear')[0];
+                        const toggle = variableValues.querySelectorAll('.variable-toggle')[0];
+                        check(label.textContent === displayName, 'Binding label retains brackets');
+                        check(input['aria-label'] === `Value of ${displayName}`, 'Accessible label retains brackets');
+                        check(clear.title === `Clear ${displayName}`, 'Clear tooltip retains brackets');
+                        check(toggle.title.includes(displayName) && !toggle.title.includes('['), 'Toggle retains brackets');
+                        check(input.dataset.bindingName === name, 'Native binding identifier changed');
+                        toggle.listeners.click();
+                        check(toggledBinding === binding, 'Toggle lost the native binding');
+                        await clear.listeners.click();
+                        check(fullExpressionText.includes(`${name} = ?`), 'Clear lost the native binding');
+                    }
+                    renderDerivativeButtons([name]);
+                    for (const [index, action] of ['derivative', 'integral'].entries()) {
+                        const button = derivativeButtons.children[index];
+                        check(button.textContent === `${displayName} ${action}`, 'Calculus label retains brackets');
+                        check(button.children[0].tag === 'i' && button.children[0].textContent === displayName,
+                              'Calculus variable name must be italic');
+                        check(button.children[1] === ` ${action}`, 'Calculus action must remain upright');
+                        button.listeners.click();
+                        check(calculusCall[0] === action && calculusCall[1] === name, 'Calculus identifier changed');
+                    }
+                }
                 for (const kind of ['variable', 'constant']) {
                     fullExpressionText = kind === 'variable' ? '{ ω | ω = 77 }' : '{ ω | ; ω = 77 }';
                     renderVariableValues([{name: 'ω', kind, value: '77'}]);
@@ -524,6 +629,52 @@ class MobileAccessTests(unittest.TestCase):
 
 
 class EquationResultTests(unittest.TestCase):
+    def test_exact_quartic_surds_reach_cards_and_run(self) -> None:
+        binary = ROOT / "build/release/scratch/equation_lab"
+        expected = ["x = -1 ± i", "x = (1 ± i·√(11))/2"]
+        individual = ["x = -1 + i", "x = -1 - i", "x = (1 + i·√(11))/2", "x = (1 - i·√(11))/2"]
+        for precision in (32, 116):
+            fields, raw, code = mars_lab.run_equation_lab_fields(binary, "x^4+x^3+3x^2+4x+6=0", precision)
+            self.assertEqual(code, 0, raw)
+            payload = mars_lab.prepare_equation_fields(fields, precision)
+            self.assertEqual(payload["solution_count"], 4)
+            self.assertEqual(payload["display_solutions"].splitlines(), expected)
+            self.assertEqual(payload["solutions"].splitlines(), individual)
+            self.assertIn(r"\frac{1 \pm i\mkern-2mu \sqrt{11}}{2}", payload["full_display_TeX"])
+            self.assertNotIn(r"\approx", payload["full_display_TeX"])
+            self.assertNotIn("1.658", payload["display_solutions"])
+            programme = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), str(precision)],
+                                       input=payload["function"], text=True, capture_output=True, timeout=10)
+            self.assertEqual(programme.returncode, 0, programme.stderr)
+            self.assertEqual(programme.stdout.strip().splitlines(), individual)
+            numeric = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), str(precision)],
+                                     input=payload["function"].replace("outputa(", "output("),
+                                     text=True, capture_output=True, timeout=10)
+            self.assertEqual(numeric.returncode, 0, numeric.stderr)
+            self.assertIn("1.658312395", numeric.stdout)
+            self.assertNotIn("√", numeric.stdout)
+
+    def test_conjugate_pairs_omit_unit_imaginary_coefficients(self) -> None:
+        binary = ROOT / "build/release/scratch/equation_lab"
+        cases = (
+            ("x^4+x^3+3x^2+4x+6=0", "-1 ± i", r"-1 \pm i"),
+            ("x^4+5x^2+4=0", "0 ± i", r"0 \pm i"),
+            ("x^4+5x^2+4=0", "0 ± 2i", r"0 \pm 2\mkern-2mu i"),
+            ("x^4+122x^2+121=0", "0 ± 11i", r"0 \pm 11\mkern-2mu i"),
+        )
+        for source, expected, expected_TeX in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_equation_lab_fields(binary, source, 40)
+                self.assertEqual(code, 0, raw)
+                self.assertIn(expected, fields["display_solutions"])
+                self.assertIn(expected_TeX, fields["solutions_TeX"])
+                payload = mars_lab.prepare_equation_fields(fields, 40)
+                self.assertIn(expected, payload["display_solutions"])
+                self.assertIn(expected_TeX, payload["full_display_TeX"])
+                self.assertIn(expected_TeX, payload["display_TeX"])
+                self.assertNotIn("± 1i", payload["display_solutions"])
+                self.assertNotIn(r"\pm 1\mkern-2mu i", payload["full_display_TeX"])
+
     def test_zeta_nontrivial_roots_are_labelled_and_reach_the_cards(self) -> None:
         binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
         source = "zeta(s) = 0"
@@ -531,8 +682,8 @@ class EquationResultTests(unittest.TestCase):
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(fields["status"], "solved", raw)
         payload = mars_lab.prepare_equation_fields(fields, 78)
-        self.assertIn("output(solve(equ(s))).", fields["function"])
-        self.assertIn("output(solve(equ(s))).", payload["function"])
+        self.assertIn("outputa(solve(equ(s))).", fields["function"])
+        self.assertIn("outputa(solve(equ(s))).", payload["function"])
         self.assertEqual(payload["solution_count"], 40)
         self.assertIn("14.134725141734693790", payload["solutions"])
         pairs = payload["display_solutions"].splitlines()
@@ -1078,7 +1229,7 @@ class EquationResultTests(unittest.TestCase):
         )
         self.assertEqual(payload["solution_count"], 9)
         self.assertEqual(payload["display_solutions"].splitlines(), [
-            "x = -2", "x = -1", "x = 1", "x = 3", "x = 5", "x ≈ 0 ± 1i", "x ≈ 1 ± 2i",
+            "x = -2", "x = -1", "x = 1", "x = 3", "x = 5", "x ≈ 0 ± i", "x ≈ 1 ± 2i",
         ])
         self.assertEqual(payload["solutions_TeX"].count(r"\pm"), 2)
         self.assertEqual(payload["solutions_TeX"].count(r"\approx"), 2)
@@ -1522,7 +1673,8 @@ class MatrixResultTests(unittest.TestCase):
         self.assertNotIn(
             "const text = String(resultUseInput.dataset.inputText || currentExpressionText() || '').trim();", html
         )
-        self.assertLess(html.index("`${name} derivative`"), html.index("`${name} integral`"))
+        self.assertLess(html.index("derivativeButton.append(variableName, ' derivative');"),
+                        html.index("integralButton.append(variableName, ' integral');"))
 
     def test_use_as_input_restores_the_native_matrix_result_without_scalar_parsing(self) -> None:
         self.assertIn(
@@ -4549,6 +4701,94 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_unsupported_integral_retains_formal_family_and_runnable_function(self) -> None:
+        for source in ("gamma(a+[time]i)", "gamma([time])", "exp(cosh([time]))"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "[time]", "integral")
+                self.assertEqual(code, 0, raw)
+                self.assertNotIn("no symbolic integral", fields["integral"])
+                self.assertIn("∫", fields["integral"])
+                self.assertIn(r"\int", fields["integral_TeX"])
+                self.assertIn("C", fields["integral"])
+                self.assertIn("return integral(", fields["integral_function"])
+                self.assertIn(", time).", fields["integral_function"])
+                programme = subprocess.run(
+                    [str(ROOT / "build/release/scratch/ophelia"), "40"],
+                    input=fields["integral_function"], text=True, capture_output=True, timeout=10)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertIn("∫", programme.stdout)
+                self.assertIn("C", programme.stdout)
+                result = fields["integral"].split(" = ", 1)[1]
+                derivative, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, result, 40, "[time]", "derivative")
+                self.assertEqual(code, 0, raw)
+                self.assertNotIn("∫", derivative["derivative"])
+                self.assertIn("Γ" if source.startswith("gamma") else "exp", derivative["derivative"])
+
+    def test_zero_real_component_is_not_prepended_to_result_cards(self) -> None:
+        cases = (
+            ("i[time]", "[time]", "evaluate"),
+            ("-i[time]", "[time]", "evaluate"),
+            ("sin(i[time])", "[time]", "evaluate"),
+            ("gamma(a+i[time])", "[time]", "derivative"),
+            ("sin(i[time])", "[time]", "derivative"),
+            ("sin(i[time])", "[time]", "integral"),
+        )
+        for source, wrt, action in cases:
+            with self.subTest(source=source, action=action):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, wrt, action)
+                self.assertEqual(code, 0, raw)
+                text_key = "unbound" if action == "evaluate" else action
+                TeX_key = "tex" if action == "evaluate" else action + "_TeX"
+                function_key = "function" if action == "evaluate" else action + "_function"
+                for key in (text_key, TeX_key, function_key):
+                    self.assertIn(key, fields, raw)
+                    self.assertNotIn("0 +", fields[key])
+                if source.startswith("gamma"):
+                    self.assertIn(r"\Gamma", fields[TeX_key])
+                    self.assertIn(r"\psi", fields[TeX_key])
+                    self.assertIn(r"\mathit{time} \cdot i", fields[TeX_key])
+                    self.assertEqual(fields[TeX_key].count(r"\cdot"), 2)
+
+    def test_rendered_TeX_omits_long_name_brackets(self) -> None:
+        for source in ("gamma(a+i[time])", "[time]^2", "@F(exp(-[time]^2),[time],[frequency])"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "x", "evaluate")
+                self.assertEqual(code, 0, raw)
+                payload = mars_lab.prepare_evaluation_fields(self.expression_binary, fields, source, 40, False)
+                name = "frequency" if "[frequency]" in source else "time"
+                self.assertIn(r"\mathit{" + name + "}", payload["full_display_TeX"])
+                self.assertNotIn("[" + name + "]", payload["full_display_TeX"])
+                self.assertIn("[" + name + "]", payload["full_display_expression"])
+                if source.startswith("gamma"):
+                    self.assertIn(r"\mathit{time} \cdot i", payload["full_display_TeX"])
+                    self.assertIn(r"\mathit{time}^{2n}", payload["full_display_TeX"])
+                    self.assertIn(r"\mathit{time}^{2n+1}", payload["full_display_TeX"])
+
+    def test_TeX_separates_compound_name_factors(self) -> None:
+        cases = (
+            ("[time]*i", r"\mathit{time} \cdot i"),
+            ("[time]^2*i", r"\mathit{time}^{2} \cdot i"),
+            ("2*[time]", r"2 \cdot \mathit{time}"),
+            ("[time]*[radius]", r"\mathit{radius} \cdot \mathit{time}"),
+            ("[time]*[radius]/(2*x)", r"\mathit{time} \cdot \mathit{radius}"),
+            ("[time]*i/(2*x)", r"\frac{\mathit{time}}{2\mkern-2mu x}\mkern-2mu i"),
+            ("x/(2*[time])", r"2 \cdot \mathit{time}"),
+            ("x*i", r"x\mkern-2mu i"),
+            ("x^2*i", r"x^{2}\mkern-2mu i"),
+            ("[x0]*i", r"x_{0}\mkern-2mu i"),
+            ("θ*i", r"\theta\mkern-2mu i"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "x", "evaluate")
+                self.assertEqual(code, 0, raw)
+                self.assertIn(expected, fields["tex"])
+
     def test_conditioned_result_display_formats_unset_bindings(self) -> None:
         for value, displayed in (("NAN", "?"), ("π", "π"), ("¹⁄₃", "¹⁄₃")):
             with self.subTest(value=value):
@@ -8598,9 +8838,9 @@ class ExpressionResultTests(unittest.TestCase):
             action="evaluate",
         )
 
-        self.assertEqual(payload["full_display_TeX"], r"0 + \theta\mkern-2mu i")
-        self.assertEqual(payload["full_display_expression"], "{ 0 + θ·i | θ = π }")
-        self.assertIn("return 0 + @theta.i.", payload["full_display_function"])
+        self.assertEqual(payload["full_display_TeX"], r"\theta\mkern-2mu i")
+        self.assertEqual(payload["full_display_expression"], "{ θ·i | θ = π }")
+        self.assertIn("return @theta.i.", payload["full_display_function"])
         self.assertIn("@theta = @pi", payload["full_display_function"])
         self.assertNotIn("θ", payload["full_display_function"].split("`", 2)[-1])
         self.assertIn("value", payload)
@@ -10294,6 +10534,38 @@ class AlmanacLocationTests(unittest.TestCase):
 # README examples: this class is named to sort after the ordinary regressions
 # and deliberately runs the examples documented in docs/mars-lab.md last.
 class ZZMarsLabReadmeExamples(unittest.TestCase):
+    def test_readme_laplace_function_condition(self) -> None:
+        # README example: docs/expression.md, the guarded Function body for @L(t).
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "@L(t)", 30, "s", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], "1/s² where (Re(s) > 0)")
+        self.assertIn("    if (realpart(s) > 0) {\n"
+                      "        return laplace(t, t, s).\n"
+                      "    } else {\n"
+                      "        return @nan.\n"
+                      "    }", fields["operation_function"])
+
+    def test_readme_formal_gamma_integral(self) -> None:
+        # README example: an unsupported primitive remains a formal antiderivative family.
+        source = "gamma(a+[time]i)"
+        expected = "∫^[time] Γ(t·i + a)·dt + C"
+        documentation = (ROOT / "docs/mars-lab.md").read_text(encoding="utf-8")
+        self.assertIn(source, documentation)
+        self.assertIn(expected, documentation)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, source, 40, "[time]", "integral")
+        self.assertEqual(code, 0, raw)
+        self.assertIn(expected, fields["integral"])
+
+    def test_equation_readme_exact_quartic(self) -> None:
+        # README: docs/equation.md, certified exact quartic roots in MARS Lab.
+        fields, raw, code = mars_lab.run_equation_lab_fields(
+            ROOT / "build/release/scratch/equation_lab", "x^4 + x^3 + 3x^2 + 4x + 6 = 0", 40)
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(mars_lab.prepare_equation_fields(fields, 40)["display_solutions"],
+                         "x = -1 ± i\nx = (1 ± i·√(11))/2")
+
     def test_laplace_tanh_readme_example(self) -> None:
         # README example: docs/expression.md, the hyperbolic tangent transform.
         fields, raw, code = mars_lab.run_mars_lab_fields(
@@ -10321,6 +10593,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(code, 0, raw)
         self.assertEqual(fields["unbound"], "ln(t)")
         self.assertIn("return ln(t).", fields["function"])
+        self.assertIn("return inverselaplace(-(ln(s) + @eulermascheroni)/s, s, t).",
+                      fields["operation_function"])
 
     def test_laplace_logarithm_readme_example(self) -> None:
         # README example: docs/expression.md, braces and the natural logarithm.
@@ -10339,6 +10613,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertAlmostEqual(float(fields["value"]), 2.385516730959136, places=13)
         self.assertIn(r"\mathcal{L}^{-1}", fields["transform_identity_TeX"])
         self.assertNotIn("inverselaplace(", fields["function"])
+        self.assertIn("return inverselaplace((s - a)/((s - a)^2 + 1), s, t).",
+                      fields["operation_function"])
         fields, raw, code = mars_lab.run_mars_lab_fields(
             mars_lab.DEFAULT_BIN, "@Linv(F(s),s,x)", 30, "x", "evaluate")
         self.assertEqual(code, 0, raw)
@@ -10352,6 +10628,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(code, 0, raw)
         self.assertEqual(fields['unbound'], 'ℒ(f(t), t, s - a)')
         self.assertIn('return laplace(f(t), t, s - a).', fields['function'])
+        self.assertIn('return laplace(f(t).e^(a.t), t, s).', fields['operation_function'])
         self.assertIn(r'= F\left(s - a\right)', fields['transform_identity_TeX'])
         self.assertIn(r'F(s):=\mathcal{L}_{t\to s}\left\{f\left(t\right)\right\}',
                       fields['transform_identity_TeX'])
@@ -10684,7 +10961,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         # README examples: symbolic complex elementary functions use Cartesian output.
         for source, want in (
             ("exp(x+i*y)", "exp(x)·cos(y) + exp(x)·sin(y)·i"),
-            ("sin(i*y)", "0 + sinh(y)·i"),
+            ("sin(i*y)", "sinh(y)·i"),
         ):
             with self.subTest(readme_example=source):
                 expression, raw, returncode = mars_lab.run_mars_lab_fields(

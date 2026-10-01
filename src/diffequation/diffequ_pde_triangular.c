@@ -101,9 +101,9 @@ static diffequ_solve_result_t *de_triangular_chart(const expr_t *dependent, cons
         !de_triangular_constant(b, x, y, dependent) || !de_triangular_constant(d, x, y, dependent) ||
         !de_triangular_constant(forcing, x, y, dependent))
         goto cleanup;
-    number_t av = expr_eval(a), dv = expr_eval(d);
-    bool nonzero = !num_is_zero(av), repeated = num_eq(av, dv);
-    num_destroy(&dv);
+    number_t av = expr_eval(a), d_value = expr_eval(d);
+    bool nonzero = !num_is_zero(av), repeated = num_eq(av, d_value);
+    num_destroy(&d_value);
     num_destroy(&av);
     if (!nonzero)
         goto cleanup;

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "expr_stringout.h"
+#include "expr_stringin_scan.h"
 #include "expression.h"
 
 char *expr_tostring_texify(const char *text);
@@ -300,6 +301,31 @@ done:
     return ok;
 }
 
+static int function_keyword_compare(const void *name, const void *keyword)
+{
+    return strcmp(name, keyword);
+}
+
+/* Bare Function names must round-trip as the same symbol, not a keyword or Greek alias. */
+static bool function_symbol_is_bare(const char *name)
+{
+    static const char keywords[][11] = {
+        "array", "const", "else", "equation", "expression", "if", "matrix", "output", "outputa", "return", "where"
+    };
+    if (!expr_tostring_is_safe_func_name(name) || expr_is_default_constant_name(name) ||
+        strcmp(expr_default_constant_canonical_name(name), name) != 0 ||
+        bsearch(name, keywords, sizeof(keywords) / sizeof(*keywords), sizeof(*keywords), function_keyword_compare))
+        return false;
+    string_t *text = string_new_with(name);
+    string_cursor_t *cursor = text ? string_cursor_new(text) : NULL;
+    string_t *parsed = cursor ? expr_parse_read_name(cursor, true) : NULL;
+    bool safe = parsed && string_cursor_done(cursor) && strcmp(string_c_str(parsed), name) == 0;
+    string_free(parsed);
+    string_cursor_free(cursor);
+    string_free(text);
+    return safe;
+}
+
 void emit_name_func(sbuf_t *b, const char *name)
 {
     if (!name || !*name) {
@@ -322,7 +348,7 @@ void emit_name_func(sbuf_t *b, const char *name)
         }
     }
 
-    if (expr_tostring_is_simple_name(name)) {
+    if (expr_tostring_is_simple_name(name) || function_symbol_is_bare(name)) {
         sbuf_puts(b, name);
     } else {
         sbuf_putc(b, '[');

@@ -118,11 +118,11 @@ number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
     }
 
     if (A->elem == &expr_elem) {
-        expr_t *dv = NULL;
+        expr_t *expr = NULL;
 
-        mat_get(A, i, j, &dv);
-        if (dv)
-            out = expr_eval(dv);
+        mat_get(A, i, j, &expr);
+        if (expr)
+            out = expr_eval(expr);
         return out;
     }
     return out;

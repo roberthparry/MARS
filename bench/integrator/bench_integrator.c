@@ -41,34 +41,34 @@ typedef expr_t *(*build_fn)(expr_t **x_out, expr_t **y_out);
 static expr_t *bench_expr_new_var_num(double x)
 {
     number_t n = num_create_from_double(x);
-    expr_t *dv = expr_new_var(n);
+    expr_t *expr = expr_new_var(n);
 
     num_destroy(&n);
-    return dv;
+    return expr;
 }
 
-static expr_t *bench_expr_add_d(const expr_t *dv, double x)
+static expr_t *bench_expr_add_d(const expr_t *expr, double x)
 {
     number_t n = num_create_from_double(x);
-    expr_t *out = expr_add_num(dv, &n);
-
-    num_destroy(&n);
-    return out;
-}
-
-static expr_t *bench_expr_mul_d(const expr_t *dv, double x)
-{
-    number_t n = num_create_from_double(x);
-    expr_t *out = expr_mul_num(dv, &n);
+    expr_t *out = expr_add_num(expr, &n);
 
     num_destroy(&n);
     return out;
 }
 
-static expr_t *bench_expr_pow_d(const expr_t *dv, double x)
+static expr_t *bench_expr_mul_d(const expr_t *expr, double x)
 {
     number_t n = num_create_from_double(x);
-    expr_t *out = expr_pow(dv, &n);
+    expr_t *out = expr_mul_num(expr, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static expr_t *bench_expr_pow_d(const expr_t *expr, double x)
+{
+    number_t n = num_create_from_double(x);
+    expr_t *out = expr_pow(expr, &n);
 
     num_destroy(&n);
     return out;

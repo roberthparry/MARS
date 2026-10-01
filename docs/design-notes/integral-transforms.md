@@ -77,6 +77,12 @@ The defaults are:
 @Finv  ω → t, k → x, m → y, n → z
 ```
 
+Other source names, including bracketed multi-character variables, default to
+`ω` under `@F` and `t` under `@Finv`. Explicit targets override these defaults.
+Source inference must still be unambiguous, and a default target must neither
+equal the source nor capture an existing operand parameter; supply an explicit
+source or target when required.
+
 The default Laplace transform-domain variable is always `s`, irrespective of
 the source-variable name:
 

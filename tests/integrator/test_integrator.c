@@ -487,51 +487,51 @@ static void test_intg_set_tolerance_text(integrator_t *ig, const char *text)
 static expr_t *test_expr_new_const_d(double x)
 {
     number_t n = test_num_from_double(x);
-    expr_t *dv = expr_new_const(n);
+    expr_t *expr = expr_new_const(n);
 
     num_destroy(&n);
-    return dv;
+    return expr;
 }
 
 static expr_t *test_expr_new_var_num(number_t x)
 {
-    expr_t *dv = expr_new_var(x);
+    expr_t *expr = expr_new_var(x);
 
     num_destroy(&x);
-    return dv;
+    return expr;
 }
 
-static expr_t *test_expr_add_d(const expr_t *dv, double x)
+static expr_t *test_expr_add_d(const expr_t *expr, double x)
 {
     number_t n = test_num_from_double(x);
-    expr_t *out = expr_add_num(dv, &n);
+    expr_t *out = expr_add_num(expr, &n);
 
     num_destroy(&n);
     return out;
 }
 
-static expr_t *test_expr_sub_d(const expr_t *dv, double x)
+static expr_t *test_expr_sub_d(const expr_t *expr, double x)
 {
     number_t n = test_num_from_double(x);
-    expr_t *out = expr_sub_num(dv, &n);
+    expr_t *out = expr_sub_num(expr, &n);
 
     num_destroy(&n);
     return out;
 }
 
-static expr_t *test_expr_mul_d(const expr_t *dv, double x)
+static expr_t *test_expr_mul_d(const expr_t *expr, double x)
 {
     number_t n = test_num_from_double(x);
-    expr_t *out = expr_mul_num(dv, &n);
+    expr_t *out = expr_mul_num(expr, &n);
 
     num_destroy(&n);
     return out;
 }
 
-static expr_t *test_expr_pow_d(const expr_t *dv, double x)
+static expr_t *test_expr_pow_d(const expr_t *expr, double x)
 {
     number_t n = test_num_from_double(x);
-    expr_t *out = expr_pow(dv, &n);
+    expr_t *out = expr_pow(expr, &n);
 
     num_destroy(&n);
     return out;

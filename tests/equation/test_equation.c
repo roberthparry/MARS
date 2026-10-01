@@ -726,7 +726,7 @@ static void test_equation_function_style_preserves_both_sides(void)
     ASSERT_TRUE(strstr(string_c_str(text), "equation equ(x, y, z, const a)") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "return equation(x + y = a.z).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "return x + y - a.z.") == NULL);
-    ASSERT_TRUE(strstr(string_c_str(text), "output(solve(equ(x, y, z, a))).") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(text), "outputa(solve(equ(x, y, z, a))).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "constant[] solve") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "print(") == NULL);
     ASSERT_TRUE(strstr(string_c_str(text), "equ_eval") == NULL);
@@ -802,7 +802,7 @@ static void test_equation_expands_conjugate_factors_and_solves_all_roots(void)
     ASSERT_TRUE(strstr(string_c_str(function), "884.x^2") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "912.x") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "1040 = 0") != NULL);
-    ASSERT_TRUE(strstr(string_c_str(function), "`` x = ?\noutput(solve(equ(x))).") != NULL);
+    ASSERT_TRUE(strstr(string_c_str(function), "`` x = ?\noutputa(solve(equ(x))).") != NULL);
     ASSERT_TRUE(strstr(string_c_str(function), "(x - (1 + i))") == NULL);
 
     ASSERT_EQ_INT(equ_solve_for(equation, x, result), 0);
@@ -1470,6 +1470,41 @@ static void test_equation_quartic_roots_satisfy_original_polynomial(void)
 
     equ_solve_result_free(result);
     equ_free(equation);
+}
+
+static void test_equation_quartic_preserves_certified_surds(void)
+{
+    const struct {
+        const char *source;
+        size_t count;
+        bool surds;
+    } cases[] = {
+        {"x^4+x^3+3x^2+4x+6=0", 4u, true},
+        {"2x^4+2x^3+6x^2+8x+12=0", 4u, true},
+        {"x^4-x^3/3+13x^2/3+6=0", 4u, true},
+        {"x^4+2x^3+3x^2+2x+1=0", 2u, true},
+        {"x^4+2000001x^3/1000000+3000001x^2/1000000+2000001x/1000000+1=0", 4u, true},
+        {"x^4+x^3+3x^2+4x+600000000000000000001/100000000000000000000=0", 4u, false},
+        {"x^4+x+1=0", 4u, false},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        equation_t *equation = equ_from_string(cases[i].source);
+        ASSERT_NOT_NULL(equation);
+        equation_solutions_t *result = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(result);
+        ASSERT_EQ_INT((int)equ_solutions_count(result), (int)cases[i].count);
+        ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, equ_binding(equation, "x"), result, "1e-35"));
+        ASSERT_EQ_INT(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{"), cases[i].surds);
+        if (i < 2u) {
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "-1 + i"));
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "-1 - i"));
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "(1 + i·√(11))/2"));
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "(1 - i·√(11))/2"));
+        }
+        equ_solutions_free(result);
+        equ_free(equation);
+    }
 }
 
 static void test_equation_solves_expanded_quintic_five_real_roots(void)
@@ -2155,6 +2190,7 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_deduplicates_repeated_quartic_root, NULL);
     TEST_RUN_SUBTEST(test_equation_deduplicates_repeated_irrational_quartic_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_quartic_roots_satisfy_original_polynomial, NULL);
+    TEST_RUN_SUBTEST(test_equation_quartic_preserves_certified_surds, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_expanded_quintic_five_real_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_quintic_complex_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_deduplicates_repeated_quintic_root, NULL);

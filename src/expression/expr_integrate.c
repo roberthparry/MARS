@@ -968,7 +968,11 @@ expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
     expr_t *constant;
     expr_t *family;
 
+    if (!expr || !wrt || !expr_is_var(wrt))
+        return NULL;
     anti = expr_integrate(expr, wrt);
+    if (!anti)
+        anti = expr_integral(expr, wrt);
     if (!anti)
         return NULL;
 

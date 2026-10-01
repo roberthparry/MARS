@@ -205,7 +205,7 @@ static char *TeX_aligned_scaled_add_terms(const expr_t *sum, const expr_t *facto
         else if (i > 0u)
             sbuf_puts(&b, "{} + ");
         sbuf_puts(&b, factor_TeX);
-        sbuf_puts(&b, "\\mkern-2mu ");
+        emit_TeX_mul_separator(factor, terms.exprs[i], &b);
         sbuf_puts(&b, term);
         free(term_alloc);
     }
@@ -346,13 +346,13 @@ static void TeX_primitive_definition(const expr_t *initial, sbuf_t *out)
     sbuf_puts(out, "\\quad\\text{(F is the chosen antiderivative)}");
 }
 
-int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
+int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out)
 {
     autoname_table_t vnames;
     const expr_t *g;
     varlist_t vl;
     varlist_t cl;
-    sbuf_t expr;
+    sbuf_t expression_text;
     sbuf_t bindings;
 
     expr_init_singletons();
@@ -362,7 +362,7 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
     *expr_out = NULL;
     *bindings_out = NULL;
     expr_t *initial = NULL;
-    expr_t *display = dv ? TeX_primitive_display(dv, &initial) : NULL;
+    expr_t *display = expr ? TeX_primitive_display(expr, &initial) : NULL;
 
     /*
      * A binding expression records the user's surface syntax, but its compact
@@ -370,31 +370,31 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
      * derivative.  Render the expression tree whenever formal derivatives are
      * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
      */
-    if (!display && dv && dv->binding_expr && !expr_is_const(dv) && !TeX_tree_contains_formal_derivative(dv)) {
-        *expr_out = expr_binding_expr_to_TeX(dv->binding_expr);
+    if (!display && expr && expr->binding_expr && !expr_is_const(expr) && !TeX_tree_contains_formal_derivative(expr)) {
+        *expr_out = expr_binding_expr_to_TeX(expr->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
-    if (!dv) {
+    if (!expr) {
         *expr_out = expr_tostring_xstrdup("NULL");
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
     autoname_init(&vnames);
-    assign_unnamed_vars_dfs((expr_t *)dv, &vnames);
-    g = dv;
+    assign_unnamed_vars_dfs((expr_t *)expr, &vnames);
+    g = expr;
 
     varlist_init(&vl);
     varlist_init(&cl);
     find_vars_dfs(g, &vl);
-    find_explicit_named_consts_dfs(dv, &cl);
+    find_explicit_named_consts_dfs(expr, &cl);
     find_named_consts_dfs(g, &cl);
 
-    sbuf_init(&expr);
-    emit_TeX_expr(display ? display : g, &expr, PREC_LOWEST);
-    TeX_primitive_definition(initial, &expr);
+    sbuf_init(&expression_text);
+    emit_TeX_expr(display ? display : g, &expression_text, PREC_LOWEST);
+    TeX_primitive_definition(initial, &expression_text);
     expr_free(initial);
     expr_free(display);
 
@@ -434,10 +434,10 @@ int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out)
         }
     }
 
-    *expr_out = expr_tostring_texify(sbuf_c_str(&expr));
+    *expr_out = expr_tostring_texify(sbuf_c_str(&expression_text));
     *bindings_out = expr_tostring_texify(sbuf_c_str(&bindings));
 
-    sbuf_free(&expr);
+    sbuf_free(&expression_text);
     sbuf_free(&bindings);
     free(vl.vars);
     free(cl.vars);

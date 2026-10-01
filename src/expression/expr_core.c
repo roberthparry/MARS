@@ -66,12 +66,12 @@ static expr_t *expr_nan_const_shared(void)
 /* Lazy eval / deriv                                                         */
 /* ------------------------------------------------------------------------- */
 
-static number_t expr_eval_cached_num(const expr_t *dv)
+static number_t expr_eval_cached_num(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return NUM_ZERO;
 
-    expr_t *m = (expr_t *)dv;
+    expr_t *m = (expr_t *)expr;
 
     /* Binding-expression atoms are lazy constants/initialisers. They only
      * refresh when the global working precision increases. */
@@ -108,10 +108,10 @@ static number_t expr_eval_cached_num(const expr_t *dv)
     return m->x;
 }
 
-number_t expr_eval_num_internal(const expr_t *dv)
+number_t expr_eval_num_internal(const expr_t *expr)
 {
     expr_init_singletons();
-    return expr_eval_cached_num(dv);
+    return expr_eval_cached_num(expr);
 }
 
 static uint64_t current_wrt_id(void)
@@ -119,63 +119,63 @@ static uint64_t current_wrt_id(void)
     return tl_wrt ? tl_wrt->var_id : 0;
 }
 
-/* Look up (or compute and cache) the derivative of dv w.r.t. tl_wrt.
+/* Look up (or compute and cache) the derivative of expr w.r.t. tl_wrt.
  * Returns a borrowed pointer owned by the cache entry. */
-static expr_t *expr_build_dx(expr_t *dv)
+static expr_t *expr_build_dx(expr_t *expr)
 {
-    if (!dv || !dv->ops->deriv)
+    if (!expr || !expr->ops->deriv)
         return NULL;
 
     uint64_t wrt_id = current_wrt_id();
 
     /* Search the cache for a matching wrt entry. */
-    for (expr_deriv_cache_t *ce = dv->dx_cache; ce; ce = ce->next) {
+    for (expr_deriv_cache_t *ce = expr->dx_cache; ce; ce = ce->next) {
         if (ce->wrt_id == wrt_id)
             return ce->dx; /* borrowed */
     }
 
     /* Not cached: compute and insert at head. */
-    expr_t *dx = dv->ops->deriv(dv); /* refcount = 1, tl_wrt still set */
+    expr_t *dx = expr->ops->deriv(expr); /* refcount = 1, tl_wrt still set */
     expr_deriv_cache_t *ce = malloc(sizeof *ce);
     if (!ce)
         abort();
     ce->wrt_id = wrt_id;
     ce->dx = dx;
-    ce->next = dv->dx_cache;
-    dv->dx_cache = ce;
+    ce->next = expr->dx_cache;
+    expr->dx_cache = ce;
     return dx; /* borrowed */
 }
 
-bool expr_is_differentiable(const expr_t *dv)
+bool expr_is_differentiable(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return false;
-    if (dv->ops && dv->ops->diff_kind == EXPR_DIFF_NONE)
+    if (expr->ops && expr->ops->diff_kind == EXPR_DIFF_NONE)
         return false;
-    if (expr_is_integral_transform(dv) || dv->ops == &ops_real_domain)
+    if (expr_is_integral_transform(expr) || expr->ops == &ops_real_domain)
         return true;
-    if (dv->ops == &ops_convolution || dv->ops == &ops_causal_convolution)
-        return expr_is_differentiable(dv->a->a) && expr_is_differentiable(dv->a->b);
-    if (dv->ops == &ops_summation || dv->ops == &ops_product)
-        return expr_is_differentiable(dv->a);
-    if (dv->ops == &ops_pow_d)
-        return expr_is_differentiable(dv->a);
-    if (dv->ops == &ops_polygamma)
-        return expr_is_differentiable(dv->b);
-    if (dv->ops && dv->ops->arity != EXPR_OP_ATOM && !expr_is_differentiable(dv->a))
+    if (expr->ops == &ops_convolution || expr->ops == &ops_causal_convolution)
+        return expr_is_differentiable(expr->a->a) && expr_is_differentiable(expr->a->b);
+    if (expr->ops == &ops_summation || expr->ops == &ops_product)
+        return expr_is_differentiable(expr->a);
+    if (expr->ops == &ops_pow_d)
+        return expr_is_differentiable(expr->a);
+    if (expr->ops == &ops_polygamma)
+        return expr_is_differentiable(expr->b);
+    if (expr->ops && expr->ops->arity != EXPR_OP_ATOM && !expr_is_differentiable(expr->a))
         return false;
-    if (dv->ops && dv->ops->arity == EXPR_OP_BINARY && !expr_is_differentiable(dv->b))
+    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY && !expr_is_differentiable(expr->b))
         return false;
     return true;
 }
 
-/* Return an owning reference to the derivative of dv w.r.t. tl_wrt.
+/* Return an owning reference to the derivative of expr w.r.t. tl_wrt.
  * Falls back to a zero constant when no derivative exists. */
-static expr_t *get_dx(const expr_t *dv)
+static expr_t *get_dx(const expr_t *expr)
 {
     /* tl_wrt is already set by the caller; call expr_build_dx directly so we
      * don't go through the public expr_get_deriv signature which also sets it. */
-    const expr_t *d = expr_build_dx((expr_t *)dv);
+    const expr_t *d = expr_build_dx((expr_t *)expr);
     if (d) {
         expr_retain((expr_t *)d);
         return (expr_t *)d;
@@ -183,9 +183,9 @@ static expr_t *get_dx(const expr_t *dv)
     return expr_new_const(NUM_ZERO);
 }
 
-expr_t *expr_get_dx_internal(const expr_t *dv)
+expr_t *expr_get_dx_internal(const expr_t *expr)
 {
-    return get_dx(dv);
+    return get_dx(expr);
 }
 
 const expr_t *expr_current_wrt_internal(void)
@@ -193,9 +193,9 @@ const expr_t *expr_current_wrt_internal(void)
     return tl_wrt;
 }
 
-number_t expr_eval(const expr_t *dv)
+number_t expr_eval(const expr_t *expr)
 {
-    return num_clone(expr_eval_num_internal(dv));
+    return num_clone(expr_eval_num_internal(expr));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -219,59 +219,59 @@ const expr_t *expr_get_deriv(const expr_t *expr, const expr_t *wrt)
 /* Setters                                                                   */
 /* ------------------------------------------------------------------------- */
 
-void expr_set_val(expr_t *dv, number_t value)
+void expr_set_val(expr_t *expr, number_t value)
 {
     bool preserve_binding_expr = false;
 
-    if (!dv)
+    if (!expr)
         abort();
-    if (dv->ops != &ops_var && !(dv->ops == &ops_const && dv->name && *dv->name))
+    if (expr->ops != &ops_var && !(expr->ops == &ops_const && expr->name && *expr->name))
         abort();
-    if (dv->binding_expr && expr_binding_expr_is_numeric_literal(dv->binding_expr)) {
-        number_t binding_value = expr_binding_expr_eval(dv->binding_expr);
+    if (expr->binding_expr && expr_binding_expr_is_numeric_literal(expr->binding_expr)) {
+        number_t binding_value = expr_binding_expr_eval(expr->binding_expr);
 
         preserve_binding_expr = num_eq(binding_value, value);
         num_destroy(&binding_value);
     }
-    if (dv->binding_expr && !preserve_binding_expr) {
-        expr_binding_expr_free(dv->binding_expr);
-        dv->binding_expr = NULL;
+    if (expr->binding_expr && !preserve_binding_expr) {
+        expr_binding_expr_free(expr->binding_expr);
+        expr->binding_expr = NULL;
     }
-    expr_store_const_num(dv, num_clone(value));
-    expr_store_value_num(dv, num_clone(dv->c));
-    dv->x_valid = 1;
-    dv->epoch++;
-    dv->simplified = false;
-    dv->simplify_epoch = 0;
+    expr_store_const_num(expr, num_clone(value));
+    expr_store_value_num(expr, num_clone(expr->c));
+    expr->x_valid = 1;
+    expr->epoch++;
+    expr->simplified = false;
+    expr->simplify_epoch = 0;
 }
 
-void expr_set_name(expr_t *dv, const char *name)
+void expr_set_name(expr_t *expr, const char *name)
 {
-    if (!dv)
+    if (!expr)
         return;
-    if (dv->name)
-        free(dv->name);
-    dv->name = expr_normalise_name(name);
-    dv->epoch++;
-    dv->simplified = false;
-    dv->simplify_epoch = 0;
+    if (expr->name)
+        free(expr->name);
+    expr->name = expr_normalise_name(name);
+    expr->epoch++;
+    expr->simplified = false;
+    expr->simplify_epoch = 0;
 }
 
-void expr_set_name_text(expr_t *dv, const string_t *name)
+void expr_set_name_text(expr_t *expr, const string_t *name)
 {
-    if (!dv)
+    if (!expr)
         return;
-    if (dv->name)
-        free(dv->name);
-    dv->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
-    dv->epoch++;
-    dv->simplified = false;
-    dv->simplify_epoch = 0;
+    if (expr->name)
+        free(expr->name);
+    expr->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
+    expr->epoch++;
+    expr->simplified = false;
+    expr->simplify_epoch = 0;
 }
 
-number_t expr_get_val(const expr_t *dv)
+number_t expr_get_val(const expr_t *expr)
 {
-    return expr_eval(dv);
+    return expr_eval(expr);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -280,26 +280,26 @@ number_t expr_get_val(const expr_t *dv)
 
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a)
 {
-    expr_t *dv = expr_alloc(ops);
-    dv->a = (expr_t *)a;
-    return dv;
+    expr_t *expr = expr_alloc(ops);
+    expr->a = (expr_t *)a;
+    return expr;
 }
 
 expr_t *expr_new_binary_internal(const expr_ops_t *ops, const expr_t *a, const expr_t *b)
 {
-    expr_t *dv = expr_alloc(ops);
-    dv->a = (expr_t *)a;
-    dv->b = (expr_t *)b;
-    return dv;
+    expr_t *expr = expr_alloc(ops);
+    expr->a = (expr_t *)a;
+    expr->b = (expr_t *)b;
+    return expr;
 }
 
 expr_t *expr_new_pow_const_internal(const expr_t *a, number_t exponent)
 {
-    expr_t *dv = expr_alloc(&ops_pow_d);
+    expr_t *expr = expr_alloc(&ops_pow_d);
 
-    dv->a = (expr_t *)a;
-    expr_store_const_num(dv, num_clone(exponent));
-    return dv;
+    expr->a = (expr_t *)a;
+    expr_store_const_num(expr, num_clone(exponent));
+    return expr;
 }
 
 int expr_cmp(const expr_t *expr1, const expr_t *expr2)

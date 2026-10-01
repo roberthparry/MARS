@@ -256,33 +256,33 @@ void find_explicit_named_consts_dfs(const expr_t *f, varlist_t *cl)
     find_explicit_named_consts_dfs(f->b, cl);
 }
 
-const char *expr_name_or_default(const expr_t *dv, const char *fallback)
+const char *expr_name_or_default(const expr_t *expr, const char *fallback)
 {
-    return (dv->name && *dv->name) ? dv->name : fallback;
+    return (expr->name && *expr->name) ? expr->name : fallback;
 }
 
-char *binding_rhs_expr_string_local(const expr_t *dv)
+char *binding_rhs_expr_string_local(const expr_t *expr)
 {
     string_t *text;
     char *out;
 
-    if (dv && dv->binding_expr)
-        return expr_binding_expr_to_string(dv->binding_expr);
-    text = dv ? num_to_string(dv->c) : NULL;
+    if (expr && expr->binding_expr)
+        return expr_binding_expr_to_string(expr->binding_expr);
+    text = expr ? num_to_string(expr->c) : NULL;
     out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
     string_free(text);
     return out;
 }
 
-char *binding_rhs_TeX_string_local(const expr_t *dv)
+char *binding_rhs_TeX_string_local(const expr_t *expr)
 {
     string_t *number_text;
     char *text;
     char *tex;
 
-    if (dv && dv->binding_expr)
-        return expr_binding_expr_to_TeX(dv->binding_expr);
-    number_text = dv ? num_to_string(dv->c) : NULL;
+    if (expr && expr->binding_expr)
+        return expr_binding_expr_to_TeX(expr->binding_expr);
+    number_text = expr ? num_to_string(expr->c) : NULL;
     text = number_text ? expr_tostring_xstrdup(string_c_str(number_text)) : NULL;
     string_free(number_text);
     tex = expr_text_to_TeX_local(text);
@@ -290,14 +290,14 @@ char *binding_rhs_TeX_string_local(const expr_t *dv)
     return tex;
 }
 
-char *binding_rhs_c_string_local(const expr_t *dv)
+char *binding_rhs_c_string_local(const expr_t *expr)
 {
     string_t *text;
     char *out;
 
-    if (dv && dv->binding_expr)
-        return expr_binding_expr_to_function_string(dv->binding_expr);
-    text = dv ? num_to_string(dv->c) : NULL;
+    if (expr && expr->binding_expr)
+        return expr_binding_expr_to_function_string(expr->binding_expr);
+    text = expr ? num_to_string(expr->c) : NULL;
     out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
     string_free(text);
     return out;

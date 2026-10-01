@@ -122,8 +122,9 @@ The second statement prints the algebraic derivative using native
 by the native renderer. It must not replace the variables in that body with their
 numerical values. If a numerical value cannot be determined, the first statement
 also falls back to algebraic output under the usual `output` rule. These examples
-specify Ophelia behaviour; changing the native callable spelling does not itself
-implement the language runner or its output operations.
+specify the intended Ophelia behaviour. The initial runner supports generated
+Function cards, but its presence does not imply support for every dependency and
+assignment rule described in this design note.
 
 Differentiation returns a new expression with respect to a specified variable.
 Expose automatic differentiation in both forward and reverse mode from the
@@ -314,8 +315,11 @@ in symbolic calculus immediately. The missing declaration is not itself an error
 Resolve existing scoped bindings before applying this default; using an already
 declared `const` name must not silently replace it with a non-constant variable.
 
-The following is a language-design example, not a claim that an Ophelia runner
-is already implemented. It is valid even when none of these names has previously
+The following specifies the intended implicit-variable semantics. The initial
+Ophelia runner implements only the subset described under
+[Running Function cards](../mars-lab.md#running-function-cards); its existence
+does not imply that every design example below is executable. Under the intended
+semantics, this assignment is valid even when none of these names has previously
 been declared or used:
 
 ```text
@@ -431,6 +435,14 @@ Provide `if` and `else` for programme execution. Their conditions must resolve t
 Boolean values. An unresolved symbolic comparison is a diagnostic, not an implicit
 false value or permission to substitute whichever numerical bindings happen to
 be available.
+
+The current runner has a narrow exception for generated scalar domain guards:
+a supported unresolved comparison with an `else` branch containing only
+`return @nan.` retains the condition on the returned symbolic expression.
+It does not select an arbitrary branch or implement general symbolic control
+flow. Numerically false guards return `NAN`; unresolved ordinary conditionals
+remain diagnostics. See the executable domain-guard example in
+[Running Function cards](../mars-lab.md#running-function-cards).
 
 Provide a separate mathematical piecewise constructor for symbolic conditions.
 It retains its conditions and branches as an expression that MARS can evaluate,

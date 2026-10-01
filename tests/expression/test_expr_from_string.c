@@ -489,7 +489,7 @@ static void test_from_function_body_formal_derivatives(void)
         "derivative(derivative(f(x, y), x, 2), y, 1)",
         "derivative(derivative(derivative(f(x, y), x, 1), y, 1), x, 1)",
         "derivative(delta(@omega), @omega, 2)",
-        "derivative(f([frequency]), [frequency], 2)",
+        "derivative(f(frequency), frequency, 2)",
         "derivative(y, x, 1)",
     };
     for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {

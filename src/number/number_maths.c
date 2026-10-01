@@ -3766,7 +3766,7 @@ int num_divmod(const number_t number, const number_t divisor, number_t *quotient
     mpz_srcptr nd = number_mpz_src_if_mpz(&number);
     mpz_srcptr dd = number_mpz_src_if_mpz(&divisor);
     mpz_t nv;
-    mpz_t dv;
+    mpz_t divisor_value;
     mpz_t qv;
     mpz_t rv;
     int rc = -1;
@@ -3793,14 +3793,15 @@ int num_divmod(const number_t number, const number_t divisor, number_t *quotient
     }
 
     mpz_init(nv);
-    mpz_init(dv);
+    mpz_init(divisor_value);
     mpz_init(qv);
     mpz_init(rv);
-    if (number_get_exact_integer_mpz(number, nv) && number_get_exact_integer_mpz(divisor, dv) && mpz_sgn(dv) != 0) {
+    if (number_get_exact_integer_mpz(number, nv) && number_get_exact_integer_mpz(divisor, divisor_value) &&
+        mpz_sgn(divisor_value) != 0) {
         number_t q;
         number_t r;
 
-        mpz_tdiv_qr(qv, rv, nv, dv);
+        mpz_tdiv_qr(qv, rv, nv, divisor_value);
         q = number_from_mpz_value(qv);
         r = number_from_mpz_value(rv);
         if (!num_is_nan(q) && !num_is_nan(r)) {
@@ -3814,7 +3815,7 @@ int num_divmod(const number_t number, const number_t divisor, number_t *quotient
     }
     mpz_clear(rv);
     mpz_clear(qv);
-    mpz_clear(dv);
+    mpz_clear(divisor_value);
     mpz_clear(nv);
     return rc;
 }

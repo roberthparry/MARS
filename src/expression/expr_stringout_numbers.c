@@ -581,27 +581,27 @@ fail:
     return NULL;
 }
 
-char *expr_const_to_string_local(const expr_t *dv)
+char *expr_const_to_string_local(const expr_t *expr)
 {
-    return dv ? expr_number_to_string_local(num_clone(dv->c)) : NULL;
+    return expr ? expr_number_to_string_local(num_clone(expr->c)) : NULL;
 }
 
-char *expr_eval_to_string_local(const expr_t *dv)
+char *expr_eval_to_string_local(const expr_t *expr)
 {
-    return expr_number_to_string_local(expr_eval(dv));
+    return expr_number_to_string_local(expr_eval(expr));
 }
 
-bool expr_is_immortal_default_const_local(const expr_t *dv)
+bool expr_is_immortal_default_const_local(const expr_t *expr)
 {
     const char *canon;
     number_t builtin;
     bool match;
     bool precise_match = false;
 
-    if (!dv || !expr_is_const(dv) || !dv->name || !*dv->name)
+    if (!expr || !expr_is_const(expr) || !expr->name || !*expr->name)
         return false;
 
-    canon = expr_default_constant_canonical_name(dv->name);
+    canon = expr_default_constant_canonical_name(expr->name);
     if (!canon)
         return false;
     if (strcmp(canon, "@tau") == 0)
@@ -609,11 +609,11 @@ bool expr_is_immortal_default_const_local(const expr_t *dv)
     if (!expr_get_default_constant_num(canon, &builtin))
         return false;
 
-    match = num_eq(dv->c, builtin);
-    if (!match || num_get_prec_bits(dv->c) != num_get_prec_bits(builtin)) {
-        number_t builtin_at_prec = num_const_prec(builtin, num_get_prec_bits(dv->c));
+    match = num_eq(expr->c, builtin);
+    if (!match || num_get_prec_bits(expr->c) != num_get_prec_bits(builtin)) {
+        number_t builtin_at_prec = num_const_prec(builtin, num_get_prec_bits(expr->c));
 
-        precise_match = num_eq(dv->c, builtin_at_prec);
+        precise_match = num_eq(expr->c, builtin_at_prec);
         num_destroy(&builtin_at_prec);
     }
     num_destroy(&builtin);

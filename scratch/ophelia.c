@@ -127,9 +127,24 @@ static bool identifier_part(unsigned char c)
     return identifier_start(c) || isdigit(c);
 }
 
+/* Bracketed symbolic names are opaque tokens, not arrays or mathematical expressions. */
+static char *bracketed_name_end(char *text)
+{
+    char *end = *text == '[' ? strchr(text + 1, ']') : NULL;
+    return end && end != text + 1 ? end + 1 : NULL;
+}
+
 static char *identifier(char **p)
 {
     space(p);
+    if (**p == '[') {
+        char *end = bracketed_name_end(*p);
+        if (!end)
+            return NULL;
+        char *name = copy_range(*p, end);
+        *p = end;
+        return name;
+    }
     if (!identifier_start((unsigned char)**p))
         return NULL;
     char *start = *p;
@@ -215,7 +230,7 @@ static bool discover(runtime_t *runtime, scope_t *scope, const char *text)
 {
     char *p = (char *)text;
     while (*p && !runtime->failed) {
-        if (*p == '[' || *p == ']' || *p == '{' || *p == '}' || *p == '*' || *p == '?') {
+        if (*p == ']' || *p == '{' || *p == '}' || *p == '*' || *p == '?') {
             fail(runtime, "arrays, embedded blocks, convolution and embedded '?' are not supported yet");
             break;
         }
@@ -232,7 +247,7 @@ static bool discover(runtime_t *runtime, scope_t *scope, const char *text)
             }
             continue;
         }
-        if (!identifier_start((unsigned char)*p)) {
+        if (*p != '[' && !identifier_start((unsigned char)*p)) {
             ++p;
             continue;
         }
@@ -290,6 +305,15 @@ static char *expression_text(runtime_t *runtime, char **p)
     unsigned int depth = 0u;
     while (**p) {
         char c = **p;
+        if (c == '[') {
+            char *end = bracketed_name_end(*p);
+            if (!end) {
+                fail(runtime, "expected a complete bracketed variable name");
+                return NULL;
+            }
+            *p = end;
+            continue;
+        }
         if (c == '(') {
             if (++depth > DEPTH_LIMIT) {
                 fail(runtime, "expression nesting limit exceeded");
@@ -322,6 +346,11 @@ static char *matching_block(runtime_t *runtime, char *p)
 {
     unsigned int depth = 1u;
     while (*p) {
+        char *name_end = bracketed_name_end(p);
+        if (name_end) {
+            p = name_end;
+            continue;
+        }
         if (*p == '{' && ++depth > DEPTH_LIMIT) {
             fail(runtime, "block nesting limit exceeded");
             return NULL;
@@ -409,6 +438,11 @@ static condition_truth_t condition_value(runtime_t *runtime, scope_t *scope, cha
         int level = 0;
         size_t end = 0u;
         for (; end < length; ++end) {
+            char *name_end = bracketed_name_end(text + end);
+            if (name_end) {
+                end = (size_t)(name_end - text) - 1u;
+                continue;
+            }
             if (text[end] == '(')
                 ++level;
             else if (text[end] == ')' && --level == 0)
@@ -424,6 +458,11 @@ static condition_truth_t condition_value(runtime_t *runtime, scope_t *scope, cha
         int level = 0;
         const char *operation = pass ? "&&" : "||";
         for (char *p = text; *p; ++p) {
+            char *name_end = bracketed_name_end(p);
+            if (name_end) {
+                p = name_end - 1;
+                continue;
+            }
             if (*p == '(')
                 ++level;
             else if (*p == ')')
@@ -472,6 +511,11 @@ static condition_truth_t condition_value(runtime_t *runtime, scope_t *scope, cha
     };
     int level = 0;
     for (char *p = text; *p; ++p) {
+        char *name_end = bracketed_name_end(p);
+        if (name_end) {
+            p = name_end - 1;
+            continue;
+        }
         if (*p == '(')
             ++level;
         else if (*p == ')')
@@ -677,10 +721,10 @@ static void define_function(runtime_t *runtime, char **p)
         *p = fn->end + 1;
 }
 
-static void output_equation(runtime_t *runtime, const equation_t *equation, bool algebraic)
+static void output_equation(runtime_t *runtime, const equation_t *equation, bool algebraic, bool solution)
 {
     expr_t *lhs = expr_beautify(equ_lhs(equation));
-    expr_t *rhs = expr_beautify(equ_rhs(equation));
+    expr_t *rhs = algebraic && solution ? expr_clone(equ_rhs(equation)) : expr_beautify(equ_rhs(equation));
     if (rhs && !algebraic) {
         number_t number = expr_eval(rhs);
         if (!num_is_nan(number)) {
@@ -890,7 +934,7 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
                 size_t count = result.equation ? 1u : equ_solutions_count(result.solutions);
                 for (size_t i = 0u; i < count; ++i) {
                     const equation_t *equation = result.equation ? result.equation : equ_solutions_at(result.solutions, i);
-                    output_equation(runtime, equation, algebraic);
+                    output_equation(runtime, equation, algebraic, result.solutions != NULL);
                 }
                 if (result.solutions) {
                     if (!count)
@@ -952,6 +996,11 @@ static bool remove_comments(runtime_t *runtime)
 {
     char *p = runtime->source;
     while (*p) {
+        char *name_end = bracketed_name_end(p);
+        if (name_end) {
+            p = name_end;
+            continue;
+        }
         if (*p != '\x60') {
             ++p;
             continue;

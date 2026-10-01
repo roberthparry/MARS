@@ -3206,6 +3206,41 @@ static void test_integrate_unevaluated_integral_explicit_bounds(void)
     expr_free(expr);
 }
 
+static void test_integrate_family_retains_unsupported_integral(void)
+{
+    const char *sources[] = {
+        "{ gamma(a+i[time]) | [time] = 0.3; a = 1 }",
+        "{ gamma([time]) | [time] = 1.3 }",
+        "{ exp(cosh([time])) | [time] = 0.3 }",
+        "{ gamma(C+i[time]) | [time] = 0.3; C = 1 }",
+    };
+    for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string(sources[i], &bindings);
+        expr_t *wrt = bindings ? expr_bindings_get(bindings, "[time]") : NULL;
+        expr_t *primitive = expr_integrate(expr, wrt);
+        expr_t *family = expr_integrate_family(expr, wrt);
+        expr_t *derivative = family ? expr_create_deriv(family, wrt) : NULL;
+        char *text = family ? expr_to_string(family, style_UNBOUND) : NULL;
+        ASSERT_TRUE(primitive == NULL);
+        ASSERT_NOT_NULL(family);
+        ASSERT_NOT_NULL(derivative);
+        ASSERT_TRUE(text && strstr(text, "∫") && strstr(text, "C"));
+        number_t got = derivative ? expr_eval(derivative) : NUM_NAN;
+        number_t want = expr ? expr_eval(expr) : NUM_NAN;
+        ASSERT_TRUE(!num_is_nan(got) && num_eq(got, want));
+        num_destroy(&got);
+        num_destroy(&want);
+        free(text);
+        expr_free(derivative);
+        expr_free(family);
+        expr_free(primitive);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+    ASSERT_TRUE(expr_integrate_family(NULL, NULL) == NULL);
+}
+
 static void test_integrate_partial_symbolic_with_unevaluated_term(void)
 {
     static const double points[] = {-0.75, -0.2, 0.4, 1.0};
@@ -3859,6 +3894,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_constant_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_chain_rule_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_explicit_bounds, NULL);
+    TEST_RUN_SUBTEST(test_integrate_family_retains_unsupported_integral, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_symbolic_with_unevaluated_term, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_display_symbolic_result, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_improper_endpoint_value, NULL);

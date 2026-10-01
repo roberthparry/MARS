@@ -33,8 +33,8 @@
 #include "internal/number_internal.h"
 
 /* forward declaration — helpers below call expr_simplify recursively */
-expr_t *expr_simplify(const expr_t *dv);
-static expr_t *expr_simplify_mark_current(expr_t *dv);
+expr_t *expr_simplify(const expr_t *expr);
+static expr_t *expr_simplify_mark_current(expr_t *expr);
 static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b);
 static number_t *expr_simplify_number_array_alloc_local(size_t n);
 static void expr_simplify_number_array_free_local(number_t *values, size_t n);
@@ -110,48 +110,48 @@ static expr_t *expr_make_pow_like_owned_local(expr_t *base, number_t exponent)
     return out;
 }
 
-static bool expr_simplify_is_literal_euler_const_local(const expr_t *dv)
+static bool expr_simplify_is_literal_euler_const_local(const expr_t *expr)
 {
     const char *canon;
 
-    if (!expr_is_op(dv, &ops_const) || !num_eq(dv->c, NUM_E))
+    if (!expr_is_op(expr, &ops_const) || !num_eq(expr->c, NUM_E))
         return false;
 
-    if (!dv->binding_expr)
+    if (!expr->binding_expr)
         return true;
 
-    if (!dv->name || !*dv->name)
+    if (!expr->name || !*expr->name)
         return false;
 
-    canon = expr_default_constant_canonical_name(dv->name);
+    canon = expr_default_constant_canonical_name(expr->name);
     return canon && strcmp(canon, "e") == 0;
 }
 
-static bool expr_simplify_is_literal_ten_const_local(const expr_t *dv)
+static bool expr_simplify_is_literal_ten_const_local(const expr_t *expr)
 {
-    if (!expr_is_op(dv, &ops_const) || !num_eq(dv->c, NUM_TEN))
+    if (!expr_is_op(expr, &ops_const) || !num_eq(expr->c, NUM_TEN))
         return false;
-    if (dv->name && *dv->name)
+    if (expr->name && *expr->name)
         return false;
-    return !dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER;
+    return !expr->binding_expr || expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER;
 }
 
-static bool expr_simplify_is_i_const_local(const expr_t *dv)
+static bool expr_simplify_is_i_const_local(const expr_t *expr)
 {
-    return dv && expr_is_op(dv, &ops_const) && num_eq(dv->c, NUM_I);
+    return expr && expr_is_op(expr, &ops_const) && num_eq(expr->c, NUM_I);
 }
 
-static bool expr_simplify_is_i_times_unary_local(const expr_t *dv, const expr_ops_t *ops, const expr_t **arg_out)
+static bool expr_simplify_is_i_times_unary_local(const expr_t *expr, const expr_ops_t *ops, const expr_t **arg_out)
 {
     const expr_t *candidate;
 
-    if (!dv || !arg_out || !expr_is_op(dv, &ops_mul))
+    if (!expr || !arg_out || !expr_is_op(expr, &ops_mul))
         return false;
 
-    if (expr_simplify_is_i_const_local(dv->a)) {
-        candidate = dv->b;
-    } else if (expr_simplify_is_i_const_local(dv->b)) {
-        candidate = dv->a;
+    if (expr_simplify_is_i_const_local(expr->a)) {
+        candidate = expr->b;
+    } else if (expr_simplify_is_i_const_local(expr->b)) {
+        candidate = expr->a;
     } else {
         return false;
     }
@@ -186,9 +186,9 @@ static bool expr_simplify_is_euler_sum_operands_local(const expr_t *a, const exp
     return true;
 }
 
-static bool expr_simplify_is_euler_sum_local(const expr_t *dv, const expr_t **arg_out)
+static bool expr_simplify_is_euler_sum_local(const expr_t *expr, const expr_t **arg_out)
 {
-    return dv && expr_is_op(dv, &ops_add) && expr_simplify_is_euler_sum_operands_local(dv->a, dv->b, arg_out);
+    return expr && expr_is_op(expr, &ops_add) && expr_simplify_is_euler_sum_operands_local(expr->a, expr->b, arg_out);
 }
 
 static expr_t *expr_simplify_try_euler_sum_exp_local(const expr_t *a, const expr_t *b)
@@ -448,34 +448,34 @@ static void expr_append_factor_local(expr_factor_t **factors, size_t *n, size_t 
     ++(*n);
 }
 
-static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t sign, bool split_symbolic_scalar_power,
+static void expr_split_product_factors_scaled_local(const expr_t *expr, number_t sign, bool split_symbolic_scalar_power,
                                                     expr_factor_t **factors, size_t *n, size_t *cap)
 {
-    if (!dv)
+    if (!expr)
         return;
-    if (expr_is_op(dv, &ops_mul)) {
-        expr_split_product_factors_scaled_local(dv->a, sign, split_symbolic_scalar_power, factors, n, cap);
-        expr_split_product_factors_scaled_local(dv->b, sign, split_symbolic_scalar_power, factors, n, cap);
+    if (expr_is_op(expr, &ops_mul)) {
+        expr_split_product_factors_scaled_local(expr->a, sign, split_symbolic_scalar_power, factors, n, cap);
+        expr_split_product_factors_scaled_local(expr->b, sign, split_symbolic_scalar_power, factors, n, cap);
         return;
     }
-    if (expr_is_div(dv)) {
+    if (expr_is_div(expr)) {
         number_t neg_sign = num_neg(sign);
 
-        expr_split_product_factors_scaled_local(dv->a, sign, split_symbolic_scalar_power, factors, n, cap);
-        expr_split_product_factors_scaled_local(dv->b, neg_sign, split_symbolic_scalar_power, factors, n, cap);
+        expr_split_product_factors_scaled_local(expr->a, sign, split_symbolic_scalar_power, factors, n, cap);
+        expr_split_product_factors_scaled_local(expr->b, neg_sign, split_symbolic_scalar_power, factors, n, cap);
         num_destroy(&neg_sign);
         return;
     }
-    if (split_symbolic_scalar_power && expr_is_op(dv, &ops_pow) && dv->a && dv->b && expr_is_op(dv->a, &ops_mul)) {
+    if (split_symbolic_scalar_power && expr_is_op(expr, &ops_pow) && expr->a && expr->b && expr_is_op(expr->a, &ops_mul)) {
         const expr_t *scalar = NULL;
         const expr_t *remainder = NULL;
 
-        if (expr_simplify_is_plain_real_const(dv->a->a) && num_gt(dv->a->a->c, NUM_ZERO)) {
-            scalar = dv->a->a;
-            remainder = dv->a->b;
-        } else if (expr_simplify_is_plain_real_const(dv->a->b) && num_gt(dv->a->b->c, NUM_ZERO)) {
-            scalar = dv->a->b;
-            remainder = dv->a->a;
+        if (expr_simplify_is_plain_real_const(expr->a->a) && num_gt(expr->a->a->c, NUM_ZERO)) {
+            scalar = expr->a->a;
+            remainder = expr->a->b;
+        } else if (expr_simplify_is_plain_real_const(expr->a->b) && num_gt(expr->a->b->c, NUM_ZERO)) {
+            scalar = expr->a->b;
+            remainder = expr->a->a;
         }
         if (scalar && remainder) {
             long numerator = 0L;
@@ -483,8 +483,8 @@ static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t s
             bool reciprocal_integer = num_get_small_rational(scalar->c, &numerator, &denominator) &&
                                       numerator == 1L && denominator > 1L;
             expr_t *scalar_base = reciprocal_integer ? expr_const_long(denominator) : (expr_t *)scalar;
-            expr_t *scalar_power = expr_pow_xp(scalar_base, dv->b);
-            expr_t *remainder_power = expr_pow_xp(remainder, dv->b);
+            expr_t *scalar_power = expr_pow_xp(scalar_base, expr->b);
+            expr_t *remainder_power = expr_pow_xp(remainder, expr->b);
             number_t scalar_sign = reciprocal_integer ? num_neg(sign) : num_clone(sign);
 
             expr_append_factor_local(factors, n, cap, scalar_power, scalar_sign);
@@ -497,14 +497,14 @@ static void expr_split_product_factors_scaled_local(const expr_t *dv, number_t s
             return;
         }
     }
-    if (expr_is_pow_d_expr(dv)) {
-        number_t exponent = num_mul(dv->c, sign);
+    if (expr_is_pow_d_expr(expr)) {
+        number_t exponent = num_mul(expr->c, sign);
 
-        expr_append_factor_local(factors, n, cap, dv->a, exponent);
+        expr_append_factor_local(factors, n, cap, expr->a, exponent);
         num_destroy(&exponent);
         return;
     }
-    expr_append_factor_local(factors, n, cap, dv, sign);
+    expr_append_factor_local(factors, n, cap, expr, sign);
 }
 
 static expr_t *expr_simplify_atan_tan_sawtooth(expr_t *inner)
@@ -547,35 +547,35 @@ static expr_t *expr_simplify_atan_tan_sawtooth(expr_t *inner)
     return out;
 }
 
-static int expr_is_pi_const_local(const expr_t *dv)
+static int expr_is_pi_const_local(const expr_t *expr)
 {
-    return dv && expr_is_op(dv, &ops_const) && num_eq(dv->c, NUM_PI);
+    return expr && expr_is_op(expr, &ops_const) && num_eq(expr->c, NUM_PI);
 }
 
-static int expr_is_pi_times_floor_local(const expr_t *dv)
+static int expr_is_pi_times_floor_local(const expr_t *expr)
 {
     const expr_t *left;
     const expr_t *right;
 
-    if (!dv || !expr_is_op(dv, &ops_mul))
+    if (!expr || !expr_is_op(expr, &ops_mul))
         return 0;
 
-    left = dv->a;
-    right = dv->b;
+    left = expr->a;
+    right = expr->b;
 
     return (expr_is_pi_const_local(left) && expr_is_op(right, &ops_floor)) ||
            (expr_is_pi_const_local(right) && expr_is_op(left, &ops_floor));
 }
 
-static int expr_collect_pi_floor_product_local(const expr_t *dv, number_t *coeff, int *has_pi, int *has_floor)
+static int expr_collect_pi_floor_product_local(const expr_t *expr, number_t *coeff, int *has_pi, int *has_floor)
 {
-    if (!dv)
+    if (!expr)
         return 0;
 
-    if (expr_is_op(dv, &ops_neg)) {
+    if (expr_is_op(expr, &ops_neg)) {
         number_t negated;
 
-        if (!expr_collect_pi_floor_product_local(dv->a, coeff, has_pi, has_floor))
+        if (!expr_collect_pi_floor_product_local(expr->a, coeff, has_pi, has_floor))
             return 0;
         negated = num_neg(*coeff);
         num_destroy(coeff);
@@ -583,24 +583,24 @@ static int expr_collect_pi_floor_product_local(const expr_t *dv, number_t *coeff
         return 1;
     }
 
-    if (expr_is_op(dv, &ops_mul))
-        return expr_collect_pi_floor_product_local(dv->a, coeff, has_pi, has_floor) &&
-               expr_collect_pi_floor_product_local(dv->b, coeff, has_pi, has_floor);
+    if (expr_is_op(expr, &ops_mul))
+        return expr_collect_pi_floor_product_local(expr->a, coeff, has_pi, has_floor) &&
+               expr_collect_pi_floor_product_local(expr->b, coeff, has_pi, has_floor);
 
-    if (expr_is_op(dv, &ops_const) && !dv->binding_expr && (!dv->name || !*dv->name) && num_is_real(dv->c)) {
-        number_t product = num_mul(*coeff, dv->c);
+    if (expr_is_op(expr, &ops_const) && !expr->binding_expr && (!expr->name || !*expr->name) && num_is_real(expr->c)) {
+        number_t product = num_mul(*coeff, expr->c);
 
         num_destroy(coeff);
         *coeff = product;
         return 1;
     }
 
-    if (expr_is_pi_const_local(dv) && !*has_pi) {
+    if (expr_is_pi_const_local(expr) && !*has_pi) {
         *has_pi = 1;
         return 1;
     }
 
-    if (expr_is_op(dv, &ops_floor) && !*has_floor) {
+    if (expr_is_op(expr, &ops_floor) && !*has_floor) {
         *has_floor = 1;
         return 1;
     }
@@ -608,7 +608,7 @@ static int expr_collect_pi_floor_product_local(const expr_t *dv, number_t *coeff
     return 0;
 }
 
-static int expr_is_pos_pi_times_floor_local(const expr_t *dv)
+static int expr_is_pos_pi_times_floor_local(const expr_t *expr)
 {
     NUM_SCOPE(scope);
     number_t coeff = num_const(NUM_ONE);
@@ -616,18 +616,18 @@ static int expr_is_pos_pi_times_floor_local(const expr_t *dv)
     int has_floor = 0;
     int ok;
 
-    if (expr_is_pi_times_floor_local(dv))
+    if (expr_is_pi_times_floor_local(expr))
         return 1;
 
-    ok = expr_collect_pi_floor_product_local(dv, &coeff, &has_pi, &has_floor) && has_pi && has_floor &&
+    ok = expr_collect_pi_floor_product_local(expr, &coeff, &has_pi, &has_floor) && has_pi && has_floor &&
          num_eq(coeff, NUM_ONE);
     num_destroy(&coeff);
     return ok;
 }
 
-static int expr_is_period_pi_base_local(const expr_t *dv)
+static int expr_is_period_pi_base_local(const expr_t *expr)
 {
-    return expr_is_pi_const_local(dv) || expr_is_pos_pi_times_floor_local(dv);
+    return expr_is_pi_const_local(expr) || expr_is_pos_pi_times_floor_local(expr);
 }
 
 static void expr_free_addends_local(addend_t *terms, size_t n)
@@ -1295,46 +1295,46 @@ static int expr_try_common_abs_coeff_local(const addend_t *terms, size_t n, numb
     return 1;
 }
 
-static bool expr_contains_var_local(const expr_t *dv)
+static bool expr_contains_var_local(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return false;
-    if (expr_is_var(dv))
+    if (expr_is_var(expr))
         return true;
-    return expr_contains_var_local(dv->a) || expr_contains_var_local(dv->b);
+    return expr_contains_var_local(expr->a) || expr_contains_var_local(expr->b);
 }
 
-static bool expr_is_numeric_arithmetic_const_local(const expr_t *dv)
+static bool expr_is_numeric_arithmetic_const_local(const expr_t *expr)
 {
-    if (!expr_is_op(dv, &ops_const) || !num_is_finite(dv->c))
+    if (!expr_is_op(expr, &ops_const) || !num_is_finite(expr->c))
         return false;
 
-    if (num_is_real(dv->c) && !num_is_exact(dv->c) && num_constant_name(dv->c) && !num_eq(dv->c, NUM_I) &&
-        !num_eq(dv->c, NUM_NEG_I))
+    if (num_is_real(expr->c) && !num_is_exact(expr->c) && num_constant_name(expr->c) && !num_eq(expr->c, NUM_I) &&
+        !num_eq(expr->c, NUM_NEG_I))
         return false;
 
-    if (dv->name && *dv->name && !num_eq(dv->c, NUM_I) && !num_eq(dv->c, NUM_NEG_I))
+    if (expr->name && *expr->name && !num_eq(expr->c, NUM_I) && !num_eq(expr->c, NUM_NEG_I))
         return false;
 
-    if (!dv->binding_expr)
+    if (!expr->binding_expr)
         return true;
 
-    return !num_is_real(dv->c) || num_eq(dv->c, NUM_I) || num_eq(dv->c, NUM_NEG_I);
+    return !num_is_real(expr->c) || num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I);
 }
 
-static bool expr_is_pure_numeric_arithmetic_local(const expr_t *dv)
+static bool expr_is_pure_numeric_arithmetic_local(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return false;
 
-    if (expr_is_numeric_arithmetic_const_local(dv))
+    if (expr_is_numeric_arithmetic_const_local(expr))
         return true;
 
-    if (expr_is_op(dv, &ops_neg))
-        return expr_is_pure_numeric_arithmetic_local(dv->a);
+    if (expr_is_op(expr, &ops_neg))
+        return expr_is_pure_numeric_arithmetic_local(expr->a);
 
-    if (expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub) || expr_is_op(dv, &ops_mul) || expr_is_op(dv, &ops_div))
-        return expr_is_pure_numeric_arithmetic_local(dv->a) && expr_is_pure_numeric_arithmetic_local(dv->b);
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub) || expr_is_op(expr, &ops_mul) || expr_is_op(expr, &ops_div))
+        return expr_is_pure_numeric_arithmetic_local(expr->a) && expr_is_pure_numeric_arithmetic_local(expr->b);
 
     return false;
 }
@@ -1386,17 +1386,17 @@ static expr_t *expr_try_fold_numeric_complex_rational_power_local(const expr_t *
     return out;
 }
 
-static expr_t *expr_try_fold_numeric_arithmetic_local(const expr_t *dv, expr_t *a, expr_t *b)
+static expr_t *expr_try_fold_numeric_arithmetic_local(const expr_t *expr, expr_t *a, expr_t *b)
 {
     expr_t *raw;
     number_t value;
     expr_t *out;
 
-    if (!dv || !dv->ops->apply_binary || !expr_is_pure_numeric_arithmetic_local(a) ||
+    if (!expr || !expr->ops->apply_binary || !expr_is_pure_numeric_arithmetic_local(a) ||
         !expr_is_pure_numeric_arithmetic_local(b))
         return NULL;
 
-    raw = dv->ops->apply_binary(a, b);
+    raw = expr->ops->apply_binary(a, b);
     value = expr_eval(raw);
     expr_free(raw);
 
@@ -2060,17 +2060,17 @@ int expr_fold_erfc_const(const number_t *in, number_t *out)
 
 static expr_t *expr_try_simplify_preserved_i_power_local(const expr_binding_expr_t *base_expr, number_t exponent);
 
-static bool expr_is_negative_real_power_local(const expr_t *dv)
+static bool expr_is_negative_real_power_local(const expr_t *expr)
 {
     number_t exponent = num_new();
     bool out = false;
 
-    if (expr_is_pow_d_expr(dv) && dv->a) {
+    if (expr_is_pow_d_expr(expr) && expr->a) {
         num_destroy(&exponent);
-        exponent = num_clone(dv->c);
-    } else if (expr_is_op(dv, &ops_pow) && dv->a && dv->b && expr_simplify_is_plain_real_const(dv->b)) {
+        exponent = num_clone(expr->c);
+    } else if (expr_is_op(expr, &ops_pow) && expr->a && expr->b && expr_simplify_is_plain_real_const(expr->b)) {
         num_destroy(&exponent);
-        exponent = num_clone(dv->b->c);
+        exponent = num_clone(expr->b->c);
     } else {
         num_destroy(&exponent);
         return false;
@@ -2081,7 +2081,7 @@ static bool expr_is_negative_real_power_local(const expr_t *dv)
     return out;
 }
 
-static bool expr_collect_negative_power_as_reciprocal_local(expr_t *dv, int in_denominator, expr_t ***terms,
+static bool expr_collect_negative_power_as_reciprocal_local(expr_t *expr, int in_denominator, expr_t ***terms,
                                                             size_t *nterms, size_t *term_cap, expr_t ***den_terms,
                                                             size_t *nden_terms, size_t *den_cap)
 {
@@ -2090,14 +2090,14 @@ static bool expr_collect_negative_power_as_reciprocal_local(expr_t *dv, int in_d
     number_t positive_exponent;
     expr_t *factor;
 
-    if (expr_is_pow_d_expr(dv) && dv->a) {
-        base = dv->a;
+    if (expr_is_pow_d_expr(expr) && expr->a) {
+        base = expr->a;
         num_destroy(&exponent);
-        exponent = num_clone(dv->c);
-    } else if (expr_is_op(dv, &ops_pow) && dv->a && dv->b && expr_simplify_is_plain_real_const(dv->b)) {
-        base = dv->a;
+        exponent = num_clone(expr->c);
+    } else if (expr_is_op(expr, &ops_pow) && expr->a && expr->b && expr_simplify_is_plain_real_const(expr->b)) {
+        base = expr->a;
         num_destroy(&exponent);
-        exponent = num_clone(dv->b->c);
+        exponent = num_clone(expr->b->c);
     } else {
         num_destroy(&exponent);
         return false;
@@ -2125,7 +2125,7 @@ static bool expr_collect_negative_power_as_reciprocal_local(expr_t *dv, int in_d
 /* Multiplication flattening                                                  */
 /* ========================================================================= */
 
-static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t ***terms, size_t *nterms, size_t *cap)
+static void collect_mul_flat(expr_t *expr, number_t *c_acc, int *is_zero, expr_t ***terms, size_t *nterms, size_t *cap)
 {
     NUM_SCOPE(scope);
     if (*is_zero) {
@@ -2133,11 +2133,11 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
         return;
     }
 
-    if (expr_is_op(dv, &ops_const) && (num_eq(dv->c, NUM_I) || num_eq(dv->c, NUM_NEG_I)) &&
-        (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
-         dv->binding_expr->kind == EXPR_BINDING_EXPR_CONST)) {
+    if (expr_is_op(expr, &ops_const) && (num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I)) &&
+        (!expr->binding_expr || expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
+         expr->binding_expr->kind == EXPR_BINDING_EXPR_CONST)) {
         NUM_SCOPE_SUSPEND(saved_scope);
-        number_t product = num_mul(*c_acc, dv->c);
+        number_t product = num_mul(*c_acc, expr->c);
 
         num_destroy(c_acc);
         *c_acc = product;
@@ -2145,16 +2145,16 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
         return;
     }
 
-    if (expr_is_unnamed_const(dv) && (num_is_exact(dv->c) || !num_constant_name(dv->c)) &&
-        (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER)) {
-        if (num_is_zero(dv->c)) {
+    if (expr_is_unnamed_const(expr) && (num_is_exact(expr->c) || !num_constant_name(expr->c)) &&
+        (!expr->binding_expr || expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER)) {
+        if (num_is_zero(expr->c)) {
             *is_zero = 1;
             num_scope_leave(&(scope));
             return;
         }
         {
             NUM_SCOPE_SUSPEND(saved_scope);
-            number_t product = num_mul(*c_acc, dv->c);
+            number_t product = num_mul(*c_acc, expr->c);
 
             num_destroy(c_acc);
             *c_acc = product;
@@ -2162,11 +2162,11 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
         num_scope_leave(&(scope));
         return;
     }
-    if (expr_is_unnamed_const(dv) && num_is_real(dv->c) && dv->binding_expr) {
+    if (expr_is_unnamed_const(expr) && num_is_real(expr->c) && expr->binding_expr) {
         number_t coeff;
         expr_binding_expr_t *rest_expr = NULL;
 
-        if (expr_binding_expr_split_leading_number(dv->binding_expr, &coeff, &rest_expr)) {
+        if (expr_binding_expr_split_leading_number(expr->binding_expr, &coeff, &rest_expr)) {
             if (num_is_zero(coeff)) {
                 num_destroy(&coeff);
                 expr_binding_expr_free(rest_expr);
@@ -2196,8 +2196,8 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
             return;
         }
     }
-    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_DIV) {
-        expr_t *expanded = expr_binding_expr_eval_expr(dv->binding_expr);
+    if (expr_is_unnamed_const(expr) && expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_DIV) {
+        expr_t *expanded = expr_binding_expr_eval_expr(expr->binding_expr);
 
         if (expanded) {
             collect_mul_flat(expanded, c_acc, is_zero, terms, nterms, cap);
@@ -2206,11 +2206,11 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
             return;
         }
     }
-    if (expr_is_unnamed_const(dv) && dv->binding_expr) {
+    if (expr_is_unnamed_const(expr) && expr->binding_expr) {
         expr_binding_expr_t *base_expr = NULL;
         number_t exponent;
 
-        if (binding_expr_power_base_local(dv->binding_expr, &base_expr, &exponent)) {
+        if (binding_expr_power_base_local(expr->binding_expr, &base_expr, &exponent)) {
             expr_t *i_power = expr_try_simplify_preserved_i_power_local(base_expr, exponent);
 
             if (i_power) {
@@ -2237,7 +2237,7 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
         }
     }
     {
-        expr_t *positive = expr_simplify_positive_part_if_negative(dv);
+        expr_t *positive = expr_simplify_positive_part_if_negative(expr);
 
         if (positive) {
             NUM_SCOPE_SUSPEND(saved_scope);
@@ -2251,34 +2251,34 @@ static void collect_mul_flat(expr_t *dv, number_t *c_acc, int *is_zero, expr_t *
             return;
         }
     }
-    if (expr_is_op(dv, &ops_neg)) {
+    if (expr_is_op(expr, &ops_neg)) {
         NUM_SCOPE_SUSPEND(saved_scope);
         number_t negated = num_neg(*c_acc);
 
         num_destroy(c_acc);
         *c_acc = negated;
         num_scope_leave(&(scope));
-        collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
+        collect_mul_flat(expr->a, c_acc, is_zero, terms, nterms, cap);
         return;
     }
-    if (expr_is_op(dv, &ops_mul)) {
+    if (expr_is_op(expr, &ops_mul)) {
         num_scope_leave(&(scope));
-        collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
-        collect_mul_flat(dv->b, c_acc, is_zero, terms, nterms, cap);
+        collect_mul_flat(expr->a, c_acc, is_zero, terms, nterms, cap);
+        collect_mul_flat(expr->b, c_acc, is_zero, terms, nterms, cap);
         return;
     }
     if (*nterms == *cap) {
         *cap = (*cap == 0 ? 4 : *cap * 2);
         *terms = expr_xrealloc(*terms, *cap * sizeof(expr_t *));
     }
-    expr_retain(dv);
-    (*terms)[(*nterms)++] = dv;
+    expr_retain(expr);
+    (*terms)[(*nterms)++] = expr;
     num_scope_leave(&(scope));
 }
 
-static bool expr_is_exact_zero_node_local(const expr_t *dv)
+static bool expr_is_exact_zero_node_local(const expr_t *expr)
 {
-    return dv == EXPR_ZERO || (expr_simplify_is_simplifiable_const(dv) && expr_const_is_zero(dv));
+    return expr == EXPR_ZERO || (expr_simplify_is_simplifiable_const(expr) && expr_const_is_zero(expr));
 }
 
 static expr_t *expr_try_simplify_i_power_local(expr_t *base, number_t exponent)
@@ -2431,7 +2431,7 @@ static expr_t *expr_try_simplify_preserved_i_power_local(const expr_binding_expr
     return out;
 }
 
-static void collect_quotient_flat(expr_t *dv, int in_denominator, number_t *c_acc, int *is_zero, expr_t ***terms,
+static void collect_quotient_flat(expr_t *expr, int in_denominator, number_t *c_acc, int *is_zero, expr_t ***terms,
                                   size_t *nterms, size_t *term_cap, expr_t ***den_terms, size_t *nden_terms,
                                   size_t *den_cap)
 {
@@ -2442,28 +2442,28 @@ static void collect_quotient_flat(expr_t *dv, int in_denominator, number_t *c_ac
         return;
     }
 
-    if (expr_simplify_is_plain_real_const(dv) && (num_is_exact(dv->c) || !num_constant_name(dv->c))) {
+    if (expr_simplify_is_plain_real_const(expr) && (num_is_exact(expr->c) || !num_constant_name(expr->c))) {
         NUM_SCOPE_SUSPEND(saved_scope);
         number_t next;
 
-        if (num_is_zero(dv->c) && !in_denominator) {
+        if (num_is_zero(expr->c) && !in_denominator) {
             *is_zero = 1;
             num_scope_leave(&(scope));
             return;
         }
 
-        next = in_denominator ? num_div(*c_acc, dv->c) : num_mul(*c_acc, dv->c);
+        next = in_denominator ? num_div(*c_acc, expr->c) : num_mul(*c_acc, expr->c);
         num_destroy(c_acc);
         *c_acc = next;
         num_scope_leave(&(scope));
         return;
     }
 
-    if (expr_is_unnamed_const(dv) && num_is_real(dv->c) && dv->binding_expr) {
+    if (expr_is_unnamed_const(expr) && num_is_real(expr->c) && expr->binding_expr) {
         expr_binding_expr_t *base_expr = NULL;
         number_t exponent;
 
-        if (binding_expr_power_base_local(dv->binding_expr, &base_expr, &exponent)) {
+        if (binding_expr_power_base_local(expr->binding_expr, &base_expr, &exponent)) {
             expr_t *base = expr_from_preserved_binding_expr_local(base_expr);
             expr_t *powered = base ? expr_pow(base, &exponent) : NULL;
 
@@ -2480,48 +2480,48 @@ static void collect_quotient_flat(expr_t *dv, int in_denominator, number_t *c_ac
         }
     }
 
-    if (expr_is_op(dv, &ops_neg)) {
+    if (expr_is_op(expr, &ops_neg)) {
         NUM_SCOPE_SUSPEND(saved_scope);
         number_t negated = num_neg(*c_acc);
 
         num_destroy(c_acc);
         *c_acc = negated;
         num_scope_leave(&(scope));
-        collect_quotient_flat(dv->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
+        collect_quotient_flat(expr->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
                               den_cap);
         return;
     }
 
-    if (expr_is_op(dv, &ops_mul)) {
+    if (expr_is_op(expr, &ops_mul)) {
         num_scope_leave(&(scope));
-        collect_quotient_flat(dv->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
+        collect_quotient_flat(expr->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
                               den_cap);
-        collect_quotient_flat(dv->b, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
+        collect_quotient_flat(expr->b, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
                               den_cap);
         return;
     }
 
-    if (expr_is_div(dv)) {
+    if (expr_is_div(expr)) {
         num_scope_leave(&(scope));
-        collect_quotient_flat(dv->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
+        collect_quotient_flat(expr->a, in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
                               den_cap);
-        collect_quotient_flat(dv->b, !in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
+        collect_quotient_flat(expr->b, !in_denominator, c_acc, is_zero, terms, nterms, term_cap, den_terms, nden_terms,
                               den_cap);
         return;
     }
 
-    if (expr_collect_negative_power_as_reciprocal_local(dv, in_denominator, terms, nterms, term_cap, den_terms,
+    if (expr_collect_negative_power_as_reciprocal_local(expr, in_denominator, terms, nterms, term_cap, den_terms,
                                                         nden_terms, den_cap)) {
         num_scope_leave(&(scope));
         return;
     }
 
     if (in_denominator) {
-        expr_retain(dv);
-        expr_append_node(den_terms, nden_terms, den_cap, dv);
+        expr_retain(expr);
+        expr_append_node(den_terms, nden_terms, den_cap, expr);
     } else {
-        expr_retain(dv);
-        expr_append_node(terms, nterms, term_cap, dv);
+        expr_retain(expr);
+        expr_append_node(terms, nterms, term_cap, expr);
     }
 
     num_scope_leave(&(scope));
@@ -2731,21 +2731,21 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
 /* Unary function simplification                                             */
 /* ========================================================================= */
 
-expr_t *expr_simplify_passthrough(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_passthrough(const expr_t *expr, expr_t *a, expr_t *b)
 {
     if (a)
         expr_free(a);
     if (b)
         expr_free(b);
-    expr_retain((expr_t *)dv);
-    return (expr_t *)dv;
+    expr_retain((expr_t *)expr);
+    return (expr_t *)expr;
 }
 
-expr_t *expr_simplify_rebuild_binary_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_rebuild_binary_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
-    if (!dv || !a || !b)
-        return expr_simplify_passthrough(dv, a, b);
-    return expr_new_binary_internal(dv->ops, a, b);
+    if (!expr || !a || !b)
+        return expr_simplify_passthrough(expr, a, b);
+    return expr_new_binary_internal(expr->ops, a, b);
 }
 
 /* Write -k*(u-v) as k*(v-u) in exponential arguments, retaining the magnitude of the scale. */
@@ -2786,7 +2786,7 @@ cleanup:
     return out;
 }
 
-expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_unary_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
     expr_t *branch_inverse;
@@ -2796,14 +2796,14 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
     (void)b;
     /* Literal real magnitudes are exact; named and symbolic constants retain their identity. */
-    if (expr_is_op(dv, &ops_abs) && expr_simplify_is_plain_real_const(a) && num_is_finite(a->c)) {
+    if (expr_is_op(expr, &ops_abs) && expr_simplify_is_plain_real_const(a) && num_is_finite(a->c)) {
         expr_t *out = expr_new_const_owned_local(num_abs(a->c));
 
         expr_free(a);
         return out;
     }
     /* Preserve the exact dilogarithm endpoint values needed by definite integration. */
-    if (expr_is_op(dv, &ops_dilog) && expr_simplify_allows_const_identity_fold(a) &&
+    if (expr_is_op(expr, &ops_dilog) && expr_simplify_allows_const_identity_fold(a) &&
         (num_is_zero(a->c) || num_eq(a->c, NUM_ONE) || num_eq(a->c, NUM_NEG_ONE))) {
         expr_t *out = NULL;
 
@@ -2822,7 +2822,7 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return out;
         }
     }
-    if (expr_is_exp_expr(dv)) {
+    if (expr_is_exp_expr(expr)) {
         expr_t *positive_scale = expr_simplify_reverse_negative_difference_local(a);
 
         if (positive_scale) {
@@ -2844,7 +2844,7 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    if (expr_is_op(dv, &ops_lambert_w) || expr_is_op(dv, &ops_lambert_w0)) {
+    if (expr_is_op(expr, &ops_lambert_w) || expr_is_op(expr, &ops_lambert_w0)) {
         lambert_argument = expr_simplify_try_lambert_argument(a);
         if (lambert_argument) {
             expr_free(a);
@@ -2852,34 +2852,34 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    direct_inverse = expr_simplify_direct_inverse_pair_from_raw(dv, dv->a, a);
+    direct_inverse = expr_simplify_direct_inverse_pair_from_raw(expr, expr->a, a);
     if (direct_inverse)
         return direct_inverse;
 
-    if (expr_is_op(dv, &ops_atan)) {
+    if (expr_is_op(expr, &ops_atan)) {
         branch_inverse = expr_simplify_atan_tan_sawtooth(a);
         if (branch_inverse)
             return branch_inverse;
     }
 
-    direct_inverse = expr_simplify_direct_inverse_pair(dv, a);
+    direct_inverse = expr_simplify_direct_inverse_pair(expr, a);
     if (direct_inverse)
         return direct_inverse;
 
-    direct_inverse = expr_simplify_try_vtable_inverse_argument(dv, a);
+    direct_inverse = expr_simplify_try_vtable_inverse_argument(expr, a);
     if (direct_inverse) {
         expr_free(a);
         return direct_inverse;
     }
 
-    if (expr_is_op(dv, &ops_tan)) {
+    if (expr_is_op(expr, &ops_tan)) {
         expr_t *periodic = expr_try_simplify_tan_period_floor(a);
 
         if (periodic)
             return periodic;
     }
 
-    if (expr_is_op(dv, &ops_tanh)) {
+    if (expr_is_op(expr, &ops_tanh)) {
         const expr_t *positive_argument = NULL;
 
         if (expr_is_neg(a) && a->a) {
@@ -2894,11 +2894,11 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    imag_bridge = expr_simplify_try_imag_trig_bridge(dv, a);
+    imag_bridge = expr_simplify_try_imag_trig_bridge(expr, a);
     if (imag_bridge)
         return imag_bridge;
 
-    if (expr_is_op(dv, &ops_log10)) {
+    if (expr_is_op(expr, &ops_log10)) {
         expr_t *log10_power = expr_simplify_try_log10_power_of_ten(a);
 
         if (log10_power)
@@ -2906,27 +2906,27 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     {
-        expr_t *floor_ceil_const = expr_simplify_try_floor_ceil_const(dv, a);
+        expr_t *floor_ceil_const = expr_simplify_try_floor_ceil_const(expr, a);
 
         if (floor_ceil_const)
             return floor_ceil_const;
     }
 
     {
-        expr_t *const_fold = expr_simplify_try_unary_const_fold(dv, a);
+        expr_t *const_fold = expr_simplify_try_unary_const_fold(expr, a);
 
         if (const_fold)
             return const_fold;
     }
 
     {
-        expr_t *value_fold = expr_simplify_try_unary_const_value_fold(dv, a);
+        expr_t *value_fold = expr_simplify_try_unary_const_value_fold(expr, a);
 
         if (value_fold)
             return value_fold;
     }
 
-    if (expr_is_op(dv, &ops_sqrt)) {
+    if (expr_is_op(expr, &ops_sqrt)) {
         expr_t *sqrt_scaled = expr_simplify_try_sqrt_scaled_square_const(a);
 
         if (sqrt_scaled)
@@ -2934,12 +2934,12 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     /* Canonicalise the argument without splitting logarithms or roots, preserving their branches. */
-    if (expr_is_op(dv, &ops_log) || expr_is_op(dv, &ops_log10) ||
-        expr_is_op(dv, &ops_sqrt) || expr_is_op(dv, &ops_cubrt)) {
+    if (expr_is_op(expr, &ops_log) || expr_is_op(expr, &ops_log10) ||
+        expr_is_op(expr, &ops_sqrt) || expr_is_op(expr, &ops_cubrt)) {
         expr_t *reversed = expr_simplify_reverse_negative_difference_local(a);
 
         if (reversed) {
-            expr_t *out = dv->ops->apply_unary(reversed);
+            expr_t *out = expr->ops->apply_unary(reversed);
 
             expr_free(reversed);
             expr_free(a);
@@ -2947,30 +2947,30 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    if (dv->ops->apply_unary && a != dv->a) {
-        expr_t *out = dv->ops->apply_unary(a);
+    if (expr->ops->apply_unary && a != expr->a) {
+        expr_t *out = expr->ops->apply_unary(a);
         expr_free(a);
         return out;
     }
 
     expr_free(a);
-    expr_retain((expr_t *)dv);
-    return (expr_t *)dv;
+    expr_retain((expr_t *)expr);
+    return (expr_t *)expr;
 }
 
-expr_t *expr_simplify_binary_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_binary_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
-    if ((!a || !b) || !dv->ops->apply_binary) {
-        return expr_simplify_passthrough(dv, a, b);
+    if ((!a || !b) || !expr->ops->apply_binary) {
+        return expr_simplify_passthrough(expr, a, b);
     }
 
-    expr_t *out = dv->ops->apply_binary(a, b);
+    expr_t *out = expr->ops->apply_binary(a, b);
     expr_free(a);
     expr_free(b);
     return out;
 }
 
-expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_root_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     long numerator;
     long denominator;
@@ -2979,8 +2979,8 @@ expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b)
     long root_numerator;
     long root_denominator;
 
-    if (!dv || !a || !b)
-        return expr_simplify_passthrough(dv, a, b);
+    if (!expr || !a || !b)
+        return expr_simplify_passthrough(expr, a, b);
 
     if (expr_is_unnamed_const(b) && num_get_small_rational(b->c, &order, &order_denominator) &&
         order_denominator == 1L && order > 1L) {
@@ -3017,17 +3017,17 @@ expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    return expr_simplify_binary_operator(dv, a, b);
+    return expr_simplify_binary_operator(expr, a, b);
 }
 
 /* ========================================================================= */
 /* Per-operation simplifiers                                                 */
 /* ========================================================================= */
 
-expr_t *expr_simplify_neg_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_neg_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
-    (void)dv;
+    (void)expr;
     (void)b;
     {
         expr_t *positive = expr_simplify_positive_part_if_negative(a);
@@ -3447,7 +3447,7 @@ static bool expr_contains_arbitrary_function_local(const expr_t *expr)
                     expr_contains_arbitrary_function_local(expr->b));
 }
 
-expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_add_sub_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
     number_t c_const = num_const(NUM_ZERO);
@@ -3455,7 +3455,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
     addend_t *terms = NULL;
     size_t n = 0, cap = 0;
     int combined_atan_difference = 0;
-    expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(dv, a, b);
+    expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(expr, a, b);
 
     if (folded_numeric) {
         expr_free(a);
@@ -3465,7 +3465,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         return folded_numeric;
     }
 
-    if (expr_polynomial_is_zero_deg4(dv)) {
+    if (expr_polynomial_is_zero_deg4(expr)) {
         expr_free(a);
         expr_free(b);
         num_destroy(&c_const);
@@ -3473,7 +3473,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         return expr_new_const(NUM_ZERO);
     }
 
-    if (expr_is_op(dv, &ops_add)) {
+    if (expr_is_op(expr, &ops_add)) {
         expr_t *euler_exp = expr_simplify_try_euler_sum_exp_local(a, b);
 
         if (euler_exp) {
@@ -3504,7 +3504,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    if (expr_is_op(dv, &ops_sub)) {
+    if (expr_is_op(expr, &ops_sub)) {
         expr_t *atan_difference = expr_try_simplify_atan_const_difference_local(a, b);
 
         if (atan_difference) {
@@ -3516,7 +3516,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    if (expr_is_op(dv, &ops_sub)) {
+    if (expr_is_op(expr, &ops_sub)) {
         expr_t *log_difference = expr_try_simplify_log_const_difference_local(a, b);
 
         if (log_difference) {
@@ -3527,7 +3527,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return log_difference;
         }
     }
-    if (expr_is_op(dv, &ops_add)) {
+    if (expr_is_op(expr, &ops_add)) {
         expr_t *log_difference = NULL;
 
         if (expr_is_op(a, &ops_neg))
@@ -3546,7 +3546,7 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
     expr_collect_addends(a, NUM_ONE, &c_const, &terms, &n, &cap);
     expr_free(a);
-    expr_collect_addends(b, expr_is_op(dv, &ops_sub) ? NUM_NEG_ONE : NUM_ONE, &c_const, &terms, &n, &cap);
+    expr_collect_addends(b, expr_is_op(expr, &ops_sub) ? NUM_NEG_ONE : NUM_ONE, &c_const, &terms, &n, &cap);
     expr_free(b);
 
     expr_combine_atan_sum_addends_local(terms, n);
@@ -3743,7 +3743,7 @@ static expr_t *expr_simplify_try_squared_quotient_sum_product_local(const expr_t
     return expanded;
 }
 
-expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_mul_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
     expr_t **terms = NULL;
@@ -3758,7 +3758,7 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_t *division;
 
     {
-        expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(dv, a, b);
+        expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(expr, a, b);
 
         if (folded_numeric) {
             expr_free(a);
@@ -4008,10 +4008,10 @@ cleanup:
     return out;
 }
 
-static bool expr_simplify_is_exp_minus_one_local(const expr_t *dv)
+static bool expr_simplify_is_exp_minus_one_local(const expr_t *expr)
 {
-    return dv && expr_is_exp_expr(dv) && dv->a && expr_simplify_is_simplifiable_const(dv->a) &&
-           expr_const_is_minus_one(dv->a);
+    return expr && expr_is_exp_expr(expr) && expr->a && expr_simplify_is_simplifiable_const(expr->a) &&
+           expr_const_is_minus_one(expr->a);
 }
 
 static expr_t *expr_simplify_try_const_over_e_local(expr_t *a, expr_t *b)
@@ -4848,7 +4848,7 @@ static bool expr_clone_effective_power_local(const expr_t *expr, expr_t **base_o
     return false;
 }
 
-expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
 
@@ -4883,7 +4883,7 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
     {
-        expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(dv, a, b);
+        expr_t *folded_numeric = expr_try_fold_numeric_arithmetic_local(expr, a, b);
 
         if (folded_numeric) {
             expr_free(a);
@@ -5185,7 +5185,7 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         simp = expr_simplify(quot);
         expr_free(quot);
         expr_free(a);
-        return expr_simplify_neg_operator(dv, simp, NULL);
+        return expr_simplify_neg_operator(expr, simp, NULL);
     }
     if (expr_simplify_is_plain_real_const(b) && expr_is_addsub(a)) {
         number_t c_const = num_const(NUM_ZERO);
@@ -5688,11 +5688,11 @@ cleanup:
     return out;
 }
 
-expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
     (void)b;
-    number_t exponent = dv->c;
+    number_t exponent = expr->c;
 
     if (num_eq(exponent, NUM_ONE)) {
         return a;
@@ -5884,9 +5884,9 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
 /* --- */
 
-expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_pow_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
-    (void)dv;
+    (void)expr;
     if (expr_is_op(a, &ops_neg) && expr_simplify_is_plain_real_const(b) &&
         num_is_finite(b->c) && num_is_integer(b->c)) {
         expr_t *out = expr_make_pow_like_owned_local(a, b->c);
@@ -5987,9 +5987,9 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
 /* --- */
 
-expr_t *expr_simplify_hypot_operator(const expr_t *dv, expr_t *a, expr_t *b)
+expr_t *expr_simplify_hypot_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
-    (void)dv;
+    (void)expr;
 
     if (expr_is_op(a, &ops_const) && expr_const_is_zero(a)) {
         expr_free(a);
@@ -6004,74 +6004,74 @@ expr_t *expr_simplify_hypot_operator(const expr_t *dv, expr_t *a, expr_t *b)
         return r;
     }
 
-    return expr_simplify_binary_operator(dv, a, b);
+    return expr_simplify_binary_operator(expr, a, b);
 }
 
 /* ========================================================================= */
 /* Main dispatcher                                                            */
 /* ========================================================================= */
 
-static uint64_t expr_simplify_subtree_epoch(const expr_t *dv)
+static uint64_t expr_simplify_subtree_epoch(const expr_t *expr)
 {
     uint64_t epoch;
     uint64_t child_epoch;
 
-    if (!dv)
+    if (!expr)
         return 0;
 
-    epoch = dv->epoch;
+    epoch = expr->epoch;
 
-    child_epoch = expr_simplify_subtree_epoch(dv->a);
+    child_epoch = expr_simplify_subtree_epoch(expr->a);
     if (child_epoch > epoch)
         epoch = child_epoch;
 
-    child_epoch = expr_simplify_subtree_epoch(dv->b);
+    child_epoch = expr_simplify_subtree_epoch(expr->b);
     if (child_epoch > epoch)
         epoch = child_epoch;
 
     return epoch;
 }
 
-static bool expr_simplify_is_current(const expr_t *dv)
+static bool expr_simplify_is_current(const expr_t *expr)
 {
-    return dv && dv->simplified && expr_simplify_subtree_epoch(dv) <= dv->simplify_epoch;
+    return expr && expr->simplified && expr_simplify_subtree_epoch(expr) <= expr->simplify_epoch;
 }
 
-static expr_t *expr_simplify_mark_current(expr_t *dv)
+static expr_t *expr_simplify_mark_current(expr_t *expr)
 {
-    if (dv) {
-        dv->simplified = true;
-        dv->simplify_epoch = expr_simplify_subtree_epoch(dv);
+    if (expr) {
+        expr->simplified = true;
+        expr->simplify_epoch = expr_simplify_subtree_epoch(expr);
     }
-    return dv;
+    return expr;
 }
 
-static expr_t *expr_simplify_once(const expr_t *dv)
+static expr_t *expr_simplify_once(const expr_t *expr)
 {
     expr_t *out;
 
-    if (!dv)
+    if (!expr)
         return NULL;
 
-    if (expr_simplify_is_current(dv)) {
-        expr_retain(dv);
-        return (expr_t *)dv;
+    if (expr_simplify_is_current(expr)) {
+        expr_retain(expr);
+        return (expr_t *)expr;
     }
 
-    if (dv->ops->arity == EXPR_OP_ATOM) {
-        expr_retain(dv);
-        return expr_simplify_mark_current((expr_t *)dv);
+    if (expr->ops->arity == EXPR_OP_ATOM) {
+        expr_retain(expr);
+        return expr_simplify_mark_current((expr_t *)expr);
     }
 
-    expr_t *a = dv->a ? expr_simplify(dv->a) : NULL;
-    expr_t *b = dv->b ? expr_simplify(dv->b) : NULL;
+    expr_t *a = expr->a ? expr_simplify(expr->a) : NULL;
+    expr_t *b = expr->b ? expr_simplify(expr->b) : NULL;
 
-    if (dv->ops->simplify)
-        out = dv->ops->simplify(dv, a, b);
+    if (expr->ops->simplify)
+        out = expr->ops->simplify(expr, a, b);
     else
-        out = expr_simplify_passthrough(dv, a, b);
+        out = expr_simplify_passthrough(expr, a, b);
 
-    if (out && out != dv) {
+    if (out && out != expr) {
         expr_t *cartesian_root = expr_simplify_try_cartesian_root_local(out);
 
         if (cartesian_root) {
@@ -6080,27 +6080,27 @@ static expr_t *expr_simplify_once(const expr_t *dv)
         }
     }
 
-    if (out == dv)
+    if (out == expr)
         return expr_simplify_mark_current(out);
 
     return out;
 }
 
-static expr_t *expr_simplify_impl(const expr_t *dv)
+static expr_t *expr_simplify_impl(const expr_t *expr)
 {
     enum { MAX_SIMPLIFY_PASSES = 64 };
     expr_t *cur;
     unsigned pass;
 
-    if (!dv)
+    if (!expr)
         return NULL;
 
-    if (expr_simplify_is_current(dv)) {
-        expr_retain(dv);
-        return (expr_t *)dv;
+    if (expr_simplify_is_current(expr)) {
+        expr_retain(expr);
+        return (expr_t *)expr;
     }
 
-    cur = expr_simplify_once(dv);
+    cur = expr_simplify_once(expr);
     if (!cur)
         return NULL;
 
@@ -6134,18 +6134,18 @@ static expr_t *expr_simplify_impl(const expr_t *dv)
 }
 
 /* Simplify an expression while bounding recursion through exceptionally deep or cyclic rewrite trees. */
-expr_t *expr_simplify(const expr_t *dv)
+expr_t *expr_simplify(const expr_t *expr)
 {
     static _Thread_local size_t simplify_depth;
     expr_t *out;
 
-    if (!dv)
+    if (!expr)
         return NULL;
-    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
-        dv->binding_expr->u.unary_op.ops == &ops_sqrt) {
+    if (expr_is_unnamed_const(expr) && expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
         number_t exact_sqrt_seed = num_new();
 
-        if (expr_exact_principal_sqrt_seed(dv, &exact_sqrt_seed)) {
+        if (expr_exact_principal_sqrt_seed(expr, &exact_sqrt_seed)) {
             out = num_is_real(exact_sqrt_seed) ? expr_new_const(exact_sqrt_seed)
                                                : expr_new_cartesian_const_local(exact_sqrt_seed);
             num_destroy(&exact_sqrt_seed);
@@ -6154,11 +6154,11 @@ expr_t *expr_simplify(const expr_t *dv)
         num_destroy(&exact_sqrt_seed);
     }
     if (simplify_depth >= 128u) {
-        expr_retain(dv);
-        return (expr_t *)dv;
+        expr_retain(expr);
+        return (expr_t *)expr;
     }
     simplify_depth++;
-    out = expr_simplify_impl(dv);
+    out = expr_simplify_impl(expr);
     simplify_depth--;
     return out;
 }

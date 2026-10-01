@@ -16,14 +16,14 @@ static bool expr_is_op_kind(const expr_t *expr, expr_op_kind_t kind)
     return expr && expr->ops && expr->ops->kind == kind;
 }
 
-bool expr_is_exact_zero(const expr_t *dv)
+bool expr_is_exact_zero(const expr_t *expr)
 {
-    return expr_is_op_kind(dv, EXPR_KIND_CONST) && !dv->name && num_eq(dv->c, NUM_ZERO);
+    return expr_is_op_kind(expr, EXPR_KIND_CONST) && !expr->name && num_eq(expr->c, NUM_ZERO);
 }
 
-bool expr_is_named_const(const expr_t *dv)
+bool expr_is_named_const(const expr_t *expr)
 {
-    return expr_is_op_kind(dv, EXPR_KIND_CONST) && dv->name && *dv->name;
+    return expr_is_op_kind(expr, EXPR_KIND_CONST) && expr->name && *expr->name;
 }
 
 /* Report whether an expression is a formal summation. */
@@ -309,11 +309,11 @@ static bool expr_match_scaled_inner(const expr_t *factor, const expr_t *other, n
     return true;
 }
 
-static int expr_match_var_index(size_t nvars, expr_t *const *vars, const expr_t *dv)
+static int expr_match_var_index(size_t nvars, expr_t *const *vars, const expr_t *expr)
 {
     for (size_t i = 0; i < nvars; ++i)
-        if (vars[i] == dv ||
-            (expr_is_var(vars[i]) && expr_is_var(dv) && vars[i]->var_id != 0 && vars[i]->var_id == dv->var_id))
+        if (vars[i] == expr ||
+            (expr_is_var(vars[i]) && expr_is_var(expr) && vars[i]->var_id != 0 && vars[i]->var_id == expr->var_id))
             return (int)i;
     return -1;
 }

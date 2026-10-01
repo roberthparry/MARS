@@ -315,11 +315,11 @@ done:
     return ok;
 }
 
-static void mat_collect_expr_bindings(const expr_t *dv, string_t ***var_bindings, size_t *nvar_bindings,
+static void mat_collect_expr_bindings(const expr_t *expr, string_t ***var_bindings, size_t *nvar_bindings,
                                      size_t *capvar_bindings, string_t ***const_bindings, size_t *nconst_bindings,
                                      size_t *capconst_bindings, const string_t *binding_text)
 {
-    if (dv && expr_is_named_const(dv) && mat_text_is_nonempty_without_semicolon(binding_text)) {
+    if (expr && expr_is_named_const(expr) && mat_text_is_nonempty_without_semicolon(binding_text)) {
         mat_append_binding(const_bindings, nconst_bindings, capconst_bindings, string_clone(binding_text));
         return;
     }
@@ -786,7 +786,7 @@ static void mat_emit_numeric_cells_real_imaginary_TeX(mat_buf_t *out, string_t *
     mb_puts(out, "\\end{aligned}");
 }
 
-static int mat_split_expr_repr(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
+static int mat_split_expr_repr(const expr_t *expr, string_t **expr_out, string_t **bindings_out)
 {
     string_t *tmp_text;
     string_t *expr_text = NULL;
@@ -802,13 +802,13 @@ static int mat_split_expr_repr(const expr_t *dv, string_t **expr_out, string_t *
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (!dv) {
+    if (!expr) {
         *expr_out = string_new_with("NULL");
         *bindings_out = string_new_with("");
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
-    tmp_text = expr_to_text(dv, style_EXPRESSION);
+    tmp_text = expr_to_text(expr, style_EXPRESSION);
     if (!tmp_text)
         return -1;
 
@@ -870,19 +870,19 @@ done:
     return ok ? 0 : -1;
 }
 
-static int mat_expr_TeX_parts_text(const expr_t *dv, string_t **expr_out, string_t **bindings_out)
+static int mat_expr_TeX_parts_text(const expr_t *expr, string_t **expr_out, string_t **bindings_out)
 {
-    char *expr = NULL;
+    char *expression_text = NULL;
     char *bindings = NULL;
     int ok;
 
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (expr_to_TeX_parts(dv, &expr, &bindings) != 0)
+    if (expr_to_TeX_parts(expr, &expression_text, &bindings) != 0)
         return -1;
 
-    *expr_out = mat_string_from_owned_cstr(expr);
+    *expr_out = mat_string_from_owned_cstr(expression_text);
     *bindings_out = mat_string_from_owned_cstr(bindings);
     ok = *expr_out && *bindings_out;
     if (!ok) {

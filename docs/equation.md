@@ -26,7 +26,7 @@ The intended public workflow is:
   isolated form, such as `x = 2` or `E = 2.2749...`.
 
 The initial Ophelia runner can execute generated equation functions and their
-`output(solve(equ(...)))` calls through this API. See
+`outputa(solve(equ(...)))` calls through this API. See
 [Running Function cards](mars-lab.md#running-function-cards) for the supported
 subset and its limitations.
 
@@ -109,7 +109,9 @@ starting bindings retain the existing single-root behaviour.
 The Lab combines verified numerical conjugates into one `±` row in both the
 Rendered TeX and Solutions cards. The native solution set still contains both
 roots; pairing uses the numerical values, not their rounded display text.
-Symbolic solution formulae and parameterised families remain unchanged.
+Exact algebraic conjugates are paired by their expression structure, retaining
+surds and a shared denominator with an equality sign. Parameterised families
+remain separate; numerical evaluations do not establish a symbolic pairing.
 
 The native search, family and interpretation notes are available through
 `equ_solutions_search_note`, `equ_solutions_family_note` and
@@ -147,10 +149,33 @@ their combined real factor
 search, preserves real coefficients for later stages, and avoids the numerical
 drift caused by deflating the two roots independently.
 
+For exact real-coefficient quartics, the solver also attempts to recover a
+rational quadratic factor from a non-real root. A bounded continued-fraction
+search proposes its coefficients; multiplying the proposed factors must reproduce
+every original coefficient in exact arithmetic before they are accepted. The
+quadratic solutions then retain their radicals in the native solution set,
+including Ophelia RUN output. An unverified candidate retains the numerical
+fallback; rounded root values are never promoted to exact surds.
+
+For example, entering this equation in MARS Lab:
+
+```text
+x^4 + x^3 + 3x^2 + 4x + 6 = 0
+```
+
+produces these exact Solutions rows, with the same roots rendered in TeX:
+
+```text
+x = -1 ± i
+x = (1 ± i·√(11))/2
+```
+
+The native solution set and RUN output contain the four individual roots.
+
 Deflation is implemented as an iterative constant-stack loop, so increasing
 the polynomial degree does not increase solver call-stack depth. Coefficient
 storage is allocated from the detected degree rather than a fixed maximum.
-Returned roots are polished against the original polynomial, and repeated
+Numerical roots are polished against the original polynomial, and repeated
 roots are represented once. Complex starting seeds allow polynomials with no
 real roots to return their complex solutions. As with any numerical root
 finder, practical limits are available memory, requested precision, polynomial
@@ -296,8 +321,10 @@ replacing its binding.
 - `equ_to_text(..., style_FUNCTION)` produces an equation-valued callable
   that preserves the left- and right-hand expressions, notes unbound variables
   with a Function-style line comment beginning with two backticks, then uses
-  the compact `output(solve(equ(...))).` form; `solve` is a function call,
-  leaving the full stop for multiplication and statement termination
+  the compact `outputa(solve(equ(...))).` form to retain exact roots; `solve` is
+  a function call, leaving the full stop for multiplication and statement
+  termination. An explicit `output(...)` call instead evaluates roots numerically
+  when possible.
 - `equ_to_text(..., style_UNBOUND)` shows the plain equation body, using compact
   native notation when a solver supplies it (for example, defined spherical
   means instead of expanded angular integrals). This is display text, not a

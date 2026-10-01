@@ -93,16 +93,16 @@ static const char *expr_lookup_default_constant_alias(const char *name)
     return mapped ? mapped : name;
 }
 
-void expr_store_const_num(expr_t *dv, number_t value)
+void expr_store_const_num(expr_t *expr, number_t value)
 {
-    num_destroy(&dv->c);
-    dv->c = num_scope_detach(value);
+    num_destroy(&expr->c);
+    expr->c = num_scope_detach(value);
 }
 
-void expr_store_value_num(expr_t *dv, number_t value)
+void expr_store_value_num(expr_t *expr, number_t value)
 {
-    num_destroy(&dv->x);
-    dv->x = num_scope_detach(value);
+    num_destroy(&expr->x);
+    expr->x = num_scope_detach(value);
 }
 
 bool expr_ops_is_lambert(const expr_ops_t *ops)
@@ -1039,29 +1039,29 @@ string_t *expr_default_constant_canonical_name_text(const string_t *name)
 /* Lifetime                                                                  */
 /* ------------------------------------------------------------------------- */
 
-void expr_retain(const expr_t *dv)
+void expr_retain(const expr_t *expr)
 {
     expr_init_singletons();
-    if (dv)
-        refcount_inc(&((expr_t *)dv)->refcount);
+    if (expr)
+        refcount_inc(&((expr_t *)expr)->refcount);
 }
 
-static void expr_release(expr_t *dv)
+static void expr_release(expr_t *expr)
 {
     expr_t *a;
     expr_t *b;
     expr_deriv_cache_t *ce;
 
-    if (!dv)
+    if (!expr)
         return;
     expr_init_singletons();
-    if (refcount_dec(&dv->refcount) > 1)
+    if (refcount_dec(&expr->refcount) > 1)
         return;
 
-    a = dv->a;
-    b = dv->b;
+    a = expr->a;
+    b = expr->b;
 
-    ce = dv->dx_cache;
+    ce = expr->dx_cache;
     while (ce) {
         expr_deriv_cache_t *next = ce->next;
         expr_release(ce->dx);
@@ -1069,16 +1069,16 @@ static void expr_release(expr_t *dv)
         ce = next;
     }
 
-    if (dv->name)
-        free(dv->name);
-    if (dv->binding_expr)
-        expr_binding_expr_free(dv->binding_expr);
-    for (size_t i = 0u; i < dv->formal_wrt_count; ++i)
-        expr_release(dv->formal_wrts[i]);
-    free(dv->formal_wrts);
-    num_destroy(&dv->c);
-    num_destroy(&dv->x);
-    free(dv);
+    if (expr->name)
+        free(expr->name);
+    if (expr->binding_expr)
+        expr_binding_expr_free(expr->binding_expr);
+    for (size_t i = 0u; i < expr->formal_wrt_count; ++i)
+        expr_release(expr->formal_wrts[i]);
+    free(expr->formal_wrts);
+    num_destroy(&expr->c);
+    num_destroy(&expr->x);
+    free(expr);
 
     expr_release(a);
     expr_release(b);
@@ -1091,30 +1091,30 @@ void expr_free(expr_t *expr)
 
 expr_t *expr_alloc(const expr_ops_t *ops)
 {
-    expr_t *dv = malloc(sizeof *dv);
+    expr_t *expr = malloc(sizeof *expr);
 
-    if (!dv)
+    if (!expr)
         abort();
 
     expr_init_singletons();
-    dv->ops = ops;
-    dv->a = NULL;
-    dv->b = NULL;
-    dv->c = NUM_ZERO;
-    dv->x = NUM_ZERO;
-    dv->x_valid = 0;
-    dv->epoch = 0;
-    dv->simplified = false;
-    dv->simplify_epoch = 0;
-    dv->dx_cache = NULL;
-    dv->name = NULL;
-    dv->binding_expr = NULL;
-    dv->formal_wrts = NULL;
-    dv->formal_wrt_count = 0u;
-    dv->refcount = 1;
-    dv->var_id = 0;
+    expr->ops = ops;
+    expr->a = NULL;
+    expr->b = NULL;
+    expr->c = NUM_ZERO;
+    expr->x = NUM_ZERO;
+    expr->x_valid = 0;
+    expr->epoch = 0;
+    expr->simplified = false;
+    expr->simplify_epoch = 0;
+    expr->dx_cache = NULL;
+    expr->name = NULL;
+    expr->binding_expr = NULL;
+    expr->formal_wrts = NULL;
+    expr->formal_wrt_count = 0u;
+    expr->refcount = 1;
+    expr->var_id = 0;
 
-    return dv;
+    return expr;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1123,23 +1123,23 @@ expr_t *expr_alloc(const expr_ops_t *ops)
 
 expr_t *expr_make_const_num(number_t x)
 {
-    expr_t *dv = expr_alloc(&ops_const);
+    expr_t *expr = expr_alloc(&ops_const);
 
-    expr_store_const_num(dv, x);
-    expr_store_value_num(dv, num_clone(dv->c));
-    dv->x_valid = 1;
-    return dv;
+    expr_store_const_num(expr, x);
+    expr_store_value_num(expr, num_clone(expr->c));
+    expr->x_valid = 1;
+    return expr;
 }
 
 expr_t *expr_make_var_num(number_t x)
 {
-    expr_t *dv = expr_alloc(&ops_var);
+    expr_t *expr = expr_alloc(&ops_var);
 
-    expr_store_const_num(dv, x);
-    expr_store_value_num(dv, num_clone(dv->c));
-    dv->x_valid = 1;
-    dv->var_id = alloc_var_id();
-    return dv;
+    expr_store_const_num(expr, x);
+    expr_store_value_num(expr, num_clone(expr->c));
+    expr->x_valid = 1;
+    expr->var_id = alloc_var_id();
+    return expr;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1156,16 +1156,16 @@ expr_t *expr_new_var(number_t x)
     return expr_make_var_num(num_clone(x));
 }
 
-static expr_t *expr_attach_name(expr_t *dv, const char *name)
+static expr_t *expr_attach_name(expr_t *expr, const char *name)
 {
-    dv->name = expr_normalise_name(name);
-    return dv;
+    expr->name = expr_normalise_name(name);
+    return expr;
 }
 
-static expr_t *expr_attach_name_text(expr_t *dv, const string_t *name)
+static expr_t *expr_attach_name_text(expr_t *expr, const string_t *name)
 {
-    dv->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
-    return dv;
+    expr->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
+    return expr;
 }
 
 expr_t *expr_new_named_const(number_t x, const char *name)

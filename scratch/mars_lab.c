@@ -477,14 +477,6 @@ static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *w
         expr_free(reciprocal_cartesian);
         expr_free(beautified);
     }
-    if (result) {
-        expr_t *explicit_real_component = expr_prepend_zero_real_component_for_display(result);
-
-        if (explicit_real_component) {
-            expr_free(result);
-            result = explicit_real_component;
-        }
-    }
     expr_free(pre_beautified_cartesian);
     expr_free(preserved_expanded);
     return result;
@@ -1730,13 +1722,18 @@ static void print_bindings(const char *label, expr_bindings_t *bindings, int pre
             continue;
 
         value_text = owned_number_text(expr_get_val(binding), precision);
-        printf("%-20s %s\t%s\t%s\n", label, expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
-               value_text ? value_text : "(num_to_string failed)");
         expr_t *named = expr_new_named_var(NUM_NAN, name);
+        char *expression_name = named ? expr_text_dup(named, style_UNBOUND) : NULL;
         char *function_name = named ? expr_to_function_body(named) : NULL;
-        if (function_name && strcmp(function_name, name) != 0)
-            printf("binding_function_name  %s\t%s\n", name, function_name);
+        const char *binding_name = expression_name ? expression_name : name;
+
+        /* Editor bindings round-trip through Expression syntax, not Function syntax. */
+        printf("%-20s %s\t%s\t%s\n", label, expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable",
+               binding_name, value_text ? value_text : "(num_to_string failed)");
+        if (function_name && strcmp(function_name, binding_name) != 0)
+            printf("binding_function_name  %s\t%s\n", binding_name, function_name);
         free(function_name);
+        free(expression_name);
         expr_free(named);
         free(value_text);
     }

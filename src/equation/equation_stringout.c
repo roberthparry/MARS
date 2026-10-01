@@ -522,7 +522,7 @@ static string_t *equ_to_text_function(const equation_t *equation)
     sbuf_puts(&buffer, "}\n\n");
 
     equ_emit_unknown_variable_hint(&buffer, &variables);
-    sbuf_puts(&buffer, "output(solve(equ(");
+    sbuf_puts(&buffer, "outputa(solve(equ(");
     equ_emit_function_argument_list(&buffer, &variables, &constants);
     sbuf_puts(&buffer, "))).");
 

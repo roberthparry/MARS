@@ -2,48 +2,48 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
-bool expr_simplify_is_plain_real_const(const expr_t *dv)
+bool expr_simplify_is_plain_real_const(const expr_t *expr)
 {
-    if (!expr_is_unnamed_const(dv) || !num_is_real(dv->c))
+    if (!expr_is_unnamed_const(expr) || !num_is_real(expr->c))
         return false;
-    if (!num_is_exact(dv->c) && num_constant_name(dv->c))
+    if (!num_is_exact(expr->c) && num_constant_name(expr->c))
         return false;
-    if (dv->binding_expr && dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER)
+    if (expr->binding_expr && expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER)
         return false;
     return true;
 }
 
-bool expr_simplify_try_get_plain_real_const(const expr_t *dv, number_t *out)
+bool expr_simplify_try_get_plain_real_const(const expr_t *expr, number_t *out)
 {
-    if (!expr_simplify_is_plain_real_const(dv))
+    if (!expr_simplify_is_plain_real_const(expr))
         return false;
-    *out = num_clone(dv->c);
+    *out = num_clone(expr->c);
     return true;
 }
 
-bool expr_simplify_is_simplifiable_const(const expr_t *dv)
+bool expr_simplify_is_simplifiable_const(const expr_t *expr)
 {
-    return expr_is_op(dv, &ops_const) && (!dv->name || !*dv->name || !dv->binding_expr);
+    return expr_is_op(expr, &ops_const) && (!expr->name || !*expr->name || !expr->binding_expr);
 }
 
-bool expr_simplify_allows_const_identity_fold(const expr_t *dv)
+bool expr_simplify_allows_const_identity_fold(const expr_t *expr)
 {
-    if (!dv || !expr_is_op(dv, &ops_const))
+    if (!expr || !expr_is_op(expr, &ops_const))
         return false;
-    if (!dv->binding_expr)
+    if (!expr->binding_expr)
         return true;
-    if (dv->name && *dv->name) {
+    if (expr->name && *expr->name) {
         number_t value;
         bool is_default;
         int has_default;
 
-        has_default = expr_get_default_constant_num(dv->name, &value);
-        is_default = has_default && num_eq(dv->c, value);
+        has_default = expr_get_default_constant_num(expr->name, &value);
+        is_default = has_default && num_eq(expr->c, value);
         if (has_default)
             num_destroy(&value);
         return is_default;
     }
-    return dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER || dv->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
+    return expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER || expr->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
 }
 
 number_t expr_simplify_normalise_simple_rational_coeff(number_t coeff)
@@ -229,13 +229,13 @@ expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg)
     return out;
 }
 
-static bool expr_contains_var_for_value_fold(const expr_t *dv)
+static bool expr_contains_var_for_value_fold(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return false;
-    if (expr_is_var(dv))
+    if (expr_is_var(expr))
         return true;
-    return expr_contains_var_for_value_fold(dv->a) || expr_contains_var_for_value_fold(dv->b);
+    return expr_contains_var_for_value_fold(expr->a) || expr_contains_var_for_value_fold(expr->b);
 }
 
 expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
@@ -713,14 +713,14 @@ expr_t *expr_simplify_try_vtable_inverse_argument(const expr_t *outer, const exp
     return expr_try_simplify_vtable_inverse_candidate(outer, arg, arg);
 }
 
-static bool expr_is_trig_square_of(const expr_t *dv, const expr_ops_t *op, const expr_t **arg_out)
+static bool expr_is_trig_square_of(const expr_t *expr, const expr_ops_t *op, const expr_t **arg_out)
 {
-    if (!expr_is_pow_d_expr(dv) || !num_eq(dv->c, NUM_TWO))
+    if (!expr_is_pow_d_expr(expr) || !num_eq(expr->c, NUM_TWO))
         return false;
-    if (!expr_is_op(dv->a, op))
+    if (!expr_is_op(expr->a, op))
         return false;
 
-    *arg_out = dv->a->a;
+    *arg_out = expr->a->a;
     return true;
 }
 
@@ -1123,9 +1123,9 @@ expr_t *expr_simplify_try_tangent_addition_quotient(const expr_t *numerator, con
     return out;
 }
 
-static bool expr_is_lambert_expr(const expr_t *dv)
+static bool expr_is_lambert_expr(const expr_t *expr)
 {
-    return dv && expr_ops_is_lambert(dv->ops);
+    return expr && expr_ops_is_lambert(expr->ops);
 }
 
 expr_t *expr_simplify_try_lambert_exp(expr_t *arg)
@@ -1225,30 +1225,30 @@ expr_t *expr_simplify_try_lambert_product(expr_t *a, expr_t *b)
     return inner;
 }
 
-static bool expr_is_i_const(const expr_t *dv)
+static bool expr_is_i_const(const expr_t *expr)
 {
-    return dv && expr_is_op(dv, &ops_const) && num_eq(dv->c, NUM_I);
+    return expr && expr_is_op(expr, &ops_const) && num_eq(expr->c, NUM_I);
 }
 
-static bool expr_i_unit_sign(const expr_t *dv, int *sign_out)
+static bool expr_i_unit_sign(const expr_t *expr, int *sign_out)
 {
     int child_sign;
 
-    if (!dv || !sign_out)
+    if (!expr || !sign_out)
         return false;
 
-    if (expr_is_op(dv, &ops_const)) {
-        if (num_eq(dv->c, NUM_I)) {
+    if (expr_is_op(expr, &ops_const)) {
+        if (num_eq(expr->c, NUM_I)) {
             *sign_out = 1;
             return true;
         }
-        if (num_eq(dv->c, NUM_NEG_I)) {
+        if (num_eq(expr->c, NUM_NEG_I)) {
             *sign_out = -1;
             return true;
         }
     }
 
-    if (expr_is_op(dv, &ops_neg) && expr_i_unit_sign(dv->a, &child_sign)) {
+    if (expr_is_op(expr, &ops_neg) && expr_i_unit_sign(expr->a, &child_sign)) {
         *sign_out = -child_sign;
         return true;
     }
@@ -1256,23 +1256,23 @@ static bool expr_i_unit_sign(const expr_t *dv, int *sign_out)
     return false;
 }
 
-static bool expr_extract_i_unit_factor(const expr_t *dv, int *sign_out, const expr_t **rest_out)
+static bool expr_extract_i_unit_factor(const expr_t *expr, int *sign_out, const expr_t **rest_out)
 {
-    if (!dv || !sign_out || !rest_out)
+    if (!expr || !sign_out || !rest_out)
         return false;
 
-    if (expr_i_unit_sign(dv, sign_out)) {
+    if (expr_i_unit_sign(expr, sign_out)) {
         *rest_out = NULL;
         return true;
     }
 
-    if (expr_is_op(dv, &ops_mul)) {
-        if (expr_i_unit_sign(dv->a, sign_out)) {
-            *rest_out = dv->b;
+    if (expr_is_op(expr, &ops_mul)) {
+        if (expr_i_unit_sign(expr->a, sign_out)) {
+            *rest_out = expr->b;
             return true;
         }
-        if (expr_i_unit_sign(dv->b, sign_out)) {
-            *rest_out = dv->a;
+        if (expr_i_unit_sign(expr->b, sign_out)) {
+            *rest_out = expr->a;
             return true;
         }
     }
@@ -1396,17 +1396,17 @@ expr_t *expr_simplify_try_i_unit_product(expr_t *a, expr_t *b)
     return base;
 }
 
-static bool expr_extract_i_product_arg(const expr_t *dv, const expr_t **arg_out)
+static bool expr_extract_i_product_arg(const expr_t *expr, const expr_t **arg_out)
 {
-    if (!dv || !arg_out || !expr_is_op(dv, &ops_mul))
+    if (!expr || !arg_out || !expr_is_op(expr, &ops_mul))
         return false;
 
-    if (expr_is_i_const(dv->a)) {
-        *arg_out = dv->b;
+    if (expr_is_i_const(expr->a)) {
+        *arg_out = expr->b;
         return true;
     }
-    if (expr_is_i_const(dv->b)) {
-        *arg_out = dv->a;
+    if (expr_is_i_const(expr->b)) {
+        *arg_out = expr->a;
         return true;
     }
 
@@ -2400,23 +2400,23 @@ expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg_node)
     return NULL;
 }
 
-expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
+expr_t *expr_simplify_positive_part_if_negative(expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return NULL;
 
-    if (expr_is_neg(dv)) {
-        expr_retain(dv->a);
-        return dv->a;
+    if (expr_is_neg(expr)) {
+        expr_retain(expr->a);
+        return expr->a;
     }
 
-    if (expr_is_op(dv, &ops_sub) && expr_const_is_zero(dv->a)) {
-        expr_retain(dv->b);
-        return dv->b;
+    if (expr_is_op(expr, &ops_sub) && expr_const_is_zero(expr->a)) {
+        expr_retain(expr->b);
+        return expr->b;
     }
 
-    if (expr_simplify_is_plain_real_const(dv) && num_lt(dv->c, NUM_ZERO)) {
-        number_t positive = num_neg(dv->c);
+    if (expr_simplify_is_plain_real_const(expr) && num_lt(expr->c, NUM_ZERO)) {
+        number_t positive = num_neg(expr->c);
         expr_t *out = expr_new_const(positive);
 
         num_destroy(&positive);
@@ -2424,23 +2424,23 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
     }
 
     /* Extract a common syntactic minus from a sum, without assuming its terms are positive. */
-    if (expr_is_addsub(dv)) {
-        expr_t *left = expr_simplify_positive_part_if_negative(dv->a);
-        expr_t *right = expr_simplify_positive_part_if_negative(dv->b);
+    if (expr_is_addsub(expr)) {
+        expr_t *left = expr_simplify_positive_part_if_negative(expr->a);
+        expr_t *right = expr_simplify_positive_part_if_negative(expr->b);
         expr_t *out = NULL;
 
-        if (left && expr_is_op(dv, &ops_add) && right)
+        if (left && expr_is_op(expr, &ops_add) && right)
             out = expr_add(left, right);
-        else if (left && expr_is_op(dv, &ops_sub) && !right)
-            out = expr_add(left, dv->b);
+        else if (left && expr_is_op(expr, &ops_sub) && !right)
+            out = expr_add(left, expr->b);
         expr_free(right);
         expr_free(left);
         return out;
     }
 
-    if (expr_is_mul(dv)) {
-        expr_t *positive_left = expr_simplify_positive_part_if_negative(dv->a);
-        expr_t *positive_right = expr_simplify_positive_part_if_negative(dv->b);
+    if (expr_is_mul(expr)) {
+        expr_t *positive_left = expr_simplify_positive_part_if_negative(expr->a);
+        expr_t *positive_right = expr_simplify_positive_part_if_negative(expr->b);
 
         if (positive_left && positive_right) {
             expr_free(positive_left);
@@ -2448,7 +2448,7 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
             return NULL;
         }
         if (positive_left) {
-            expr_t *right = dv->b;
+            expr_t *right = expr->b;
             expr_t *out;
 
             expr_retain(right);
@@ -2458,7 +2458,7 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
             return out;
         }
         if (positive_right) {
-            expr_t *left = dv->a;
+            expr_t *left = expr->a;
             expr_t *out;
 
             expr_retain(left);
@@ -2469,9 +2469,9 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
         }
     }
 
-    if (expr_is_div(dv)) {
-        expr_t *positive_num = expr_simplify_positive_part_if_negative(dv->a);
-        expr_t *positive_den = expr_simplify_positive_part_if_negative(dv->b);
+    if (expr_is_div(expr)) {
+        expr_t *positive_num = expr_simplify_positive_part_if_negative(expr->a);
+        expr_t *positive_den = expr_simplify_positive_part_if_negative(expr->b);
 
         if (positive_num && positive_den) {
             expr_free(positive_num);
@@ -2479,7 +2479,7 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
             return NULL;
         }
         if (positive_num) {
-            expr_t *den = dv->b;
+            expr_t *den = expr->b;
             expr_t *out;
 
             expr_retain(den);
@@ -2489,7 +2489,7 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv)
             return out;
         }
         if (positive_den) {
-            expr_t *num = dv->a;
+            expr_t *num = expr->a;
             expr_t *out;
 
             expr_retain(num);

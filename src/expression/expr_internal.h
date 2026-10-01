@@ -205,9 +205,9 @@ typedef enum {
 
 typedef enum expr_diff_kind { EXPR_DIFF_SMOOTH = 0, EXPR_DIFF_NONE } expr_diff_kind_t;
 
-typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+typedef void (*expr_reverse_fn)(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 typedef int (*expr_reverse_accumulate_fn)(void *context, const expr_t *child, const number_t *child_bar);
-typedef int (*expr_reverse_many_fn)(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+typedef int (*expr_reverse_many_fn)(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                     void *context);
 typedef expr_t *(*expr_apply_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_apply_binary_fn)(const expr_t *left, const expr_t *right);
@@ -231,8 +231,8 @@ static inline number_t expr_reverse_num_mul(const number_t a, const number_t b) 
 static inline number_t expr_reverse_num_div(const number_t a, const number_t b) { return num_div(a, b); }
 
 typedef struct expr_ops {
-    number_t (*eval)(expr_t *dv);
-    expr_t *(*deriv)(expr_t *dv);
+    number_t (*eval)(expr_t *expr);
+    expr_t *(*deriv)(expr_t *expr);
     expr_reverse_fn reverse;
     expr_reverse_many_fn reverse_many;
     expr_op_kind_t kind;
@@ -610,41 +610,41 @@ extern const expr_ops_t ops_shl;
 extern const expr_ops_t ops_shr;
 extern const expr_ops_t ops_factors;
 
-static inline int expr_const_is_zero(const expr_t *dv) {
-    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
+static inline int expr_const_is_zero(const expr_t *expr) {
+    return expr && expr->ops == &ops_const && num_eq(expr->c, NUM_ZERO);
 }
 
-static inline int expr_const_is_one(const expr_t *dv) { return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ONE); }
+static inline int expr_const_is_one(const expr_t *expr) { return expr && expr->ops == &ops_const && num_eq(expr->c, NUM_ONE); }
 
-static inline int expr_const_is_minus_one(const expr_t *dv) {
-    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_NEG_ONE);
+static inline int expr_const_is_minus_one(const expr_t *expr) {
+    return expr && expr->ops == &ops_const && num_eq(expr->c, NUM_NEG_ONE);
 }
 
-static inline int expr_is_op(const expr_t *dv, const expr_ops_t *ops) { return dv && dv->ops == ops; }
+static inline int expr_is_op(const expr_t *expr, const expr_ops_t *ops) { return expr && expr->ops == ops; }
 
-static inline int expr_is_const(const expr_t *dv) { return expr_is_op(dv, &ops_const); }
+static inline int expr_is_const(const expr_t *expr) { return expr_is_op(expr, &ops_const); }
 
-static inline int expr_is_var(const expr_t *dv) { return expr_is_op(dv, &ops_var); }
+static inline int expr_is_var(const expr_t *expr) { return expr_is_op(expr, &ops_var); }
 
-static inline int expr_is_neg(const expr_t *dv) { return expr_is_op(dv, &ops_neg); }
+static inline int expr_is_neg(const expr_t *expr) { return expr_is_op(expr, &ops_neg); }
 
-static inline int expr_is_mul(const expr_t *dv) { return expr_is_op(dv, &ops_mul); }
+static inline int expr_is_mul(const expr_t *expr) { return expr_is_op(expr, &ops_mul); }
 
-static inline int expr_is_div(const expr_t *dv) { return expr_is_op(dv, &ops_div); }
+static inline int expr_is_div(const expr_t *expr) { return expr_is_op(expr, &ops_div); }
 
-static inline int expr_is_integral_bounds(const expr_t *dv) { return expr_is_op(dv, &ops_integral_bounds); }
+static inline int expr_is_integral_bounds(const expr_t *expr) { return expr_is_op(expr, &ops_integral_bounds); }
 
-static inline int expr_is_integral_meta(const expr_t *dv) { return expr_is_op(dv, &ops_integral_meta); }
+static inline int expr_is_integral_meta(const expr_t *expr) { return expr_is_op(expr, &ops_integral_meta); }
 
-static inline int expr_is_addsub(const expr_t *dv) { return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub); }
+static inline int expr_is_addsub(const expr_t *expr) { return expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub); }
 
-static inline int expr_is_exp_expr(const expr_t *dv) { return expr_is_op(dv, &ops_exp); }
+static inline int expr_is_exp_expr(const expr_t *expr) { return expr_is_op(expr, &ops_exp); }
 
-static inline int expr_is_sqrt_expr(const expr_t *dv) { return dv && dv->ops && dv->ops->kind == EXPR_KIND_SQRT; }
+static inline int expr_is_sqrt_expr(const expr_t *expr) { return expr && expr->ops && expr->ops->kind == EXPR_KIND_SQRT; }
 
-static inline int expr_is_pow_d_expr(const expr_t *dv) { return dv && dv->ops && dv->ops->kind == EXPR_KIND_POW_D; }
+static inline int expr_is_pow_d_expr(const expr_t *expr) { return expr && expr->ops && expr->ops->kind == EXPR_KIND_POW_D; }
 
-static inline int expr_is_unnamed_const(const expr_t *dv) { return expr_is_const(dv) && (!dv->name || !*dv->name); }
+static inline int expr_is_unnamed_const(const expr_t *expr) { return expr_is_const(expr) && (!expr->name || !*expr->name); }
 
 typedef enum expr_integration_bound_kind {
     EXPR_INTEGRATION_BOUND_DEFINITE = 0,
@@ -726,12 +726,12 @@ expr_t *expr_make_const_num(number_t x);
 expr_t *expr_make_var_num(number_t x);
 int expr_get_default_constant_num(const char *name, number_t *value_out);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
-void expr_store_const_num(expr_t *dv, number_t value);
-void expr_store_value_num(expr_t *dv, number_t value);
+void expr_store_const_num(expr_t *expr, number_t value);
+void expr_store_value_num(expr_t *expr, number_t value);
 void expr_init_singletons(void);
 /* Return a borrowed cache value; use expr_eval() when the caller needs an owning number. */
-number_t expr_eval_num_internal(const expr_t *dv);
-expr_t *expr_get_dx_internal(const expr_t *dv);
+number_t expr_eval_num_internal(const expr_t *expr);
+expr_t *expr_get_dx_internal(const expr_t *expr);
 const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
@@ -758,24 +758,24 @@ bool expr_hypergeometric_pFq_unpack(const expr_t *expr, const expr_t ***upper, s
                                     const expr_t ***lower, size_t *lower_count, const expr_t **argument);
 
 /* Simplification helpers. */
-expr_t *expr_simplify_passthrough(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_rebuild_binary_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_binary_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_root_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_neg_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b);
-expr_t *expr_simplify_hypot_operator(const expr_t *dv, expr_t *a, expr_t *b);
-bool expr_simplify_is_plain_real_const(const expr_t *dv);
-bool expr_simplify_try_get_plain_real_const(const expr_t *dv, number_t *out);
-bool expr_simplify_is_simplifiable_const(const expr_t *dv);
-bool expr_simplify_allows_const_identity_fold(const expr_t *dv);
+expr_t *expr_simplify_passthrough(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_rebuild_binary_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_unary_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_binary_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_root_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_neg_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_add_sub_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_mul_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_pow_operator(const expr_t *expr, expr_t *a, expr_t *b);
+expr_t *expr_simplify_hypot_operator(const expr_t *expr, expr_t *a, expr_t *b);
+bool expr_simplify_is_plain_real_const(const expr_t *expr);
+bool expr_simplify_try_get_plain_real_const(const expr_t *expr, number_t *out);
+bool expr_simplify_is_simplifiable_const(const expr_t *expr);
+bool expr_simplify_allows_const_identity_fold(const expr_t *expr);
 number_t expr_simplify_normalise_simple_rational_coeff(number_t coeff);
-expr_t *expr_simplify_positive_part_if_negative(expr_t *dv);
+expr_t *expr_simplify_positive_part_if_negative(expr_t *expr);
 expr_t *expr_simplify_try_log10_power_of_ten(expr_t *arg);
 expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg);
@@ -828,7 +828,7 @@ bool expr_contains_half_scaled_symbolic_power(const expr_t *expr);
 expr_t *expr_simplify_normalize_negated_mul_factor(const expr_t *expr);
 expr_t *expr_make_scaled(number_t coeff, expr_t *base);
 expr_t *expr_make_pow_like(expr_t *base, number_t exponent);
-void expr_collect_addends(expr_t *dv, number_t scale, number_t *c_const, addend_t **terms, size_t *n, size_t *cap);
+void expr_collect_addends(expr_t *expr, number_t scale, number_t *c_const, addend_t **terms, size_t *n, size_t *cap);
 void expr_combine_common_denominator_addends(addend_t *terms, size_t n);
 void expr_sort_addends(addend_t *terms, size_t n);
 int expr_extract_common_addend_coeff(const addend_t *terms, size_t n, number_t c_const, number_t *common_out);
@@ -868,113 +868,113 @@ int expr_fold_erfc_const(const number_t *in, number_t *out);
 int expr_fold_trigamma_const(const number_t *in, number_t *out);
 
 /* Reverse-mode local adjoint hooks. */
-void expr_reverse_atom(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_add(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sub(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_mul(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_div(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_pow(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_pow_d(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atan2(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_neg(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_tan(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_versin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_vercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_coversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_covercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_haversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_havercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_hacoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_hacovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_tanh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cosech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_coth(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atan(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosec(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_arcversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_arcvercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_arccoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_arccovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_archaversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_archavercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_archacoversin(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_archacovercos(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asinh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_atanh(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_asech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acosech(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_acoth(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_exp(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_log(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_log10(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_sqrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_cubrt(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_root(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_floor(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_ceil(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_abs(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_conj(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_hypot(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfc(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfinv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_erfcinv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lgamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_digamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_qdigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_trigamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_zeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_polygamma(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_dilog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_polylog1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_polylog(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_legendre_chi(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_bessel_j(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_bessel_y(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lommel_s(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_parameter_pack(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_hypergeometric_pFq(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-int expr_reverse_appell_f1_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+void expr_reverse_atom(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_add(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sub(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_mul(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_div(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_pow(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_pow_d(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_atan2(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_neg(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_tan(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sec(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cosec(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cot(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_versin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_vercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_coversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_covercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_haversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_havercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_hacoversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_hacovercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sinh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cosh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_tanh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sech(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cosech(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_coth(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_asin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_atan(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_asec(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acosec(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acot(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_arcversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_arcvercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_arccoversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_arccovercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_archaversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_archavercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_archacoversin(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_archacovercos(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_asinh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acosh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_atanh(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_asech(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acosech(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_acoth(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_exp(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_log(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_log10(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_sqrt(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_cubrt(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_root(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_floor(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_ceil(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_abs(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_conj(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_hypot(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_erf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_erfc(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_erfinv(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_erfcinv(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lgamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_digamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_qdigamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_trigamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_zeta(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_polygamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_dilog(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_polylog1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_polylog(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_legendre_chi(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_bessel_j(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_bessel_y(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lommel_s(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_parameter_pack(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_hypergeometric_pFq(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+int expr_reverse_appell_f1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context);
-int expr_reverse_lerch_phi_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context);
-int expr_reverse_lauricella_f_many(const expr_t *dv, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_lauricella_f_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                    void *context);
-void expr_reverse_gammainv(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_w(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_wn(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_w0(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_wm1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_pdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_cdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_normal_logpdf(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_Ei(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_Li(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_E1(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_beta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_logbeta(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_lower(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_upper(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_P(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_gammainc_Q(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_not_differentiable(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gammainv(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_w(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_wn(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_w0(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_wm1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_normal_pdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_normal_cdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_normal_logpdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_Ei(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_Li(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_E1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_beta(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_logbeta(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gammainc_lower(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gammainc_upper(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gammainc_P(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_gammainc_Q(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_not_differentiable(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 
-bool expr_is_exact_zero(const expr_t *dv);
-bool expr_is_named_const(const expr_t *dv);
+bool expr_is_exact_zero(const expr_t *expr);
+bool expr_is_named_const(const expr_t *expr);
 bool expr_is_summation(const expr_t *expr);
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
 expr_t *expr_clone(const expr_t *expr);
@@ -1074,7 +1074,7 @@ char *expr_tostring_texify(const char *text);
 char *expr_to_TeX_operation_body(const expr_t *expr);
 /** @brief Scan an authored expression tree for calculus operations. */
 bool expr_contains_calculus_request(const expr_t *expr);
-int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);
 int fs_is_letter(unsigned int c);
@@ -1129,14 +1129,13 @@ bool expr_binding_expr_eval_if_precision_increased(expr_binding_expr_t *expr, nu
  * Returned node is owning (refcount = 1).
  * Input node is borrowed.
  */
-expr_t *expr_simplify(const expr_t *dv);
+expr_t *expr_simplify(const expr_t *expr);
 expr_t *expr_expand_products_internal(const expr_t *expr);
 expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr);
 expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
 expr_t *expr_expand_preserved_for_display(const expr_t *expr);
 expr_t *expr_separate_cartesian_for_display(const expr_t *expr);
 expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
-expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
 bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
                                       bool *has_imaginary_out);
 

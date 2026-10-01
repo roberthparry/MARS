@@ -1046,6 +1046,48 @@ static expr_t *equ_quadratic_surd_term(number_t discriminant)
 static expr_t *equ_quadratic_surd_root(number_t neg_linear, number_t discriminant, number_t denominator,
                                        bool positive)
 {
+    number_t magnitude_squared = num_abs(discriminant);
+    expr_t *radicand_expr = expr_new_const(magnitude_squared);
+    expr_t *raw_magnitude = radicand_expr ? expr_sqrt(radicand_expr) : NULL;
+    expr_t *exact_magnitude = raw_magnitude ? expr_simplify(raw_magnitude) : NULL;
+    number_t magnitude = NUM_NAN;
+
+    bool rational_magnitude = expr_match_const_value(exact_magnitude, &magnitude) && num_is_exact(magnitude);
+    expr_free(exact_magnitude);
+    expr_free(raw_magnitude);
+    expr_free(radicand_expr);
+
+    num_destroy(&magnitude_squared);
+    if (num_sign(discriminant) >= 0 && rational_magnitude) {
+        number_t signed_magnitude = positive ? num_clone(magnitude) : num_neg(magnitude);
+        number_t value = equ_quadratic_root(neg_linear, signed_magnitude, denominator);
+        expr_t *root = expr_new_const(value);
+
+        num_destroy(&value);
+        num_destroy(&signed_magnitude);
+        num_destroy(&magnitude);
+        return root;
+    }
+    if (num_sign(discriminant) < 0 && rational_magnitude) {
+        number_t centre = num_div(neg_linear, denominator);
+        number_t coefficient = num_div(magnitude, denominator);
+        expr_t *real = expr_new_const(centre);
+        expr_t *imaginary_unit = expr_new_const(NUM_I);
+        expr_t *scale = expr_new_const(coefficient);
+        expr_t *term = num_is_one(coefficient) ? expr_clone(imaginary_unit) : expr_mul(scale, imaginary_unit);
+        expr_t *root = num_is_zero(centre) ? (positive ? expr_clone(term) : expr_neg(term))
+                                         : (positive ? expr_add(real, term) : expr_sub(real, term));
+
+        expr_free(term);
+        expr_free(scale);
+        expr_free(imaginary_unit);
+        expr_free(real);
+        num_destroy(&coefficient);
+        num_destroy(&centre);
+        num_destroy(&magnitude);
+        return root;
+    }
+    num_destroy(&magnitude);
     expr_t *linear = expr_new_const(neg_linear);
     expr_t *surd = equ_quadratic_surd_term(discriminant);
     expr_t *numerator = linear && surd ? (positive ? expr_add(linear, surd) : expr_sub(linear, surd)) : NULL;
