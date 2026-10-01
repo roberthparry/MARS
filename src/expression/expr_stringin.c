@@ -2667,7 +2667,7 @@ static expr_t *evaluate_function_integral(expr_parse_state_t *p, expr_t *integra
         string_t *name = constant ? string_new_with(expr_symbol_name(constant)) : NULL;
         expr_t *bound = name ? lookup_symbol_text_normalised(p->syms, name) : NULL;
 
-        result = constant ? expr_add(value ? value : integral, bound ? bound : constant) : NULL;
+        result = constant ? expr_add_integration_constant(value ? value : integral, bound ? bound : constant) : NULL;
         string_free(name);
         expr_free(constant);
     } else if (value) {

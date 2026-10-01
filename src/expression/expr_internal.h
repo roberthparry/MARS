@@ -437,6 +437,9 @@ bool expr_transform_real_coordinate_only(const expr_t *expr, const expr_t *symbo
 /** Return the operand of a non-zero domain condition, or NULL for other predicates. */
 const expr_t *expr_domain_nonzero_operand(const expr_t *condition);
 expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
+
+/* Add a borrowed integration constant inside the primitive's outer domain restrictions. */
+expr_t *expr_add_integration_constant(const expr_t *antiderivative, const expr_t *constant);
 expr_t *expr_laplace_result(const expr_t *transform);
 expr_t *expr_laplace_from_args(size_t count, expr_t *const *args);
 expr_t *expr_laplace_formula(const expr_t *transform, number_t *abscissa, expr_t **conditions);

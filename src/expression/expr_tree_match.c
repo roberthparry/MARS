@@ -907,7 +907,7 @@ static expr_t *expr_display_add_integration_constant(expr_t *anti)
     if (!constant)
         return anti;
 
-    out = expr_add(anti, constant);
+    out = expr_add_integration_constant(anti, constant);
     expr_free(constant);
     if (!out)
         return anti;
