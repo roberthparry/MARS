@@ -6,9 +6,9 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-static bool expr_node_is_exact_zero(const expr_t *dv)
+static bool expr_node_is_exact_zero(const expr_t *expr)
 {
-    return !dv || expr_is_exact_zero(dv);
+    return !expr || expr_is_exact_zero(expr);
 }
 
 typedef struct {

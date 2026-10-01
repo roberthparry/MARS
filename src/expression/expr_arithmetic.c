@@ -16,26 +16,26 @@
 /* EVALUATION FUNCTIONS                                                      */
 /* ------------------------------------------------------------------------- */
 
-static number_t eval_const(expr_t *dv)
+static number_t eval_const(expr_t *expr)
 {
-    return num_clone(dv->c);
+    return num_clone(expr->c);
 }
 
-static number_t eval_var(expr_t *dv)
+static number_t eval_var(expr_t *expr)
 {
-    if (dv && dv->binding_expr)
-        return expr_binding_expr_eval(dv->binding_expr);
-    return num_clone(dv->c);
+    if (expr && expr->binding_expr)
+        return expr_binding_expr_eval(expr->binding_expr);
+    return num_clone(expr->c);
 }
 
-static number_t eval_formal_derivative(expr_t *dv)
+static number_t eval_formal_derivative(expr_t *expr)
 {
-    return expr_distribution_derivative_eval(dv);
+    return expr_distribution_derivative_eval(expr);
 }
 
-static number_t eval_arbitrary_function(expr_t *dv)
+static number_t eval_arbitrary_function(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return num_clone(NUM_NAN);
 }
 
@@ -99,9 +99,9 @@ const expr_ops_t ops_ordered_derivative = {
     .apply_binary = expr_new_ordered_derivative, .simplify = simplify_ordered_derivative,
 };
 
-static number_t eval_argument_list(expr_t *dv)
+static number_t eval_argument_list(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return num_clone(NUM_NAN);
 }
 
@@ -134,26 +134,26 @@ static bool eval_zetap_difference_at_one(const expr_t *riemann, const expr_t *hu
     return true;
 }
 
-static number_t eval_add(expr_t *dv)
+static number_t eval_add(expr_t *expr)
 {
     number_t result;
 
-    if (dv && dv->a && dv->b && expr_is_neg(dv->b) &&
-        eval_zetap_difference_at_one(dv->a, dv->b->a, &result))
+    if (expr && expr->a && expr->b && expr_is_neg(expr->b) &&
+        eval_zetap_difference_at_one(expr->a, expr->b->a, &result))
         return result;
-    if (dv && dv->a && dv->b && expr_is_neg(dv->a) &&
-        eval_zetap_difference_at_one(dv->b, dv->a->a, &result))
+    if (expr && expr->a && expr->b && expr_is_neg(expr->a) &&
+        eval_zetap_difference_at_one(expr->b, expr->a->a, &result))
         return result;
-    return num_add(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    return num_add(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
 }
 
-static number_t eval_sub(expr_t *dv)
+static number_t eval_sub(expr_t *expr)
 {
     number_t result;
 
-    if (dv && eval_zetap_difference_at_one(dv->a, dv->b, &result))
+    if (expr && eval_zetap_difference_at_one(expr->a, expr->b, &result))
         return result;
-    return num_sub(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    return num_sub(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
 }
 
 static expr_t *lambert_product_inner(expr_t *a, expr_t *b)
@@ -174,14 +174,14 @@ static expr_t *lambert_product_inner(expr_t *a, expr_t *b)
     return expr_struct_eq(w, exp_term->a) ? (expr_t *)expr_lambert_arg(w) : NULL;
 }
 
-static number_t eval_mul(expr_t *dv)
+static number_t eval_mul(expr_t *expr)
 {
-    expr_t *inner = lambert_product_inner(dv->a, dv->b);
+    expr_t *inner = lambert_product_inner(expr->a, expr->b);
 
     if (inner)
         return num_clone(expr_eval_num_internal(inner));
 
-    return num_mul(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    return num_mul(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
 }
 
 static bool expr_same_var_local(const expr_t *left, const expr_t *right)
@@ -205,16 +205,16 @@ static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io
     return expr_find_single_var_local(expr->a, var_io) && expr_find_single_var_local(expr->b, var_io);
 }
 
-static number_t eval_div_removable_singularity(expr_t *dv)
+static number_t eval_div_removable_singularity(expr_t *expr)
 {
     static _Thread_local size_t removable_singularity_depth;
     const expr_t *wrt = NULL;
-    const expr_t *numer = dv->a;
-    const expr_t *denom = dv->b;
+    const expr_t *numer = expr->a;
+    const expr_t *denom = expr->b;
     number_t result = num_clone(NUM_NAN);
 
-    if (!expr_find_single_var_local(dv, &wrt) || !wrt)
-        return num_div(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    if (!expr_find_single_var_local(expr, &wrt) || !wrt)
+        return num_div(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
     if (removable_singularity_depth >= 8u)
         return result;
     removable_singularity_depth++;
@@ -242,40 +242,40 @@ static number_t eval_div_removable_singularity(expr_t *dv)
     return result;
 }
 
-static number_t eval_div(expr_t *dv)
+static number_t eval_div(expr_t *expr)
 {
-    number_t numerator = expr_eval_num_internal(dv->a);
-    number_t denominator = expr_eval_num_internal(dv->b);
+    number_t numerator = expr_eval_num_internal(expr->a);
+    number_t denominator = expr_eval_num_internal(expr->b);
 
     if (num_is_zero(numerator) && num_is_zero(denominator))
-        return eval_div_removable_singularity(dv);
+        return eval_div_removable_singularity(expr);
     return num_div(numerator, denominator);
 }
 
-static number_t eval_neg(expr_t *dv)
+static number_t eval_neg(expr_t *expr)
 {
-    return num_neg(expr_eval_num_internal(dv->a));
+    return num_neg(expr_eval_num_internal(expr->a));
 }
 
-static number_t eval_pow(expr_t *dv)
+static number_t eval_pow(expr_t *expr)
 {
-    return num_pow(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
+    return num_pow(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
 }
 
-static number_t eval_pow_d(expr_t *dv)
+static number_t eval_pow_d(expr_t *expr)
 {
-    return num_pow(expr_eval_num_internal(dv->a), dv->c);
+    return num_pow(expr_eval_num_internal(expr->a), expr->c);
 }
 
-static number_t eval_integral_bounds(expr_t *dv)
+static number_t eval_integral_bounds(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return num_clone(NUM_NAN);
 }
 
-static number_t eval_integral_meta(expr_t *dv)
+static number_t eval_integral_meta(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return num_clone(NUM_NAN);
 }
 
@@ -348,7 +348,7 @@ static size_t eval_integral_interval_budget(void)
     return refinements * steps_per_refinement;
 }
 
-static number_t eval_integral(expr_t *dv)
+static number_t eval_integral(expr_t *expr)
 {
     integrator_t *ig;
     const expr_t *lower_expr;
@@ -362,12 +362,12 @@ static number_t eval_integral(expr_t *dv)
     expr_t *antiderivative;
     int status;
 
-    if (!dv || !dv->a || !dv->b)
+    if (!expr || !expr->a || !expr->b)
         return num_clone(NUM_NAN);
 
-    lower_expr = expr_integral_lower_bound_expr(dv);
-    upper_expr = expr_integral_upper_bound_expr(dv);
-    dummy_expr = expr_integral_dummy_expr(dv);
+    lower_expr = expr_integral_lower_bound_expr(expr);
+    upper_expr = expr_integral_upper_bound_expr(expr);
+    dummy_expr = expr_integral_dummy_expr(expr);
     if (!upper_expr || !dummy_expr)
         return num_clone(NUM_NAN);
 
@@ -383,7 +383,7 @@ static number_t eval_integral(expr_t *dv)
         return num_clone(NUM_NAN);
     }
 
-    result = expr_integrate_Li_definite(dv->a, dummy_expr, lower, upper);
+    result = expr_integrate_Li_definite(expr->a, dummy_expr, lower, upper);
     if (num_is_real(result) && num_is_finite(result)) {
         num_destroy(&lower);
         num_destroy(&upper);
@@ -405,7 +405,7 @@ static number_t eval_integral(expr_t *dv)
         num_destroy(&upper);
         return num_clone(NUM_NAN);
     }
-    local_integrand = expr_substitute(dv->a, dummy_expr, local_var);
+    local_integrand = expr_substitute(expr->a, dummy_expr, local_var);
     if (!local_integrand) {
         expr_free(local_var);
         intg_free(ig);
@@ -484,22 +484,22 @@ static number_t eval_integral(expr_t *dv)
 /* DERIVATIVE FUNCTIONS — lazy, stored in each node                          */
 /* ------------------------------------------------------------------------- */
 
-static expr_t *deriv_const(expr_t *dv)
+static expr_t *deriv_const(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return expr_new_const(NUM_ZERO);
 }
 
-static expr_t *deriv_var(expr_t *dv)
+static expr_t *deriv_var(expr_t *expr)
 {
     const expr_t *wrt = expr_current_wrt_internal();
     bool same_var =
-        wrt == NULL || dv == wrt || (wrt && expr_is_var(wrt) && dv->var_id != 0 && dv->var_id == wrt->var_id);
+        wrt == NULL || expr == wrt || (wrt && expr_is_var(wrt) && expr->var_id != 0 && expr->var_id == wrt->var_id);
 
     return expr_new_const(same_var ? NUM_ONE : NUM_ZERO);
 }
 
-static expr_t *deriv_formal_derivative(expr_t *dv)
+static expr_t *deriv_formal_derivative(expr_t *expr)
 {
     const expr_t *wrt = expr_current_wrt_internal();
     expr_t **wrts;
@@ -509,26 +509,26 @@ static expr_t *deriv_formal_derivative(expr_t *dv)
         return NULL;
 
     /* An explicitly parameterised unknown function is constant in coordinates absent from its arguments. */
-    if (dv->a && dv->a->ops == &ops_arbitrary_function) {
+    if (expr->a && expr->a->ops == &ops_arbitrary_function) {
         expr_t *variable = (expr_t *)wrt;
         bool used = false;
-        if (expr_collect_var_usage(dv->a->a, 1u, &variable, &used) && !used)
+        if (expr_collect_var_usage(expr->a->a, 1u, &variable, &used) && !used)
             return expr_const_zero();
     }
 
-    wrts = calloc(dv->formal_wrt_count + 1u, sizeof(*wrts));
+    wrts = calloc(expr->formal_wrt_count + 1u, sizeof(*wrts));
     if (!wrts)
         return NULL;
-    for (size_t i = 0u; i < dv->formal_wrt_count; ++i)
-        wrts[i] = dv->formal_wrts[i];
-    wrts[dv->formal_wrt_count] = (expr_t *)wrt;
+    for (size_t i = 0u; i < expr->formal_wrt_count; ++i)
+        wrts[i] = expr->formal_wrts[i];
+    wrts[expr->formal_wrt_count] = (expr_t *)wrt;
 
-    out = expr_new_formal_derivative(dv->a, dv->formal_wrt_count + 1u, wrts);
+    out = expr_new_formal_derivative(expr->a, expr->formal_wrt_count + 1u, wrts);
     free(wrts);
     return out;
 }
 
-static expr_t *deriv_arbitrary_function(expr_t *dv)
+static expr_t *deriv_arbitrary_function(expr_t *expr)
 {
     expr_t *outer;
     expr_t *inner;
@@ -536,37 +536,37 @@ static expr_t *deriv_arbitrary_function(expr_t *dv)
     size_t name_length;
     char *derivative_name;
 
-    if (!dv || !dv->name || !dv->a)
+    if (!expr || !expr->name || !expr->a)
         return NULL;
-    if (dv->a->ops == &ops_argument_list) {
+    if (expr->a->ops == &ops_argument_list) {
         expr_t *wrt = (expr_t *)expr_current_wrt_internal();
         bool used = false;
-        if (!wrt || !expr_collect_var_usage(dv->a, 1u, &wrt, &used))
+        if (!wrt || !expr_collect_var_usage(expr->a, 1u, &wrt, &used))
             return NULL;
         /* Preserve a coordinate derivative of the whole composition, rather than differentiating a tuple. */
-        return used ? expr_new_formal_derivative(dv, 1u, &wrt) : expr_const_zero();
+        return used ? expr_new_formal_derivative(expr, 1u, &wrt) : expr_const_zero();
     }
-    if (strcmp(dv->name, "Si") == 0 || strcmp(dv->name, "Ci") == 0) {
-        expr_t *numerator = strcmp(dv->name, "Si") == 0 ? expr_sin(dv->a) : expr_cos(dv->a);
-        expr_t *ratio = numerator ? expr_div(numerator, dv->a) : NULL;
+    if (strcmp(expr->name, "Si") == 0 || strcmp(expr->name, "Ci") == 0) {
+        expr_t *numerator = strcmp(expr->name, "Si") == 0 ? expr_sin(expr->a) : expr_cos(expr->a);
+        expr_t *ratio = numerator ? expr_div(numerator, expr->a) : NULL;
 
         expr_free(numerator);
-        inner = expr_get_dx_internal(dv->a);
+        inner = expr_get_dx_internal(expr->a);
         out = (ratio && inner) ? expr_mul(ratio, inner) : NULL;
         expr_free(inner);
         expr_free(ratio);
         return expr_simplify_owned(out);
     }
-    name_length = strlen(dv->name);
+    name_length = strlen(expr->name);
     derivative_name = malloc(name_length + 2u);
     if (!derivative_name)
         return NULL;
-    memcpy(derivative_name, dv->name, name_length);
+    memcpy(derivative_name, expr->name, name_length);
     derivative_name[name_length] = '\'';
     derivative_name[name_length + 1u] = '\0';
-    outer = expr_new_arbitrary_function(derivative_name, dv->a);
+    outer = expr_new_arbitrary_function(derivative_name, expr->a);
     free(derivative_name);
-    inner = expr_get_dx_internal(dv->a);
+    inner = expr_get_dx_internal(expr->a);
     out = outer && inner ? expr_mul(outer, inner) : NULL;
     expr_free(inner);
     expr_free(outer);
@@ -721,48 +721,48 @@ const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index)
     return expr->formal_wrts[index];
 }
 
-static expr_t *deriv_add(expr_t *dv)
+static expr_t *deriv_add(expr_t *expr)
 {
-    expr_t *da = expr_get_dx_internal(dv->a);
-    expr_t *db = expr_get_dx_internal(dv->b);
+    expr_t *da = expr_get_dx_internal(expr->a);
+    expr_t *db = expr_get_dx_internal(expr->b);
     expr_t *out = expr_add(da, db);
     expr_free(da);
     expr_free(db);
     return out;
 }
 
-static expr_t *deriv_sub(expr_t *dv)
+static expr_t *deriv_sub(expr_t *expr)
 {
-    expr_t *da = expr_get_dx_internal(dv->a);
-    expr_t *db = expr_get_dx_internal(dv->b);
+    expr_t *da = expr_get_dx_internal(expr->a);
+    expr_t *db = expr_get_dx_internal(expr->b);
     expr_t *out = expr_sub(da, db);
     expr_free(da);
     expr_free(db);
     return out;
 }
 
-static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv);
-static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *dv);
-static expr_t *deriv_sqrt_affine_over_power(expr_t *dv);
-static expr_t *deriv_atan_matching_sqrt_product(expr_t *dv);
+static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *expr);
+static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *expr);
+static expr_t *deriv_sqrt_affine_over_power(expr_t *expr);
+static expr_t *deriv_atan_matching_sqrt_product(expr_t *expr);
 
-static expr_t *deriv_mul(expr_t *dv)
+static expr_t *deriv_mul(expr_t *expr)
 {
-    expr_t *special = deriv_exp_inverse_scaled_sqrt_product(dv);
+    expr_t *special = deriv_exp_inverse_scaled_sqrt_product(expr);
 
     if (special)
         return special;
-    special = deriv_power_inverse_scaled_sqrt_product(dv);
+    special = deriv_power_inverse_scaled_sqrt_product(expr);
     if (special)
         return special;
-    special = deriv_atan_matching_sqrt_product(dv);
+    special = deriv_atan_matching_sqrt_product(expr);
     if (special)
         return special;
 
-    expr_t *da = expr_get_dx_internal(dv->a);
-    expr_t *db = expr_get_dx_internal(dv->b);
-    expr_t *t1 = expr_mul(da, dv->b);
-    expr_t *t2 = expr_mul(dv->a, db);
+    expr_t *da = expr_get_dx_internal(expr->a);
+    expr_t *db = expr_get_dx_internal(expr->b);
+    expr_t *t1 = expr_mul(da, expr->b);
+    expr_t *t2 = expr_mul(expr->a, db);
     expr_t *out = expr_add(t1, t2);
     expr_free(da);
     expr_free(db);
@@ -1335,38 +1335,38 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_rational_over_polynomial_power(expr_t *dv)
+static expr_t *deriv_rational_over_polynomial_power(expr_t *expr)
 {
-    return expr_deriv_rational_over_polynomial_power(dv, expr_current_wrt_internal());
+    return expr_deriv_rational_over_polynomial_power(expr, expr_current_wrt_internal());
 }
 
-static int expr_has_composite_preserved_binding_expr_node(const expr_t *dv)
+static int expr_has_composite_preserved_binding_expr_node(const expr_t *expr)
 {
-    return expr_is_const(dv) && dv->binding_expr && dv->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
-           dv->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(dv->binding_expr);
+    return expr_is_const(expr) && expr->binding_expr && expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+           expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST && !expr_binding_expr_is_array(expr->binding_expr);
 }
 
-static int expr_binding_aware_search(const expr_t *dv, const expr_t *needle, int null_needle_matches_any,
+static int expr_binding_aware_search(const expr_t *expr, const expr_t *needle, int null_needle_matches_any,
                                      int match_composite_binding)
 {
     expr_t *expanded;
     int depends;
 
-    if (!dv)
+    if (!expr)
         return 0;
 
-    if (match_composite_binding && expr_has_composite_preserved_binding_expr_node(dv))
+    if (match_composite_binding && expr_has_composite_preserved_binding_expr_node(expr))
         return 1;
 
     if (!needle) {
         if (null_needle_matches_any)
             return 1;
-    } else if (dv == needle || expr_struct_eq(dv, needle)) {
+    } else if (expr == needle || expr_struct_eq(expr, needle)) {
         return 1;
     }
 
-    if (expr_has_composite_preserved_binding_expr_node(dv)) {
-        expanded = expr_binding_expr_eval_expr(dv->binding_expr);
+    if (expr_has_composite_preserved_binding_expr_node(expr)) {
+        expanded = expr_binding_expr_eval_expr(expr->binding_expr);
         depends = expanded
                       ? expr_binding_aware_search(expanded, needle, null_needle_matches_any, match_composite_binding)
                       : 0;
@@ -1375,92 +1375,92 @@ static int expr_binding_aware_search(const expr_t *dv, const expr_t *needle, int
         return depends;
     }
 
-    return expr_binding_aware_search(dv->a, needle, null_needle_matches_any, match_composite_binding) ||
-           expr_binding_aware_search(dv->b, needle, null_needle_matches_any, match_composite_binding);
+    return expr_binding_aware_search(expr->a, needle, null_needle_matches_any, match_composite_binding) ||
+           expr_binding_aware_search(expr->b, needle, null_needle_matches_any, match_composite_binding);
 }
 
-static int expr_depends_on_current_wrt(const expr_t *dv)
+static int expr_depends_on_current_wrt(const expr_t *expr)
 {
-    return expr_binding_aware_search(dv, expr_current_wrt_internal(), 1, 0);
+    return expr_binding_aware_search(expr, expr_current_wrt_internal(), 1, 0);
 }
 
-static int expr_depends_on_structural_node(const expr_t *dv, const expr_t *needle)
+static int expr_depends_on_structural_node(const expr_t *expr, const expr_t *needle)
 {
     if (!needle)
         return 0;
-    return expr_binding_aware_search(dv, needle, 0, 0);
+    return expr_binding_aware_search(expr, needle, 0, 0);
 }
 
-static int expr_has_composite_preserved_binding_expr(const expr_t *dv)
+static int expr_has_composite_preserved_binding_expr(const expr_t *expr)
 {
-    return expr_binding_aware_search(dv, NULL, 0, 1);
+    return expr_binding_aware_search(expr, NULL, 0, 1);
 }
 
-static int expr_is_deriv_foldable_real_const(const expr_t *dv)
+static int expr_is_deriv_foldable_real_const(const expr_t *expr)
 {
-    return expr_is_unnamed_const(dv) && (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
-           num_is_real(dv->c);
+    return expr_is_unnamed_const(expr) && (!expr->binding_expr || expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) &&
+           num_is_real(expr->c);
 }
 
-static int expr_is_sqrt_like_expr(const expr_t *dv)
+static int expr_is_sqrt_like_expr(const expr_t *expr)
 {
-    return expr_is_sqrt_expr(dv) || (expr_is_pow_d_expr(dv) && num_eq(dv->c, NUM_HALF));
+    return expr_is_sqrt_expr(expr) || (expr_is_pow_d_expr(expr) && num_eq(expr->c, NUM_HALF));
 }
 
-static const expr_t *expr_sqrt_like_arg(const expr_t *dv)
+static const expr_t *expr_sqrt_like_arg(const expr_t *expr)
 {
-    return dv->a;
+    return expr->a;
 }
 
-static int split_scaled_sqrt_denominator(const expr_t *dv, number_t *scale_out, const expr_t **sqrt_out)
+static int split_scaled_sqrt_denominator(const expr_t *expr, number_t *scale_out, const expr_t **sqrt_out)
 {
-    if (expr_is_sqrt_like_expr(dv)) {
+    if (expr_is_sqrt_like_expr(expr)) {
         num_destroy(scale_out);
         *scale_out = num_clone(NUM_ONE);
-        *sqrt_out = dv;
+        *sqrt_out = expr;
         return 1;
     }
 
-    if (!expr_is_op(dv, &ops_mul))
+    if (!expr_is_op(expr, &ops_mul))
         return 0;
 
-    if (expr_is_deriv_foldable_real_const(dv->a) && expr_is_sqrt_like_expr(dv->b)) {
+    if (expr_is_deriv_foldable_real_const(expr->a) && expr_is_sqrt_like_expr(expr->b)) {
         num_destroy(scale_out);
-        *scale_out = num_clone(dv->a->c);
-        *sqrt_out = dv->b;
+        *scale_out = num_clone(expr->a->c);
+        *sqrt_out = expr->b;
         return 1;
     }
 
-    if (expr_is_deriv_foldable_real_const(dv->b) && expr_is_sqrt_like_expr(dv->a)) {
+    if (expr_is_deriv_foldable_real_const(expr->b) && expr_is_sqrt_like_expr(expr->a)) {
         num_destroy(scale_out);
-        *scale_out = num_clone(dv->b->c);
-        *sqrt_out = dv->a;
+        *scale_out = num_clone(expr->b->c);
+        *sqrt_out = expr->a;
         return 1;
     }
 
     return 0;
 }
 
-static int split_exp_numerator(const expr_t *dv, const expr_t **factor_out, const expr_t **exp_out)
+static int split_exp_numerator(const expr_t *expr, const expr_t **factor_out, const expr_t **exp_out)
 {
-    if (expr_is_exp_expr(dv)) {
+    if (expr_is_exp_expr(expr)) {
         *factor_out = NULL;
-        *exp_out = dv;
+        *exp_out = expr;
         return 1;
     }
 
-    if (!expr_is_op(dv, &ops_mul))
+    if (!expr_is_op(expr, &ops_mul))
         return 0;
 
-    if (expr_is_exp_expr(dv->a) && !expr_depends_on_current_wrt(dv->b)) {
-        *factor_out = dv->b;
-        *exp_out = dv->a;
+    if (expr_is_exp_expr(expr->a) && !expr_depends_on_current_wrt(expr->b)) {
+        *factor_out = expr->b;
+        *exp_out = expr->a;
         return 1;
     }
 
-    if (expr_is_exp_expr(dv->b) && !expr_depends_on_current_wrt(dv->a)) {
-        *factor_out = dv->a;
-        *exp_out = dv->b;
+    if (expr_is_exp_expr(expr->b) && !expr_depends_on_current_wrt(expr->a)) {
+        *factor_out = expr->a;
+        *exp_out = expr->b;
         return 1;
     }
 
@@ -1491,7 +1491,7 @@ static int exp_arg_is_scaled_sqrt(const expr_t *arg, const expr_t *sqrt_node)
     return 0;
 }
 
-static expr_t *deriv_exp_over_scaled_sqrt(expr_t *dv)
+static expr_t *deriv_exp_over_scaled_sqrt(expr_t *expr)
 {
     NUM_SCOPE(scope);
     const expr_t *sqrt_den;
@@ -1506,9 +1506,9 @@ static expr_t *deriv_exp_over_scaled_sqrt(expr_t *dv)
     expr_t *quotient = NULL;
     expr_t *out = NULL;
 
-    if (!split_scaled_sqrt_denominator(dv->b, &den_scale, &sqrt_den))
+    if (!split_scaled_sqrt_denominator(expr->b, &den_scale, &sqrt_den))
         return NULL;
-    if (!split_exp_numerator(dv->a, &factor, &exp_node)) {
+    if (!split_exp_numerator(expr->a, &factor, &exp_node)) {
         num_destroy(&den_scale);
         return NULL;
     }
@@ -1564,49 +1564,49 @@ static expr_t *deriv_exp_over_scaled_sqrt(expr_t *dv)
     return out;
 }
 
-static int split_inverse_scaled_sqrt(const expr_t *dv, number_t *num_scale_out, number_t *den_scale_out,
+static int split_inverse_scaled_sqrt(const expr_t *expr, number_t *num_scale_out, number_t *den_scale_out,
                                      const expr_t **sqrt_out)
 {
-    if (!expr_is_div(dv))
+    if (!expr_is_div(expr))
         return 0;
-    if (!expr_is_deriv_foldable_real_const(dv->a))
+    if (!expr_is_deriv_foldable_real_const(expr->a))
         return 0;
-    if (!split_scaled_sqrt_denominator(dv->b, den_scale_out, sqrt_out))
+    if (!split_scaled_sqrt_denominator(expr->b, den_scale_out, sqrt_out))
         return 0;
 
     num_destroy(num_scale_out);
-    *num_scale_out = num_clone(dv->a->c);
+    *num_scale_out = num_clone(expr->a->c);
     return 1;
 }
 
-static int split_symbolic_inverse_scaled_sqrt(const expr_t *dv, number_t *den_scale_out, const expr_t **factor_out,
+static int split_symbolic_inverse_scaled_sqrt(const expr_t *expr, number_t *den_scale_out, const expr_t **factor_out,
                                               const expr_t **sqrt_out)
 {
-    if (!expr_is_div(dv))
+    if (!expr_is_div(expr))
         return 0;
-    if (!split_scaled_sqrt_denominator(dv->b, den_scale_out, sqrt_out))
+    if (!split_scaled_sqrt_denominator(expr->b, den_scale_out, sqrt_out))
         return 0;
-    if (expr_has_composite_preserved_binding_expr(dv->a))
+    if (expr_has_composite_preserved_binding_expr(expr->a))
         return 0;
-    if (expr_depends_on_structural_node(dv->a, expr_sqrt_like_arg(*sqrt_out)))
+    if (expr_depends_on_structural_node(expr->a, expr_sqrt_like_arg(*sqrt_out)))
         return 0;
 
-    *factor_out = dv->a;
+    *factor_out = expr->a;
     return 1;
 }
 
-static int split_power_like(const expr_t *dv, const expr_t **base_out, number_t *exponent_out)
+static int split_power_like(const expr_t *expr, const expr_t **base_out, number_t *exponent_out)
 {
-    if (expr_is_sqrt_like_expr(dv)) {
-        *base_out = expr_sqrt_like_arg(dv);
+    if (expr_is_sqrt_like_expr(expr)) {
+        *base_out = expr_sqrt_like_arg(expr);
         num_destroy(exponent_out);
         *exponent_out = num_clone(NUM_HALF);
         return 1;
     }
-    if (expr_is_pow_d_expr(dv)) {
-        *base_out = dv->a;
+    if (expr_is_pow_d_expr(expr)) {
+        *base_out = expr->a;
         num_destroy(exponent_out);
-        *exponent_out = num_clone(dv->c);
+        *exponent_out = num_clone(expr->c);
         return 1;
     }
     return 0;
@@ -1700,7 +1700,7 @@ static int split_sqrt_affine_numerator_owned(const expr_t *num, const expr_t *ba
     return 0;
 }
 
-static expr_t *deriv_sqrt_affine_over_power(expr_t *dv)
+static expr_t *deriv_sqrt_affine_over_power(expr_t *expr)
 {
     NUM_SCOPE(scope);
     const expr_t *base = NULL;
@@ -1718,9 +1718,9 @@ static expr_t *deriv_sqrt_affine_over_power(expr_t *dv)
     expr_t *den = NULL;
     expr_t *out = NULL;
 
-    if (!split_power_like(dv->b, &base, &exponent))
+    if (!split_power_like(expr->b, &base, &exponent))
         goto cleanup;
-    if (!split_sqrt_affine_numerator_owned(dv->a, base, &factor, &constant))
+    if (!split_sqrt_affine_numerator_owned(expr->a, base, &factor, &constant))
         goto cleanup;
 
     half_minus_exponent = num_sub(NUM_HALF, exponent);
@@ -1753,7 +1753,7 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *dv)
+static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *expr)
 {
     NUM_SCOPE(scope);
     const expr_t *factor = NULL;
@@ -1773,10 +1773,10 @@ static expr_t *deriv_power_inverse_scaled_sqrt_product(expr_t *dv)
     expr_t *out = NULL;
     int matched;
 
-    matched = (split_power_like(dv->a, &base, &exponent) &&
-               split_symbolic_inverse_scaled_sqrt(dv->b, &den_scale, &factor, &sqrt_den)) ||
-              (split_power_like(dv->b, &base, &exponent) &&
-               split_symbolic_inverse_scaled_sqrt(dv->a, &den_scale, &factor, &sqrt_den));
+    matched = (split_power_like(expr->a, &base, &exponent) &&
+               split_symbolic_inverse_scaled_sqrt(expr->b, &den_scale, &factor, &sqrt_den)) ||
+              (split_power_like(expr->b, &base, &exponent) &&
+               split_symbolic_inverse_scaled_sqrt(expr->a, &den_scale, &factor, &sqrt_den));
     if (!matched)
         goto cleanup;
     if (!expr_struct_eq(base, expr_sqrt_like_arg(sqrt_den)))
@@ -1814,7 +1814,7 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv)
+static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *expr)
 {
     NUM_SCOPE(scope);
     const expr_t *factor = NULL;
@@ -1831,10 +1831,10 @@ static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv)
     expr_t *out = NULL;
     int matched;
 
-    matched = (split_exp_numerator(dv->a, &factor, &exp_node) &&
-               split_inverse_scaled_sqrt(dv->b, &num_scale, &den_scale, &sqrt_den)) ||
-              (split_exp_numerator(dv->b, &factor, &exp_node) &&
-               split_inverse_scaled_sqrt(dv->a, &num_scale, &den_scale, &sqrt_den));
+    matched = (split_exp_numerator(expr->a, &factor, &exp_node) &&
+               split_inverse_scaled_sqrt(expr->b, &num_scale, &den_scale, &sqrt_den)) ||
+              (split_exp_numerator(expr->b, &factor, &exp_node) &&
+               split_inverse_scaled_sqrt(expr->a, &num_scale, &den_scale, &sqrt_den));
     if (!matched) {
         num_destroy(&num_scale);
         num_destroy(&den_scale);
@@ -1896,39 +1896,39 @@ static expr_t *deriv_exp_inverse_scaled_sqrt_product(expr_t *dv)
     return out;
 }
 
-static int split_scaled_atan(const expr_t *dv, number_t *scale_out, const expr_t **atan_out)
+static int split_scaled_atan(const expr_t *expr, number_t *scale_out, const expr_t **atan_out)
 {
-    if (expr_is_op(dv, &ops_atan)) {
+    if (expr_is_op(expr, &ops_atan)) {
         num_destroy(scale_out);
         *scale_out = num_clone(NUM_ONE);
-        *atan_out = dv;
+        *atan_out = expr;
         return 1;
     }
 
-    if (!expr_is_op(dv, &ops_mul))
+    if (!expr_is_op(expr, &ops_mul))
         return 0;
 
-    if (expr_is_deriv_foldable_real_const(dv->a) && expr_is_op(dv->b, &ops_atan)) {
+    if (expr_is_deriv_foldable_real_const(expr->a) && expr_is_op(expr->b, &ops_atan)) {
         num_destroy(scale_out);
-        *scale_out = num_clone(dv->a->c);
-        *atan_out = dv->b;
+        *scale_out = num_clone(expr->a->c);
+        *atan_out = expr->b;
         return 1;
     }
 
-    if (expr_is_deriv_foldable_real_const(dv->b) && expr_is_op(dv->a, &ops_atan)) {
+    if (expr_is_deriv_foldable_real_const(expr->b) && expr_is_op(expr->a, &ops_atan)) {
         num_destroy(scale_out);
-        *scale_out = num_clone(dv->b->c);
-        *atan_out = dv->a;
+        *scale_out = num_clone(expr->b->c);
+        *atan_out = expr->a;
         return 1;
     }
 
     return 0;
 }
 
-static int expr_has_sqrt_like_factor(const expr_t *dv)
+static int expr_has_sqrt_like_factor(const expr_t *expr)
 {
-    return expr_is_sqrt_like_expr(dv) ||
-           (expr_is_op(dv, &ops_mul) && (expr_is_sqrt_like_expr(dv->a) || expr_is_sqrt_like_expr(dv->b)));
+    return expr_is_sqrt_like_expr(expr) ||
+           (expr_is_op(expr, &ops_mul) && (expr_is_sqrt_like_expr(expr->a) || expr_is_sqrt_like_expr(expr->b)));
 }
 
 static void replace_deriv_number(number_t *target, number_t value)
@@ -1937,30 +1937,30 @@ static void replace_deriv_number(number_t *target, number_t value)
     *target = value;
 }
 
-static int split_numeric_affine_in_current_wrt(const expr_t *dv, number_t *linear_out, number_t *constant_out)
+static int split_numeric_affine_in_current_wrt(const expr_t *expr, number_t *linear_out, number_t *constant_out)
 {
     const expr_t *wrt = expr_current_wrt_internal();
 
-    if (!dv || !wrt)
+    if (!expr || !wrt)
         return 0;
 
-    if (dv == wrt || expr_struct_eq(dv, wrt)) {
+    if (expr == wrt || expr_struct_eq(expr, wrt)) {
         replace_deriv_number(linear_out, num_clone(NUM_ONE));
         replace_deriv_number(constant_out, num_clone(NUM_ZERO));
         return 1;
     }
 
-    if (expr_is_deriv_foldable_real_const(dv)) {
+    if (expr_is_deriv_foldable_real_const(expr)) {
         replace_deriv_number(linear_out, num_clone(NUM_ZERO));
-        replace_deriv_number(constant_out, num_clone(dv->c));
+        replace_deriv_number(constant_out, num_clone(expr->c));
         return 1;
     }
 
-    if (expr_is_neg(dv)) {
+    if (expr_is_neg(expr)) {
         number_t linear = num_new();
         number_t constant = num_new();
 
-        if (!split_numeric_affine_in_current_wrt(dv->a, &linear, &constant)) {
+        if (!split_numeric_affine_in_current_wrt(expr->a, &linear, &constant)) {
             num_destroy(&constant);
             num_destroy(&linear);
             return 0;
@@ -1972,15 +1972,15 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv, number_t *linea
         return 1;
     }
 
-    if (expr_is_addsub(dv)) {
+    if (expr_is_addsub(expr)) {
         number_t left_linear = num_new();
         number_t left_constant = num_new();
         number_t right_linear = num_new();
         number_t right_constant = num_new();
-        int matched = split_numeric_affine_in_current_wrt(dv->a, &left_linear, &left_constant) &&
-                      split_numeric_affine_in_current_wrt(dv->b, &right_linear, &right_constant);
+        int matched = split_numeric_affine_in_current_wrt(expr->a, &left_linear, &left_constant) &&
+                      split_numeric_affine_in_current_wrt(expr->b, &right_linear, &right_constant);
 
-        if (matched && expr_is_op(dv, &ops_sub)) {
+        if (matched && expr_is_op(expr, &ops_sub)) {
             replace_deriv_number(linear_out, num_sub(left_linear, right_linear));
             replace_deriv_number(constant_out, num_sub(left_constant, right_constant));
         } else if (matched) {
@@ -1995,19 +1995,19 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv, number_t *linea
         return matched;
     }
 
-    if (expr_is_mul(dv)) {
+    if (expr_is_mul(expr)) {
         const expr_t *factor = NULL;
         const expr_t *affine = NULL;
         number_t linear = num_new();
         number_t constant = num_new();
         int matched = 0;
 
-        if (expr_is_deriv_foldable_real_const(dv->a)) {
-            factor = dv->a;
-            affine = dv->b;
-        } else if (expr_is_deriv_foldable_real_const(dv->b)) {
-            factor = dv->b;
-            affine = dv->a;
+        if (expr_is_deriv_foldable_real_const(expr->a)) {
+            factor = expr->a;
+            affine = expr->b;
+        } else if (expr_is_deriv_foldable_real_const(expr->b)) {
+            factor = expr->b;
+            affine = expr->a;
         }
 
         if (factor && split_numeric_affine_in_current_wrt(affine, &linear, &constant)) {
@@ -2024,20 +2024,20 @@ static int split_numeric_affine_in_current_wrt(const expr_t *dv, number_t *linea
     return 0;
 }
 
-static int split_numeric_scaled_sqrt_denominator(const expr_t *dv, number_t *scale_out, number_t *radicand_out)
+static int split_numeric_scaled_sqrt_denominator(const expr_t *expr, number_t *scale_out, number_t *radicand_out)
 {
-    if (!dv)
+    if (!expr)
         return 0;
 
-    if (expr_is_sqrt_like_expr(dv) && expr_is_deriv_foldable_real_const(expr_sqrt_like_arg(dv))) {
+    if (expr_is_sqrt_like_expr(expr) && expr_is_deriv_foldable_real_const(expr_sqrt_like_arg(expr))) {
         replace_deriv_number(scale_out, num_clone(NUM_ONE));
-        replace_deriv_number(radicand_out, num_clone(expr_sqrt_like_arg(dv)->c));
+        replace_deriv_number(radicand_out, num_clone(expr_sqrt_like_arg(expr)->c));
         return 1;
     }
 
-    if (expr_is_unnamed_const(dv) && dv->binding_expr && dv->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
-        dv->binding_expr->u.unary_op.ops == &ops_sqrt) {
-        expr_t *radicand = expr_binding_expr_eval_expr(dv->binding_expr->u.unary_op.child);
+    if (expr_is_unnamed_const(expr) && expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
+        expr_t *radicand = expr_binding_expr_eval_expr(expr->binding_expr->u.unary_op.child);
         int matched = expr_is_deriv_foldable_real_const(radicand);
 
         if (matched) {
@@ -2048,19 +2048,19 @@ static int split_numeric_scaled_sqrt_denominator(const expr_t *dv, number_t *sca
         return matched;
     }
 
-    if (expr_is_mul(dv)) {
+    if (expr_is_mul(expr)) {
         const expr_t *factor = NULL;
         const expr_t *root = NULL;
         number_t inner_scale = num_new();
         number_t radicand = num_new();
         int matched = 0;
 
-        if (expr_is_deriv_foldable_real_const(dv->a)) {
-            factor = dv->a;
-            root = dv->b;
-        } else if (expr_is_deriv_foldable_real_const(dv->b)) {
-            factor = dv->b;
-            root = dv->a;
+        if (expr_is_deriv_foldable_real_const(expr->a)) {
+            factor = expr->a;
+            root = expr->b;
+        } else if (expr_is_deriv_foldable_real_const(expr->b)) {
+            factor = expr->b;
+            root = expr->a;
         }
 
         if (factor && split_numeric_scaled_sqrt_denominator(root, &inner_scale, &radicand)) {
@@ -2076,7 +2076,7 @@ static int split_numeric_scaled_sqrt_denominator(const expr_t *dv, number_t *sca
     return 0;
 }
 
-static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv, number_t atan_scale, const expr_t *atan_node)
+static expr_t *deriv_atan_over_matching_sqrt(expr_t *expr, number_t atan_scale, const expr_t *atan_node)
 {
     NUM_SCOPE(scope);
     const expr_t *arg = atan_node ? atan_node->a : NULL;
@@ -2109,7 +2109,7 @@ static expr_t *deriv_atan_over_matching_sqrt(expr_t *dv, number_t atan_scale, co
     if (!arg || !expr_is_div(arg) || !wrt)
         goto cleanup;
     if (!split_numeric_scaled_sqrt_denominator(arg->b, &arg_den_scale, &arg_radicand) ||
-        !split_numeric_scaled_sqrt_denominator(dv->b, &outer_den_scale, &outer_radicand))
+        !split_numeric_scaled_sqrt_denominator(expr->b, &outer_den_scale, &outer_radicand))
         goto cleanup;
     if (!num_eq(arg_radicand, outer_radicand))
         goto cleanup;
@@ -2218,7 +2218,7 @@ no_match:
     return 0;
 }
 
-static expr_t *deriv_atan_matching_sqrt_product(expr_t *dv)
+static expr_t *deriv_atan_matching_sqrt_product(expr_t *expr)
 {
     const expr_t *atan_node = NULL;
     number_t scale = num_clone(NUM_ONE);
@@ -2230,7 +2230,7 @@ static expr_t *deriv_atan_matching_sqrt_product(expr_t *dv)
     expr_t *out = NULL;
     int has_root = 0;
 
-    if (!split_scaled_sqrt_atan_product(dv, &scale, &radicand, &atan_node, &has_root) || !has_root || !atan_node)
+    if (!split_scaled_sqrt_atan_product(expr, &scale, &radicand, &atan_node, &has_root) || !has_root || !atan_node)
         goto cleanup;
 
     replace_deriv_number(&adjusted_scale, num_mul(scale, radicand));
@@ -2249,7 +2249,7 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_atan_over_scaled_sqrt(expr_t *dv)
+static expr_t *deriv_atan_over_scaled_sqrt(expr_t *expr)
 {
     const expr_t *atan_node = NULL;
     number_t scale = num_new();
@@ -2261,20 +2261,20 @@ static expr_t *deriv_atan_over_scaled_sqrt(expr_t *dv)
     expr_t *quotient = NULL;
     expr_t *out = NULL;
 
-    if (!split_scaled_atan(dv->a, &scale, &atan_node))
+    if (!split_scaled_atan(expr->a, &scale, &atan_node))
         goto cleanup;
 
-    out = deriv_atan_over_matching_sqrt(dv, scale, atan_node);
+    out = deriv_atan_over_matching_sqrt(expr, scale, atan_node);
     if (out)
         goto cleanup;
-    if (!expr_has_sqrt_like_factor(dv->b))
+    if (!expr_has_sqrt_like_factor(expr->b))
         goto cleanup;
 
     arg_dx = expr_get_dx_internal(atan_node->a);
     arg_sq = expr_mul(atan_node->a, atan_node->a);
     one = expr_new_const(NUM_ONE);
     atan_den = expr_add(one, arg_sq);
-    full_den = expr_mul(dv->b, atan_den);
+    full_den = expr_mul(expr->b, atan_den);
     quotient = expr_div(arg_dx, full_den);
     out = expr_make_scaled(scale, quotient);
 
@@ -2288,30 +2288,30 @@ cleanup:
     return out;
 }
 
-static expr_t *deriv_div(expr_t *dv)
+static expr_t *deriv_div(expr_t *expr)
 {
     NUM_SCOPE(scope);
-    expr_t *special = deriv_exp_over_scaled_sqrt(dv);
+    expr_t *special = deriv_exp_over_scaled_sqrt(expr);
 
     if (special)
         return special;
-    special = deriv_sqrt_affine_over_power(dv);
+    special = deriv_sqrt_affine_over_power(expr);
     if (special)
         return special;
-    special = deriv_atan_over_scaled_sqrt(dv);
+    special = deriv_atan_over_scaled_sqrt(expr);
     if (special)
         return special;
-    special = deriv_rational_over_polynomial_power(dv);
+    special = deriv_rational_over_polynomial_power(expr);
     if (special)
         return special;
 
-    expr_t *da = expr_get_dx_internal(dv->a);
-    expr_t *db = expr_get_dx_internal(dv->b);
-    expr_t *num1 = expr_mul(da, dv->b);
-    expr_t *num2 = expr_mul(dv->a, db);
+    expr_t *da = expr_get_dx_internal(expr->a);
+    expr_t *db = expr_get_dx_internal(expr->b);
+    expr_t *num1 = expr_mul(da, expr->b);
+    expr_t *num2 = expr_mul(expr->a, db);
     expr_t *num = expr_sub(num1, num2);
     number_t two = num_create_from_long(2);
-    expr_t *den = expr_pow(dv->b, &two);
+    expr_t *den = expr_pow(expr->b, &two);
     expr_t *out = expr_div(num, den);
     expr_free(da);
     expr_free(db);
@@ -2322,9 +2322,9 @@ static expr_t *deriv_div(expr_t *dv)
     return out;
 }
 
-static expr_t *deriv_neg(expr_t *dv)
+static expr_t *deriv_neg(expr_t *expr)
 {
-    expr_t *da = expr_get_dx_internal(dv->a);
+    expr_t *da = expr_get_dx_internal(expr->a);
     expr_t *out = expr_neg(da);
     expr_free(da);
     return out;
@@ -2355,10 +2355,10 @@ static expr_t *expr_log_preserving_constexpr(const expr_t *arg)
     return preserved ? preserved : expr_log(arg);
 }
 
-static expr_t *deriv_pow(expr_t *dv)
+static expr_t *deriv_pow(expr_t *expr)
 {
-    expr_t *a = dv->a;
-    expr_t *b = dv->b;
+    expr_t *a = expr->a;
+    expr_t *b = expr->b;
     expr_t *da = expr_get_dx_internal(a);
     expr_t *db = expr_get_dx_internal(b);
 
@@ -2382,13 +2382,13 @@ static expr_t *deriv_pow(expr_t *dv)
     return out;
 }
 
-static expr_t *deriv_pow_d(expr_t *dv)
+static expr_t *deriv_pow_d(expr_t *expr)
 {
     NUM_SCOPE(scope);
-    number_t exponent = num_clone(dv->c);
+    number_t exponent = num_clone(expr->c);
     number_t exponent_minus_one = num_sub(exponent, NUM_ONE);
-    expr_t *da = expr_get_dx_internal(dv->a);
-    expr_t *p = expr_pow(dv->a, &exponent_minus_one);
+    expr_t *da = expr_get_dx_internal(expr->a);
+    expr_t *p = expr_pow(expr->a, &exponent_minus_one);
     expr_t *coef = expr_new_const(exponent);
     expr_t *cp = expr_mul(coef, p);
     expr_t *out = expr_mul(cp, da);
@@ -2399,19 +2399,19 @@ static expr_t *deriv_pow_d(expr_t *dv)
     return out;
 }
 
-static expr_t *deriv_integral_bounds(expr_t *dv)
+static expr_t *deriv_integral_bounds(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return expr_new_const(NUM_NAN);
 }
 
-static expr_t *deriv_integral_meta(expr_t *dv)
+static expr_t *deriv_integral_meta(expr_t *expr)
 {
-    (void)dv;
+    (void)expr;
     return expr_new_const(NUM_NAN);
 }
 
-static expr_t *deriv_integral(expr_t *dv)
+static expr_t *deriv_integral(expr_t *expr)
 {
     const expr_t *wrt;
     const expr_t *lower;
@@ -2428,16 +2428,16 @@ static expr_t *deriv_integral(expr_t *dv)
     expr_t *boundary_term = NULL;
     expr_t *out;
 
-    if (!dv || !dv->a || !dv->b)
+    if (!expr || !expr->a || !expr->b)
         return expr_new_const(NUM_NAN);
     wrt = expr_current_wrt_internal();
-    lower = expr_integral_lower_bound_expr(dv);
-    upper = expr_integral_upper_bound_expr(dv);
-    dummy = expr_integral_dummy_expr(dv);
+    lower = expr_integral_lower_bound_expr(expr);
+    upper = expr_integral_upper_bound_expr(expr);
+    dummy = expr_integral_dummy_expr(expr);
     if (!upper || !dummy)
         return expr_new_const(NUM_NAN);
 
-    integrand_deriv = wrt ? expr_create_deriv(dv->a, wrt) : expr_get_dx_internal(dv->a);
+    integrand_deriv = wrt ? expr_create_deriv(expr->a, wrt) : expr_get_dx_internal(expr->a);
     if (!integrand_deriv)
         return expr_new_const(NUM_NAN);
     if (!expr_is_exact_zero(integrand_deriv)) {
@@ -2450,7 +2450,7 @@ static expr_t *deriv_integral(expr_t *dv)
     }
     expr_free(integrand_deriv);
 
-    upper_integrand = expr_substitute(dv->a, dummy, (expr_t *)upper);
+    upper_integrand = expr_substitute(expr->a, dummy, (expr_t *)upper);
     if (!upper_integrand)
         goto fail;
 
@@ -2468,7 +2468,7 @@ static expr_t *deriv_integral(expr_t *dv)
     if (!lower) {
         boundary_term = upper_term;
     } else {
-        lower_integrand = expr_substitute(dv->a, dummy, (expr_t *)lower);
+        lower_integrand = expr_substitute(expr->a, dummy, (expr_t *)lower);
         lower_deriv = expr_get_dx_internal(lower);
         if (!lower_integrand || !lower_deriv) {
             expr_free(lower_deriv);
@@ -2798,12 +2798,12 @@ const expr_ops_t ops_neg = {.eval = eval_neg,
 /* Arithmetic constructors (retain children)                                 */
 /* ------------------------------------------------------------------------- */
 
-expr_t *expr_neg(const expr_t *dv)
+expr_t *expr_neg(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return NULL;
-    expr_retain(dv);
-    return expr_new_unary_internal(&ops_neg, dv);
+    expr_retain(expr);
+    return expr_new_unary_internal(&ops_neg, expr);
 }
 
 expr_t *expr_add(const expr_t *expr1, const expr_t *expr2)
@@ -2943,15 +2943,15 @@ expr_t *expr_integral_with_bounds_internal(const expr_t *integrand, const expr_t
 }
 
 /* Construct a constant-exponent power while retaining explicit root syntax. */
-expr_t *expr_pow(const expr_t *dv, const number_t *exponent)
+expr_t *expr_pow(const expr_t *expr, const number_t *exponent)
 {
-    if (!dv || !exponent)
+    if (!expr || !exponent)
         return NULL;
-    expr_retain(dv);
-    return expr_new_pow_const_internal(dv, *exponent);
+    expr_retain(expr);
+    return expr_new_pow_const_internal(expr, *exponent);
 }
 
-expr_t *expr_add_num(const expr_t *dv, const number_t *value)
+expr_t *expr_add_num(const expr_t *expr, const number_t *value)
 {
     expr_t *c;
     expr_t *r;
@@ -2961,12 +2961,12 @@ expr_t *expr_add_num(const expr_t *dv, const number_t *value)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_add(dv, c);
+    r = expr_add(expr, c);
     expr_free(c);
     return r;
 }
 
-expr_t *expr_sub_num(const expr_t *dv, const number_t *value)
+expr_t *expr_sub_num(const expr_t *expr, const number_t *value)
 {
     expr_t *c;
     expr_t *r;
@@ -2976,12 +2976,12 @@ expr_t *expr_sub_num(const expr_t *dv, const number_t *value)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_sub(dv, c);
+    r = expr_sub(expr, c);
     expr_free(c);
     return r;
 }
 
-expr_t *expr_num_sub(const number_t *value, const expr_t *dv)
+expr_t *expr_num_sub(const number_t *value, const expr_t *expr)
 {
     expr_t *c;
     expr_t *r;
@@ -2991,12 +2991,12 @@ expr_t *expr_num_sub(const number_t *value, const expr_t *dv)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_sub(c, dv);
+    r = expr_sub(c, expr);
     expr_free(c);
     return r;
 }
 
-expr_t *expr_mul_num(const expr_t *dv, const number_t *value)
+expr_t *expr_mul_num(const expr_t *expr, const number_t *value)
 {
     expr_t *c;
     expr_t *r;
@@ -3006,12 +3006,12 @@ expr_t *expr_mul_num(const expr_t *dv, const number_t *value)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_mul(dv, c);
+    r = expr_mul(expr, c);
     expr_free(c);
     return r;
 }
 
-expr_t *expr_div_num(const expr_t *dv, const number_t *value)
+expr_t *expr_div_num(const expr_t *expr, const number_t *value)
 {
     expr_t *c;
     expr_t *r;
@@ -3021,12 +3021,12 @@ expr_t *expr_div_num(const expr_t *dv, const number_t *value)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_div(dv, c);
+    r = expr_div(expr, c);
     expr_free(c);
     return r;
 }
 
-expr_t *expr_num_div(const number_t *value, const expr_t *dv)
+expr_t *expr_num_div(const number_t *value, const expr_t *expr)
 {
     expr_t *c;
     expr_t *r;
@@ -3036,7 +3036,7 @@ expr_t *expr_num_div(const number_t *value, const expr_t *dv)
     c = expr_new_const(*value);
     if (!c)
         return NULL;
-    r = expr_div(c, dv);
+    r = expr_div(c, expr);
     expr_free(c);
     return r;
 }

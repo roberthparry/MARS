@@ -6,54 +6,78 @@
 \noindent Source: \texttt{tests/expression/test\_expr\_to\_string.c}
 
 \subsection*{Sample 1}
-\noindent\texttt{basic var (TEX)}
+\noindent\texttt{x0}
 \begin{flushleft}
 $\displaystyle \left\{ x_{0} \;\middle|\; x_{0} = 42 \right\}$
 \end{flushleft}
 
 \subsection*{Sample 2}
+\noindent\texttt{time}
+\begin{flushleft}
+$\displaystyle \left\{ \mathit{time} \;\middle|\; \mathit{time} = 42 \right\}$
+\end{flushleft}
+
+\subsection*{Sample 3}
+\noindent\texttt{theta}
+\begin{flushleft}
+$\displaystyle \left\{ \mathit{theta} \;\middle|\; \mathit{theta} = 42 \right\}$
+\end{flushleft}
+
+\subsection*{Sample 4}
+\noindent\texttt{θ}
+\begin{flushleft}
+$\displaystyle \left\{ \theta \;\middle|\; \theta = 42 \right\}$
+\end{flushleft}
+
+\subsection*{Sample 5}
+\noindent\texttt{time₁}
+\begin{flushleft}
+$\displaystyle \left\{ \mathit{time_{1}} \;\middle|\; \mathit{time_{1}} = 42 \right\}$
+\end{flushleft}
+
+\subsection*{Sample 6}
 \noindent\texttt{nested transcendental (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ e^{\sin(x_{0}\mkern-2mu y_{1})} + x_{0}\mkern-2mu \ln(y_{1}) \;\middle|\; x_{0} = 1, y_{1} = 2 \right\}$
 \end{flushleft}
 
-\subsection*{Sample 3}
+\subsection*{Sample 7}
 \noindent\texttt{nested quotient pow (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ \ln(\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) \;\middle|\; x_{0} = 2, y_{1} = 3 \right\}$
 \end{flushleft}
 
-\subsection*{Sample 4}
+\subsection*{Sample 8}
 \noindent\texttt{log10 (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ \lg(x_{0}) \;\middle|\; x_{0} = 100 \right\}$
 \end{flushleft}
 
-\subsection*{Sample 5}
+\subsection*{Sample 9}
 \noindent\texttt{symbolic constants (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ e^{\pi\mkern-2mu i\mkern-2mu \frac{3}{2}\mkern-2mu x} \;\middle|\; x = NAN \right\}$
 \end{flushleft}
 
-\subsection*{Sample 6}
+\subsection*{Sample 10}
 \noindent\texttt{symbolic constant quotient (TEX)}
 \begin{flushleft}
 $\displaystyle \frac{1}{\pi}$
 \end{flushleft}
 
-\subsection*{Sample 7}
+\subsection*{Sample 11}
 \noindent\texttt{lambert W0 (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ W_{0}(x_{0}) \;\middle|\; x_{0} = 1 \right\}$
 \end{flushleft}
 
-\subsection*{Sample 8}
+\subsection*{Sample 12}
 \noindent\texttt{lambert W-1 (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ W_{-1}(x_{1}) \;\middle|\; x_{1} = -0.2 \right\}$
 \end{flushleft}
 
-\subsection*{Sample 9}
+\subsection*{Sample 13}
 \noindent\texttt{gammainv inverse gamma (TEX)}
 \begin{flushleft}
 $\displaystyle \left\{ \ln\Gamma(x) - \ln(5) \;\middle|\; x = \Gamma^{-1}(5) \right\}$

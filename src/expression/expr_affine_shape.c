@@ -57,7 +57,7 @@ static void expr_copy_number_array(number_t *dst, const number_t *src, size_t n)
     }
 }
 
-static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const *vars, number_t scale,
+static bool expr_match_affine_term(const expr_t *expr, size_t nvars, expr_t *const *vars, number_t scale,
                                    number_t *constant_io, number_t *coeffs_io)
 {
     NUM_SCOPE(scope);
@@ -69,10 +69,10 @@ static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const
     bool is_sub;
     size_t idx;
 
-    if (!dv)
+    if (!expr)
         return false;
 
-    if (expr_match_const_value(dv, &constant)) {
+    if (expr_match_const_value(expr, &constant)) {
         number_t product;
         number_t sum;
 
@@ -86,7 +86,7 @@ static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const
         return true;
     }
 
-    if (expr_match_var_expr(dv, nvars, vars, &idx)) {
+    if (expr_match_var_expr(expr, nvars, vars, &idx)) {
         if (!num_is_real(scale)) {
             return false;
         }
@@ -99,7 +99,7 @@ static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const
         return true;
     }
 
-    if (expr_match_add_sub_expr(dv, &left, &right, &is_sub)) {
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         number_t right_scale = is_sub ? num_neg(scale) : num_clone(scale);
         number_t trial_constant = num_clone(*constant_io);
         number_t *trial_coeffs = expr_clone_number_array(coeffs_io, nvars);
@@ -129,7 +129,7 @@ static bool expr_match_affine_term(const expr_t *dv, size_t nvars, expr_t *const
         return true;
     }
 
-    if (expr_match_scaled_expr(dv, &inner_scale, &base)) {
+    if (expr_match_scaled_expr(expr, &inner_scale, &base)) {
         number_t product;
         number_t trial_constant;
         number_t *trial_coeffs;

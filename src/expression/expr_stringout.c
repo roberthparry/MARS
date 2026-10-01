@@ -1,7 +1,7 @@
 /* expr_stringout.c - symbolic/string conversion for expr_t
  *
  * Produces human-readable string representations of a expr_t DAG via
- * expr_to_text(dv, style).  Four styles are supported:
+ * expr_to_text(expr, style).  Four styles are supported:
  *
  *   style_EXPRESSION  — infix notation, e.g.
  *                         { sin(x)·cos(y) | x = 1, y = ½π }
@@ -3321,18 +3321,10 @@ void emit_TeX_name(sbuf_t *b, const char *name)
         return;
     }
 
-    if (expr_tostring_is_simple_name(name)) {
-        tex = expr_tostring_texify(name);
-        if (tex) {
-            sbuf_puts(b, tex);
-            free(tex);
-        } else {
-            sbuf_puts(b, name);
-        }
-        return;
-    }
+    bool compound_name = !expr_tostring_is_simple_name(name);
 
-    sbuf_putc(b, '[');
+    if (compound_name)
+        sbuf_puts(b, "\\mathit{");
     tex = expr_tostring_texify(name);
     if (tex) {
         sbuf_puts(b, tex);
@@ -3340,7 +3332,8 @@ void emit_TeX_name(sbuf_t *b, const char *name)
     } else {
         sbuf_puts(b, name);
     }
-    sbuf_putc(b, ']');
+    if (compound_name)
+        sbuf_putc(b, '}');
 }
 
 static const char *expr_known_constant_TeX_local(number_t value)
@@ -3399,17 +3392,17 @@ static void emit_TeX_number_value(sbuf_t *b, number_t value)
     free(text);
 }
 
-static void emit_TeX_const_value(sbuf_t *b, const expr_t *dv)
+static void emit_TeX_const_value(sbuf_t *b, const expr_t *expr)
 {
     const char *constant_TeX = NULL;
-    char *text = expr_const_to_string_local(dv);
+    char *text = expr_const_to_string_local(expr);
     char *tex;
 
     if (!text)
         return;
 
-    if (dv && !num_is_exact(dv->c))
-        constant_TeX = expr_known_constant_TeX_local(dv->c);
+    if (expr && !num_is_exact(expr->c))
+        constant_TeX = expr_known_constant_TeX_local(expr->c);
     if (constant_TeX) {
         sbuf_puts(b, constant_TeX);
         free(text);
@@ -4099,7 +4092,17 @@ static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
 
 static bool TeX_contains_calculus(const expr_t *f);
 
-static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
+/* Keep a descriptive identifier visually separate from neighbouring factors. */
+static bool TeX_factor_has_compound_name(const expr_t *factor)
+{
+    while (factor && (expr_is_neg(factor) || expr_is_op(factor, &ops_pow) || expr_is_pow_d_expr(factor)))
+        factor = factor->a;
+    return factor && (expr_is_var(factor) || expr_is_const(factor)) && factor->name && *factor->name &&
+           !expr_tostring_should_emit_binding_expr(factor) && !expr_tostring_is_simple_name(factor->name);
+}
+
+/* Use the same factor separation in ordinary products, fractions and multiline output. */
+void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
     const expr_t *right_power_base = NULL;
 
@@ -4125,6 +4128,10 @@ static void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf
          (right && expr_is_const(right) && right->binding_expr &&
           expr_binding_expr_needs_explicit_mul_separator(right->binding_expr)))) {
         sbuf_puts(b, " \\times ");
+        return;
+    }
+    if (TeX_factor_has_compound_name(left) || TeX_factor_has_compound_name(right)) {
+        sbuf_puts(b, " \\cdot ");
         return;
     }
     sbuf_puts(b, "\\mkern-2mu ");
@@ -4272,7 +4279,7 @@ static bool emit_TeX_large_sum_quotient(const expr_t *sum, const expr_t *denomin
         char text[32];
         snprintf(text, sizeof(text), "%ld", q);
         sbuf_puts(&divisor, text);
-        sbuf_puts(&divisor, "\\mkern-2mu ");
+        emit_TeX_mul_separator(NULL, denominator, &divisor);
     }
     emit_TeX_expr(denominator, &divisor, q == 1L ? PREC_LOWEST : PREC_MUL);
     bool factored = sbuf_len(&numerator) >= 200u && sbuf_len(&divisor) <= 32u;
@@ -4333,19 +4340,21 @@ static bool emit_TeX_rational_quotient(const expr_t *numerator, const expr_t *de
     if (emitted)
         emit_TeX_number_value(b, coefficient);
     num_destroy(&coefficient);
+    const expr_t *previous_factor = NULL;
     for (size_t i = 0u; i < count; ++i) {
         if (i == coefficient_index)
             continue;
         if (emitted)
-            sbuf_puts(b, "\\mkern-2mu ");
+            emit_TeX_mul_separator(previous_factor, factors[i], b);
         emit_TeX_expr_abs(factors[i], b, PREC_MUL);
+        previous_factor = factors[i];
         emitted = true;
     }
     sbuf_puts(b, "}{");
     char text[32];
     snprintf(text, sizeof(text), "%ld", q);
     sbuf_puts(b, text);
-    sbuf_puts(b, "\\mkern-2mu ");
+    emit_TeX_mul_separator(NULL, denominator, b);
     emit_TeX_expr(denominator, b, PREC_MUL);
     sbuf_putc(b, '}');
     if (PREC_MUL < parent_prec)
@@ -5025,7 +5034,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_expr(f->a->a, b, PREC_LOWEST);
             sbuf_puts(b, "}{");
             emit_TeX_expr(f->a->b, b, PREC_MUL);
-            sbuf_puts(b, "\\mkern-2mu ");
+            emit_TeX_mul_separator(f->a->b, f->b, b);
             emit_TeX_expr(f->b, b, PREC_MUL);
             sbuf_putc(b, '}');
             if (need)
@@ -6680,28 +6689,28 @@ char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial)
     return text;
 }
 
-static string_t *expr_to_TeX_text(const expr_t *dv)
+static string_t *expr_to_TeX_text(const expr_t *expr)
 {
-    char *expr = NULL;
+    char *expression_text = NULL;
     char *bindings = NULL;
     sbuf_t b;
     string_t *out;
 
-    if (expr_to_TeX_parts(dv, &expr, &bindings) != 0)
-        return expr_to_text_expr(dv);
+    if (expr_to_TeX_parts(expr, &expression_text, &bindings) != 0)
+        return expr_to_text_expr(expr);
 
     sbuf_init(&b);
     if (bindings && *bindings) {
         sbuf_puts(&b, "\\left\\{ ");
-        sbuf_puts(&b, expr);
+        sbuf_puts(&b, expression_text);
         sbuf_puts(&b, " \\;\\middle|\\; ");
         sbuf_puts(&b, bindings);
         sbuf_puts(&b, " \\right\\}");
     } else {
-        sbuf_puts(&b, expr);
+        sbuf_puts(&b, expression_text);
     }
 
-    free(expr);
+    free(expression_text);
     free(bindings);
     out = sbuf_to_string(&b);
     sbuf_free(&b);
@@ -6734,22 +6743,22 @@ static string_t *expr_trim_trailing_display_space(string_t *text)
     return trimmed;
 }
 
-string_t *expr_to_text(const expr_t *dv, style_t style)
+string_t *expr_to_text(const expr_t *expr, style_t style)
 {
     string_t *text;
 
     expr_init_singletons();
-    if (!dv)
+    if (!expr)
         return string_new_with("NULL");
 
     if (style == style_LATEX) {
-        text = expr_to_TeX_text(dv);
+        text = expr_to_TeX_text(expr);
     } else if (style == style_FUNCTION) {
-        text = expr_to_text_function(dv);
+        text = expr_to_text_function(expr);
     } else if (style == style_UNBOUND) {
-        text = expr_to_text_unbound(dv);
+        text = expr_to_text_unbound(expr);
     } else {
-        text = expr_to_text_expr(dv);
+        text = expr_to_text_expr(expr);
     }
 
     return expr_trim_trailing_display_space(text);
@@ -6833,9 +6842,9 @@ int expr_printf(const char *fmt, ...)
     return written;
 }
 
-void expr_print(const expr_t *dv)
+void expr_print(const expr_t *expr)
 {
-    if (expr_printf("%n\n", dv) < 0)
+    if (expr_printf("%n\n", expr) < 0)
         string_printf("NULL\n");
 }
 

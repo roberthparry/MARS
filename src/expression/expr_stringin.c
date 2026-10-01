@@ -3728,7 +3728,8 @@ static expr_t *parse_atom_body(expr_parse_state_t *p, bool allow_ascii_rational_
                         message = "Derivative requires (function, order) or "
                                   "(expression, coordinate, non-negative integer order)";
                     else if (fourier_transform)
-                        message = "Fourier requires one source variable and a distinct target; unfamiliar coordinates need an explicit target";
+                        message = "Fourier requires one unambiguous source variable and a distinct target "
+                                  "that does not capture an operand parameter";
                     else if (inverse_laplace)
                         message = "InverseLaplace requires one source variable (or an explicit source), and a distinct target";
                     else if (integral_transform)

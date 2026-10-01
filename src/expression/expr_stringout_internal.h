@@ -33,10 +33,10 @@ typedef struct {
 
 /* Local value formatting. */
 char *expr_number_to_string_local(number_t value);
-char *expr_const_to_string_local(const expr_t *dv);
-char *expr_eval_to_string_local(const expr_t *dv);
+char *expr_const_to_string_local(const expr_t *expr);
+char *expr_eval_to_string_local(const expr_t *expr);
 char *expr_text_to_TeX_local(const char *text);
-bool expr_is_immortal_default_const_local(const expr_t *dv);
+bool expr_is_immortal_default_const_local(const expr_t *expr);
 bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
 
@@ -53,12 +53,12 @@ void varlist_init(varlist_t *vl);
 void find_vars_dfs(const expr_t *f, varlist_t *vl);
 void find_named_consts_dfs(const expr_t *f, varlist_t *cl);
 void find_explicit_named_consts_dfs(const expr_t *f, varlist_t *cl);
-const char *expr_name_or_default(const expr_t *dv, const char *fallback);
+const char *expr_name_or_default(const expr_t *expr, const char *fallback);
 
 /* Binding RHS formatting. */
-char *binding_rhs_expr_string_local(const expr_t *dv);
-char *binding_rhs_TeX_string_local(const expr_t *dv);
-char *binding_rhs_c_string_local(const expr_t *dv);
+char *binding_rhs_expr_string_local(const expr_t *expr);
+char *binding_rhs_TeX_string_local(const expr_t *expr);
+char *binding_rhs_c_string_local(const expr_t *expr);
 
 /* Expression emitters. */
 typedef struct expr_distribution_TeX_scope {
@@ -80,6 +80,8 @@ void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *buffer);
 
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+/** Emit native multiplication spacing or a separator between neighbouring factors. */
+void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b);
 /** Collect borrowed additive terms in display order, with their signs, within the supplied capacity. */
 bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *signs, size_t *count, size_t capacity);
 void emit_func_fragment(sbuf_t *b, const char *text);

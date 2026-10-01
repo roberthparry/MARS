@@ -70,8 +70,13 @@ class SgnTests(unittest.TestCase):
 
     def test_real_primitive_domain(self):
         primitive = self.fields("@S sgn(2x-1) dx")
-        self.assertIn("|2x - 1|/2", primitive["unbound"])
+        self.assertIn("|2x - 1|", primitive["unbound"])
+        self.assertIn("C", primitive["unbound"])
         self.assertIn("x ∈ ℝ", primitive["unbound"])
+        # Factoring the family must preserve both the half coefficient and the arbitrary constant.
+        for point, expected in (("-2", 5.5), ("0", 3.5), ("2", 4.5)):
+            fields = self.fields("{@S sgn(2x-1) dx | x=" + point + "; C=3}")
+            self.assertEqual(float(fields["value"]), expected)
         for point, expected in (("-2", "2"), ("0", "0"), ("2", "2"), ("i", "NAN")):
             fields = self.fields("{@S^x_0 sgn(t) dt | x=" + point + "}")
             self.assertEqual(fields["value"], expected)

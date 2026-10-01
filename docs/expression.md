@@ -15,7 +15,8 @@ without `t` require an explicit source.
 The Rendered TeX card presents evaluated transforms as identities, with the
 calligraphic Laplace operator and source expression on the left and the
 algebraic result with its convergence conditions on the right. The Expression
-and Function cards retain the algebraic result alone. Supplied constant
+card retains that algebraic result; the Function card keeps executable calls
+for the original transform and any nested calculus operations. Supplied constant
 parameters are specialised consistently on both sides; unresolved transforms
 remain a single unevaluated operator.
 
@@ -116,7 +117,10 @@ $\quad\begin{array}{l}\displaystyle \mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+
 where $\gamma$ is the Euler–Mascheroni constant. At `s=1`, the value is
 approximately `-0.5772156649015329`.
 The inverse pair is also recognised: `@Linv{-(ln(s)+γ)/s}` returns `ln(t)`
-for positive time, with `return ln(t).` in the Function card. More generally,
+for positive time. The Lab Function card retains the calculation as
+`return inverselaplace(-(ln(s) + @eulermascheroni)/s, s, t).`;
+direct Function-style rendering of the evaluated expression instead returns
+`ln(t)`. More generally,
 linear combinations of a logarithm and a constant divided by the source
 variable are inverted algebraically.
 
@@ -164,7 +168,8 @@ For example, `@Linv((s-a)/((s-a)^2+1))` produces
 
 $\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\left\{\frac{s-a}{(s-a)^2+1}\right\} = e^{at}\cos(t).\end{array}$
 
-The Function card returns `exp(a*t)*cos(t)` (using MARS multiplication syntax),
+The Lab Function card retains
+`return inverselaplace((s - a)/((s - a)^2 + 1), s, t).`,
 and numerical bindings `a=2`, `t=0.5` give approximately `2.385516730959136`.
 An unknown input such as `@Linv(F(s),s,x)` remains `ℒ⁻¹(F(s), s, x)`;
 its Function representation is `inverselaplace(F(s), s, x)`.
@@ -177,14 +182,19 @@ $\mathcal L\{e^{at}f(t)\}(s)=F(s-a)$, with the local definition
 $F(s):=\mathcal L\{f(t)\}(s)$ and the restriction
 $s-a\in\operatorname{ROC}(F)$. Here ROC denotes the region of convergence;
 no numerical bound is assumed for an unspecified function.
-The corresponding unbound Expression output is `ℒ(f(t), t, s - a)` and the
-Function return expression is `laplace(f(t), t, s - a)`, so neither relies on an
-undefined global function named `F`. These evaluated transform arguments are
+The corresponding unbound Expression output is `ℒ(f(t), t, s - a)`.
+Direct Function-style rendering of that result uses `laplace(f(t), t, s - a)`;
+the Lab Function card retains the authored calculation as
+`return laplace(f(t).e^(a.t), t, s).`. Neither relies on an undefined global
+function named `F`. These evaluated transform arguments are
 accepted as input. Known base transforms are evaluated and their convergence
 restrictions shifted with the formula.
 
-TeX, Expression and Function output all display the same formula. Supplied constant
-parameters are specialised consistently across these cards; free variables remain
+TeX and Expression output display the evaluated formula. The Lab Function card
+retains the requested calculus operations, including nested calls, to calculate
+that same result when run. Direct `style_FUNCTION` rendering of an evaluated
+expression instead represents its formula. Supplied constant parameters are
+specialised consistently across these cards; free variables remain
 symbolic even when they have numerical bindings. Conditions proved by the supplied
 constants are removed. Expression and Function show readable, parseable conditions,
 so restrictions survive copying a result back as input.
@@ -192,12 +202,12 @@ For example, `@L(t)` produces `1/s² where (Re(s) > 0)` in unbound Expression ou
 The bound Expression card places conditions after the binding bar instead:
 `{ 1/s² | s = ?; Re(s) > 0 }`. This form is also accepted as input.
 Several conditions are separated by semicolons inside the `where` parentheses.
-The Function card checks the restrictions before evaluating the formula and
+The Function card checks the restrictions before executing the calculation and
 returns `@nan` otherwise. For `@L(t)`, its function body is:
 
 ```text
     if (realpart(s) > 0) {
-        return 1/s^2.
+        return laplace(t, t, s).
     } else {
         return @nan.
     }
@@ -596,9 +606,24 @@ $\quad\begin{array}{l}\displaystyle \mathcal F\{f\}(\omega)=\int_{-\infty}^{\inf
 Both coordinates are real. Default coordinate pairs are `t`/`ω`, `x`/`k`,
 `y`/`m` and `z`/`n`; inverse transforms reverse the pair. The three-argument
 form takes the operand, bound source variable and free target expression.
-Unfamiliar coordinate names require an explicit target. Source coordinates
-are not exposed as Lab bindings, and target names must not capture parameters
-already present in the operand.
+Other source names, including bracketed multi-character variables, default to
+`ω` for a forward transform and `t` for an inverse transform. An explicit target
+overrides these defaults. Source coordinates are not exposed as Lab bindings;
+the target must be distinct from the source and must not capture a parameter
+already present in the operand. Ambiguous sources still require an explicit
+source coordinate.
+
+For example, `[time]` is one variable in:
+
+```text
+@F{gamma(a+i[time])}
+```
+
+Unbound expression output:
+
+```text
+2π·exp(aω - exp(ω)) where (ω ∈ ℝ; Re(a) > 0)
+```
 
 The current rules cover Gaussian, rectangular, triangular, normalised sinc,
 two-sided exponential, fractional absolute-power, quadratic-reciprocal and hyperbolic-secant pairs, plus
@@ -1456,7 +1481,12 @@ other terms are not. In that case the unsupported additive pieces are left as
 unevaluated `expr_integral(...)` nodes inside the returned antiderivative. An
 unevaluated integral node represents `∫^x f(t)·dt`: it is symbolically
 differentiable with respect to its upper variable by the fundamental theorem
-of calculus, but direct numeric evaluation of the node itself returns `NaN`.
+of calculus. Numerical evaluation uses zero as the lower endpoint when none is
+specified, and computes the definite integral to the bound upper coordinate.
+This requires real numerical endpoints and a supported, convergent calculation;
+missing bindings or an unsuccessful numerical calculation give `NaN`.
+The arbitrary constant added by `expr_integrate_family()` must also be bound
+before the complete family has a numerical value.
 
 The implementation is split into logical integration modules:
 
@@ -2442,6 +2472,20 @@ suitable for later differentiation. Descriptive identifiers such as
 canonicalised to `[sqrt(2)]`, but Function-style output does not generate the
 `$[...]` form.
 
+Multi-character symbols use ordinary bare identifiers in Function output when
+they can be read back unchanged. Brackets remain in Expression output and remain
+available in Function input. Function output retains brackets for names containing
+spaces or punctuation, language keywords, and spellings that would otherwise be
+read as built-in constants or Greek aliases.
+
+LaTeX output displays multi-character symbols as single italic identifiers,
+without the square brackets required by Expression syntax. This applies equally
+to their occurrences in powers, calculus notation and binding annotations;
+single-letter symbols, Greek letters and subscripts retain their usual notation.
+A small centred multiplication dot separates a multi-character identifier,
+including its powers, from adjacent factors so that their names do not run together.
+Products of single-letter symbols retain their existing notation.
+
 Built-in function names in `style_FUNCTION` use canonical concatenated lowercase
 spellings, such as `normalpdf`, `gammainclower`, `besselj`, `lerchphi`,
 `besseli`, `besselk`, `struveh`, `struvel`, `hypergeometricpfq`, and the bit operations `and`, `or`, `xor`, `not`, `shl`,
@@ -2966,7 +3010,11 @@ with `C` and choosing an indexed name when necessary to avoid an existing symbol
 The primitive's outer domain restrictions apply to the whole family, including
 the constant. Bound Expression output places those restrictions after the bindings,
 not in a `where` clause embedded in one summand. The Lab Function card retains the
-domain guard around the integral call. Returns `NULL` when no primitive can be constructed.
+domain guard around the integral call. When no supported primitive is found,
+retains a formal integral plus the arbitrary constant. This family remains
+symbolically differentiable; it does not claim a closed-form primitive.
+Returns `NULL` for invalid inputs or allocation failure. The lower-level
+`expr_integrate()` API retains its existing `NULL` result for fully unsupported inputs.
 
 ```c
 expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);

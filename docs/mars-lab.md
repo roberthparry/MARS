@@ -69,7 +69,21 @@ their hyperbolic counterparts; and all twelve inverse circular and inverse
 hyperbolic functions. This applies to inputs written with both parts—
 `exp(x + iy)` is displayed as `exp(x)·cos(y) + exp(x)·sin(y)·i`—and to
 pure-imaginary inputs, for which `sin(iy)` is displayed as
-`0 + sinh(y)·i`.
+`sinh(y)·i`. A zero real component is omitted rather than displayed as `0 +`.
+
+When the symbolic integrator has no supported closed-form primitive, the integral
+button retains a formal integral with an arbitrary constant instead of reporting
+an error. The Function card still calls `integral(integrand, variable)`; this
+operation generates the constant and can be differentiated back to the integrand.
+
+For example, enter `gamma(a+[time]i)` and select the *time* integral button.
+The resulting antiderivative family, without its bindings, is:
+
+```text
+∫^[time] Γ(t·i + a)·dt + C
+```
+
+Here `t` is a dummy integration variable; `[time]` remains the result's free variable.
 
 Logarithm input follows the calculator convention: `log(x)`, `log10(x)`, and
 `lg(x)` all mean the base-10 logarithm, while `ln(x)` means the natural
@@ -439,6 +453,17 @@ not from TeX or Function presentation. Its binding-aware transfer preserves
 the expression body's order and notation while applying the result bindings to
 the editor controls.
 
+Binding controls retain the native Expression spelling internally when
+editing, clearing or transferring bindings. Their visible name labels,
+tooltips and derivative/integral buttons omit enclosing square brackets.
+The calculus buttons italicise only the variable name, leaving the action word
+upright. Multi-character names keep their square brackets in Expression syntax, while ordinary Ophelia
+identifiers are unbracketed in Function source. Rendered TeX also omits these
+brackets, presenting each multi-character name as a single italic identifier.
+Native TeX inserts a small centred dot between these names and adjacent factors
+to make multiplication clear.
+Products of single-letter symbols retain their existing notation.
+
 [![MARS Lab expression mode displaying an inverse-power series as a sigma, Hurwitz-zeta formula and numerical value](images/mars-lab/expression.png?v=20260820-2)](images/mars-lab/expression.png?v=20260820-2)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
@@ -482,6 +507,10 @@ top-level output calls. Paired-backtick comments and double-backtick line
 comments are accepted. A full stop followed by whitespace or the end of the
 statement terminates it; an internal full stop multiplies. Commas can separate
 ordinary assignments on one line.
+
+Bracketed multi-character symbolic names are supported in expressions,
+declarations, function parameters and transform coordinates. Their contents are
+one name, not a product of letters or an array literal.
 
 For example, RUN executes this Function source:
 
@@ -685,14 +714,16 @@ short-circuit behaviour, including when a known operand determines their result.
 
 Equation functions return native equation values. `solve` accepts one equation
 value and returns the native solver's solution set; output prints every returned
-solution rather than choosing one root. For example:
+solution rather than choosing one root. Generated equation programmes use
+`outputa()` to retain exact fractions and surds; an explicit `output()` still
+requests numerical evaluation. For example:
 
 ```text
 equation equ(Y) {
     return equation(26.Y = 320/9).
 }
 `` Y = ?
-output(solve(equ(Y))).
+outputa(solve(equ(Y))).
 ```
 
 Output:
@@ -736,7 +767,11 @@ negative-even family is labelled separately. Both **Rendered TeX** and
 **Solutions** combine numerical conjugates into one `±` row, so twenty rows
 can show forty roots at the selected precision. The native backend compares
 the actual numbers before pairing; it does not merge rounded display values
-or sampled symbolic families. The search is not exhaustive. A literal
+or sampled symbolic families. Exact algebraic conjugates are paired structurally,
+retaining surds and shared denominators with `=` rather than `≈`. Certified
+rational quadratic factors of quartics preserve these exact roots in RUN output
+as well. Both cards omit a unit coefficient before the imaginary unit in conjugate
+pairs. The search is not exhaustive. A literal
 inverse-power series starting at one retains its convergence domain and, when
 equated to zero, reports no solutions in that domain. It does not acquire
 analytic-continuation zeros. **Solutions** says only **No solutions** for a

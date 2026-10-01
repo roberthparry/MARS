@@ -5,17 +5,17 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
-static int const_is_protected_bound_symbol(const expr_t *dv)
+static int const_is_protected_bound_symbol(const expr_t *expr)
 {
     number_t value;
     int has_default;
     int is_default;
 
-    if (!dv || !expr_is_const(dv) || !dv->binding_expr || !dv->name || !*dv->name)
+    if (!expr || !expr_is_const(expr) || !expr->binding_expr || !expr->name || !*expr->name)
         return 0;
 
-    has_default = expr_get_default_constant_num(dv->name, &value);
-    is_default = has_default && num_eq(dv->c, value);
+    has_default = expr_get_default_constant_num(expr->name, &value);
+    is_default = has_default && num_eq(expr->c, value);
     if (has_default)
         num_destroy(&value);
 
@@ -59,36 +59,36 @@ static void *expr_match_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-static void collect_mul_factors_borrowed(const expr_t *dv, number_t *c_acc, const expr_t ***terms, size_t *nterms,
+static void collect_mul_factors_borrowed(const expr_t *expr, number_t *c_acc, const expr_t ***terms, size_t *nterms,
                                          size_t *cap)
 {
     NUM_SCOPE(scope);
-    if (expr_is_unnamed_const(dv) && num_is_real(dv->c) &&
-        (!dv->binding_expr || dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER)) {
-        number_t product = num_mul(*c_acc, dv->c);
+    if (expr_is_unnamed_const(expr) && num_is_real(expr->c) &&
+        (!expr->binding_expr || expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER)) {
+        number_t product = num_mul(*c_acc, expr->c);
 
         num_destroy(c_acc);
         *c_acc = num_scope_detach(product);
         return;
     }
-    if (expr_is_neg(dv)) {
+    if (expr_is_neg(expr)) {
         number_t negated = num_neg(*c_acc);
 
         num_destroy(c_acc);
         *c_acc = num_scope_detach(negated);
-        collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
+        collect_mul_factors_borrowed(expr->a, c_acc, terms, nterms, cap);
         return;
     }
-    if (expr_is_mul(dv)) {
-        collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
-        collect_mul_factors_borrowed(dv->b, c_acc, terms, nterms, cap);
+    if (expr_is_mul(expr)) {
+        collect_mul_factors_borrowed(expr->a, c_acc, terms, nterms, cap);
+        collect_mul_factors_borrowed(expr->b, c_acc, terms, nterms, cap);
         return;
     }
     if (*nterms == *cap) {
         *cap = (*cap == 0) ? 4 : (*cap * 2);
         *terms = expr_match_xrealloc((void *)*terms, *cap * sizeof(**terms));
     }
-    (*terms)[(*nterms)++] = dv;
+    (*terms)[(*nterms)++] = expr;
 }
 
 static int mul_struct_eq(const expr_t *u, const expr_t *v)

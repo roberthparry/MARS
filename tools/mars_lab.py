@@ -6719,6 +6719,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       return handled;
     }
 
+    function bindingDisplayName(name) {
+      const text = String(name || '');
+      // Brackets remain part of the native identifier, but are not needed on UI labels.
+      return text.startsWith('[') && text.endsWith(']') ? text.slice(1, -1) : text;
+    }
+
     function renderVariableValues(bindings) {
       variableValues.replaceChildren();
       bindingValueCache = new Map();
@@ -6741,6 +6747,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
       [...variableBindings, ...constantBindings].forEach((binding) => {
         const kind = binding.kind || 'variable';
+        const displayName = bindingDisplayName(binding.name);
         currentBindingKinds.set(binding.name, kind);
         const displayValue = displayValueForBinding(binding);
         const fullValue = fullValueForBinding(binding);
@@ -6756,7 +6763,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         name.className = kind === 'constant'
           ? 'variable-value-name constant-value-name'
           : 'variable-value-name';
-        name.textContent = binding.name;
+        name.textContent = displayName;
 
         const field = document.createElement('div');
         field.className = 'binding-value-field';
@@ -6772,7 +6779,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         text.spellcheck = false;
         // A blank placeholder lets CSS hide the clear button whenever the value is empty.
         text.placeholder = ' ';
-        text.setAttribute('aria-label', `Value of ${binding.name}`);
+        text.setAttribute('aria-label', `Value of ${displayName}`);
         text.addEventListener('keydown', (event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
@@ -6795,7 +6802,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         clear.className = 'binding-value-clear';
         clear.type = 'button';
         clear.textContent = '×';
-        clear.title = `Clear ${binding.name}`;
+        clear.title = `Clear ${displayName}`;
         clear.setAttribute('aria-label', clear.title);
         // Do not blur and re-render the field before the click can clear it.
         clear.addEventListener('pointerdown', (event) => event.preventDefault());
@@ -6822,7 +6829,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           try {
             await writeClipboardText(text.value);
             flashCopyButton(copy, true);
-            setStatus(`Copied ${binding.name}`);
+            setStatus(`Copied ${displayName}`);
             setTimeout(() => setStatus('Ready'), 1000);
           } catch (err) {
             flashCopyButton(copy, false);
@@ -6835,8 +6842,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         toggle.type = 'button';
         toggle.textContent = kind === 'constant' ? 'Variable' : 'Constant';
         toggle.title = kind === 'constant'
-          ? `Treat ${binding.name} as a variable`
-          : `Treat ${binding.name} as a constant`;
+          ? `Treat ${displayName} as a variable`
+          : `Treat ${displayName} as a constant`;
         toggle.addEventListener('click', () => {
           void toggleBindingKind(binding);
         });
@@ -8177,7 +8184,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const derivativeButton = document.createElement('button');
         derivativeButton.className = 'secondary';
         derivativeButton.type = 'button';
-        derivativeButton.textContent = `${name} derivative`;
+        const variableName = document.createElement('i');
+        variableName.textContent = bindingDisplayName(name);
+        derivativeButton.append(variableName, ' derivative');
         derivativeButton.addEventListener('click', () => takeDerivative(name, derivativeButton));
         derivativeButtons.appendChild(derivativeButton);
       });
@@ -8185,7 +8194,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         const integralButton = document.createElement('button');
         integralButton.className = 'secondary';
         integralButton.type = 'button';
-        integralButton.textContent = `${name} integral`;
+        const variableName = document.createElement('i');
+        variableName.textContent = bindingDisplayName(name);
+        integralButton.append(variableName, ' integral');
         integralButton.addEventListener('click', () => takeIntegral(name, integralButton));
         derivativeButtons.appendChild(integralButton);
       });

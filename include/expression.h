@@ -323,6 +323,8 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
  * named constant. The first constant is C, with indexed names chosen if earlier
  * ones already appear in the expression. Outer domain restrictions enclose the
  * whole family, including the integration constant.
+ * If no supported primitive is found, retains an unevaluated integral plus the
+ * arbitrary constant. Returns NULL for invalid inputs or allocation failure.
  */
 expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);
 

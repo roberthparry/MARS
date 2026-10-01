@@ -192,9 +192,9 @@ static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A, void (*scalar_
     return R;
 }
 
-static bool expr_is_zero_local(const expr_t *dv)
+static bool expr_is_zero_local(const expr_t *expr)
 {
-    return !dv || expr_is_exact_zero(dv);
+    return !expr || expr_is_exact_zero(expr);
 }
 
 static expr_t *expr_fun_first_derivative_at_zero_local(void (*scalar_f)(void *out, const void *in))

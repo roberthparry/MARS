@@ -41,19 +41,19 @@ static void mp_subinterval_clear(mp_subinterval_t *interval)
     num_destroy(&interval->error);
 }
 
-static void intg_expr_set_val_num(expr_t *dv, number_t x)
+static void intg_expr_set_val_num(expr_t *expr, number_t x)
 {
-    expr_set_val(dv, x);
+    expr_set_val(expr, x);
 }
 
-static int intg_expr_eval_num_real(const expr_t *dv, number_t *out)
+static int intg_expr_eval_num_real(const expr_t *expr, number_t *out)
 {
     number_t value;
 
     if (!out)
         return -1;
 
-    value = expr_eval(dv);
+    value = expr_eval(expr);
     if (!num_is_real(value) || !num_is_finite(value)) {
         num_destroy(&value);
         return -1;

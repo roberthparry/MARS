@@ -684,20 +684,32 @@ void test_to_string_basic_var(void)
 
 static void test_to_string_basic_var_TeX(void)
 {
-    expr_t *x = test_expr_new_named_var_d(42.0, "x0");
-    char *got = expr_to_string(x, style_LATEX);
+    const struct {
+        const char *name;
+        const char *TeX;
+    } cases[] = {
+        {"x0",    "x_{0}"},
+        {"time",  "\\mathit{time}"},
+        {"theta", "\\mathit{theta}"},
+        {"θ",     "\\theta"},
+        {"time₁", "\\mathit{time_{1}}"},
+    };
 
-    const char *want = "\\left\\{ x_{0} \\;\\middle|\\; x_{0} = 42 \\right\\}";
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *x = test_expr_new_named_var_d(42.0, cases[i].name);
+        char *got = expr_to_string(x, style_LATEX);
+        char want[256];
 
-    TeX_preview_emit_case(__FILE__, "basic var (TEX)", got);
+        snprintf(want, sizeof(want), "\\left\\{ %s \\;\\middle|\\; %s = 42 \\right\\}", cases[i].TeX, cases[i].TeX);
+        TeX_preview_emit_case(__FILE__, cases[i].name, got);
+        if (str_eq(got, want))
+            to_string_pass(cases[i].name, got, want);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].name, got, want);
 
-    if (str_eq(got, want))
-        to_string_pass("basic var (TEX)", got, want);
-    else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (TEX)", got, want);
-
-    free(got);
-    expr_free(x);
+        free(got);
+        expr_free(x);
+    }
 }
 
 static void test_to_string_nested_transcendental_TeX(void)
@@ -4376,31 +4388,31 @@ void test_expressions_longname(void)
     } tests[] = {
         /* L01 */
         {"radius^2", make_expr_l01, "{ [radius]² | [radius] = 1.25 }",
-         "[radius] = 1.25\n"
-         "expr([radius]) = [radius]^2\n"
-         "return expr([radius])",
+         "radius = 1.25\n"
+         "expr(radius) = radius^2\n"
+         "return expr(radius)",
          __LINE__},
 
         /* L02 */
         {"base * height", make_expr_l02, "{ [base]·[height] | [base] = 1.25, [height] = 1.25 }",
-         "[base] = 1.25\n"
-         "[height] = 1.25\n"
-         "expr([base],[height]) = [base]*[height]\n"
-         "return expr([base],[height])",
+         "base = 1.25\n"
+         "height = 1.25\n"
+         "expr(base,height) = base*height\n"
+         "return expr(base,height)",
          __LINE__},
 
         /* L03 */
         {"pi * radius^2", make_expr_l03, "{ [pi]·[radius]² | [radius] = 1.25 }",
-         "[radius] = 1.25\n"
-         "expr([radius]) = [pi]*[radius]^2\n"
-         "return expr([radius])",
+         "radius = 1.25\n"
+         "expr(radius) = [pi]*radius^2\n"
+         "return expr(radius)",
          __LINE__},
 
         /* L04 */
         {"@pi * radius^2", make_expr_l04, "{ π·[radius]² | [radius] = 1.25 }",
-         "[radius] = 1.25\n"
-         "expr([radius]) = @pi*[radius]^2\n"
-         "return expr([radius])",
+         "radius = 1.25\n"
+         "expr(radius) = @pi*radius^2\n"
+         "return expr(radius)",
          __LINE__},
 
         /* L05 */

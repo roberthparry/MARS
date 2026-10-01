@@ -421,10 +421,56 @@ class FourierTests(unittest.TestCase):
             self.assertEqual(self.fields("@F{"+alias+"(t)}")["unbound"], "1")
         for alias in ("step", "heaviside", "Heaviside", "θ"):
             self.assertEqual(float(self.fields(alias+"(0)")["value"]), 0.5)
-        for source in ("@F(exp(-q^2))", "@F(exp(-t^2),t,t)", "@F{ω*exp(-t^2)}",
+        for source in ("@F(exp(-t^2),t,t)", "@F{ω*exp(-t^2)}",
                        "Derivative(-t,n)", "Derivative(t+1,n)"):
             fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "ω", "evaluate")
             self.assertNotEqual(code, 0, raw)
+
+    def test_custom_coordinate_defaults_both_directions(self):
+        for aliases, conventional, target in ((("@F", "ℱ", "Fourier"), "t", "ω"),
+                                               (("@Finv", "ℱ⁻¹", "InverseFourier"), "ω", "t")):
+            expected = self.fields(aliases[0] + "{exp(-" + conventional + "^2)}", target)["unbound"]
+            for alias in aliases:
+                for coordinate in ("[time]", "[frequency]", "[radius]", "q", "τ"):
+                    for source in (alias + "{exp(-" + coordinate + "^2)}",
+                                   alias + "(exp(-" + coordinate + "^2)," + coordinate + ")"):
+                        with self.subTest(source=source):
+                            fields = self.fields(source, target)
+                            self.assertEqual(fields["unbound"], expected)
+                            self.assertNotIn(coordinate + " = ?.", fields["operation_function"])
+
+    def test_bracketed_gamma_coordinate_and_run(self):
+        source = "@F{gamma(a+i[time])}"
+        fields = self.fields(source)
+        explicit = self.fields("@F(gamma(a+i[time]),[time],ω)")
+        self.assertEqual(fields["unbound"], explicit["unbound"])
+        self.assertIn("fourier(gamma(a + i.time), time, @omega)", fields["operation_function"])
+        self.assertNotIn("[time] =", fields["expression"])
+        bound = self.fields("{" + source + " | ω=0; a=1}")
+        result = mars_lab.run_function_programme(bound["operation_function"], 40)
+        self.assertTrue(result["ok"], result)
+        self.assertAlmostEqual(float(result["output"]), 2*math.pi/math.e, places=12)
+
+    def test_custom_coordinate_targets_do_not_capture_or_hide_ambiguity(self):
+        for source in ("@F{[time]+[position]}", "@Finv{[frequency]+[wave]}",
+                       "@F(exp(-[time]^2)+ω,[time])", "@Finv(exp(-[frequency]^2)+t,[frequency])",
+                       "@F(exp(-[time]^2),[time],[time])"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "ω", "evaluate")
+                self.assertNotEqual(code, 0, raw)
+        explicit = self.fields("@F(exp(-[time]^2),[time],[frequency])")
+        self.assertIn("[frequency] ∈ ℝ", explicit["unbound"])
+        self.assertIn("time, frequency)", explicit["operation_function"])
+        self.assertNotIn("@omega", explicit["operation_function"])
+
+    def test_conventional_coordinate_pairs_keep_their_defaults(self):
+        for coordinate, frequency in (("t", "ω"), ("x", "k"), ("y", "m"), ("z", "n")):
+            for alias, source, target in (("@F", coordinate, frequency), ("@Finv", frequency, coordinate)):
+                with self.subTest(alias=alias, source=source):
+                    shorthand = self.fields(alias + "{exp(-" + source + "^2)}", target)
+                    explicit = self.fields(alias + "(exp(-" + source + "^2)," + source + "," + target + ")", target)
+                    self.assertEqual(shorthand["unbound"].replace("¼·", "¼"),
+                                     explicit["unbound"].replace("¼·", "¼"))
 
     def test_parameters_are_not_free_variable_samples(self):
         source = "@F{exp(-a*t^2)}"
@@ -553,6 +599,13 @@ class FourierTests(unittest.TestCase):
 
 class ZZFourierReadmeExamples(unittest.TestCase):
     """README examples from docs/expression.md; run after ordinary suites."""
+
+    def test_readme_bracketed_fourier_coordinate(self):
+        # README example: docs/expression.md, Fourier transforms with bracketed names.
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, "@F{gamma(a+i[time])}", 40, "ω", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], "2π·exp(aω - exp(ω)) where (ω ∈ ℝ; Re(a) > 0)")
 
     def test_readme_absolute_half_power(self):
         examples = (("@F{1/sqrt(|t|)}", "ω", "√(2π/|ω|) where (ω ∈ ℝ; ω ≠ 0)"),

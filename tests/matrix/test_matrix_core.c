@@ -816,9 +816,9 @@ static void test_expr_symbolic_printing(void)
     expr_free(alpha);
 }
 
-static void print_det_expr(const char *label, expr_t *dv)
+static void print_det_expr(const char *label, expr_t *expr)
 {
-    char *s = dv ? expr_to_string(dv, style_EXPRESSION) : NULL;
+    char *s = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     printf("      %s = %s\n", label, s ? s : "<null>");
     free(s);
 }

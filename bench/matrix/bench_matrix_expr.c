@@ -40,19 +40,19 @@ static int bench_read_bool(const char *name)
 static expr_t *bench_expr_new_const_d(double x)
 {
     number_t n = num_create_from_double(x);
-    expr_t *dv = expr_new_const(n);
+    expr_t *expr = expr_new_const(n);
 
     num_destroy(&n);
-    return dv;
+    return expr;
 }
 
 static expr_t *bench_expr_new_named_var_d(double x, const char *name)
 {
     number_t n = num_create_from_double(x);
-    expr_t *dv = expr_new_named_var(n, name);
+    expr_t *expr = expr_new_named_var(n, name);
 
     num_destroy(&n);
-    return dv;
+    return expr;
 }
 
 static void free_exprs(expr_t **vals, size_t count)

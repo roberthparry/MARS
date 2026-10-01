@@ -17,7 +17,7 @@ static const transform_descriptor_t transform_descriptors[EXPR_KIND_COUNT] = {
 
 static const char *fourier_target(const char *source, bool inverse)
 {
-    /* Four conventional coordinate pairs; arbitrary names require an explicit target. */
+    /* Recognise conventional pairs separately from the fallback for arbitrary coordinate names. */
     static const char *const pairs[4][2] = {{"t", "ω"}, {"x", "k"}, {"y", "m"}, {"z", "n"}};
     for (size_t i = 0u; i < 4u; ++i)
         if (strcmp(source, pairs[i][inverse]) == 0)
@@ -117,6 +117,8 @@ expr_t *expr_integral_transform_from_args(size_t count, expr_t *const *args, con
     const expr_t *source_symbol = source && source->ops == &ops_imag_coordinate ? source->a : source;
     if (!target_name && source_symbol && source_symbol->name)
         target_name = fourier_target(source_symbol->name, ops == &ops_inverse_fourier);
+    if (!target_name && fourier)
+        target_name = ops == &ops_inverse_fourier ? "t" : "ω";
     expr_t *target = count > 2u ? expr_clone(args[2])
                               : target_name ? expr_new_named_var(NUM_NAN, target_name) : NULL;
     if (count < 3u && ops == &ops_inverse_fourier && target && target->name) {

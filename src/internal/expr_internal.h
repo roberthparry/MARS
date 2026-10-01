@@ -74,14 +74,6 @@ expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *
 expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
 
 /**
- * @brief Prepend an explicit zero real component to a purely imaginary display expression.
- *
- * @param expr Expression to inspect.
- * @return Owning `0 + qi` expression, or `NULL` when no prefix is needed.
- */
-expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr);
-
-/**
  * @brief Write a symbolic reciprocal square root in Cartesian surd form for display.
  *
  * @param expr Expression to rewrite.
@@ -135,8 +127,8 @@ typedef enum {
     EXPR_PATTERN_UNARY_COUNT
 } expr_pattern_unary_affine_kind_t;
 
-bool expr_is_exact_zero(const expr_t *dv);
-bool expr_is_named_const(const expr_t *dv);
+bool expr_is_exact_zero(const expr_t *expr);
+bool expr_is_named_const(const expr_t *expr);
 bool expr_stringin_function_hash_is_valid(void);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
 expr_t *expr_const_zero(void);
@@ -344,7 +336,7 @@ const char *expr_greek_symbol_alias(rune_t symbol);
 string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
-int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
+int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
 char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial);

@@ -334,7 +334,7 @@ cleanup:
     string_free(want_text);
 }
 
-typedef expr_t *(*expr_unary_builder_t)(const expr_t *dv);
+typedef expr_t *(*expr_unary_builder_t)(const expr_t *expr);
 typedef expr_t *(*expr_binary_builder_t)(const expr_t *a, const expr_t *b);
 typedef number_t (*num_unary_builder_t)(const number_t value);
 typedef number_t (*num_binary_builder_t)(const number_t a, const number_t b);
@@ -829,17 +829,17 @@ static void test_cmp_qfloat_precision(void)
 static void test_new_const_num_preserves_mpfr_precision(void)
 {
     number_t n = num_from_text_bits("1.25", 512u);
-    expr_t *dv;
+    expr_t *expr;
     number_t got;
 
-    dv = expr_new_const(n);
-    got = expr_eval(dv);
+    expr = expr_new_const(n);
+    got = expr_eval(expr);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 512);
 
     num_destroy(&got);
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
@@ -860,53 +860,53 @@ static void test_inexact_known_constant_uses_short_text(void)
 static void test_set_val_num_preserves_mpfr_precision(void)
 {
     number_t n = num_from_text_bits("1.25", 640u);
-    expr_t *dv = test_expr_new_var_d(0.0);
+    expr_t *expr = test_expr_new_var_d(0.0);
     number_t got;
 
-    expr_set_val(dv, n);
-    got = expr_eval(dv);
+    expr_set_val(expr, n);
+    got = expr_eval(expr);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 640);
 
     num_destroy(&got);
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
 static void test_new_const_num_preserves_complex_precision(void)
 {
     number_t n = num_from_text_bits("1 + 2i", 384u);
-    expr_t *dv;
+    expr_t *expr;
     number_t got;
 
-    dv = expr_new_const(n);
-    got = expr_eval(dv);
+    expr = expr_new_const(n);
+    got = expr_eval(expr);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_TRUE(!num_is_real(got));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 384);
 
     num_destroy(&got);
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
 static void test_set_val_num_preserves_complex_precision(void)
 {
     number_t n = num_from_text_bits("1 + 2i", 448u);
-    expr_t *dv = test_expr_new_var_d(0.0);
+    expr_t *expr = test_expr_new_var_d(0.0);
     number_t got;
 
-    expr_set_val(dv, n);
-    got = expr_get_val(dv);
+    expr_set_val(expr, n);
+    got = expr_get_val(expr);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_TRUE(!num_is_real(got));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 448);
 
     num_destroy(&got);
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
@@ -1034,12 +1034,12 @@ static void test_new_const_num_preserves_qfloat_precision(void)
 {
     qfloat_t q = qf_from_string("1.00000000000000000001");
     number_t n = num_create_from_qfloat(q);
-    expr_t *dv = expr_new_const(n);
-    qfloat_t got = expr_eval_qf(dv);
+    expr_t *expr = expr_new_const(n);
+    qfloat_t got = expr_eval_qf(expr);
 
     check_q_at(__FILE__, __LINE__, 1, "expr_new_const preserves qfloat precision", got, q);
 
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
@@ -1047,12 +1047,12 @@ static void test_set_val_num_preserves_qfloat_precision(void)
 {
     qfloat_t q = qf_from_string("1.00000000000000000001");
     number_t n = num_create_from_qfloat(q);
-    expr_t *dv = test_expr_new_var_d(0.0);
+    expr_t *expr = test_expr_new_var_d(0.0);
 
-    expr_set_val(dv, n);
-    check_q_at(__FILE__, __LINE__, 1, "expr_set_val preserves qfloat precision", expr_eval_qf(dv), q);
+    expr_set_val(expr, n);
+    check_q_at(__FILE__, __LINE__, 1, "expr_set_val preserves qfloat precision", expr_eval_qf(expr), q);
 
-    expr_free(dv);
+    expr_free(expr);
     num_destroy(&n);
 }
 
@@ -1486,7 +1486,7 @@ static void test_to_string_unbound_omits_binding_wrapper(void)
     expr_free(expr);
 }
 
-typedef expr_t *(*test_unary_expr_fn)(const expr_t *dv);
+typedef expr_t *(*test_unary_expr_fn)(const expr_t *expr);
 
 static void check_direct_inverse_simplifies(const char *label, test_unary_expr_fn outer, test_unary_expr_fn inner)
 {

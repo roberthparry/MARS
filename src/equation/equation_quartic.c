@@ -5,12 +5,16 @@
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #include "number.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 /*
  * Quartics deliberately avoid Ferrari radicals here.  Newton iteration finds
  * one root.  A non-real root of a real-coefficient quartic contributes its
  * conjugate, allowing real quadratic deflation before the quadratic solver
- * finishes.  Other cases use linear deflation and the cubic solver.
+ * finishes. Rational quadratic factors are certified against the original
+ * coefficients before their roots are retained as exact expressions.
+ * Other cases use linear deflation and the cubic solver.
  */
 enum {
     EQU_QUARTIC_DEGREE = 4u,
@@ -280,6 +284,147 @@ static bool equ_quartic_roots_close(number_t left, number_t right, number_t tole
     return close;
 }
 
+static number_t equ_quartic_rational_candidate(number_t value)
+{
+    /* Bounded continued fractions propose coefficients, never certify them. */
+    double approximate = num_to_double(value);
+    double remainder = fabs(approximate);
+    long previous_numerator = 0L, numerator = 1L;
+    long previous_denominator = 1L, denominator = 0L;
+
+    if (!isfinite(approximate) || remainder > 1000000000.0)
+        return num_clone(NUM_NAN);
+    for (size_t i = 0u; i < 32u; ++i) {
+        double integral = floor(remainder);
+        long term;
+        long next_numerator;
+        long next_denominator;
+
+        if (!isfinite(integral) || integral > 1000000000.0)
+            break;
+        term = (long)integral;
+        if ((numerator && term > (1000000000L - previous_numerator) / numerator) ||
+            (denominator && term > (1000000L - previous_denominator) / denominator))
+            break;
+        next_numerator = term * numerator + previous_numerator;
+        next_denominator = term * denominator + previous_denominator;
+        previous_numerator = numerator;
+        numerator = next_numerator;
+        previous_denominator = denominator;
+        denominator = next_denominator;
+        remainder -= integral;
+        if (remainder == 0.0)
+            break;
+        remainder = 1.0 / remainder;
+    }
+    return denominator ? num_create_from_frac(approximate < 0.0 ? -numerator : numerator, denominator)
+                       : num_clone(NUM_NAN);
+}
+
+static bool equ_quartic_certify_factors(const number_t *coeffs, const number_t *factor, const number_t *quotient)
+{
+    for (size_t degree = 0u; degree <= EQU_QUARTIC_DEGREE; ++degree) {
+        number_t sum = num_clone(NUM_ZERO);
+
+        for (size_t i = 0u; i <= 2u; ++i) {
+            if (i > degree || degree - i > 2u)
+                continue;
+            number_t product = num_mul(factor[i], quotient[degree - i]);
+            number_t next = num_add(sum, product);
+
+            num_destroy(&sum);
+            num_destroy(&product);
+            sum = next;
+        }
+        number_t difference = num_sub(sum, coeffs[degree]);
+        bool exact = num_is_exact(difference) && num_is_zero(difference);
+
+        num_destroy(&difference);
+        num_destroy(&sum);
+        if (!exact)
+            return false;
+    }
+    return true;
+}
+
+static int equ_quartic_try_exact_factors(const number_t *coeffs, const expr_t *wrt, number_t root,
+                                         equation_solutions_t *solutions)
+{
+    if (num_is_real(root))
+        return 1;
+    for (size_t i = 0u; i < EQU_QUARTIC_COEFF_COUNT; ++i)
+        if (!num_is_exact(coeffs[i]) || !num_is_real(coeffs[i]))
+            return 1;
+
+    number_t real = num_real_part(root);
+    number_t imaginary = num_imag_part(root);
+    number_t linear = num_mul_long(real, -2L);
+    number_t real_squared = num_mul(real, real);
+    number_t imaginary_squared = num_mul(imaginary, imaginary);
+    number_t constant = num_add(real_squared, imaginary_squared);
+    number_t factor[3] = {equ_quartic_rational_candidate(constant), equ_quartic_rational_candidate(linear),
+                          num_clone(NUM_ONE)};
+    number_t quotient[3] = {num_new(), num_new(), num_clone(coeffs[4])};
+    equation_solutions_t exact_solutions = {0};
+    int rc = 1;
+
+    if (!num_is_finite(factor[0]) || !num_is_finite(factor[1]))
+        goto cleanup;
+    number_t product = num_mul(factor[1], quotient[2]);
+    num_destroy(&quotient[1]);
+    quotient[1] = num_sub(coeffs[3], product);
+    num_destroy(&product);
+    product = num_mul(factor[1], quotient[1]);
+    number_t other_product = num_mul(factor[0], quotient[2]);
+    number_t sum = num_add(product, other_product);
+    num_destroy(&quotient[0]);
+    quotient[0] = num_sub(coeffs[2], sum);
+    num_destroy(&sum);
+    num_destroy(&other_product);
+    num_destroy(&product);
+    if (!equ_quartic_certify_factors(coeffs, factor, quotient))
+        goto cleanup;
+    /* Remove the verified leading scale before constructing quadratic radicals. */
+    for (size_t i = 0u; i < 2u; ++i) {
+        number_t monic = num_div(quotient[i], quotient[2]);
+        num_destroy(&quotient[i]);
+        quotient[i] = monic;
+    }
+    num_destroy(&quotient[2]);
+    quotient[2] = num_clone(NUM_ONE);
+    rc = -1;
+    if (equ_solve_quadratic_coefficients(factor, wrt, &exact_solutions) != 0 ||
+        equ_solve_quadratic_coefficients(quotient, wrt, &exact_solutions) != 0)
+        goto cleanup;
+    for (size_t i = 0u; i < exact_solutions.count; ++i) {
+        expr_t *rhs = expr_clone(equ_rhs(exact_solutions.solutions[i]));
+        bool duplicate = false;
+
+        if (!rhs)
+            goto cleanup;
+        /* At most four roots; exact structural comparison retains distinct close roots. */
+        for (size_t j = 0u; j < solutions->count; ++j)
+            duplicate |= expr_simplify_same_factor(rhs, equ_rhs(solutions->solutions[j]));
+        int append_rc = duplicate ? 0 : equ_append_solution_expr(wrt, rhs, solutions);
+        expr_free(rhs);
+        if (append_rc != 0)
+            goto cleanup;
+    }
+    rc = 0;
+
+cleanup:
+    equ_solutions_clear(&exact_solutions);
+    equ_quartic_destroy_numbers(quotient, 3u);
+    equ_quartic_destroy_numbers(factor, 3u);
+    num_destroy(&constant);
+    num_destroy(&imaginary_squared);
+    num_destroy(&real_squared);
+    num_destroy(&linear);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    return rc;
+}
+
 static int equ_quartic_append_distinct(const number_t *coeffs, const expr_t *wrt, number_t candidate,
                                        number_t newton_tolerance, number_t distinct_tolerance, number_t *seen,
                                        size_t *seen_count, equation_solutions_t *solutions)
@@ -329,6 +474,10 @@ int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, eq
         rc = 1;
         goto cleanup;
     }
+    rc = equ_quartic_try_exact_factors(coeffs, wrt, first_root, solutions);
+    if (rc != 1)
+        goto cleanup;
+    rc = -1;
 
     {
         number_t snapped = equ_quartic_snap_gaussian_integer(coeffs, first_root);

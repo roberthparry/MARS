@@ -50,52 +50,52 @@ expr_t *test_expr_new_named_var_qf(qfloat_t x, const char *name);
 expr_t *test_expr_new_named_var_qc(qcomplex_t x, const char *name);
 
 /** Set an expression value from a double and release the temporary number. */
-void test_expr_set_val_d(expr_t *dv, double x);
+void test_expr_set_val_d(expr_t *expr, double x);
 
 /** Set an expression value from a qfloat and release the temporary number. */
-void test_expr_set_val_qf(expr_t *dv, qfloat_t x);
+void test_expr_set_val_qf(expr_t *expr, qfloat_t x);
 
 /** Set an expression value from a complex value and release the temporary number. */
-void test_expr_set_val_qc(expr_t *dv, qcomplex_t x);
+void test_expr_set_val_qc(expr_t *expr, qcomplex_t x);
 
 /** Add a double to an expression and release the temporary number. */
-expr_t *test_expr_add_d(const expr_t *dv, double x);
+expr_t *test_expr_add_d(const expr_t *expr, double x);
 
 /** Subtract a double from an expression and release the temporary number. */
-expr_t *test_expr_sub_d(const expr_t *dv, double x);
+expr_t *test_expr_sub_d(const expr_t *expr, double x);
 
 /** Subtract an expression from a double and release the temporary number. */
-expr_t *test_expr_d_sub(double x, const expr_t *dv);
+expr_t *test_expr_d_sub(double x, const expr_t *expr);
 
 /** Multiply an expression by a double and release the temporary number. */
-expr_t *test_expr_mul_d(const expr_t *dv, double x);
+expr_t *test_expr_mul_d(const expr_t *expr, double x);
 
 /** Divide an expression by a double and release the temporary number. */
-expr_t *test_expr_div_d(const expr_t *dv, double x);
+expr_t *test_expr_div_d(const expr_t *expr, double x);
 
 /** Divide a double by an expression and release the temporary number. */
-expr_t *test_expr_d_div(double x, const expr_t *dv);
+expr_t *test_expr_d_div(double x, const expr_t *expr);
 
 /** Raise an expression to a double power and release the temporary number. */
-expr_t *test_expr_pow_d(const expr_t *dv, double x);
+expr_t *test_expr_pow_d(const expr_t *expr, double x);
 
 /** Raise an expression to a complex power and release the temporary number. */
-expr_t *test_expr_pow_qc(const expr_t *dv, qcomplex_t x);
+expr_t *test_expr_pow_qc(const expr_t *expr, qcomplex_t x);
 
 /** Evaluate an expression as a double and release temporary numbers. */
-double test_expr_eval_d(const expr_t *dv);
+double test_expr_eval_d(const expr_t *expr);
 
 /** Evaluate an expression as a qfloat and release temporary numbers. */
-qfloat_t test_expr_eval_qf(const expr_t *dv);
+qfloat_t test_expr_eval_qf(const expr_t *expr);
 
 /** Evaluate an expression as a complex value and release temporary numbers. */
-qcomplex_t test_expr_eval_qc(const expr_t *dv);
+qcomplex_t test_expr_eval_qc(const expr_t *expr);
 
 /** Read an expression value as a qfloat and release temporary numbers. */
-qfloat_t test_expr_get_val_qf(const expr_t *dv);
+qfloat_t test_expr_get_val_qf(const expr_t *expr);
 
 /** Read an expression value as a complex value and release temporary numbers. */
-qcomplex_t test_expr_get_val_qc(const expr_t *dv);
+qcomplex_t test_expr_get_val_qc(const expr_t *expr);
 
 int str_eq(const char *a, const char *b);
 void to_string_pass(const char *msg, const char *got, const char *want);

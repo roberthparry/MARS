@@ -470,11 +470,11 @@ static void collect_bindings(char ***var_bindings, size_t *nvar_bindings, size_t
     }
 }
 
-static void collect_expr_bindings(const expr_t *dv, char ***var_bindings, size_t *nvar_bindings,
+static void collect_expr_bindings(const expr_t *expr, char ***var_bindings, size_t *nvar_bindings,
                                   size_t *capvar_bindings, char ***const_bindings, size_t *nconst_bindings,
                                   size_t *capconst_bindings, const char *binding_text)
 {
-    if (dv && expr_symbol_name(dv) && !expr_is_variable(dv) && binding_text && *binding_text &&
+    if (expr && expr_symbol_name(expr) && !expr_is_variable(expr) && binding_text && *binding_text &&
         !strchr(binding_text, ';')) {
         append_binding(const_bindings, nconst_bindings, capconst_bindings, strdup(binding_text));
         return;
@@ -611,7 +611,7 @@ static char *join_bindings(char **var_bindings, size_t nvar_bindings, char **con
     return out;
 }
 
-static int split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_out)
+static int split_expr_repr(const expr_t *expr, char **expr_out, char **bindings_out)
 {
     char *tmp;
     char *body;
@@ -621,13 +621,13 @@ static int split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_ou
     *expr_out = NULL;
     *bindings_out = NULL;
 
-    if (!dv) {
+    if (!expr) {
         *expr_out = strdup("NULL");
         *bindings_out = strdup("");
         return *expr_out && *bindings_out ? 0 : -1;
     }
 
-    tmp = expr_to_string(dv, style_EXPRESSION);
+    tmp = expr_to_string(expr, style_EXPRESSION);
     if (!tmp)
         return -1;
 
@@ -1017,9 +1017,9 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t want, double tol
 }
 
 /* Check a symbolic matrix entry's rendering in both core and solve regressions. */
-void check_expr_text_contains(const char *label, expr_t *dv, const char *needle)
+void check_expr_text_contains(const char *label, expr_t *expr, const char *needle)
 {
-    char *s = dv ? expr_to_string(dv, style_EXPRESSION) : NULL;
+    char *s = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     check_bool(label, s && strstr(s, needle) != NULL);
     free(s);
 }

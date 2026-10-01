@@ -6408,9 +6408,9 @@ static void test_number_matrix_functions(void)
     num_destroy(&jordan_atanh_data[3]);
 }
 
-static void check_expr_expr_contains(const char *label, expr_t *dv, const char *needle)
+static void check_expr_expr_contains(const char *label, expr_t *expr, const char *needle)
 {
-    char *s = expr_to_string(dv, style_EXPRESSION);
+    char *s = expr_to_string(expr, style_EXPRESSION);
     check_bool(label, s != NULL && strstr(s, needle) != NULL);
     free(s);
 }

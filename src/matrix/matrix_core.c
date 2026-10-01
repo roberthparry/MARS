@@ -252,24 +252,24 @@ exact_update:
     }
 }
 
-static bool expr_node_is_exact_zero(const expr_t *dv)
+static bool expr_node_is_exact_zero(const expr_t *expr)
 {
-    return !dv || expr_is_exact_zero(dv);
+    return !expr || expr_is_exact_zero(expr);
 }
 
-expr_t *expr_clone_for_storage(const expr_t *dv)
+expr_t *expr_clone_for_storage(const expr_t *expr)
 {
-    if (!dv)
+    if (!expr)
         return NULL;
-    if (dv == EXPR_ZERO || dv == EXPR_ONE) {
-        number_t value = expr_get_val(dv);
+    if (expr == EXPR_ZERO || expr == EXPR_ONE) {
+        number_t value = expr_get_val(expr);
         expr_t *clone = expr_new_const(value);
 
         num_destroy(&value);
         return clone;
     }
-    expr_retain(dv);
-    return (expr_t *)dv;
+    expr_retain(expr);
+    return (expr_t *)expr;
 }
 
 void elem_init_zero_value(const struct elem_vtable *elem, void *slot)
@@ -365,10 +365,10 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
     }
 
     if (elem == &expr_elem) {
-        expr_t *dv = NULL;
+        expr_t *expr = NULL;
 
-        memcpy(&dv, value, sizeof(dv));
-        return dv ? expr_eval(dv) : NUM_ZERO;
+        memcpy(&expr, value, sizeof(expr));
+        return expr ? expr_eval(expr) : NUM_ZERO;
     }
 
     return NUM_ZERO;
@@ -569,30 +569,30 @@ void expr_init_zero_slot(void *slot)
 
 void expr_copy_value(void *dst, const void *src)
 {
-    expr_t *dv = src ? *(expr_t *const *)src : NULL;
+    expr_t *expr = src ? *(expr_t *const *)src : NULL;
 
-    *(expr_t **)dst = expr_clone_for_storage(dv);
+    *(expr_t **)dst = expr_clone_for_storage(expr);
 }
 
 void expr_destroy_value(void *slot)
 {
-    expr_t *dv = *(expr_t **)slot;
+    expr_t *expr = *(expr_t **)slot;
 
-    if (dv)
-        expr_free(dv);
+    if (expr)
+        expr_free(expr);
     *(expr_t **)slot = NULL;
 }
 
 void expr_simplify_value(void *slot)
 {
-    expr_t *dv = *(expr_t **)slot;
+    expr_t *expr = *(expr_t **)slot;
     expr_t *simp;
 
-    if (!dv)
+    if (!expr)
         return;
 
-    simp = expr_simplify(dv);
-    expr_free(dv);
+    simp = expr_simplify(expr);
+    expr_free(expr);
     *(expr_t **)slot = simp;
 }
 

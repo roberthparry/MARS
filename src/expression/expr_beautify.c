@@ -153,18 +153,6 @@ static bool expr_beautify_contains_i_unit(const expr_t *expr)
     return expr->ops->arity == EXPR_OP_BINARY && expr_beautify_contains_i_unit(expr->b);
 }
 
-static bool expr_beautify_contains_variable(const expr_t *expr)
-{
-    if (!expr)
-        return false;
-    if (expr_is_variable(expr))
-        return true;
-    if (!expr->ops || expr->ops->arity == EXPR_OP_ATOM)
-        return false;
-    return expr_beautify_contains_variable(expr->a) ||
-           (expr->ops->arity == EXPR_OP_BINARY && expr_beautify_contains_variable(expr->b));
-}
-
 static bool expr_beautify_extract_i_factor(const expr_t *expr, int *sign_out, const expr_t **coefficient_out)
 {
     if (!expr || !sign_out || !coefficient_out)
@@ -1868,38 +1856,6 @@ expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr)
         return NULL;
     }
     return rewrite;
-}
-
-/* Preserve an explicit zero real component on a purely imaginary display result. */
-expr_t *expr_prepend_zero_real_component_for_display(const expr_t *expr)
-{
-    expr_t *zero = NULL;
-    expr_t *imaginary = NULL;
-    expr_t *parsed_real = NULL;
-    expr_t *parsed_imaginary = NULL;
-    expr_t *out = NULL;
-    bool has_imaginary = false;
-
-    if (!expr || expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_sub) || !expr_beautify_contains_i_unit(expr) ||
-        !expr_beautify_contains_variable(expr))
-        return NULL;
-    if (!expr_beautify_cartesian_parts(expr, &parsed_real, &parsed_imaginary, &has_imaginary, true) ||
-        !has_imaginary || !expr_const_is_zero(parsed_real))
-        goto cleanup;
-    zero = expr_const_zero();
-    imaginary = expr_clone(expr);
-    out = zero && imaginary ? expr_new_binary_internal(&ops_add, zero, imaginary) : NULL;
-    if (out) {
-        zero = NULL;
-        imaginary = NULL;
-    }
-
-cleanup:
-    expr_free(parsed_imaginary);
-    expr_free(parsed_real);
-    expr_free(imaginary);
-    expr_free(zero);
-    return out;
 }
 
 static void expr_beautify_collect_product_factors(const expr_t *expr, const expr_t ***factors, size_t *count,
