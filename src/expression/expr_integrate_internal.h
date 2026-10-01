@@ -13,14 +13,8 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
-static inline bool expr_integrate_contains_imaginary_unit(const expr_t *expr)
-{
-    if (!expr)
-        return false;
-    if (expr_is_const(expr) && (num_eq(expr->c, NUM_I) || num_eq(expr->c, NUM_NEG_I)))
-        return true;
-    return expr_integrate_contains_imaginary_unit(expr->a) || expr_integrate_contains_imaginary_unit(expr->b);
-}
+/** Detect imaginary-unit constants recursively within an expression. */
+bool expr_integrate_contains_imaginary_unit(const expr_t *expr);
 
 /* Shared ownership, simplification and dispatch helpers. */
 expr_t *simplify_owned(expr_t *expr);

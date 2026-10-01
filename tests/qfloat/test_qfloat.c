@@ -158,6 +158,19 @@ void test_difficult_qfloat_cases(void)
     TEST_ASSERT_QFLOAT_CLOSE(ident, qf_from_double(0.0));
 }
 
+static void test_qf_sgn(void)
+{
+    qfloat_t positive[] = {QF_ONE, QF_HALF, QF_TWO, qf_from_string("1e-300"), QF_INF};
+
+    for (size_t i = 0u; i < sizeof(positive) / sizeof(positive[0]); ++i) {
+        TEST_ASSERT_TRUE(qf_eq(qf_sgn(positive[i]), QF_ONE), "positive real signum");
+        TEST_ASSERT_TRUE(qf_eq(qf_sgn(qf_neg(positive[i])), QF_NEG_ONE), "negative real signum");
+    }
+    TEST_ASSERT_TRUE(qf_eq(qf_sgn(QF_ZERO), QF_ZERO), "signum at positive zero");
+    TEST_ASSERT_TRUE(qf_eq(qf_sgn(qf_from_double(-0.0)), QF_ZERO), "signum at negative zero");
+    TEST_ASSERT_TRUE(qf_isnan(qf_sgn(QF_NAN)), "signum preserves NaN");
+}
+
 int tests_main()
 {
     // qfloat_t x = qf_from_string("1.7724538509055160272981674833411451827975494561223871282138");
@@ -181,6 +194,7 @@ int tests_main()
     TEST_RUN_IN_GROUP(test_hypotenus, tests, NULL);
 
     TEST_SECTION("Special Functions");
+    TEST_RUN_IN_GROUP(test_qf_sgn, tests, "qfloat,signal,sgn");
     TEST_RUN_IN_GROUP(test_gamma_erf_erfc_erfinv_erfcinv_digamma, tests, NULL);
     TEST_RUN_IN_GROUP(test_lambert_w, tests, NULL);
     TEST_RUN_IN_GROUP(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, tests, NULL);

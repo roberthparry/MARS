@@ -432,6 +432,7 @@
         "test_equation_function_style_preserves_both_sides": true,
         "test_equation_general_polynomial_roots_satisfy_original": true,
         "test_equation_geometric_sum_uses_degree_and_scale_rule": true,
+        "test_equation_infers_existing_binding_nodes": true,
         "test_equation_infinite_series_domain": true,
         "test_equation_normalises_shifted_repeated_power_exponents": true,
         "test_equation_numeric_rejects_unresolved_parameter_residual": true,
@@ -1168,7 +1169,8 @@
       "test_reverse_mode": true,
       "test_runtime_regressions": true,
       "test_second_derivatives": true,
-      "test_symbolic_integration": true
+      "test_symbolic_integration": true,
+      "test_fourier_and_signal_functions": true
     }
   },
   "tests/integrator/test_integrator.c": {
@@ -1307,7 +1309,8 @@
       "test_readme_example_bessel_i": true,
       "test_readme_example_struve_l": true,
       "test_readme_example_bessel_y": true,
-      "test_readme_example_struve_h": true
+      "test_readme_example_struve_h": true,
+      "test_readme_example_sgn": true
     },
     "tests": {
       "enabled": true,
@@ -1512,7 +1515,8 @@
     "test_mat_bessel_y_numeric": true,
     "test_mat_ordinary_cylindrical_symbolic": true,
     "test_mat_struve_h_nilpotent": true,
-    "test_mat_struve_h_numeric": true
+    "test_mat_struve_h_numeric": true,
+    "test_mat_sgn_numeric": true
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_printf_smoke": true,
@@ -1581,7 +1585,8 @@
         "test_number_bessel_i": true,
         "test_number_struve_l": true,
         "run_number_bessel_y_tests": true,
-        "test_number_struve_h": true
+        "test_number_struve_h": true,
+        "test_number_sgn": true
       }
     }
   },
@@ -1591,7 +1596,8 @@
       "example_euler_identity": true,
       "example_bessel_i": true,
       "example_struve_l": true,
-      "example_struve_h": true
+      "example_struve_h": true,
+      "example_sgn": true
     },
     "tests": {
       "enabled": true,
@@ -1628,7 +1634,8 @@
         "test_productlog": true,
         "test_bessel_i": true,
         "test_struve_l": true,
-        "test_struve_h": true
+        "test_struve_h": true,
+        "test_sgn": true
       },
       "test_trig_group": {
         "enabled": true,
@@ -1664,7 +1671,8 @@
       "test_printf": true,
       "test_strings": true,
       "test_trigonometric": true,
-      "test_vsprintf": true
+      "test_vsprintf": true,
+      "test_qf_sgn": true
     }
   },
   "tests/qfloat/test_qfloat_arithmetic.c": {
@@ -2031,6 +2039,15 @@
       "test_symfunc_biquadratic_four": true,
       "test_symfunc_block_diagonal_four": true,
       "test_symfunc_permuted_blocks_four": true
+    }
+  },
+  "tests/expression/test_expr_fourier.c": {
+    "tests": {
+      "enabled": true,
+      "test_fourier_and_signal_functions": {
+        "enabled": true,
+        "test_sgn_native_derivatives": true
+      }
     }
   }
 }

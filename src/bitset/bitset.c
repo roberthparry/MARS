@@ -12,8 +12,7 @@ typedef struct _bitset_t {
     pthread_mutex_t mutex;
 } bitset_t;
 
-static inline size_t words_for_bits(size_t bits)
-{
+static inline size_t words_for_bits(size_t bits) {
     return (bits + BITSET_WORD_BITS - 1) / BITSET_WORD_BITS;
 }
 

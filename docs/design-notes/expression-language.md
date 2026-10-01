@@ -5,8 +5,12 @@
 The language is named **Ophelia**. MARS remains its mathematical engine; the
 language frontend and any future standalone project carry the Ophelia name.
 
-This note records an agreed direction, not an implemented language or a final
-grammar. Prototype a small language frontend alongside MARS first, then consider
+This note records an agreed direction, not a final grammar or a claim that the
+whole language is implemented. A first scalar and equation frontend now lives in the separate
+native target `scratch/ophelia`, reached through **RUN** on MARS Lab Function
+cards. Its supported subset and limits are documented in
+[Running Function cards](../mars-lab.md#running-function-cards). Most of the
+language design below remains prospective. Prototype alongside MARS first, then consider
 moving it into a separate project once its semantics and public API requirements
 are stable. The existing `style_FUNCTION` representation is the starting point,
 not a promise that every generated programme is already executable.
@@ -40,8 +44,8 @@ generated source as a durable interchange format.
 The language should support functions, conditionals, loops and module reuse,
 introduced incrementally after the expression-construction core. Shell execution,
 network access, unrestricted file access and a package installation system are
-outside the initial scope. A command-line runner is sufficient to establish the
-semantics before adding a Lab or notebook interface.
+outside the initial scope. The initial command-line runner is also accessible
+through Lab's RUN control; an editable language workspace remains future work.
 
 ## Expression and Evaluation Semantics
 
@@ -146,23 +150,33 @@ constants, bounds, convergence conditions, domains and branch restrictions must
 follow MARS's mathematical semantics rather than being silently invented or
 discarded by the frontend.
 
-Retain the existing `style_FUNCTION` integral signatures and argument order as
-the agreed language forms:
+Use the following `style_FUNCTION` integral signatures:
 
-- `integral(upper, expression, variable)` represents an antiderivative of the
+- `integral(expression, variable)` performs indefinite integration and generates
+  the arbitrary integration constant itself. Do not append `+ C` to the call.
+- `integral(expression, variable, upper)` represents an antiderivative of the
   expression with respect to the variable, evaluated at the supplied upper
-  argument. It does not imply a lower bound of zero and does not automatically
-  add an arbitrary integration constant.
-- `integral(lower, upper, expression, variable)` represents the definite
+  argument, without adding an arbitrary constant. It does not imply a lower bound
+  of zero. Prefer the two-argument form when no separate endpoint is needed.
+- `integral(expression, variable, lower, upper)` represents the definite
   integral over the supplied bounds, with the integration variable locally bound
   within the integrand.
 
-Both forms construct integral expressions that can remain unevaluated when a
+These forms construct integral expressions that can remain unevaluated when a
 supported reduction is unavailable. They work with the established `output` and
-`outputa` rules. Keep the distinction between the upper-only antiderivative form
-and a complete indefinite-integral family containing an arbitrary constant.
-There is no agreed two-argument `integral(expression, variable)` overload, and
-the existing four-argument form must not be reinterpreted as expression-first.
+`outputa` rules. Definite integrals do not acquire an arbitrary constant. The
+integrand always comes first and its integration variable second; any bounds
+follow them, with the lower bound before the upper bound for a definite integral.
+
+Function cards preserve the requested calculus operation rather than its already
+evaluated result. RUN performs the differentiation or integration; the TeX and
+Expression cards continue to show the evaluated algebra. Generated integration
+constants remain bindable, but are created by `integral`, not appended by the
+generated programme.
+Generated functions retain the result's domain restrictions as guards around
+the original operation calls, returning `@nan` outside the domain. Unset
+bindings preserve those restrictions on the symbolic result rather than
+requiring premature numerical evaluation.
 
 The current native integral-transform forms in `style_FUNCTION` are:
 
@@ -693,10 +707,10 @@ for cell state, rich output, reproducibility and interruption requirements.
    bindings and algebraic output of the same derivative without substitution.
    Verify that the mixed-derivative example agrees with its nested-call form,
    including left-to-right ordering, zero orders and additional coordinate pairs.
-   Verify round trips for both retained integral signatures, including argument
+   Verify round trips for all integral signatures, including argument
    order, bound-variable scope and the distinction between an absent lower bound
-   and an explicit zero lower bound. Do not invent an integration constant for
-   the upper-only form.
+   and an explicit zero lower bound. Only two-argument indefinite calls generate
+   an arbitrary constant; upper-only and bounded calls do not.
    Verify the four native transform call signatures and their source/target
    order, including inverse calls, bound-coordinate scope and preservation of
    unresolved transform expressions.

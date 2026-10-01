@@ -264,8 +264,7 @@ expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
 
 expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
 {
-    number_t coeff_root;
-    number_t coeff_square;
+    number_t coeff_root = NUM_NAN;
     expr_t *raw;
     expr_t *simp;
     expr_t *out;
@@ -273,14 +272,11 @@ expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
     if (!expr_is_op(arg, &ops_mul) || !expr_simplify_is_plain_real_const(arg->a) || !num_gt(arg->a->c, NUM_ZERO))
         return NULL;
 
-    coeff_root = num_sqrt(arg->a->c);
-    coeff_square = num_mul(coeff_root, coeff_root);
-    if (!num_eq(coeff_square, arg->a->c)) {
-        num_destroy(&coeff_square);
+    /* Extract only an exact rational square, not an irrational root whose rounded square happens to match. */
+    if (!expr_fold_sqrt_const(&arg->a->c, &coeff_root)) {
         num_destroy(&coeff_root);
         return NULL;
     }
-    num_destroy(&coeff_square);
 
     expr_retain(arg->b);
     raw = expr_sqrt(arg->b);
@@ -519,7 +515,8 @@ static expr_t *expr_simplify_repeated_factor(expr_t *a, expr_t *b)
 {
     if (!expr_struct_eq(a, b))
         return NULL;
-    return expr_pow(a, &NUM_TWO);
+    expr_retain(a);
+    return expr_make_pow_like(a, NUM_TWO);
 }
 
 static expr_t *expr_add_one_to_arg(const expr_t *arg)

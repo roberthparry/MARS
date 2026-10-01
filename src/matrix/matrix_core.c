@@ -530,6 +530,13 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     }
 }
 
+/* Clone the input number and transfer the copy into the matrix's numeric storage. */
+void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j, const number_t *value)
+{
+    number_t copy = num_is_immortal(*value) ? *value : num_clone(*value);
+    mat_set_num_owned(A, i, j, &copy);
+}
+
 void num_init_zero_slot(void *slot)
 {
     *(number_t *)slot = NUM_ZERO;
@@ -2406,13 +2413,7 @@ void expr_scalar_E1(void *out, const void *a)
    Conversion helpers for mixed-type arithmetic
    ============================================================ */
 
-static inline void num_as_expr(expr_t **out, const number_t *a)
-{
-    *out = expr_new_const(*a);
-}
-
-static inline void id_expr(expr_t **out, expr_t *const *a)
-{
+static inline void id_expr(expr_t **out, expr_t *const *a) {
     *out = (expr_t *)((a && *a) ? *a : EXPR_ZERO);
 }
 

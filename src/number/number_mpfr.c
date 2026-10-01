@@ -45,36 +45,65 @@ static int number_mpfr_set_sqrt_ui_over_ui(mpfr_t out, unsigned long radicand, u
     return 0;
 }
 
-#define NUMBER_MPFR_CONST_UI(name, value)                                                                              \
-    static int name(mpfr_t out)                                                                                        \
-    {                                                                                                                  \
-        return number_mpfr_set_ui(out, (value));                                                                       \
-    }
+static int number_mpfr_const_zero(mpfr_t out)
+{
+    return number_mpfr_set_ui(out, 0u);
+}
 
-#define NUMBER_MPFR_CONST_SI(name, value)                                                                              \
-    static int name(mpfr_t out)                                                                                        \
-    {                                                                                                                  \
-        return number_mpfr_set_si(out, (value));                                                                       \
-    }
+static int number_mpfr_const_one(mpfr_t out)
+{
+    return number_mpfr_set_ui(out, 1u);
+}
 
-#define NUMBER_MPFR_CONST_PI(name, numerator, denominator, sign)                                                       \
-    static int name(mpfr_t out)                                                                                        \
-    {                                                                                                                  \
-        return number_mpfr_set_pi_fraction(out, (numerator), (denominator), (sign));                                   \
-    }
+static int number_mpfr_const_neg_one(mpfr_t out)
+{
+    return number_mpfr_set_si(out, -1l);
+}
 
-NUMBER_MPFR_CONST_UI(number_mpfr_const_zero, 0u)
-NUMBER_MPFR_CONST_UI(number_mpfr_const_one, 1u)
-NUMBER_MPFR_CONST_SI(number_mpfr_const_neg_one, -1l)
-NUMBER_MPFR_CONST_UI(number_mpfr_const_two, 2u)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_pi, 1u, 1u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_2pi, 2u, 1u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_pi_2, 1u, 2u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_neg_pi_2, 1u, 2u, -1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_pi_4, 1u, 4u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_3pi_4, 3u, 4u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_pi_6, 1u, 6u, 1)
-NUMBER_MPFR_CONST_PI(number_mpfr_const_pi_3, 1u, 3u, 1)
+static int number_mpfr_const_two(mpfr_t out)
+{
+    return number_mpfr_set_ui(out, 2u);
+}
+
+static int number_mpfr_const_pi(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 1u, 1);
+}
+
+static int number_mpfr_const_2pi(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 2u, 1u, 1);
+}
+
+static int number_mpfr_const_pi_2(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 2u, 1);
+}
+
+static int number_mpfr_const_neg_pi_2(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 2u, -1);
+}
+
+static int number_mpfr_const_pi_4(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 4u, 1);
+}
+
+static int number_mpfr_const_3pi_4(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 3u, 4u, 1);
+}
+
+static int number_mpfr_const_pi_6(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 6u, 1);
+}
+
+static int number_mpfr_const_pi_3(mpfr_t out)
+{
+    return number_mpfr_set_pi_fraction(out, 1u, 3u, 1);
+}
 
 static int number_mpfr_const_half(mpfr_t out)
 {

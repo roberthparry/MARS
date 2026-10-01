@@ -30,6 +30,123 @@ class FourierTests(unittest.TestCase):
         self.assert_formula("@Finv{exp(-ω^2)}", lambda t: math.exp(-t*t/4)/(2*math.sqrt(math.pi)), "t")
         self.assert_formula("@F{exp(-2*t^2+3)}", lambda w: math.sqrt(math.pi/2)*math.exp(3-w*w/8))
 
+    def test_absolute_half_power_spellings_and_run(self):
+        expected = self.fields("@F{1/sqrt(|t|)}")["unbound"]
+        self.assertEqual(expected, "√(2π/|ω|) where (ω ∈ ℝ; ω ≠ 0)")
+        for body in ("1/sqrt(|t|)", "1/sqrt(abs(t))", "abs(t)^(-1/2)", "1/abs(t)^(1/2)"):
+            self.assertEqual(self.fields("@F{" + body + "}")["unbound"], expected)
+            self.assert_formula("@F{" + body + "}", lambda w: math.sqrt(2*math.pi/abs(w)),
+                                points=(-4, -1, 1, 4, 77))
+        for frequency in ("0", "i"):
+            fields = self.fields("{@F{1/sqrt(|t|)} | ω=" + frequency + "}")
+            self.assertTrue(math.isnan(float(fields["value"])))
+        for frequency in ("?", "4"):
+            fields = self.fields("{@F{1/sqrt(|t|)} | ω=" + frequency + "}")
+            run = mars_lab.run_function_programme(fields["operation_function"], 40)
+            self.assertTrue(run["ok"], run)
+            if frequency == "?":
+                self.assertIn("ω = ?", run["output"])
+                self.assertNotIn("ℱ", run["output"])
+            else:
+                self.assertAlmostEqual(float(self.fields(run["output"].strip())["value"]),
+                                       math.sqrt(math.pi/2), places=12)
+
+    def test_absolute_power_inverse_and_copied_spectrum(self):
+        self.assert_formula("@Finv{1/sqrt(|ω|)}", lambda t: 1/math.sqrt(2*math.pi*abs(t)),
+                            "t", points=(-3, -1, 1, 3))
+        spectrum = self.fields("@F{1/sqrt(|t|)}")["unbound"]
+        inverse = "InverseFourier(" + spectrum + ",ω,t)"
+        self.assertEqual(self.fields(inverse, "t")["unbound"], "1/√(|t|) where (t ∈ ℝ; t ≠ 0)")
+        self.assert_formula(inverse, lambda t: 1/math.sqrt(abs(t)), "t", points=(-3, -1, 1, 3))
+
+    def test_radical_quotient_simplification_preserves_branches(self):
+        for source, expected in (("sqrt(2*pi)/sqrt(abs(x))", "√(2π/|x|)"),
+                                 ("sqrt(2*x)", "√(2x)"), ("sqrt(4*x)", "2·√(x)"),
+                                 ("sqrt(x)/sqrt(abs(y))", "√(x/|y|)"),
+                                 ("sqrt(x)/sqrt(y)", "√(x)/√(y)")):
+            self.assertEqual(self.fields(source, "x")["unbound"], expected)
+        # Arbitrary complex denominators cannot be combined with principal roots.
+        for x, y in ((-1, -1), (1, -1), (-1, 1)):
+            value = self.fields(f"{{sqrt(x)/sqrt(y) | x={x}; y={y}}}", "x")["value"]
+            actual = complex(value.replace(" ", "").replace("i", "j"))
+            self.assertLess(abs(actual-cmath.sqrt(x)/cmath.sqrt(y)), 1e-12)
+        bound = self.fields("{sqrt(x)/sqrt(abs(y)) | x=-1; y=4}", "x")
+        # Lab treats y as a constant parameter here; only the free coordinate x must remain symbolic.
+        self.assertEqual(bound["unbound"], "√(x)/2")
+        self.assertEqual(complex(bound["value"].replace("i", "j")), 0.5j)
+
+    def test_absolute_power_strip_affine_scaling_and_scalar_factors(self):
+        for power in (-0.25, -0.5, -0.75):
+            coefficient = 2*math.gamma(power+1)*math.cos(math.pi*(power+1)/2)
+            for inverse in (False, True):
+                operator, source, target = ("@Finv", "ω", "t") if inverse else ("@F", "t", "ω")
+                for rate in (-2, 2):
+                    for point in (-1.3, 0.7):
+                        body = f"-3*abs({rate}*{source}+3)^({power})/2"
+                        fields = self.fields("{" + operator + "{" + body + "} | " + target + "=" + str(point) + "}", target)
+                        self.assertNotIn("fourier(", fields["function"])
+                        actual = complex(fields["value"].replace(" ", "").replace("i", "j"))
+                        expected = (-1.5*coefficient*abs(rate)**power*abs(point)**(-power-1)
+                                    *cmath.exp((-1j if inverse else 1j)*point*3/rate))
+                        if inverse:
+                            expected /= 2*math.pi
+                        self.assertLess(abs(actual-expected), 1e-11)
+        fields = self.fields("@F{|t|^p}")
+        self.assertIn("Re(-p) > 0", fields["unbound"])
+        self.assertIn("Re(p + 1) > 0", fields["unbound"])
+        for power in ("-1/4", "-3/4"):
+            bound = self.fields("{@F{|t|^p} | p=" + power + "; ω=2}")
+            literal = self.fields("{@F{|t|^(" + power + ")} | ω=2}")
+            self.assertAlmostEqual(float(bound["value"]), float(literal["value"]), places=12)
+
+    def test_absolute_power_preserves_unrelated_source_domains(self):
+        for condition in ("ω - 1 ≠ 0", "a*ω ≠ 0", "Re(ω) > 0"):
+            fields = self.fields("InverseFourier(1/sqrt(abs(ω)) where (" + condition + "),ω,t)", "t")
+            self.assertIn("inversefourier(", fields["function"])
+        for power in ("-2", "-1", "1/4"):
+            fields = self.fields("InverseFourier(abs(ω)^(" + power + ") where (ω ≠ 0),ω,t)", "t")
+            self.assertIn("inversefourier(", fields["function"])
+            self.assertIn("ω ≠ 0", fields["unbound"])
+
+    def test_implicit_modulus_products(self):
+        for body, expected in (("2|x|", 6), ("2 |x|", 6), ("|x||x+1|", 6),
+                               ("|x| |x+1|", 6), ("||x||", 3), ("|2*(3|x|)|", 18),
+                               ("|2*|x||", 6), ("|hypot(2|x|,8)|", 10),
+                               ("|floor(2|x|)|", 6), ("|sin(2|x|)|", abs(math.sin(6)))):
+            with self.subTest(body=body):
+                fields = self.fields("{" + body + " | x=-3}", "x")
+                self.assertAlmostEqual(float(fields["value"]), expected, places=12)
+                copied = self.fields(fields["expression"], "x")
+                self.assertEqual(copied["value"], fields["value"])
+
+    def test_implicit_modulus_exponential_transform(self):
+        implicit = self.fields("@F{exp(a|t|)}")
+        explicit = self.fields("@F{exp(a*abs(t))}")
+        self.assertEqual(implicit["unbound"], explicit["unbound"])
+        self.assertNotIn("(-a)²", implicit["unbound"])
+        self.assertIn("Re(-a) > 0", implicit["unbound"])
+        for decay in (-1, -2):
+            for frequency in (0, 1, 3):
+                source = "{@F{exp(a|t|)} | ω=" + str(frequency) + "; a=" + str(decay) + "}"
+                fields = self.fields(source)
+                self.assertAlmostEqual(float(fields["value"]), -2*decay/(decay*decay+frequency*frequency))
+                run = mars_lab.run_function_programme(fields["operation_function"], 40)
+                self.assertTrue(run["ok"], run)
+                run_value = self.fields(run["output"].strip())["value"]
+                self.assertAlmostEqual(float(run_value), float(fields["value"]))
+
+    def test_negated_integer_powers(self):
+        for exponent in (2, 3, 4, -2, -3):
+            source = "(-x)^(" + str(exponent) + ")"
+            fields = self.fields(source, "x")
+            self.assertNotIn("(-x)", fields["unbound"])
+            for point in ("2", "-2", "1+i"):
+                actual = self.fields("{" + source + " | x=" + point + "}", "x")["value"]
+                value = complex(point.replace("i", "j")) if point != "1+i" else 1+1j
+                self.assertAlmostEqual(complex(actual.replace(" ", "").replace("i", "j")), (-value)**exponent)
+        self.assertEqual(self.fields("(-x)*(-x)", "x")["unbound"], "x²")
+        self.assertIn("-x", self.fields("(-x)^(1/2)", "x")["unbound"])
+
     def test_bessel_indexed_parser_and_bindings(self):
         for indexed, canonical in (("J_n(x)", "bessel_j(n,x)"), ("J_{n+1}(x)", "bessel_j(n+1,x)"),
                                    ("J_3(x)", "bessel_j(3,x)"), ("J₃(x)", "bessel_j(3,x)"),
@@ -388,7 +505,11 @@ class FourierTests(unittest.TestCase):
         self.assertIn("(-i)^n·Derivative(δ(t), n)", inverse["unbound"])
         for source in ("@F{t^33}", "@Finv{ω^33}"):
             self.assertNotIn("fourier(", self.fields(source)["function"])
-        for order in ("-1", "1/2"):
+        # The reciprocal now belongs to the sign-function pair with symmetric cancellation at zero.
+        reciprocal = self.fields("@F{t^(-1)}")
+        self.assertNotIn("fourier(", reciprocal["function"])
+        self.assertIn("sgn(ω)", reciprocal["unbound"])
+        for order in ("-2", "1/2"):
             self.assertIn("fourier(", self.fields("@F{t^("+order+")}")["function"])
         for order in (0, 1, 2, 3, 33):
             for operator, source, target, factor in (("@F", "t", "ω", "1"),
@@ -432,6 +553,22 @@ class FourierTests(unittest.TestCase):
 
 class ZZFourierReadmeExamples(unittest.TestCase):
     """README examples from docs/expression.md; run after ordinary suites."""
+
+    def test_readme_absolute_half_power(self):
+        examples = (("@F{1/sqrt(|t|)}", "ω", "√(2π/|ω|) where (ω ∈ ℝ; ω ≠ 0)"),
+                    ("@Finv{sqrt(2*pi)/sqrt(|ω|)}", "t", "1/√(|t|) where (t ∈ ℝ; t ≠ 0)"))
+        for source, target, expected in examples:
+            fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, target, "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["unbound"], expected)
+
+    def test_readme_implicit_modulus_products(self):
+        for source, expected in (("{2|t| | t=-3}", "6"),
+                                 ("{|t||t+1| | t=-3}", "6"),
+                                 ("{@F{exp(a|t|)} | ω=1; a=-2}", "0.8")):
+            fields, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, source, 40, "ω", "evaluate")
+            self.assertEqual(code, 0, raw)
+            self.assertEqual(fields["value"], expected)
 
     def test_readme_logarithmic_fourier_examples(self):
         for source in ("@F{ln|x|}", "@F{ln(|x|)}", "@F{ln(abs(x))}"):

@@ -1146,6 +1146,21 @@ expr_t *expr_make_pow_like(expr_t *base, number_t exponent)
     }
     if (num_eq(exponent, NUM_ONE))
         return base;
+    /* Integer powers preserve parity for real and complex bases; fractional powers do not. */
+    if (expr_is_op(base, &ops_neg) && num_is_real(exponent) && num_is_finite(exponent) && num_is_integer(exponent)) {
+        number_t remainder = num_mod(exponent, NUM_TWO);
+        bool even = num_is_zero(remainder);
+        num_destroy(&remainder);
+        expr_t *inner = base->a;
+        expr_retain(inner);
+        expr_free(base);
+        expr_t *power = expr_make_pow_like(inner, exponent);
+        if (even)
+            return power;
+        expr_t *out = expr_neg(power);
+        expr_free(power);
+        return out;
+    }
     if (num_eq(exponent, NUM_TWO) && expr_is_sqrt_expr(base)) {
         expr_t *inner = base->a;
 
@@ -1528,6 +1543,20 @@ void expr_merge_coefficient_sqrt_terms(number_t *coefficient, expr_t **terms, si
     }
 }
 
+/* Structural signs only: a variable's current numerical binding must not alter its algebra. */
+static bool expr_radicand_nonnegative_local(const expr_t *expr)
+{
+    if (expr_is_const(expr))
+        return num_is_real(expr->c) && num_is_finite(expr->c) && num_ge(expr->c, NUM_ZERO);
+    if (expr_is_op(expr, &ops_abs))
+        return true;
+    if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_mul) || expr_is_op(expr, &ops_div))
+        return expr_radicand_nonnegative_local(expr->a) && expr_radicand_nonnegative_local(expr->b);
+    if (expr_is_sqrt_expr(expr))
+        return expr_radicand_nonnegative_local(expr->a);
+    return false;
+}
+
 void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
 {
     for (size_t i = 0; i < nterms; ++i) {
@@ -1554,10 +1583,8 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
                 break;
             }
             /* Principal roots multiply across a product only with a proven non-negative real factor. */
-            bool left_nonnegative = expr_is_unnamed_const(left_radicand) && num_is_real(left_radicand->c) &&
-                                    num_ge(left_radicand->c, NUM_ZERO);
-            bool right_nonnegative = expr_is_unnamed_const(right_radicand) && num_is_real(right_radicand->c) &&
-                                     num_ge(right_radicand->c, NUM_ZERO);
+            bool left_nonnegative = expr_radicand_nonnegative_local(left_radicand);
+            bool right_nonnegative = expr_radicand_nonnegative_local(right_radicand);
             if (!left_nonnegative && !right_nonnegative) {
                 expr_free(right_radicand);
                 continue;
@@ -1582,7 +1609,8 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
 void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_terms, size_t nden_terms)
 {
     for (size_t i = 0; i < nterms; ++i) {
-        if (!expr_is_sqrt_expr(terms[i]) || !terms[i]->a)
+        expr_t *numerator_radicand = expr_sqrt_radicand_owned_local(terms[i]);
+        if (!numerator_radicand)
             continue;
 
         for (size_t j = 0; j < nden_terms; ++j) {
@@ -1590,11 +1618,12 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_
             expr_t *simp_arg;
             expr_t *raw;
 
-            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a || !expr_is_const(den_terms[j]->a) ||
-                !num_is_real(den_terms[j]->a->c) || !num_gt(den_terms[j]->a->c, NUM_ZERO))
+            /* A non-negative denominator preserves principal branches wherever the quotient is defined. */
+            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a ||
+                !expr_radicand_nonnegative_local(den_terms[j]->a) || expr_const_is_zero(den_terms[j]->a))
                 continue;
 
-            quotient = expr_div(terms[i]->a, den_terms[j]->a);
+            quotient = expr_div(numerator_radicand, den_terms[j]->a);
             simp_arg = quotient ? expr_simplify(quotient) : NULL;
             raw = simp_arg ? expr_sqrt(simp_arg) : NULL;
             if (raw) {
@@ -1608,6 +1637,7 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_
             expr_free(quotient);
             break;
         }
+        expr_free(numerator_radicand);
     }
 }
 

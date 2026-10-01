@@ -2366,6 +2366,71 @@ cleanup:
     return rewrite;
 }
 
+/* Absorb a minus into one numerator factor, without expanding products or changing denominators. */
+static expr_t *expr_beautify_reverse_difference(const expr_t *expr)
+{
+    expr_t *reversed;
+
+    if (expr_is_op(expr, &ops_sub))
+        return expr_new_binary_internal(&ops_sub, expr_clone(expr->b), expr_clone(expr->a));
+    if (expr_is_op(expr, &ops_add)) {
+        reversed = expr_simplify_positive_part_if_negative(expr->b);
+        if (reversed)
+            return expr_new_binary_internal(&ops_sub, reversed, expr_clone(expr->a));
+        reversed = expr_simplify_positive_part_if_negative(expr->a);
+        if (reversed)
+            return expr_new_binary_internal(&ops_sub, reversed, expr_clone(expr->b));
+    }
+    if (!expr_is_mul(expr) && !expr_is_div(expr))
+        return NULL;
+    reversed = expr_beautify_reverse_difference(expr->a);
+    if (reversed) {
+        if (expr_const_is_one(expr->b))
+            return reversed;
+        return expr_new_binary_internal(expr->ops, reversed, expr_clone(expr->b));
+    }
+    if (expr_is_mul(expr)) {
+        reversed = expr_beautify_reverse_difference(expr->b);
+        if (reversed) {
+            if (expr_const_is_one(expr->a))
+                return reversed;
+            return expr_new_binary_internal(&ops_mul, expr_clone(expr->a), reversed);
+        }
+    }
+    return NULL;
+}
+
+static expr_t *expr_beautify_negative_quotient(expr_t *expr)
+{
+    expr_t *unsigned_product;
+    expr_t *reversed;
+
+    if (!expr_is_div(expr) && !(expr_is_neg(expr) && expr_is_div(expr->a)))
+        return NULL;
+    unsigned_product = expr_simplify_positive_part_if_negative(expr);
+    if (!unsigned_product)
+        return NULL;
+    reversed = expr_beautify_reverse_difference(unsigned_product);
+    expr_free(unsigned_product);
+    return reversed;
+}
+
+/* Normalise signs in an independent clone without reconstructing metadata-bearing operators. */
+static expr_t *expr_beautify_product_signs_owned(expr_t *expr)
+{
+    expr_t *rewrite;
+
+    if (!expr)
+        return NULL;
+    expr->a = expr_beautify_product_signs_owned(expr->a);
+    expr->b = expr_beautify_product_signs_owned(expr->b);
+    rewrite = expr_beautify_negative_quotient(expr);
+    if (!rewrite)
+        return expr;
+    expr_free(expr);
+    return rewrite;
+}
+
 static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_roots)
 {
     expr_t *left = NULL;
@@ -2404,7 +2469,7 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
                 rebuilt = expr->ops->apply_unary ? expr->ops->apply_unary(left) : NULL;
             }
             if (!rebuilt)
-                rebuilt = expr_clone(expr);
+                rebuilt = expr_beautify_product_signs_owned(expr_clone(expr));
             goto cleanup;
     }
 
@@ -2484,6 +2549,12 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         }
     }
     rewrite = expr_beautify_imaginary_product(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
+    rewrite = expr_beautify_negative_quotient(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);
         rebuilt = rewrite;

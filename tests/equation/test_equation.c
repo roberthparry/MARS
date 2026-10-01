@@ -306,6 +306,49 @@ static void example_equation_output_form(void)
     equ_free(equation);
 }
 
+static void test_equation_infers_existing_binding_nodes(void)
+{
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    expr_t *a = expr_new_named_const(two, "a");
+    expr_t *b = expr_new_named_const(three, "b");
+    expr_t *lhs = expr_mul(a, x);
+    expr_t *rhs = expr_add(x, b);
+    equation_t *equation = equ_new_with_inferred_bindings(lhs, rhs);
+
+    ASSERT_NOT_NULL(equation);
+    ASSERT_TRUE(equ_binding(equation, "x") == x);
+    ASSERT_TRUE(equ_binding(equation, "a") == a);
+    ASSERT_TRUE(equ_binding(equation, "b") == b);
+    ASSERT_EQ_INT((int)expr_bindings_count(equ_bindings(equation)), 3);
+    for (size_t i = 0u; i < expr_bindings_count(equ_bindings(equation)); ++i)
+        ASSERT_TRUE(expr_bindings_is_constant_at(equ_bindings(equation), i) ==
+                    (expr_bindings_expr_at(equ_bindings(equation), i) != x));
+    expr_free(rhs);
+    expr_free(lhs);
+    expr_free(b);
+    expr_free(a);
+    expr_free(x);
+    num_destroy(&three);
+    num_destroy(&two);
+
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_EQ_INT((int)equ_solutions_count(solutions), 1);
+    ASSERT_TRUE(test_equation_result_contains_long(solutions, 3));
+    equ_solutions_free(solutions);
+    number_t five = num_create_from_long(5);
+    expr_set_val(equ_binding(equation, "b"), five);
+    num_destroy(&five);
+    solutions = equ_derive_solutions(equation);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_TRUE(test_equation_result_contains_long(solutions, 5));
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_TRUE(equ_new_with_inferred_bindings(NULL, NULL) == NULL);
+}
+
 static void test_equation_from_string_shares_symbols_across_sides(void)
 {
     equation_t *equation = equ_from_string("{ x = x + 1 | x = NAN }");
@@ -2069,6 +2112,7 @@ static void test_equation_zeta_level_search(void)
 
 static void test_equation_basics(void)
 {
+    TEST_RUN_SUBTEST(test_equation_infers_existing_binding_nodes, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
     TEST_RUN_SUBTEST(test_equation_expands_algebraic_sequence_ellipsis, NULL);

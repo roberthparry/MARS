@@ -539,6 +539,9 @@ LAB_SUBTITLE = os.environ.get(
 ).strip() or "Switch between expression, equation, differential-equation, matrix, integrator, datetime, and almanac experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
 DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
 DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
+DEFAULT_OPHELIA_BIN = ROOT / "build" / "release" / "scratch" / "ophelia"
+OPHELIA_SOURCE_LIMIT = 65536
+OPHELIA_BUILD_LOCK = threading.Lock()
 DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
 DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
 DEFAULT_EQUATION_BIN = ROOT / "build" / "release" / "scratch" / "equation_lab"
@@ -2234,9 +2237,51 @@ INDEX_HTML = r"""<!doctype html>
       font: 0.82rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
     }
 
+    .binding-value-field {
+      position: relative;
+      display: flex;
+      min-width: 0;
+    }
+
     .binding-value-input {
       width: 100%;
+      padding-right: 2.5rem;
       outline: none;
+    }
+
+    .binding-value-clear {
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      bottom: 2px;
+      width: 2rem;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      color: #d7e7b7;
+      background: transparent;
+      box-shadow: none;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .binding-value-clear:hover,
+    .binding-value-clear:focus-visible {
+      background: rgba(113, 198, 180, 0.2);
+    }
+
+    .binding-value-clear:focus-visible {
+      outline: 2px solid #cfa052;
+      outline-offset: -2px;
+    }
+
+    .binding-value-clear:active:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .binding-value-input:placeholder-shown + .binding-value-clear {
+      display: none;
     }
 
     .binding-value-input:focus {
@@ -3713,6 +3758,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               <button class="card-action more-digits hidden" id="functionMore">Show more digits</button>
             </span>
             <span class="card-actions top-card-actions">
+              <button class="card-action" id="functionRun" type="button" title="Run this card's full-precision Ophelia programme">RUN</button>
               <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
               <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
               <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
@@ -3721,6 +3767,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </span>
           </div>
           <pre id="functionStyle"></pre>
+          <div id="functionRunResult" class="hidden" role="status" aria-live="polite">
+            <div class="card-title">Run output</div>
+            <pre id="functionRunOutput"></pre>
+          </div>
         </div>
         <div class="card result-card hidden" id="valueNoteCard" role="status">
           <div class="card-title">Evaluation note</div>
@@ -4370,6 +4420,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     const functionStyle = document.getElementById('functionStyle');
     const functionTitle = document.getElementById('functionTitle');
     const functionMore = document.getElementById('functionMore');
+    const functionRun = document.getElementById('functionRun');
+    const functionRunResult = document.getElementById('functionRunResult');
+    const functionRunOutput = document.getElementById('functionRunOutput');
+    let functionRunSequence = 0;
+    let functionRunController = null;
     const valueCard = document.getElementById('valueCard');
     const valueNoteCard = document.getElementById('valueNoteCard');
     const valueNote = document.getElementById('valueNote');
@@ -4715,6 +4770,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       renderedTitle.textContent = renderedText;
       parsedTitle.textContent = parsedText;
       functionTitle.textContent = functionText;
+      functionRun.classList.toggle('hidden', functionText !== 'Function');
+      clearFunctionRun();
       valueTitle.textContent = valueText;
     }
 
@@ -4815,6 +4872,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function restoreModeResultState(mode = currentMode()) {
+      clearFunctionRun();
       const state = modeResultState[mode];
       if (!state) {
         clearResultPane();
@@ -6650,6 +6708,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       renderDerivativeButtons(currentVariables);
     }
 
+    function queueBindingInputCommit(input) {
+      const isExpression = currentMode() === 'expression';
+      const pending = isExpression
+        ? pendingExpressionBindingCommit.then(() => commitBindingInput(input))
+        : commitBindingInput(input);
+      const handled = pending.catch((err) => setStatus(String(err)));
+      if (isExpression)
+        pendingExpressionBindingCommit = handled;
+      return handled;
+    }
+
     function renderVariableValues(bindings) {
       variableValues.replaceChildren();
       bindingValueCache = new Map();
@@ -6689,6 +6758,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           : 'variable-value-name';
         name.textContent = binding.name;
 
+        const field = document.createElement('div');
+        field.className = 'binding-value-field';
+
         const text = document.createElement('input');
         text.className = 'variable-value-text binding-value-input';
         text.type = 'text';
@@ -6698,6 +6770,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         text.dataset.bindingKind = kind;
         text.autocomplete = 'off';
         text.spellcheck = false;
+        // A blank placeholder lets CSS hide the clear button whenever the value is empty.
+        text.placeholder = ' ';
+        text.setAttribute('aria-label', `Value of ${binding.name}`);
         text.addEventListener('keydown', (event) => {
           if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
@@ -6712,17 +6787,29 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           }
         });
         text.addEventListener('change', () => {
-          if (currentMode() === 'expression') {
-            pendingExpressionBindingCommit = pendingExpressionBindingCommit
-              .then(() => commitBindingInput(text))
-              .catch((err) => {
-                setStatus(String(err));
-              });
-          } else {
-            void commitBindingInput(text);
-          }
+          void queueBindingInputCommit(text);
         });
         text.addEventListener('input', () => updateHistoryButtons());
+
+        const clear = document.createElement('button');
+        clear.className = 'binding-value-clear';
+        clear.type = 'button';
+        clear.textContent = '×';
+        clear.title = `Clear ${binding.name}`;
+        clear.setAttribute('aria-label', clear.title);
+        // Do not blur and re-render the field before the click can clear it.
+        clear.addEventListener('pointerdown', (event) => event.preventDefault());
+        clear.addEventListener('click', async () => {
+          text.value = '';
+          text.focus();
+          updateHistoryButtons();
+          await queueBindingInputCommit(text);
+          // Other modes may replace the binding controls while committing.
+          const replacement = Array.from(variableValues.querySelectorAll('.binding-value-input'))
+            .find((input) => input.dataset.bindingName === binding.name && input.dataset.bindingKind === kind);
+          (replacement || expr).focus();
+        });
+        field.append(text, clear);
 
         const actions = document.createElement('div');
         actions.className = 'variable-value-actions';
@@ -6755,7 +6842,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         });
 
         actions.append(toggle, copy);
-        box.append(name, text, actions);
+        box.append(name, field, actions);
         variableValues.appendChild(box);
       });
 
@@ -9887,7 +9974,68 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       renderMatrixSectionHeadings(element, text);
     }
 
+    function clearFunctionRun() {
+      ++functionRunSequence;
+      if (functionRunController)
+        functionRunController.abort();
+      functionRunController = null;
+      functionRun.disabled = false;
+      setActionRunning(functionRun, false);
+      functionRunOutput.textContent = '';
+      functionRunResult.classList.add('hidden');
+    }
+
+    async function runFunctionCard() {
+      if (functionRun.disabled || functionTitle.textContent !== 'Function')
+        return;
+      // The display may abbreviate digits; only the native full source is executable.
+      const source = String(functionStyle.dataset.fullText || '').trim();
+      clearFunctionRun();
+      functionRunResult.classList.remove('hidden');
+      if (!source) {
+        functionRunOutput.textContent = 'No Function programme is available. Evaluate an input first.';
+        return;
+      }
+      const sequence = functionRunSequence;
+      const controller = new AbortController();
+      functionRunController = controller;
+      functionRun.disabled = true;
+      setActionRunning(functionRun, true);
+      functionRunOutput.textContent = 'Running…';
+      const timer = setTimeout(() => controller.abort(), 45000);
+      try {
+        const response = await fetch('/function-run', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({source, precision: requestedValuePrecision()}),
+          signal: controller.signal
+        });
+        const data = await response.json();
+        if (sequence !== functionRunSequence)
+          return;
+        const output = String(data.output || '').trimEnd();
+        const error = String(data.error || '').trim();
+        functionRunOutput.textContent = response.ok && data.ok
+          ? (output || 'Programme completed without output.')
+          : [output, error || 'Programme execution failed.'].filter(Boolean).join('\n\n');
+      } catch (error) {
+        if (sequence === functionRunSequence)
+          functionRunOutput.textContent = error.name === 'AbortError'
+            ? 'Execution request timed out.'
+            : 'Could not run programme: ' + error.message;
+      } finally {
+        clearTimeout(timer);
+        if (sequence === functionRunSequence) {
+          functionRunController = null;
+          functionRun.disabled = false;
+          setActionRunning(functionRun, false);
+        }
+      }
+    }
+
     function setExpandableText(element, button, displayText, fullText) {
+      if (element === functionStyle)
+        clearFunctionRun();
       renderResultText(element, displayText || fullText || '');
       element.dataset.displayText = displayText || '';
       element.dataset.fullText = fullText || '';
@@ -10275,6 +10423,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     }
 
     function clearResultDetails(options = {}) {
+      clearFunctionRun();
       parsed.classList.remove('matrix-pretty');
       parsed.classList.remove('matrix-expression-pretty');
       parsed.classList.remove('matrix-expression-text');
@@ -11944,6 +12093,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       toggleTextDigits(functionStyle, functionMore);
     });
 
+    functionRun.addEventListener('click', () => {
+      void runFunctionCard();
+    });
+
     valueMore.addEventListener('click', () => {
       toggleTextDigits(value, valueMore);
     });
@@ -13559,6 +13712,7 @@ def precision_limit_result_fields(fields: dict[str, str], precision: int) -> Non
         "tex",
         "derivation_TeX",
         "function",
+        "operation_function",
         "derivative_function",
         "integral_function",
     ):
@@ -13620,6 +13774,33 @@ def find_free_port(host: str) -> int:
 
 def ensure_mars_lab(binary: Path) -> None:
     ensure_scratch_binary(binary, DEFAULT_SCRATCH_TARGET)
+
+def run_function_programme(source: str, precision: int) -> dict[str, object]:
+    """Run the initial native Ophelia scalar frontend in an isolated process."""
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("Function programme is empty")
+    if len(source.encode("utf-8")) > OPHELIA_SOURCE_LIMIT or "\0" in source:
+        raise ValueError("Function programme must be at most 64 KiB and contain no NUL bytes")
+    if not 17 <= precision <= min(10000, MAX_VALUE_PRECISION_DIGITS):
+        raise ValueError("Function precision is outside the supported range")
+    with OPHELIA_BUILD_LOCK:
+        ensure_scratch_binary(DEFAULT_OPHELIA_BIN, "scratch/ophelia")
+    try:
+        completed = subprocess.run(
+            [str(DEFAULT_OPHELIA_BIN), str(precision)],
+            input=source,
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=EXPRESSION_OPERATION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "output": "", "error": "Ophelia execution exceeded the 30-second limit."}
+    return {
+        "ok": completed.returncode == 0,
+        "output": expression_for_display(completed.stdout),
+        "error": completed.stderr.strip() if completed.returncode else "",
+    }
 
 
 def ensure_scratch_binary(binary: Path, target: str) -> None:
@@ -13692,6 +13873,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "conditioned_expression": r"^conditioned_expression\s{2,}(.*)$",
         "unbound": r"^unbound\s+(.*)$",
         "function": r"^function\s+(.*)$",
+        "operation_function": r"^operation_function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
         "derivation_TeX": r"^derivation_TeX\s*(.*)$",
         "transform_identity_TeX": r"^transform_identity_TeX\s*(.*)$",
@@ -13726,6 +13908,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         patterns,
         {
             "function",
+            "operation_function",
             "tex",
             "derivation_TeX",
             "root_function",
@@ -15665,7 +15848,8 @@ def prepare_evaluation_fields(
         or fields.get("root_TeX", "") or fields.get("tex", "")
     )
     fields["full_display_function"] = function_with_source_comment(
-        function_for_display(fields.get("root_function", "") or fields.get("function", "")),
+        function_for_display(fields.get("root_function", "") or fields.get("operation_function", "")
+                             or fields.get("function", "")),
         expression,
     )
     if fields.get("root_value"):
@@ -17659,6 +17843,27 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         if not self.request_allowed():
             return
         path = urllib.parse.urlparse(self.path).path
+        if path == "/function-run":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= OPHELIA_SOURCE_LIMIT * 6 + 1024:
+                    raise ValueError("Invalid Function request size")
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("Expected a Function request object")
+                source = payload.get("source")
+                precision = payload.get("precision", 50)
+                if not isinstance(precision, int) or isinstance(precision, bool):
+                    raise ValueError("Precision must be an integer")
+                result = run_function_programme(source, precision)
+            except (ValueError, TypeError, UnicodeError) as exc:
+                self.send_json(400, {"ok": False, "error": str(exc)})
+                return
+            except Exception as exc:
+                self.send_json(500, {"ok": False, "error": tidy_lab_error_text(exc)})
+                return
+            self.send_json(200 if result["ok"] else 422, result)
+            return
         if path == "/funnel-toggle":
             self.send_json(410, {"ok": False, "error": "Public access switching is disabled in MARS Lab."})
             return

@@ -95,18 +95,15 @@ static size_t dict_aligned_size(size_t size)
     return ((size + alignment - 1u) / alignment) * alignment;
 }
 
-static inline size_t *key_slot_hash_ptr(const struct _dictionary_t *dict, size_t index)
-{
+static inline size_t *key_slot_hash_ptr(const struct _dictionary_t *dict, size_t index) {
     return (size_t *)(dict->key_arena + index * dict->key_slot_stride);
 }
 
-static inline void *key_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
-{
+static inline void *key_slot_data_ptr(const struct _dictionary_t *dict, size_t index) {
     return (void *)(dict->key_arena + index * dict->key_slot_stride + dict->key_data_offset);
 }
 
-static inline void *value_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
-{
+static inline void *value_slot_data_ptr(const struct _dictionary_t *dict, size_t index) {
     return (void *)(dict->value_arena + index * dict->value_slot_stride);
 }
 
@@ -114,7 +111,7 @@ static inline void *value_slot_data_ptr(const struct _dictionary_t *dict, size_t
  * Clone / destroy helpers  (eliminate the repeated clone-or-memcpy pattern)
  * ---------------------------------------------------------------------- */
 
-static inline void slot_copy_key(const struct _dictionary_t *dict, void *dst, const void *src)
+static void slot_copy_key(const struct _dictionary_t *dict, void *dst, const void *src)
 {
     if (dict->key_clone)
         dict->key_clone(dst, src);
@@ -122,7 +119,7 @@ static inline void slot_copy_key(const struct _dictionary_t *dict, void *dst, co
         memcpy(dst, src, dict->key_size);
 }
 
-static inline void slot_copy_value(const struct _dictionary_t *dict, void *dst, const void *src)
+static void slot_copy_value(const struct _dictionary_t *dict, void *dst, const void *src)
 {
     if (dict->value_clone)
         dict->value_clone(dst, src);
@@ -130,13 +127,13 @@ static inline void slot_copy_value(const struct _dictionary_t *dict, void *dst, 
         memcpy(dst, src, dict->value_size);
 }
 
-static inline void slot_destroy_key(const struct _dictionary_t *dict, void *key)
+static void slot_destroy_key(const struct _dictionary_t *dict, void *key)
 {
     if (dict->key_destroy)
         dict->key_destroy(key);
 }
 
-static inline void slot_destroy_value(const struct _dictionary_t *dict, void *val)
+static void slot_destroy_value(const struct _dictionary_t *dict, void *val)
 {
     if (dict->value_destroy)
         dict->value_destroy(val);

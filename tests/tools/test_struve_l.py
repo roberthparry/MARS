@@ -100,7 +100,8 @@ class StruveLTests(unittest.TestCase):
     def test_affine_primitives_differentiate_back(self):
         for nu in (0, 1, 2, -0.5, -1.5):
             result = fields(f"struve_l({nu},2*x+1)", "integral")
-            self.assertNotIn("integral(", result["integral_function"])
+            self.assertIn("return integral(struvel(", result["integral_function"])
+            self.assertNotIn("∫", result["integral"].split(" = ", 1)[1])
             primitive = result["integral"].split(" = ", 1)[1].replace("x = NAN", "x = 1")
             differentiated = fields(primitive, "derivative")
             self.assertLess(abs(number(differentiated, "derivative_value")-reference(nu, 3)), 2e-10)

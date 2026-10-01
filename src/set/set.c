@@ -58,13 +58,11 @@ static size_t set_aligned_size(size_t size)
     return ((size + alignment - 1u) / alignment) * alignment;
 }
 
-static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index)
-{
+static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index) {
     return (size_t *)(set->arena + index * set->slot_stride);
 }
 
-static inline void *slot_data_ptr(const struct _set_t *set, size_t index)
-{
+static inline void *slot_data_ptr(const struct _set_t *set, size_t index) {
     return (void *)(set->arena + index * set->slot_stride + set->data_offset);
 }
 

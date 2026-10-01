@@ -16,6 +16,81 @@
 #include <complex.h>
 #undef complex
 
+/* Resolve a valid storage kind through the backend registry. */
+const number_vtable_t *number_vt(const number_t *number)
+{
+    size_t kind;
+
+    if (!number)
+        return NULL;
+    kind = (size_t)number_impl_const(number)->kind;
+    return kind < number_dispatch_count ? number_dispatch[kind] : NULL;
+}
+
+/* Return the backend kind only for a valid numeric value. */
+number_kind_t number_kind_value(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    return number && number_is_valid_value(number) && vt ? vt->kind : NUMBER_INVALID;
+}
+
+/* Check whether two valid numeric values use the same backend. */
+bool number_same_kind_value(const number_t *a, const number_t *b)
+{
+    number_kind_t ak = number_kind_value(a);
+    number_kind_t bk = number_kind_value(b);
+
+    return ak != NUMBER_INVALID && ak == bk;
+}
+
+/* Resolve the mathematical dispatch family for a valid numeric value. */
+number_math_family_t number_math_family_value(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    return number && number_is_valid_value(number) && vt ? vt->math_family : NUMBER_MATH_INVALID;
+}
+
+/* Select the common mathematical family through the bounded dispatch table. */
+number_math_family_t number_math_family_binary(number_math_family_t a, number_math_family_t b)
+{
+    return (unsigned)a <= NUMBER_MATH_COMPLEX && (unsigned)b <= NUMBER_MATH_COMPLEX
+               ? number_math_family_binary_table[a][b]
+               : NUMBER_MATH_INVALID;
+}
+
+/* Convert a numeric payload to double-double precision through its backend. */
+qfloat_t number_value_to_qfloat(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    if (!number)
+        return QF_NAN;
+    return vt && vt->to_qfloat ? vt->to_qfloat(number) : num_to_qfloat(*number);
+}
+
+/* Convert real and complex numeric payloads to double-double complex precision. */
+qcomplex_t number_value_to_qcomplex(const number_t *number)
+{
+    double _Complex cd;
+    const complex_t *cx;
+
+    if (!number)
+        return QC_NAN;
+    if (number_kind_value(number) == NUMBER_QCOMPLEX)
+        return number_impl_const(number)->value.qc;
+    if (number_kind_value(number) == NUMBER_CDOUBLE) {
+        cd = number_impl_const(number)->value.cd.value;
+        return qc_make(qf_from_double(__real__ cd), qf_from_double(__imag__ cd));
+    }
+    if (number_kind_value(number) == NUMBER_COMPLEX) {
+        cx = number_impl_const(number)->value.cx;
+        return cx ? qc_make(number_value_to_qfloat(&cx->real), number_value_to_qfloat(&cx->imag)) : QC_NAN;
+    }
+    return qc_make(number_value_to_qfloat(number), QF_ZERO);
+}
+
 typedef struct number_scope_record_t {
     number_kind_t kind;
     void *payload;
@@ -2667,11 +2742,13 @@ bool num_is_immortal(number_t number)
     return number_value_is_immortal(&number);
 }
 
+/* Release a numeric value using the shared lifetime dispatcher. */
 void num_destroy(number_t *number)
 {
     num_destroy_slow(number);
 }
 
+/* Release heap-backed storage while leaving immediate values unchanged. */
 void num_destroy_slow(number_t *number)
 {
     const number_vtable_t *vt;
@@ -3066,6 +3143,7 @@ static bool number_try_exact_immortal_binary(const number_t *a, const number_t *
     return false;
 }
 
+/* Add numeric values using the existing backend dispatch. */
 number_t num_add(const number_t a, const number_t b)
 {
     return num_add_slow(a, b);
@@ -3088,6 +3166,7 @@ static number_t number_apply_binary_mpfr_value(const number_t *a, const number_t
     return number_take_mpfr(copy);
 }
 
+/* Add equal-backend values directly and promote mixed backends as required. */
 number_t num_add_slow(const number_t a, const number_t b)
 {
     number_kind_t kind = number_impl_const(&a)->kind;
@@ -3111,11 +3190,13 @@ number_t num_add_slow(const number_t a, const number_t b)
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_ADD));
 }
 
+/* Subtract numeric values using the existing backend dispatch. */
 number_t num_sub(const number_t a, const number_t b)
 {
     return num_sub_slow(a, b);
 }
 
+/* Subtract equal-backend values directly and promote mixed backends as required. */
 number_t num_sub_slow(const number_t a, const number_t b)
 {
     number_kind_t kind = number_impl_const(&a)->kind;
@@ -3139,11 +3220,13 @@ number_t num_sub_slow(const number_t a, const number_t b)
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_SUB));
 }
 
+/* Multiply numeric values using the existing backend dispatch. */
 number_t num_mul(const number_t a, const number_t b)
 {
     return num_mul_slow(a, b);
 }
 
+/* Multiply values with the established backend and exact-constant rules. */
 number_t num_mul_slow(const number_t a, const number_t b)
 {
     number_kind_t kind = number_impl_const(&a)->kind;
@@ -3170,11 +3253,13 @@ number_t num_mul_slow(const number_t a, const number_t b)
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_MUL));
 }
 
+/* Divide numeric values using the existing backend dispatch. */
 number_t num_div(const number_t a, const number_t b)
 {
     return num_div_slow(a, b);
 }
 
+/* Divide values with the established backend and exact-constant rules. */
 number_t num_div_slow(const number_t a, const number_t b)
 {
     number_kind_t kind = number_impl_const(&a)->kind;
@@ -3227,35 +3312,35 @@ void number_assign(number_t *dst, number_t value)
     *dst = value;
 }
 
-static inline bool number_is_finite_value(const number_t *number)
+static bool number_is_finite_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
     return number && number_is_valid_value(number) && vt && vt->is_finite && vt->is_finite(number);
 }
 
-static inline bool number_is_nan_value(const number_t *number)
+static bool number_is_nan_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
     return !number || !number_is_valid_value(number) || (vt && vt->is_nan && vt->is_nan(number));
 }
 
-static inline bool number_is_inf_value(const number_t *number)
+static bool number_is_inf_value(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
     return number && number_is_valid_value(number) && vt && vt->is_inf && vt->is_inf(number);
 }
 
-static inline int number_cmp_same_kind(const number_t *a, const number_t *b)
+static int number_cmp_same_kind(const number_t *a, const number_t *b)
 {
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 
     return a && b && vt && vt->cmp_same ? vt->cmp_same(a, b) : 0;
 }
 
-static inline bool number_eq_same_kind(const number_t *a, const number_t *b)
+static bool number_eq_same_kind(const number_t *a, const number_t *b)
 {
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 

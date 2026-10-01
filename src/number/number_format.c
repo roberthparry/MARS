@@ -208,6 +208,9 @@ static bool number_format_text_starts_with_ascii(const string_t *text, char ch)
 
 static string_t *number_format_value_text(number_t value, char spec, int precision)
 {
+    /* Exact complex zero has no imaginary component, irrespective of its storage backend. */
+    if (number_vt(&value)->is_complex && num_is_zero(value))
+        return string_new_with("0");
     if (num_is_exact(value) && !number_vt(&value)->is_complex)
         return num_to_string(value);
     return number_format_inexact_text(&value, spec == 'N', precision);

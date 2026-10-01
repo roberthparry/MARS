@@ -175,7 +175,7 @@ mat_type_t mat_typeof(const matrix_t *A)
     return A->elem->public_type;
 }
 
-static inline void mat_copy_flat(matrix_t *A, void *data, void (*op)(matrix_t *A, size_t, size_t, void *))
+static void mat_copy_flat(matrix_t *A, void *data, void (*op)(matrix_t *A, size_t, size_t, void *))
 {
     size_t elem_size = A->elem->size;
     char *cursor = (char *)data;

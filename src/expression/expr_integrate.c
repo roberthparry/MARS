@@ -231,7 +231,7 @@ static expr_t *expr_integrate_symbolic_affine_unary_local(const expr_t *expr, co
     expr_t *quotient = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr->ops || expr_is_op(expr, &ops_abs) ||
+    if (!expr || !wrt || !expr->ops || expr_is_op(expr, &ops_abs) || expr_is_op(expr, &ops_sgn) ||
         expr->ops->arity != EXPR_OP_UNARY || !expr->ops->apply_unary || !expr->a ||
         !match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) ||
         expr_const_is_zero(coefficient))

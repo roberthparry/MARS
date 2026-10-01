@@ -9,6 +9,35 @@ void run_number_formatting_tests(void)
     printf(C_CYAN "Testing formatting and extended public operations...\n" C_RESET);
 
     {
+        char buf[128];
+        number_t zeros[] = {
+            num_create_from_cdouble(CMPLX(0.0, 0.0)),
+            num_create_from_cdouble(CMPLX(-0.0, -0.0)),
+            num_create_from_qcomplex(QC_ZERO),
+            num_create_from_qcomplex(qc_make(qf_neg(QF_ZERO), qf_neg(QF_ZERO))),
+            num_create_from_string("0i"),
+            num_create_from_string("-0i"),
+            num_mul(NUM_ZERO, NUM_I)
+        };
+        const char *formats[] = { "%n", "%.40n", "%N", "%.40N" };
+        for (size_t i = 0u; i < sizeof(zeros) / sizeof(*zeros); ++i) {
+            ASSERT_TRUE(num_is_zero(zeros[i]));
+            for (size_t j = 0u; j < sizeof(formats) / sizeof(*formats); ++j) {
+                ASSERT_EQ_INT(num_sprintf(buf, sizeof(buf), formats[j], zeros[i]), 1);
+                ASSERT_TRUE(strcmp(buf, "0") == 0);
+            }
+            ASSERT_EQ_INT(num_sprintf(buf, sizeof(buf), "%+5n", zeros[i]), 5);
+            ASSERT_TRUE(strcmp(buf, "   +0") == 0);
+            num_destroy(&zeros[i]);
+        }
+        number_t tiny = num_create_from_string("1e-80i");
+        ASSERT_TRUE(!num_is_zero(tiny));
+        ASSERT_TRUE(num_sprintf(buf, sizeof(buf), "%.3n", tiny) > 0);
+        ASSERT_TRUE(strchr(buf, 'i') != NULL);
+        num_destroy(&tiny);
+    }
+
+    {
         char buf[512];
         number_t dec = num_create_from_string("32.123");
         number_t rat = num_create_from_string("5/6");

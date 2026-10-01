@@ -5,13 +5,13 @@
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
-static inline void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
+static void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
     *a_bar = value;
     *b_bar = NUM_ZERO;
 }
 
-static inline void expr_reverse_binary(number_t a_value, number_t b_value, number_t *a_bar, number_t *b_bar)
+static void expr_reverse_binary(number_t a_value, number_t b_value, number_t *a_bar, number_t *b_bar)
 {
     *a_bar = a_value;
     *b_bar = b_value;

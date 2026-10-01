@@ -19,6 +19,17 @@ typedef struct equation_solutions equation_solutions_t;
 equation_t *equ_new(const expr_t *lhs, const expr_t *rhs);
 
 /**
+ * @brief Create a solvable equation, inferring named bindings from both sides.
+ *
+ * Retains the expressions and their existing variable and constant nodes without
+ * reparsing or changing their values. Occurrences of the same name must already
+ * refer to the same node. The caller owns the result and releases it with equ_free().
+ * Unlike equ_new(), this constructor supplies the binding table used by
+ * equ_derive_solutions(). Returns NULL on invalid input or allocation failure.
+ */
+equation_t *equ_new_with_inferred_bindings(const expr_t *lhs, const expr_t *rhs);
+
+/**
  * @brief Release an owning equation handle.
  */
 void equ_free(equation_t *equation);

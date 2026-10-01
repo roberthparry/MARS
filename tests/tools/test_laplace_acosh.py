@@ -131,7 +131,7 @@ class AcoshReadmeTests(AcoshHelpers, unittest.TestCase):
         # README example: docs/expression.md, unbound acosh Laplace Expression output.
         result = self.fields("@L{acosh(t)}")
         self.assertEqual(result["unbound"],
-                         "1/s·(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s))) where (Re(s) > 0)")
+                         "(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)")
 
     def test_readme_acosh_laplace(self):
         # README example: docs/expression.md, principal inverse-hyperbolic Laplace pair.

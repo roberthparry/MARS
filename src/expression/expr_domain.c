@@ -181,6 +181,68 @@ static bool domain_numeric(const expr_t *expr)
     return numeric;
 }
 
+/* Strip finite numeric translations, retaining the symbolic centre and its real offset. */
+static const expr_t *domain_shift_centre(const expr_t *value, number_t *shift)
+{
+    *shift = num_clone(NUM_ZERO);
+    while (expr_is_op(value, &ops_add) || expr_is_op(value, &ops_sub)) {
+        const expr_t *constant = value->b;
+        const expr_t *centre = value->a;
+        bool subtract = expr_is_op(value, &ops_sub);
+        if (!domain_numeric(constant)) {
+            if (subtract || !domain_numeric(value->a))
+                break;
+            constant = value->a;
+            centre = value->b;
+        }
+        number_t offset = expr_eval(constant);
+        if (!num_is_finite(offset)) {
+            num_destroy(&offset);
+            break;
+        }
+        number_t real = num_real_part(offset);
+        number_t next = subtract ? num_sub(*shift, real) : num_add(*shift, real);
+        num_destroy(&offset);
+        num_destroy(&real);
+        num_destroy(shift);
+        *shift = next;
+        value = centre;
+    }
+    return value;
+}
+
+/* Compare strict half-planes only when their centres and bound ordering are proved. */
+static bool domain_predicate_implies(const expr_t *strong, const expr_t *weak)
+{
+    number_t strong_shift, weak_shift;
+    const expr_t *strong_centre = domain_shift_centre(strong->a, &strong_shift);
+    const expr_t *weak_centre = domain_shift_centre(weak->a, &weak_shift);
+    bool implies = false;
+    if (domain_same_value(strong_centre, weak_centre)) {
+        number_t difference = NUM_NAN;
+        if (domain_same_value(strong->b->a, weak->b->a)) {
+            difference = num_clone(NUM_ZERO);
+        } else if (domain_numeric(strong->b->a) && domain_numeric(weak->b->a)) {
+            number_t strong_bound = expr_eval(strong->b->a);
+            number_t weak_bound = expr_eval(weak->b->a);
+            if (num_is_finite(strong_bound) && num_is_real(strong_bound) &&
+                num_is_finite(weak_bound) && num_is_real(weak_bound))
+                difference = num_sub(strong_bound, weak_bound);
+            num_destroy(&weak_bound);
+            num_destroy(&strong_bound);
+        }
+        number_t offset = num_sub(weak_shift, strong_shift);
+        number_t gap = num_add(difference, offset);
+        implies = num_is_finite(gap) && num_is_real(gap) && num_ge(gap, NUM_ZERO);
+        num_destroy(&gap);
+        num_destroy(&offset);
+        num_destroy(&difference);
+    }
+    num_destroy(&weak_shift);
+    num_destroy(&strong_shift);
+    return implies;
+}
+
 static expr_t *real_domain_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 {
     (void)expr;
@@ -205,11 +267,19 @@ static expr_t *real_domain_simplify(const expr_t *expr, expr_t *a, expr_t *b)
     out->a = a;
     expr_t **tail = &out->b;
     for (const expr_t *pair = b; pair; pair = pair->b->b) {
-        // Domains are normally tiny; cap duplicate comparisons for large user-authored lists.
+        // Domains are normally tiny; cap implication comparisons for large user-authored lists.
         bool duplicate = false;
         unsigned int compared = 0u;
-        for (const expr_t *seen = out->b; seen && compared < 64u; seen = seen->b->b, ++compared) {
-            if (domain_same_value(seen->a, pair->a) && domain_same_value(seen->b->a, pair->b->a)) {
+        for (expr_t *seen = out->b; seen && compared < 64u; seen = seen->b->b, ++compared) {
+            if (domain_predicate_implies(seen, pair)) {
+                duplicate = true;
+                break;
+            }
+            if (domain_predicate_implies(pair, seen)) {
+                expr_free(seen->a);
+                expr_free(seen->b->a);
+                seen->a = expr_clone(pair->a);
+                seen->b->a = expr_clone(pair->b->a);
                 duplicate = true;
                 break;
             }
@@ -265,6 +335,26 @@ expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args)
         *tail = expr_alloc(&ops_argument_list);
         (*tail)->a = expr_clone(args[index]);
         tail = &(*tail)->b;
+    }
+    return out;
+}
+
+/* Carry outer domain conditions onto a new body without detaching its live binding nodes. */
+expr_t *expr_with_domain_of(const expr_t *expr, const expr_t *domain)
+{
+    if (!expr || !domain || domain->ops != &ops_real_domain)
+        return NULL;
+    expr_t *out = expr_alloc(&ops_real_domain);
+    out->a = (expr_t *)expr;
+    expr_retain(expr);
+    expr_t **tail = &out->b;
+    for (const expr_t *wrapper = domain; wrapper && wrapper->ops == &ops_real_domain; wrapper = wrapper->a) {
+        for (const expr_t *argument = wrapper->b; argument; argument = argument->b) {
+            *tail = expr_alloc(&ops_argument_list);
+            (*tail)->a = argument->a;
+            expr_retain(argument->a);
+            tail = &(*tail)->b;
+        }
     }
     return out;
 }
@@ -352,6 +442,37 @@ expr_t *expr_transform_specialise_constants(const expr_t *expr)
     return out;
 }
 
+/* Retain authored inner operations when the outer transform is still unresolved. */
+char *expr_formal_transform_TeX(const expr_t *source, const expr_t *result)
+{
+    const expr_t *domain = result;
+    while (source && source->ops == &ops_real_domain)
+        source = source->a;
+    while (result && result->ops == &ops_real_domain)
+        result = result->a;
+    if (!expr_is_integral_transform(source) || !expr_is_integral_transform(result) ||
+        !expr_contains_calculus_request(source->a))
+        return NULL;
+    expr_t *evaluated = expr_transform_result(result);
+    if (evaluated) {
+        expr_free(evaluated);
+        return NULL;
+    }
+    expr_t *request = expr_clone(source);
+    if (!request)
+        return NULL;
+    expr_t *operand = expr_transform_bound_constants(source->a);
+    if (operand) {
+        expr_free(request->a);
+        request->a = operand;
+    }
+    expr_t *conditioned = expr_with_domain_of(request, domain);
+    char *out = expr_to_TeX_operation_body(conditioned ? conditioned : request);
+    expr_free(conditioned);
+    expr_free(request);
+    return out;
+}
+
 /* Present an evaluated transform as an identity without changing the result algebra. */
 char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
 {
@@ -361,18 +482,28 @@ char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
         result = result->a;
     if (!expr_is_integral_transform(source) || !result)
         return NULL;
-    bool shifted_formal = source->ops == &ops_laplace && result->ops == &ops_laplace &&
-                          !expr_struct_eq(source->b->b->a, result->b->b->a);
+    const expr_t *source_target = source->b->b->a;
+    const expr_t *result_target = result->ops == &ops_laplace ? result->b->b->a : NULL;
+    bool same_target = result_target &&
+                       (expr_struct_eq(source_target, result_target) ||
+                        (source_target->name && result_target->name &&
+                         strcmp(source_target->name, result_target->name) == 0));
+    bool shifted_formal = source->ops == &ops_laplace && result->ops == &ops_laplace && !same_target;
     if (expr_is_integral_transform(result) && !shifted_formal)
         return NULL;
-    expr_t *operand = shifted_formal ? expr_clone(source->a) : domain_specialise_copy(source->a);
-    char *body = expr_to_TeX_body(operand);
+    expr_t *operand = shifted_formal ? NULL : expr_transform_bound_constants(source->a);
+    if (!operand)
+        operand = expr_clone(source->a);
+    char *body = expr_to_TeX_operation_body(operand);
     /* The integration coordinate is a symbol, even when copied with an unset binding. */
     expr_t *coordinate = source->b->a->name ? expr_new_named_var(NUM_NAN, source->b->a->name)
                                           : expr_clone(source->b->a);
     char *from = expr_to_TeX_body(coordinate);
     expr_free(coordinate);
-    char *to = expr_to_TeX_body(source->b->b->a);
+    const expr_t *target = source->b->b->a;
+    coordinate = target->name ? expr_new_named_var(NUM_NAN, target->name) : expr_clone(target);
+    char *to = expr_to_TeX_body(coordinate);
+    expr_free(coordinate);
     char *rhs = expr_to_TeX_body(result);
     char *out = NULL;
     if (body && from && to && rhs && shifted_formal) {

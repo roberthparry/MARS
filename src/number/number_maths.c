@@ -538,43 +538,125 @@ static int number_mpfr_apply_binary(mpfr_t value, const mpfr_t other,
     return 0;
 }
 
-#define NUMBER_MPFR_UNARY(name, op)                                                                                    \
-    static int name(mpfr_t value)                                                                                      \
-    {                                                                                                                  \
-        return number_mpfr_apply_unary(value, (op));                                                                   \
-    }
+static int number_mpfr_log10_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_log10);
+}
 
-#define NUMBER_MPFR_BINARY(name, op)                                                                                   \
-    static int name(mpfr_t value, const mpfr_t other)                                                                  \
-    {                                                                                                                  \
-        return number_mpfr_apply_binary(value, other, (op));                                                           \
-    }
+static int number_mpfr_sin_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_sin);
+}
 
-NUMBER_MPFR_UNARY(number_mpfr_log10_mut, mpfr_log10)
-NUMBER_MPFR_UNARY(number_mpfr_sin_mut, mpfr_sin)
-NUMBER_MPFR_UNARY(number_mpfr_cos_mut, mpfr_cos)
-NUMBER_MPFR_UNARY(number_mpfr_tan_mut, mpfr_tan)
-NUMBER_MPFR_UNARY(number_mpfr_atan_mut, mpfr_atan)
-NUMBER_MPFR_UNARY(number_mpfr_asin_mut, mpfr_asin)
-NUMBER_MPFR_UNARY(number_mpfr_acos_mut, mpfr_acos)
-NUMBER_MPFR_UNARY(number_mpfr_sinh_mut, mpfr_sinh)
-NUMBER_MPFR_UNARY(number_mpfr_cosh_mut, mpfr_cosh)
-NUMBER_MPFR_UNARY(number_mpfr_tanh_mut, mpfr_tanh)
-NUMBER_MPFR_UNARY(number_mpfr_asinh_mut, mpfr_asinh)
-NUMBER_MPFR_UNARY(number_mpfr_acosh_mut, mpfr_acosh)
-NUMBER_MPFR_UNARY(number_mpfr_atanh_mut, mpfr_atanh)
-NUMBER_MPFR_UNARY(number_mpfr_gamma_mut, mpfr_gamma)
-NUMBER_MPFR_UNARY(number_mpfr_lgamma_mut, mpfr_lngamma)
-NUMBER_MPFR_UNARY(number_mpfr_digamma_mut, mpfr_digamma)
-NUMBER_MPFR_UNARY(number_mpfr_erf_mut, mpfr_erf)
-NUMBER_MPFR_UNARY(number_mpfr_erfc_mut, mpfr_erfc)
-NUMBER_MPFR_UNARY(number_mpfr_Ei_mut, mpfr_eint)
-NUMBER_MPFR_UNARY(number_mpfr_dilog_mut, mpfr_li2)
+static int number_mpfr_cos_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_cos);
+}
 
-NUMBER_MPFR_BINARY(number_mpfr_atan2_mut, mpfr_atan2)
-NUMBER_MPFR_BINARY(number_mpfr_pow_mut, mpfr_pow)
-NUMBER_MPFR_BINARY(number_mpfr_hypot_mut, mpfr_hypot)
-NUMBER_MPFR_BINARY(number_mpfr_beta_mut, mpfr_beta)
+static int number_mpfr_tan_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_tan);
+}
+
+static int number_mpfr_atan_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_atan);
+}
+
+static int number_mpfr_asin_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_asin);
+}
+
+static int number_mpfr_acos_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_acos);
+}
+
+static int number_mpfr_sinh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_sinh);
+}
+
+static int number_mpfr_cosh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_cosh);
+}
+
+static int number_mpfr_tanh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_tanh);
+}
+
+static int number_mpfr_asinh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_asinh);
+}
+
+static int number_mpfr_acosh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_acosh);
+}
+
+static int number_mpfr_atanh_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_atanh);
+}
+
+static int number_mpfr_gamma_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_gamma);
+}
+
+static int number_mpfr_lgamma_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_lngamma);
+}
+
+static int number_mpfr_digamma_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_digamma);
+}
+
+static int number_mpfr_erf_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_erf);
+}
+
+static int number_mpfr_erfc_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_erfc);
+}
+
+static int number_mpfr_Ei_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_eint);
+}
+
+static int number_mpfr_dilog_mut(mpfr_t value)
+{
+    return number_mpfr_apply_unary(value, mpfr_li2);
+}
+
+static int number_mpfr_atan2_mut(mpfr_t value, const mpfr_t other)
+{
+    return number_mpfr_apply_binary(value, other, mpfr_atan2);
+}
+
+static int number_mpfr_pow_mut(mpfr_t value, const mpfr_t other)
+{
+    return number_mpfr_apply_binary(value, other, mpfr_pow);
+}
+
+static int number_mpfr_hypot_mut(mpfr_t value, const mpfr_t other)
+{
+    return number_mpfr_apply_binary(value, other, mpfr_hypot);
+}
+
+static int number_mpfr_beta_mut(mpfr_t value, const mpfr_t other)
+{
+    return number_mpfr_apply_binary(value, other, mpfr_beta);
+}
 
 static int number_mpfr_bessel_j_mut(mpfr_t order, const mpfr_t argument)
 {

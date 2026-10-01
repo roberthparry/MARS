@@ -20,6 +20,114 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_binding_clear_button_commits_unset_value_and_restores_focus(self) -> None:
+        names = (
+            "renderVariableValues", "queueBindingInputCommit", "commitBindingInput",
+            "normalisedBindingInputValue", "replaceBindingValueInExpression", "bindingParts",
+            "lastIndexOfTopLevel", "indexOfTopLevel", "splitTopLevel", "isUnsetBindingValue",
+            "displayValueForBinding", "fullValueForBinding", "compareBindingNames",
+        )
+        functions = "\n".join(
+            re.search(r"^    (?:async )?function " + name + r"\([\s\S]*?(?=^    (?:async )?function )",
+                      mars_lab.INDEX_HTML, re.MULTILINE).group(0) for name in names
+        )
+        script = functions + r'''
+            function check(value, message) { if (!value) throw new Error(message); }
+            class Element {
+                constructor(tag) {
+                    this.tag = tag;
+                    this.children = [];
+                    this.dataset = {};
+                    this.listeners = {};
+                    this.classList = {add() {}, remove() {}};
+                }
+                append(...children) { this.children.push(...children); }
+                appendChild(child) { this.append(child); }
+                replaceChildren() { this.children = []; }
+                setAttribute(name, value) { this[name] = value; }
+                addEventListener(name, callback) { this.listeners[name] = callback; }
+                focus() { document.activeElement = this; }
+                querySelectorAll(selector) {
+                    return this.children.flatMap(child => [
+                        ...(child.className.split(' ').includes(selector.slice(1)) ? [child] : []),
+                        ...child.querySelectorAll(selector)
+                    ]);
+                }
+            }
+            const document = {createElement: tag => new Element(tag)};
+            const variableValues = new Element('div'), expr = new Element('textarea');
+            let bindingValueCache, currentBindingKinds, fullExpressionText, saved, historyUpdates = 0;
+            let pendingExpressionBindingCommit = Promise.resolve(), mode = 'expression';
+            const currentMode = () => mode;
+            const currentExpressionText = () => fullExpressionText;
+            const expressionForEditor = text => text;
+            const updateHistoryButtons = () => ++historyUpdates;
+            const saveCurrentModeEditorState = () => { saved = fullExpressionText; };
+            const setStatus = message => { throw new Error(message); };
+            const isIntegrationConstantName = () => false;
+            const applyUpdatedBindingExpression = text => { fullExpressionText = text; };
+            const refreshVariableValuesFromEditor = () => renderVariableValues([
+                {name: 'ω', kind: 'variable', value: '?'}
+            ]);
+            async function test() {
+                for (const kind of ['variable', 'constant']) {
+                    fullExpressionText = kind === 'variable' ? '{ ω | ω = 77 }' : '{ ω | ; ω = 77 }';
+                    renderVariableValues([{name: 'ω', kind, value: '77'}]);
+                    const input = variableValues.querySelectorAll('.binding-value-input')[0];
+                    const clear = variableValues.querySelectorAll('.binding-value-clear')[0];
+                    check(clear.type === 'button' && clear.textContent === '×', 'Not a native clear button');
+                    check(clear['aria-label'] === 'Clear ω', 'Missing accessible clear label');
+                    check(input.placeholder === ' ', 'Missing empty-value visibility hook');
+                    check(bindingValueCache.get('ω') === '77', 'Initial cache missing');
+                    let prevented = false;
+                    clear.listeners.pointerdown({preventDefault() { prevented = true; }});
+                    check(prevented, 'Pointer action would blur before clearing');
+                    // Clearing must also work after typing and queuing an ordinary change.
+                    input.value = '88';
+                    input.listeners.input();
+                    input.listeners.change();
+                    await clear.listeners.click();
+                    check(input.value === '' && input.title === '?', 'Input not reset');
+                    check(fullExpressionText.includes('ω = ?'), 'Underlying binding not unset');
+                    check(saved === fullExpressionText, 'Cleared binding not saved');
+                    check(!bindingValueCache.has('ω'), 'Cleared value remains cached');
+                    check(document.activeElement === input, 'Focus not returned to input');
+                    check(historyUpdates > 0, 'History controls not updated');
+                    // A keyboard-activated native button follows the same click handler.
+                    input.value = '99';
+                    await clear.listeners.click();
+                    check(input.value === '' && document.activeElement === input, 'Keyboard clear failed');
+                }
+                for (const value of ['?', 'NAN', '']) {
+                    renderVariableValues([{name: 'ω', kind: 'variable', value}]);
+                    check(variableValues.querySelectorAll('.binding-value-input')[0].value === '',
+                          'Unset bindings must start empty');
+                }
+                mode = 'equation';
+                fullExpressionText = '{ ω | ω = 77 }';
+                renderVariableValues([{name: 'ω', kind: 'variable', value: '77'}]);
+                const oldInput = variableValues.querySelectorAll('.binding-value-input')[0];
+                await variableValues.querySelectorAll('.binding-value-clear')[0].listeners.click();
+                const newInput = variableValues.querySelectorAll('.binding-value-input')[0];
+                check(oldInput !== newInput && document.activeElement === newInput,
+                      'Focus lost when committing replaces the controls');
+                check(fullExpressionText.includes('ω = ?') && !bindingValueCache.has('ω'),
+                      'Other mode retained the cleared binding');
+            }
+            test().catch(error => { printerr(error.stack); imports.system.exit(1); });
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        if Path(runtime).name == "gjs-console":
+            flag = "-c"
+        else:
+            flag = "-e"
+            script = script.replace("printerr(error.stack); imports.system.exit(1);",
+                                    "console.error(error.stack); process.exit(1);")
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(".binding-value-input:placeholder-shown + .binding-value-clear {\n"
+                      "      display: none;", mars_lab.INDEX_HTML)
+
     def test_conditions_are_not_binding_values(self) -> None:
         source = "{ f(s) | s = NAN; a = NAN, b = NAN; Re(s) > Re(b); Re(s) > Re(a) }"
         values = mars_lab.expression_variable_binding_values(source, 40)
@@ -3769,8 +3877,8 @@ solutions y = final
         )
         self.assertEqual(
             payload["solutions"],
-            "r = 1/(2·cos²(θ))·(sin(θ) - √(sin²(θ) - C·cos²(θ)))\n"
-            "r = 1/(2·cos²(θ))·(sin(θ) + √(sin²(θ) - C·cos²(θ)))",
+            "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))\n"
+            "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))",
         )
         self.assertIn(r"\,dr", payload["problem_TeX"])
         self.assertIn(r"\,d\theta", payload["problem_TeX"])
@@ -3808,7 +3916,7 @@ solutions y = final
 
         self.assertEqual(payload["status"], "solved")
         self.assertEqual(payload["solver"], "exact first-order")
-        self.assertEqual(payload["solutions"], "y = √(1/(3x)·(14 - x³))")
+        self.assertEqual(payload["solutions"], "y = √((14 - x³)/(3x))")
         self.assertIn(r"14 - x^{3}", payload["solutions_TeX"])
         self.assertNotIn(r"\ln", payload["solutions_TeX"])
 
@@ -4403,7 +4511,7 @@ solutions y = final
                 "c_(-2) = 0",
                 "c_(-3) = 0",
                 "c_(n + 2) = "
-                "1/(2·(n + 2)·(n + 1))·(C₁·c_(n) + c_(n - 3))",
+                "(C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))",
             ],
         )
 
@@ -4451,8 +4559,8 @@ class ExpressionResultTests(unittest.TestCase):
         fields, raw, code = mars_lab.run_mars_lab_fields(
             self.expression_binary, "@L{tanh(c*t)}", 40, "s", "derivative")
         self.assertEqual(code, 0, raw)
-        self.assertIn("trigamma(", fields["derivative_function"])
-        self.assertNotIn("digamma(", fields["derivative_function"])
+        self.assertIn("return derivative(", fields["derivative_function"])
+        self.assertIn("derivative(laplace(tanh(c.t), t, s), s, 1)", fields["derivative_function"])
         self.assertNotIn(r"\frac{\frac{", fields["derivative_TeX"])
         self.assertIn("realpart(s) > 0", fields["derivative_function"])
         self.assertIn("realpart(sqrt(c^2)) > 0", fields["derivative_function"])
@@ -4642,11 +4750,12 @@ class ExpressionResultTests(unittest.TestCase):
         fields, raw, code = mars_lab.run_mars_lab_fields(
             self.expression_binary, "@Linv(1/s^2)", 30, "t", "derivative")
         self.assertEqual(code, 0, raw)
-        self.assertIn("return 1.", fields["derivative_function"])
+        self.assertIn("return derivative(inverselaplace(1/s^2, s, t), t, 1).", fields["derivative_function"])
         fields, raw, code = mars_lab.run_mars_lab_fields(
             self.expression_binary, "@Linv(1/s^2)", 30, "t", "integral")
         self.assertEqual(code, 0, raw)
         self.assertIn("t²", fields["integral"])
+        self.assertIn("return integral(t, t).", fields["integral_function"])
         self.assertNotIn("inverselaplace(", fields["integral_function"])
 
     def test_laplace_exponential_shift_formal_definition_and_round_trip(self) -> None:
@@ -4736,7 +4845,7 @@ class ExpressionResultTests(unittest.TestCase):
             self.expression_binary, fields, source, 30, False, action="evaluate"
         )
         self.assertEqual(payload["full_display_TeX"], mars_lab.TeX_for_display(identity))
-        self.assertNotIn("laplace(", payload["full_display_function"])
+        self.assertIn("return laplace(sinh(", payload["full_display_function"])
 
     def test_laplace_identity_specialises_constants_and_skips_unevaluated(self) -> None:
         fields, raw, code = mars_lab.run_mars_lab_fields(
@@ -5126,7 +5235,9 @@ class ExpressionResultTests(unittest.TestCase):
                 )
             self.assertEqual(payload["full_display_expression"], expected)
             self.assertEqual(payload["full_display_TeX"], mars_lab.TeX_for_display(native_TeX))
-            self.assertNotIn("const n", payload["full_display_function"])
+            self.assertIn("const n = " + value + ".", payload["full_display_function"])
+            self.assertIn("return laplace(t^n, t, s).", payload["full_display_function"])
+            self.assertIn("if (realpart(s) > 0)", payload["full_display_function"])
             self.assertIn("return @nan.", payload["full_display_function"])
             self.assertEqual([(item["name"], item["value"]) for item in payload["binding_values"]],
                              [("s", "1"), ("n", value)])
@@ -5483,6 +5594,10 @@ class ExpressionResultTests(unittest.TestCase):
                     self.assertNotIn("factorial", fields[field])
                 for field in ("function", "derivative_function"):
                     function = fields[field]
+                    if field == "derivative_function":
+                        self.assertIn("return derivative(exp(", function)
+                        self.assertIn(", x, 1).", function)
+                        continue
                     self.assertIn("return p + q.i.", function)
                     self.assertEqual(function.count("exp("), 1)
                     self.assertEqual(function.count("sum("), 2)
@@ -5581,9 +5696,9 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(returncode, 0, raw)
         for source in (
-            "{ sum(k,1,n,integral(1,x,Li(k.t),t))+C | x=2; n=1,C=0 }",
-            "integral(1,2,Li(t),t)",
-            "integral(1,2,Ei(ln(t)),t)",
+            "{ sum(k,1,n,integral(Li(k.t),t,1,x))+C | x=2; n=1,C=0 }",
+            "integral(Li(t),t,1,2)",
+            "integral(Ei(ln(t)),t,1,2)",
         ):
             with self.subTest(source=source):
                 fields, raw, returncode = mars_lab.run_mars_lab_fields(
@@ -5738,19 +5853,14 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("n·exp(nx)/(n²x² + m²y²)·(nx·sin(my) - my·cos(my))·i", derivative_fields["derivative"])
         self.assertIn(r"n^{2}\mkern-2mu x^{2} + m^{2}\mkern-2mu y^{2}", derivative_fields["derivative_TeX"])
         self.assertNotIn(r"n\mkern-2mu x + m\mkern-2mu y\mkern-2mu i", derivative_fields["derivative_TeX"])
-        # The full repeated coefficient is n.exp(n.x), so its exponential needs no separate alias.
-        self.assertIn("v1 = n.exp(n.x).", derivative_fields["derivative_function"])
-        self.assertEqual(derivative_fields["derivative_function"].count("exp(n.x)"), 1)
-        self.assertNotIn("v1 = n.x.", derivative_fields["derivative_function"])
-        self.assertNotIn("v1 = exp(v", derivative_fields["derivative_function"])
+        # RUN differentiates the original function; Cartesian expansion remains in the result cards.
+        self.assertIn("return derivative(ei(n.x + i.m.y), x, 1).", derivative_fields["derivative_function"])
         self.assertIn(
             r"\frac{\partial}{\partial x}\operatorname{Ei}",
             derivative_fields["derivative_TeX"],
         )
         self.assertIn(r"&=p+q\mkern-2mu i", derivative_fields["derivative_TeX"])
-        self.assertIn("p = ", derivative_fields["derivative_function"])
-        self.assertIn("q = ", derivative_fields["derivative_function"])
-        self.assertIn("return p + q.i.", derivative_fields["derivative_function"])
+        self.assertNotIn("return p + q.i.", derivative_fields["derivative_function"])
 
         precise_fields, precise_raw, precise_returncode = mars_lab.run_mars_lab_fields(
             self.expression_binary,
@@ -7079,14 +7189,14 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "{ sin(n/2)·sin(1/2·(n + 1))/sin(½) | ; n = ? }",
+            "{ sin(n/2)·sin((n + 1)/2)/sin(½) | ; n = ? }",
         )
         self.assertEqual(
             payload["display_TeX"],
             r"\sum_{k=1}^{n}\sin(k) = "
             r"\frac{\sin(\frac{n}{2})\mkern-2mu \sin(\frac{n + 1}{2})}{\sin(\frac{1}{2})}",
         )
-        self.assertIn("return sin(n/2).sin((n + 1)/2)/sin(1/2).", payload["full_display_function"])
+        self.assertIn("return sin(n/2).sin((n + 1)/2)/(sin(1/2)).", payload["full_display_function"])
         self.assertNotIn("value", payload)
 
     @unittest.skipUnless(
@@ -7922,7 +8032,7 @@ class ExpressionResultTests(unittest.TestCase):
             r"H_{n}(\cos(x) - \sin(x)\mkern-2mu i)}{2\mkern-2mu i} + C",
         )
         self.assertIn(
-            "return (harmonicpoly(n, v1 + v3) - harmonicpoly(n, v1 - v3))/(2.i) + C.",
+            "return integral(sin(n.x/2).cos(x.(n + 1)/2)/sin(x/2), x).",
             fields["integral_function"],
         )
         self.assertIn("x = @pi/12.", fields["integral_function"])
@@ -8029,7 +8139,8 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(derivative_returncode, 0, derivative_raw)
         self.assertIn("sinh(nx/2)·cosh(x/2·(n + 1))/sinh(x/2)", derivative_fields["derivative"])
-        self.assertIn("return sinh(n.v1).cosh((n + 1).v1)/sinh(v1).", derivative_fields["derivative_function"])
+        self.assertIn("return derivative(sum(k, 1, n, sinh(k.x)/k) + C, x, 1).",
+                      derivative_fields["derivative_function"])
         self.assertIn(
             r"\sum_{k=1}^{n}\cosh(k\mkern-2mu x) = "
             r"\frac{\sinh(\frac{n\mkern-2mu x}{2})\mkern-2mu "
@@ -8256,7 +8367,7 @@ class ExpressionResultTests(unittest.TestCase):
             "    v1 = exp(i.x).\n"
             "    v2 = 1/v1.\n"
             "\n"
-            "    return -1/2.(li1(v1) - v1^c1.lerchphi(v1, 1, c1) + "
+            "    return -(1/2).(li1(v1) - v1^c1.lerchphi(v1, 1, c1) + "
             "li1(v2) - v2^c1.lerchphi(v2, 1, c1)).\n"
             "}\n"
             "\n"
@@ -8321,7 +8432,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertEqual(integral_returncode, 0, integral_raw)
         self.assertIn("p - Σ_(k=2)^n k^(-p)/ln(k) + C", integral["integral"])
         self.assertEqual(integral["integral_TeX"], r"p - \sum_{k=2}^{n}\frac{k^{-p}}{\ln(k)} + C")
-        self.assertIn("return p - sum(k, 2, n, k^(-p)/ln(k)) + C.", integral["integral_function"])
+        self.assertIn("return integral(zeta(p) - zetah(p, n + 1), p).", integral["integral_function"])
         self.assertEqual(integral["integral_value"], "NAN")
 
     @unittest.skipUnless(
@@ -8525,7 +8636,7 @@ class ExpressionResultTests(unittest.TestCase):
         self.assertIn("·i", fields["derivative"])
         self.assertIn("(-1)^k", fields["derivative"])
         self.assertIn("expression roots(x, y, array const k)", fields["derivative_function"])
-        self.assertIn("abs(y)", fields["derivative_function"])
+        self.assertIn("derivative((x + i.y)^1/2, x, 1)", fields["derivative_function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -8774,8 +8885,8 @@ class ExpressionResultTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["full_display_expression"],
-            "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-            "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)",
+            "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) + "
+            "√(root(2, 4) - √((√(2) + 1)/2))·i)",
         )
         function = payload["full_display_function"]
         self.assertIn("const c1 = sqrt(2).", function)
@@ -9424,7 +9535,9 @@ class ExpressionResultTests(unittest.TestCase):
 
         self.assertEqual(payload["integral_TeX"], r"2\mkern-2mu \sqrt{x + y\mkern-2mu i} + C")
         self.assertEqual(payload["integral"], "∫dx = { 2·√(x + y·i) + C | x = ?, y = ?; C = ? }")
-        self.assertIn("return 2.(x + y.i)^1/2 + C.", payload["full_display_integral_function"])
+        self.assertIn("return integral(1/(", payload["full_display_integral_function"])
+        self.assertIn(", x).", payload["full_display_integral_function"])
+        self.assertNotIn(" + C.", payload["full_display_integral_function"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -9501,7 +9614,8 @@ class ExpressionResultTests(unittest.TestCase):
                     for line in payload["full_display_integral_function"].splitlines()
                     if line.strip().startswith("return ")
                 )
-                self.assertTrue(return_line.endswith(" + C."))
+                self.assertTrue(return_line.startswith("return integral("))
+                self.assertTrue(return_line.endswith(f", {wrt})."))
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "mars_lab").is_file(),
@@ -9669,15 +9783,15 @@ class ExpressionResultTests(unittest.TestCase):
             "∫^x exp(cosh(t))·dt",
         )
         self.assertIn(
-            "return integral(x, exp(cosh(t)), t).",
+            "return integral(exp(cosh(t)), t, x).",
             fields["function"],
         )
         self.assertNotIn("integral_meta", completed.stdout)
 
     def test_function_integrals_use_calls_inside_sums_and_with_bounds(self) -> None:
         cases = (
-            ("integral(a, x, exp(cosh(t)), t)", "integral(a, x, exp(cosh(t)), t)"),
-            ("sum(k, 1, n, integral(x, Li(k.t), t))", "sum(k, 1, n, integral(x, li(k.t), t))"),
+            ("integral(exp(cosh(t)), t, a, x)", "integral(exp(cosh(t)), t, a, x)"),
+            ("sum(k, 1, n, integral(Li(k.t), t, x))", "sum(k, 1, n, integral(li(k.t), t, x))"),
         )
         for source, want in cases:
             with self.subTest(source=source):
@@ -9779,7 +9893,7 @@ class ExpressionResultTests(unittest.TestCase):
             "d/dx = { 5x⁴ - 24x³ - 6x² + 72x + 1 | x = NAN }",
         )
         self.assertIn(
-            "return 5.x^4 - 24.x^3 - 6.x^2 + 72.x + 1.",
+            "return derivative((x - 1).(x^2 - 3.x - 10).(x^2 - 2.x - 3), x, 1).",
             fields["derivative_function"],
         )
 
@@ -10299,8 +10413,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(returncode, 0, raw)
         self.assertEqual(
             expression["unbound"],
-            "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-            "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)",
+            "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) + "
+            "√(root(2, 4) - √((√(2) + 1)/2))·i)",
         )
         self.assertEqual(
             expression["value"],
@@ -10334,7 +10448,7 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
             "evaluate",
         )
         self.assertEqual(returncode, 0, raw)
-        self.assertEqual(expression["unbound"], "1/2·(3^n - 1)")
+        self.assertEqual(expression["unbound"], "(3^n - 1)/2")
         self.assertIn(r"\sum_{k=0}^{n - 1}3^{k}", expression["derivation_TeX"])
         self.assertIn(r"\frac{3^{n} - 1}{2}", expression["derivation_TeX"])
         self.assertEqual(expression["value"], "29524")

@@ -2280,7 +2280,7 @@ static void test_atan_quotient_derivative_simplifies_to_quartic(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *derivative = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *text = derivative ? expr_to_string(derivative, style_EXPRESSION) : NULL;
-    const char *want = "{ 1/(x⁴ - x² + 1)·(x² + 1) | x = π/2 }";
+    const char *want = "{ (x² + 1)/(x⁴ - x² + 1) | x = π/2 }";
 
     if (text && str_eq(text, want))
         to_string_pass("atan quotient derivative simplifies to quartic", text, want);
@@ -3892,8 +3892,8 @@ static void test_symbolic_complex_square_root_reciprocal_beautifies_to_cartesian
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(x² + y²)·(√(½·(√(x² + y²) + x)) - "
-                       "i·y/|y|·√(½·(√(x² + y²) - x)))");
+                       "(√(½·(√(x² + y²) + x)) - "
+                       "i·y/|y|·√(½·(√(x² + y²) - x)))/√(x² + y²)");
 
     free(text);
     expr_free(beautified);
@@ -4017,8 +4017,8 @@ static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) + "
-                       "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)");
+                       "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) + "
+                       "√(root(2, 4) - √((√(2) + 1)/2))·i)");
 
     free(text);
     expr_free(beautified);
@@ -4036,8 +4036,8 @@ static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetr
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(root(2, 4) + √(1/2·(√(2) + 1))) - "
-                       "√(root(2, 4) - √(1/2·(√(2) + 1)))·i)");
+                       "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) - "
+                       "√(root(2, 4) - √((√(2) + 1)/2))·i)");
 
     free(text);
     expr_free(beautified);

@@ -6,6 +6,8 @@ static qcomplex_t signal_real(qcomplex_t z, qfloat_t (*function)(qfloat_t))
     return qf_eq(qc_imag(z), QF_ZERO) ? qc_make(function(qc_real(z)), QF_ZERO) : qc_make(QF_NAN, QF_NAN);
 }
 
+/* Restrict signum to real arguments. */
+qcomplex_t qc_sgn(qcomplex_t z) { return signal_real(z, qf_sgn); }
 /* Restrict the unit step to real arguments. */
 qcomplex_t qc_step(qcomplex_t z) { return signal_real(z, qf_step); }
 /* Restrict the rectangular pulse to real arguments. */

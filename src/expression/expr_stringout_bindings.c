@@ -137,9 +137,11 @@ static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *b
 
     if (expr_is_integral_transform(expr)) {
         find_vars_dfs_impl(expr->b->b->a, vars, bound_vars);
+        size_t outer_count = bound_vars->count;
         varlist_add(bound_vars, expr->b->a);
         find_vars_dfs_impl(expr->a, vars, bound_vars);
-        --bound_vars->count;
+        /* Adding an already-bound dummy does not grow the set. Restore the actual outer scope. */
+        bound_vars->count = outer_count;
         return;
     }
     if (expr_is_op(expr, &ops_integral)) {
@@ -150,11 +152,11 @@ static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *b
         find_vars_dfs_impl(lower, vars, bound_vars);
         find_vars_dfs_impl(upper, vars, bound_vars);
 
+        size_t outer_count = bound_vars->count;
         if (dummy)
             varlist_add(bound_vars, (expr_t *)dummy);
         find_vars_dfs_impl(expr->a, vars, bound_vars);
-        if (dummy && bound_vars->count > 0u)
-            --bound_vars->count;
+        bound_vars->count = outer_count;
         return;
     }
 
@@ -172,11 +174,11 @@ static void find_vars_dfs_impl(const expr_t *expr, varlist_t *vars, varlist_t *b
         }
         find_vars_dfs_impl(lower, vars, bound_vars);
         find_vars_dfs_impl(upper, vars, bound_vars);
+        size_t outer_count = bound_vars->count;
         if (dummy)
             varlist_add(bound_vars, (expr_t *)dummy);
         find_vars_dfs_impl(expr->a, vars, bound_vars);
-        if (dummy && bound_vars->count > 0u)
-            --bound_vars->count;
+        bound_vars->count = outer_count;
         return;
     }
 

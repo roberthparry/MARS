@@ -326,6 +326,43 @@ done:
     return out;
 }
 
+/* For a real affine argument, d|a t+b|/dt = a sgn(a t+b) almost everywhere. */
+static expr_t *elementary_sgn_rule(const expr_t *f, const expr_t *t, const expr_t *s,
+                                   number_t *bound, expr_t **conditions)
+{
+    expr_t *rate = NULL, *offset = NULL, *out = NULL;
+    number_t a = NUM_NAN, b = NUM_NAN;
+    if (!elementary_affine(f->a, t, &rate, &offset) ||
+        !elementary_constant(rate, &a) || !elementary_constant(offset, &b) ||
+        !num_is_real(a) || !num_is_real(b))
+        goto done;
+    if (num_is_zero(a)) {
+        expr_t *value = expr_sgn(offset);
+        out = expr_div(value, s);
+        expr_free(value);
+    } else {
+        expr_t *absolute = expr_abs(f->a);
+        expr_t *spectrum = elementary_abs_rule(absolute, t, s, bound, conditions);
+        if (spectrum) {
+            expr_t *initial = elementary_absolute(offset);
+            expr_t *scaled = expr_mul(s, spectrum);
+            expr_t *difference = expr_sub(scaled, initial);
+            out = expr_div(difference, rate);
+            expr_free(difference);
+            expr_free(scaled);
+            expr_free(initial);
+        }
+        expr_free(spectrum);
+        expr_free(absolute);
+    }
+done:
+    num_destroy(&b);
+    num_destroy(&a);
+    expr_free(offset);
+    expr_free(rate);
+    return out;
+}
+
 static expr_t *elementary_staircase_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                          number_t *bound, expr_t **conditions)
 {
@@ -510,7 +547,114 @@ done:
     return out;
 }
 
-/* Positive real affine arguments avoid both logarithmic and E1 branch-cut ambiguities. */
+/* Sum the symmetric digamma values without assuming the offset is real or imaginary. */
+static expr_t *elementary_digamma_pair(const expr_t *centre, const expr_t *offset)
+{
+    expr_t *plus = expr_add(centre, offset);
+    expr_t *minus = expr_sub(centre, offset);
+    expr_t *first = expr_digamma(plus);
+    expr_t *second = expr_digamma(minus);
+    expr_t *out = expr_add(first, second);
+    expr_free(second);
+    expr_free(first);
+    expr_free(minus);
+    expr_free(plus);
+    return out;
+}
+
+/* Fourier series of ln|sin(a*t)| and ln|cos(a*t)| sum to symmetric digamma pairs.
+ * Principal logarithms additionally contribute i*pi times the negative-lobe indicator's transform.
+ * All logarithmic zeros are locally integrable; Re(s)>0 is sufficient for real non-zero rates. */
+static expr_t *elementary_log_trig_rule(const expr_t *argument, const expr_t *t, const expr_t *s)
+{
+    bool absolute = expr_is_op(argument, &ops_abs);
+    const expr_t *trig = absolute ? argument->a : argument;
+    if (!expr_is_op(trig, &ops_cos) && !expr_is_op(trig, &ops_sin))
+        return NULL;
+    bool cosine = expr_is_op(trig, &ops_cos);
+    expr_t *rate = NULL, *offset = NULL, *out = NULL;
+    number_t value = NUM_NAN;
+    if (!elementary_affine(trig->a, t, &rate, &offset) || !expr_is_exact_zero(offset) ||
+        !elementary_constant(rate, &value) || !num_is_real(value) || num_is_zero(value))
+        goto done;
+    expr_t *q = elementary_absolute(rate);
+    expr_t *one = expr_const_one();
+    expr_t *two = expr_const_long(2);
+    expr_t *factor = expr_const_long(cosine ? 4 : 2);
+    expr_t *denominator = expr_mul(factor, q);
+    expr_t *imaginary = expr_new_const(NUM_I);
+    expr_t *i_s = expr_mul(imaginary, s);
+    expr_t *z = expr_div(i_s, denominator);
+    expr_t *pair = elementary_digamma_pair(one, z);
+    if (cosine) {
+        expr_t *half = expr_div(one, two);
+        expr_t *half_pair = elementary_digamma_pair(half, z);
+        expr_t *difference = expr_sub(half_pair, pair);
+        expr_t *four_s = expr_mul(factor, s);
+        out = expr_div(difference, four_s);
+        expr_free(four_s);
+        expr_free(difference);
+        expr_free(half_pair);
+        expr_free(half);
+    } else {
+        expr_t *half_pair = expr_div(pair, two);
+        expr_t *log_two = expr_log(two);
+        expr_t *gamma = expr_new_const(NUM_EULER_MASCHERONI);
+        expr_t *constant = expr_add(log_two, gamma);
+        expr_t *sum = expr_add(half_pair, constant);
+        expr_t *negative = expr_neg(sum);
+        out = expr_div(negative, s);
+        expr_free(negative);
+        expr_free(sum);
+        expr_free(constant);
+        expr_free(gamma);
+        expr_free(log_two);
+        expr_free(half_pair);
+    }
+    if (!absolute) {
+        expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+        expr_t *pi_s = expr_mul(pi, s);
+        expr_t *period_rate = cosine ? expr_mul(two, q) : expr_clone(q);
+        expr_t *h = expr_div(pi_s, period_rate);
+        expr_t *wave = cosine ? expr_cosh(h) : expr_exp(h);
+        expr_t *normaliser = cosine ? expr_mul(two, wave) : expr_add(one, wave);
+        expr_t *fraction = expr_div(!cosine && num_cmp(value, NUM_ZERO) < 0 ? wave : one, normaliser);
+        expr_t *i_pi = expr_mul(imaginary, pi);
+        expr_t *jump = expr_mul(i_pi, fraction);
+        expr_t *term = expr_div(jump, s);
+        expr_t *combined = expr_add(out, term);
+        expr_free(out);
+        out = combined;
+        expr_free(term);
+        expr_free(jump);
+        expr_free(i_pi);
+        expr_free(fraction);
+        expr_free(normaliser);
+        expr_free(wave);
+        expr_free(h);
+        expr_free(period_rate);
+        expr_free(pi_s);
+        expr_free(pi);
+    }
+    expr_free(pair);
+    expr_free(z);
+    expr_free(i_s);
+    expr_free(imaginary);
+    expr_free(denominator);
+    expr_free(factor);
+    expr_free(two);
+    expr_free(one);
+    expr_free(q);
+done:
+    num_destroy(&value);
+    expr_free(offset);
+    expr_free(rate);
+    return out;
+}
+
+/* For a>0, b<0, ln(a*t+b) has the principal +i*pi boundary value up to t=-b/a.
+ * With z=-s*b/a, its transform is [ln(-b)-exp(-z)*Ei(z)+i*pi*(1-exp(-z))]/s.
+ * The logarithmic singularity is integrable; Re(s)>0 keeps Ei away from its cut. */
 static expr_t *elementary_logarithm_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                          number_t *bound, expr_t **conditions)
 {
@@ -518,9 +662,12 @@ static expr_t *elementary_logarithm_rule(const expr_t *f, const expr_t *t, const
     (void)conditions;
     expr_t *rate = NULL, *offset = NULL, *out = NULL;
     number_t a = NUM_NAN, b = NUM_NAN;
+    out = elementary_log_trig_rule(f->a, t, s);
+    if (out)
+        goto scale;
     if (!elementary_affine(f->a, t, &rate, &offset) || !elementary_constant(rate, &a) ||
         !elementary_constant(offset, &b) || !num_is_real(a) || !num_is_real(b) ||
-        num_cmp(a, NUM_ZERO) < 0 || num_cmp(b, NUM_ZERO) < 0 || (num_is_zero(a) && num_is_zero(b)))
+        num_cmp(a, NUM_ZERO) < 0 || (num_is_zero(a) && num_is_zero(b)))
         goto done;
     if (num_is_zero(a)) {
         expr_t *initial = expr_log(offset);
@@ -538,6 +685,40 @@ static expr_t *elementary_logarithm_rule(const expr_t *f, const expr_t *t, const
         expr_free(log_s);
         expr_free(gamma);
         expr_free(log_rate);
+    } else if (num_cmp(b, NUM_ZERO) < 0) {
+        expr_t *magnitude = expr_neg(offset);
+        expr_t *ratio = expr_div(magnitude, rate);
+        expr_t *z = expr_mul(s, ratio);
+        expr_t *minus_z = expr_neg(z);
+        expr_t *exponential = expr_exp(minus_z);
+        expr_t *integral = expr_Ei(z);
+        expr_t *product = expr_mul(exponential, integral);
+        expr_t *initial = expr_log(magnitude);
+        expr_t *real_part = expr_sub(initial, product);
+        expr_t *one = expr_const_one();
+        expr_t *interval = expr_sub(one, exponential);
+        expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+        expr_t *imaginary = expr_new_const(NUM_I);
+        expr_t *i_pi = expr_mul(imaginary, pi);
+        expr_t *jump = expr_mul(i_pi, interval);
+        expr_t *numerator = expr_add(real_part, jump);
+        out = expr_div(numerator, s);
+        expr_free(numerator);
+        expr_free(jump);
+        expr_free(i_pi);
+        expr_free(imaginary);
+        expr_free(pi);
+        expr_free(interval);
+        expr_free(one);
+        expr_free(real_part);
+        expr_free(initial);
+        expr_free(product);
+        expr_free(integral);
+        expr_free(exponential);
+        expr_free(minus_z);
+        expr_free(z);
+        expr_free(ratio);
+        expr_free(magnitude);
     } else {
         expr_t *ratio = expr_div(offset, rate);
         expr_t *z = expr_mul(s, ratio);
@@ -555,6 +736,7 @@ static expr_t *elementary_logarithm_rule(const expr_t *f, const expr_t *t, const
         expr_free(z);
         expr_free(ratio);
     }
+scale:
     if (out && f->ops == &ops_log10) {
         expr_t *ten = expr_const_long(10);
         expr_t *scale = expr_log(ten);
@@ -730,6 +912,7 @@ static const elementary_rule_fn elementary_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_HACOVERCOS] = elementary_circular_rule,
     [EXPR_KIND_SECH      ] = elementary_sech_rule,
     [EXPR_KIND_ABS       ] = elementary_abs_rule,
+    [EXPR_KIND_SGN       ] = elementary_sgn_rule,
     [EXPR_KIND_CONJ      ] = elementary_linear_rule,
     [EXPR_KIND_REAL_BOUND] = elementary_linear_rule,
     [EXPR_KIND_FLOOR     ] = elementary_staircase_rule,

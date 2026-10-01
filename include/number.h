@@ -96,79 +96,29 @@ typedef union number_inline_qcomplex_bits_t {
     uint64_t words[4];
 } number_inline_qcomplex_bits_t;
 
-static inline uint32_t number_inline_kind(number_t number)
-{
-    return (uint32_t)number.storage[0];
-}
+/** @brief Return the storage kind tag without validating the numeric value. */
+static inline uint32_t number_inline_kind(number_t number) { return (uint32_t)number.storage[0]; }
 
-static inline qfloat_t number_inline_qfloat(number_t number)
-{
-    number_inline_qfloat_bits_t bits;
+/** @brief Extract the stored double-double value; @p number must use the qfloat backend. */
+qfloat_t number_inline_qfloat(number_t number);
 
-    bits.words[0] = number.storage[1];
-    bits.words[1] = number.storage[2];
-    return bits.value;
-}
+/** @brief Extract the stored complex value; @p number must use the qcomplex backend. */
+qcomplex_t number_inline_qcomplex(number_t number);
 
-static inline qcomplex_t number_inline_qcomplex(number_t number)
-{
-    number_inline_qcomplex_bits_t bits;
+/** @brief Extract the real component; @p number must use the qcomplex backend. */
+qfloat_t number_inline_qcomplex_real(number_t number);
 
-    bits.words[0] = number.storage[1];
-    bits.words[1] = number.storage[2];
-    bits.words[2] = number.storage[3];
-    bits.words[3] = number.storage[4];
-    return bits.value;
-}
+/** @brief Extract the imaginary component; @p number must use the qcomplex backend. */
+qfloat_t number_inline_qcomplex_imag(number_t number);
 
-static inline qfloat_t number_inline_qcomplex_real(number_t number)
-{
-    number_inline_qfloat_bits_t bits;
+/** @brief Construct a fixed-precision qfloat value without changing its components. */
+number_t number_inline_make_qfloat(qfloat_t value);
 
-    bits.words[0] = number.storage[1];
-    bits.words[1] = number.storage[2];
-    return bits.value;
-}
+/** @brief Construct a fixed-precision qcomplex value from its real and imaginary components. */
+number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag);
 
-static inline qfloat_t number_inline_qcomplex_imag(number_t number)
-{
-    number_inline_qfloat_bits_t bits;
-
-    bits.words[0] = number.storage[3];
-    bits.words[1] = number.storage[4];
-    return bits.value;
-}
-
-static inline number_t number_inline_make_qfloat(qfloat_t value)
-{
-    number_t number;
-    number_inline_qfloat_bits_t bits;
-
-    bits.value = value;
-    number.storage[0] = 2u;
-    number.storage[1] = bits.words[0];
-    number.storage[2] = bits.words[1];
-    return number;
-}
-
-static inline number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag)
-{
-    number_t number;
-    number_inline_qfloat_bits_t real_bits;
-    number_inline_qfloat_bits_t imag_bits;
-
-    real_bits.value = real;
-    imag_bits.value = imag;
-    number.storage[0] = 3u;
-    number.storage[1] = real_bits.words[0];
-    number.storage[2] = real_bits.words[1];
-    number.storage[3] = imag_bits.words[0];
-    number.storage[4] = imag_bits.words[1];
-    return number;
-}
-
-static inline number_t number_inline_make_qcomplex(qcomplex_t value)
-{
+/** @brief Construct a fixed-precision qcomplex value without changing its components. */
+static inline number_t number_inline_make_qcomplex(qcomplex_t value) {
     return number_inline_make_qcomplex_parts(value.re, value.im);
 }
 #endif
@@ -435,23 +385,9 @@ number_t num_const_prec_digits(number_t constant, size_t significant_digits);
  * multiple aliases of the same underlying payload unless they first made an
  * independent copy with `num_clone()`.
  */
-#ifndef MARS_NUMBER_IMPLEMENTATION
-void num_destroy_slow(number_t *number);
-static inline void num_destroy(number_t *number)
-{
-    uint32_t kind;
-
-    if (!number)
-        return;
-    kind = (uint32_t)number->storage[0];
-    if (kind <= 3u)
-        return;
-    num_destroy_slow(number);
-}
-#else
-void num_destroy_slow(number_t *number);
 void num_destroy(number_t *number);
-#endif
+/** @brief Release a numeric payload through the generic lifetime dispatcher, as for num_destroy(). */
+void num_destroy_slow(number_t *number);
 /** @} */
 
 /** @name Temporary scopes
@@ -642,96 +578,22 @@ number_t num_conj(const number_t number);
 number_t num_real_part(const number_t number);
 number_t num_imag_part(const number_t number);
 number_t num_arg(const number_t number);
-#ifndef MARS_NUMBER_IMPLEMENTATION
-number_t num_add_slow(const number_t a, const number_t b);
-number_t num_sub_slow(const number_t a, const number_t b);
-number_t num_mul_slow(const number_t a, const number_t b);
-number_t num_div_slow(const number_t a, const number_t b);
-
-static inline number_t num_add(const number_t a, const number_t b)
-{
-    uint32_t kind = number_inline_kind(a);
-
-    if (kind == number_inline_kind(b)) {
-        if (kind == 2u)
-            return number_inline_make_qfloat(qf_add(number_inline_qfloat(a), number_inline_qfloat(b)));
-        if (kind == 3u)
-            return number_inline_make_qcomplex_parts(
-                qf_add(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
-                qf_add(number_inline_qcomplex_imag(a), number_inline_qcomplex_imag(b)));
-    }
-    return num_add_slow(a, b);
-}
-
-static inline number_t num_sub(const number_t a, const number_t b)
-{
-    uint32_t kind = number_inline_kind(a);
-
-    if (kind == number_inline_kind(b)) {
-        if (kind == 2u)
-            return number_inline_make_qfloat(qf_sub(number_inline_qfloat(a), number_inline_qfloat(b)));
-        if (kind == 3u)
-            return number_inline_make_qcomplex_parts(
-                qf_sub(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
-                qf_sub(number_inline_qcomplex_imag(a), number_inline_qcomplex_imag(b)));
-    }
-    return num_sub_slow(a, b);
-}
-
-static inline number_t num_mul(const number_t a, const number_t b)
-{
-    uint32_t kind = number_inline_kind(a);
-
-    if (kind == number_inline_kind(b)) {
-        if (kind == 2u)
-            return number_inline_make_qfloat(qf_mul(number_inline_qfloat(a), number_inline_qfloat(b)));
-        if (kind == 3u) {
-            qfloat_t ar = number_inline_qcomplex_real(a);
-            qfloat_t ai = number_inline_qcomplex_imag(a);
-            qfloat_t br = number_inline_qcomplex_real(b);
-            qfloat_t bi = number_inline_qcomplex_imag(b);
-
-            return number_inline_make_qcomplex_parts(qf_sub(qf_mul(ar, br), qf_mul(ai, bi)),
-                                                     qf_add(qf_mul(ar, bi), qf_mul(ai, br)));
-        }
-    }
-    return num_mul_slow(a, b);
-}
-
-static inline number_t num_div(const number_t a, const number_t b)
-{
-    uint32_t kind = number_inline_kind(a);
-
-    if (kind == number_inline_kind(b)) {
-        if (kind == 2u) {
-            qfloat_t av = number_inline_qfloat(a);
-            qfloat_t bv = number_inline_qfloat(b);
-
-            return number_inline_make_qfloat(qf_div(av, bv));
-        }
-        if (kind == 3u) {
-            qfloat_t ar = number_inline_qcomplex_real(a);
-            qfloat_t ai = number_inline_qcomplex_imag(a);
-            qfloat_t br = number_inline_qcomplex_real(b);
-            qfloat_t bi = number_inline_qcomplex_imag(b);
-            qfloat_t denom = qf_add(qf_mul(br, br), qf_mul(bi, bi));
-
-            return number_inline_make_qcomplex_parts(qf_div(qf_add(qf_mul(ar, br), qf_mul(ai, bi)), denom),
-                                                     qf_div(qf_sub(qf_mul(ai, br), qf_mul(ar, bi)), denom));
-        }
-    }
-    return num_div_slow(a, b);
-}
-#else
+/** @brief Add two values using their existing backend and precision rules. */
 number_t num_add(const number_t a, const number_t b);
+/** @brief Subtract two values using their existing backend and precision rules. */
 number_t num_sub(const number_t a, const number_t b);
+/** @brief Multiply two values using their existing backend and precision rules. */
 number_t num_mul(const number_t a, const number_t b);
+/** @brief Divide two values using their existing backend and precision rules. */
 number_t num_div(const number_t a, const number_t b);
+/** @brief Add two values through the generic dispatcher, as for num_add(). */
 number_t num_add_slow(const number_t a, const number_t b);
+/** @brief Subtract two values through the generic dispatcher, as for num_sub(). */
 number_t num_sub_slow(const number_t a, const number_t b);
+/** @brief Multiply two values through the generic dispatcher, as for num_mul(). */
 number_t num_mul_slow(const number_t a, const number_t b);
+/** @brief Divide two values through the generic dispatcher, as for num_div(). */
 number_t num_div_slow(const number_t a, const number_t b);
-#endif
 number_t num_add_long(const number_t number, long value);
 number_t num_mul_long(const number_t number, long value);
 number_t num_pow(const number_t base, const number_t exponent);
@@ -834,6 +696,12 @@ number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
 number_t num_ceil(const number_t number);
 
+/**
+ * @brief Real signum using exact comparisons at the input's numeric precision.
+ * @param argument Real input, including either infinity or a purely real complex value.
+ * @return An owning exact -1, zero or +1, or NaN for NaN or non-real inputs. Either signed zero gives zero.
+ */
+number_t num_sgn(number_t argument);
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 number_t num_step(number_t argument);
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */

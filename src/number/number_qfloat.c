@@ -5,6 +5,29 @@
 #include "number_internal.h"
 #include "ustring.h"
 
+/* Extract the double-double payload through its original storage representation. */
+qfloat_t number_inline_qfloat(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    return bits.value;
+}
+
+/* Construct the fixed-precision payload without converting or rounding its components. */
+number_t number_inline_make_qfloat(qfloat_t value)
+{
+    number_t number;
+    number_inline_qfloat_bits_t bits;
+
+    bits.value = value;
+    number.storage[0] = NUMBER_QFLOAT;
+    number.storage[1] = bits.words[0];
+    number.storage[2] = bits.words[1];
+    return number;
+}
+
 bool number_is_zero_qfloat(const number_t *number)
 {
     return number && qf_eq(number_impl_const(number)->value.qf, QF_ZERO);

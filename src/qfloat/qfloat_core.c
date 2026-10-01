@@ -3,6 +3,55 @@
 
 #include <math.h>
 
+/* Split addition into its rounded sum and rounding residual. */
+void qf_two_sum(double a, double b, double *s, double *e)
+{
+    *s = a + b;
+    double bb = *s - a;
+    *e = (a - (*s - bb)) + (b - bb);
+}
+
+/* Split multiplication into its rounded product and rounding residual. */
+void qf_two_prod(double a, double b, double *p, double *e)
+{
+    *p = a * b;
+    *e = fma(a, b, -*p);
+}
+
+/* Recover the residual when the first addend has the larger magnitude. */
+void qf_quick_two_sum(double a, double b, double *s, double *e)
+{
+    double t = a + b;
+    *s = t;
+    *e = b - (t - a);
+}
+
+/* Split a double into leading and trailing components for Dekker arithmetic. */
+void qf_split_double(double x, double *hi, double *lo)
+{
+    double t = QF_SPLIT * x;
+    *hi = t - (t - x);
+    *lo = x - *hi;
+}
+
+/* Preserve the public TwoSum helper through the shared implementation. */
+void qf_inline_two_sum(double a, double b, double *s, double *e)
+{
+    qf_two_sum(a, b, s, e);
+}
+
+/* Preserve the public QuickTwoSum helper through the shared implementation. */
+void qf_inline_quick_two_sum(double a, double b, double *s, double *e)
+{
+    qf_quick_two_sum(a, b, s, e);
+}
+
+/* Preserve the public renormalisation helper through the shared implementation. */
+qfloat_t qf_inline_renorm(double hi, double lo)
+{
+    return qf_renorm(hi, lo);
+}
+
 qfloat_t qf_renorm(double hi, double lo)
 {
     qfloat_t r;

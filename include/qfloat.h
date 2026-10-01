@@ -55,30 +55,14 @@ typedef struct {
 #define QF_SPLIT 134217729.0
 #endif
 
-static inline void qf_inline_two_sum(double a, double b, double *s, double *e)
-{
-    double bb;
+/** @brief Store the rounded sum of two doubles in @p s and its rounding residual in @p e. */
+void qf_inline_two_sum(double a, double b, double *s, double *e);
 
-    *s = a + b;
-    bb = *s - a;
-    *e = (a - (*s - bb)) + (b - bb);
-}
+/** @brief Store the sum and rounding residual, assuming the magnitude of @p a is at least that of @p b. */
+void qf_inline_quick_two_sum(double a, double b, double *s, double *e);
 
-static inline void qf_inline_quick_two_sum(double a, double b, double *s, double *e)
-{
-    double t = a + b;
-
-    *s = t;
-    *e = b - (t - a);
-}
-
-static inline qfloat_t qf_inline_renorm(double hi, double lo)
-{
-    qfloat_t r;
-
-    qf_inline_quick_two_sum(hi, lo, &r.hi, &r.lo);
-    return r;
-}
+/** @brief Renormalise a leading component and a smaller residual into a double-double value. */
+qfloat_t qf_inline_renorm(double hi, double lo);
 
 /* -------------------------------------------------------------------------
    Constants
@@ -410,6 +394,12 @@ qfloat_t qf_sqr(qfloat_t x);
  */
 qfloat_t qf_floor(qfloat_t x);
 
+/**
+ * @brief Real signum: -1 for negative arguments, zero at either signed zero, and +1 for positive arguments.
+ * @param argument Real input, including either infinity.
+ * @return The sign of the argument, or NaN when the argument is NaN.
+ */
+qfloat_t qf_sgn(qfloat_t argument);
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 qfloat_t qf_step(qfloat_t argument);
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
@@ -540,20 +530,7 @@ int qf_printf(const char *fmt, ...);
  * @param b Second operand.
  * @return a + b (double‑double precision).
  */
-#ifndef MARS_QFLOAT_IMPLEMENTATION
-static inline qfloat_t qf_add(qfloat_t a, qfloat_t b)
-{
-    double s;
-    double e1;
-    double e2;
-
-    qf_inline_two_sum(a.hi, b.hi, &s, &e1);
-    e2 = a.lo + b.lo + e1;
-    return qf_inline_renorm(s, e2);
-}
-#else
 qfloat_t qf_add(qfloat_t a, qfloat_t b);
-#endif
 
 /**
  * @brief Add a double to a qfloat_t.
@@ -571,20 +548,7 @@ qfloat_t qf_add_double(qfloat_t x, double y);
  * @param b Subtrahend.
  * @return a - b (double‑double precision).
  */
-#ifndef MARS_QFLOAT_IMPLEMENTATION
-static inline qfloat_t qf_sub(qfloat_t a, qfloat_t b)
-{
-    double s;
-    double e1;
-    double e2;
-
-    qf_inline_two_sum(a.hi, -b.hi, &s, &e1);
-    e2 = a.lo - b.lo + e1;
-    return qf_inline_renorm(s, e2);
-}
-#else
 qfloat_t qf_sub(qfloat_t a, qfloat_t b);
-#endif
 
 /**
  * @brief Multiply two qfloat_t values.
@@ -595,37 +559,7 @@ qfloat_t qf_sub(qfloat_t a, qfloat_t b);
  * @param b Second operand.
  * @return a * b (double‑double precision).
  */
-#ifndef MARS_QFLOAT_IMPLEMENTATION
-static inline qfloat_t qf_mul(qfloat_t a, qfloat_t b)
-{
-    double hx;
-    double tx;
-    double hy;
-    double ty;
-    double C;
-    double c;
-    double d;
-    double hi;
-    double lo;
-
-    C = QF_SPLIT * a.hi;
-    hx = C - a.hi;
-    hx = C - hx;
-    tx = a.hi - hx;
-
-    d = QF_SPLIT * b.hi;
-    hy = d - b.hi;
-    hy = d - hy;
-    ty = b.hi - hy;
-
-    C = a.hi * b.hi;
-    c = ((((hx * hy - C) + hx * ty) + tx * hy) + tx * ty) + (a.hi * b.lo + a.lo * b.hi) + (a.lo * b.lo);
-    qf_inline_two_sum(C, c, &hi, &lo);
-    return (qfloat_t){hi, lo};
-}
-#else
 qfloat_t qf_mul(qfloat_t a, qfloat_t b);
-#endif
 
 /**
  * @brief Multiply a qfloat_t by a double.
@@ -650,32 +584,7 @@ qfloat_t qf_mul_double(qfloat_t x, double a);
  * @param b Denominator.
  * @return a / b (double‑double precision).
  */
-#if !defined(MARS_QFLOAT_IMPLEMENTATION) && !defined(MARS_QFLOAT_NO_INLINE_DIV)
-static inline qfloat_t qf_div(qfloat_t a, qfloat_t b)
-{
-    double b_hi;
-    double q1;
-    double q2;
-    qfloat_t q1q;
-    qfloat_t qb;
-    qfloat_t r;
-    qfloat_t q2q;
-
-    if (b.hi == 0.0 && b.lo == 0.0)
-        return QF_NAN;
-
-    b_hi = b.hi;
-    q1 = a.hi / b_hi;
-    q1q = (qfloat_t){q1, 0.0};
-    qb = qf_mul(q1q, b);
-    r = qf_sub(a, qb);
-    q2 = r.hi / b_hi;
-    q2q = (qfloat_t){q2, 0.0};
-    return qf_add(q1q, q2q);
-}
-#else
 qfloat_t qf_div(qfloat_t a, qfloat_t b);
-#endif
 
 /**
  * @brief Raise a qfloat_t to an integer power.

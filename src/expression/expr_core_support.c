@@ -284,13 +284,13 @@ void expr_init_singletons(void)
     expr_singletons_ready = 1;
 }
 
-static inline void refcount_inc(int *rc)
+static void refcount_inc(int *rc)
 {
     if (*rc < INT_MAX)
         (*rc)++;
 }
 
-static inline int refcount_dec(int *rc)
+static int refcount_dec(int *rc)
 {
     int prev = *rc;
 
