@@ -5821,12 +5821,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
 
     function derivativeExpressionFromLine(line) {
       const match = String(line || '').match(/^d\/d[^=]*=\s*(.+)$/);
-      return match ? match[1].trim() : '';
+      return match ? expressionForEditor(match[1].trim()) : '';
     }
 
     function integralExpressionFromLine(line) {
       const match = String(line || '').match(/^∫d[^=]*=\s*(.+)$/);
-      return match ? match[1].trim() : '';
+      return match ? expressionForEditor(match[1].trim()) : '';
     }
 
     function expressionForEvaluation(text) {
@@ -15840,8 +15840,8 @@ def prepare_evaluation_fields(
         save_state_expression(expression_for_editor(expression))
 
     display_expression_source = fields.get("root_expression", "") or fields.get("expression", "") or fields.get("unbound", "")
-    fields["full_display_expression"] = (
-        fields.get("conditioned_expression") or expression_for_display(display_expression_source)
+    fields["full_display_expression"] = expression_for_display(
+        fields.get("conditioned_expression") or display_expression_source
     )
     fields["full_display_TeX"] = TeX_for_display(
         fields.get("transform_identity_TeX", "") or fields.get("derivation_TeX", "")
