@@ -20,6 +20,38 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_calculus_result_bindings_display_unknowns_as_question_marks(self) -> None:
+        names = ("derivativeExpressionFromLine", "integralExpressionFromLine", "expressionForEditor")
+        functions = "\n".join(
+            re.search(r"^    function " + name + r"\([\s\S]*?(?=^    function )",
+                      mars_lab.INDEX_HTML, re.MULTILINE).group(0) for name in names
+        )
+        script = functions + r'''
+            const cases = [
+                ['{ (s² - 1)/(s² + 1)² | s = NAN; Re(s) > 0 }',
+                 '{ (s² - 1)/(s² + 1)² | s = ?; Re(s) > 0 }'],
+                ['{ C - cos(x) | x = NAN; C = NAN }', '{ C - cos(x) | x = ?; C = ? }'],
+                ['{ C - cos(x) | x = π; C = 0 }', '{ C - cos(x) | x = π; C = 0 }'],
+                ['{ x + a | x = ?; a = ¹⁄₃ }', '{ x + a | x = ?; a = ¹⁄₃ }'],
+                ['NAN', 'NAN'],
+                ['0', '0'],
+            ];
+            for (const [extract, prefix] of [[derivativeExpressionFromLine, 'd/ds'],
+                                              [integralExpressionFromLine, '∫dx']]) {
+                for (const [input, expected] of cases) {
+                    const actual = extract(prefix + ' = ' + input);
+                    if (actual !== expected)
+                        throw new Error(JSON.stringify({input, actual, expected}));
+                }
+                if (extract('') !== '' || extract('invalid') !== '')
+                    throw new Error('Invalid result accepted');
+            }
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_binding_clear_button_commits_unset_value_and_restores_focus(self) -> None:
         names = (
             "renderVariableValues", "queueBindingInputCommit", "commitBindingInput",
@@ -4517,6 +4549,23 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_conditioned_result_display_formats_unset_bindings(self) -> None:
+        for value, displayed in (("NAN", "?"), ("π", "π"), ("¹⁄₃", "¹⁄₃")):
+            with self.subTest(value=value):
+                expression = f"{{ 1/s | s = {value}; Re(s) > 0 }}"
+                fields = {
+                    "expression": expression,
+                    "conditioned_expression": expression,
+                    "algebraic_specialisation": "native-result",
+                }
+                with mock.patch.object(mars_lab, "render_TeX_to_svg", return_value=("", "")):
+                    payload = mars_lab.prepare_evaluation_fields(
+                        Path("mars_lab"), fields, expression, 32, False)
+                expected = f"{{ 1/s | s = {displayed}; Re(s) > 0 }}"
+                self.assertEqual(payload["full_display_expression"], expected)
+                self.assertEqual(payload["display_expression"], expected)
+                self.assertEqual(payload["expression"], expression)
+
     def test_TeX_rational_coefficients_share_the_outer_denominator(self) -> None:
         cases = (
             ("(1/2)*(x+y)/(c*s)", r"\frac{1}{2\mkern-2mu c\mkern-2mu s}"),
