@@ -1,5 +1,12 @@
 #include "number.h"
 
+/* Return the exact real sign without reducing the input's numeric precision. */
+number_t num_sgn(number_t x)
+{
+    return num_clone(!num_is_real(x) || num_is_nan(x) ? NUM_NAN
+                     : num_is_zero(x) ? NUM_ZERO : num_gt(x, NUM_ZERO) ? NUM_ONE : NUM_NEG_ONE);
+}
+
 /* Preserve exact half-height endpoints without reducing numeric precision. */
 number_t num_step(number_t x)
 {

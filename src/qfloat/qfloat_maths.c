@@ -35,7 +35,7 @@ static const qfloat_t QF_BESSEL_TOLERANCE = {1e-31, -8.333642060758599e-48};
 
 static const qfloat_t QF_LOMMEL_TOLERANCE = {1e-31, -8.333642060758599e-48};
 
-static inline int qf_round_to_int(qfloat_t y)
+static int qf_round_to_int(qfloat_t y)
 {
     double s, e;
     qf_two_sum(y.hi, y.lo, &s, &e); /* s = hi+lo, e = tiny residual */
@@ -43,7 +43,7 @@ static inline int qf_round_to_int(qfloat_t y)
     return (int)nearbyint(s);
 }
 
-static inline qfloat_t qf_exp_kernel(qfloat_t r)
+static qfloat_t qf_exp_kernel(qfloat_t r)
 {
     static const qfloat_t EXP_COEF[] = {
         {2.0078201327067089, 7.6989170590508717e-17},     /* 2.00782013270670897025569345450493539496719826451529e+00 */
@@ -120,7 +120,7 @@ static inline qfloat_t qf_exp_kernel(qfloat_t r)
 /*  */
 /*   x = k*ln2 + r */
 /*  */
-static inline void qf_exp_reduce(qfloat_t x, int *k, qfloat_t *r)
+static void qf_exp_reduce(qfloat_t x, int *k, qfloat_t *r)
 {
     /* High/low split of ln2 in double */
     static const double LN2_HI = 6.93147180559945286227e-01; /* 0x3fe62e42fefa3800 */

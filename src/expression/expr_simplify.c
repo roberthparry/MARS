@@ -55,7 +55,7 @@ static void *expr_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-static inline expr_t *expr_new_const_owned_local(number_t value)
+static expr_t *expr_new_const_owned_local(number_t value)
 {
     NUM_SCOPE_SUSPEND(saved_scope);
     expr_t *out = expr_new_const(value);
@@ -94,7 +94,7 @@ static expr_t *expr_new_cartesian_const_local(number_t value)
     return out;
 }
 
-static inline expr_t *expr_make_scaled_owned_local(number_t coeff, expr_t *base)
+static expr_t *expr_make_scaled_owned_local(number_t coeff, expr_t *base)
 {
     NUM_SCOPE_SUSPEND(saved_scope);
     expr_t *out = expr_make_scaled(coeff, base);
@@ -102,7 +102,7 @@ static inline expr_t *expr_make_scaled_owned_local(number_t coeff, expr_t *base)
     return out;
 }
 
-static inline expr_t *expr_make_pow_like_owned_local(expr_t *base, number_t exponent)
+static expr_t *expr_make_pow_like_owned_local(expr_t *base, number_t exponent)
 {
     NUM_SCOPE_SUSPEND(saved_scope);
     expr_t *out = expr_make_pow_like(base, exponent);
@@ -4852,6 +4852,16 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
 
+    /* Simple quotients do not otherwise visit the flattened product's radical-merging pass. */
+    if (expr_is_sqrt_expr(b)) {
+        expr_t *numerators[] = {a};
+        expr_t *denominators[] = {b};
+
+        expr_merge_sqrt_quotient_terms(numerators, 1u, denominators, 1u);
+        if (!denominators[0])
+            return numerators[0];
+    }
+
     if (expr_const_is_one(a) &&
         (expr_is_addsub(b) ||
          (expr_is_op(b, &ops_mul) && (expr_is_addsub(b->a) || expr_is_addsub(b->b))))) {
@@ -5877,6 +5887,12 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
 expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     (void)dv;
+    if (expr_is_op(a, &ops_neg) && expr_simplify_is_plain_real_const(b) &&
+        num_is_finite(b->c) && num_is_integer(b->c)) {
+        expr_t *out = expr_make_pow_like_owned_local(a, b->c);
+        expr_free(b);
+        return out;
+    }
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) {
         expr_free(b);
         return a;

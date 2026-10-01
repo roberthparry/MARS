@@ -1,9 +1,9 @@
-#define MARS_QFLOAT_IMPLEMENTATION
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
 #include <math.h>
 
+/* Add double-double values with an error-free sum and renormalisation. */
 qfloat_t qf_add(qfloat_t a, qfloat_t b)
 {
     double s, e1, e2;
@@ -12,6 +12,7 @@ qfloat_t qf_add(qfloat_t a, qfloat_t b)
     return qf_renorm(s, e2);
 }
 
+/* Subtract double-double values without dropping the trailing components. */
 qfloat_t qf_sub(qfloat_t a, qfloat_t b)
 {
     double s, e1, e2;
@@ -20,6 +21,7 @@ qfloat_t qf_sub(qfloat_t a, qfloat_t b)
     return qf_renorm(s, e2);
 }
 
+/* Multiply double-double values using Dekker splitting and cross terms. */
 qfloat_t qf_mul(qfloat_t a, qfloat_t b)
 {
     double hx, tx, hy, ty, C, c;

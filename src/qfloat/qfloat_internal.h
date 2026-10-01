@@ -12,37 +12,12 @@
 
 #define QF_SPLIT 134217729.0
 
-static inline void qf_two_sum(double a, double b, double *s, double *e)
-{
-    *s = a + b;
-    double bb = *s - a;
-    *e = (a - (*s - bb)) + (b - bb);
-}
+void qf_two_sum(double a, double b, double *s, double *e);
+void qf_two_prod(double a, double b, double *p, double *e);
+void qf_quick_two_sum(double a, double b, double *s, double *e);
+void qf_split_double(double x, double *hi, double *lo);
 
-static inline void qf_two_prod(double a, double b, double *p, double *e)
-{
-    *p = a * b;
-    *e = fma(a, b, -*p);
-}
-
-static inline void qf_quick_two_sum(double a, double b, double *s, double *e)
-{
-    double t = a + b;
-    *s = t;
-    *e = b - (t - a);
-}
-
-static inline void qf_split_double(double x, double *hi, double *lo)
-{
-    double t = QF_SPLIT * x;
-    *hi = t - (t - x);
-    *lo = x - *hi;
-}
-
-static inline int qf_to_int(qfloat_t x)
-{
-    return (int)(x.hi + x.lo);
-}
+static inline int qf_to_int(qfloat_t x) { return (int)(x.hi + x.lo); }
 
 qfloat_t qf_renorm(double hi, double lo);
 string_t *qf_decimal_digits_text(qfloat_t x, int ndigits, int *out_exp10);

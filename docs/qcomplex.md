@@ -5,10 +5,28 @@
 ## Signal functions
 
 `qc_sinc` is the entire complex continuation of normalised sinc, with value one
-at zero. `qc_step`, `qc_rect`, `qc_tri` and `qc_circ` follow the
+at zero. `qc_sgn`, `qc_step`, `qc_rect`, `qc_tri` and `qc_circ` follow the
 [real signal definitions](expression.md#signal-functions-and-distributions)
 and return NaN for non-real arguments; they are not applied separately to the
 real and imaginary components.
+
+`qc_sgn(z)` returns a purely real -1, zero or +1 according to the sign of its
+real argument, including signed infinities. Either signed zero in the imaginary
+component is accepted; NaN inputs remain NaN. This is real signum, not a complex
+phase normalisation.
+
+README signum example:
+
+```c
+qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
+printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+```
+
+Output:
+
+```text
+sgn(-1 + 0i) = -1 + 0i
+```
 
 README example:
 

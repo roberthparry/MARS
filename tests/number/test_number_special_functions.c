@@ -1,3 +1,4 @@
+#include <complex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -455,11 +456,50 @@ static void test_number_struve_h(void)
     ASSERT_EQ_INT(num_get_default_prec_bits(), precision);
 }
 
+static void test_number_sgn(void)
+{
+    NUM_SCOPE(scope);
+    size_t saved_precision = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_bits(256u), 0);
+    number_t tiny = num_create_from_string("1e-1000");
+    number_t tiny_complex = num_create_from_string("1 + 1e-1000i");
+    number_t mp_real_complex = num_create_from_string("2.5 + 0i");
+    ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
+    number_t positive[] = {num_create_from_long(2), num_create_from_frac(2, 3),
+                            num_create_from_double(0.25), num_create_from_qfloat(QF_HALF),
+                            num_create_from_cdouble(2.5 + 0.0 * I), num_create_from_qcomplex(QC_ONE),
+                            mp_real_complex, tiny, NUM_INF};
+
+    for (size_t i = 0u; i < sizeof(positive) / sizeof(positive[0]); ++i) {
+        number_t original = num_clone(positive[i]);
+        number_t plus = num_sgn(positive[i]);
+        number_t minus = num_sgn(num_neg(positive[i]));
+        ASSERT_TRUE(num_eq(plus, NUM_ONE) && num_is_exact(plus));
+        ASSERT_TRUE(num_eq(minus, NUM_NEG_ONE) && num_is_exact(minus));
+        ASSERT_TRUE(num_eq(positive[i], original));
+    }
+    number_t zeros[] = {NUM_ZERO, num_create_from_double(-0.0),
+                         num_create_from_qfloat(qf_from_double(-0.0)),
+                         num_create_from_cdouble(0.0 + 0.0 * I),
+                         num_create_from_qcomplex(qc_make(QF_ZERO, qf_from_double(-0.0)))};
+    for (size_t i = 0u; i < sizeof(zeros) / sizeof(zeros[0]); ++i) {
+        number_t sign = num_sgn(zeros[i]);
+        ASSERT_TRUE(num_is_zero(sign) && num_is_exact(sign));
+    }
+    ASSERT_TRUE(num_is_nan(num_sgn(NUM_NAN)));
+    ASSERT_TRUE(num_is_nan(num_sgn(NUM_I)));
+    ASSERT_TRUE(num_is_nan(num_sgn(num_create_from_cdouble(1.0 + 1.0 * I))));
+    ASSERT_TRUE(num_is_nan(num_sgn(num_create_from_qcomplex(qc_make(QF_ONE, QF_HALF)))));
+    ASSERT_TRUE(num_is_nan(num_sgn(tiny_complex)));
+    ASSERT_EQ_INT(num_get_default_prec_bits(), saved_precision);
+}
+
 void run_number_special_function_tests(void)
 {
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     test_number_clausen();
+    TEST_RUN_SUBTEST(test_number_sgn, "number,signal,sgn,precision");
     TEST_RUN_SUBTEST(test_number_struve_l, "number,struve,precision");
     TEST_RUN_SUBTEST(test_number_struve_h, "number,struve,precision");
     TEST_RUN_SUBTEST(test_number_bessel_i, "number,bessel,precision");

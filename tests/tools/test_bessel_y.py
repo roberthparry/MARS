@@ -125,7 +125,8 @@ class BesselYTests(unittest.TestCase):
     def test_integer_primitives_differentiate_back(self):
         for order in (0, 1, 2, -1, -2):
             result = fields(f"bessely({order},2*x+1)", "integral")
-            self.assertNotIn("integral(", result["integral_function"])
+            self.assertRegex(result["integral_function"], r"return integral\(-?bessely\(")
+            self.assertNotIn("∫", result["integral"].split(" = ", 1)[1])
             primitive = result["integral"].split(" = ",1)[1].replace("x = NAN", "x = 1+i")
             derivative = fields(primitive, "derivative")
             expected = number(fields(f"bessely({order},3+2*i)", precision=80))

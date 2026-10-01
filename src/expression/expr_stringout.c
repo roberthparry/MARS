@@ -718,6 +718,7 @@ typedef struct {
 } function_temporary_context_t;
 
 static _Thread_local function_temporary_context_t function_temporary_context;
+static _Thread_local bool preserve_function_operations;
 
 static const char *function_temporary_name(const expr_t *expr)
 {
@@ -2361,15 +2362,17 @@ static void emit_func_integral(const expr_t *f, sbuf_t *b)
     const expr_t *display_integrand = f ? f->a : NULL;
     const expr_t *display_dummy = expr_integral_dummy_expr(f);
     sbuf_puts(b, "integral(");
-    if (lower) {
-        emit_func(lower, b, PREC_LOWEST);
-        sbuf_puts(b, ", ");
-    }
-    emit_func(upper, b, PREC_LOWEST);
-    sbuf_puts(b, ", ");
     emit_func(display_integrand, b, PREC_LOWEST);
     sbuf_puts(b, ", ");
     emit_func(display_dummy, b, PREC_LOWEST);
+    if (lower || !expr_struct_eq(upper, display_dummy)) {
+        sbuf_puts(b, ", ");
+        if (lower) {
+            emit_func(lower, b, PREC_LOWEST);
+            sbuf_puts(b, ", ");
+        }
+        emit_func(upper, b, PREC_LOWEST);
+    }
     sbuf_putc(b, ')');
 }
 
@@ -3485,6 +3488,7 @@ static const char *TeX_unary_name(const expr_t *f)
 static bool TeX_unary_has_bare_greek_argument(const expr_t *function)
 {
     static const bool explicit_argument[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_SGN]             = true,
         [EXPR_KIND_STEP]            = true,
         [EXPR_KIND_RECT]            = true,
         [EXPR_KIND_TRI]             = true,
@@ -4490,6 +4494,7 @@ static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 }
 
 static _Thread_local unsigned TeX_expression_depth;
+static _Thread_local bool preserve_TeX_operations;
 static _Thread_local const expr_t *TeX_shift_centre;
 static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec);
 
@@ -4546,7 +4551,8 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     expr_cartesian_composition_t view;
     const bool outermost = TeX_expression_depth == 0u;
-    expr_t *resolved = outermost && expr_is_integral_transform(f) ? expr_transform_result(f) : NULL;
+    expr_t *resolved = outermost && !preserve_TeX_operations && expr_is_integral_transform(f)
+                           ? expr_transform_result(f) : NULL;
     if (resolved)
         f = resolved;
     expr_distribution_TeX_scope_t distribution;
@@ -4557,7 +4563,7 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     if (centre)
         TeX_shift_centre = centre;
 
-    if (TeX_expression_depth++ == 0u && expr_cartesian_composition_init(f, &view)) {
+    if (TeX_expression_depth++ == 0u && !preserve_TeX_operations && expr_cartesian_composition_init(f, &view)) {
         sbuf_puts(b, "\\begin{aligned}\n&");
         emit_TeX_expr(view.compact, b, PREC_LOWEST);
         sbuf_puts(b, ",\\\\\n");
@@ -4630,15 +4636,21 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
     if (expr_is_integral_transform(f)) {
-        expr_t *result = expr_transform_result(f);
+        expr_t *result = preserve_TeX_operations ? NULL : expr_transform_result(f);
         if (result) {
             emit_TeX_expr(result, b, parent_prec);
         } else {
             sbuf_puts(b, f->ops->TeX_name);
             sbuf_puts(b, "_{");
-            emit_TeX_expr(f->b->a, b, PREC_LOWEST);
+            if (f->b->a->name)
+                emit_TeX_name(b, f->b->a->name);
+            else
+                emit_TeX_expr(f->b->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\to ");
-            emit_TeX_expr(f->b->b->a, b, PREC_LOWEST);
+            if (f->b->b->a->name)
+                emit_TeX_name(b, f->b->b->a->name);
+            else
+                emit_TeX_expr(f->b->b->a, b, PREC_LOWEST);
             sbuf_puts(b, "}\\{");
             emit_TeX_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\}");
@@ -5718,7 +5730,9 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
+        /* Keep ordinary sums in the numerator; do not manufacture a reciprocal coefficient. */
+        if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum) &&
+            (common_numerator_factor || expr_contains_calculus_request(common_sum))) {
             if (need)
                 sbuf_putc(b, '(');
             if (common_numerator_factor)
@@ -6105,6 +6119,27 @@ void emit_func_fragment(sbuf_t *b, const char *text)
     free(normalised);
 }
 
+/* Normalise fraction glyphs before testing precedence; a following multiplication dot must not join a denominator. */
+static void emit_func_numeric_atom(const expr_t *expr, sbuf_t *b, const char *text, int parent_prec)
+{
+    sbuf_t atom;
+    sbuf_init(&atom);
+    emit_func_fragment(&atom, text);
+    const char *normalised = string_c_str(atom.text);
+    bool grouped = numeric_atom_needs_grouping(expr, normalised, parent_prec) ||
+                   (parent_prec >= PREC_MUL && normalised && strchr(normalised, '/'));
+    /* Additive chains extract a leading sign; keep it visible outside grouped product coefficients. */
+    bool leading_minus = grouped && parent_prec == PREC_MUL && normalised[0] == '-';
+    if (leading_minus)
+        sbuf_putc(b, '-');
+    if (grouped)
+        sbuf_putc(b, '(');
+    sbuf_puts(b, normalised ? normalised + leading_minus : "");
+    if (grouped)
+        sbuf_putc(b, ')');
+    sbuf_free(&atom);
+}
+
 static void emit_func_additive_chain(const expr_t *expr, sbuf_t *b, bool subtract, bool *emitted)
 {
     const char *temporary_name = function_temporary_name(expr);
@@ -6140,6 +6175,16 @@ static void emit_func_additive_chain(const expr_t *expr, sbuf_t *b, bool subtrac
     *emitted = true;
 }
 
+/* Emit an authored operation tree without replacing nested transforms by their results. */
+void emit_func_operations(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    bool previous = preserve_function_operations;
+
+    preserve_function_operations = true;
+    emit_func(f, b, parent_prec);
+    preserve_function_operations = previous;
+}
+
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     const char *temporary_name = function_temporary_name(f);
@@ -6168,15 +6213,16 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (expr_is_addsub(f) && (display_series_remainder(f) || display_sum_has_transform(f)) &&
+    if (!preserve_function_operations && expr_is_addsub(f) &&
+        (display_series_remainder(f) || display_sum_has_transform(f)) &&
         emit_func_display_polynomial_sum(f, b, parent_prec))
         return;
 
-    if (emit_func_integral_cartesian(f, b, parent_prec))
+    if (!preserve_function_operations && emit_func_integral_cartesian(f, b, parent_prec))
         return;
 
     if (expr_is_integral_transform(f)) {
-        expr_t *result = expr_transform_result(f);
+        expr_t *result = preserve_function_operations ? NULL : expr_transform_result(f);
         if (result) {
             emit_func(result, b, parent_prec);
             expr_free(result);
@@ -6243,12 +6289,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             char *text = expr_binding_expr_to_function_string(f->binding_expr);
 
             if (text) {
-                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
-                if (grouped)
-                    sbuf_putc(b, '(');
-                emit_func_fragment(b, text);
-                if (grouped)
-                    sbuf_putc(b, ')');
+                emit_func_numeric_atom(f, b, text, parent_prec);
                 free(text);
             }
         } else if (f->name && *f->name) {
@@ -6262,12 +6303,7 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         else {
             char *text = expr_const_to_string_local(f);
             if (text) {
-                bool grouped = numeric_atom_needs_grouping(f, text, parent_prec);
-                if (grouped)
-                    sbuf_putc(b, '(');
-                emit_func_fragment(b, text);
-                if (grouped)
-                    sbuf_putc(b, ')');
+                emit_func_numeric_atom(f, b, text, parent_prec);
                 free(text);
             }
         }
@@ -6601,6 +6637,25 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 /* ------------------------------------------------------------------------- */
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
+
+/* Render source operations intact, retaining their authored order and normal calculus factor layout. */
+char *expr_to_TeX_operation_body(const expr_t *expr)
+{
+    sbuf_t buffer;
+    bool previous = preserve_TeX_operations;
+
+    if (!expr)
+        return NULL;
+    sbuf_init(&buffer);
+    preserve_TeX_operations = true;
+    ++TeX_source_order_depth;
+    emit_TeX_expr(expr, &buffer, PREC_LOWEST);
+    --TeX_source_order_depth;
+    preserve_TeX_operations = previous;
+    char *text = expr_tostring_texify(sbuf_c_str(&buffer));
+    sbuf_free(&buffer);
+    return text;
+}
 
 /* Render an authored equation term without polynomial reordering, retaining the normal calculus factor layout. */
 char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial)

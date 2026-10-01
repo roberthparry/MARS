@@ -230,6 +230,85 @@ class LaplaceElementaryTests(unittest.TestCase):
                 fields = self.fields("Laplace(" + operand + ",t,s)")
                 self.assertIn("laplace(", fields["function"])
 
+    def test_nested_transform_derivative_against_quadrature(self):
+        # Differentiate the Laplace kernel numerically: integrate -t*exp(-s*t)*G(t),
+        # where G(t) is the native principal-logarithm primitive of 1/(1-t^2).
+        for target, target_text in ((1, "1"), (1+1j, "1+i"), (1-1j, "1-i")):
+            def integrand(u, exterior):
+                if u == 0:
+                    return 0
+                t = 1+u*u if exterior else 1-u*u
+                primitive = (math.log(1+t)-2*math.log(u))/2
+                if not exterior:
+                    primitive -= 0.5j*math.pi
+                return -t*2*u*cmath.exp(-target*t)*primitive
+            expected = quadrature(lambda u: integrand(u, False), 0, end=1, count=40000)
+            expected += quadrature(lambda u: integrand(u, True), 0, end=math.sqrt(40), count=40000)
+            fields = self.fields("{ Ds(@L{@S^t 1/(1-x^2) dx}) | s="+target_text+" }")
+            self.assertNotIn("derivative(", fields["function"])
+            self.assertAlmostEqual(self.value(fields), expected, places=6)
+
+    def test_periodic_logarithms_against_split_quadrature(self):
+        # Smooth each endpoint of the zero-separated intervals, then sum the geometric period tail.
+        for name, trig, cuts in (("cos", math.cos, (0, 0.5, 1.5, 2)),
+                                 ("sin", math.sin, (0, 1, 2))):
+            for rate, target, target_text in ((1, math.pi, "pi"), (-2, 1+2j, "1+2i"),
+                                             (3, 0.5-1j, "0.5-i")):
+                for absolute in (False, True):
+                    expected = 0j
+                    for left, right in zip(cuts, cuts[1:]):
+                        a, b = left*math.pi/abs(rate), right*math.pi/abs(rate)
+                        def integrand(u):
+                            if u == 0 or u == 1:
+                                return 0
+                            t = a+(b-a)*(1-math.cos(math.pi*u))/2
+                            jacobian = (b-a)*math.pi*math.sin(math.pi*u)/2
+                            wave = trig(rate*t)
+                            value = math.log(abs(wave))
+                            if not absolute and wave < 0:
+                                value += 1j*math.pi
+                            return jacobian*cmath.exp(-target*t)*value
+                        expected += quadrature(integrand, 0, end=1, count=20000)
+                    expected /= 1-cmath.exp(-target*2*math.pi/abs(rate))
+                    argument = name + "(" + str(rate) + "*t)"
+                    if absolute:
+                        argument = "abs(" + argument + ")"
+                    for logarithm in ("ln", "log", "lg", "log10"):
+                        with self.subTest(argument=argument, logarithm=logarithm, target=target):
+                            value = expected if logarithm == "ln" else expected/math.log(10)
+                            fields = self.assert_transform(logarithm+"("+argument+")", target_text, value, places=6)
+                            self.assertIn("Re(s) > 0", fields["expression"])
+        for operand in ("ln(cos(t))", "ln(sin(t))", "ln(abs(cos(t)))", "ln(abs(sin(t)))"):
+            for target in ("0", "-1", "i"):
+                self.assertEqual(self.fields("{Laplace("+operand+",t,s) | s="+target+"}")["value"], "NAN")
+        for operand in ("ln(cos(c*t))", "ln(cos(i*t))", "ln(cos(t+1))"):
+            self.assertIn("laplace(", self.fields("Laplace("+operand+",t,s)")["function"])
+
+    def test_logarithms_crossing_the_negative_real_cut(self):
+        # Independent quadrature: t=q*(1 +/- u^2) smooths the logarithmic singularity.
+        for rate, magnitude, target, target_text in ((1, 1, 1, "1"), (2, 3, 2+1j, "2+i"),
+                                                     (3, 2, 1-2j, "1-2i")):
+            q = magnitude/rate
+            def integrand(u, exterior):
+                if u == 0:
+                    return 0
+                t = q*(1+u*u if exterior else 1-u*u)
+                source = math.log(magnitude*u*u) + (0 if exterior else 1j*math.pi)
+                return 2*q*u*cmath.exp(-target*t)*source
+            expected = quadrature(lambda u: integrand(u, False), 0, end=1, count=40000)
+            expected += quadrature(lambda u: integrand(u, True), 0,
+                                   end=math.sqrt(40/q), count=40000)
+            for name in ("ln", "log", "lg", "log10"):
+                with self.subTest(rate=rate, magnitude=magnitude, target=target, name=name):
+                    operand = name + "(" + str(rate) + "*t-" + str(magnitude) + ")"
+                    value = expected if name == "ln" else expected/math.log(10)
+                    fields = self.assert_transform(operand, target_text, value, places=6)
+                    self.assertIn("Re(s) > 0", fields["expression"])
+        for target in ("0", "-1", "i"):
+            fields = self.fields("{Laplace(ln(t-1),t,s) | s=" + target + "}")
+            self.assertEqual(fields["value"], "NAN")
+        self.assert_transform("ln(-2)", "1+i", (math.log(2)+1j*math.pi)/(1+1j))
+
     def test_atanh_real_rates_and_complex_targets(self):
         # Independent integration: t=(1 +/- u^2)/|c| removes the logarithmic endpoint.
         for rate, target, target_text in ((1, 1, "1"), (-1, 1, "1"),

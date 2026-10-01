@@ -358,6 +358,17 @@ expr_t *expr_clone(const expr_t *expr);
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);
 
 /**
+ * @brief Restrict an expression by the outer domain conditions of another expression.
+ *
+ * Copies conditions from the outer, possibly nested, @c where wrappers of @p domain;
+ * its algebraic body is ignored. Existing conditions on @p expr remain in force.
+ * Inputs are borrowed and their binding nodes are retained, so subsequent binding
+ * changes remain visible. Returns an owning, unsimplified expression, or NULL for
+ * a missing input or a @p domain without an outer domain wrapper.
+ */
+expr_t *expr_with_domain_of(const expr_t *expr, const expr_t *domain);
+
+/**
  * @brief Return an owning display-oriented simplification of @p expr.
  *
  * This helper expands simple products over sums before simplification so UI
@@ -551,6 +562,13 @@ expr_t *expr_cubrt(const expr_t *expr);
 expr_t *expr_root(const expr_t *expr, const expr_t *order);
 expr_t *expr_floor(const expr_t *expr);
 
+/**
+ * @brief Construct the real signum, with values -1, 0 and +1; non-real inputs are undefined.
+ *
+ * @param argument Expression whose sign is required; it is retained.
+ * @return A newly allocated signum expression, or NULL for a missing argument.
+ */
+expr_t *expr_sgn(const expr_t *argument);
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 expr_t *expr_step(const expr_t *argument);
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
@@ -982,6 +1000,28 @@ string_t *expr_to_function_body_text(const expr_t *expr);
 char *expr_to_function_body(const expr_t *expr);
 
 /**
+ * @brief Render an integral-transform request as an executable Function programme.
+ *
+ * Preserves Laplace, Fourier and inverse-transform calls, including nested
+ * operations, instead of replacing them with their results. The source coordinate remains local to the
+ * transform; free variables and constants receive parameters and bindings.
+ * Returns NULL for a non-transform input or allocation failure. Release the
+ * returned text with string_free(). The input is borrowed and unchanged.
+ */
+string_t *expr_to_transform_function_text(const expr_t *expr);
+
+/**
+ * @brief Render a calculus or integral-transform request as an executable Function programme.
+ *
+ * Keeps calculus calls in @p request and includes bindings from @p result,
+ * including generated integration constants. Both expressions are borrowed.
+ * Returns NULL when the request contains no calculus operation. Release returned text
+ * with string_free(). Only two-argument indefinite calls generate an arbitrary
+ * constant; explicit upper-only and definite calls do not.
+ */
+string_t *expr_to_calculus_function_text(const expr_t *request, const expr_t *result);
+
+/**
  * @brief Return the TeX expression body without binding wrappers.
  *
  * The returned C string is allocated with malloc() and must be released with
@@ -1160,6 +1200,25 @@ expr_t *expr_from_function_body_text(const string_t *text, expr_bindings_t **bnd
  * and must release it with expr_free().
  */
 expr_t *expr_from_function_body(const char *source, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Parse a Function-style expression body using caller-supplied symbols.
+ *
+ * Names and symbols are borrowed during parsing. Symbols are resolved before calculus operations, so intermediate
+ * expressions retain their algebraic dependencies. Names must be unique and every referenced variable must be
+ * supplied. Returns an owning expression, released with expr_free(), or NULL on a parse error.
+ */
+expr_t *expr_from_function_body_with_symbols(const char *source, const char *const *names,
+                                            expr_t *const *symbols, size_t count);
+
+/**
+ * @brief Parse Function-style body text using borrowed names and symbols.
+ *
+ * This is the string_t counterpart of expr_from_function_body_with_symbols(). The returned expression is owned
+ * by the caller; the source, names and symbol handles remain owned by their caller.
+ */
+expr_t *expr_from_function_body_text_with_symbols(const string_t *source, const string_t *const *names,
+                                                 expr_t *const *symbols, size_t count);
 
 /**
  * @brief Serialise an expression into a SQLite-ready payload.

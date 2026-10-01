@@ -3404,7 +3404,7 @@ static void test_nested_unevaluated_integral_integrand(void)
 {
     integrator_t *ig = intg_new();
     expr_bindings_t *bindings = NULL;
-    expr_t *expr = expr_from_string("{ integral(x, t^2, t) }", &bindings);
+    expr_t *expr = expr_from_string("{ integral(t^2, t, x) }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     TEST_NUMBER_AUTO_VALUE(lo, num_create_from_long(0));
     TEST_NUMBER_AUTO_VALUE(hi, num_create_from_long(1));

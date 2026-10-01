@@ -368,6 +368,11 @@ expr_t *expr_transform_specialise_constants(const expr_t *expr);
  */
 char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result);
 
+/** @brief Render an unresolved transform's authored operations without claiming an evaluated identity.
+ * @return An owned TeX string to release with free(), or NULL for other expressions.
+ */
+char *expr_formal_transform_TeX(const expr_t *source, const expr_t *result);
+
 /** Return a borrowed convergence, unsupported-transform or distribution explanation, or NULL. */
 const char *expr_transform_value_note(const expr_t *expr);
 
@@ -407,5 +412,8 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
 expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindings_t **bnd_out,
                                                       string_t **derivation_TeX_out,
                                                       bool *domain_specialised_out);
+
+/** @brief Parse authored calculus operations without replacing them with their results. */
+expr_t *expr_from_string_preserving_calculus_internal(const char *source);
 
 #endif /* EXPR_SHARED_INTERNAL_H */

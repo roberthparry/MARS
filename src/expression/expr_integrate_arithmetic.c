@@ -2142,8 +2142,7 @@ static number_t *integrate_number_matrix_alloc_local(size_t rows, size_t cols)
     return integrate_number_array_alloc_local(rows * cols);
 }
 
-static inline number_t *integrate_matrix_cell_local(number_t *matrix, size_t cols, size_t row, size_t col)
-{
+static inline number_t *integrate_matrix_cell_local(number_t *matrix, size_t cols, size_t row, size_t col) {
     return &matrix[row * cols + col];
 }
 

@@ -69,7 +69,8 @@ datetime_t *datetime_alloc()
     return dttm;
 }
 
-inline void datetime_dealloc(datetime_t *dttm)
+/* Release a datetime object; a null pointer requires no action. */
+void datetime_dealloc(datetime_t *dttm)
 {
     if (!dttm)
         return;
@@ -1787,8 +1788,7 @@ datetime_t *datetime_to_gmt(datetime_t *dttm)
  * @param denominator The denominator.
  * @return The truncated result of numerator / denominator.
  */
-static inline long ldivide(long numerator, long denominator)
-{
+static inline long ldivide(long numerator, long denominator) {
     return (numerator >= 0L) ? (numerator / denominator) : ((numerator - denominator + 1L) / denominator);
 }
 
@@ -2083,7 +2083,8 @@ int datetime_compare(const datetime_t *dttm1, const datetime_t *dttm2)
     return 0; // They are equal
 }
 
-inline bool datetime_is_leap_year(short year)
+/* Apply the Gregorian leap-year rule. */
+bool datetime_is_leap_year(short year)
 {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
@@ -3314,8 +3315,9 @@ static datetime_t *datetime_init_adjacent_sun_time_checked(datetime_t *dttm, lon
                                   timeZoneOffset, isSunrise);
 }
 
-inline datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double latitude, double longitude,
-                                         double timeZoneOffset)
+/* Initialise the requested date's sunrise using the checked solar calculation. */
+datetime_t *datetime_init_sunrise(datetime_t *dttm, long julianDayNumber, double latitude, double longitude,
+                                 double timeZoneOffset)
 {
     return datetime_init_sun_time_checked(dttm, julianDayNumber, latitude, longitude, timeZoneOffset, true, NULL);
 }
@@ -3341,8 +3343,9 @@ datetime_t *datetime_init_next_sunrise_checked(datetime_t *dttm, long julianDayN
                                                    status);
 }
 
-inline datetime_t *datetime_init_sunset(datetime_t *dttm, long julianDayNumber, double latitude, double longitude,
-                                        double timeZoneOffset)
+/* Initialise the requested date's sunset using the checked solar calculation. */
+datetime_t *datetime_init_sunset(datetime_t *dttm, long julianDayNumber, double latitude, double longitude,
+                                double timeZoneOffset)
 {
     return datetime_init_sun_time_checked(dttm, julianDayNumber, latitude, longitude, timeZoneOffset, false, NULL);
 }
@@ -3368,12 +3371,14 @@ datetime_t *datetime_init_next_sunset_checked(datetime_t *dttm, long julianDayNu
                                                    status);
 }
 
-inline void datetime_set_sunrise(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)
+/* Set the datetime's time to sunrise at the supplied location. */
+void datetime_set_sunrise(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)
 {
     datetime_set_sun_time(dttm, latitude, longitude, timeZoneOffset, true);
 }
 
-inline void datetime_set_sunset(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)
+/* Set the datetime's time to sunset at the supplied location. */
+void datetime_set_sunset(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset)
 {
     datetime_set_sun_time(dttm, latitude, longitude, timeZoneOffset, false);
 }

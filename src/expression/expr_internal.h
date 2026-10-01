@@ -184,6 +184,7 @@ typedef enum {
     EXPR_KIND_INVERSE_LAPLACE,
     EXPR_KIND_FOURIER,
     EXPR_KIND_INVERSE_FOURIER,
+    EXPR_KIND_SGN,
     EXPR_KIND_STEP,
     EXPR_KIND_RECT,
     EXPR_KIND_TRI,
@@ -217,35 +218,17 @@ typedef expr_t *(*expr_inverse_unary_fn)(const expr_t *arg);
 typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
 typedef expr_t *(*expr_finite_progression_fn)(const expr_t *upper, const expr_t *step);
 
-static inline number_t expr_reverse_num_sq(const number_t value)
-{
-    return num_mul(value, value);
-}
+static inline number_t expr_reverse_num_sq(const number_t value) { return num_mul(value, value); }
 
-static inline number_t expr_reverse_num_inverse(const number_t value)
-{
-    return num_div(NUM_ONE, value);
-}
+static inline number_t expr_reverse_num_inverse(const number_t value) { return num_div(NUM_ONE, value); }
 
-static inline number_t expr_reverse_num_clone(const number_t value)
-{
-    return num_clone(value);
-}
+static inline number_t expr_reverse_num_clone(const number_t value) { return num_clone(value); }
 
-static inline number_t expr_reverse_num_neg(const number_t value)
-{
-    return num_neg(value);
-}
+static inline number_t expr_reverse_num_neg(const number_t value) { return num_neg(value); }
 
-static inline number_t expr_reverse_num_mul(const number_t a, const number_t b)
-{
-    return num_mul(a, b);
-}
+static inline number_t expr_reverse_num_mul(const number_t a, const number_t b) { return num_mul(a, b); }
 
-static inline number_t expr_reverse_num_div(const number_t a, const number_t b)
-{
-    return num_div(a, b);
-}
+static inline number_t expr_reverse_num_div(const number_t a, const number_t b) { return num_div(a, b); }
 
 typedef struct expr_ops {
     number_t (*eval)(expr_t *dv);
@@ -269,15 +252,9 @@ typedef struct expr_ops {
     expr_fold_const_unary_fn fold_const_unary;
 } expr_ops_t;
 
-static inline const char *expr_ops_expression_name(const expr_ops_t *ops)
-{
-    return ops ? ops->expression_name : "?";
-}
+static inline const char *expr_ops_expression_name(const expr_ops_t *ops) { return ops ? ops->expression_name : "?"; }
 
-static inline const char *expr_ops_function_name(const expr_ops_t *ops)
-{
-    return ops ? ops->function_name : "?";
-}
+static inline const char *expr_ops_function_name(const expr_ops_t *ops) { return ops ? ops->function_name : "?"; }
 
 typedef struct expr_deriv_cache {
     uint64_t wrt_id;
@@ -398,7 +375,10 @@ extern const expr_ops_t ops_laplace;
 extern const expr_ops_t ops_inverse_laplace;
 extern const expr_ops_t ops_fourier;
 extern const expr_ops_t ops_inverse_fourier;
+extern const expr_ops_t ops_sgn;
 extern const expr_ops_t ops_step;
+/* Reduce finite real-affine signum sums with fixed integer bounds; retain other sums. */
+expr_t *expr_sgn_sum_closed_form(const expr_t *expr);
 extern const expr_ops_t ops_rect;
 extern const expr_ops_t ops_tri;
 extern const expr_ops_t ops_circ;
@@ -431,6 +411,8 @@ expr_t *expr_transform_bound_constants(const expr_t *expr);
 bool expr_is_integral_transform(const expr_t *expr);
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
+/** Differentiate a recognised transform result, retaining its domain or a formal derivative when unresolved. */
+expr_t *expr_transform_deriv(expr_t *transform);
 /** Construct an inverse Laplace operator from its expression and optional variable mapping. */
 expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args);
 /** Return a recognised inverse Laplace formula, or NULL when no rule applies. */
@@ -625,85 +607,41 @@ extern const expr_ops_t ops_shl;
 extern const expr_ops_t ops_shr;
 extern const expr_ops_t ops_factors;
 
-static inline int expr_const_is_zero(const expr_t *dv)
-{
+static inline int expr_const_is_zero(const expr_t *dv) {
     return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
 }
 
-static inline int expr_const_is_one(const expr_t *dv)
-{
-    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ONE);
-}
+static inline int expr_const_is_one(const expr_t *dv) { return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ONE); }
 
-static inline int expr_const_is_minus_one(const expr_t *dv)
-{
+static inline int expr_const_is_minus_one(const expr_t *dv) {
     return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_NEG_ONE);
 }
 
-static inline int expr_is_op(const expr_t *dv, const expr_ops_t *ops)
-{
-    return dv && dv->ops == ops;
-}
+static inline int expr_is_op(const expr_t *dv, const expr_ops_t *ops) { return dv && dv->ops == ops; }
 
-static inline int expr_is_const(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_const);
-}
+static inline int expr_is_const(const expr_t *dv) { return expr_is_op(dv, &ops_const); }
 
-static inline int expr_is_var(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_var);
-}
+static inline int expr_is_var(const expr_t *dv) { return expr_is_op(dv, &ops_var); }
 
-static inline int expr_is_neg(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_neg);
-}
+static inline int expr_is_neg(const expr_t *dv) { return expr_is_op(dv, &ops_neg); }
 
-static inline int expr_is_mul(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_mul);
-}
+static inline int expr_is_mul(const expr_t *dv) { return expr_is_op(dv, &ops_mul); }
 
-static inline int expr_is_div(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_div);
-}
+static inline int expr_is_div(const expr_t *dv) { return expr_is_op(dv, &ops_div); }
 
-static inline int expr_is_integral_bounds(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_integral_bounds);
-}
+static inline int expr_is_integral_bounds(const expr_t *dv) { return expr_is_op(dv, &ops_integral_bounds); }
 
-static inline int expr_is_integral_meta(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_integral_meta);
-}
+static inline int expr_is_integral_meta(const expr_t *dv) { return expr_is_op(dv, &ops_integral_meta); }
 
-static inline int expr_is_addsub(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub);
-}
+static inline int expr_is_addsub(const expr_t *dv) { return expr_is_op(dv, &ops_add) || expr_is_op(dv, &ops_sub); }
 
-static inline int expr_is_exp_expr(const expr_t *dv)
-{
-    return expr_is_op(dv, &ops_exp);
-}
+static inline int expr_is_exp_expr(const expr_t *dv) { return expr_is_op(dv, &ops_exp); }
 
-static inline int expr_is_sqrt_expr(const expr_t *dv)
-{
-    return dv && dv->ops && dv->ops->kind == EXPR_KIND_SQRT;
-}
+static inline int expr_is_sqrt_expr(const expr_t *dv) { return dv && dv->ops && dv->ops->kind == EXPR_KIND_SQRT; }
 
-static inline int expr_is_pow_d_expr(const expr_t *dv)
-{
-    return dv && dv->ops && dv->ops->kind == EXPR_KIND_POW_D;
-}
+static inline int expr_is_pow_d_expr(const expr_t *dv) { return dv && dv->ops && dv->ops->kind == EXPR_KIND_POW_D; }
 
-static inline int expr_is_unnamed_const(const expr_t *dv)
-{
-    return expr_is_const(dv) && (!dv->name || !*dv->name);
-}
+static inline int expr_is_unnamed_const(const expr_t *dv) { return expr_is_const(dv) && (!dv->name || !*dv->name); }
 
 typedef enum expr_integration_bound_kind {
     EXPR_INTEGRATION_BOUND_DEFINITE = 0,
@@ -1129,6 +1067,10 @@ int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
+/** Render the authored operation tree without evaluating nested transforms. Returns an owning C string. */
+char *expr_to_TeX_operation_body(const expr_t *expr);
+/** @brief Scan an authored expression tree for calculus operations. */
+bool expr_contains_calculus_request(const expr_t *expr);
 int expr_to_TeX_parts(const expr_t *dv, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);

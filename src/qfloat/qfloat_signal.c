@@ -1,5 +1,11 @@
 #include "qfloat.h"
 
+/* Evaluate real signum, preserving NaN and treating both signed zeros as zero. */
+qfloat_t qf_sgn(qfloat_t x)
+{
+    return qf_isnan(x) ? QF_NAN : qf_eq(x, QF_ZERO) ? QF_ZERO : qf_gt(x, QF_ZERO) ? QF_ONE : QF_NEG_ONE;
+}
+
 /* Evaluate the symmetric endpoint convention for the real unit step. */
 qfloat_t qf_step(qfloat_t x)
 {

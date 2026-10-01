@@ -245,6 +245,20 @@ This initial implementation requires one source variable; inferred
 multidimensional transforms remain planned. Fourier operators are described below.
 Targets that would capture an existing input parameter are rejected.
 
+### Differentiating transform results
+
+Differentiation of a Laplace, inverse Laplace, Fourier or inverse Fourier
+transform first resolves any supported transform formula, then differentiates
+that formula while retaining its domain conditions. Repeated and mixed
+derivatives follow the same rule. Unresolved transforms retain formal
+derivatives; an unavailable formula is not replaced by zero.
+
+For example, at 32-digit precision, `{ Ds(@L{t}) | s=2 }` produces
+`{ -2/s³ | s = 2; Re(s) > 0 }` in Expression and `-0.25` in Value and RUN.
+The Function representation retains `derivative(laplace(t, t, s), s, 1)`
+inside its convergence guard, so RUN still performs the requested operations.
+The same behaviour applies when the transform contains a nested integral.
+
 ### Derivatives of unspecified functions
 
 Prime notation and parenthesised derivative orders are accepted for unary
@@ -306,6 +320,26 @@ the transform's convergence restrictions on the antiderivative.
 | `@L{@S_0^t f(x) dx}` | `ℒ(f(t), t, s)/s` |
 | `@L{@S^t f(x) dx}` | `1/s·(ℒ(f(t), t, s) + ∫^0 f(x)·dx)` |
 
+An upper-only primitive retains the logarithm branch selected by native
+integration. For `@L{@S^t 1/(1-x^2) dx}`, the chosen primitive is
+`½·(ln(t+1)-ln(t-1))`, not a real-logarithm absolute-value replacement.
+Its transform is
+
+$\quad\begin{array}{l}\displaystyle \frac{e^s E_1(s)+e^{-s}\operatorname{Ei}(s)-i\pi(1-e^{-s})}{2s},\qquad \operatorname{Re}(s)>0.\end{array}$
+
+The logarithmic singularity at `t=1` is locally integrable. The imaginary term
+retains the principal-logarithm value on `0<t<1`; this does not assert that a
+definite integral through the original pole exists. At `s=1`, the value is
+approximately `0.6467611227791301 - 0.9929326518994358i`.
+
+The chosen primitive of `tan(t)` is `-ln(cos(t))`. Its Laplace transform is
+supported for `Re(s)>0` using digamma functions, with the principal-logarithm
+contribution from intervals where the cosine is negative. This is distinct
+from transforming `-ln(abs(cos(t)))`, which omits that contribution. For example,
+`{ @L{@S^t tan(x) dx} | s=pi }` produces approximately
+`0.0390230861269195 - 0.00719151138794376i` in Value and RUN. The Function card
+retains `laplace(integral(tan(x), x, t), t, s)` and its convergence guard.
+
 ### Laplace transforms of translated arbitrary functions
 
 An unspecified function name, including `u`, remains arbitrary: it is not an
@@ -364,6 +398,12 @@ binding, serialisation and parsing are not scalar function families.
 
 #### Supported families
 
+Native domain simplification removes duplicate or weaker strict half-plane
+conditions when finite numerical translations and the bound ordering prove the
+implication. It retains the strongest condition regardless of input order;
+unknown symbolic shifts and incomparable bounds retain their separate conditions.
+Numerical bindings of free variables are not assumptions used for this proof.
+
 Restrictions below are sufficient domains used by the implementation, not
 claims that every listed domain is maximal. A scale described as *known* must
 be a supplied constant, not a free variable which happens to have a value.
@@ -376,8 +416,9 @@ All three symbolic cards use the same native expression and conditions.
 | `sin`, `cos`, `sinh`, `cosh` | Affine arguments; both component exponentials must converge. Small integer powers of hyperbolic functions are finite exponential sums. Integer circular powers use recurrences or finite sums. |
 | `versin`, `vercos`, `coversin`, `covercos`, `haversin`, `havercos`, `hacoversin`, `hacovercos` | Reductions to sine, cosine and constants, with their convergence conditions. |
 | `tanh`, `sech` | Digamma formulas for scaled arguments; branch-safe square-root scales retain sufficient conditions. |
-| `log`, `ln`, `log10`, `lg` | Direct logarithms; supported positive affine arguments use exponential integrals. |
+| `log`, `ln`, `log10`, `lg` | Known real affine arguments with non-negative slope use exponential integrals, including negative offsets. A positive-slope zero crossing retains the principal logarithm's `+iπ` value on the negative-argument interval; its logarithmic singularity is integrable. Identically zero arguments remain unsupported. The sufficient convergence condition is `Re(s)>0`. |
 | `abs`, `conj` | Homogeneous linear arguments; absolute values additionally cover known real affine arguments, including a zero crossing. |
+| Logarithms of sine and cosine | Natural and common logarithms of homogeneous sine/cosine arguments, optionally inside `abs`, with known real non-zero rates. Digamma formulas retain the principal-logarithm contribution on negative lobes unless `abs` is present. The domain is `Re(s)>0`; shifted arguments and unknown or non-real rates remain symbolic. |
 | `floor`, `ceil` | Homogeneous arguments with known real rates, including negative and zero rates. |
 | `atan`, `acot` | Homogeneous arguments with known real rates, using exponential integrals and the native inverse-cotangent branch. |
 | `asinh` | Homogeneous arguments with known real rates, using native order-zero Struve H and Bessel Y. |
@@ -421,7 +462,7 @@ Both representations preserve the same algebra and copied-expression inverses.
 For example, `@L{acosh(t)}` has the following unbound Expression output:
 
 ```text
-1/s·(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s))) where (Re(s) > 0)
+(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)
 ```
 
 Real and complex targets in the stated half-plane are supported
@@ -560,7 +601,7 @@ are not exposed as Lab bindings, and target names must not capture parameters
 already present in the operand.
 
 The current rules cover Gaussian, rectangular, triangular, normalised sinc,
-two-sided exponential, quadratic-reciprocal and hyperbolic-secant pairs, plus
+two-sided exponential, fractional absolute-power, quadratic-reciprocal and hyperbolic-secant pairs, plus
 one-sided exponentials with explicit step factors. Distributional rules cover
 constants, impulses, harmonics, the unit step with its principal value,
 derivatives and polynomial weighting. Linearity, real affine changes of a
@@ -585,6 +626,81 @@ transforms, circular-aperture disk transforms, chirps, impulse trains,
 non-integral-order or second-kind Bessel transforms, general regularised powers
 and complex-branch logarithmic families remain unsupported. See the
 [coverage inventory](design-notes/integral-transforms.md#fourier-acceptance-criteria).
+
+The native rules are grouped by shared implementation: `expr_fourier_hyperbolic.c`
+contains hyperbolic powers, analytic-functional spectra, odd hyperbolic pairs and
+beta-spectrum inverses; `expr_fourier_pairs.c` contains fractional absolute-power,
+sign, arctangent, inverse hyperbolic sine, gamma and periodic principal-value pairs,
+with shared exponential and reciprocal kernel matching. Branch-sensitive families
+remain in `expr_fourier_branch.c`. The main
+`expr_fourier.c` retains dispatch, general transform properties and normalisation.
+Shared ownership, structural matching and domain-condition helpers live in
+`expr_fourier_support.c`; the internal header keeps only declarations and trivial
+inline construction wrappers.
+
+### Fractional absolute powers
+
+The native forward and inverse rules recognise absolute powers, including reciprocal
+square roots written with `sqrt`, powers or modulus bars. The cosine Mellin integral gives
+
+$\quad\begin{array}{l}\displaystyle \mathcal F_{t\to\omega}\{|t|^p\}=2\Gamma(p+1)\cos\!\left(\frac{\pi(p+1)}2\right)|\omega|^{-p-1},\qquad -1<\Re(p)<0,\quad\omega\in\mathbb R\setminus\{0\}.\end{array}$
+
+This is an oscillatory improper integral, not an absolutely convergent integral over
+the whole line. Both the input and spectrum are locally integrable at zero in this
+strip, so no principal-value or finite-part prescription is needed. The spectrum
+has no finite pointwise value at zero. See [DLMF 5.9.6](https://dlmf.nist.gov/5.9.E6).
+
+Scalar multiples and real-affine arguments `abs(a*t+b)^p` are supported with
+real `a ≠ 0` and real `b`. Symbolic parameters retain these conditions and the
+strip restrictions. Inverse transforms use the angular-frequency normalisation
+`1/(2π)`. A copied spectrum's exclusion of its own integrable singularity does
+not prevent inversion; unrelated source-domain restrictions remain in force.
+This rule does not extend powers outside the strip by analytic continuation.
+
+README examples (unbound Expression output):
+
+| Input | Output |
+| --- | --- |
+| `@F{1/sqrt(\|t\|)}` | `√(2π/\|ω\|) where (ω ∈ ℝ; ω ≠ 0)` |
+| `@Finv{sqrt(2*pi)/sqrt(\|ω\|)}` | `1/√(\|t\|) where (t ∈ ℝ; t ≠ 0)` |
+
+### Sign function
+
+`sgn(x)`, `sign(x)` and `signum(x)` name the real sign function, with values
+`-1`, `0` and `1` for negative, zero and positive arguments respectively.
+Non-real arguments are undefined. The native constructor is `expr_sgn(x)`;
+Expression, Function and TeX output use the canonical name `sgn`.
+
+Its symbolic derivative is the distribution `2δ(x)`, with the usual chain rule.
+Forward and reverse numerical differentiation give zero at finite real nonzero
+arguments and `NAN` at the jump. Real-affine primitives use the absolute value,
+retaining the real-variable domain. Finite sums with fixed integer bounds and
+fixed real-affine arguments are counted directly, without visiting every term.
+Unbounded sums retain the existing formal-sum behaviour rather than receiving
+an assumed convergent value. General indefinite discrete antidifferences remain
+formal; the closed-form counting rule requires finite integer bounds.
+
+The angular-frequency Fourier pair has the numerical representative
+
+$\quad\begin{array}{l}\displaystyle \mathcal F_{t\to\omega}\{\operatorname{sgn}(t)\}=-\frac{2i}{\omega},\qquad \omega\in\mathbb R,\quad\omega\ne0.\end{array}$
+
+The full pair is distributional: reciprocal spectra use symmetric cancellation
+at zero. The numerical domain condition alone is not a definition of that
+extension; the native transform rule and evaluation note specify it. The inverse
+recognises an independently entered or copied spectrum and returns `sgn(t)`,
+including its zero value at the jump. Real nonzero affine scales and real shifts
+are supported, with conditions retained for symbolic parameters. Ordinary Laplace
+transforms also support fixed real-affine arguments on `Re(s)>0`.
+
+README examples (numeric Value output where available; otherwise unbound Expression output):
+
+| Input | Output |
+| --- | --- |
+| `sgn(-2)` | `-1` |
+| `sgn(0)` | `0` |
+| `@F{sgn(t)}` | `-2i/ω where (ω ∈ ℝ; ω ≠ 0)` |
+| `InverseFourier(-2i/ω,ω,t)` | `sgn(t) where (t ∈ ℝ)` |
+| `sum(k,-2,3,sgn(k))` | `1` |
 
 ### Logarithmic distributions
 
@@ -1358,8 +1474,8 @@ The implementation is split into logical integration modules:
   handle structured transformations.
 - `expr_integrate_partialfrac.c` holds rational factoring and partial
   fractions.
-- `expr_integrate_support.c` and `expr_integrate_owned.c` hold shared helper
-  logic.
+- `expr_integrate_support.c` holds shared structural helpers and owning
+  arithmetic operations for integration rules.
 
 Rules are dispatched through tables where that keeps the code readable; more
 specialised pattern code remains local to the module that owns the rule family.
@@ -1747,6 +1863,29 @@ f        = 3.1757249085749458319171494634201048934788501753034439927543048401638
 
 ## Design Notes
 
+### Implementation organisation
+
+Related implementations share a source file without changing their public APIs:
+
+- `expr_bessel.c` contains the Bessel I, K and Y expression nodes and their
+  evaluation, differentiation, integration and simplification rules.
+- `expr_special.c` contains Clausen functions and their summation recognition,
+  alongside orthogonal-polynomial nodes and calculus.
+- `expr_deriv_reverse.c` contains reverse-mode traversal, adjoint accumulation
+  and elementary arithmetic pullbacks. Mathematical-function pullbacks remain
+  in `expr_deriv_reverse_maths.c`.
+- `expr_signal.c` contains signal and distribution nodes together with
+  whole-line and causal convolution operations.
+- `expr_fourier_pairs.c` groups related Fourier pairs, including periodic
+  principal-value spectra and their impulse-series inverses.
+- `expr_integrate_support.c` contains shared integration helpers, including
+  operations that consume their expression and numeric operands.
+- `expr_laplace_special.c` contains special-function transform rules, including
+  inverse circular and inverse hyperbolic functions.
+- `expr_distribution_notation.c` keeps distribution-qualification parsing and
+  rendering together; `expr_stringout_support.c` includes Cartesian composition
+  presentations alongside other shared output helpers.
+
 ### Node Model
 
 Expressions are stored as a directed acyclic graph. Each node is one of:
@@ -1840,6 +1979,14 @@ simplifies and then arranges an equivalent expression for readable
 presentation, including symmetric surds and Cartesian complex products. The
 beautifier does not select a different expression for TeX output; rendering
 style is applied afterwards.
+
+An exterior minus on a quotient is absorbed by reversing a
+subtraction factor in its numerator where possible. This retains the other
+factors and the denominator without expanding them. Domain conditions are
+preserved, and the same sign normalisation applies to mathematical output
+and algebraic RUN results.
+An ordinary additive numerator remains grouped before the division sign in
+Expression and RUN output, rather than being written after a reciprocal factor.
 
 Integrals and formal derivatives rendered as ordinary or partial derivative
 fractions are kept outside enclosing algebraic fractions. Fractional
@@ -2053,11 +2200,27 @@ The string grammar accepts `conj(z)` and `conjugate(z)` for complex
 conjugation. Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
 also equivalent for every scalar type; for complex values and expressions
 they denote the modulus `sqrt(z*z^*)`. An unmatched bar is a syntax error.
+In Expression syntax, an opening modulus may follow another factor without a
+multiplication sign, including inside function arguments. A bar following a
+complete term inside a modulus closes that modulus; use explicit multiplication
+or parentheses when an inner modulus would otherwise be ambiguous. Function
+syntax continues to require explicit multiplication.
+
+README examples (Value output):
+
+| Input | Output |
+| --- | --- |
+| `{2\|t\| \| t=-3}` | `6` |
+| `{\|t\|\|t+1\| \| t=-3}` | `6` |
+| `{@F{exp(a\|t\|)} \| ω=1; a=-2}` | `0.8` |
+
+The last transform requires `Re(-a)>0`, equivalently `Re(a)<0`.
+
 These function names are resolved by the native expression parser's
 collision-free lookup tables rather than by a client-side rewrite.
 
 The function registry remains an inline, one-entry-per-line table in
-`src/expression/expr_stringin.c`. Its 323 registered spellings occupy 323
+`src/expression/expr_stringin.c`. Its 326 registered spellings occupy 326
 distinct slots. Lookup samples six fixed byte positions, reads one
 displacement and probes one entry; it does not scan the registry, follow
 collision chains or retry neighbouring slots. The final exact spelling
@@ -2453,7 +2616,7 @@ bindings.
   - additive ellipsis series such as `a₁ + a₂ + a₃ + ... + aₙ`; the native
     parser selects an exact geometric, inverse-index-power, or Lagrange-
     interpolated polynomial term model from the supplied terms and endpoint
-  - literal unevaluated integral forms `integral(x, f_expr, t)`,
+  - literal unevaluated integral forms `integral(f_expr, t, x)`,
     `∫^x f(t)dt`, `∫^x f(t)*dt`, and `∫^x f(t)·dt`; the spaced form
     `∫^x f(t) dt` is also accepted on input, but the canonical pretty-printed
     form uses `·dt`
@@ -2747,6 +2910,17 @@ expr_t *expr_from_function_body(const char *source, expr_bindings_t **bnd_out);
 
 ### `expr_from_function_body_text()`
 
+The related public entry points `expr_from_function_body_with_symbols` and
+`expr_from_function_body_text_with_symbols` parse the same Function-style grammar
+against caller-supplied name/symbol tables. They borrow the source and symbols
+and return an owning expression, released with `expr_free`. Names must be unique;
+the frontend supplies the lexical symbols before parsing. This lets intermediate
+expressions retain their dependencies instead of substituting current numeric
+values. These entry points preserve the parsed tree rather than running a final
+simplification pass; use native simplification explicitly when producing output.
+They do not parse declarations, execute statements or implement lexical scope.
+The Ophelia prototype supplies that separate frontend.
+
 Creates or reconstructs the public value described by from function body text.
 
 ```c
@@ -2897,6 +3071,19 @@ Returns the public result described by sprintf text.
 string_t *expr_sprintf_text(const char *fmt, ...);
 ```
 
+### `expr_with_domain_of()`
+
+`expr_with_domain_of(expr, domain)` returns an owning expression restricted by
+the outer `where` conditions of `domain`, including nested outer wrappers. The
+algebraic body of `domain` is ignored; existing restrictions on `expr` remain in
+force. Both inputs are borrowed. The result retains their binding nodes without
+simplifying, so later binding changes remain visible. Missing inputs or a
+`domain` without an outer `where` wrapper return `NULL`.
+
+This is the native construction API used by Ophelia's
+[symbolic scalar domain guards](mars-lab.md#running-function-cards). Domain
+simplification and output remain native expression operations.
+
 ### `expr_substitute()`
 
 Return an owning expression with the requested substitution. The source,
@@ -2948,6 +3135,48 @@ Returns the public result described by to function body text.
 ```c
 string_t *expr_to_function_body_text(const expr_t *expr);
 ```
+
+### `expr_to_transform_function_text()`
+
+Renders a top-level Laplace, Fourier or inverse-transform request as an executable
+Function programme, preserving the transform call and nested operations rather
+than their computed results. Its source coordinate is local to the transform; free variables and
+constants appear in the function parameters and binding declarations. The caller
+owns the returned `string_t` and releases it with `string_free`. Non-transform
+inputs and allocation failures return `NULL`. The input is unchanged.
+
+MARS Lab uses this native programme for transform Function cards. Ordinary
+`expr_to_text(..., style_FUNCTION)` still renders the result representation.
+
+### `expr_to_calculus_function_text()`
+
+Renders a derivative, integral or integral-transform request as an executable Function programme,
+using the request's original operands and the result's bindings. The native Lab
+uses this for authored calculus requests and its derivative/integral buttons.
+It returns `NULL` for a request without a calculus operation. Both input
+expressions are borrowed; release the returned text with `string_free`.
+The Lab reparses the authored source with calculus operations retained, so a
+transform of an integral remains a transform call containing an integral call.
+Transform identities likewise retain those operations on the left-hand side;
+only the right-hand side shows the evaluated result. Source and target
+coordinates are displayed as symbols even when their bindings are unset.
+The operation programme retains the result's outer domain restrictions as
+executable `if` guards with `@nan` fallbacks, without replacing the guarded
+operation by its evaluated formula. These guards remain visible with supplied
+bindings; unresolved guards remain conditions on the symbolic RUN result.
+
+In Function syntax, `integral(expression, variable)` performs indefinite
+integration and generates an arbitrary constant. The integrand is always first
+and the integration variable second. The three-argument upper-only form
+`integral(expression, variable, upper)` evaluates a chosen primitive at an endpoint
+without adding an arbitrary constant, matching `@S^upper`;
+`integral(expression, variable, lower, upper)` is a definite integral and
+generates no arbitrary constant. Unsupported integrands
+remain formal. `derivative(expression, variable, order)` performs the requested
+differentiation before numerical binding evaluation.
+Completing a symbolic integral preserves supplied values of its free coordinates
+and generated integration constants, including exact symbolic binding expressions.
+Locally bound integration variables remain independent of outer bindings.
 
 ### `expr_to_string()`
 

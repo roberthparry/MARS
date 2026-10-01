@@ -34,4 +34,11 @@ void test_readme_examples(void)
     qf_printf("H_0(1) = %.15q\n", ordinary);
     qf_sprintf(output, sizeof(output), "H_0(1) = %.15q", ordinary);
     TEST_ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0, "Struve H README output");
+
+    /* README example: real signum (docs/qfloat.md). */
+    printf("sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
+           qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+    snprintf(output, sizeof(output), "sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
+             qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+    TEST_ASSERT_TRUE(strcmp(output, "sgn(-2), sgn(0), sgn(2) = -1, 0, 1\n") == 0, "signum README output");
 }

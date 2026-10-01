@@ -1333,6 +1333,13 @@ matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 
 matrix_t *mat_exp(const matrix_t *A);
 matrix_t *mat_sin(const matrix_t *A);
+/**
+ * @brief Apply real signum through spectral functional calculus on real spectra.
+ * @param A Square matrix belonging to a class supported by the spectral engine, as for mat_step().
+ * @return A newly allocated matrix with eigenvalues mapped to -1, zero or +1, or NULL if unsupported.
+ * Non-real scalar spectral values give NaN. Signum is discontinuous at zero and is not applied entry by entry.
+ */
+matrix_t *mat_sgn(const matrix_t *A);
 /** @brief Apply the symmetric-endpoint unit step through spectral functional calculus on real spectra. */
 matrix_t *mat_step(const matrix_t *A);
 /** @brief Apply the unit-width rectangular pulse through spectral functional calculus on real spectra. */

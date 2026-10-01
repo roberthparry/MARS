@@ -542,9 +542,9 @@ static void test_diffequ_solves_exact_differential_form(void)
                 (long)DE_SOLVER_EXACT_FIRST_ORDER);
     WANT_LONG("exact differential-form solution count", result ? (long)de_solve_result_count(result) : -1L, 2L);
     WANT_TEXT("exact differential-form positive branch", positive_text ? string_c_str(positive_text) : NULL,
-                "r = 1/(2·cos²(θ))·(sin(θ) - √(sin²(θ) - C·cos²(θ)))");
+                "r = (sin(θ) - √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
     WANT_TEXT("exact differential-form negative branch", negative_text ? string_c_str(negative_text) : NULL,
-                "r = 1/(2·cos²(θ))·(sin(θ) + √(sin²(θ) - C·cos²(θ)))");
+                "r = (sin(θ) + √(sin²(θ) - C·cos²(θ)))/(2·cos²(θ))");
 
     string_free(negative_text);
     string_free(positive_text);
@@ -568,7 +568,7 @@ static void test_diffequ_applies_initial_condition_to_exact_differential_form(vo
     WANT_LONG("conditioned exact differential-form solution count",
                 result ? (long)de_solve_result_count(result) : -1L, 1L);
     WANT_TEXT("conditioned exact differential-form branch", solution_text ? string_c_str(solution_text) : NULL,
-                "y = √(1/(3x)·(14 - x³))");
+                "y = √((14 - x³)/(3x))");
 
     string_free(solution_text);
     de_solve_result_free(result);
@@ -932,7 +932,7 @@ static void test_diffequ_solves_linear_initial_value_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("linear solution text", text, true);
     if (text)
-        WANT_TEXT("linear solution", string_c_str(text), "y = 1/exp(x)·((x - 1)·exp(x) + 1)");
+        WANT_TEXT("linear solution", string_c_str(text), "y = ((x - 1)·exp(x) + 1)/exp(x)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1064,7 +1064,7 @@ static void test_diffequ_linear_solution_retains_arbitrary_constant(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("unconditioned linear solution text", text, true);
     if (text)
-        WANT_TEXT("unconditioned linear solution", string_c_str(text), "y = 1/exp(x)·(C + (x - 1)·exp(x))");
+        WANT_TEXT("unconditioned linear solution", string_c_str(text), "y = (C + (x - 1)·exp(x))/exp(x)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1606,7 +1606,7 @@ static void test_diffequ_linearizes_exact_third_order_problem(void)
                                      "c_(-1) = 0",
                                      "c_(-2) = 0",
                                      "c_(-3) = 0",
-                                     "c_(n + 2) = 1/(2·(n + 2)·(n + 1))·(C₁·c_(n) + c_(n - 3))"};
+                                     "c_(n + 2) = (C₁·c_(n) + c_(n - 3))/(2·(n + 2)·(n + 1))"};
     diffequ_t *de = de_from_string("y''' + y''*y' = 3x^2");
     diffequ_solve_result_t *result;
 
@@ -2262,7 +2262,7 @@ static void test_diffequ_solves_power_law_bessel_family(void)
         WANT_POINTER("power-law Bessel solution text", text, true);
         if (text) {
             WANT_POINTER("power-law Bessel solution has negative-order basis",
-                           strstr(string_c_str(text), "BesselJ(-"), true);
+                           strstr(string_c_str(text), "J_{-"), true);
             WANT_POINTER("power-law Bessel solution has positive-order basis", strstr(string_c_str(text), orders[i]),
                            true);
             WANT_POINTER("power-law Bessel solution has derived argument", strstr(string_c_str(text), arguments[i]),
@@ -2675,29 +2675,29 @@ static void test_diffequ_defaults_bare_differential_operator(void)
             "(D^2 + @omega^2)^4x = 0",
             "{ d⁸x/dt⁸ + 4ω²*d⁶x/dt⁶ + 6ω⁴*d⁴x/dt⁴ + "
             "4ω⁶*d²x/dt² + ω⁸*x = 0 | t = ?; ;  }",
-            "x = Σ_(k=0)^3 C_(k + 1)·t^k·cos(ωt) + "
-            "Σ_(k=0)^3 C_(k + 5)·t^k·sin(ωt)",
+            "x = (Σ_(k=0)^3 C_(k + 1)·t^k)·cos(ωt) + "
+            "(Σ_(k=0)^3 C_(k + 5)·t^k)·sin(ωt)",
         },
         {
             "(D^2 + @omega^2)^4phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
-            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4@phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
-            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4φ = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
             "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
-            "φ = Σ_(k=0)^3 C_(k + 1)·x^k·cos(ωx) + "
-            "Σ_(k=0)^3 C_(k + 5)·x^k·sin(ωx)",
+            "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
+            "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
     };
     bool valid = true;
@@ -2735,8 +2735,8 @@ static void test_diffequ_solves_maximum_repeated_quadratic_power(void)
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
-                 strcmp(string_c_str(text), "x = Σ_(k=0)^63 C_(k + 1)·t^k·cos(ωt) + "
-                                            "Σ_(k=0)^63 C_(k + 65)·t^k·sin(ωt)") == 0;
+                 strcmp(string_c_str(text), "x = (Σ_(k=0)^63 C_(k + 1)·t^k)·cos(ωt) + "
+                                            "(Σ_(k=0)^63 C_(k + 65)·t^k)·sin(ωt)") == 0;
 
     string_free(text);
     de_solve_result_free(result);
@@ -4016,7 +4016,7 @@ static void test_diffequ_solves_scaled_coordinate_characteristics(void)
     WANT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0", "z = F(y/(x² + 1)) + ½y");
     WANT_CHARACTERISTIC_SOLUTION("(x^2+1)*Dx(z) + 2*x*y*Dy(z) - x*y = 0; "
                                    "z(x, 1) = (x^2+1)^2",
-                                   "z = ½·(y + 2·(1/y·(x² + 1))² - 1)");
+                                   "z = ½·(y + 2·((x² + 1)/y)² - 1)");
 }
 
 static void test_diffequ_solves_exponential_characteristics(void)

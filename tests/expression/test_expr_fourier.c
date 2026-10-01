@@ -467,8 +467,37 @@ static void test_imaginary_additive_parentheses(void)
     expr_free(x);
 }
 
+static void test_sgn_native_derivatives(void)
+{
+    expr_t *x = expr_new_named_var(NUM_ZERO, "x");
+    expr_t *sign = expr_sgn(x);
+    const expr_t *variables[] = {x};
+    const expr_t *derivative = expr_get_deriv(sign, x);
+    const number_t points[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE, NUM_I};
+    ASSERT_NOT_NULL(derivative);
+    for (size_t i = 0u; i < sizeof(points) / sizeof(*points); ++i) {
+        expr_set_val(x, points[i]);
+        number_t forward = expr_eval(derivative), value = NUM_NAN, reverse = NUM_NAN;
+        ASSERT_EQ_INT(expr_eval_derivatives(sign, 1u, variables, &value, &reverse), 0);
+        if (i == 1u || i == 3u) {
+            ASSERT_TRUE(num_is_nan(forward));
+            ASSERT_TRUE(num_is_nan(reverse));
+        } else {
+            ASSERT_TRUE(num_is_zero(forward));
+            ASSERT_TRUE(num_is_zero(reverse));
+            ASSERT_TRUE(num_eq(value, points[i]));
+        }
+        num_destroy(&reverse);
+        num_destroy(&value);
+        num_destroy(&forward);
+    }
+    expr_free(sign);
+    expr_free(x);
+}
+
 void test_fourier_and_signal_functions(void)
 {
+    TEST_RUN_SUBTEST(test_sgn_native_derivatives, "expression,sgn,derivatives");
     TEST_RUN_SUBTEST(test_imaginary_additive_parentheses, NULL);
     TEST_RUN_SUBTEST(test_analytic_evaluation_functional, NULL);
     TEST_RUN_SUBTEST(test_modified_bessel_k_numeric_layers, NULL);

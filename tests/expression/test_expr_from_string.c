@@ -495,6 +495,8 @@ static void test_from_function_body_formal_derivatives(void)
     for (size_t i = 0u; i < sizeof(sources) / sizeof(sources[0]); ++i) {
         expr_t *original = expr_from_function_body(sources[i], NULL);
         ASSERT_NOT_NULL(original);
+        if (!expr_is_formal_derivative(original))
+            fprintf(stderr, "Expected a formal derivative for %s\n", sources[i]);
         ASSERT_TRUE(expr_is_formal_derivative(original));
         char *body = original ? expr_to_function_body(original) : NULL;
         ASSERT_NOT_NULL(body);
@@ -621,6 +623,10 @@ static void test_from_string_conjugation(void)
     check_parse_num("postfix conjugate evaluates", "(1 + 2i)^*", "1 - 2i", __LINE__);
     check_parse_expr("symbolic modulus bars parse", "|z|", "{ |z| | z = NAN }", __LINE__);
     check_parse_val("complex modulus bars evaluate", "|1 + 2i|", sqrt(5.0), __LINE__);
+    check_parse_val("implicit coefficient before modulus", "{2|x| | x=-3}", 6.0, __LINE__);
+    check_parse_val("adjacent moduli multiply", "{|x||x+1| | x=-3}", 6.0, __LINE__);
+    check_parse_val("nested modulus inside function argument", "{|hypot(2|x|,8)| | x=-3}", 10.0, __LINE__);
+    check_parse_val("explicit product inside nested modulus", "{|2*|x|| | x=-3}", 6.0, __LINE__);
     check_parse_val("complex modulus agrees with sqrt(z z*)",
                     "{ |z| - sqrt(z * z^*) | z = 1 + 2i }", 0.0, __LINE__);
     check_parse_val("abs and modulus bars agree for complex scalars",
@@ -1117,7 +1123,7 @@ static void test_from_string_series_ellipsis(void)
         sine_progression_text = expr_to_string(sine_progression, style_UNBOUND);
         ASSERT_NOT_NULL(sine_progression_text);
         ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(n/2)"));
-        ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(1/2·(n + 1))"));
+        ASSERT_NOT_NULL(strstr(sine_progression_text, "sin((n + 1)/2)"));
         ASSERT_NOT_NULL(strstr(sine_progression_text, "sin(½)"));
         ASSERT_NOT_NULL(strstr(string_c_str(sine_progression_derivation_TeX),
                                "\\sum_{k=1}^{n}\\sin(k)"));
@@ -1621,7 +1627,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ 1/2·(3^n - 1) | ; n = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ (3^n - 1)/2 | ; n = NAN }");
     ASSERT_NOT_NULL(strstr(function_text, "return (3^n - 1)/2."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n - 1}3^{k}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{3^{n} - 1}{2}"));
@@ -2972,8 +2978,8 @@ static void test_from_string_errors(void)
     check_parse_null("duplicate var name", "{ x | x = 1, x = 2 }", __LINE__);
     /* Same name used as both variable and named constant */
     check_parse_null("var-const name clash", "{ x | x = 1; x = 2 }", __LINE__);
-    /* Missing '=' in binding */
-    check_parse_null_stderr_contains("missing '=' in binding", "{ x | x 1 }", "trailing input", __LINE__);
+    /* Without a binding assignment, the bar starts an unterminated modulus factor. */
+    check_parse_null_stderr_contains("unmatched bar without binding assignment", "{ x | x 1 }", "expected '|'", __LINE__);
     /* Missing numeric value after '=' in binding */
     check_parse_null_stderr_contains("missing value in binding", "{ x | x = }", "incorrect syntax for x:", __LINE__);
     /* Malformed binding value should identify the binding that failed. */
@@ -3352,8 +3358,9 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    if (deriv_text && strcmp(deriv_text, "{ 1/(x² + 3x + 5)⁸·(-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + "
-                                         "8114400x⁴ + 3951360x³ - 10301760x² - 11652480x - 2530080) | x = NAN }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ (-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + "
+                                         "8114400x⁴ + 3951360x³ - 10301760x² - 11652480x - 2530080)"
+                                         "/(x² + 3x + 5)⁸ | x = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational quadratic-power derivative uses polynomial fast path\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -3379,8 +3386,9 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     if (deriv_text &&
-        strcmp(deriv_text, "{ 1/(x² + 3x + 5)⁹·(40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - "
-                           "71124480x⁴ + 247242240x³ + 419489280x² + 182165760x + 2459520) | x = NAN }") == 0) {
+        strcmp(deriv_text, "{ (40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - "
+                           "71124480x⁴ + 247242240x³ + 419489280x² + 182165760x + 2459520)"
+                           "/(x² + 3x + 5)⁹ | x = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational derivative polynomial storage follows degree\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -3697,6 +3705,12 @@ static void test_binding_edit_preserves_array_value(void)
 
 static void test_from_string_unevaluated_integral(void)
 {
+    check_parse_val("indefinite integral retains supplied coordinate and constant",
+                    "{ @S sin(x) dx | x=pi; C=0 }", 1.0, __LINE__);
+    check_parse_val("indefinite integral retains multiple supplied constants",
+                    "{ @S (a.x + sin(x)) dx | x=0; a=2,C=7 }", 6.0, __LINE__);
+    check_parse_val("definite integral keeps dummy independent of outer binding",
+                    "{ @S_0^2 x dx | x=99 }", 2.0, __LINE__);
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ ∫^x exp(cosh(t)) dt }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
@@ -3751,7 +3765,7 @@ static void test_from_string_unevaluated_integral(void)
         TEST_FAIL();
     }
 
-    if (func_text && strstr(func_text, "integral(x, exp(cosh(t)), t)") != NULL) {
+    if (func_text && strstr(func_text, "integral(exp(cosh(t)), t, x)") != NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral function form uses integral() notation\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", func_text);
     } else {
@@ -3768,7 +3782,7 @@ static void test_from_string_unevaluated_integral(void)
     expr_bindings_free(bindings);
     expr_free(expr);
 
-    expr = expr_from_string("{ integral(x, exp(cosh(t)), t) }", &bindings);
+    expr = expr_from_string("{ integral(exp(cosh(t)), t, x) }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral ASCII function form parses\n");
@@ -3896,25 +3910,25 @@ static void test_from_string_unevaluated_integral(void)
     check_parse_val("unevaluated integral explicit bounds evaluate numerically", "{ @S^3_1 1/t dt }", log(3.0),
                     __LINE__);
 
-    check_parse_val("Li integral removable primitive limit at one", "integral(1,2,Li(t),t)",
+    check_parse_val("Li integral removable primitive limit at one", "integral(Li(t),t,1,2)",
                     -0.18411035424411999890, __LINE__);
-    check_parse_val("Li integral continuous primitive limit at zero", "integral(0,1,Li(t),t)", -log(2.0), __LINE__);
-    check_parse_val("Li integral reversed endpoints", "integral(1,0,Li(t),t)", log(2.0), __LINE__);
-    check_parse_val("Li integral scaled argument", "integral(1/2,1,Li(2t),t)",
+    check_parse_val("Li integral continuous primitive limit at zero", "integral(Li(t),t,0,1)", -log(2.0), __LINE__);
+    check_parse_val("Li integral reversed endpoints", "integral(Li(t),t,1,0)", log(2.0), __LINE__);
+    check_parse_val("Li integral scaled argument", "integral(Li(2t),t,1/2,1)",
                     -0.09205517712205999945, __LINE__);
-    check_parse_val("Li integral shifted argument", "integral(0,1,Li(t+1),t)",
+    check_parse_val("Li integral shifted argument", "integral(Li(t+1),t,0,1)",
                     -0.18411035424411999890, __LINE__);
-    check_parse_val("Li integral negative slope", "integral(0,1,Li(2-t),t)",
+    check_parse_val("Li integral negative slope", "integral(Li(2-t),t,0,1)",
                     -0.18411035424411999890, __LINE__);
-    check_parse_val("Li integral crosses singularity", "integral(0,2,Li(t),t)",
+    check_parse_val("Li integral crosses singularity", "integral(Li(t),t,0,2)",
                     -0.18411035424411999890 - log(2.0), __LINE__);
-    check_parse_val("Ei log integral equivalent endpoint limit", "integral(1,2,Ei(ln(t)),t)",
+    check_parse_val("Ei log integral equivalent endpoint limit", "integral(Ei(ln(t)),t,1,2)",
                     -0.18411035424411999890, __LINE__);
     check_parse_val("Li integral inside bound finite sum",
-                    "{ sum(k,1,n,integral(1,x,Li(k.t),t))+C | x=2; n=1,C=0 }",
+                    "{ sum(k,1,n,integral(Li(k.t),t,1,x))+C | x=2; n=1,C=0 }",
                     -0.18411035424411999890, __LINE__);
 
-    expr = expr_from_string("{ integral(1, 3, 1/t, t) }", &bindings);
+    expr = expr_from_string("{ integral(1/t, t, 1, 3) }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     if (text && strcmp(text, "∫^3_1 1/t·dt") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral four-argument ASCII function form parses\n");
@@ -4414,7 +4428,7 @@ static void test_from_string_infinity_TeX(void)
         {"-∞", "-\\infty"},
         {"sum(n,1,inf,1/n^s)", "\\sum_{n=1}^{\\infty}"},
         {"product(n,1,inf,1-1/n^s)", "\\prod_{n=1}^{\\infty}"},
-        {"integral(0,inf,exp(-x),x)", "\\infty"}
+        {"integral(exp(-x),x,0,inf)", "\\infty"}
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {

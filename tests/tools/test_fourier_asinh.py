@@ -120,7 +120,8 @@ class ModifiedBesselKTests(unittest.TestCase):
         for n in (0, 1, 2, 3):
             primitive, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, f"K_{n}(x)", 40, "x", "integral")
             self.assertEqual(code, 0, raw)
-            self.assertNotIn("integral(", primitive["integral_function"])
+            self.assertIn("return integral(besselk(", primitive["integral_function"])
+            self.assertNotIn("∫", primitive["integral"].split(" = ", 1)[1])
             expression = primitive["integral"].split(" = ", 1)[1]
             result, raw, code = mars_lab.run_mars_lab_fields(
                 mars_lab.DEFAULT_BIN, expression.replace("x = NAN", "x = 1"), 40, "x", "derivative")

@@ -266,6 +266,29 @@ static void test_readme_example_bessel_y(void)
     mat_free(A);
 }
 
+/* README example: docs/matrix.md, real signum on a diagonal matrix. */
+static void test_readme_example_sgn(void)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *a = mat_create_diagonal(3u, diagonal);
+    matrix_t *b = mat_sgn(a);
+    check_bool("README signum example produces a matrix", b != NULL);
+    if (b) {
+        printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
+               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+               num_to_double(mat_get_num(b, 2, 2)));
+        char output[80];
+        snprintf(output, sizeof(output), "sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
+                 num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+                 num_to_double(mat_get_num(b, 2, 2)));
+        check_bool("README signum output matches the guide",
+                   strcmp(output, "sgn(diag(-1, 0, 1)) = diag(-1, 0, 1)\n") == 0);
+    }
+    mat_free(b);
+    mat_free(a);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Core");
@@ -292,6 +315,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_bessel_i, readme_examples, "matrix,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_struve_h, readme_examples, "matrix,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_bessel_y, readme_examples, "matrix,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_sgn, readme_examples, "matrix,readme,output,sgn");
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

@@ -99,13 +99,11 @@ static int expr_text_to_long(const string_t *text, long *out)
     return 1;
 }
 
-static inline number_t expr_eval_unary_num(expr_t *dv, number_t (*fn)(const number_t))
-{
+static inline number_t expr_eval_unary_num(expr_t *dv, number_t (*fn)(const number_t)) {
     return fn(expr_eval_num_internal(dv->a));
 }
 
-static inline number_t expr_eval_binary_num(expr_t *dv, number_t (*fn)(const number_t, const number_t))
-{
+static inline number_t expr_eval_binary_num(expr_t *dv, number_t (*fn)(const number_t, const number_t)) {
     return fn(expr_eval_num_internal(dv->a), expr_eval_num_internal(dv->b));
 }
 

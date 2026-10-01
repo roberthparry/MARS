@@ -680,16 +680,18 @@ static bool function_root_has_explicit_integral_cartesian_output(const expr_t *r
 static bool function_contains_bound_operator(const expr_t *expr)
 {
     return expr && (expr_is_op(expr, &ops_summation) || expr_is_op(expr, &ops_product) ||
-                    expr_is_op(expr, &ops_integral) || function_contains_bound_operator(expr->a) ||
+                    expr_is_op(expr, &ops_integral) || expr_is_formal_derivative(expr) ||
+                    expr_is_integral_transform(expr) || function_contains_bound_operator(expr->a) ||
                     function_contains_bound_operator(expr->b));
 }
 
-static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants)
+static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *variables, const varlist_t *constants,
+                               bool preserve_operations)
 {
-    if (expr_is_integral_transform(root)) {
+    if (!preserve_operations && expr_is_integral_transform(root)) {
         expr_t *result = expr_transform_result(root);
         if (result) {
-            emit_function_body(b, result, variables, constants);
+            emit_function_body(b, result, variables, constants, false);
             expr_free(result);
             return;
         }
@@ -757,7 +759,7 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
         sbuf_puts(b, ") {\n");
         sbuf_t body;
         sbuf_init(&body);
-        emit_function_body(&body, root->a, variables, constants);
+        emit_function_body(&body, root->a, variables, constants, preserve_operations);
         char *text = sbuf_to_c_string(&body);
         if (text) {
             for (char *line = text; *line;) {
@@ -776,6 +778,12 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
         free(text);
         sbuf_free(&body);
         sbuf_puts(b, "    } else {\n        return @nan.\n    }\n");
+        return;
+    }
+    if (preserve_operations) {
+        sbuf_puts(b, "    return ");
+        emit_func_operations(root, b, PREC_LOWEST);
+        sbuf_puts(b, ".\n");
         return;
     }
     function_dag_table_t dag;
@@ -1158,7 +1166,7 @@ char *expr_to_function_body(const expr_t *expr)
     return out;
 }
 
-string_t *expr_to_text_function(const expr_t *f)
+static string_t *expr_to_text_function_mode(const expr_t *f, bool preserve_transform, const expr_t *bindings)
 {
     expr_cartesian_composition_t view;
     sbuf_t b;
@@ -1166,10 +1174,11 @@ string_t *expr_to_text_function(const expr_t *f)
     varlist_t vl;
     varlist_t cl;
     const expr_t *g = f;
+    expr_t *guarded_operation = NULL;
     const char *fname = "expr";
     string_t *out;
 
-    if (expr_cartesian_composition_init(f, &view)) {
+    if (!preserve_transform && !bindings && expr_cartesian_composition_init(f, &view)) {
         out = expr_to_text_function_cartesian(view.expanded);
         expr_cartesian_composition_clear(&view);
         if (out)
@@ -1196,13 +1205,29 @@ string_t *expr_to_text_function(const expr_t *f)
         }
     }
 
+    if (preserve_transform || bindings) {
+        const expr_t *operation = f;
+
+        /* The result already combines authored and inferred restrictions. Use those once,
+         * with the original operation as the guarded body rather than its evaluated formula. */
+        while (expr_is_op(operation, &ops_real_domain))
+            operation = operation->a;
+        guarded_operation = expr_with_domain_of(operation, bindings);
+        if (guarded_operation && guarded_operation->b)
+            g = guarded_operation;
+    }
+
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((expr_t *)f, &vnames);
 
     varlist_init(&vl);
+    if (bindings)
+        find_vars_dfs(bindings, &vl);
     find_vars_dfs(g, &vl);
 
     varlist_init(&cl);
+    if (bindings)
+        find_named_consts_dfs(bindings, &cl);
     find_explicit_named_consts_dfs(f, &cl);
     find_named_consts_dfs(g, &cl);
 
@@ -1211,7 +1236,7 @@ string_t *expr_to_text_function(const expr_t *f)
     sbuf_putc(&b, '(');
     emit_function_param_list(&b, &vl, &cl);
     sbuf_puts(&b, ") {\n");
-    emit_function_body(&b, g, &vl, &cl);
+    emit_function_body(&b, g, &vl, &cl, preserve_transform || bindings);
     sbuf_puts(&b, "}\n\n");
 
     emit_bindings(&b, &vl, false);
@@ -1227,5 +1252,36 @@ string_t *expr_to_text_function(const expr_t *f)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
+    expr_free(guarded_operation);
     return out;
+}
+
+string_t *expr_to_text_function(const expr_t *f)
+{
+    return expr_to_text_function_mode(f, false, NULL);
+}
+
+/* Preserve the requested outer transform for execution by a Function programme. */
+string_t *expr_to_transform_function_text(const expr_t *expr)
+{
+    if (!expr_is_integral_transform(expr))
+        return NULL;
+    expr_t *result = expr_transform_result(expr);
+    string_t *text = expr_to_text_function_mode(expr, true, result);
+    expr_free(result);
+    return text;
+}
+
+/* Search the authored expression tree for operations which must remain executable. */
+bool expr_contains_calculus_request(const expr_t *expr)
+{
+    return expr && (expr_is_formal_derivative(expr) || expr_is_op(expr, &ops_integral) ||
+                    expr_is_integral_transform(expr) ||
+                    expr_contains_calculus_request(expr->a) || expr_contains_calculus_request(expr->b));
+}
+
+/* Keep calculus executable while retaining the result's generated constant bindings. */
+string_t *expr_to_calculus_function_text(const expr_t *request, const expr_t *result)
+{
+    return expr_contains_calculus_request(request) ? expr_to_text_function_mode(request, false, result) : NULL;
 }

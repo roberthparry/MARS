@@ -2415,7 +2415,7 @@ static void test_to_string_symmetric_shifts_TeX(void)
         {"sin(a*q+z)+cos(z-a*q)", "z + a\\mkern-2mu q", "z - a\\mkern-2mu q"},
         {"sin(t+x^2)+cos(x^2-t)", "x^{2} + t", "x^{2} - t"},
         {"sin(exp(t)+x)+cos(x-exp(t))", "x + e^{t}", "x - e^{t}"},
-        {"integral(x-t,t+x,exp(r),r)", "^{x + t}", "_{x - t}"},
+        {"integral(exp(r),r,x-t,t+x)", "^{x + t}", "_{x - t}"},
         {"sin(t+x)+cos(x-2*t)", "t + x", "x - 2\\mkern-2mu t"}
     };
     for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
@@ -2442,14 +2442,14 @@ static void test_to_string_symmetric_shifts_TeX(void)
 static void test_to_string_integrals_outside_fractions_TeX(void)
 {
     static const struct { const char *source; const char *prefix; } cases[] = {
-        {"integral(0,x,exp(cosh(t)),t)/exp(x)", "e^{-x}\\,"},
-        {"-integral(0,x,exp(cosh(t)),t)/exp(x)", "-e^{-x}\\,"},
-        {"integral(0,x,exp(cosh(t)),t)/c", "\\frac{1}{c}\\,"},
-        {"(1+integral(0,x,exp(cosh(t)),t))/c", "\\frac{1}{c}\\,"},
-        {"1/integral(0,x,exp(cosh(t)),t)", "\\left("},
-        {"1/exp(integral(0,x,exp(cosh(t)),t))", "e^{-"},
-        {"integral(0,x,exp(cosh(t)),t)^(-2)", "\\left("},
-        {"integral(0,x,exp(cosh(t)),t)^(-1/2)", "\\left("}
+        {"integral(exp(cosh(t)),t,0,x)/exp(x)", "e^{-x}\\,"},
+        {"-integral(exp(cosh(t)),t,0,x)/exp(x)", "-e^{-x}\\,"},
+        {"integral(exp(cosh(t)),t,0,x)/c", "\\frac{1}{c}\\,"},
+        {"(1+integral(exp(cosh(t)),t,0,x))/c", "\\frac{1}{c}\\,"},
+        {"1/integral(exp(cosh(t)),t,0,x)", "\\left("},
+        {"1/exp(integral(exp(cosh(t)),t,0,x))", "e^{-"},
+        {"integral(exp(cosh(t)),t,0,x)^(-2)", "\\left("},
+        {"integral(exp(cosh(t)),t,0,x)^(-1/2)", "\\left("}
     };
     for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
         expr_t *expr = expr_from_string(cases[i].source, NULL);

@@ -13,6 +13,10 @@ The intended public workflow is:
 ## Ownership
 
 - `equ_new(lhs, rhs)` returns an owning `equation_t *`.
+- `equ_new_with_inferred_bindings(lhs, rhs)` also discovers the named variables
+  and constants on both sides for `equ_derive_solutions`. It retains the existing
+  nodes and their values without a text round-trip. All occurrences of one name
+  must already share a node; the returned equation owns its binding table.
 - `equ_free(...)` releases the equation and any bindings it owns.
 - `equ_lhs(...)`, `equ_rhs(...)`, `equ_bindings(...)`, and
   `equ_binding(...)` return borrowed views.
@@ -20,6 +24,11 @@ The intended public workflow is:
   `equation_solutions_t *`, released with `equ_solutions_free(...)`.
 - Each solution borrowed from a solution set is itself an `equation_t` in
   isolated form, such as `x = 2` or `E = 2.2749...`.
+
+The initial Ophelia runner can execute generated equation functions and their
+`output(solve(equ(...)))` calls through this API. See
+[Running Function cards](mars-lab.md#running-function-cards) for the supported
+subset and its limitations.
 
 ## Parsing Model
 

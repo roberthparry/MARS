@@ -21,14 +21,14 @@ class LaplaceTimeIntegralTests(unittest.TestCase):
         if "chosen antiderivative" in fields["tex"]:
             for fragment in (r"F\left(0\right)", r"F'(x)=f\left(x\right)"):
                 self.assertIn(fragment, copied["tex"])
-            self.assertIn("integral(0, f(x), x)", copied["function"])
+            self.assertIn("integral(f(x), x, 0)", copied["function"])
             self.assertIn("laplace(f(t), t, s)", copied["function"])
             return
         normalise = lambda text: text.replace(r"\mkern-2mu ", "").replace(r"\,", "")
         self.assertEqual(normalise(fields["tex"]), normalise(copied["tex"]))
 
     def test_zero_based_integral_spellings(self):
-        expected = self.fields("@L{integral(0,t,f(x),x)}")
+        expected = self.fields("@L{integral(f(x),x,0,t)}")
         self.assertEqual(expected["unbound"], "ℒ(f(t), t, s)/s")
         for source in ("@L{@S_0^t f(x) dx}", "@L{@S^t_0 f(x) dx}", "@L{∫_0^t f(x) dx}"):
             fields = self.fields(source)
@@ -39,13 +39,13 @@ class LaplaceTimeIntegralTests(unittest.TestCase):
     def test_upper_only_retains_initial_value(self):
         fields = self.fields("@L{@S^t f(x) dx}")
         self.assertIn("laplace(f(t), t, s)", fields["function"])
-        self.assertIn("integral(0, f(x), x)", fields["function"])
+        self.assertIn("integral(f(x), x, 0)", fields["function"])
         self.assertNotIn("integral_meta", fields["unbound"])
         self.assertIn(r"F\left(0\right)", fields["tex"])
         self.assertIn(r"F'(x)=f\left(x\right)", fields["tex"])
         self.assertIn("chosen antiderivative", fields["tex"])
         self.assertNotIn(r"\int^{0}", fields["tex"])
-        self.assertEqual(fields["tex"], self.fields("@L{integral(t,f(x),x)}")["tex"])
+        self.assertEqual(fields["tex"], self.fields("@L{integral(f(x),x,t)}")["tex"])
         self.assert_round_trip(fields)
 
     def test_primitive_notation_does_not_capture_existing_F(self):
@@ -61,11 +61,11 @@ class LaplaceTimeIntegralTests(unittest.TestCase):
 
     def test_nonzero_lower_bound_and_integration_constant(self):
         fields = self.fields("@L{@S_2^t f(x) dx}")
-        self.assertIn("integral(2, 0, f(x), x)", fields["function"])
+        self.assertIn("integral(f(x), x, 2, 0)", fields["function"])
         self.assert_round_trip(fields)
         fields = self.fields("@L{@S^t f(x) dx + C}")
         self.assertIn("const C", fields["function"])
-        self.assertIn("integral(0, f(x), x)", fields["function"])
+        self.assertIn("integral(f(x), x, 0)", fields["function"])
 
     def test_explicit_variables_and_same_dummy(self):
         fields = self.fields("@L(@S_0^u f(x) dx,u,p)")
@@ -79,7 +79,7 @@ class LaplaceTimeIntegralTests(unittest.TestCase):
         self.assertEqual(self.fields("a(x+1)")["tex"], self.fields("a*(x+1)")["tex"])
 
     def test_known_integrand(self):
-        for integral in ("@S_0^t sin(x) dx", "∫_0^t sin(x) dx", "integral(0,t,sin(x),x)"):
+        for integral in ("@S_0^t sin(x) dx", "∫_0^t sin(x) dx", "integral(sin(x),x,0,t)"):
             fields = self.fields("{@L{" + integral + "} | s=2}")
             self.assertAlmostEqual(float(fields["value"]), 0.1)
 

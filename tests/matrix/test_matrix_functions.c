@@ -31,6 +31,80 @@ static void check_cylindrical_entry(const char *label, const matrix_t *A, size_t
     num_destroy(&got);
 }
 
+static void test_mat_sgn_numeric(void)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal[] = {num_neg(NUM_TWO), NUM_ZERO, num_create_from_long(3)};
+    number_t signs[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *a = mat_create_diagonal(3u, diagonal);
+    matrix_t *sign = mat_sgn(a);
+
+    check_bool("signum diagonal produces a matrix", sign != NULL);
+    for (size_t row = 0u; row < 3u; ++row) {
+        for (size_t col = 0u; col < 3u; ++col)
+            check_cylindrical_entry("signum diagonal spectrum", sign, row, col, row == col ? signs[row] : NUM_ZERO);
+        check_cylindrical_entry("signum preserves input", a, row, row, diagonal[row]);
+    }
+    mat_free(sign);
+    mat_free(a);
+
+    /* Positive eigenvalues give the identity, even when off-diagonal entries are positive. */
+    number_t positive[] = {NUM_TWO, NUM_ONE, NUM_ONE, NUM_TWO};
+    a = mat_create(2u, 2u, positive);
+    sign = mat_sgn(a);
+    check_bool("positive definite signum produces a matrix", sign != NULL);
+    for (size_t row = 0u; row < 2u; ++row) {
+        for (size_t col = 0u; col < 2u; ++col)
+            check_cylindrical_entry("positive spectrum signum is identity", sign, row, col,
+                                    row == col ? NUM_ONE : NUM_ZERO);
+    }
+    mat_free(sign);
+    mat_free(a);
+
+    number_t mixed[] = {num_create_from_long(3), num_create_from_long(4),
+                         num_create_from_long(4), num_create_from_long(-3)};
+    a = mat_create(2u, 2u, mixed);
+    sign = mat_sgn(a);
+    check_bool("mixed real spectrum signum produces a matrix", sign != NULL);
+    for (size_t row = 0u; row < 2u; ++row) {
+        for (size_t col = 0u; col < 2u; ++col)
+            check_cylindrical_entry("eigenvalues -5 and 5 give A/5", sign, row, col,
+                                    num_div(mixed[2u * row + col], num_create_from_long(5)));
+    }
+    mat_free(sign);
+    mat_free(a);
+
+    /* Complex Hermitian entries still have a real spectrum. */
+    number_t hermitian[] = {NUM_ZERO, num_mul(NUM_TWO, NUM_I), num_mul(NUM_TWO, NUM_NEG_I), NUM_ZERO};
+    a = mat_create(2u, 2u, hermitian);
+    sign = mat_sgn(a);
+    check_bool("complex Hermitian signum produces a matrix", sign != NULL);
+    for (size_t row = 0u; row < 2u; ++row) {
+        for (size_t col = 0u; col < 2u; ++col)
+            check_cylindrical_entry("real spectrum permits complex entries", sign, row, col,
+                                    num_div(hermitian[2u * row + col], NUM_TWO));
+    }
+    mat_free(sign);
+    mat_free(a);
+
+    number_t invalid[] = {NUM_I, NUM_NAN};
+    for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        a = mat_create(1u, 1u, &invalid[i]);
+        sign = mat_sgn(a);
+        check_bool("invalid scalar spectrum produces NaN", sign && num_is_nan(mat_get_num(sign, 0u, 0u)));
+        mat_free(sign);
+        mat_free(a);
+    }
+    a = mat_create(1u, 2u, positive);
+    sign = mat_sgn(a);
+    check_bool("signum rejects non-square matrices", sign == NULL);
+    mat_free(sign);
+    mat_free(a);
+    sign = mat_sgn(NULL);
+    check_bool("signum rejects null input", sign == NULL);
+    mat_free(sign);
+}
+
 static void test_mat_struve_h_numeric(void)
 {
     NUM_SCOPE(scope);
@@ -6479,6 +6553,7 @@ static void test_expr_matrix_functions(void)
 
 void run_matrix_function_tests(void)
 {
+    TEST_RUN_CASE(test_mat_sgn_numeric, "matrix,signal,sgn");
     TEST_RUN_CASE(test_mat_struve_h_numeric, NULL);
     TEST_RUN_CASE(test_mat_struve_h_nilpotent, NULL);
     TEST_RUN_CASE(test_mat_bessel_y_numeric, NULL);

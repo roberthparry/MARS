@@ -85,7 +85,8 @@ class BesselITests(unittest.TestCase):
     def test_primitives_differentiate_back(self):
         for n in (0, 1, 2, -1, -2):
             result = fields(f"bessel_i({n},2*x+1)", "integral")
-            self.assertNotIn("integral(", result["integral_function"])
+            self.assertIn("return integral(besseli(", result["integral_function"])
+            self.assertNotIn("∫", result["integral"].split(" = ", 1)[1])
             primitive = result["integral"].split(" = ", 1)[1].replace("x = NAN", "x = 1")
             differentiated = fields(primitive, "derivative")
             self.assertLess(abs(number(differentiated, "derivative_value")-reference(n,3)), 2e-10)

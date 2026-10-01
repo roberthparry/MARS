@@ -172,6 +172,17 @@ static void number_readme_struve_h_example(void)
     ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0);
 }
 
+static void number_readme_sgn_example(void)
+{
+    /* README example: real signum (docs/number.md). */
+    NUM_SCOPE(scope);
+    number_t sign = num_sgn(num_create_from_frac(-2, 3));
+    printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+    char output[80];
+    snprintf(output, sizeof(output), "sgn(-2/3) = %.0f\n", num_to_double(sign));
+    ASSERT_TRUE(strcmp(output, "sgn(-2/3) = -1\n") == 0);
+}
+
 void run_number_readme_example_tests(void)
 {
     number_readme_rational_basic();
@@ -182,4 +193,5 @@ void run_number_readme_example_tests(void)
     number_readme_bessel_i_example();
     number_readme_struve_h_example();
     run_number_bessel_y_readme_tests();
+    number_readme_sgn_example();
 }

@@ -413,19 +413,23 @@ shifted-argument `sech` value are evaluated through the recognised real finite
 sum, avoiding unsupported unit-circle terms and spurious complex cancellation;
 the remaining real-q hyperbolic forms are evaluated directly.
 
-The result cards deliberately show different representations of one native
-simplified expression:
+The result cards deliberately show different representations of the native
+calculation:
 
 - **Rendered TeX** shows the simplified mathematical result without bindings.
 - **Expression** shows the parseable MARS expression, including variable and
   constant bindings when the input has them. Riemann and Hurwitz zeta use the
   shared mathematical symbol `ζ`, distinguished by their one- and two-argument
   forms.
-- **Function** shows an evaluable MARS function. Reused expression-DAG nodes
+- **Function** shows MARS function source. Its **RUN** control executes the
+  initial scalar and equation Ophelia subset described below. Reused expression-DAG nodes
   are named once as intermediate constants or variables before the return
   expression. A shared subexpression such as `x/2` is assigned once and reused.
   When both `exp(x)` and `exp(-x)` are needed, the second temporary reuses the
   first as `v2 = 1/v1`.
+  For a top-level Laplace, Fourier or inverse-transform request, the programme
+  preserves the original transform operation: RUN performs it instead of returning
+  a precomputed formula. TeX and Expression continue to show the simplified result.
 - **Value** appears whenever supplied bindings allow a numerical result. It is
   the only card that substitutes those bindings; it also appears when
   simplification proves a binding-independent value despite an unset binding.
@@ -448,6 +452,10 @@ syntax.
 Typeable named constants use `@pi`, `@phi`, `@gamma`, `@tau` and `@inf`, with
 their own syntax colour. Values edited in Expression-mode binding controls are
 committed to the expression before evaluation, differentiation or integration.
+Each populated binding input has an × button inside its right edge. It clears
+the value using the same rules as deleting it manually. For ordinary bindings,
+this leaves the value unset and returns focus to the input. The button is also
+accessible by keyboard.
 Descriptive `$[...]` identifiers remain accepted as input aliases for
 bracketed names and use the subdued off-white italic styling of variable and
 constant names, but result cards do not generate the `$[...]` form.
@@ -455,6 +463,269 @@ The syntax colouring distinguishes keywords, functions, variables, numbers and
 comments. Function-call brackets use the same gold hue as operators without
 bold weight, while grouping brackets retain the ordinary text colour. The
 colouring does not alter the copyable Function text.
+
+### Running Function cards
+
+Every card titled **Function** has a **RUN** button, including the cards in
+Expression, Equation and Matrix modes. RUN submits the card's complete,
+unabbreviated source at the selected precision to the native Ophelia prototype.
+It does not re-evaluate the editor input, execute JavaScript or change the
+Expression and Value cards. Output and source-position diagnostics appear in
+the Function card's **Run output** area. Replacing the result or switching modes
+clears this area and prevents an older response from appearing on a newer card.
+Evaluate again after editing bindings before pressing RUN.
+
+The first supported subset accepts one expression or equation function with scalar
+parameters, variable and constant assignments, generated intermediate values,
+returns, numerically decidable comparisons, symbolic scalar domain guards, and
+top-level output calls. Paired-backtick comments and double-backtick line
+comments are accepted. A full stop followed by whitespace or the end of the
+statement terminates it; an internal full stop multiplies. Commas can separate
+ordinary assignments on one line.
+
+For example, RUN executes this Function source:
+
+```text
+expression expr(x, y) {
+    return sqrt(x^2 + y^2).
+}
+x = 3.
+y = 4.
+output(expr(x, y)).
+```
+
+Output:
+
+```text
+5
+```
+
+Derivative and integral Function cards retain the requested operation, so RUN
+performs the calculation. This applies both to authored calculus requests and
+to the derivative/integral buttons. The TeX and Expression cards still show the
+evaluated algebra.
+
+Nested operations remain nested in both the Function programme and the
+left-hand side of the transform's TeX identity. An unresolved transform also
+retains those operations in TeX, without claiming an evaluated equality.
+For input `@L{@S^t sin(x) dx}`,
+the Function card contains:
+
+```text
+expression expr(s) {
+    if (realpart(s) > 0) {
+        return laplace(integral(sin(x), x, t), t, s).
+    } else {
+        return @nan.
+    }
+}
+s = ?.
+output(expr(s)).
+```
+
+RUN output:
+
+```text
+{ -s/(s² + 1) | s = ?; Re(s) > 0 }
+```
+
+The inner integral remains visible on the left of the TeX identity; it is not
+replaced there by its evaluated primitive. The integration coordinates `x` and
+`t` are local to their calls, not programme input bindings.
+The Function card carries the same domain restrictions as the result, as an
+`if` guard with an `@nan` fallback. Supplying a valid numerical binding does not
+remove this guard from the generated function. With unset bindings, RUN retains
+the condition on its symbolic result; outside the domain it returns `NAN`.
+
+For an indefinite integral:
+
+```text
+expression expr(x, const C) {
+    return integral(sin(x), x).
+}
+x = ?.
+const C = ?.
+output(expr(x, C)).
+```
+
+RUN output:
+
+```text
+{ C - cos(x) | x = ?; C = ? }
+```
+
+The two-argument call generates the integration constant itself. Its parameter
+allows a supplied value of that constant to be used; the programme does not
+append `+ C`. Definite integrals retain the four-argument form
+`integral(expression, variable, lower, upper)` and generate no arbitrary constant.
+Supplied bindings are preserved in the executable programme, including exact
+symbolic values. With the indefinite integral above, setting `x` to `pi` and `C`
+to zero produces:
+
+```text
+expression expr(x, const C) {
+    return integral(sin(x), x).
+}
+x = @pi.
+const C = 0.
+output(expr(x, C)).
+```
+
+RUN output:
+
+```text
+1
+```
+
+The integrand always comes first and the integration variable second. For example:
+
+```text
+output(integral(sin(x), x, 0, @pi)).
+```
+
+Output:
+
+```text
+2
+```
+
+An explicit upper endpoint selects a primitive without adding an arbitrary
+constant. Thus `@S^z sin(x) dx` generates this programme, and RUN agrees with
+the TeX and Expression cards:
+
+```text
+expression expr(z) {
+    return integral(sin(x), x, z).
+}
+z = ?.
+output(expr(z)).
+```
+
+RUN output:
+
+```text
+{ -cos(z) | z = ? }
+```
+
+This is not a definite integral from zero: at `z = 0`, this chosen primitive
+is `-1`, whereas the definite integral with both limits zero is `0`.
+
+For a derivative:
+
+```text
+expression expr(x) {
+    return derivative(sin(x), x, 1).
+}
+x = ?.
+output(expr(x)).
+```
+
+RUN output:
+
+```text
+{ cos(x) | x = ? }
+```
+
+For an inverse Laplace request, the Function card keeps the calculation executable:
+
+```text
+expression expr(t) {
+    return inverselaplace(5.(s + 3 + 10/s^2)/(s^2 + 4.s + 5), s, t).
+}
+t = ?.
+output(expr(t)).
+```
+
+RUN output:
+
+```text
+{ 10t + exp(-2t)·(13·cos(t) + 11·sin(t)) - 8 | t = ? }
+```
+
+Here `s` is the transform's local source coordinate, not an uninitialised function
+argument. Changing `t` to a numerical binding allows RUN to evaluate the result.
+
+An unset binding may be written as `?`. Ordinary scalar output falls back to
+native algebraic expression output when no numerical value is available;
+`outputa` explicitly requests algebraic output. Stored expressions retain their
+variable dependencies when numeric bindings are subsequently changed.
+RUN displays unset variable and constant bindings as `name = ?`, matching the
+Expression card; a standalone undefined numerical result remains `NAN`.
+Generated scalar domain guards can retain an unset binding symbolically when
+their `else` block returns `@nan`. Supported predicates are strict real-part
+lower bounds, nonzero comparisons, real-variable checks and conjunctions of these
+predicates. RUN preserves the native domain conditions alongside the returned
+expression; it does not assume that an unknown condition is true or false.
+For example:
+
+```text
+expression expr(s) {
+    if (realpart(s) > 0) {
+        return 1/s.
+    } else {
+        return @nan.
+    }
+}
+s = ?.
+output(expr(s)).
+```
+
+RUN output:
+
+```text
+{ 1/s | s = ?; Re(s) > 0 }
+```
+
+Supplying a binding evaluates the condition normally; values outside the domain
+return `NAN`. Expressions constructed with symbolic guards retain their variable
+dependencies for subsequent binding changes. General symbolic branching, including
+an unknown condition whose branches return different ordinary expressions, is not
+yet supported and produces a diagnostic. Boolean combinations retain normal
+short-circuit behaviour, including when a known operand determines their result.
+
+Equation functions return native equation values. `solve` accepts one equation
+value and returns the native solver's solution set; output prints every returned
+solution rather than choosing one root. For example:
+
+```text
+equation equ(Y) {
+    return equation(26.Y = 320/9).
+}
+`` Y = ?
+output(solve(equ(Y))).
+```
+
+Output:
+
+```text
+Y = ¹⁶⁰⁄₁₁₇
+```
+
+The commented hint leaves `Y` as an implicit uninitialised variable. Constant
+parameters remain constants during solving. Equation output preserves the
+left-hand side and evaluates the right-hand side when possible; `outputa`
+keeps it algebraic. Unsuccessful solving reports that no solution was established,
+not that none exists, unless the native solver proves an empty solution set.
+Any native search limitations or separate solution-family notes are also printed.
+
+This is not yet the full Ophelia language. Matrix programmes,
+arrays, convolution, loops, recursion, multiple function definitions, nested
+user-function calls, in-programme precision changes and undeclared captures
+from an outer scope are not implemented. Equation and solution-set assignments
+and the two-argument `solve(e, variable)` design are not implemented yet;
+the generated one-argument solve-and-output form is supported. Native mathematical calls retain their
+current expression semantics; an unresolved transform or formal derivative can
+remain symbolic. Unsupported statement forms report an error rather than being
+sent to a shell or silently ignored.
+
+The separate native target is `scratch/ophelia`; the resulting
+`build/release/scratch/ophelia` reads programme source from standard input and
+accepts an optional decimal-precision argument. Lab requests have a 30-second
+execution timeout. The prototype limits source to 64 KiB, scope size to 256
+symbols, parameters to 64, nesting to 32, executed statements to 2048 and output
+calls to 128. Shell, network and file-access operations are not language features.
+The wider design remains in the
+[Ophelia design notes](design-notes/expression-language.md).
 
 ## Equation mode
 

@@ -186,3 +186,19 @@ expr_t *expr_transform_result(const expr_t *transform)
 {
     return expr_is_integral_transform(transform) ? transform_descriptors[transform->ops->kind].result(transform) : NULL;
 }
+
+/* Differentiate known transform results on their existing domains; retain genuinely unresolved requests. */
+expr_t *expr_transform_deriv(expr_t *transform)
+{
+    expr_t *wrt = (expr_t *)expr_current_wrt_internal();
+    if (!wrt)
+        return NULL;
+    expr_t *result = expr_transform_result(transform);
+    const expr_t *body = result;
+    while (body && body->ops == &ops_real_domain)
+        body = body->a;
+    /* A rule which only wraps the original request has not made progress. */
+    expr_t *derivative = body && !expr_struct_eq(body, transform) ? expr_create_deriv(result, wrt) : NULL;
+    expr_free(result);
+    return derivative ? derivative : expr_new_formal_derivative(transform, 1u, &wrt);
+}

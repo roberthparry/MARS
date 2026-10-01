@@ -1453,8 +1453,40 @@ static void example_bessel_i(void)
     TEST_ASSERT_TRUE(strcmp(output, "I_0(1) = 1.2660658777520083") == 0, "Bessel I README output");
 }
 
+static void test_sgn(void)
+{
+    qfloat_t positive[] = {QF_ONE, QF_HALF, QF_TWO, qf_from_string("1e-300"), QF_INF};
+
+    for (size_t i = 0u; i < sizeof(positive) / sizeof(positive[0]); ++i) {
+        qcomplex_t plus = qc_sgn(qc_make(positive[i], QF_ZERO));
+        qcomplex_t minus = qc_sgn(qc_make(qf_neg(positive[i]), qf_from_double(-0.0)));
+        TEST_ASSERT_TRUE(qf_eq(qc_real(plus), QF_ONE) && qf_eq(qc_imag(plus), QF_ZERO), "positive real signum");
+        TEST_ASSERT_TRUE(qf_eq(qc_real(minus), QF_NEG_ONE) && qf_eq(qc_imag(minus), QF_ZERO),
+                         "negative real signum with signed imaginary zero");
+    }
+    qcomplex_t zero = qc_sgn(qc_make(qf_from_double(-0.0), qf_from_double(-0.0)));
+    TEST_ASSERT_TRUE(qf_eq(qc_real(zero), QF_ZERO) && qf_eq(qc_imag(zero), QF_ZERO), "signed zero signum");
+    TEST_ASSERT_TRUE(qc_isnan(qc_sgn(qc_make(QF_ONE, QF_ONE))), "non-real signum rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_sgn(qc_make(QF_ZERO, qf_from_string("1e-300")))), "tiny imaginary part rejected");
+    TEST_ASSERT_TRUE(qc_isnan(qc_sgn(qc_make(QF_NAN, QF_ZERO))), "real NaN signum");
+    TEST_ASSERT_TRUE(qc_isnan(qc_sgn(qc_make(QF_ONE, QF_NAN))), "imaginary NaN signum");
+    TEST_ASSERT_TRUE(qc_isnan(qc_sgn(qc_make(QF_ONE, QF_INF))), "imaginary infinity rejected");
+}
+
+static void example_sgn(void)
+{
+    /* README example: real signum (docs/qcomplex.md). */
+    qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
+    printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+    char output[80];
+    snprintf(output, sizeof(output), "sgn(-1 + 0i) = %.0f + %.0fi\n",
+             qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+    TEST_ASSERT_TRUE(strcmp(output, "sgn(-1 + 0i) = -1 + 0i\n") == 0, "signum README output");
+}
+
 static void test_special_group(void)
 {
+    TEST_RUN_SUBTEST(test_sgn, "qcomplex,signal,sgn");
     TEST_RUN_SUBTEST(test_bessel_i, NULL);
     TEST_RUN_SUBTEST(test_struve_l, NULL);
     TEST_RUN_SUBTEST(test_struve_h, NULL);
@@ -1666,6 +1698,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_struve_l, readme_examples, "qcomplex,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_bessel_i, readme_examples, "qcomplex,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_struve_h, readme_examples, "qcomplex,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sgn, readme_examples, "qcomplex,readme,output,sgn");
 
     return TESTS_EXIT_CODE();
 }

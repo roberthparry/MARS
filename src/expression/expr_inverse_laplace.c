@@ -1314,14 +1314,8 @@ static expr_t *inverse_laplace_simplify(const expr_t *expr, expr_t *a, expr_t *b
     return out;
 }
 
-static expr_t *inverse_laplace_deriv(expr_t *transform)
-{
-    expr_t *wrt = (expr_t *)expr_current_wrt_internal();
-    return wrt ? expr_new_formal_derivative(transform, 1u, &wrt) : NULL;
-}
-
 const expr_ops_t ops_inverse_laplace = {
-    .eval = inverse_laplace_eval, .deriv = inverse_laplace_deriv, .reverse = expr_reverse_not_differentiable,
+    .eval = inverse_laplace_eval, .deriv = expr_transform_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_INVERSE_LAPLACE, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
     .expression_name = "ℒ⁻¹", .function_name = "inverselaplace", .TeX_name = "\\mathcal{L}^{-1}",
     .simplify = inverse_laplace_simplify,

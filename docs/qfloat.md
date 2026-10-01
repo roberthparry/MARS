@@ -5,11 +5,27 @@ of two IEEE-754 `double` values.
 
 ## Signal functions
 
-`qf_step`, `qf_rect`, `qf_tri`, `qf_circ` and `qf_sinc` implement the
+`qf_sgn`, `qf_step`, `qf_rect`, `qf_tri`, `qf_circ` and `qf_sinc` implement the
 [signal definitions](expression.md#signal-functions-and-distributions).
 Sinc is normalised by pi and has value one at zero. Pulse discontinuities use
 the symmetric half-value convention; NaN inputs remain NaN. Dirac impulses
 and principal values are expression-level distributions, not scalar numbers.
+
+`qf_sgn(x)` returns -1 for negative inputs, zero for either signed zero, and +1
+for positive inputs. This includes signed infinities; NaN remains NaN.
+
+README signum example:
+
+```c
+printf("sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
+       qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+```
+
+Output:
+
+```text
+sgn(-2), sgn(0), sgn(2) = -1, 0, 1
+```
 
 README example:
 
@@ -561,27 +577,37 @@ long qf_get_exponent2(qfloat_t x);
 
 ### `qf_inline_quick_two_sum()`
 
-Returns the public result described by inline quick two sum.
+Stores the rounded sum in `s` and its rounding residual in `e`, assuming the
+magnitude of `a` is at least that of `b`. This is now an out-of-line library
+function; its existing name is retained for source compatibility.
 
 ```c
-static inline void qf_inline_quick_two_sum(double a, double b, double *s, double *e);
+void qf_inline_quick_two_sum(double a, double b, double *s, double *e);
 ```
 
 ### `qf_inline_renorm()`
 
-Returns the public result described by inline renorm.
+Renormalises a leading component and a smaller residual into a double-double
+value. This is an out-of-line library function with its existing name retained.
 
 ```c
-static inline qfloat_t qf_inline_renorm(double hi, double lo);
+qfloat_t qf_inline_renorm(double hi, double lo);
 ```
 
 ### `qf_inline_two_sum()`
 
-Returns the public result described by inline two sum.
+Stores the rounded sum in `s` and its rounding residual in `e`. This is an
+out-of-line library function with its existing name retained.
 
 ```c
-static inline void qf_inline_two_sum(double a, double b, double *s, double *e);
+void qf_inline_two_sum(double a, double b, double *s, double *e);
 ```
+
+The public arithmetic functions `qf_add`, `qf_sub`, `qf_mul` and `qf_div` also
+use their out-of-line library implementations. Their error-free transformations
+and arithmetic ordering are unchanged. Clients must link the MARS library;
+`MARS_QFLOAT_IMPLEMENTATION` and `MARS_QFLOAT_NO_INLINE_DIV` no longer select
+separate header implementations.
 
 ### `qf_sprintf_text()`
 

@@ -2075,13 +2075,27 @@ int main(int argc, char **argv)
                                                                                      : expr)
                    : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_result_TeX_dup(display_expr);
 
+    expr_t *request = expr_from_string_preserving_calculus_internal(raw_input);
+    char *transform_identity = expr_transform_identity_TeX(request ? request : expr, display_expr);
+    char *formal_transform = transform_identity ? NULL : expr_formal_transform_TeX(request, display_expr);
+    if (formal_transform) {
+        free(TeX_text);
+        TeX_text = formal_transform;
+    }
+
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
-    char *transform_identity = expr_transform_identity_TeX(expr, display_expr);
+    string_t *operation_function = expr_to_calculus_function_text(request, display_expr);
+    if (!operation_function)
+        operation_function = expr_to_transform_function_text(expr);
+    expr_free(request);
+    if (operation_function)
+        printf("operation_function  %s\n", string_c_str(operation_function));
+    string_free(operation_function);
     printf("transform_identity_TeX  %s\n", transform_identity ? transform_identity : "");
     free(transform_identity);
     char *conditioned_expression = expr_conditioned_cases_to_string(display_expr);
@@ -2204,6 +2218,25 @@ int main(int argc, char **argv)
                 deriv_TeX_text = expr_result_TeX_dup(display_deriv);
             string_free(cartesian_function);
         }
+        expr_t *derivative_variables[1] = {wrt};
+        expr_t *derivative_operation = expr_new_formal_derivative(expr, 1u, derivative_variables);
+        string_t *derivative_programme = expr_to_calculus_function_text(derivative_operation, display_deriv);
+        if (derivative_root_order >= 2L) {
+            char *family_expression = NULL;
+            char *family_function = NULL;
+
+            if (root_family_texts_dup(derivative_operation, derivative_root_order,
+                                      &family_expression, &family_function)) {
+                free(deriv_func_text);
+                deriv_func_text = family_function;
+            }
+            free(family_expression);
+        } else if (derivative_programme) {
+            free(deriv_func_text);
+            deriv_func_text = xstrdup_local(string_c_str(derivative_programme));
+        }
+        string_free(derivative_programme);
+        expr_free(derivative_operation);
         normalise_double_minus_owned(&deriv_text);
         normalise_double_minus_owned(&deriv_func_text);
         normalise_double_minus_owned(&deriv_TeX_text);
@@ -2265,6 +2298,14 @@ int main(int argc, char **argv)
                 }
                 integral_text = expr_text_dup(display_integral, style_EXPRESSION);
                 integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
+                expr_t *integral_operation = expr_integral_with_dummy_internal(integral_source, wrt, wrt);
+                string_t *integral_programme = expr_to_calculus_function_text(integral_operation, display_integral);
+                if (integral_programme) {
+                    free(integral_func_text);
+                    integral_func_text = xstrdup_local(string_c_str(integral_programme));
+                }
+                string_free(integral_programme);
+                expr_free(integral_operation);
                 integral_TeX_text = expr_result_TeX_dup(display_integral);
                 normalise_double_minus_owned(&integral_text);
                 normalise_double_minus_owned(&integral_func_text);

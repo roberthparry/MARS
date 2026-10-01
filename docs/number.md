@@ -2,11 +2,30 @@
 
 `number_t` is MARS's generic numeric value cluster.
 
-The signal APIs `num_step`, `num_rect`, `num_tri`, `num_circ` and `num_sinc`
+The signal APIs `num_sgn`, `num_step`, `num_rect`, `num_tri`, `num_circ` and `num_sinc`
 follow the [expression-level definitions](expression.md#signal-functions-and-distributions),
 using the existing numeric precision policy. Piecewise functions require real
 arguments; sinc has an entire complex continuation and an exact removable value
 of one at zero. Distributional impulses and principal values are not numeric APIs.
+
+`num_sgn(x)` compares real inputs at their existing precision and returns an
+owning exact integer -1, zero or +1. Either signed zero gives zero, and signed
+infinities give their signs. Purely real complex values are accepted; NaN and
+non-real inputs return NaN. The input is unchanged.
+
+README signum example:
+
+```c
+NUM_SCOPE(scope);
+number_t sign = num_sgn(num_create_from_frac(-2, 3));
+printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+```
+
+Output:
+
+```text
+sgn(-2/3) = -1
+```
 
 README example (the scope owns temporary numbers):
 
@@ -301,6 +320,10 @@ Supported format specifiers:
 - `%N` — scientific form for floating-point and complex values, otherwise the
   ordinary exact form
 
+Both specifiers render an exactly zero complex value as `0`, without an
+imaginary suffix, regardless of its storage backend. Small nonzero components
+are not treated as zero; field width, padding and explicit sign flags still apply.
+
 Examples:
 
 - integer and rational values print exactly:
@@ -373,8 +396,11 @@ owning `number_t`.
 
 The `num_add_slow`, `num_sub_slow`, `num_mul_slow`, and `num_div_slow`
 variants perform the same four operations through the full generic dispatcher.
-They exist for internal parity tests and for code that deliberately bypasses
-the inline fixed-precision fast paths.
+Their existing names remain available for compatibility and parity checks.
+The ordinary arithmetic APIs now use the same out-of-line implementations,
+including their direct paths for equal fixed-precision backends. Their precision,
+promotion and arithmetic rules are unchanged. `num_destroy` likewise uses its
+existing library implementation, so callers must link the MARS library.
 
 ### Elementary, Trigonometric, and Hyperbolic Functions
 
@@ -1214,7 +1240,8 @@ string_t *num_vsprintf_text(const char *fmt, va_list ap);
 
 ### `number_inline_kind()`
 
-Returns the public result described by inline kind.
+Returns the storage kind tag without validating the value. This trivial
+accessor remains inline.
 
 ```c
 static inline uint32_t number_inline_kind(number_t number);
@@ -1222,7 +1249,8 @@ static inline uint32_t number_inline_kind(number_t number);
 
 ### `number_inline_make_qcomplex()`
 
-Returns the public result described by inline make qcomplex.
+Constructs a fixed-precision complex value without changing its components.
+This trivial wrapper remains inline and calls the out-of-line component constructor.
 
 ```c
 static inline number_t number_inline_make_qcomplex(qcomplex_t value);
@@ -1230,50 +1258,56 @@ static inline number_t number_inline_make_qcomplex(qcomplex_t value);
 
 ### `number_inline_make_qcomplex_parts()`
 
-Returns the public result described by inline make qcomplex parts.
+Constructs a fixed-precision complex value from its real and imaginary
+components. The implementation is out of line; the existing name is retained.
 
 ```c
-static inline number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag);
+number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag);
 ```
 
 ### `number_inline_make_qfloat()`
 
-Returns the public result described by inline make qfloat.
+Constructs a fixed-precision real value without changing its double-double
+components. The implementation is out of line; the existing name is retained.
 
 ```c
-static inline number_t number_inline_make_qfloat(qfloat_t value);
+number_t number_inline_make_qfloat(qfloat_t value);
 ```
 
 ### `number_inline_qcomplex()`
 
-Returns the public result described by inline qcomplex.
+Extracts the stored complex value from a number using the qcomplex backend.
+The implementation is out of line; the existing name is retained.
 
 ```c
-static inline qcomplex_t number_inline_qcomplex(number_t number);
+qcomplex_t number_inline_qcomplex(number_t number);
 ```
 
 ### `number_inline_qcomplex_imag()`
 
-Returns the public result described by inline qcomplex imag.
+Extracts the imaginary component from a number using the qcomplex backend.
+The implementation is out of line; the existing name is retained.
 
 ```c
-static inline qfloat_t number_inline_qcomplex_imag(number_t number);
+qfloat_t number_inline_qcomplex_imag(number_t number);
 ```
 
 ### `number_inline_qcomplex_real()`
 
-Returns the public result described by inline qcomplex real.
+Extracts the real component from a number using the qcomplex backend.
+The implementation is out of line; the existing name is retained.
 
 ```c
-static inline qfloat_t number_inline_qcomplex_real(number_t number);
+qfloat_t number_inline_qcomplex_real(number_t number);
 ```
 
 ### `number_inline_qfloat()`
 
-Returns the public result described by inline qfloat.
+Extracts the stored double-double value from a number using the qfloat backend.
+The implementation is out of line; the existing name is retained.
 
 ```c
-static inline qfloat_t number_inline_qfloat(number_t number);
+qfloat_t number_inline_qfloat(number_t number);
 ```
 
 

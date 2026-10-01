@@ -10,13 +10,42 @@ switches appear in user code.
 
 ## Signal functions
 
-`mat_step`, `mat_rect`, `mat_tri`, `mat_circ` and `mat_sinc` apply their
+`mat_sgn`, `mat_step`, `mat_rect`, `mat_tri`, `mat_circ` and `mat_sinc` apply their
 [scalar signal functions](expression.md#signal-functions-and-distributions)
 through spectral matrix functional calculus, not entry by entry. Real pulse
 functions require an appropriate real spectrum and remain subject to the
 existing spectral engine's supported matrix classes. They are not holomorphic
 at their breakpoints. Normalised sinc is entire; repeated-eigenvalue triangular
 numeric matrices use its Taylor derivatives, including at zero.
+
+`mat_sgn(a)` maps negative, zero and positive real eigenvalues to -1, zero and
++1 respectively. It uses the same supported spectral matrix classes as
+`mat_step`, including its symbolic callback path, and returns a newly allocated
+matrix or `NULL` when unsupported. Non-real scalar spectral values produce NaN.
+Signum is discontinuous at zero; there is no general holomorphic extension to
+arbitrary Jordan blocks at that point.
+
+README signum example:
+
+```c
+NUM_SCOPE(scope);
+number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+matrix_t *a = mat_create_diagonal(3u, diagonal);
+matrix_t *b = mat_sgn(a);
+if (b) {
+    printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
+           num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+           num_to_double(mat_get_num(b, 2, 2)));
+}
+mat_free(b);
+mat_free(a);
+```
+
+Output:
+
+```text
+sgn(diag(-1, 0, 1)) = diag(-1, 0, 1)
+```
 
 README example:
 

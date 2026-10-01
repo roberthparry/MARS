@@ -15,6 +15,7 @@
         *(expr_t **)out = value;                                                                                       \
     }
 
+SIGNAL_CALLBACKS(sgn)
 SIGNAL_CALLBACKS(step)
 SIGNAL_CALLBACKS(rect)
 SIGNAL_CALLBACKS(tri)
@@ -22,6 +23,8 @@ SIGNAL_CALLBACKS(circ)
 SIGNAL_CALLBACKS(sinc)
 #undef SIGNAL_CALLBACKS
 
+/* Apply real signum to the spectrum. */
+matrix_t *mat_sgn(const matrix_t *a) { return mat_apply_scalar_callbacks(a, number_sgn, expression_sgn); }
 /* Apply the unit step to the spectrum rather than individual matrix entries. */
 matrix_t *mat_step(const matrix_t *a) { return mat_apply_scalar_callbacks(a, number_step, expression_step); }
 /* Apply the rectangular pulse to the spectrum. */

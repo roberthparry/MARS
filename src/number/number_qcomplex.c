@@ -5,6 +5,55 @@
 #include "number_internal.h"
 #include "ustring.h"
 
+/* Extract the complex payload through its original storage representation. */
+qcomplex_t number_inline_qcomplex(number_t number)
+{
+    number_inline_qcomplex_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    bits.words[2] = number.storage[3];
+    bits.words[3] = number.storage[4];
+    return bits.value;
+}
+
+/* Extract the stored real component without changing its precision. */
+qfloat_t number_inline_qcomplex_real(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    return bits.value;
+}
+
+/* Extract the stored imaginary component without changing its precision. */
+qfloat_t number_inline_qcomplex_imag(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[3];
+    bits.words[1] = number.storage[4];
+    return bits.value;
+}
+
+/* Construct a complex payload without converting or rounding either component. */
+number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag)
+{
+    number_t number;
+    number_inline_qfloat_bits_t real_bits;
+    number_inline_qfloat_bits_t imag_bits;
+
+    real_bits.value = real;
+    imag_bits.value = imag;
+    number.storage[0] = NUMBER_QCOMPLEX;
+    number.storage[1] = real_bits.words[0];
+    number.storage[2] = real_bits.words[1];
+    number.storage[3] = imag_bits.words[0];
+    number.storage[4] = imag_bits.words[1];
+    return number;
+}
+
 bool number_is_zero_qcomplex(const number_t *number)
 {
     return number && qc_eq(number_impl_const(number)->value.qc, QC_ZERO);

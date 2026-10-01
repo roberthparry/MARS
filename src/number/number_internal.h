@@ -237,93 +237,28 @@ const number_t *number_complex_real_ref(const complex_t *value);
 const number_t *number_complex_imag_ref(const complex_t *value);
 number_const_id_t number_complex_const_id(const complex_t *value);
 
-static inline number_private_t *number_impl(number_t *number)
-{
-    return (number_private_t *)number;
-}
+static inline number_private_t *number_impl(number_t *number) { return (number_private_t *)number; }
 
-static inline const number_private_t *number_impl_const(const number_t *number)
-{
+static inline const number_private_t *number_impl_const(const number_t *number) {
     return (const number_private_t *)number;
 }
 
-static inline bool number_is_valid_value(const number_t *number)
-{
+static inline bool number_is_valid_value(const number_t *number) {
     return number != NULL && number_impl_const(number)->kind != NUMBER_INVALID;
 }
 
-static inline const number_vtable_t *number_vt(const number_t *number)
-{
-    size_t kind;
+const number_vtable_t *number_vt(const number_t *number);
+number_kind_t number_kind_value(const number_t *number);
+bool number_same_kind_value(const number_t *a, const number_t *b);
+number_math_family_t number_math_family_value(const number_t *number);
+number_math_family_t number_math_family_binary(number_math_family_t a, number_math_family_t b);
 
-    if (!number)
-        return NULL;
-    kind = (size_t)number_impl_const(number)->kind;
-    return kind < number_dispatch_count ? number_dispatch[kind] : NULL;
-}
-
-static inline number_kind_t number_kind_value(const number_t *number)
-{
-    const number_vtable_t *vt = number ? number_vt(number) : NULL;
-
-    return number && number_is_valid_value(number) && vt ? vt->kind : NUMBER_INVALID;
-}
-
-static inline bool number_same_kind_value(const number_t *a, const number_t *b)
-{
-    number_kind_t ak = number_kind_value(a);
-    number_kind_t bk = number_kind_value(b);
-
-    return ak != NUMBER_INVALID && ak == bk;
-}
-
-static inline number_math_family_t number_math_family_value(const number_t *number)
-{
-    const number_vtable_t *vt = number ? number_vt(number) : NULL;
-
-    return number && number_is_valid_value(number) && vt ? vt->math_family : NUMBER_MATH_INVALID;
-}
-
-static inline number_math_family_t number_math_family_binary(number_math_family_t a, number_math_family_t b)
-{
-    return (unsigned)a <= NUMBER_MATH_COMPLEX && (unsigned)b <= NUMBER_MATH_COMPLEX
-               ? number_math_family_binary_table[a][b]
-               : NUMBER_MATH_INVALID;
-}
-
-static inline number_kind_t number_math_family_target_kind(number_math_family_t family)
-{
+static inline number_kind_t number_math_family_target_kind(number_math_family_t family) {
     return (unsigned)family <= NUMBER_MATH_COMPLEX ? number_math_family_target_kind_table[family] : NUMBER_INVALID;
 }
 
-static inline qfloat_t number_value_to_qfloat(const number_t *number)
-{
-    const number_vtable_t *vt = number ? number_vt(number) : NULL;
-
-    if (!number)
-        return QF_NAN;
-    return vt && vt->to_qfloat ? vt->to_qfloat(number) : num_to_qfloat(*number);
-}
-
-static inline qcomplex_t number_value_to_qcomplex(const number_t *number)
-{
-    double _Complex cd;
-    const complex_t *cx;
-
-    if (!number)
-        return QC_NAN;
-    if (number_kind_value(number) == NUMBER_QCOMPLEX)
-        return number_impl_const(number)->value.qc;
-    if (number_kind_value(number) == NUMBER_CDOUBLE) {
-        cd = number_impl_const(number)->value.cd.value;
-        return qc_make(qf_from_double(__real__ cd), qf_from_double(__imag__ cd));
-    }
-    if (number_kind_value(number) == NUMBER_COMPLEX) {
-        cx = number_impl_const(number)->value.cx;
-        return cx ? qc_make(number_value_to_qfloat(&cx->real), number_value_to_qfloat(&cx->imag)) : QC_NAN;
-    }
-    return qc_make(number_value_to_qfloat(number), QF_ZERO);
-}
+qfloat_t number_value_to_qfloat(const number_t *number);
+qcomplex_t number_value_to_qcomplex(const number_t *number);
 
 number_t number_invalid(void);
 bool num_is_immortal(number_t number);

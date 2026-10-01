@@ -8,7 +8,7 @@
 #include "expr_maths.h"
 #include "ustring.h"
 
-static inline expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
+static expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
 {
     if (!a)
         return NULL;
@@ -16,7 +16,7 @@ static inline expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *
     return expr_new_unary_internal(ops, a);
 }
 
-static inline expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t *a, const expr_t *b)
+static expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t *a, const expr_t *b)
 {
     if (!a || !b)
         return NULL;
@@ -281,6 +281,16 @@ static number_t eval_finite_summation(expr_t *dv)
 
     if (!dv || !dv->a || !expr_is_op(dv->b, &ops_argument_list))
         return num_clone(NUM_NAN);
+    {
+        expr_t *closed = expr_sgn_sum_closed_form(dv);
+
+        if (closed) {
+            number_t value = expr_eval(closed);
+
+            expr_free(closed);
+            return value;
+        }
+    }
     {
         expr_t *closed = expr_clausen_sum_closed_form(dv);
 
@@ -2477,6 +2487,8 @@ static expr_t *expr_simplify_linear_summation_term(const expr_t *term, const exp
         expr_t *closed_form = sum ? expr_clausen_sum_closed_form(sum) : NULL;
 
         if (!closed_form && sum)
+            closed_form = expr_sgn_sum_closed_form(sum);
+        if (!closed_form && sum)
             closed_form = expr_finite_progression_closed_form(sum);
 
         if (closed_form) {
@@ -2503,6 +2515,8 @@ static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, ex
     expr_t *simplified_term;
     expr_t *out;
 
+    if (!closed && sum)
+        closed = expr_sgn_sum_closed_form(sum);
     expr_free(sum);
     if (closed) {
         expr_free(term);
@@ -2516,6 +2530,8 @@ static expr_t *expr_simplify_summation_with_special_forms(const expr_t *expr, ex
     }
     sum = term && bounds ? expr_math_wrap_binary(&ops_summation, term, bounds) : NULL;
     closed = sum ? expr_clausen_sum_closed_form(sum) : NULL;
+    if (!closed && sum)
+        closed = expr_sgn_sum_closed_form(sum);
     expr_free(sum);
     if (closed) {
         expr_free(term);
@@ -5361,6 +5377,7 @@ const expr_ops_t ops_factors = {.eval = eval_factors,
 expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
 {
     static const expr_ops_t *const unary_ops_by_kind[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_SGN] = &ops_sgn,
         [EXPR_KIND_STEP] = &ops_step,
         [EXPR_KIND_RECT] = &ops_rect,
         [EXPR_KIND_TRI] = &ops_tri,

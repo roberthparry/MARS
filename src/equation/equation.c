@@ -75,6 +75,25 @@ equation_t *equ_new(const expr_t *lhs, const expr_t *rhs)
     return equ_new_with_owned_bindings(lhs, rhs, NULL);
 }
 
+/* Construct a solvable equation while preserving the caller's expression nodes. */
+equation_t *equ_new_with_inferred_bindings(const expr_t *lhs, const expr_t *rhs)
+{
+    if (!lhs || !rhs)
+        return NULL;
+    expr_bindings_t *left = expr_bindings_from_expr_internal(lhs);
+    expr_bindings_t *right = expr_bindings_from_expr_internal(rhs);
+    expr_bindings_t *bindings = expr_bindings_merge_internal(left, right);
+    bool failed = (left || right) && !bindings;
+    expr_bindings_free(left);
+    expr_bindings_free(right);
+    if (failed)
+        return NULL;
+    equation_t *equation = equ_new_with_owned_bindings(lhs, rhs, bindings);
+    if (!equation)
+        expr_bindings_free(bindings);
+    return equation;
+}
+
 void equ_free(equation_t *equation)
 {
     if (!equation)

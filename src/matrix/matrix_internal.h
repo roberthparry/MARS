@@ -288,11 +288,9 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
 void mat_raw_value_from_number(const struct elem_vtable *elem, void *out, const number_t *value);
 void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value);
 
-static inline void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j, const number_t *value)
-{
-    number_t copy = num_is_immortal(*value) ? *value : num_clone(*value);
-    mat_set_num_owned(A, i, j, &copy);
-}
+/** @brief Store a cloned numeric value, retaining the caller's ownership and reusing immortal constants. */
+void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j, const number_t *value);
+
 size_t mat_cached_numeric_precision_bits(const struct matrix_t *A);
 void mat_numeric_precision_note_set(struct matrix_t *A, const void *old_val, const void *new_val);
 void mat_numeric_precision_release(struct matrix_t *A);
@@ -316,18 +314,15 @@ extern const struct store_vtable lower_triangular_store;
    Convenience accessor
    ============================================================ */
 
-static inline const struct elem_vtable *elem_of(const struct matrix_t *A)
-{
+static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
     return A ? A->elem : NULL;
 }
 
-static inline bool elem_is_symbolic(const struct elem_vtable *elem)
-{
+static inline bool elem_is_symbolic(const struct elem_vtable *elem) {
     return elem && elem->kind == ELEM_EXPR;
 }
 
-static inline bool matrix_is_symbolic(const struct matrix_t *A)
-{
+static inline bool matrix_is_symbolic(const struct matrix_t *A) {
     return elem_is_symbolic(elem_of(A));
 }
 

@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 
-static inline qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
+static qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 {
     static const qfloat_t P10_1 = {1.00000000000000000e+01, 0.00000000000000000e+00};
     static const qfloat_t P10_2 = {1.00000000000000000e+02, 0.00000000000000000e+00};
@@ -70,13 +70,8 @@ qfloat_t qf_pow10(int e)
     return qf_scale_pow10(QF_ONE, e);
 }
 
-static inline int qf_iszero(qfloat_t x)
-{
-    /* Treat any representable zero as zero, regardless of sign.
-       This matches Option A: always print "0". */
-
-    return (x.hi == 0.0 && x.lo == 0.0);
-}
+/* Treat either signed zero as zero so the formatter prints "0". */
+static inline int qf_iszero(qfloat_t x) { return x.hi == 0.0 && x.lo == 0.0; }
 
 static bool qf_cursor_peek_digit(const string_cursor_t *cursor, int *digit_out)
 {
@@ -198,23 +193,6 @@ qfloat_t qf_from_string(const char *s)
 }
 
 /* 32-digit decimal formatter (robust) */
-
-static inline int qf_is_negative(qfloat_t x)
-{
-    return (x.hi < 0.0) || (x.hi == 0.0 && x.lo < 0.0);
-}
-
-static inline void qf_modf_like(qfloat_t x, qfloat_t *ip, qfloat_t *fp)
-{
-    qfloat_t f = qf_floor(x);
-    *ip = f;
-    *fp = qf_sub(x, f);
-}
-
-static inline qfloat_t qf_div_double(qfloat_t x, double d)
-{
-    return qf_div(x, qf_from_double(d));
-}
 
 int qf_decimal_exponent(qfloat_t x)
 {

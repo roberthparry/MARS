@@ -214,27 +214,17 @@ extern const qcomplex_t QC_EULER_MASCHERONI;
 /**
  * @brief Construct a qcomplex_t from real and imaginary parts.
  */
-static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im)
-{
-    qcomplex_t z = {re, im};
-    return z;
-}
+static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im) { return (qcomplex_t){re, im}; }
 
 /**
  * @brief Return the real component of a complex value.
  */
-static inline qfloat_t qc_real(qcomplex_t z)
-{
-    return z.re;
-}
+static inline qfloat_t qc_real(qcomplex_t z) { return z.re; }
 
 /**
  * @brief Return the imaginary component of a complex value.
  */
-static inline qfloat_t qc_imag(qcomplex_t z)
-{
-    return z.im;
-}
+static inline qfloat_t qc_imag(qcomplex_t z) { return z.im; }
 
 /**
  * @name Basic arithmetic
@@ -525,6 +515,12 @@ qcomplex_t qc_E1(qcomplex_t z);                           /**< exponential integ
 qcomplex_t qc_ldexp(qcomplex_t z, int k);        /**< z * 2^k */
 qcomplex_t qc_floor(qcomplex_t z);               /**< floor(z) */
 
+/**
+ * @brief Real signum restricted to purely real complex arguments.
+ * @param argument Input with a zero imaginary component; either signed zero is accepted.
+ * @return The real value -1, zero or +1 (including at infinities), or NaN for NaN or non-real inputs.
+ */
+qcomplex_t qc_sgn(qcomplex_t argument);
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 qcomplex_t qc_step(qcomplex_t argument);
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
