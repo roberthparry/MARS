@@ -332,6 +332,53 @@ output(expr(x, y)).
                     self.assertIn("k ≠ 0", output)
                     self.assertEqual(self.run_programme(programme.replace("k = ?.", "k = 0.")), "NAN")
 
+    def test_integral_family_conditions_follow_bindings(self):
+        cases = (
+            ("@L{-cos(t)}", "s", "integral", "Re(s) > 0"),
+            ("@S (-s/(s^2+1) where (Re(s)>0)) ds", "s", "evaluate", "Re(s) > 0"),
+            ("@S (q where (Re(q)>0; q != 0)) dq", "q", "evaluate", "Re(q) > 0"),
+        )
+        for source, variable, action, condition in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    mars_lab.DEFAULT_BIN, source, 40, variable, action)
+                self.assertEqual(code, 0, raw)
+                expression = fields["integral"].split(" = ", 1)[1] if action == "integral" else fields["expression"]
+                body, bindings = expression.split(" | ", 1)
+                self.assertNotIn("where", body)
+                self.assertNotIn(condition, body)
+                self.assertIn("C", body)
+                self.assertIn("C = ", bindings)
+                self.assertIn("; " + condition, bindings)
+                programme = fields["integral_function" if action == "integral" else "operation_function"]
+                self.assertIn("if (realpart(" + variable + ") > 0", programme)
+                output = self.run_programme(programme)
+                self.assertNotIn("where", output.split(" | ", 1)[0])
+                self.assertIn("; " + condition, output)
+                for value in ("0", "-1"):
+                    invalid = programme.replace(variable + " = ?.", variable + " = " + value + ".")
+                    invalid = invalid.replace("const C = ?.", "const C = 7.")
+                    self.assertEqual(self.run_programme(invalid), "NAN")
+
+    def test_function_integral_family_preserves_domain_and_bindings(self):
+        for value in ("?", "1", "0", "-1"):
+            source = ("s = " + value + ".\nconst C = 2.\n"
+                      "output(integral(-s/(s^2+1) where (Re(s)>0),s)).")
+            with self.subTest(value=value):
+                output = self.run_programme(source)
+                if value == "?":
+                    body, bindings = output.split(" | ", 1)
+                    self.assertNotIn("where", body)
+                    self.assertIn("4 - ln(s² + 1)", body)
+                    self.assertIn("; Re(s) > 0", bindings)
+                elif value == "1":
+                    self.assertEqual(output, self.run_programme("output(2-ln(2)/2)."))
+                else:
+                    # Direct output falls back to the restricted expression when no number exists.
+                    self.assertIn("s = " + value, output)
+                    self.assertIn("; Re(s) > 0", output)
+                    self.assertNotIn("where", output)
+
     def test_integral_expression_first_bounds(self):
         cases = (
             ("output(integral(x, x, 1, 3)).", "4"),

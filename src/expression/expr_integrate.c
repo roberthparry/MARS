@@ -947,6 +947,21 @@ expr_t *expr_new_integration_constant(const expr_t *expr, const expr_t *wrt, con
     return expr_new_named_const(NUM_NAN, "C");
 }
 
+/* Keep the whole antiderivative family on the primitive's domain, including its constant. */
+expr_t *expr_add_integration_constant(const expr_t *antiderivative, const expr_t *constant)
+{
+    const expr_t *body = antiderivative;
+    while (expr_is_op(body, &ops_real_domain))
+        body = body->a;
+    expr_t *sum = expr_add(body, constant);
+    if (body == antiderivative)
+        return sum;
+    expr_t *conditioned = sum ? expr_with_domain_of(sum, antiderivative) : NULL;
+    expr_free(sum);
+    return conditioned;
+}
+
+/* Construct an antiderivative family with its arbitrary constant and original domain. */
 expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
 {
     expr_t *anti;
@@ -963,7 +978,7 @@ expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt)
         return NULL;
     }
 
-    family = expr_add(anti, constant);
+    family = expr_add_integration_constant(anti, constant);
     expr_free(constant);
     expr_free(anti);
     return family;

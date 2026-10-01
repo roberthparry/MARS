@@ -2961,7 +2961,12 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size);
 
 ### `expr_integrate_family()`
 
-Returns the public result described by integrate family.
+Returns an owning antiderivative family with a fresh arbitrary constant, starting
+with `C` and choosing an indexed name when necessary to avoid an existing symbol.
+The primitive's outer domain restrictions apply to the whole family, including
+the constant. Bound Expression output places those restrictions after the bindings,
+not in a `where` clause embedded in one summand. The Lab Function card retains the
+domain guard around the integral call. Returns `NULL` when no primitive can be constructed.
 
 ```c
 expr_t *expr_integrate_family(const expr_t *expr, const expr_t *wrt);
