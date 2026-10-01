@@ -745,8 +745,67 @@ static void test_mat_to_string_function_card_reuses_shared_calculations(void)
     mat_free(A);
 }
 
+static void test_mat_to_string_common_positive_base_power(void)
+{
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    const char *names[] = {"x"};
+    expr_t *symbols[] = {x};
+    matrix_t *matrix = mat_from_function_body_with_symbols(
+        "((1/3)^x, 2.(1/3)^x/sqrt(7); -(1/3)^x, (1/3)^x)", names, symbols, 1u);
+    const mat_string_style_t styles[] = {MAT_STRING_EXPRESSION, MAT_STRING_EXPRESSION_LAYOUT};
+
+    check_bool("matrix with a shared rational-base power parses", matrix != NULL);
+    for (size_t index = 0u; matrix && index < sizeof(styles) / sizeof(styles[0]); ++index) {
+        char *text = mat_to_string(matrix, styles[index]);
+
+        check_bool("shared power appears once", text && matrix_tostring_count_substring(text, "⅓^x") == 1u);
+        check_bool("common-factor-only variable keeps its binding", text && strstr(text, "x = ?"));
+        check_bool("fractional coefficient retains its radical", text && strstr(text, "√(7)"));
+        free(text);
+    }
+    expr_set_val(x, NUM_TWO);
+    number_t actual = mat_get_num(matrix, 1u, 0u);
+    number_t expected = num_create_from_frac(-1, 9);
+
+    check_bool("factoring preserves the original matrix and live binding", num_eq(actual, expected));
+    num_destroy(&expected);
+    num_destroy(&actual);
+    mat_free(matrix);
+    expr_free(x);
+}
+
+static void test_mat_function_preserves_exact_binding_values(void)
+{
+    mat_bindings_t *bindings = NULL;
+    matrix_t *matrix = mat_from_string_expr("{ (x,c;0,x) | x=@pi; c=sqrt(2) }", &bindings);
+    char *function = matrix ? mat_to_string(matrix, MAT_STRING_FUNCTION) : NULL;
+    char *expression = matrix ? mat_to_string(matrix, MAT_STRING_EXPRESSION) : NULL;
+
+    check_bool("matrix Function preserves pi binding", function && strstr(function, "x = @pi.\n"));
+    check_bool("matrix Function preserves surd constant", function && strstr(function, "const c = sqrt(2).\n"));
+    check_bool("matrix Expression preserves pi binding", expression && strstr(expression, "x = π"));
+    check_bool("matrix Expression retains symbolic entries", expression && strstr(expression, "(x, c; 0, x)"));
+    char *TeX = matrix ? mat_body_to_string(matrix, MAT_STRING_LATEX) : NULL;
+    check_bool("matrix TeX retains symbolic entries", TeX && strstr(TeX, "x") && !strstr(TeX, "\\pi"));
+    free(TeX);
+    free(expression);
+    free(function);
+    expr_t *x = mat_bindings_get(bindings, "x");
+
+    if (x)
+        expr_set_val(x, NUM_TWO);
+    function = matrix ? mat_to_string(matrix, MAT_STRING_FUNCTION) : NULL;
+    check_bool("numerical edit clears stale exact binding", function && strstr(function, "x = 2.\n") &&
+                                                          !strstr(function, "x = @pi."));
+    free(function);
+    mat_bindings_free(bindings);
+    mat_free(matrix);
+}
+
 void run_matrix_tostring_tests(void)
 {
+    TEST_RUN_CASE(test_mat_function_preserves_exact_binding_values, NULL);
+    TEST_RUN_CASE(test_mat_to_string_common_positive_base_power, NULL);
     TEST_RUN_CASE(test_mat_to_string_numeric, NULL);
     TEST_RUN_CASE(test_mat_to_string_numeric_TeX, NULL);
     TEST_RUN_CASE(test_mat_to_string_number_precision, NULL);

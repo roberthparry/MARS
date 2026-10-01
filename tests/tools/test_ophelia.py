@@ -1,10 +1,13 @@
-"""Initial Ophelia scalar/equation runtime and MARS Lab RUN integration."""
+"""Initial Ophelia scalar/equation/matrix runtime and MARS Lab RUN integration."""
 import io
 import json
+import math
+import re
 import shutil
 import subprocess
 import sys
 import unittest
+from decimal import Decimal, localcontext
 from pathlib import Path
 from unittest import mock
 
@@ -19,6 +22,145 @@ class OpheliaTests(unittest.TestCase):
         result = subprocess.run([str(BINARY), "40"], input=source, text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout.strip()
+
+    def test_generated_matrix_fractional_power(self):
+        # The reported Function card: (1 2; 3 4)^x with x = 5/2.
+        fields, raw, code = mars_lab.run_matrix_lab_fields(
+            mars_lab.DEFAULT_MATRIX_BIN, "{ (1,2;3,4)^x | x=5/2 }", "eval", 40)
+        self.assertEqual(code, 0, raw)
+        programme = fields["function"]
+        self.assertIn("matrix mat(x)", programme)
+        self.assertIn("return 1/2^x.", programme)
+        self.assertIn("v3 = v1 - v2.", programme)
+        result = mars_lab.run_function_programme(programme, 40)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["output"].strip(), fields["value"])
+        values = [complex(cell.replace(" ", "").replace("i", "j"))
+                  for cell in re.split(r"[,;]", result["output"].strip()[1:-1])]
+        gap = math.sqrt(33)
+        plus, minus = (5 + gap) / 2, (5 - gap) / 2
+        plus_power, minus_power = complex(plus) ** 2.5, complex(minus) ** 2.5
+        # Independent spectral projector formula, not the generated temporary layout.
+        for entry, diagonal, actual in zip((1, 2, 3, 4), (1, 0, 0, 1), values):
+            expected = ((entry - minus * diagonal) * plus_power +
+                        (plus * diagonal - entry) * minus_power) / gap
+            self.assertAlmostEqual(actual.real, expected.real, places=11)
+            self.assertAlmostEqual(actual.imag, expected.imag, places=11)
+
+    def test_generated_matrix_exact_binding_initialisers(self):
+        values = (("@pi", "@pi"), ("pi", "@pi"), ("π", "@pi"), ("@pi/2", "@pi/2"),
+                  ("sqrt(2)", "sqrt(2)"), ("1/3", "1/3"), ("3.14159", "3.14159"))
+        for body in ("(1,2;3,4)^x", "(x,1;0,x)"):
+            for value, expected in values:
+                with self.subTest(body=body, value=value):
+                    source = "{ " + body + " | x=" + value + " }"
+                    fields, raw, code = mars_lab.run_matrix_lab_fields(mars_lab.DEFAULT_MATRIX_BIN, source, "eval", 40)
+                    self.assertEqual(code, 0, raw)
+                    self.assertIn("x = " + expected + ".\n", fields["function"])
+                    if value in ("@pi", "pi", "π"):
+                        with mock.patch.object(mars_lab, "render_TeX_to_svg", return_value=(None, None)):
+                            payload = mars_lab.prepare_matrix_fields(fields, 40)
+                        for field in ("expression", "expression_pretty", "display_expression",
+                                      "full_display_expression", "display_expression_pretty"):
+                            self.assertIn("x = π", payload[field], field)
+                            self.assertNotIn("x = 3.14159", payload[field], field)
+                    if body == "(x,1;0,x)":
+                        self.assertIn("(x, 1; 0, x)", fields["expression"])
+                    result = mars_lab.run_function_programme(fields["function"], 40)
+                    self.assertTrue(result["ok"], result)
+                    actual = result["output"].strip()
+                    self.assertTrue(actual.startswith("("), actual)
+                    if actual != fields["value"]:
+                        # The independently evaluated formula may differ in its final rounding digit.
+                        pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+                        actual_parts = re.findall(pattern, actual.replace(" ", ""))
+                        expected_parts = re.findall(pattern, fields["value"].replace(" ", ""))
+                        self.assertEqual(len(actual_parts), len(expected_parts))
+                        with localcontext() as context:
+                            context.prec = 60
+                            for got, want in zip(actual_parts, expected_parts):
+                                scale = max(Decimal(1), abs(Decimal(want)))
+                                self.assertLess(abs(Decimal(got) - Decimal(want)), scale * Decimal("1e-37"))
+
+    def test_generated_matrix_symbolic_power_output(self):
+        fields, raw, code = mars_lab.run_matrix_lab_fields(
+            mars_lab.DEFAULT_MATRIX_BIN, "(1,2;3,4)^x", "eval", 40)
+        self.assertEqual(code, 0, raw)
+        result = mars_lab.run_function_programme(fields["function"], 40)
+        self.assertTrue(result["ok"], result)
+        output = result["output"]
+        self.assertIn("x = ?", output)
+        self.assertIn("√(33)", output)
+        self.assertIn("√(³⁄₁₁)", output)
+        self.assertNotRegex(output, r"[cv][₀-₉0-9]+")
+        self.assertNotRegex(output, r"\d\.\d{12}")
+        self.assertIn("\n\t", output)
+        self.assertEqual(output.count("½^x") + output.count("1/2^x"), 1)
+
+    def test_exact_local_constants_across_function_types(self):
+        for kind, body in (("expression", "x + root"), ("equation", "equation(x = root)"),
+                           ("matrix", "(x + root, root)")):
+            with self.subTest(kind=kind):
+                source = kind + " f(x) { const root=sqrt(2). return " + body + ". } x=?. output(f(x))."
+                result = self.run_programme(source)
+                self.assertIn("√", result)
+                self.assertNotIn("root", result)
+                self.assertNotIn("1.414213", result)
+        self.assertIn("C = ?", self.run_programme(
+            "matrix f(x) { const C=?. return (x+C,x). } x=?. output(f(x))."))
+        self.assertEqual(self.run_programme(
+            "expression f(x) { v=1. y=v+x. v=2. return y. } x=3. output(f(x))."), "5")
+
+    def test_matrix_function_return_forms(self):
+        cases = (
+            ("(1,2;3,4)", "(1, 2; 3, 4)"),
+            ("x.(1,2,3) + (4,5,6)", "(6, 9, 12)"),
+            ("(x+1).(1,2;3,4)", "(3, 6; 9, 12)"),
+            ("(1,2;3,4).(x+1)", "(3, 6; 9, 12)"),
+            ("((1,2).(3;4))", "(11)"),
+            ("(x.(1,2))", "(2, 4)"),
+            ("-(1,2;3,4)", "(-1, -2; -3, -4)"),
+            ("+(1,2;3,4)", "(1, 2; 3, 4)"),
+            ("(x,x^2) - (1,2)", "(1, 2)"),
+            ("(sqrt(2), @pi; i, exp(i.@pi))", None),
+        )
+        for body, expected in cases:
+            with self.subTest(body=body):
+                programme = "matrix mat(x) { return " + body + ". } x=2. output(mat(x))."
+                result = subprocess.run([str(BINARY), "40"], input=programme, text=True, capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+                if expected is not None:
+                    self.assertEqual(result.stdout.strip(), expected)
+                else:
+                    self.assertIn("1.41421356237", result.stdout)
+                    self.assertIn("3.14159265358", result.stdout)
+                    self.assertIn("i", result.stdout)
+
+    def test_matrix_symbolic_and_algebraic_output(self):
+        prefix = "matrix mat(x) { v1=x^2. return (v1,x). } "
+        symbolic = self.run_programme(prefix + "x=?. output(mat(x)).")
+        self.assertIn("x²", symbolic)
+        self.assertIn("x = ?", symbolic)
+        algebraic = self.run_programme(prefix + "x=2. outputa(mat(x)).")
+        self.assertIn("x²", algebraic)
+        self.assertIn("x = 2", algebraic)
+        self.assertEqual(self.run_programme(prefix + "x=2. output(mat(x)). x=3. output(mat(x))."),
+                         "(4, 2)\n(9, 3)")
+
+    def test_generated_matrix_calculus_functions(self):
+        for source in ("{ Dx((x,x^2;3x,4x)) | x=2 }", "@S(x,x^2;3x,4x)dx"):
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_matrix_lab_fields(mars_lab.DEFAULT_MATRIX_BIN, source, "eval", 40)
+                self.assertEqual(code, 0, raw)
+                result = mars_lab.run_function_programme(fields["function"], 40)
+                self.assertTrue(result["ok"], result)
+                if fields.get("value"):
+                    self.assertEqual(result["output"].strip(), fields["value"])
+                else:
+                    self.assertIn("x = ?", result["output"])
+                    self.assertIn("C₁₁ = ?", result["output"])
+                    self.assertIn("C₂₂ = ?", result["output"])
 
     def test_complex_zero_output(self):
         source = """expression expr(@omega) {
@@ -596,7 +738,7 @@ outputa(equ(x,a)).
             ("expression expr(x) { return equation(x = 2). } output(expr(x)).", "declared function type"),
             ("output(equation(x == 2)).", "exactly one"),
             ("output(equation(x)).", "lhs = rhs"),
-            ("q = equation(x = 2).", "storing equation"),
+            ("q = equation(x = 2).", "storing matrix, equation or solution-set values is not supported yet"),
             ("output(solve(solve(equation(x = 2)))).", "solve requires an equation value"),
         ):
             with self.subTest(source=source):
@@ -807,6 +949,10 @@ output(expr(a)).
     def test_unsupported_and_malformed_programmes(self):
         for source in (
             "matrix expr() { return [1,2]. } output(expr()).",
+            "matrix mat() { return 1. } output(mat()).",
+            "matrix mat() { return (1,2;3). } output(mat()).",
+            "matrix mat() { return (1,2).(3,4). } output(mat()).",
+            "matrix mat() { return (1,2). } m=mat().",
             "expression expr(array x) { return x. }",
             "expression expr(x) { return expr(x). } x=1. output(expr(x)).",
             "while (1) { output(1). }",
@@ -952,6 +1098,23 @@ output(expr(t)).
 
 
 class ZZOpheliaReadmeExamples(unittest.TestCase):
+    def test_readme_matrix_function(self):
+        # README example: docs/mars-lab.md, executable matrix Function cards.
+        source = """matrix mat(x) {
+    const scale = 2.
+    v1 = x^2.
+    return scale.(v1, x; x + 1, v1).
+}
+x = 3.
+output(mat(x)).
+"""
+        documentation = (ROOT / "docs/mars-lab.md").read_text(encoding="utf-8")
+        self.assertIn(source.strip(), documentation)
+        with mock.patch.object(mars_lab, "ensure_scratch_binary"):
+            result = mars_lab.run_function_programme(source, 40)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["output"].strip(), "(18, 6; 8, 18)")
+
     def test_readme_derivative_of_transform(self):
         # README example: docs/expression.md, Differentiating transform results.
         fields, raw, code = mars_lab.run_mars_lab_fields(

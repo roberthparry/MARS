@@ -99,6 +99,28 @@ static void test_number_real_arithmetic_parity(void)
     assert_number_string("ldexp(2.25, 3)", scaled, "18");
     assert_number_string("10^3", pow10, "1000");
 
+    /* Inexact negative bases still require the principal complex power. */
+    number_t roots[] = {num_create_from_double(sqrt(2.0)), num_create_from_qfloat(qf_sqrt(QF_TWO)), num_sqrt(NUM_TWO)};
+    double complex expected_power = cpow(-sqrt(2.0) + 0.0 * I, sqrt(2.0));
+    for (size_t backend = 0u; backend < sizeof(roots) / sizeof(roots[0]); ++backend) {
+        number_t base = num_neg(roots[backend]);
+        number_t power = num_pow(base, roots[backend]);
+        number_t expected = num_create_from_cdouble(expected_power);
+        number_t difference = num_sub(power, expected);
+        number_t error = num_abs(difference);
+        number_t tolerance = num_create_from_double(1e-12);
+
+        ASSERT_FALSE(num_is_nan(power));
+        ASSERT_TRUE(num_le(error, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&error);
+        num_destroy(&difference);
+        num_destroy(&expected);
+        num_destroy(&power);
+        num_destroy(&base);
+        num_destroy(&roots[backend]);
+    }
+
     num_destroy(&pow10);
     num_destroy(&scaled);
     num_destroy(&pow);

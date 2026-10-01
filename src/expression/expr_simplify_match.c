@@ -614,7 +614,12 @@ expr_t *expr_simplify_extract_common_factor_quotient(const expr_t *expr, const e
         return NULL;
     }
 
-    if (expr->ops && expr->ops->kind == EXPR_KIND_ADD && expr->a && expr->b) {
+    if (expr_is_div(expr) && expr->a && expr->b) {
+        left = expr_simplify_extract_common_factor_quotient(expr->a, factor);
+        if (!left)
+            return expr_simplify_extract_exact_factor_quotient(expr, factor);
+        out = expr_div(left, expr->b);
+    } else if (expr->ops && expr->ops->kind == EXPR_KIND_ADD && expr->a && expr->b) {
         left = expr_simplify_extract_common_factor_quotient(expr->a, factor);
         right = expr_simplify_extract_common_factor_quotient(expr->b, factor);
         out = (left && right) ? expr_add(left, right) : NULL;

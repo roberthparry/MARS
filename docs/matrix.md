@@ -8,6 +8,18 @@ complex values through the `number_t` layer. Storage remains pluggable
 All operations dispatch through internal vtables; no type switches or storage
 switches appear in user code.
 
+## Source organisation
+
+`src/matrix/matrix_cylindrical.c` keeps the Bessel I/K/Y and Struve H/L
+implementations with their shared numerical and symbolic machinery. Those
+shared helpers are private to the file.
+
+`src/matrix/matrix_special.c` groups the polynomial recurrences, harmonic
+polynomials, Lerch and q-digamma series, and spectral signal functions.
+`matrix_maths.c` owns the common functional-calculus engine and elementary
+matrix functions. Formatting, integration and beautification retain their
+separate source files because they have distinct responsibilities.
+
 ## Signal functions
 
 `mat_sgn`, `mat_step`, `mat_rect`, `mat_tri`, `mat_circ` and `mat_sinc` apply their
@@ -1440,6 +1452,11 @@ after those algebraic transformations does matrix beautification recognise
 symmetry across entries, arrange surds and separate an antiderivative matrix
 from its constant matrix.
 
+Shared symbolic powers of positive constant bases are extracted even when they
+occur inside fractional coefficients. Bindings that occur only in the common
+factor remain in the matrix's binding footer; factoring does not change the
+stored entries or their live bindings.
+
 The resulting expression structure is shared by every output style. TeX does
 not select a different simplified expression: its only style-specific change
 is replacing implied-multiplication dots with narrow mathematical spacing.
@@ -1454,11 +1471,18 @@ every cell.
 
 ### String Construction and Output
 
+Authored binding values retain their exact symbolic form through matrix parsing
+and result formatting. Function initialisers use canonical named-constant
+aliases, fractions and surds, while a later numerical `expr_set_val` update
+replaces the old symbolic value rather than leaving stale binding text.
+
 ```c
 typedef struct mat_bindings_t mat_bindings_t;
 
 matrix_t *mat_from_string(const char *s);
 matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
+matrix_t *mat_from_function_body_with_symbols(const char *source, const char *const *names,
+                                             expr_t *const *symbols, size_t nsymbols);
 matrix_t *mat_expression_from_string(const char *text, mat_bindings_t **bnd_out, const char **operation_out);
 expr_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 void mat_bindings_free(mat_bindings_t *bnd);
@@ -1478,6 +1502,21 @@ string_t *mat_sprintf_text(const char *fmt, ...);
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
 ```
+
+`mat_from_function_body_with_symbols(...)` parses the return body emitted by
+`MAT_STRING_FUNCTION` using supplied scalar expressions. It accepts matrix
+literals, scalar prefactors, matrix sums, differences and compatible products.
+Entries and factors use Function syntax, so multi-character identifiers and
+generated temporaries are not split into products of letters. Scalar dependencies
+and exact expressions remain in the returned symbolic matrix, even when their
+bindings currently have numerical values. Supply unique canonical binding names
+from `expr_bindings_name_at()`, including canonical subscripts, for every referenced
+variable. The input arrays are borrowed;
+release the returned matrix with `mat_free`. Invalid or unsupported bodies
+return `NULL`. This is not a parser for complete programmes or matrix-valued
+variable declarations; Ophelia handles the programme scope and scalar bindings.
+See [Running Function cards](mars-lab.md#running-function-cards) for a tested
+matrix programme and its output.
 
 `mat_from_string(...)` and `mat_from_string_expr(...)` accept three main forms:
 

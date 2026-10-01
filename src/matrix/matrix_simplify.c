@@ -508,6 +508,37 @@ static expr_t *mat_cancel_reciprocal_factor(const expr_t *expr, const expr_t *de
     return expr_negate_owned(mat_cancel_reciprocal_factor(negated, denominator));
 }
 
+/* Positive constant bases never vanish, so their shared symbolic powers can be extracted safely. */
+static expr_t *mat_find_common_positive_base_power(const expr_t *expr, expr_t *const *entries, size_t count)
+{
+    const expr_t *base = NULL;
+    const expr_t *exponent = NULL;
+    number_t value = number_invalid();
+
+    if (!expr)
+        return NULL;
+    bool candidate = expr_match_pow_expr(expr, &base, &exponent) && mat_symbolic_exponent_core(exponent) &&
+                     expr_match_const_value(base, &value) && num_is_finite(value) && num_is_real(value) &&
+                     num_gt(value, NUM_ZERO) && !num_eq(value, NUM_ONE);
+    num_destroy(&value);
+    if (candidate) {
+        size_t index;
+
+        for (index = 0u; index < count; ++index) {
+            expr_t *quotient = expr_simplify_extract_common_factor_quotient(entries[index], expr);
+
+            if (!quotient)
+                break;
+            expr_free(quotient);
+        }
+        if (index == count)
+            return expr_clone(expr);
+    }
+    expr_t *found = mat_find_common_positive_base_power(expr_first_child(expr), entries, count);
+
+    return found ? found : mat_find_common_positive_base_power(expr_second_child(expr), entries, count);
+}
+
 /* Extract one factor shared by every completed expression entry. */
 int mat_simplify_common_expression_factor(expr_t **entries, size_t count, expr_t **factor_out)
 {
@@ -520,6 +551,8 @@ int mat_simplify_common_expression_factor(expr_t **entries, size_t count, expr_t
     if (!entries || count == 0u)
         return 0;
     factor = mat_find_common_reciprocal_symbolic_power(entries[0], entries, count, false);
+    if (!factor)
+        factor = mat_find_common_positive_base_power(entries[0], entries, count);
     if (!factor)
         factor = mat_find_common_reciprocal_factor(entries[0], entries, count);
     if (!factor)

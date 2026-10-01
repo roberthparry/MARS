@@ -46,6 +46,23 @@ static void emit_assignment_value(sbuf_t *b, const char *value)
     string_free(source);
 }
 
+/* Share canonical Function binding values with other native mathematical modules. */
+char *expr_binding_to_function_value(const expr_t *expr)
+{
+    if (!expr)
+        return NULL;
+    char *value = binding_rhs_c_string_local(expr);
+    if (!value)
+        return NULL;
+    sbuf_t buffer;
+    sbuf_init(&buffer);
+    emit_assignment_value(&buffer, value);
+    char *text = sbuf_to_c_string(&buffer);
+    sbuf_free(&buffer);
+    free(value);
+    return text;
+}
+
 static void emit_function_output_arg_list(sbuf_t *b, const varlist_t *vl, const varlist_t *cl)
 {
     for (size_t i = 0u; i < vl->count; ++i) {

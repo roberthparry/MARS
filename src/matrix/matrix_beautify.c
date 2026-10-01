@@ -148,8 +148,9 @@ int mat_beautify_expression_matrix(const matrix_t *A, mat_expr_beautification_t 
         const expr_t *power_exponent = NULL;
         bool symbolic_power_factor =
             beautification->common_factor &&
-            expr_match_div_expr(beautification->common_factor, &factor_numerator, &factor_denominator) &&
-            expr_match_pow_expr(factor_denominator, &power_base, &power_exponent);
+            (expr_match_pow_expr(beautification->common_factor, &power_base, &power_exponent) ||
+             (expr_match_div_expr(beautification->common_factor, &factor_numerator, &factor_denominator) &&
+              expr_match_pow_expr(factor_denominator, &power_base, &power_exponent)));
 
         if (symbolic_power_factor) {
             for (size_t index = 0u; index < count; ++index) {

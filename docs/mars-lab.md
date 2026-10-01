@@ -436,7 +436,7 @@ calculation:
   shared mathematical symbol `ζ`, distinguished by their one- and two-argument
   forms.
 - **Function** shows MARS function source. Its **RUN** control executes the
-  initial scalar and equation Ophelia subset described below. Reused expression-DAG nodes
+  initial scalar, equation and matrix Ophelia subset described below. Reused expression-DAG nodes
   are named once as intermediate constants or variables before the return
   expression. A shared subexpression such as `x/2` is assigned once and reused.
   When both `exp(x)` and `exp(-x)` are needed, the second temporary reuses the
@@ -500,13 +500,16 @@ the Function card's **Run output** area. Replacing the result or switching modes
 clears this area and prevents an older response from appearing on a newer card.
 Evaluate again after editing bindings before pressing RUN.
 
-The first supported subset accepts one expression or equation function with scalar
+The first supported subset accepts one expression, equation or matrix function with scalar
 parameters, variable and constant assignments, generated intermediate values,
 returns, numerically decidable comparisons, symbolic scalar domain guards, and
 top-level output calls. Paired-backtick comments and double-backtick line
 comments are accepted. A full stop followed by whitespace or the end of the
 statement terminates it; an internal full stop multiplies. Commas can separate
-ordinary assignments on one line.
+ordinary assignments on one line. Function-local constant definitions retain
+their exact algebra, including surds, rather than appearing as generated names
+with decimal bindings in symbolic results. External parameters and unset local
+constants remain bindings; mutable scalar assignments retain their live values.
 
 Bracketed multi-character symbolic names are supported in expressions,
 declarations, function parameters and transform coordinates. Their contents are
@@ -739,7 +742,40 @@ keeps it algebraic. Unsuccessful solving reports that no solution was establishe
 not that none exists, unless the native solver proves an empty solution set.
 Any native search limitations or separate solution-family notes are also printed.
 
-This is not yet the full Ophelia language. Matrix programmes,
+Matrix functions execute the native generated return body, including shared
+scalar temporaries, a common scalar prefactor and an additive constant matrix.
+Scalar parameters may be real or complex. Matrix Function initialisers retain
+authored exact bindings, including named constants, fractions and surds;
+decimal input remains decimal input.
+Named constants such as pi use mathematical symbols in both Expression layouts
+and their Function aliases in Function initialisers, rather than decimal
+approximations. `output` evaluates every entry when possible; otherwise it retains
+the symbolic matrix and its bindings. `outputa`
+always requests algebraic output. Long symbolic results use the native multiline
+matrix layout, with shared non-vanishing powers factored out and their bindings
+retained. For example:
+
+```text
+matrix mat(x) {
+    const scale = 2.
+    v1 = x^2.
+    return scale.(v1, x; x + 1, v1).
+}
+x = 3.
+output(mat(x)).
+```
+
+RUN output:
+
+```text
+(18, 6; 8, 18)
+```
+
+Generated matrix functions use the same principal complex powers as Matrix
+mode. Fractional powers of negative eigenvalues can therefore produce complex
+entries; they are not coerced to real values.
+
+This is not yet the full Ophelia language. Matrix-valued parameters and assignments,
 arrays, convolution, loops, recursion, multiple function definitions, nested
 user-function calls, in-programme precision changes and undeclared captures
 from an outer scope are not implemented. Equation and solution-set assignments

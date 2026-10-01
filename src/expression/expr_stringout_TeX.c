@@ -346,7 +346,7 @@ static void TeX_primitive_definition(const expr_t *initial, sbuf_t *out)
     sbuf_puts(out, "\\quad\\text{(F is the chosen antiderivative)}");
 }
 
-int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out)
+static int expr_to_TeX_parts_mode(const expr_t *expr, char **expr_out, char **bindings_out, bool preserve_root_symbol)
 {
     autoname_table_t vnames;
     const expr_t *g;
@@ -370,7 +370,9 @@ int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out)
      * derivative.  Render the expression tree whenever formal derivatives are
      * present so (Dx(y))^2 remains visibly distinct from Dxx(y).
      */
-    if (!display && expr && expr->binding_expr && !expr_is_const(expr) && !TeX_tree_contains_formal_derivative(expr)) {
+    if (!display && expr && expr->binding_expr && !expr_is_const(expr) &&
+        !(preserve_root_symbol && expr_is_var(expr)) &&
+        !TeX_tree_contains_formal_derivative(expr)) {
         *expr_out = expr_binding_expr_to_TeX(expr->binding_expr);
         *bindings_out = expr_tostring_xstrdup("");
         return (*expr_out && *bindings_out) ? 0 : -1;
@@ -452,6 +454,18 @@ int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out)
     }
 
     return 0;
+}
+
+/* Render standalone TeX and bindings using the normal expression semantics. */
+int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out)
+{
+    return expr_to_TeX_parts_mode(expr, expr_out, bindings_out, false);
+}
+
+/* Retain a bound root variable in TeX entries of larger mathematical objects. */
+int expr_to_TeX_symbolic_parts(const expr_t *expr, char **expr_out, char **bindings_out)
+{
+    return expr_to_TeX_parts_mode(expr, expr_out, bindings_out, true);
 }
 
 char *expr_to_TeX_body(const expr_t *expr)

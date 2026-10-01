@@ -3365,7 +3365,8 @@ number_t num_pow(const number_t base, const number_t exponent)
         return qf_isnan(rqf) && qf_lt(bqf, QF_ZERO) ? number_qfloat_qcomplex_binary(bqf, eqf, qc_pow)
                                                     : num_create_from_qfloat(rqf);
     }
-    if (number_is_plain_inexact_value(&base) && number_is_plain_inexact_value(&exponent))
+    if (number_is_plain_inexact_value(&base) && number_is_plain_inexact_value(&exponent) &&
+        (!num_is_real(base) || !num_lt(base, NUM_ZERO)))
         return number_apply_binary_math(base, exponent, qf_pow, qc_pow, number_mpfr_pow_mut, mpc_pow);
 
     if (num_eq(exponent, NUM_ZERO))

@@ -1,4 +1,4 @@
-/* Initial Ophelia scalar and equation frontend. Mathematics stays in the public MARS API. */
+/* Initial Ophelia scalar, equation and matrix frontend. Mathematics stays in the public MARS API. */
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #include "dictionary.h"
 #include "equation.h"
 #include "expression.h"
+#include "matrix.h"
 #include "number.h"
 #include "ustring.h"
 
@@ -30,6 +31,8 @@ typedef struct {
     size_t count;
 } scope_t;
 
+typedef enum { FUNCTION_EXPRESSION, FUNCTION_EQUATION, FUNCTION_MATRIX } function_kind_t;
+
 typedef struct {
     char *name;
     char *parameters[PARAMETER_LIMIT];
@@ -37,13 +40,14 @@ typedef struct {
     size_t count;
     char *body;
     char *end;
-    bool equation;
+    function_kind_t kind;
 } function_t;
 
 typedef struct {
     expr_t *expression;
     equation_t *equation;
     equation_solutions_t *solutions;
+    matrix_t *matrix;
 } value_t;
 
 static void value_free(value_t value)
@@ -51,11 +55,12 @@ static void value_free(value_t value)
     expr_free(value.expression);
     equ_free(value.equation);
     equ_solutions_free(value.solutions);
+    mat_free(value.matrix);
 }
 
 static bool value_present(value_t value)
 {
-    return value.expression || value.equation || value.solutions;
+    return value.expression || value.equation || value.solutions || value.matrix;
 }
 
 typedef struct {
@@ -279,6 +284,14 @@ static bool discover(runtime_t *runtime, scope_t *scope, const char *text)
     return !runtime->failed;
 }
 
+static void scope_symbols(const scope_t *scope, const char **names, expr_t **symbols)
+{
+    for (size_t i = 0u; i < scope->count; ++i) {
+        names[i] = scope->entries[i].canonical;
+        symbols[i] = scope->entries[i].expr;
+    }
+}
+
 static expr_t *parse_value(runtime_t *runtime, scope_t *scope, const char *text)
 {
     if (strcmp(text, "?") == 0 || strcmp(text, "@nan") == 0)
@@ -287,13 +300,23 @@ static expr_t *parse_value(runtime_t *runtime, scope_t *scope, const char *text)
         return NULL;
     const char *names[SYMBOL_LIMIT];
     expr_t *symbols[SYMBOL_LIMIT];
-    for (size_t i = 0; i < scope->count; ++i) {
-        names[i] = scope->entries[i].canonical;
-        symbols[i] = scope->entries[i].expr;
-    }
+    scope_symbols(scope, names, symbols);
     expr_t *value = expr_from_function_body_with_symbols(text, names, symbols, scope->count);
     if (!value)
         fail(runtime, "invalid or unsupported scalar expression");
+    return value;
+}
+
+static matrix_t *parse_matrix(runtime_t *runtime, scope_t *scope, const char *text)
+{
+    if (!discover(runtime, scope, text))
+        return NULL;
+    const char *names[SYMBOL_LIMIT];
+    expr_t *symbols[SYMBOL_LIMIT];
+    scope_symbols(scope, names, symbols);
+    matrix_t *value = mat_from_function_body_with_symbols(text, names, symbols, scope->count);
+    if (!value)
+        fail(runtime, "invalid or unsupported matrix expression");
     return value;
 }
 
@@ -665,7 +688,9 @@ static value_t call(runtime_t *runtime, scope_t *scope, char *text, size_t depth
         runtime->calling = false;
         if (!runtime->failed && !value_present(result))
             fail(runtime, "function ended without returning a value");
-        if (!runtime->failed && (fn->equation ? !result.equation : !result.expression))
+        bool matching_type = fn->kind == FUNCTION_MATRIX ? result.matrix != NULL :
+                             fn->kind == FUNCTION_EQUATION ? result.equation != NULL : result.expression != NULL;
+        if (!runtime->failed && !matching_type)
             fail(runtime, "return value does not match the declared function type");
     }
     scope_free(&local);
@@ -712,13 +737,46 @@ static void define_function(runtime_t *runtime, char **p)
             break;
     }
     if (!take(p, ')') || !take(p, '{')) {
-        fail(runtime, "expected a scalar function body");
+        fail(runtime, "expected a function body");
         return;
     }
     fn->body = *p;
     fn->end = matching_block(runtime, *p);
     if (fn->end)
         *p = fn->end + 1;
+}
+
+static void output_matrix(runtime_t *runtime, const matrix_t *matrix, bool algebraic)
+{
+    matrix_t *numeric = algebraic ? NULL : mat_evaluate(matrix);
+    bool complete = numeric != NULL;
+    for (size_t row = 0u; complete && row < mat_get_row_count(numeric); ++row) {
+        for (size_t col = 0u; complete && col < mat_get_col_count(numeric); ++col) {
+            number_t entry = mat_get_num(numeric, row, col);
+            complete = !num_is_nan(entry);
+            num_destroy(&entry);
+        }
+    }
+    if (complete) {
+        mat_printf("%.*m\n", (int)runtime->precision, numeric);
+    } else {
+        char *text = mat_to_string(matrix, MAT_STRING_EXPRESSION);
+        if (text && strlen(text) > 120u) {
+            char *layout = mat_to_string(matrix, MAT_STRING_EXPRESSION_LAYOUT);
+
+            if (layout) {
+                free(text);
+                text = layout;
+            }
+        }
+        if (text) {
+            puts(text);
+            free(text);
+        } else {
+            fail(runtime, "could not render matrix output");
+        }
+    }
+    mat_free(numeric);
 }
 
 static void output_equation(runtime_t *runtime, const equation_t *equation, bool algebraic, bool solution)
@@ -803,8 +861,10 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
             fail(runtime, "expected a declaration, assignment, return or output");
             break;
         }
-        if ((strcmp(name, "expression") == 0 || strcmp(name, "equation") == 0) && !function) {
-            runtime->function.equation = strcmp(name, "equation") == 0;
+        if ((strcmp(name, "expression") == 0 || strcmp(name, "equation") == 0 || strcmp(name, "matrix") == 0) &&
+            !function) {
+            runtime->function.kind = strcmp(name, "matrix") == 0 ? FUNCTION_MATRIX :
+                                     strcmp(name, "equation") == 0 ? FUNCTION_EQUATION : FUNCTION_EXPRESSION;
             free(name);
             define_function(runtime, &p);
             continue;
@@ -910,7 +970,13 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
         if (runtime->failed)
             break;
         char *text = expression_text(runtime, &p);
-        value_t result = text ? call(runtime, scope, text, 0u) : (value_t){0};
+        value_t result = {0};
+        if (text) {
+            if (returning && runtime->function.kind == FUNCTION_MATRIX)
+                result.matrix = parse_matrix(runtime, scope, text);
+            else
+                result = call(runtime, scope, text, 0u);
+        }
         expr_t *value = result.expression;
         free(text);
         if (output && !take(&p, ')'))
@@ -929,6 +995,11 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
                 value_free(result);
                 fail(runtime, "prototype output limit exceeded");
                 break;
+            }
+            if (result.matrix) {
+                output_matrix(runtime, result.matrix, algebraic);
+                value_free(result);
+                continue;
             }
             if (result.equation || result.solutions) {
                 size_t count = result.equation ? 1u : equ_solutions_count(result.solutions);
@@ -966,14 +1037,16 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
             }
             num_destroy(&number);
         } else if (!value) {
-            fail(runtime, "storing equation or solution-set values is not supported yet; use output(solve(...))");
+            fail(runtime, "storing matrix, equation or solution-set values is not supported yet; use direct output");
         } else {
             number_t number = expr_eval(value);
             expr_bindings_t *dependencies = NULL;
             char *body = expr_to_function_body(value);
             expr_t *probe = body ? expr_from_function_body(body, &dependencies) : NULL;
             bool numeric_literal = probe && expr_bindings_count(dependencies) == 0u;
-            if (binding->leaf && numeric_literal) {
+            /* Local constant definitions are algebra, not externally supplied numerical bindings. */
+            bool exact_local = function && binding->constant && numeric_literal && !num_is_nan(number);
+            if (binding->leaf && numeric_literal && !exact_local) {
                 expr_set_val(binding->expr, number);
             } else {
                 expr_free(binding->expr);

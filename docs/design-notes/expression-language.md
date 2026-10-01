@@ -6,7 +6,7 @@ The language is named **Ophelia**. MARS remains its mathematical engine; the
 language frontend and any future standalone project carry the Ophelia name.
 
 This note records an agreed direction, not a final grammar or a claim that the
-whole language is implemented. A first scalar and equation frontend now lives in the separate
+whole language is implemented. A first scalar, equation and matrix frontend now lives in the separate
 native target `scratch/ophelia`, reached through **RUN** on MARS Lab Function
 cards. Its supported subset and limits are documented in
 [Running Function cards](../mars-lab.md#running-function-cards). Most of the

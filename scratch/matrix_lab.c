@@ -7,6 +7,8 @@
 #include "matrix.h"
 #include "number.h"
 #include "ustring.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 static matrix_t *matrix_real_copy_if_possible(const matrix_t *matrix)
 {
@@ -452,40 +454,39 @@ static bool matrix_bindings_have_resolved_values(mat_bindings_t *bindings)
     return false;
 }
 
-static void matrix_bindings_copy_values(mat_bindings_t *destination, mat_bindings_t *source)
+static bool matrix_bindings_copy_values(mat_bindings_t *destination, mat_bindings_t *source)
 {
     if (!destination || !source)
-        return;
+        return true;
 
     for (size_t index = 0u; index < mat_bindings_count(destination); ++index) {
         const char *name = mat_bindings_name_at(destination, index);
         expr_t *target = mat_bindings_expr_at(destination, index);
         expr_t *origin = name ? mat_bindings_get(source, name) : NULL;
-        number_t value;
-
         if (!target || !origin)
             continue;
-        value = expr_get_val(origin);
-        expr_set_val(target, value);
-        num_destroy(&value);
+        if (!expr_copy_binding_value(target, origin))
+            return false;
     }
+    return true;
 }
 
-static void expression_bindings_copy_values(expr_t *expression, mat_bindings_t *source)
+static bool expression_bindings_copy_values(expr_t *expression, mat_bindings_t *source)
 {
     matrix_t *holder;
     mat_bindings_t *destination;
 
     if (!expression || !source)
-        return;
+        return true;
     holder = mat_new_expr(1u, 1u);
     if (!holder)
-        return;
+        return false;
     mat_set(holder, 0u, 0u, &expression);
     destination = mat_bindings_from_matrix(holder);
-    matrix_bindings_copy_values(destination, source);
+    bool copied = matrix_bindings_copy_values(destination, source);
     mat_bindings_free(destination);
     mat_free(holder);
+    return copied;
 }
 
 static bool matrix_has_numeric_values(const matrix_t *matrix)
@@ -1074,7 +1075,8 @@ int main(int argc, char **argv)
         operation = parsed_operation ? parsed_operation : operation;
         printf("input       %s\n", input);
         printf("operation   %s\n", operation);
-        expression_bindings_copy_values(scalar_result, bindings);
+        if (!expression_bindings_copy_values(scalar_result, bindings))
+            goto cleanup;
         print_expr_scalar_field(NULL, operation, scalar_result);
         scalar_result = NULL;
         print_matrix_bindings(bindings);
@@ -1139,8 +1141,10 @@ int main(int argc, char **argv)
         if (mat_typeof(matrix) == MAT_TYPE_EXPR) {
             mat_bindings_t *scalar_bindings = mat_bindings_from_matrix(matrix);
 
-            matrix_bindings_copy_values(scalar_bindings, bindings);
+            bool copied = matrix_bindings_copy_values(scalar_bindings, bindings);
             mat_bindings_free(scalar_bindings);
+            if (!copied)
+                goto cleanup;
         }
         rc = run_scalar_operation(matrix, operation);
         goto cleanup;
@@ -1171,7 +1175,8 @@ result_ready:
     }
 
     result_bindings = mat_bindings_from_matrix(result);
-    matrix_bindings_copy_values(result_bindings, bindings);
+    if (!matrix_bindings_copy_values(result_bindings, bindings))
+        goto cleanup;
     print_matrix_fields(result);
     if (matrix_bindings_are_resolved(result_bindings)) {
         const matrix_t *value_source = bound_matrix_is_result ? bound_matrix : result;
