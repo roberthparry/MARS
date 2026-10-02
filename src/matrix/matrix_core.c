@@ -549,6 +549,14 @@ void num_copy_value(void *dst, const void *src)
     *(number_t *)dst = num_is_immortal(*value) ? *value : num_clone(*value);
 }
 
+/* Matrix entries outlive temporary scopes; ordinary numeric reads remain scope-managed. */
+static void elem_copy_for_storage(const struct elem_vtable *elem, void *dst, const void *src)
+{
+    elem_copy_value(elem, dst, src);
+    if (elem == &number_elem)
+        *(number_t *)dst = num_scope_detach(*(number_t *)dst);
+}
+
 void num_destroy_value(void *slot)
 {
     number_t *value = (number_t *)slot;
@@ -663,7 +671,7 @@ void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val)
         mat_numeric_precision_note_set(A, &old_num, val);
     }
     elem_destroy_value(A->elem, slot);
-    elem_copy_value(A->elem, slot, val);
+    elem_copy_for_storage(A->elem, slot, val);
 
     if (was_zero && !is_zero)
         A->nnz++;
@@ -789,7 +797,7 @@ void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
             if (A->elem == &number_elem)
                 mat_numeric_precision_note_set(A, cur->value, val);
             elem_destroy_value(A->elem, cur->value);
-            elem_copy_value(A->elem, cur->value, val);
+            elem_copy_for_storage(A->elem, cur->value, val);
         }
         return;
     }
@@ -805,7 +813,7 @@ void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
     memset(cur->value, 0, A->elem->size);
     if (A->elem == &number_elem)
         mat_numeric_precision_note_set(A, A->elem->zero, val);
-    elem_copy_value(A->elem, cur->value, val);
+    elem_copy_for_storage(A->elem, cur->value, val);
     if (prev) {
         cur->next = prev->next;
         prev->next = cur;
@@ -1023,7 +1031,7 @@ void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
             mat_numeric_precision_note_set(A, &old_num, val);
         }
         elem_destroy_value(A->elem, A->data[i]);
-        elem_copy_value(A->elem, A->data[i], val);
+        elem_copy_for_storage(A->elem, A->data[i], val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)
@@ -1214,7 +1222,7 @@ void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *va
             mat_numeric_precision_note_set(A, &old_num, val);
         }
         elem_destroy_value(A->elem, slot);
-        elem_copy_value(A->elem, slot, val);
+        elem_copy_for_storage(A->elem, slot, val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)
@@ -1242,7 +1250,7 @@ void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *va
             mat_numeric_precision_note_set(A, &old_num, val);
         }
         elem_destroy_value(A->elem, slot);
-        elem_copy_value(A->elem, slot, val);
+        elem_copy_for_storage(A->elem, slot, val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)

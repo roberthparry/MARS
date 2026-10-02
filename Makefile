@@ -328,6 +328,8 @@ $(SHARED_LIB): Makefile $(OBJS)
 # ------------------------------------------------------------
 # Test binaries
 # ------------------------------------------------------------
+$(TEST_BUILD_DIR)/matrix/test_matrix: TEST_LINK_FLAGS = -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=string_free -Wl,--wrap=expr_to_text_symbolic
+
 define TEST_BIN_RULE
 $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
     $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
@@ -335,7 +337,7 @@ $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
     $(TEST_COMMON_HELPER_OBJS) \
     $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS))
 	@mkdir -p $$(dir $$@)
-	$(CC) -o $$@ \
+	$(CC) $$(TEST_LINK_FLAGS) -o $$@ \
 	    $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
 	    $(TEST_COMMON_HELPER_OBJS) \
 	    $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS)) \

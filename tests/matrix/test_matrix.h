@@ -203,6 +203,7 @@ void run_matrix_function_tests(void);
 void run_matrix_function_regression_tests(void);
 void run_matrix_fromstring_tests(void);
 void run_matrix_tostring_tests(void);
+void run_matrix_memory_tests(void);
 void run_matrix_output_tests(void);
 
 #define mat_new_num(rows, cols) mat_new((rows), (cols))

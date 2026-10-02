@@ -405,6 +405,36 @@ static void test_reverse_qdigamma_arguments(void)
     expr_free(q);
 }
 
+static void test_reverse_lerch_phi_arguments(void)
+{
+    expr_t *z = test_expr_new_named_var_d(0.5, "z");
+    expr_t *s = test_expr_new_named_var_d(0.0, "s");
+    expr_t *a = test_expr_new_named_var_d(1.0, "a");
+    expr_t *function = expr_lerch_phi(z, s, a);
+    const expr_t *variables[] = {z, s, a};
+    number_t value = NUM_NAN, gradients[3] = {NUM_NAN, NUM_NAN, NUM_NAN};
+    double expected_s = 0.0, power = 0.5;
+
+    /* At s = 0 the value is geometric; its order derivative is a convergent logarithmic series. */
+    for (unsigned k = 1u; k <= 64u; ++k) {
+        expected_s -= power * log((double)k + 1.0);
+        power *= 0.5;
+    }
+    ASSERT_NOT_NULL(function);
+    ASSERT_EQ_INT(expr_eval_derivatives(function, 3u, variables, &value, gradients), 0);
+    ASSERT_TRUE(fabs(num_to_double(value) - 2.0) < 1e-12);
+    ASSERT_TRUE(fabs(num_to_double(gradients[0]) - 4.0) < 1e-12);
+    ASSERT_TRUE(fabs(num_to_double(gradients[1]) - expected_s) < 1e-8);
+    ASSERT_TRUE(num_is_zero(gradients[2]));
+    for (size_t i = 0u; i < 3u; ++i)
+        num_destroy(&gradients[i]);
+    num_destroy(&value);
+    expr_free(function);
+    expr_free(a);
+    expr_free(s);
+    expr_free(z);
+}
+
 static void test_reverse_appell_variables(void)
 {
     expr_t *a = test_expr_new_const_d(0.5);
@@ -469,6 +499,7 @@ void test_reverse_mode(void)
     TEST_RUN_SUBTEST(test_reverse_modified_cylindrical_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_bessel_y_complex_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_qdigamma_arguments, NULL);
+    TEST_RUN_SUBTEST(test_reverse_lerch_phi_arguments, NULL);
     TEST_RUN_SUBTEST(test_reverse_hypergeometric_argument, NULL);
     TEST_RUN_SUBTEST(test_reverse_appell_variables, NULL);
     TEST_RUN_SUBTEST(test_reverse_lauricella_variables, NULL);

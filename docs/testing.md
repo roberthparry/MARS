@@ -2,19 +2,21 @@
 
 The project provides per-module test targets.
 
-## Machine-Readable Reports
+## Test Reports
 
-The harness emits JUnit-style XML beside each suite source file by default.
-For example, the qfloat suite writes `tests/qfloat/test_qfloat.junit.xml`.
+The native harness prints individual case results, group totals, a final
+summary and the slowest cases to the terminal. It does not currently emit
+JUnit XML. Capture both standard output and standard error when preserving
+verification evidence, and keep a separate log for every isolated batch.
 
 ```sh
 make test_qfloat
 ```
 
-- Because report emission lives in the shared harness runtime, every suite gets
-  it automatically.
-- Output examples are included in machine-readable reports, but remain separate
-  from correctness totals in the terminal summary.
+- Output examples have separate totals from ordinary correctness cases.
+- A successful process exit and final summary are required for a completed
+  batch. Reconcile the cases across partitions; a skipped group does not
+  establish coverage for its children.
 
 ## Run Tests
 
@@ -316,6 +318,206 @@ MARS Lab expression-presentation regressions live in
 evaluation, differentiation and integration as well as the browser's Function
 syntax colouring. Markdown examples are collected in
 `ZZMarsLabReadmeExamples`, which runs after the other Lab tests.
+
+### Recorded Check: 1–2 October 2026
+
+The matrix audit reproduced a null-array cleanup crash after failed formatter
+allocation, leaked entry-binding text after additive-constant formatting failed,
+and a leaked row token after its destination vector failed to grow. The fixes
+guard unallocated arrays and retain ownership until transfer succeeds.
+
+Five allocation-failure regressions use linker wrapping confined to the matrix
+test executable. Production allocation functions are unchanged, and the wrappers
+remain inactive outside the individual failure checks. An additional native
+regression renders the symbolic two-by-two matrix power in Expression, Function
+and TeX styles. The end-to-end Lab check with an exact pi binding exposed further
+temporary-number and expression leaks in common-factor and reciprocal-power
+simplification. These are fixed by releasing the borrowed-argument temporaries
+after the constructors have copied or retained them, and by releasing generated
+numeric exponents after use.
+
+The 30 matrix parser cases, 16 existing formatter cases, five allocation-failure
+cases and new three-card regression completed full leak scans with zero reported
+errors and zero heap bytes at exit. The generated matrix Function programme also
+passed with unset, pi and rational bindings. The end-to-end exact-pi Lab check
+previously leaked 14,472 bytes; after the fixes, all 4,671,196 allocations were
+freed and Valgrind reported zero errors.
+
+The matrix README checks also exposed 1,816 leaked bytes in Bessel and Struve
+evaluation: detached numeric results from order shifts, Taylor coefficients and
+matrix norms were not released by the surrounding temporary-number scope.
+These caller-owned values require explicit cleanup, including early exits.
+The broader cylindrical batch additionally identified detached Bessel Y expected
+values leaked by the test fixtures themselves; those now use the same explicit
+cleanup as production callers. Ten cylindrical regression cases completed
+family-specific scans with zero errors and zero heap bytes at exit.
+All seven matrix README examples then completed clean final Valgrind scans,
+with all 74,605 allocations freed.
+
+The memory checks use the release build, full Valgrind leak reporting and the standard
+512 MiB, no-swap, 50% CPU and 90-second limits above, without suppressions. An
+initial combined parser batch exceeded the time limit; splitting out its
+symbolic-power case allowed both batches to complete their final leak scans.
+The combined cylindrical batch also exceeded the time limit and was split into
+smaller family-specific runs; interrupted runs are not counted as clean scans.
+The isolated multi-order Bessel Y numeric case initially exceeded 90 seconds
+with zero reported errors before termination. It is now split into six named
+cases: zero, first, negative and half orders, plus separate dense and diagonal
+matrix checks for the complex order. All original inputs, precision and
+assertions are retained. The four real-order cases complete in one bounded
+batch; each complex-order layout completes separately in approximately
+79 seconds. All six cases completed full Valgrind scans with zero errors and
+zero heap bytes at exit, closing the previous coverage gap without increasing
+any resource limit or changing production code.
+The test configuration is restored after isolated runs. This targeted audit is
+not a claim of whole-project memory safety.
+
+Ordinary verification passed all 20 native suites and 131 Function-runner/matrix
+Lab tests. After the final cylindrical and fixture changes, the complete matrix
+suite passed again: 242 tests and seven README examples. All 59 Python README
+checks passed last.
+After splitting the Bessel Y checks, the complete matrix suite passed again
+with 247 tests and all seven README examples, which ran last.
+
+#### Bessel Y ownership follow-up
+
+A later scope-lifetime audit found defects not exercised by those earlier
+numeric-value checks. Both fixed-precision Bessel Y wrappers leaked their
+detached numeric result (64 bytes per isolated real-valued call). Integrating
+`BesselY(1/3,x)` leaked 760 bytes in detached Lommel parameters. A Bessel Y
+matrix evaluated inside a temporary numeric scope retained freed off-diagonal
+storage after that scope ended; reading it produced invalid accesses and a
+segmentation fault.
+
+The wrappers now release their converted result. Bessel I and Lommel parameter
+construction use scope-tracked arithmetic, including rejected-parameter paths.
+All numeric matrix storage setters detach their copies from the caller's
+temporary scope, while ordinary owning reads retain their existing temporary
+scope behaviour. Dense, sparse, diagonal and both triangular layouts share
+this ownership rule. Detached results in the Bessel Y number tests and their
+README example are also released explicitly.
+
+Eight selectable regressions cover the two wrappers, detached scalar lifetime,
+three integration construction/rejection paths, and two matrix storage/lifetime
+cases. The matrix cases also exercise sparse replacement/removal, in-place
+materialisation and automatic reclamation of temporary reads. The three focused
+Valgrind batches completed with zero errors and zero heap bytes at exit, without
+suppressions or relaxed resource limits. An existing orthogonal-polynomial
+fixture's detached expected value was also corrected after its leak was exposed
+during expression verification.
+
+Ordinary verification passed all 24 number tests, 18 selected matrix tests
+(including both complex-order Bessel Y layouts) and nine affected expression
+tests. Further bounded memory batches passed 16 matrix cases and three
+expression evaluation/reverse-mode/orthogonal-polynomial cases with zero errors
+and zero heap bytes at exit. All seven matrix README examples and the number
+README example group, including the Bessel Y examples for all three scalar
+APIs, ran last and completed equally clean final scans.
+
+Full ordinary matrix and expression runs exceeded the 90-second limit in
+unrelated symbolic inverse, solve and integration cases. A combined affected
+expression memory batch also exceeded the limit in composed integration;
+the completed construction/rejection and evaluation batches remain separate
+evidence, not full memory coverage for the composed cases. Interrupted runs
+are not counted as passes. The original test settings are restored apart from
+the eight new regression registrations. These checks do not establish
+whole-project memory safety.
+
+#### Full-suite follow-up
+
+The subsequent full number-suite AddressSanitizer/LeakSanitizer run exposed
+1,808 leaked bytes in modified Bessel K evaluation and its Wronskian fixture.
+Detached working values, intermediate series and replaced results now receive
+explicit cleanup, as do the qfloat and qcomplex wrappers and affected fixtures.
+A new ownership regression checks results after their input scope has ended,
+integer recurrences, real and complex half orders, and rejected arguments.
+It also exposed precision loss when a negative real order was unnecessarily
+promoted to a complex value; real working values now retain their requested
+precision regardless of sign. The isolated regression and existing Bessel I
+precision case pass with address, undefined-behaviour and final leak checks.
+
+The expression batches subsequently exposed 480 leaked bytes in Struve order
+shifts used by ordinary and reverse-mode derivatives. The same detached-helper
+pattern was corrected in both Struve families' integral and hypergeometric
+parameters, including rejected-parameter paths. A selectable integration
+ownership regression and the complete reverse-mode group pass their final
+leak checks. A further 56-byte leak in inverse-Fourier branch classification
+was traced to an unreleased literal value; the existing Fourier copy/rendering
+regression reproduces it, and the complete Fourier/signal group passes after
+the cleanup.
+
+The related detached-arithmetic audit identified the same ownership mistake in
+the Lerch reverse-mode finite-difference denominator. That temporary now remains
+in the caller's numeric scope, and invalid unpacking does not allocate its step.
+A new selectable regression checks all three argument derivatives against the
+geometric value and a convergent logarithmic series. It passes the final leak
+scan. The Bessel K ownership regression additionally verifies negative real
+orders and the principal branch on the negative real axis at 256-bit precision.
+
+Ordinary tests and README examples are recorded separately, with README examples
+reserved for the final phase. The six previously identified slow symbolic cases
+were allowed to run individually for up to 15 minutes with the user's approval;
+the 512 MiB memory cap, zero swap, 50% CPU quota and strictly sequential
+execution remained unchanged. Timeouts and
+empty selections do not count as completed coverage.
+
+A one-frame allocation-trace experiment was rejected: a deliberate 37-byte
+leak was not reported with `malloc_context_size=1`, whereas the retained
+four-frame setting reported it and returned a failing exit status. No
+one-frame run contributes to the coverage record. An optimised (`-O2`)
+instrumented build was used to retry slow cases without changing their inputs,
+assertions, precision or sanitizer checks.
+
+The dense six-by-six solve also exceeded 15 minutes in that optimised build,
+with a peak of 168.6 MiB. The user approved a 30-minute allowance for this
+isolated case only; the memory, swap, CPU and sequential-execution limits
+remain unchanged.
+
+All 1,505 ordinary native cases across the 20 module suites completed both fresh
+release verification and AddressSanitizer, UndefinedBehaviorSanitizer and final
+LeakSanitizer checks. This includes 249 matrix, 543 expression and 190
+differential-equation cases. All 88 native README examples/checks subsequently
+passed in both builds. Executed names were reconciled against the source
+registrations and README selections; no application cases were omitted.
+The harness's deliberately skipped fixtures remain intentional controls.
+
+All 944 ordinary Python integration/policy tests and their 59 README checks
+also passed, covering all 38 Python test modules, with no skips or missing
+test identifiers. README checks ran after ordinary verification. The release
+library, scratch helpers and parser benchmark were rebuilt, and the public
+distribution and native numeric-boundary checks passed.
+
+The completed native memory checks retained leak detection, immediate failure
+on sanitizer diagnostics, four allocation-stack frames and a 64 MiB allocation
+quarantine; no sanitizer suppressions were used. The smaller quarantine and
+shorter traces accommodate the memory cap and can reduce diagnostic reach or
+detail compared with larger settings. The deliberate leak control verifies
+that leak reporting is active, not that every possible leak is detectable.
+This is complete registered-suite coverage, not a proof of memory safety for
+all possible inputs or execution paths. The normal enabled test configuration
+was restored after the isolated runs.
+
+| Isolated sanitizer case | Case time | Peak memory |
+| --- | --- | --- |
+| Six-by-six symbolic inverse | 678.27 s | 154.4 MiB |
+| Six-by-six symbolic solve | 1,030.78 s | 171.6 MiB |
+| Iterated exponential/unary integration | 206.91 s | 223.2 MiB |
+| Integration by parts | 101.36 s | 197.4 MiB |
+| Inverse-PDE real residual | 32.29 s | 172.6 MiB |
+| Shifted-series residuals | 165.58 s | 171.7 MiB |
+
+The fresh release-build dense solve passed in 139.59 seconds under the same
+50% CPU and memory limits, compared with 1,030.78 seconds for the instrumented
+build: approximately 7.4 times slower with sanitizers. Both completed. This is
+a measured checker-build overhead for that allocation-heavy symbolic test,
+not evidence of a hang or a Valgrind timing; these runs used ASan/UBSan/LSan.
+
+One isolated Python inverse-Laplace branch-verification test exceeded its own
+30-second subprocess timeout under the CPU cap. It passed with that subprocess
+allowance raised to 120 seconds, within the existing 15-minute isolated-case
+limit. Only the temporary verification runner adjusts this timeout; the test's
+inputs and assertions are unchanged, and its neighbouring tests pass with
+their original limits.
 
 ## Notes
 

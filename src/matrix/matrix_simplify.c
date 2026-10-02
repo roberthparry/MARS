@@ -290,8 +290,10 @@ static expr_t *mat_find_common_reciprocal_symbolic_power(const expr_t *expr, exp
                 break;
         if (index == count) {
             expr_t *power = expr_pow_xp(base, core);
-            expr_t *factor = power ? expr_div(expr_const_one(), power) : NULL;
+            expr_t *one = expr_const_one();
+            expr_t *factor = power ? expr_div(one, power) : NULL;
 
+            expr_free(one);
             expr_free(power);
             return expr_simplify_owned(factor);
         }

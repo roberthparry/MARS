@@ -102,9 +102,11 @@ static bool lommel_parameters_regular(number_t mu, number_t nu)
 {
     NUM_SCOPE(scope);
     number_t sum = num_add(mu, nu), difference = num_sub(mu, nu);
-    number_t plus = num_add_long(sum, 1), minus = num_add_long(difference, 1);
-    number_t lower_plus = num_div(num_add_long(sum, 3), NUM_TWO);
-    number_t lower_minus = num_div(num_add_long(difference, 3), NUM_TWO);
+    /* Use scope-tracked arithmetic for every parameter, including rejected ones. */
+    number_t three = num_create_from_long(3);
+    number_t plus = num_add(sum, NUM_ONE), minus = num_add(difference, NUM_ONE);
+    number_t lower_plus = num_div(num_add(sum, three), NUM_TWO);
+    number_t lower_minus = num_div(num_add(difference, three), NUM_TWO);
     if (!num_is_finite(plus) || !num_is_finite(minus) || num_is_zero(plus) || num_is_zero(minus) ||
         !num_is_finite(lower_plus) || !num_is_finite(lower_minus))
         return false;
@@ -119,9 +121,9 @@ static expr_t *bessel_lommel_primitive(number_t mu, const expr_t *order, const e
     if (!order || !expr_is_const(order) || order->name || !num_is_finite(order->c) ||
         !lommel_parameters_regular(mu, order->c))
         return NULL;
-    number_t shifted_coefficient = num_add_long(num_add(mu, order->c), -1);
+    number_t shifted_coefficient = num_sub(num_add(mu, order->c), NUM_ONE);
     if (!num_is_zero(shifted_coefficient) &&
-        !lommel_parameters_regular(num_add_long(mu, -1), num_add_long(order->c, -1)))
+        !lommel_parameters_regular(num_sub(mu, NUM_ONE), num_sub(order->c, NUM_ONE)))
         return NULL;
 
     /* Lagrange's identity: d{z[C_nu s'_(mu,nu) - C'_nu s_(mu,nu)]}/dz = z^mu C_nu. */

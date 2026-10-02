@@ -512,6 +512,13 @@ to survive through compatible operations.
 
 - `void mat_free(matrix_t *A)` — free all memory owned by `A`, including element storage.
 
+Numeric entries belong to the matrix and survive any temporary `NUM_SCOPE`
+used while constructing or updating it. This applies to dense, sparse,
+diagonal and triangular storage, including matrix-function results.
+Numeric reads made with `mat_get_num()` are independent copies but follow
+the usual temporary-number scope rules: explicitly detach a read result if
+it must outlive its active scope, and destroy detached results after use.
+
 ### Element Access
 
 - `void mat_get(const matrix_t *A, size_t i, size_t j, void *out)` — low-level accessor that writes the entry at row `i`, column `j` into `out` using the matrix's native stored element representation. The caller must pass a pointer to the matching underlying type. For numeric matrices this means reading the concrete stored numeric element directly; for `MAT_TYPE_EXPR`, the written value is a borrowed `expr_t *`.

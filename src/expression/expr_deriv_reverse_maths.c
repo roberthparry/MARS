@@ -937,11 +937,12 @@ int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, exp
     number_t phi;
     number_t z_partial;
     number_t a_partial;
-    number_t h = num_create_from_string("1e-8");
+    number_t h;
     number_t s_partial;
 
     if (!expr_lerch_phi_unpack(expr, &z, &s, &a))
         return -1;
+    h = num_create_from_string("1e-8");
     zv = expr_eval_num_internal(z);
     sv = expr_eval_num_internal(s);
     av = expr_eval_num_internal(a);
@@ -950,7 +951,7 @@ int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, exp
     a_partial = num_neg(num_mul(sv, number_lerch_phi(zv, num_add(sv, NUM_ONE), av)));
     s_partial = num_div(num_sub(number_lerch_phi(zv, num_add(sv, h), av),
                                 number_lerch_phi(zv, num_sub(sv, h), av)),
-                        num_mul_long(h, 2L));
+                        num_mul(h, NUM_TWO));
     num_destroy(&h);
     return expr_reverse_emit(out_bar, z_partial, accumulate, context, z) == 0 &&
                    expr_reverse_emit(out_bar, s_partial, accumulate, context, s) == 0 &&

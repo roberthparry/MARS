@@ -102,6 +102,7 @@ static expr_t *expr_make_scaled_owned_local(number_t coeff, expr_t *base)
     return out;
 }
 
+/* Consume the base expression, but borrow the numeric exponent. */
 static expr_t *expr_make_pow_like_owned_local(expr_t *base, number_t exponent)
 {
     NUM_SCOPE_SUSPEND(saved_scope);
@@ -730,6 +731,7 @@ static expr_t *expr_rebuild_factors_local(expr_factor_t *factors, size_t n)
             number_t den_exponent = num_neg(factors[i].exponent);
 
             factor = expr_make_pow_like_owned_local(factors[i].base, den_exponent);
+            num_destroy(&den_exponent);
             expr_append_node(&den_terms, &nden, &den_cap, factor);
         } else {
             factor = expr_make_pow_like_owned_local(factors[i].base, factors[i].exponent);
@@ -4816,6 +4818,10 @@ static expr_t *expr_simplify_absorb_numerator_into_denominator_power_local(const
     shifted_power = shifted_exponent ? expr_pow_xp(power_base, shifted_exponent) : NULL;
     expr_free(power_base);
     expr_free(shifted_exponent);
+    if (!shifted_power) {
+        expr_free(remainder);
+        return NULL;
+    }
     new_denominator = shifted_power && remainder ? expr_mul_simplify_owned(shifted_power, remainder) : shifted_power;
     return new_denominator ? expr_div_simplify_owned(expr_new_const(NUM_ONE), new_denominator) : NULL;
 }
@@ -4994,8 +5000,12 @@ expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b)
             num_get_small_rational(b->a->c, &power_base, &power_base_denominator) &&
             power_base_denominator == 1L && power_base == denominator) {
             expr_t *shifted_exponent = expr_add_simplify_owned(expr_clone(b->b), expr_new_const(NUM_ONE));
-            expr_t *shifted_power = expr_pow_xp(expr_clone(b->a), shifted_exponent);
+            expr_t *shifted_base = expr_clone(b->a);
+            expr_t *shifted_power = expr_pow_xp(shifted_base, shifted_exponent);
             expr_t *one = expr_new_const(NUM_ONE);
+
+            expr_free(shifted_base);
+            expr_free(shifted_exponent);
             expr_t *out = expr_div_simplify_owned(one, shifted_power);
 
             expr_free(a);
@@ -5018,7 +5028,11 @@ expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b)
             num_get_small_rational(b->a->c, &power_base, &power_base_denominator) &&
             power_base_denominator == 1L && power_base == denominator) {
             expr_t *shifted_exponent = expr_add_simplify_owned(expr_clone(b->b), expr_new_const(NUM_ONE));
-            expr_t *shifted_power = expr_pow_xp(expr_clone(b->a), shifted_exponent);
+            expr_t *shifted_base = expr_clone(b->a);
+            expr_t *shifted_power = expr_pow_xp(shifted_base, shifted_exponent);
+
+            expr_free(shifted_base);
+            expr_free(shifted_exponent);
             expr_t *out = expr_div_simplify_owned(expr_clone(remainder), shifted_power);
 
             expr_free(a);
@@ -5093,11 +5107,13 @@ expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b)
         expr_free(b);
 
         if (num_eq(exponent, NUM_ZERO)) {
+            num_destroy(&exponent);
             expr_free(base);
             return expr_new_const(NUM_ONE);
         }
 
         denom = expr_make_pow_like_owned_local(base, exponent);
+        num_destroy(&exponent);
         one = expr_new_const(NUM_ONE);
         out = expr_div(one, denom);
         expr_free(one);
@@ -5107,12 +5123,15 @@ expr_t *expr_simplify_div_operator(const expr_t *expr, expr_t *a, expr_t *b)
     if (expr_is_pow_d_expr(a) && expr_struct_eq(a->a, b)) {
         number_t exponent = num_sub(a->c, NUM_ONE);
         expr_t *base;
+        expr_t *out;
 
         expr_retain(a->a);
         base = a->a;
         expr_free(a);
         expr_free(b);
-        return expr_make_pow_like_owned_local(base, exponent);
+        out = expr_make_pow_like_owned_local(base, exponent);
+        num_destroy(&exponent);
+        return out;
     }
     if (expr_is_op(a, &ops_pow) && expr_struct_eq(a->a, b)) {
         expr_t *base;
@@ -5737,11 +5756,14 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
     if (expr_is_pow_d_expr(a)) {
         number_t folded_exponent = num_mul(a->c, exponent);
         expr_t *base;
+        expr_t *out;
 
         expr_retain(a->a);
         base = a->a;
         expr_free(a);
-        return expr_make_pow_like_owned_local(base, folded_exponent);
+        out = expr_make_pow_like_owned_local(base, folded_exponent);
+        num_destroy(&folded_exponent);
+        return out;
     }
 
     {
@@ -5831,6 +5853,7 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
         expr_free(a);
         expr_t *out = expr_make_pow_like_owned_local(inner, half);
 
+        num_destroy(&half);
         return out;
     }
 

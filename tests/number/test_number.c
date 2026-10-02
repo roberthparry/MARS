@@ -38,6 +38,10 @@ int tests_main(void)
 
     TEST_SECTION("Special Functions");
     TEST_RUN_IN_GROUP(run_number_special_function_tests, tests, "number,special-functions");
+    TEST_RUN_IN_GROUP(run_number_bessel_k_ownership_tests, tests, "number,bessel-k,scope,ownership");
+    TEST_RUN_IN_GROUP(run_number_bessel_y_qfloat_ownership_tests, tests, "number,bessel-y,qfloat,ownership");
+    TEST_RUN_IN_GROUP(run_number_bessel_y_qcomplex_ownership_tests, tests, "number,bessel-y,qcomplex,ownership");
+    TEST_RUN_IN_GROUP(run_number_bessel_y_scope_lifetime_tests, tests, "number,bessel-y,scope,ownership");
     TEST_RUN_IN_GROUP(run_number_nonfinite_series_tests, tests, "number,special-functions,nonfinite");
 
     TEST_SECTION("Backend Parity");

@@ -95,9 +95,10 @@ static expr_t *bessel_i_series(const expr_t *order, const expr_t *z, bool primit
         expr_free(n);
         return NULL;
     }
-    number_t gamma_parameter = num_add_long(n->c, 1);
+    /* Keep the parameters in this scope; num_add_long returns detached values. */
+    number_t gamma_parameter = num_add(n->c, NUM_ONE);
     number_t upper_parameter = num_div(gamma_parameter, NUM_TWO);
-    number_t last_lower = num_add_long(upper_parameter, 1);
+    number_t last_lower = num_add(upper_parameter, NUM_ONE);
     if (!num_is_finite(gamma_parameter) || nonpositive_integer(gamma_parameter) ||
         (primitive && (!num_is_finite(last_lower) || nonpositive_integer(last_lower)))) {
         expr_free(n);
