@@ -218,7 +218,8 @@
       "example_diffequation_kdv": true,
       "example_diffequation_caret_pde": true,
       "example_diffequation_gkdv": true,
-      "example_diffequation_half_line_heat": true
+      "example_diffequation_half_line_heat": true,
+      "example_diffequation_prime_time_ivp": true
     },
     "test_diffequ_abs_pde_real_residual": true,
     "test_diffequ_applies_affine_factorized_initial_conditions": true,
@@ -402,7 +403,8 @@
     "test_diffequ_gkdv_residual": true,
     "test_diffequ_half_line_heat": true,
     "test_diffequ_half_line_heat_scope": true,
-    "test_diffequ_half_line_heat_kernel": true
+    "test_diffequ_half_line_heat_kernel": true,
+    "test_diffequ_infers_prime_coordinate": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
@@ -621,7 +623,11 @@
         "test_from_string_special_functions": true,
         "test_from_string_unevaluated_integral": true,
         "test_from_text_api": true,
-        "test_greek_symbol_reverse_perfect_hash": true
+        "test_greek_symbol_reverse_perfect_hash": true,
+        "test_from_string_laplace": true,
+        "test_from_string_inverse_rational": true,
+        "test_from_string_laplace_prime_shorthand": true,
+        "test_from_function_body_formal_derivatives": true
       }
     }
   },
@@ -725,7 +731,11 @@
         "test_integrate_unevaluated_integral_evaluation": true,
         "test_integrate_unevaluated_integral_explicit_bounds": true,
         "test_integrate_unevaluated_integral_leibniz_derivative": true,
-        "test_integrate_unsupported_product_returns_null": true
+        "test_integrate_unsupported_product_returns_null": true,
+        "test_integrate_bessel_i_parameter_ownership": true,
+        "test_integrate_bessel_y_lommel_parameter_ownership": true,
+        "test_integrate_bessel_y_lommel_rejection_ownership": true,
+        "test_integrate_struve_parameter_ownership": true
       }
     }
   },
@@ -865,7 +875,8 @@
         "test_unresolved_zero_over_zero_returns_nan_without_recursing": true,
         "test_unset_constant_clones_combine_symbolically": true,
         "test_updated_decimal_binding_stays_decimal": true,
-        "test_expr_singleton_rendering_first_use": true
+        "test_expr_singleton_rendering_first_use": true,
+        "test_simplify_common_minus_and_reciprocal_coefficients": true
       }
     }
   },
@@ -886,7 +897,8 @@
         "test_reverse_qdigamma_arguments": true,
         "test_reverse_special_function_arguments": true,
         "test_reverse_modified_cylindrical_arguments": true,
-        "test_reverse_bessel_y_complex_arguments": true
+        "test_reverse_bessel_y_complex_arguments": true,
+        "test_reverse_lerch_phi_arguments": true
       }
     }
   },
@@ -1090,7 +1102,8 @@
         "test_square_affine_times_hyperbolic_affine_matchers": true,
         "test_square_affine_times_trig_affine_matchers": true,
         "test_substitute_and_powd": true,
-        "test_tree_match_rejections": true
+        "test_tree_match_rejections": true,
+        "test_substitute_transform_scope": true
       }
     }
   },
@@ -1155,7 +1168,9 @@
   "tests/expression/test_expression.c": {
     "readme_examples": {
       "enabled": true,
-      "example_readme_examples": true
+      "example_readme_examples": true,
+      "example_orthopoly_readme_examples": true,
+      "example_signal_readme_examples": true
     },
     "tests": {
       "enabled": true,
@@ -1172,7 +1187,8 @@
       "test_runtime_regressions": true,
       "test_second_derivatives": true,
       "test_symbolic_integration": true,
-      "test_fourier_and_signal_functions": true
+      "test_fourier_and_signal_functions": true,
+      "test_orthogonal_polynomials": true
     }
   },
   "tests/integrator/test_integrator.c": {
@@ -1321,6 +1337,7 @@
       "run_matrix_function_regression_tests": true,
       "run_matrix_function_tests": true,
       "run_matrix_output_tests": true,
+      "run_matrix_memory_tests": true,
       "run_matrix_tostring_tests": true
     }
   },
@@ -1515,11 +1532,25 @@
     "test_mat_struve_l_nondiagonal": true,
     "test_mat_bessel_y_invalid": true,
     "test_mat_bessel_y_jordan": true,
-    "test_mat_bessel_y_numeric": true,
+    "test_mat_bessel_y_numeric_zero_order": true,
+    "test_mat_bessel_y_numeric_first_order": true,
+    "test_mat_bessel_y_numeric_negative_order": true,
+    "test_mat_bessel_y_numeric_half_order": true,
+    "test_mat_bessel_y_numeric_complex_order_dense": true,
+    "test_mat_bessel_y_numeric_complex_order_diagonal": true,
     "test_mat_ordinary_cylindrical_symbolic": true,
     "test_mat_struve_h_nilpotent": true,
     "test_mat_struve_h_numeric": true,
     "test_mat_sgn_numeric": true
+  },
+  "tests/matrix/test_matrix_memory.c": {
+    "test_mat_format_entry_array_allocation_failure": true,
+    "test_mat_format_constant_array_allocation_failure": true,
+    "test_mat_format_additive_constant_failure": true,
+    "test_mat_format_function_constant_failure": true,
+    "test_mat_parse_row_transfer_allocation_failure": true,
+    "test_mat_numeric_storage_survives_scope": true,
+    "test_mat_bessel_y_survives_scope": true
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_printf_smoke": true,
@@ -1529,6 +1560,7 @@
     "test_mat_text_formatters": true
   },
   "tests/matrix/test_matrix_tostring.c": {
+    "test_mat_to_string_reciprocal_power_cards": true,
     "test_mat_function_preserves_exact_binding_values": true,
     "test_mat_to_string_common_positive_base_power": true,
     "test_mat_to_string_function_card_reuses_shared_calculations": true,
@@ -1564,7 +1596,11 @@
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
       "run_number_special_function_tests": true,
-      "run_number_nonfinite_series_tests": true
+      "run_number_nonfinite_series_tests": true,
+      "run_number_bessel_y_qfloat_ownership_tests": true,
+      "run_number_bessel_y_qcomplex_ownership_tests": true,
+      "run_number_bessel_y_scope_lifetime_tests": true,
+      "run_number_bessel_k_ownership_tests": true
     }
   },
   "tests/number/test_number_backend_parity.c": {
@@ -2051,7 +2087,29 @@
       "enabled": true,
       "test_fourier_and_signal_functions": {
         "enabled": true,
-        "test_sgn_native_derivatives": true
+        "test_analytic_evaluation_functional": true,
+        "test_distribution_function_qualifier_round_trips": true,
+        "test_distribution_regular_rebinding": true,
+        "test_finite_part_distribution": true,
+        "test_hyperbolic_fourier_domains_and_beta_symbol": true,
+        "test_imaginary_additive_parentheses": true,
+        "test_inverse_hyperbolic_beta_spectra": true,
+        "test_mathematical_nonzero_domains": true,
+        "test_modified_bessel_k_numeric_layers": true,
+        "test_odd_hyperbolic_fourier_copy_and_rendering": true,
+        "test_sgn_native_derivatives": true,
+        "test_signal_calculus_and_finite_sums": true,
+        "test_signal_numeric_layers": true,
+        "test_signal_spectral_matrices": true
+      }
+    }
+  },
+  "tests/expression/test_expr_orthopoly.c": {
+    "tests": {
+      "enabled": true,
+      "test_orthogonal_polynomials": {
+        "enabled": true,
+        "test_orthopoly_numeric_and_matrix_layers": true
       }
     }
   }

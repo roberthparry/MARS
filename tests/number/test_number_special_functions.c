@@ -148,6 +148,75 @@ static void restore_modified_test_precision(size_t *precision)
     (void)num_set_default_prec_bits(*precision);
 }
 
+/* Detached public results survive input scopes; helper temporaries must not escape as leaks. */
+void run_number_bessel_k_ownership_tests(void)
+{
+    __attribute__((cleanup(restore_modified_test_precision))) size_t saved_precision = num_get_default_prec_bits();
+    number_t k0, k1, k2, half_real, half_complex, opposite_half, singular, nonfinite, oversized;
+    number_t opposite_real, cut_half;
+    bool real_results, retained_precision, rejected_inputs;
+
+    ASSERT_EQ_INT(num_set_default_prec_bits(256u), 0);
+    {
+        NUM_SCOPE(scope);
+        number_t z = num_create_from_string("1+i");
+
+        k0 = num_bessel_k(NUM_ZERO, NUM_ONE);
+        k1 = num_bessel_k(NUM_ONE, NUM_ONE);
+        k2 = num_bessel_k(NUM_TWO, NUM_ONE);
+        half_real = num_bessel_k(NUM_HALF, NUM_ONE);
+        half_complex = num_bessel_k(NUM_HALF, z);
+        opposite_half = num_bessel_k(num_neg(NUM_HALF), z);
+        opposite_real = num_bessel_k(num_neg(NUM_HALF), NUM_ONE);
+        cut_half = num_bessel_k(NUM_HALF, NUM_NEG_ONE);
+        singular = num_bessel_k(NUM_ZERO, NUM_ZERO);
+        nonfinite = num_bessel_k(NUM_NAN, NUM_ONE);
+        oversized = num_bessel_k(NUM_ZERO, num_create_from_long(1001));
+    }
+    {
+        NUM_SCOPE(scope);
+        number_t pi = num_const(NUM_PI);
+        number_t z = num_create_from_string("1+i");
+        number_t expected_real = num_mul(num_sqrt(num_mul(pi, NUM_HALF)), num_exp(NUM_NEG_ONE));
+        number_t expected_complex = num_mul(num_sqrt(num_div(pi, num_mul(NUM_TWO, z))), num_exp(num_neg(z)));
+        number_t expected_cut = num_mul(num_neg(NUM_I), num_mul(num_sqrt(num_mul(pi, NUM_HALF)), num_exp(NUM_ONE)));
+        number_t wronskian = num_add(num_mul(num_bessel_i(NUM_ZERO, NUM_ONE), k1),
+                                     num_mul(num_bessel_i(NUM_ONE, NUM_ONE), k0));
+
+        real_results = num_is_real(k0) && num_is_real(k1) && num_is_real(k2) && num_is_real(half_real);
+        retained_precision = num_get_prec_bits(k0) >= 256u && num_get_prec_bits(half_complex) >= 256u;
+        assert_number_close_number("owned K0/K1 Wronskian after scope exit", wronskian, NUM_ONE, "1e-60");
+        assert_number_close_number("owned K2 recurrence after scope exit", k2, num_add(k0, num_mul(NUM_TWO, k1)),
+                                   "1e-60");
+        assert_number_close_number("owned real K_1/2 after scope exit", half_real, expected_real, "1e-60");
+        assert_number_close_number("owned complex K_1/2 after scope exit", half_complex, expected_complex, "1e-60");
+        assert_number_close_number("owned complex K_-1/2 after scope exit", opposite_half, expected_complex, "1e-60");
+        assert_number_close_number("owned real K_-1/2 after scope exit", opposite_real, expected_real, "1e-60");
+        assert_number_close_number("owned principal-cut K_1/2 after scope exit", cut_half, expected_cut, "1e-60");
+        assert_number_close_number("real K wrapper ownership", num_create_from_qfloat(qf_bessel_k(QF_HALF, QF_ONE)),
+                                   expected_real, "1e-30");
+        assert_number_close_number("complex K wrapper ownership",
+                                   num_create_from_qcomplex(qc_bessel_k(qc_make(QF_HALF, QF_ZERO),
+                                                                       qc_make(QF_ONE, QF_ONE))),
+                                   expected_complex, "1e-30");
+        rejected_inputs = num_is_nan(singular) && num_is_nan(nonfinite) && num_is_nan(oversized);
+    }
+    num_destroy(&oversized);
+    num_destroy(&nonfinite);
+    num_destroy(&singular);
+    num_destroy(&opposite_half);
+    num_destroy(&opposite_real);
+    num_destroy(&cut_half);
+    num_destroy(&half_complex);
+    num_destroy(&half_real);
+    num_destroy(&k2);
+    num_destroy(&k1);
+    num_destroy(&k0);
+    ASSERT_TRUE(real_results);
+    ASSERT_TRUE(retained_precision);
+    ASSERT_TRUE(rejected_inputs);
+}
+
 static void test_number_bessel_i(void)
 {
     NUM_SCOPE(scope);
@@ -163,10 +232,14 @@ static void test_number_bessel_i(void)
     assert_number_close_number("80-digit Bessel I_1/2", value, num_mul(scale, num_sinh(x)), "1e-80");
     assert_number_close_number("80-digit Bessel I_-1/2", num_bessel_i(num_neg(half), x),
                                num_mul(scale, num_cosh(x)), "1e-80");
+    number_t k0 = num_bessel_k(NUM_ZERO, x);
+    number_t k1 = num_bessel_k(NUM_ONE, x);
     assert_number_close_number("80-digit Bessel I0/I1 Wronskian",
-                               num_add(num_mul(num_bessel_i(NUM_ZERO, x), num_bessel_k(NUM_ONE, x)),
-                                       num_mul(num_bessel_i(NUM_ONE, x), num_bessel_k(NUM_ZERO, x))),
+                               num_add(num_mul(num_bessel_i(NUM_ZERO, x), k1),
+                                       num_mul(num_bessel_i(NUM_ONE, x), k0)),
                                num_div(NUM_ONE, x), "1e-80");
+    num_destroy(&k1);
+    num_destroy(&k0);
     assert_number_close_number("80-digit I0 imaginary-axis cancellation",
                                num_bessel_i(NUM_ZERO, num_create_from_string("80i")),
                                num_bessel_j(NUM_ZERO, num_create_from_long(80)), "1e-80");

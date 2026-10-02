@@ -1074,10 +1074,8 @@ static int mf_parse_matrix_body_text(const string_t *body, string_t ***entries_o
                 goto fail_row;
 
             for (size_t i = 0; i < row.count; ++i) {
-                if (text_vec_push(&entries, row.items[i]) != 0) {
-                    row.items[i] = NULL;
+                if (text_vec_push(&entries, row.items[i]) != 0)
                     goto fail_row;
-                }
                 row.items[i] = NULL;
             }
 

@@ -1221,11 +1221,13 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
                            (!tex && mat_split_expr_repr(beautification.additive_constants[idx], &additive_constants[idx],
                                                        &constant_binding_text) != 0)) {
                     string_free(constant_binding_text);
+                    string_free(binding_text);
                     ok = 0;
                     break;
                 }
                 if (!additive_constants[idx] || !constant_binding_text) {
                     string_free(constant_binding_text);
+                    string_free(binding_text);
                     ok = 0;
                     break;
                 }
@@ -1351,10 +1353,14 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         string_free(joined);
     }
 
-    for (size_t i = 0; i < n; ++i)
-        string_free(exprs[i]);
-    for (size_t i = 0; i < n; ++i)
-        string_free(additive_constants[i]);
+    if (exprs) {
+        for (size_t i = 0; i < n; ++i)
+            string_free(exprs[i]);
+    }
+    if (additive_constants) {
+        for (size_t i = 0; i < n; ++i)
+            string_free(additive_constants[i]);
+    }
     for (size_t i = 0; i < nvar_bindings; ++i)
         string_free(var_bindings[i]);
     for (size_t i = 0; i < nconst_bindings; ++i)

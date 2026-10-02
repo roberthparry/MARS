@@ -189,33 +189,84 @@ static void test_mat_struve_h_nilpotent(void)
     mat_free(A);
 }
 
-static void test_mat_bessel_y_numeric(void)
+static void check_mat_bessel_y_numeric_dense(number_t order)
 {
     NUM_SCOPE(scope);
-    number_t orders[] = {NUM_ZERO, NUM_ONE, NUM_NEG_ONE, NUM_HALF, num_add(NUM_HALF, num_mul(NUM_HALF, NUM_I))};
     number_t values[] = {NUM_TWO, NUM_ONE, NUM_ONE, NUM_TWO};
-    number_t diagonal_values[] = {NUM_ONE, num_add(NUM_ONE, NUM_I)};
     matrix_t *A = mat_create(2u, 2u, values);
-    matrix_t *diagonal = mat_create_diagonal(2u, diagonal_values);
+    number_t f1 = num_bessel_y(order, NUM_ONE);
+    number_t f3 = num_bessel_y(order, num_create_from_long(3));
+    matrix_t *result = mat_bessel_y(A, &order);
 
-    for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        number_t f1 = num_bessel_y(orders[k], NUM_ONE);
-        number_t f3 = num_bessel_y(orders[k], num_create_from_long(3));
-        matrix_t *result = mat_bessel_y(A, &orders[k]);
-        matrix_t *diagonal_result = mat_bessel_y(diagonal, &orders[k]);
-
-        check_cylindrical_entry("Bessel Y dense diagonal", result, 0u, 0u, num_mul(NUM_HALF, num_add(f1, f3)));
-        check_cylindrical_entry("Bessel Y dense upper entry", result, 0u, 1u, num_mul(NUM_HALF, num_sub(f3, f1)));
-        check_cylindrical_entry("Bessel Y dense lower entry", result, 1u, 0u, num_mul(NUM_HALF, num_sub(f3, f1)));
-        check_cylindrical_entry("Bessel Y diagonal matches scalar", diagonal_result, 0u, 0u, f1);
-        check_cylindrical_entry("Bessel Y complex diagonal matches scalar", diagonal_result, 1u, 1u,
-                                num_bessel_y(orders[k], diagonal_values[1]));
-        check_cylindrical_entry("Bessel Y preserves diagonal structure", diagonal_result, 0u, 1u, NUM_ZERO);
-        mat_free(diagonal_result);
-        mat_free(result);
-    }
-    mat_free(diagonal);
+    check_cylindrical_entry("Bessel Y dense diagonal", result, 0u, 0u, num_mul(NUM_HALF, num_add(f1, f3)));
+    check_cylindrical_entry("Bessel Y dense upper entry", result, 0u, 1u, num_mul(NUM_HALF, num_sub(f3, f1)));
+    check_cylindrical_entry("Bessel Y dense lower entry", result, 1u, 0u, num_mul(NUM_HALF, num_sub(f3, f1)));
+    num_destroy(&f3);
+    num_destroy(&f1);
+    mat_free(result);
     mat_free(A);
+}
+
+static void check_mat_bessel_y_numeric_diagonal(number_t order)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal_values[] = {NUM_ONE, num_add(NUM_ONE, NUM_I)};
+    matrix_t *diagonal = mat_create_diagonal(2u, diagonal_values);
+    matrix_t *diagonal_result = mat_bessel_y(diagonal, &order);
+    number_t f1 = num_bessel_y(order, NUM_ONE);
+
+    check_cylindrical_entry("Bessel Y diagonal matches scalar", diagonal_result, 0u, 0u, f1);
+    number_t complex_value = num_bessel_y(order, diagonal_values[1]);
+
+    check_cylindrical_entry("Bessel Y complex diagonal matches scalar", diagonal_result, 1u, 1u, complex_value);
+    num_destroy(&complex_value);
+    check_cylindrical_entry("Bessel Y preserves diagonal structure", diagonal_result, 0u, 1u, NUM_ZERO);
+    num_destroy(&f1);
+    mat_free(diagonal_result);
+    mat_free(diagonal);
+}
+
+static void check_mat_bessel_y_numeric_order(number_t order)
+{
+    check_mat_bessel_y_numeric_dense(order);
+    check_mat_bessel_y_numeric_diagonal(order);
+}
+
+/* Keep each original order independently selectable for resource-bounded memory checks. */
+static void test_mat_bessel_y_numeric_zero_order(void)
+{
+    check_mat_bessel_y_numeric_order(NUM_ZERO);
+}
+
+static void test_mat_bessel_y_numeric_first_order(void)
+{
+    check_mat_bessel_y_numeric_order(NUM_ONE);
+}
+
+static void test_mat_bessel_y_numeric_negative_order(void)
+{
+    check_mat_bessel_y_numeric_order(NUM_NEG_ONE);
+}
+
+static void test_mat_bessel_y_numeric_half_order(void)
+{
+    check_mat_bessel_y_numeric_order(NUM_HALF);
+}
+
+static void test_mat_bessel_y_numeric_complex_order_dense(void)
+{
+    NUM_SCOPE(scope);
+    number_t order = num_add(NUM_HALF, num_mul(NUM_HALF, NUM_I));
+
+    check_mat_bessel_y_numeric_dense(order);
+}
+
+static void test_mat_bessel_y_numeric_complex_order_diagonal(void)
+{
+    NUM_SCOPE(scope);
+    number_t order = num_add(NUM_HALF, num_mul(NUM_HALF, NUM_I));
+
+    check_mat_bessel_y_numeric_diagonal(order);
 }
 
 static void test_mat_bessel_y_jordan(void)
@@ -243,6 +294,8 @@ static void test_mat_bessel_y_jordan(void)
         check_cylindrical_entry("Bessel Y0 Jordan second derivative", result, 0u, 2u, second);
         check_cylindrical_entry("Bessel Y0 Jordan third derivative", result, 0u, 3u, third);
         check_cylindrical_entry("Bessel Y0 lower Jordan third derivative", lower_result, 3u, 0u, third);
+        num_destroy(&y1);
+        num_destroy(&y0);
         mat_free(lower_result);
         mat_free(result);
         mat_free(lower);
@@ -253,10 +306,15 @@ static void test_mat_bessel_y_jordan(void)
                                    NUM_ZERO, NUM_ZERO, NUM_ONE};
     matrix_t *separated = mat_create(3u, 3u, separated_values);
     matrix_t *separated_result = mat_bessel_y(separated, &NUM_ZERO);
-    number_t confluent = num_add(num_sub(num_bessel_y(NUM_ZERO, NUM_TWO), num_bessel_y(NUM_ZERO, NUM_ONE)),
-                                 num_bessel_y(NUM_ONE, NUM_ONE));
+    number_t y0_at_two = num_bessel_y(NUM_ZERO, NUM_TWO);
+    number_t y0_at_one = num_bessel_y(NUM_ZERO, NUM_ONE);
+    number_t y1_at_one = num_bessel_y(NUM_ONE, NUM_ONE);
+    number_t confluent = num_add(num_sub(y0_at_two, y0_at_one), y1_at_one);
 
     check_cylindrical_entry("Bessel Y separated repeated eigenvalues retain derivative", separated_result, 0u, 2u, confluent);
+    num_destroy(&y1_at_one);
+    num_destroy(&y0_at_one);
+    num_destroy(&y0_at_two);
     mat_free(separated_result);
     mat_free(separated);
 }
@@ -304,6 +362,8 @@ static void test_mat_ordinary_cylindrical_symbolic(void)
         check_cylindrical_entry("symbolic Bessel Y0 follows binding", y0, 0u, 0u, y0_value);
         check_cylindrical_entry("symbolic Bessel Y0 derivative follows binding", y0, 0u, 1u, num_neg(y1_value));
         check_cylindrical_entry("symbolic Bessel Y0 third derivative follows binding", y0, 0u, 3u, third);
+        num_destroy(&y1_value);
+        num_destroy(&y0_value);
     }
     mat_free(y0);
     mat_free(h0);
@@ -6556,7 +6616,12 @@ void run_matrix_function_tests(void)
     TEST_RUN_CASE(test_mat_sgn_numeric, "matrix,signal,sgn");
     TEST_RUN_CASE(test_mat_struve_h_numeric, NULL);
     TEST_RUN_CASE(test_mat_struve_h_nilpotent, NULL);
-    TEST_RUN_CASE(test_mat_bessel_y_numeric, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_zero_order, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_first_order, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_negative_order, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_half_order, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_complex_order_dense, NULL);
+    TEST_RUN_CASE(test_mat_bessel_y_numeric_complex_order_diagonal, NULL);
     TEST_RUN_CASE(test_mat_bessel_y_jordan, NULL);
     TEST_RUN_CASE(test_mat_bessel_y_invalid, NULL);
     TEST_RUN_CASE(test_mat_ordinary_cylindrical_symbolic, NULL);

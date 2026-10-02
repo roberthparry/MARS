@@ -17,7 +17,9 @@ static void test_orthopoly_numeric_and_matrix_layers(void)
     ASSERT_TRUE(num_to_double(num_chebyshev_t(three, NUM_TWO)) == 26);
     ASSERT_TRUE(num_to_double(num_chebyshev_u(three, NUM_TWO)) == 56);
     ASSERT_TRUE(num_to_double(num_hermite_h(three, NUM_TWO)) == 40);
-    ASSERT_TRUE(num_eq(num_hermite_h(three, NUM_I), num_mul_long(NUM_I, -20)));
+    number_t expected_imaginary = num_mul_long(NUM_I, -20);
+    ASSERT_TRUE(num_eq(num_hermite_h(three, NUM_I), expected_imaginary));
+    num_destroy(&expected_imaginary);
     ASSERT_TRUE(num_is_nan(num_hermite_h(NUM_HALF, NUM_TWO)));
     ASSERT_TRUE(num_is_nan(num_chebyshev_t(NUM_NEG_ONE, NUM_TWO)));
     ASSERT_TRUE(num_eq(num_chebyshev_t(NUM_ZERO, NUM_ONE), NUM_ONE));

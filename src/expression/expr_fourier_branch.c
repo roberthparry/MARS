@@ -281,6 +281,7 @@ static expr_t *branch_inverse(fourier_context_t *c, const expr_t *f, const expr_
             kind = EXPR_KIND_ACOSH;
             scale = hyperbolic_scale;
         }
+        num_destroy(&value);
     }
     expr_t *body = expr_fourier_keep(c, branch_functions[kind](argument));
     if (kind == EXPR_KIND_ATANH &&

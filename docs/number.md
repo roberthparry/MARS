@@ -579,12 +579,14 @@ wrappers additionally have the exponent range of their component type.
 NUM_SCOPE(scope);
 number_t value = num_bessel_y(NUM_ZERO, NUM_ONE);
 printf("Y_0(1) = %.15f\n", num_to_double(value));
+num_destroy(&value);
 ```
 
 ```text
 Y_0(1) = 0.088256964215677
 ```
 
+The result is detached from numeric scopes and must be released explicitly.
 The example rounds only its displayed output to double precision. See also
 the [qfloat](qfloat.md) and [qcomplex](qcomplex.md#bessel-y) APIs.
 
@@ -596,6 +598,8 @@ real or complex. Non-finite operands, a zero argument, or an operand magnitude
 greater than 1000 return NaN. Real orders with positive real arguments return
 real values; other supported arguments follow the principal logarithm and power
 branches and may return complex values. The input values are not modified.
+The result is detached from numeric scopes and must be released explicitly
+with `num_destroy(...)`.
 
 The result uses the greatest input precision, with exact inputs contributing
 the current default precision, including exact Cartesian components. Evaluation

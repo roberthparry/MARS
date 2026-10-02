@@ -3790,6 +3790,81 @@ static void test_harmonic_poly_calculus(void)
     expr_bindings_free(bindings);
 }
 
+/* Small construction/destruction regressions for detached parameter leaks under Valgrind. */
+static void test_integrate_struve_parameter_ownership(void)
+{
+    expr_t *(*const constructors[])(const expr_t *, const expr_t *) = {expr_struve_h, expr_struve_l};
+    const char *const orders[] = {"1/3", "-1/2", "-2", "-5/2"};
+
+    for (size_t family = 0u; family < 2u; ++family) {
+        for (size_t i = 0u; i < sizeof(orders) / sizeof(*orders); ++i) {
+            number_t degree = num_create_from_string(orders[i]);
+            expr_t *order = expr_new_const(degree), *x = test_expr_new_named_var_d(1.0, "x");
+            expr_t *function = constructors[family](order, x);
+            expr_t *primitive = expr_integrate(function, x);
+
+            ASSERT_TRUE((primitive != NULL) == (i != 2u));
+            expr_free(primitive);
+            expr_free(function);
+            expr_free(x);
+            expr_free(order);
+            num_destroy(&degree);
+        }
+    }
+}
+
+static void test_integrate_bessel_i_parameter_ownership(void)
+{
+    number_t degree = num_create_from_frac(1, 3);
+    expr_t *order = expr_new_const(degree);
+    expr_t *x = test_expr_new_named_var_d(1.0, "x");
+    expr_t *function = expr_bessel_i(order, x);
+    expr_t *primitive = expr_integrate(function, x);
+
+    ASSERT_NOT_NULL(primitive);
+
+    expr_free(primitive);
+    expr_free(function);
+    expr_free(x);
+    expr_free(order);
+    num_destroy(&degree);
+}
+
+static void test_integrate_bessel_y_lommel_parameter_ownership(void)
+{
+    number_t degree = num_create_from_frac(1, 3);
+    expr_t *order = expr_new_const(degree);
+    expr_t *x = test_expr_new_named_var_d(1.0, "x");
+    expr_t *function = expr_bessel_y(order, x);
+    expr_t *primitive = expr_integrate(function, x);
+
+    ASSERT_NOT_NULL(primitive);
+
+    expr_free(primitive);
+    expr_free(function);
+    expr_free(x);
+    expr_free(order);
+    num_destroy(&degree);
+}
+
+static void test_integrate_bessel_y_lommel_rejection_ownership(void)
+{
+    /* Order 65 exceeds the finite recurrence limit and makes a Lommel lower parameter negative integral. */
+    number_t degree = num_create_from_long(65);
+    expr_t *order = expr_new_const(degree);
+    expr_t *x = test_expr_new_named_var_d(1.0, "x");
+    expr_t *function = expr_bessel_y(order, x);
+    expr_t *primitive = expr_integrate(function, x);
+
+    ASSERT_TRUE(primitive == NULL);
+
+    expr_free(primitive);
+    expr_free(function);
+    expr_free(x);
+    expr_free(order);
+    num_destroy(&degree);
+}
+
 static void test_integrate_power_composed_bessel_j_family(void)
 {
     static const double points[] = {0.75, 1.0, 1.4};
@@ -3910,6 +3985,10 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_log_times_affine_trigonometric_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_trigonometric_progression_closed_forms, NULL);
     TEST_RUN_SUBTEST(test_harmonic_poly_calculus, NULL);
+    TEST_RUN_SUBTEST(test_integrate_bessel_i_parameter_ownership, NULL);
+    TEST_RUN_SUBTEST(test_integrate_struve_parameter_ownership, NULL);
+    TEST_RUN_SUBTEST(test_integrate_bessel_y_lommel_parameter_ownership, NULL);
+    TEST_RUN_SUBTEST(test_integrate_bessel_y_lommel_rejection_ownership, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_bessel_j_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_bessel_y_family, NULL);
     TEST_RUN_SUBTEST(test_integrate_power_composed_lommel_s_family, NULL);

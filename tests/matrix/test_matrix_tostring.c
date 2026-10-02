@@ -774,6 +774,28 @@ static void test_mat_to_string_common_positive_base_power(void)
     expr_free(x);
 }
 
+static void test_mat_to_string_reciprocal_power_cards(void)
+{
+    mat_bindings_t *bindings = NULL;
+    matrix_t *matrix = mat_expression_from_string("{ (1,2;3,4)^x | x=? }", &bindings, NULL);
+    const mat_string_style_t styles[] = {MAT_STRING_EXPRESSION, MAT_STRING_FUNCTION, MAT_STRING_LATEX};
+
+    check_bool("reciprocal-power card fixture parses", matrix != NULL);
+    for (size_t index = 0u; matrix && index < sizeof(styles) / sizeof(styles[0]); ++index) {
+        char *text = mat_to_string(matrix, styles[index]);
+
+        check_bool("reciprocal-power card formats successfully", text && *text && !strstr(text, "<expr matrix>"));
+        check_bool("reciprocal-power card retains its symbolic variable", text && strstr(text, "x"));
+        if (styles[index] == MAT_STRING_EXPRESSION)
+            check_bool("reciprocal-power Expression retains its binding", text && strstr(text, "x = ?"));
+        if (styles[index] == MAT_STRING_FUNCTION)
+            check_bool("reciprocal-power Function retains its binding", text && strstr(text, "x = ?."));
+        free(text);
+    }
+    mat_bindings_free(bindings);
+    mat_free(matrix);
+}
+
 static void test_mat_function_preserves_exact_binding_values(void)
 {
     mat_bindings_t *bindings = NULL;
@@ -806,6 +828,7 @@ void run_matrix_tostring_tests(void)
 {
     TEST_RUN_CASE(test_mat_function_preserves_exact_binding_values, NULL);
     TEST_RUN_CASE(test_mat_to_string_common_positive_base_power, NULL);
+    TEST_RUN_CASE(test_mat_to_string_reciprocal_power_cards, NULL);
     TEST_RUN_CASE(test_mat_to_string_numeric, NULL);
     TEST_RUN_CASE(test_mat_to_string_numeric_TeX, NULL);
     TEST_RUN_CASE(test_mat_to_string_number_precision, NULL);

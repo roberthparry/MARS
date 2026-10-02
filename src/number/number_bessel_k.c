@@ -13,7 +13,7 @@ static void replace_value(number_t *value, number_t next)
 static number_t working_value(number_t value, size_t precision)
 {
     NUM_SCOPE(scope);
-    if (num_is_real(value) && num_ge(value, NUM_ZERO))
+    if (num_is_real(value))
         return num_scope_detach(num_as_inexact_real_prec(num_real_part(value), precision));
     number_t real = num_as_inexact_real_prec(num_real_part(value), precision);
     number_t imag = num_as_inexact_real_prec(num_imag_part(value), precision);
@@ -121,12 +121,21 @@ number_t num_bessel_k(const number_t order, const number_t argument)
         number_t minus = num_neg(nu);
         number_t left = num_mul(num_gamma(nu), num_pow(half_z, minus));
         number_t right = num_mul(num_gamma(minus), num_pow(half_z, nu));
-        left = num_mul(left, reduced_i_series(minus, square, tolerance));
-        right = num_mul(right, reduced_i_series(nu, square, tolerance));
+        number_t left_series = reduced_i_series(minus, square, tolerance);
+        number_t right_series = reduced_i_series(nu, square, tolerance);
+
+        left = num_mul(left, left_series);
+        right = num_mul(right, right_series);
+        num_destroy(&right_series);
+        num_destroy(&left_series);
         result = num_mul(NUM_HALF, num_add(left, right));
     }
     if (num_is_real(order) && num_is_real(argument) && num_gt(argument, NUM_ZERO))
-        result = num_real_part(result);
+        replace_value(&result, num_real_part(result));
     num_set_prec_bits(&result, precision);
+    num_destroy(&square);
+    num_destroy(&half_z);
+    num_destroy(&nu);
+    num_destroy(&z);
     return num_scope_detach(result);
 }

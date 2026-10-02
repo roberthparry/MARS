@@ -307,6 +307,9 @@ int tests_main(void)
     TEST_SECTION("Output");
     TEST_RUN_IN_GROUP(run_matrix_output_tests, tests, NULL);
 
+    TEST_SECTION("Allocation Failure Cleanup");
+    TEST_RUN_IN_GROUP(run_matrix_memory_tests, tests, NULL);
+
     TEST_SECTION("README");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_example_hermitian_eigendecomposition, readme_examples,
                                   "matrix,readme,output");

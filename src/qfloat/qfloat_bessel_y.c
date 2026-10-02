@@ -7,5 +7,8 @@ qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument)
     if (qf_lt(argument, QF_ZERO))
         return QF_NAN;
     number_t value = num_bessel_y(num_create_from_qfloat(order), num_create_from_qfloat(argument));
-    return num_is_real(value) ? num_to_qfloat(value) : QF_NAN;
+    qfloat_t result = num_is_real(value) ? num_to_qfloat(value) : QF_NAN;
+
+    num_destroy(&value);
+    return result;
 }

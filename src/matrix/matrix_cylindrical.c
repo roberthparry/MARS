@@ -53,6 +53,7 @@ static matrix_t *cylindrical_series(const matrix_t *A, const number_t *order, si
     unsigned int first = 0u;
     matrix_t *power = NULL, *square = NULL, *term = NULL, *sum = NULL;
     number_t square_norm = number_invalid();
+    number_t exponent = number_invalid();
     number_t tolerance = num_ldexp(NUM_ONE, 8 - (int)precision);
 
     /* Reciprocal gamma vanishes at non-positive integers; start with the first non-zero coefficient. */
@@ -64,11 +65,15 @@ static matrix_t *cylindrical_series(const matrix_t *A, const number_t *order, si
         first = (unsigned int)skipped;
     }
 
-    number_t exponent = num_add_long(*order, 2L * first + (struve ? 1L : 0L));
-    number_t gamma_left = num_gamma(num_add_long(shift, first));
-    number_t gamma_right = num_gamma(num_add_long(gamma_argument, first));
+    exponent = num_add_long(*order, 2L * first + (struve ? 1L : 0L));
+    number_t left_argument = num_add_long(shift, first);
+    number_t right_argument = num_add_long(gamma_argument, first);
+    number_t gamma_left = num_gamma(left_argument);
+    number_t gamma_right = num_gamma(right_argument);
     number_t coefficient = num_div(num_pow(NUM_HALF, exponent), num_mul(gamma_left, gamma_right));
 
+    num_destroy(&right_argument);
+    num_destroy(&left_argument);
     if (alternating && (first & 1u))
         coefficient = num_neg(coefficient);
 
@@ -78,6 +83,7 @@ static matrix_t *cylindrical_series(const matrix_t *A, const number_t *order, si
         power = mat_pow_int(A, (int)num_to_double(exponent));
     else
         power = mat_pow(A, &exponent);
+    num_destroy(&exponent);
     if (!power)
         goto cleanup;
     if (matrix_is_symbolic(power)) {
@@ -106,13 +112,19 @@ static matrix_t *cylindrical_series(const matrix_t *A, const number_t *order, si
             denominator = num_neg(denominator);
 
         if (mat_norm(term, MAT_NORM_INF, &term_norm) != 0 || mat_norm(sum, MAT_NORM_INF, &sum_norm) != 0 ||
-            !num_is_finite(term_norm) || !num_is_finite(sum_norm))
+            !num_is_finite(term_norm) || !num_is_finite(sum_norm)) {
+            num_destroy(&sum_norm);
+            num_destroy(&term_norm);
             goto cleanup;
+        }
         /* Once the real part of the second factor is positive, denominator magnitudes increase. */
         converged = num_eq(term_norm, NUM_ZERO) ||
                     (num_gt(num_real_part(second), NUM_ZERO) && num_le(ratio, NUM_HALF) &&
                      num_le(num_mul(NUM_TWO, term_norm), num_mul(tolerance, num_add(NUM_ONE, sum_norm))));
+        num_destroy(&sum_norm);
+        num_destroy(&term_norm);
         if (converged) {
+            num_destroy(&square_norm);
             mat_free(term);
             mat_free(square);
             mat_free(power);
@@ -133,6 +145,8 @@ static matrix_t *cylindrical_series(const matrix_t *A, const number_t *order, si
     }
 
 cleanup:
+    num_destroy(&exponent);
+    num_destroy(&square_norm);
     mat_free(sum);
     mat_free(term);
     mat_free(square);
@@ -228,6 +242,7 @@ static matrix_t *cylindrical_function(const matrix_t *A, const number_t *order, 
             number_t value = number_function(*order, mat_get_num(A, i, i));
 
             if (!num_is_finite(value)) {
+                num_destroy(&value);
                 mat_free(result);
                 return NULL;
             }
@@ -307,9 +322,13 @@ static number_t bessel_y_taylor(const number_t *order, number_t argument, size_t
         number_t shifted = num_add_long(*order, 2L * (long)j - (long)degree);
         number_t value = num_bessel_y(shifted, argument);
 
-        if (!num_is_finite(value))
+        num_destroy(&shifted);
+        if (!num_is_finite(value)) {
+            num_destroy(&value);
             return num_clone(NUM_NAN);
+        }
         sum = num_add(sum, num_mul(weight, value));
+        num_destroy(&value);
         if (j < degree) {
             number_t ratio = num_create_from_frac((long)(degree - j), (long)(j + 1u));
 
@@ -377,8 +396,10 @@ static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
             else
                 value = num_div(num_sub(coefficients[i], coefficients[i - 1u]),
                                 num_sub(nodes[i], nodes[i - degree]));
-            if (!num_is_finite(value))
+            if (!num_is_finite(value)) {
+                num_destroy(&value);
                 goto cleanup;
+            }
             num_destroy(&coefficients[i]);
             coefficients[i] = num_scope_detach(value);
         }
@@ -446,6 +467,7 @@ matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order)
             number_t value = num_bessel_y(*order, mat_get_num(A, i, i));
 
             if (!num_is_finite(value)) {
+                num_destroy(&value);
                 mat_free(result);
                 return NULL;
             }

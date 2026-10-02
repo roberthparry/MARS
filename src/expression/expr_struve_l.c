@@ -53,7 +53,7 @@ static expr_t *literal_argument_derivative(number_t order, const expr_t *z)
 
     /* L_-1 = L_1 + 2/pi: differentiating the unshifted recurrence would cancel poles at zero. */
     number_t effective = num_eq(order, NUM_NEG_ONE) ? NUM_ONE : order;
-    number_t lower_value = num_add_long(effective, -1), upper_value = num_add_long(effective, 1);
+    number_t lower_value = num_sub(effective, NUM_ONE), upper_value = num_add(effective, NUM_ONE);
     number_t gamma_value = num_add(upper_value, NUM_HALF);
     expr_t *lower_order = expr_new_const(lower_value), *upper_order = expr_new_const(upper_value);
     expr_t *lower = expr_struve_l(lower_order, z), *upper = expr_struve_l(upper_order, z);
@@ -130,7 +130,7 @@ expr_t *expr_struve_l_hypergeometric(const expr_t *order, const expr_t *argument
         expr_free(n);
         return NULL;
     }
-    number_t exponent = num_add_long(n->c, 1), lower_value = num_add(exponent, NUM_HALF);
+    number_t exponent = num_add(n->c, NUM_ONE), lower_value = num_add(exponent, NUM_HALF);
     if (!num_is_finite(exponent) || !num_is_finite(lower_value) || nonpositive_integer(lower_value)) {
         expr_free(n);
         return NULL;
@@ -170,9 +170,9 @@ static expr_t *literal_primitive(number_t order, const expr_t *z)
 {
     NUM_SCOPE(scope);
     bool shifted = negative_half_integer(order);
-    number_t exponent = shifted ? num_add_long(num_neg(order), 1) : num_add_long(order, 2);
-    number_t gamma_parameter = shifted ? num_clone(exponent) : num_add(num_add_long(order, 1), NUM_HALF);
-    number_t upper_parameter = num_div(exponent, NUM_TWO), last_lower = num_add_long(upper_parameter, 1);
+    number_t exponent = shifted ? num_sub(NUM_ONE, order) : num_add(order, NUM_TWO);
+    number_t gamma_parameter = shifted ? num_clone(exponent) : num_add(num_add(order, NUM_ONE), NUM_HALF);
+    number_t upper_parameter = num_div(exponent, NUM_TWO), last_lower = num_add(upper_parameter, NUM_ONE);
     number_t three_halves = num_add(NUM_ONE, NUM_HALF);
 
     /* Even negative integral orders contain a z^-1 term. A terminating numerator cannot cancel
