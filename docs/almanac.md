@@ -17,6 +17,35 @@ The packaged coefficient sources, transformations, checksums and AstroNav
 workbook ownership are recorded in the
 [almanac data provenance](./almanac-data-provenance.md).
 
+## Source Organisation
+
+The public API remains in `include/almanac.h`. Implementation files under
+`src/almanac/` are grouped by responsibility:
+
+| File | Responsibility |
+|---|---|
+| `almanac.c` | Configuration, engine lifetime, diagnostics and serialisation |
+| `almanac_entries.c` | Body catalogue, computed entries, magnitudes and snapshots |
+| `almanac_model.c` | Database model loading and cached ephemeris segments |
+| `almanac_ephemeris.c` | Chebyshev states and apparent-place corrections |
+| `almanac_orientation.c` | Sidereal time, nutation, obliquity and frame rotation |
+| `almanac_geometry.c` | Angular helpers and observer-relative horizon geometry |
+| `almanac_phases.c` | Phase classification, conjunction refinement and exact Moon phases |
+| `almanac_events.c` | Event times, search windows and shared numerical refinement |
+| `almanac_rise_set.c` | Local civil-day conversion and rise/set searches |
+| `almanac_solar_eclipse.c` | Solar eclipse geometry, circumstances and searches |
+| `almanac_lunar_eclipse.c` | Lunar eclipse geometry, circumstances and searches |
+| `almanac_transit.c` | Mercury and Venus solar transits |
+| `almanac_totality.c` | Nearby totality locations and probable-land refinement |
+| `almanac_cartesian.c` | Shared Cartesian vector operations |
+
+`almanac_engine_internal.h` groups the shared engine state, position, geometry,
+event and solar-eclipse declarations in one module-private header.
+`almanac_cartesian.h` contains the independent Cartesian vector interface, and
+`almanac_internal.h` retains the restricted totality-search interface used by
+internal consumers. Database handles and caches remain engine-owned; event
+record layouts that are not shared stay with their implementations.
+
 ## Capabilities
 
 - open the configured encrypted ephemeris database

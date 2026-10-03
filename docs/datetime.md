@@ -3,6 +3,31 @@
 `datetime_t` provides civil calendar utilities together with higher-level
 astronomical and calendar-observance helpers.
 
+## Source Organisation
+
+The public API remains in `include/datetime.h`. Implementation files under
+`src/datetime/` are grouped by responsibility:
+
+| File | Responsibility |
+|---|---|
+| `datetime.c` | Object lifetime, construction, parsing, serialisation, comparison and hashing |
+| `datetime_julian.c` | Julian-date conversion, lazy field access, civil-date validation and weekday navigation |
+| `datetime_arithmetic.c` | Date/time arithmetic, calendar spans and durations |
+| `datetime_format.c` | Date/time format tokens and string-builder helpers |
+| `datetime_time_conversion.c` | Host timezone and DST queries, GMT conversion, Delta T, TT and TDB |
+| `datetime_lunar.c` | Lunar phase estimates and local new-moon searches |
+| `datetime_solar.c` | Solar position estimates, solstices and sunrise/sunset calculations |
+| `datetime_calendar_tabular.c` | Christian, Islamic, Jewish and Ethiopian calendar conversions and observances |
+| `datetime_calendar_lunisolar.c` | Chinese, Hindu and Buddhist calendar views and astronomical observances |
+| `datetime_calendar_american.c` | Cherokee, Mayan and Aztec calendar views and observances |
+
+`datetime_internal.h` holds the private object layout and its lazy-cache
+sentinel contract. `datetime_astronomy_internal.h` declares the solar, lunar
+and time-scale helpers shared by calendar calculations. These headers are
+private to the datetime implementation; callers continue to use the opaque
+public API. Existing algorithms, supported ranges and approximation limits
+are unchanged.
+
 ## Capabilities
 
 - Gregorian calendar construction and field access
