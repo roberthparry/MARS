@@ -6,6 +6,54 @@ GO
 set QUOTED_IDENTIFIER on
 GO
 
+/*
+    Given a count (@Count), generate a sequence starting at 1 and ending at @Count
+ */
+ create function [dbo].[ft_Iota](
+    @Count as int
+ )
+ returns @IOTA table (
+    Number int primary key
+ )
+ as
+ begin
+    with Iota(Number) as (
+        select 1
+        union all
+        select Number + 1 from Iota where Number < @Count
+    )
+    insert into @IOTA(Number)
+    select Number from Iota
+    option (maxrecursion 0);
+
+    return
+ end
+ go
+
+ /*
+    Format a date as a string. This includes UK format too. DD is the symbol for 'st', 'nd', 'rd', 'th'
+  */
+create function [dbo].[f_FormatDate] (@DateTime datetime, @Format varchar(128))
+returns nvarchar(128)
+as
+begin
+    declare @DateStr nvarchar(128) = format(@DateTime, @Format)
+
+    if @DateStr like N'%DD%'
+    begin
+        set @DateStr = replace(@DateStr, N'DD',
+            case
+                when datepart(day, @DateTime) in (1, 21, 31) then N'ˢᵗ'
+                when datepart(day, @DateTime) in (2, 22) then N'ⁿᵈ'
+                when datepart(day, @DateTime) in (3, 23) then N'ʳᵈ'
+                else N'ᵗʰ'
+            end
+        )
+    end
+
+    return @DateStr
+end
+go
 
 /*
     Returns the date of Easter Sunday for the given year number.
@@ -34,6 +82,96 @@ begin
     return datefromparts(@YearNo, @month, @day)
 end
 GO
+
+/*
+    Returns 'Y' if the given date is a normal working day or 'N' if it isn't
+ */
+ create function [dbo].[f_IsWorkingDay] (@Date date)
+ returns char(1)
+ as
+ begin
+    declare @Monday int = datepart(weekday, datefromparts(2019, 8, 26))
+    declare @Friday int
+    declare @Saturday int = datepart(weekday, datefromparts(2019, 8, 31))
+    declare @Sunday int = datepart(weekday, datefromparts(2019, 9, 1))
+    declare @Dow int = datepart(weekday, @Date)
+    declare @EasterSunday date
+
+    if @Dow = @Saturday or @Dow = @Sunday return 'N'
+
+    declare @MonthNo int = datepart(month, @Date)
+
+    declare @DayOfMonth int = datepart(day, @Date)
+
+    if @MonthNo = 1
+    begin
+        if @DayOfMonth > 3 return 'Y'
+        declare @Jan1st date = datefromparts(datepart(year, @Date), 1, 1)
+        return case datepart(weekday, @Jan1st)
+            when @Saturday then iif(@Date = dateadd(day, 2, @Jan1st), 'N', 'Y')
+            when @Sunday then iif(@Date = dateadd(day, 1, @Jan1st), 'N', 'Y')
+            else iif(@Date = @Jan1st, 'N', 'Y')
+        end
+    end
+    else if @MonthNo = 3
+    begin
+        if @DayOfMonth < 20 return 'Y'
+        set @Friday = datepart(weekday, datefromparts(2019, 8, 30))
+        if @Dow != @Friday and @Dow != @Monday return 'Y'
+        set @EasterSunday = dbo.f_EasterSunday(datepart(year, @Date))
+        return iif(@Date = dateadd(day, -2, @EasterSunday) or @Date = dateadd(day, 1, @EasterSunday), 'N', 'Y')
+    end
+    else if @MonthNo = 4
+    begin
+        if @DayOfMonth > 26 return 'Y'
+        set @Friday = datepart(weekday, datefromparts(2019, 8, 30))
+        if @Dow != @Friday and @Dow != @Monday return 'Y'
+        set @EasterSunday = dbo.f_EasterSunday(datepart(year, @Date))
+        return iif(@Date = dateadd(day, -2, @EasterSunday) or @Date = dateadd(day, 1, @EasterSunday), 'N', 'Y')
+    end
+    else if @MonthNo = 5
+    begin
+        if @Date = datefromparts(2023, 5, 8) return 'N'
+        if @Date = datefromparts(2020, 5, 8) return 'N'
+        if @Date = datefromparts(2020, 5, 4) return 'Y'
+        if @Date = datefromparts(2022, 5, 30) return 'Y'
+        if @DayOfMonth between 8 and 24 return 'Y'
+        if @Dow != @Monday return 'Y'
+        return 'N'
+    end
+    else if @MonthNo = 6
+    begin
+        if @Date = datefromparts(2022, 6, 2) return 'N'
+        if @Date = datefromparts(2022, 6, 3) return 'N'
+        return 'Y'
+    end
+    else if @MonthNo = 8
+    begin
+        if @DayOfMonth < 25 return 'Y'
+        if @Dow != @Monday return 'Y'
+        return 'N'
+    end
+    else if @MonthNo = 9
+    begin
+        if @Date = datefromparts(2022, 9, 19) return 'N'
+        return 'Y'
+    end
+    else if @MonthNo = 12
+    begin
+        if @DayOfMonth < 25 or @DayOfMonth > 28 return 'Y'
+        declare @Dec25 date = datefromparts(datepart(year, @Date), 12, 25)
+        return case datepart(weekday, @Dec25)
+            when datepart(weekday, datefromparts(2019, 8, 30)) then iif(@Date = @Dec25 or @Date = dateadd(day, 3, @Dec25), 'N', 'Y')
+            when @Saturday then iif(@Date = dateadd(day, 2, @Dec25) or @Date = dateadd(day, 3, @Dec25), 'N', 'Y')
+            when @Sunday then iif(@Date = dateadd(day, 1, @Dec25) or @Date = dateadd(day, 2, @Dec25), 'N', 'Y')
+            else iif(@Date = @Dec25 or @Date = dateadd(day, 1, @Dec25), 'N', 'Y')
+        end
+    end
+
+    return 'Y'
+ end
+ go
+
 
 create function [dbo].[ft_SunriseAndSetTimes](@date date)
 returns @SUNRISEANDSETTIMES table (
