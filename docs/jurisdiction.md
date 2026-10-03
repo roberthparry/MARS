@@ -23,6 +23,26 @@ Easter, Orthodox Easter, Chinese New Year, and other observance dates.
 - one-off exceptions such as funerals, coronations, or special observances
 - historical rule changes over time
 
+## Source Organisation
+
+The implementation is split by responsibility within `src/jurisdiction/`:
+
+- `jurisdiction.c` — engine configuration and lifetime, shared row storage,
+  jurisdiction ancestry, default locations and serialisation.
+- `jurisdiction_calendar.c` — civil-date conversion, inherited weekend policy
+  and working-day queries.
+- `jurisdiction_holiday_rules.c` — loading holiday, observance and exception
+  rules, and evaluating calendar-based or SQL-based holiday dates.
+- `jurisdiction_holidays.c` — assembling holiday occurrences, applying
+  exceptions and substitute-day rules, and exposing visitor and array queries.
+- `jurisdiction_timezone.c` — timezone eras, named rules and GMT offsets.
+- `jurisdiction_dst.c` — daylight-saving transition collection and local
+  transition times, including the offsets before and after each change.
+
+One module-private header, `jurisdiction_internal.h`, groups the shared engine
+state, calendar helpers, holiday rows and timezone declarations by responsibility.
+Callers continue to use the unchanged public API in `include/jurisdiction.h`.
+
 ## Basic Usage
 
 Open a jurisdiction engine for a jurisdiction:
