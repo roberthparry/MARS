@@ -3156,6 +3156,68 @@ static void test_sqrt_quotient_combines_positive_real_denominator(void)
     expr_free(pi);
 }
 
+static void test_radical_display_cancels_rational_scales(void)
+{
+    static const struct { const char *input; const char *expected; } cases[] = {
+        { "sqrt(pi/(1/2))/2", "√(π/2)" },
+        { "sqrt(pi/(1/3))/3", "√(π/3)" },
+        { "sqrt(2*x)/2", "√(x/2)" },
+        { "2*sqrt(2)", "2·√(2)" }
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *input = expr_from_string(cases[i].input, &bindings);
+        expr_t *pretty = input ? expr_beautify(input) : NULL;
+        char *text = pretty ? expr_to_string(pretty, style_UNBOUND) : NULL;
+
+        if (str_eq(text, cases[i].expected))
+            to_string_pass(cases[i].input, text, cases[i].expected);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].input, text ? text : "(null)", cases[i].expected);
+        expr_t *again = pretty ? expr_beautify(pretty) : NULL;
+        char *again_text = again ? expr_to_string(again, style_UNBOUND) : NULL;
+        ASSERT_TRUE(text && again_text && str_eq(text, again_text));
+        free(again_text);
+        expr_free(again);
+        free(text);
+        expr_free(pretty);
+        expr_free(input);
+        expr_bindings_free(bindings);
+    }
+}
+
+static void test_radical_display_preserves_principal_branches(void)
+{
+    NUM_SCOPE(scope);
+    static const char *const inputs[] = {
+        "{ sqrt(2*x)/2 | x=4 }", "{ sqrt(2*x)/2 | x=-4 }", "{ sqrt(2*x)/2 | x=3+4i }",
+        "{ -sqrt(2*x)/2 | x=-4 }", "{ sqrt(2*x)/(-2) | x=3-4i }",
+        "{ sqrt(x/(-2)) | x=3+4i }", "{ c*sqrt(2*x) | x=-4; c=-1/2 }"
+    };
+
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(inputs[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *input = expr_from_string(inputs[i], &bindings);
+        expr_t *pretty = input ? expr_beautify(input) : NULL;
+        number_t expected = input ? expr_eval(input) : num_clone(NUM_NAN);
+        number_t actual = pretty ? expr_eval(pretty) : num_clone(NUM_NAN);
+        number_t difference = num_sub(actual, expected);
+        number_t magnitude = num_abs(difference);
+        number_t tolerance = num_create_from_string("1e-24");
+
+        ASSERT_TRUE(pretty && num_is_finite(actual) && num_lt(magnitude, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&magnitude);
+        num_destroy(&difference);
+        num_destroy(&actual);
+        num_destroy(&expected);
+        expr_free(pretty);
+        expr_free(input);
+        expr_bindings_free(bindings);
+    }
+}
+
 static void test_real_scalar_over_square_root_combines_into_one_root(void)
 {
     number_t three_value = num_create_from_long(3L);
@@ -4687,6 +4749,8 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_sqrt_quotient_combines_positive_real_denominator, NULL);
+    TEST_RUN_SUBTEST(test_radical_display_cancels_rational_scales, NULL);
+    TEST_RUN_SUBTEST(test_radical_display_preserves_principal_branches, NULL);
     TEST_RUN_SUBTEST(test_real_scalar_over_square_root_combines_into_one_root, NULL);
     TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);
     TEST_RUN_SUBTEST(test_named_half_exponent_round_trips_as_symbolic_power, NULL);

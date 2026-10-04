@@ -986,6 +986,8 @@ expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_beautify(const expr_t *expr);
 expr_t *expr_beautify_presimplified(const expr_t *expr);
+/* Return a replacement for rational radical factors, or NULL when no rewrite applies. */
+expr_t *expr_beautify_radical_factors_for_display(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);
 expr_t *expr_add_owned(expr_t *left, expr_t *right);
 expr_t *expr_add_long(const expr_t *expr, long value);

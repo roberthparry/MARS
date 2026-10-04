@@ -3088,6 +3088,53 @@ static void test_integrate_unevaluated_integral_evaluation(void)
     expr_free(x);
 }
 
+static void test_integrate_improper_gaussian_bound_parameters(void)
+{
+    NUM_SCOPE(scope);
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ @S_{-inf}^inf exp(-(t-m)^2/(2*s^2)) dt | m=0; s=1 }", &bindings);
+    expr_t *centre = bindings ? expr_bindings_get(bindings, "m") : NULL;
+    expr_t *width = bindings ? expr_bindings_get(bindings, "s") : NULL;
+    expr_t *want = expr_from_string("sqrt(2*pi)", NULL);
+    const double centres[] = {0.0, 3.0, -5.0, 2.0};
+    const double widths[] = {1.0, 2.0, -2.0, 0.5};
+    char *before = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(centre);
+    ASSERT_NOT_NULL(width);
+    ASSERT_NOT_NULL(want);
+    for (size_t i = 0u; i < sizeof(widths) / sizeof(widths[0]); ++i) {
+        test_expr_set_val_d(centre, centres[i]);
+        test_expr_set_val_d(width, widths[i]);
+        number_t scale = num_create_from_double(fabs(widths[i]));
+        number_t base = expr_eval(want);
+        number_t expected = num_mul(scale, base);
+        number_t actual = expr_eval(expr);
+        number_t difference = num_sub(actual, expected);
+        number_t magnitude = num_abs(difference);
+        number_t tolerance = num_create_from_string("1e-24");
+
+        ASSERT_TRUE(num_is_finite(actual) && num_lt(magnitude, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&magnitude);
+        num_destroy(&difference);
+        num_destroy(&actual);
+        num_destroy(&expected);
+        num_destroy(&base);
+        num_destroy(&scale);
+    }
+    test_expr_set_val_d(centre, 0.0);
+    test_expr_set_val_d(width, 1.0);
+    char *after = expr_to_string(expr, style_UNBOUND);
+    TEST_ASSERT_STR_EQ(after, before);
+    free(after);
+    free(before);
+    expr_free(want);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_unevaluated_integral_constant_upper(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3966,6 +4013,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_leibniz_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);
+    TEST_RUN_SUBTEST(test_integrate_improper_gaussian_bound_parameters, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_constant_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_chain_rule_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_explicit_bounds, NULL);
