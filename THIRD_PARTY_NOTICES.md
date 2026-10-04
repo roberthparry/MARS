@@ -148,11 +148,29 @@ The resulting MARS SQL data files retain source names, source URLs and source
 document identifiers so that provenance is not lost when the encrypted
 jurisdiction database is created.
 
-### Unicode CLDR week data
+### Unicode CLDR week data and calendar names
 
 Territory weekend conventions use the Unicode Common Locale Data Repository
 (CLDR) week-data model and are cross-checked against the calendar sources named
-above. Unicode CLDR data files are distributed under the Unicode Licence v3.
+above. Localised calendar month and weekday names and long-date patterns in
+`packaging/jurisdiction-db/mars_calendar_locale_names.sql` are extracted from
+Unicode CLDR 46 through Babel 2.17.0, except for the explicitly hand-maintained
+Ladino, Cajun French, North Slope Iñupiaq, Jamaican Patois and Pennsylvania Dutch supplements. Their common calendar
+vocabulary and chosen abbreviations are not attributed to CLDR; Yiddish calendar
+names do use CLDR. Sources for the supplementary vocabulary are identified in
+the generator and the jurisdiction guide; no dictionary prose is bundled.
+Language names, official-language options
+and territory-to-locale defaults use CLDR's
+likely-subtag and territory-language data. The pinned generator is
+`tools/generate_calendar_locales.py`; its Babel dependency is used only to
+regenerate the SQL seed and is not imported by installers or MARS Lab.
+Hebrew month spellings in `packaging/jurisdiction-db/mars_calendar_local.sql`
+also follow [CLDR's Hebrew locale data](https://github.com/unicode-org/cldr/blob/main/common/main/he.xml).
+The CLDR 46 source is
+[unicode-org/cldr, release-46](https://github.com/unicode-org/cldr/tree/release-46).
+Babel is separately installed generation tooling under the BSD 3-Clause licence;
+no Babel code is bundled in the seed. Unicode CLDR data files are distributed
+under the Unicode Licence v3.
 The required notice follows.
 
 Copyright © 1991-2026 Unicode, Inc.

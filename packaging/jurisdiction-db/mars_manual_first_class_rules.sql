@@ -1,4 +1,67 @@
--- Hand-maintained first-class holiday rules for Ukraine.
+-- Hand-maintained first-class holiday rules.
+
+-- England and Wales share this bank-holiday policy, not a political parent.
+-- Materialise Wales's rules from the maintained English seed so exceptions,
+-- paired substitutions and provenance cannot drift between duplicate lists.
+-- The 2400000 identifier block is reserved for these Welsh copies.
+-- https://www.gov.uk/bank-holidays
+insert into holiday_definition(
+    holiday_id, jurisdiction_id, holiday_key, default_name, holiday_class, scope,
+    calendar_system_id, valid_from_year, valid_to_year, is_active, notes
+)
+select holiday_id + 2400000, 'GB-WLS', holiday_key, default_name, holiday_class, scope,
+       calendar_system_id, valid_from_year, valid_to_year, is_active, notes
+from holiday_definition where jurisdiction_id = 'GB-ENG';
+
+insert into holiday_name(holiday_id, locale, localized_name, is_primary)
+select n.holiday_id + 2400000, n.locale, n.localized_name, n.is_primary
+from holiday_name as n join holiday_definition as d using (holiday_id)
+where d.jurisdiction_id = 'GB-ENG';
+
+insert into holiday_rule(
+    holiday_rule_id, holiday_id, sequence_no, rule_kind, month, day, weekday, ordinal,
+    offset_days, anchor_holiday_key, rrule_text, expression_language, expression_text,
+    holiday_date, valid_from_year, valid_to_year, priority, notes
+)
+select r.holiday_rule_id + 2400000, r.holiday_id + 2400000, r.sequence_no, r.rule_kind,
+       r.month, r.day, r.weekday, r.ordinal, r.offset_days, r.anchor_holiday_key, r.rrule_text,
+       r.expression_language, r.expression_text, r.holiday_date, r.valid_from_year,
+       r.valid_to_year, r.priority, r.notes
+from holiday_rule as r join holiday_definition as d using (holiday_id)
+where d.jurisdiction_id = 'GB-ENG';
+
+insert into holiday_observance_rule(
+    holiday_observance_rule_id, holiday_id, holiday_rule_id, observed_rule_kind, observed_name,
+    weekend_mask, suppress_original, move_days, second_move_days, expression_language,
+    expression_text, valid_from_year, valid_to_year, priority, notes
+)
+select r.holiday_observance_rule_id + 2400000, r.holiday_id + 2400000, r.holiday_rule_id + 2400000,
+       r.observed_rule_kind, r.observed_name, r.weekend_mask, r.suppress_original, r.move_days,
+       r.second_move_days, r.expression_language, r.expression_text, r.valid_from_year,
+       r.valid_to_year, r.priority, r.notes
+from holiday_observance_rule as r join holiday_definition as d using (holiday_id)
+where d.jurisdiction_id = 'GB-ENG';
+
+insert into holiday_exception(
+    holiday_exception_id, jurisdiction_id, holiday_id, holiday_rule_id, holiday_date, action,
+    name, replacement_holiday_key, expression_language, expression_text, valid_from_year,
+    valid_to_year, priority, source_document_id, notes
+)
+select holiday_exception_id + 2400000, 'GB-WLS', holiday_id + 2400000, holiday_rule_id + 2400000,
+       holiday_date, action, name, replacement_holiday_key, expression_language, expression_text,
+       valid_from_year, valid_to_year, priority, source_document_id, notes
+from holiday_exception where jurisdiction_id = 'GB-ENG';
+
+insert into holiday_rule_source(
+    holiday_id, holiday_rule_id, holiday_observance_rule_id, holiday_exception_id,
+    source_document_id, role, notes
+)
+select s.holiday_id + 2400000, s.holiday_rule_id + 2400000, s.holiday_observance_rule_id + 2400000,
+       s.holiday_exception_id + 2400000, s.source_document_id, s.role, s.notes
+from holiday_rule_source as s join holiday_definition as d using (holiday_id)
+where d.jurisdiction_id = 'GB-ENG';
+
+-- Ukraine:
 -- These close the post-2022 gap left by generated source coverage while
 -- preserving the earlier materialised history already present in the package.
 

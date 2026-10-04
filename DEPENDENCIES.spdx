@@ -190,6 +190,26 @@ PackageLicenseDeclared: Unicode-3.0
 PackageCopyrightText: Copyright (c) 1991-2026 Unicode, Inc.
 PackageComment: Standards and territory week-data source for calendar-system identifiers and bundled jurisdiction weekend conventions.
 
+PackageName: Unicode-CLDR-Calendar-Names
+SPDXID: SPDXRef-Package-Unicode-CLDR-Calendar
+PackageVersion: 46
+PackageDownloadLocation: https://github.com/unicode-org/cldr/tree/release-46
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: Unicode-3.0
+PackageCopyrightText: Copyright (c) 1991-2024 Unicode, Inc.
+PackageComment: Month and weekday names and territory locale defaults extracted through Babel 2.17.0 for the jurisdiction calendar SQL seed.
+
+PackageName: Babel
+SPDXID: SPDXRef-Package-Babel
+PackageVersion: 2.17.0
+PackageDownloadLocation: https://github.com/python-babel/babel/tree/v2.17.0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: NOASSERTION
+PackageComment: Generation-only tooling for the packaged calendar locale-name seed; not an installer or MARS Lab runtime dependency.
+
 PackageName: WeatherAPI.com
 SPDXID: SPDXRef-Package-WeatherAPI
 PackageVersion: API service accessed 2026-08-21
@@ -291,6 +311,8 @@ Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-python-holiday
 Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-Workalendar
 Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-TZDB
 Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-Unicode-CLDR
+Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-Unicode-CLDR-Calendar
+Relationship: SPDXRef-Package-Babel BUILD_TOOL_OF SPDXRef-Package-MARS
 Relationship: SPDXRef-Package-WeatherAPI OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
 Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-DE440
 Relationship: SPDXRef-Package-MARS GENERATED_FROM SPDXRef-Package-DE440s

@@ -187,7 +187,7 @@ begin
     declare @longitude float = -2.7553
 
     declare @month int = datepart(month, @date)
-    declare @sunday int = datepart(weekday, convert(date, '2019-12-22', 126))
+    declare @sunday int = datepart(weekday, datefromparts(2019,12,22))
     declare @previous_sunday int = datepart(day, @date) - (datepart(weekday, @date) % 7)
     declare @daylight_savings float = case
                 when @month < 3 or @month > 10 then 0.0
@@ -326,39 +326,39 @@ as return (
     ) easter
     cross apply (
         select
-            datepart(weekday, '2019-08-23') as [Friday],
-            datepart(weekday, '2019-08-24') as [Saturday],
-            datepart(weekday, '2019-08-25') as [Sunday],
-            datepart(weekday, '2019-08-26') as [Monday]
+            datepart(weekday, datefromparts(2019,8,23)) as [Friday],
+            datepart(weekday, datefromparts(2019,8,24)) as [Saturday],
+            datepart(weekday, datefromparts(2019,8,25)) as [Sunday],
+            datepart(weekday, datefromparts(2019,8,26)) as [Monday]
     ) const
     cross apply (
         select
-            convert(date, str(yr.Number) + '-01-01', 121) as [Jan1st],
-            convert(date, str(yr.Number) + '-05-01', 121) as [May1st],
-            convert(date, str(yr.Number) + '-05-31', 121) as [May31],
-            convert(date, str(yr.Number) + '-08-31', 121) as [Aug31],
-            convert(date, str(yr.Number) + '-12-25', 121) as [Dec25th],
-            convert(date, str(yr.Number) + '-12-26', 121) as [Dec26th]
+            datefromparts(yr.Number,1,1) as [Jan1st],
+            datefromparts(yr.Number,5,1) as [May1st],
+            datefromparts(yr.Number,5,31) as [May31],
+            datefromparts(yr.Number,8,31) as [Aug31],
+            datefromparts(yr.Number,12,25) as [Dec25th],
+            datefromparts(yr.Number,12,26) as [Dec26th]
     ) dat
     cross apply (
         select
             case datepart(weekday, dat.Jan1st)
-                when const.Saturday then convert(date, str(yr.Number) + '-01-03', 121)
-                when const.Sunday then convert(date, str(yr.Number) + '-01-02', 121)
+                when const.Saturday then datefromparts(yr.Number,1,3)
+                when const.Sunday then datefromparts(yr.Number,1,2)
                 else dat.Jan1st
             end as [Date]
     ) newyear
     cross apply (
         select
             case yr.Number
-                when 2020 then convert(date, '2020-05-08', 121)
+                when 2020 then datefromparts(2020,5,8)
                 else dateadd(day, (7 + const.Monday - datepart(weekday, dat.May1st)) % 7, dat.May1st)
             end as [Date]
     ) mayday
     cross apply (
         select
             case yr.Number
-                when 2022 then convert(date, '2022-06-02', 121)
+                when 2022 then datefromparts(2022,6,2)
                 else dateadd(day,
                              iif(const.Monday > datepart(weekday, dat.May31), const.Monday - datepart(weekday, dat.May31) - const.Saturday, const.Monday - DATEPART(weekday, dat.May31)),
                              dat.May31)
@@ -367,15 +367,15 @@ as return (
     cross apply (
         select
             case yr.Number
-                when 2022 then convert(date, '2022-06-03', 121)
-                when 2023 then convert(date, '2023-05-08', 121)
+                when 2022 then datefromparts(2022,6,3)
+                when 2023 then datefromparts(2023,5,8)
                 else null
             end as [Date]
     ) specialbh
     cross apply (
         select
             case yr.Number
-                when 2022 then convert(date, '2022-09-19', 121)
+                when 2022 then datefromparts(2022,9,19)
                 else null
             end as [Date]
     ) specialbh2
