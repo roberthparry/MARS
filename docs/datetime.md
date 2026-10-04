@@ -268,6 +268,17 @@ initialise it, and return the same pointer (or NULL on error).
 - `string_t *datetime_aztec_calendar_date_text(const datetime_t *dttm)` — Aztec Tonalpohualli and Xiuhpohualli text
 - `string_t *datetime_ethiopian_calendar_date_text(const datetime_t *dttm)` — Ethiopian civil calendar date text
 
+Civil Islamic conversions and observances use the tabular 30-year leap cycle
+with the Friday epoch, JDN 1948440. They are calculated dates, not local
+moon-sighting determinations or the Umm al-Qura calendar. The same convention is
+used for Arabic `Date Lingua` output in the [jurisdiction calendar](jurisdiction.md).
+
+Jewish conversions use the fixed Hebrew calendar, including leap-year Adar I/II,
+variable Cheshvan/Kislev lengths and both exceptional new-year postponements.
+The native formatter uses English month names and an AM year; the jurisdiction
+calendar uses Hebrew month names for Hebrew `Date Lingua`. Both map the civil
+date to its daytime Jewish date, without a sunset-dependent rollover.
+
 ### Field Accessors
 
 - `short datetime_year(const datetime_t *dttm)` — year; SHRT_MAX if uninitialised

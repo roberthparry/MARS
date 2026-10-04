@@ -53,6 +53,9 @@ HOLIDAY_DB_SOURCE_DIR ?= $(JURISDICTION_DB_SOURCE_DIR)
 JURISDICTION_RULES_SQL ?= $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_rules.sql
 HOLIDAY_RULES_SQL ?= $(JURISDICTION_RULES_SQL)
 JURISDICTION_RULES_SOURCES := $(JURISDICTION_RULES_SQL) $(JURISDICTION_DB_SOURCE_DIR)/mars_country_jurisdictions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_generated_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_target_subdivisions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_manual_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_location_defaults.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_towns.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_timezone_rules.sql
+JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_calendar_local.sql
+JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_calendar_locale_names.sql
+JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_localized_names.sql
 HOLIDAY_RULES_SOURCES := $(JURISDICTION_RULES_SOURCES)
 TO_BE_ANNOUNCED_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/to-be-announced-lab
 TO_BE_ANNOUNCED_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/to-be-announced-lab.desktop
@@ -481,13 +484,35 @@ install-almanac-db: check-jurisdiction-db-deps tools/configure_mars_lab_almanac_
 uninstall-almanac-db:
 	rm -f "$(HOME)/.mars/almanac/almanac.db" "$(HOME)/.mars/config/almanac-db.env"
 
-install-jurisdiction-db: check-jurisdiction-db-deps tools/configure_mars_lab_jurisdiction_db.py $(JURISDICTION_RULES_SOURCES)
+ifeq ($(firstword $(MAKECMDGOALS)),install-jurisdiction-db)
+    ifneq ($(word 3,$(MAKECMDGOALS)),)
+        $(error Supply one town or use LOCATION='town name' for names containing spaces)
+    endif
+    CALENDAR_LOCATION_GOAL := $(word 2,$(MAKECMDGOALS))
+    ifneq ($(CALENDAR_LOCATION_GOAL),)
+        ifneq ($(filter all clean test memtest test_% memtest_% debug release release-evidence install uninstall help scratch bench_% gen_% install-% uninstall-% check-% mars-lab% to-be-announced%,$(CALENDAR_LOCATION_GOAL)),)
+            $(error A calendar location cannot be another Make target; run targets separately)
+        endif
+        ifneq ($(findstring /,$(CALENDAR_LOCATION_GOAL)),)
+            $(error A calendar location must be a town name, not a file target)
+        endif
+        .PHONY: $(CALENDAR_LOCATION_GOAL)
+        $(CALENDAR_LOCATION_GOAL):
+	@:
+    endif
+endif
+
+install-jurisdiction-db: export MARS_CALENDAR_LOCATION_ARGUMENT = $(if $(LOCATION),$(LOCATION),$(CALENDAR_LOCATION_GOAL))
+install-jurisdiction-db: export MARS_CALENDAR_LANGUAGE_ARGUMENT = $(CALENDAR_LANGUAGE)
+install-jurisdiction-db: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
+install-jurisdiction-db: check-jurisdiction-db-deps $(SHARED_LIB) tools/configure_mars_lab_jurisdiction_db.py tools/jurisdiction_calendar.py tools/jurisdiction_calendar_languages.py $(JURISDICTION_RULES_SOURCES)
 	@python3 tools/configure_mars_lab_jurisdiction_db.py
 
 uninstall-jurisdiction-db:
 	rm -rf "$(HOME)/.mars"
 
-install-mars-lab: check-lab-deps tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py tools/configure_mars_lab_weather.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
+install-mars-lab: check-lab-deps $(SHARED_LIB) tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py tools/jurisdiction_calendar.py tools/jurisdiction_calendar_languages.py tools/configure_mars_lab_weather.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -608,7 +633,9 @@ help:
 	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
 	@echo "  make install-almanac-db     Build and configure the Almanac database only"
 	@echo "  make uninstall-almanac-db   Remove the configured Almanac database"
-	@echo "  make install-jurisdiction-db Build and configure the private jurisdiction database only"
+	@echo "  make install-jurisdiction-db [town] Build the private database and calendar_local for a town"
+	@echo "  make install-jurisdiction-db LOCATION='town, jurisdiction' Select a qualified or multiword town"
+	@echo "  Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
 	@echo "  make uninstall-jurisdiction-db Remove ~/.mars, including the private jurisdiction database"
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
 	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"

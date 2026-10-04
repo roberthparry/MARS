@@ -107,9 +107,11 @@ datetime_t *datetime_init_orthodox_christmas(datetime_t *dttm, int year)
     return dttm;
 }
 
+static const long islamic_civil_epoch = 1948440L;
+
 static long datetime_islamic_ymd_to_jdn(int year, int month, int day)
 {
-    return (long)(day + (int)ceil(29.5 * (month - 1)) + (year - 1) * 354 + (3 + 11 * year) / 30 + 1948439 - 1);
+    return day + (long)ceil(29.5 * (month - 1)) + (year - 1) * 354L + (3 + 11 * year) / 30 + islamic_civil_epoch - 1;
 }
 
 static datetime_t *datetime_init_civil_islamic_observance(datetime_t *dttm, int gregorianYear, int islamicMonth,
@@ -156,17 +158,29 @@ datetime_t *datetime_init_muslim_new_year(datetime_t *dttm, int year)
     return datetime_init_civil_islamic_observance(dttm, year, 1, 1);
 }
 
-static long datetime_hebrew_new_year_jdn(int hebrewYear)
+static long datetime_hebrew_elapsed_days(int year)
 {
-    const long hebrewEpochRd = -1373427L;
-    long monthsElapsed = (235L * hebrewYear - 234L) / 19L;
-    long partsElapsed = 12084L + 13753L * monthsElapsed;
-    long day = 29L * monthsElapsed + partsElapsed / 25920L;
+    long months_elapsed = (235L * year - 234L) / 19L;
+    long parts_elapsed = 12084L + 13753L * months_elapsed;
+    long day = 29L * months_elapsed + parts_elapsed / 25920L;
 
     if ((3L * (day + 1L)) % 7L < 3L)
         day++;
 
-    return hebrewEpochRd + day + 1721425L;
+    return day;
+}
+
+static long datetime_hebrew_new_year_jdn(int year)
+{
+    long day = datetime_hebrew_elapsed_days(year);
+
+    /* Exceptional postponements prevent common years of 356 days and leap years of 382 days. */
+    if (datetime_hebrew_elapsed_days(year + 1) - day == 356L)
+        day += 2;
+    else if (day - datetime_hebrew_elapsed_days(year - 1) == 382L)
+        day++;
+
+    return 347998L + day;
 }
 
 /* Initialise a datetime with Rosh Hashanah, the Jewish New Year. */
@@ -233,7 +247,7 @@ string_t *datetime_christian_calendar_date_text(const datetime_t *dttm)
 
 static void datetime_jdn_to_islamic_ymd(long jdn, int *year, int *month, int *day)
 {
-    *year = (int)((30L * (jdn - 1948439L) + 10646L) / 10631L);
+    *year = (int)((30L * (jdn - islamic_civil_epoch) + 10646L) / 10631L);
     if (*year < 1)
         *year = 1;
 

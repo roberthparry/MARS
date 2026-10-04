@@ -648,13 +648,22 @@ void test_datetime_christmas_known_dates(void)
 
 void test_datetime_jewish_new_year_known_date(void)
 {
-    datetime_t *dt = datetime_init_jewish_new_year(datetime_alloc(), 2024);
+    static const int dates[][3] = {
+        {2005, DT_October, 4},   /* One-day postponement after a leap year. */
+        {2024, DT_October, 3},
+        {2028, DT_September, 21}, /* Two-day postponement in a common year. */
+        {2035, DT_October, 4}
+    };
 
-    ASSERT_EQ_INT(datetime_year(dt), 2024);
-    ASSERT_EQ_INT(datetime_month(dt), DT_October);
-    ASSERT_EQ_INT(datetime_day(dt), 3);
+    for (size_t index = 0; index < sizeof(dates) / sizeof(dates[0]); index++) {
+        datetime_t *dt = datetime_init_jewish_new_year(datetime_alloc(), dates[index][0]);
 
-    datetime_dealloc(dt);
+        ASSERT_NOT_NULL(dt);
+        ASSERT_EQ_INT(datetime_year(dt), dates[index][0]);
+        ASSERT_EQ_INT(datetime_month(dt), dates[index][1]);
+        ASSERT_EQ_INT(datetime_day(dt), dates[index][2]);
+        datetime_dealloc(dt);
+    }
 }
 
 void test_datetime_eid_al_fitr_known_date(void)
@@ -663,7 +672,7 @@ void test_datetime_eid_al_fitr_known_date(void)
 
     ASSERT_EQ_INT(datetime_year(dt), 2026);
     ASSERT_EQ_INT(datetime_month(dt), DT_March);
-    ASSERT_EQ_INT(datetime_day(dt), 19);
+    ASSERT_EQ_INT(datetime_day(dt), 20);
 
     datetime_dealloc(dt);
 }
@@ -751,7 +760,7 @@ void test_datetime_calendar_date_texts_known_dates(void)
     TEST_ASSERT_STR_EQ(string_c_str(chinese), "Year 4724 (Horse), month 1, day 1");
     TEST_ASSERT_STR_EQ(string_c_str(hindu), "Vikram Samvat 2083, Ashadha Shukla 7, lunar day 7");
     TEST_ASSERT_STR_EQ(string_c_str(buddhist), "B.E. 2569-06-21 (Thai solar)");
-    TEST_ASSERT_STR_EQ(string_c_str(muslim), "1 Ramadan 1447 AH");
+    TEST_ASSERT_STR_EQ(string_c_str(muslim), "29 Sha'ban 1447 AH");
     TEST_ASSERT_STR_EQ(string_c_str(jewish), "1 Tishrei 5785 AM");
     TEST_ASSERT_STR_EQ(string_c_str(cherokee), "Cherokee civil Green Corn Moon, day 21, year 2026");
     TEST_ASSERT_STR_EQ(string_c_str(mayan), "Long Count 13.0.13.12.10; Tzolk'in 7 Ok; Haab 3 Sek");

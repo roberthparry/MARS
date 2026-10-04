@@ -26,6 +26,22 @@
 
 pragma foreign_keys = on;
 
+drop view if exists calendar_local;
+drop table if exists calendar_local_days;
+drop table if exists calendar_local_settings;
+drop view if exists calendar_locale_weekday;
+drop view if exists calendar_locale_month;
+drop view if exists calendar_locale_month_standalone;
+drop table if exists calendar_locale_date_pattern;
+drop table if exists calendar_date_pattern_part;
+drop table if exists calendar_locale_name_set;
+drop table if exists calendar_weekday_names;
+drop table if exists calendar_month_names;
+drop table if exists calendar_territory_locale;
+drop table if exists calendar_jurisdiction_language;
+drop table if exists calendar_language_name;
+drop table if exists holiday_name_qualifier;
+drop table if exists holiday_event_localized_name;
 drop view if exists jurisdiction;
 drop view if exists calendar_system;
 drop view if exists source_document;
@@ -1392,6 +1408,8 @@ create index jurisdiction_type_idx on jurisdiction_jurisdiction_type(jurisdictio
 create index jurisdiction_name_idx on jurisdiction_name(name);
 create index holiday_definition_jurisdiction_idx on holiday_definition_jurisdiction_id(jurisdiction_id);
 create index holiday_definition_key_idx on holiday_definition_holiday_key(holiday_key);
+create index holiday_name_holiday_idx on holiday_name_holiday_id(holiday_id);
+create index holiday_name_locale_normalized_idx on holiday_name_locale(lower(replace(locale, '-', '_')));
 create index holiday_rule_holiday_idx on holiday_rule_holiday_id(holiday_id);
 create index holiday_rule_priority_idx on holiday_rule_priority(priority);
 create index holiday_observance_holiday_idx on holiday_observance_rule_holiday_id(holiday_id);
@@ -2466,3 +2484,6 @@ insert into holiday_rule_source(
 
 .read packaging/jurisdiction-db/mars_generated_first_class_rules.sql
 .read packaging/jurisdiction-db/mars_manual_first_class_rules.sql
+.read packaging/jurisdiction-db/mars_holiday_localized_names.sql
+.read packaging/jurisdiction-db/mars_calendar_locale_names.sql
+.read packaging/jurisdiction-db/mars_calendar_local.sql
