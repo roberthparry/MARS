@@ -348,6 +348,37 @@ static size_t eval_integral_interval_budget(void)
     return refinements * steps_per_refinement;
 }
 
+/* Specialise only the private numerical integrand; keep the caller's symbolic tree and bindings live. */
+static expr_t *eval_integral_bind_parameters(const expr_t *integrand, const expr_t *dummy)
+{
+    expr_bindings_t *bindings = expr_bindings_from_expr_internal(integrand);
+    expr_t *out = expr_clone(integrand);
+    const char *dummy_name = expr_symbol_name(dummy);
+
+    for (size_t index = 0u; out && index < expr_bindings_count(bindings); ++index) {
+        const char *name = expr_bindings_name_at(bindings, index);
+        expr_t *binding = expr_bindings_get(bindings, name);
+
+        if (binding == dummy || (dummy_name && name && strcmp(dummy_name, name) == 0))
+            continue;
+        number_t value = expr_eval(binding);
+        if (num_is_finite(value)) {
+            expr_t *literal = expr_new_const(value);
+            /* A variable needle matches named constants as well as variables in the private clone. */
+            expr_t *needle = expr_new_named_var(NUM_NAN, name);
+            expr_t *next = literal && needle ? expr_substitute(out, needle, literal) : NULL;
+
+            expr_free(needle);
+            expr_free(literal);
+            expr_free(out);
+            out = next;
+        }
+        num_destroy(&value);
+    }
+    expr_bindings_free(bindings);
+    return expr_simplify_owned(out);
+}
+
 static number_t eval_integral(expr_t *expr)
 {
     integrator_t *ig;
@@ -405,7 +436,9 @@ static number_t eval_integral(expr_t *expr)
         num_destroy(&upper);
         return num_clone(NUM_NAN);
     }
-    local_integrand = expr_substitute(expr->a, dummy_expr, local_var);
+    expr_t *bound_integrand = eval_integral_bind_parameters(expr->a, dummy_expr);
+    local_integrand = bound_integrand ? expr_substitute(bound_integrand, dummy_expr, local_var) : NULL;
+    expr_free(bound_integrand);
     if (!local_integrand) {
         expr_free(local_var);
         intg_free(ig);

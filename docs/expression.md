@@ -1488,6 +1488,30 @@ missing bindings or an unsuccessful numerical calculation give `NaN`.
 The arbitrary constant added by `expr_integrate_family()` must also be bound
 before the complete family has a numerical value.
 
+When `expr_eval()` evaluates a retained integral, supplied parameter values are
+substituted into a private numerical copy before seeking an antiderivative.
+The integration variable remains local, the original symbolic expression is
+unchanged, and later binding edits are honoured. Infinite endpoints are supported
+when the antiderivative evaluation yields a convergent result; the general
+quadrature fallback still requires finite endpoints.
+
+For example, evaluating this input in MARS Lab at 40 digits:
+
+```text
+{@S_{-inf}^inf e^(-1/2(t-@mu)^2/@sigma^2) dt | @mu=0; @sigma=1}
+```
+
+produces the Value output:
+
+```text
+2.506628274631000502415765284811045253007
+```
+
+This is $\sqrt{2\pi}$. More generally, real $\mu$ and nonzero real $\sigma$
+give $|\sigma|\sqrt{2\pi}$. The non-Value cards retain the symbolic parameters;
+this numerical evaluation does not assert convergence for arbitrary unbound
+or complex parameters.
+
 The implementation is split into logical integration modules:
 
 - `expr_integrate.c` owns the public orchestration and dispatch.
@@ -2009,6 +2033,25 @@ simplifies and then arranges an equivalent expression for readable
 presentation, including symmetric surds and Cartesian complex products. The
 beautifier does not select a different expression for TeX output; rendering
 style is applied afterwards.
+
+The beautifier cancels exact rational factors around square roots when this
+does not enlarge the rational scale inside the root. Reciprocal positive
+integer roots can be written as division by a root. These rules retain an
+exterior negative sign and do not assume that symbolic variables are positive.
+For example, this Gaussian primitive in MARS Lab:
+
+```text
+@S^x e^(-1/2t^2) dt
+```
+
+has unbound output:
+
+```text
+√(π/2)·erf(x/√(2))
+```
+
+The same simplified algebra supplies the Expression, Function and Rendered
+TeX representations.
 
 An exterior minus on a quotient is absorbed by reversing a
 subtraction factor in its numerator where possible. This retains the other

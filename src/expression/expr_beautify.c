@@ -2472,6 +2472,12 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
             rewrite = NULL;
         }
     }
+    rewrite = expr_beautify_radical_factors_for_display(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
     rewrite = expr_beautify_symmetric_square_root(rebuilt);
     if (rewrite) {
         expr_free(rebuilt);

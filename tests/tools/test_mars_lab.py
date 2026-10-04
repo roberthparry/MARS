@@ -4701,6 +4701,69 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_improper_gaussian_evaluates_bound_parameters_without_substituting_cards(self) -> None:
+        for centre, width in (("0", "1"), ("3", "2"), ("-5", "-2"), ("2", "1/2")):
+            with self.subTest(centre=centre, width=width):
+                source = ("{@S_{-inf}^inf e^(-1/2(t-@mu)^2/@sigma^2) dt | @mu=" + centre
+                          + "; @sigma=" + width + "}")
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "@mu", "evaluate")
+                self.assertEqual(code, 0, raw)
+                scale = 0.5 if width == "1/2" else abs(float(width))
+                expected = scale * math.sqrt(2 * math.pi)
+                self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+                payload = mars_lab.prepare_evaluation_fields(
+                    self.expression_binary, dict(fields), source, 40, False, "@mu", "evaluate")
+                self.assertAlmostEqual(float(payload["value"]), expected, places=14)
+                self.assertIn("μ", fields["unbound"])
+                self.assertIn("σ", fields["unbound"])
+                self.assertIn(r"\mu", fields["tex"])
+                self.assertIn(r"\sigma", fields["tex"])
+                self.assertIn("return integral(", fields["function"])
+                programme = subprocess.run(
+                    [str(ROOT / "build/release/scratch/ophelia"), "40"],
+                    input=fields["function"], text=True, capture_output=True, timeout=10)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertAlmostEqual(float(programme.stdout.strip()), expected, places=14)
+
+    def test_improper_parameter_integrals_handle_endpoints_and_invalid_bindings(self) -> None:
+        cases = (
+            ("{@S_{-inf}^0 exp(-(t-m)^2/(2*s^2)) dt | m=0; s=2}", math.sqrt(2 * math.pi)),
+            ("{@S_{inf}^{-inf} exp(-(t-m)^2/(2*s^2)) dt | m=3; s=2}", -2 * math.sqrt(2 * math.pi)),
+            ("{@S_0^inf exp(-a*t) dt | a=2}", 0.5),
+            ("{@S_{-inf}^inf exp(-(t-m)^2/(2*s^2)) dt | m=0; s=0}", None),
+            ("{@S_{-inf}^inf exp(-(t-m)^2/(2*s^2)) dt | m=0; s=?}", None),
+            ("{@S_0^inf exp(-a*t) dt | a=-1}", "∞"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "m", "evaluate")
+                self.assertEqual(code, 0, raw)
+                if expected is None:
+                    self.assertEqual(fields["value"], "NAN")
+                elif isinstance(expected, str):
+                    self.assertEqual(fields["value"], expected)
+                else:
+                    self.assertAlmostEqual(float(fields["value"]), expected, places=14)
+
+    def test_gaussian_primitive_has_compact_radicals_in_all_styles(self) -> None:
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            self.expression_binary, "@S^x e^(-1/2t^2) dt", 40, "x", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], "√(π/2)·erf(x/√(2))")
+        self.assertIn(fields["unbound"], fields["expression"])
+        self.assertIn("return sqrt(@pi/2).erf(x/sqrt(2)).", fields["function"])
+        self.assertEqual(fields["tex"],
+                         r"\sqrt{\frac{\pi}{2}}\mkern-2mu \operatorname{erf}(\frac{x}{\sqrt{2}})")
+        programme = subprocess.run(
+            [str(ROOT / "build/release/scratch/ophelia"), "40"],
+            input=fields["function"].replace("x = ?.", "x = 1."),
+            text=True, capture_output=True, timeout=10)
+        self.assertEqual(programme.returncode, 0, programme.stderr)
+        self.assertAlmostEqual(float(programme.stdout.strip()),
+                               math.sqrt(math.pi / 2) * math.erf(1 / math.sqrt(2)), places=14)
+
     def test_unsupported_integral_retains_formal_family_and_runnable_function(self) -> None:
         for source in ("gamma(a+[time]i)", "gamma([time])", "exp(cosh([time]))"):
             with self.subTest(source=source):
@@ -10534,6 +10597,30 @@ class AlmanacLocationTests(unittest.TestCase):
 # README examples: this class is named to sort after the ordinary regressions
 # and deliberately runs the examples documented in docs/mars-lab.md last.
 class ZZMarsLabReadmeExamples(unittest.TestCase):
+    def test_readme_improper_gaussian_value(self) -> None:
+        # README example: docs/expression.md, private numerical parameter binding.
+        source = "{@S_{-inf}^inf e^(-1/2(t-@mu)^2/@sigma^2) dt | @mu=0; @sigma=1}"
+        expected = "2.506628274631000502415765284811045253007"
+        documentation = (ROOT / "docs/expression.md").read_text(encoding="utf-8")
+        self.assertIn(source, documentation)
+        self.assertIn(expected, documentation)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, source, 40, "@mu", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["value"], expected)
+
+    def test_readme_gaussian_primitive_radicals(self) -> None:
+        # README example: docs/expression.md, cancelling rational factors around roots.
+        source = "@S^x e^(-1/2t^2) dt"
+        expected = "√(π/2)·erf(x/√(2))"
+        documentation = (ROOT / "docs/expression.md").read_text(encoding="utf-8")
+        self.assertIn(source, documentation)
+        self.assertIn(expected, documentation)
+        fields, raw, code = mars_lab.run_mars_lab_fields(
+            mars_lab.DEFAULT_BIN, source, 40, "x", "evaluate")
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(fields["unbound"], expected)
+
     def test_readme_laplace_function_condition(self) -> None:
         # README example: docs/expression.md, the guarded Function body for @L(t).
         fields, raw, code = mars_lab.run_mars_lab_fields(
