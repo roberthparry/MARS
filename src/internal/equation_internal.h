@@ -57,6 +57,10 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
 
 void equ_solutions_clear(equation_solutions_t *solutions);
 
+/* Render long finite root sets with shared exact definitions; NULL retains the ordinary output.
+ * Optional order indexes the solutions. Expression style places definitions after a binding bar. */
+string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, const size_t *order, style_t style);
+
 /* Attach faithful native mathematical notation to an equation's underlying expression trees. */
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 

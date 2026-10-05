@@ -1008,6 +1008,29 @@ expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *
     return plan;
 }
 
+/* Prefer short, parseable names for a bounded mathematical definition block. */
+expr_function_temporaries_t *expr_mathematical_temporaries_new(const expr_t *const *roots, size_t count)
+{
+    expr_function_temporaries_t *plan = expr_function_temporaries_new(roots, count);
+    char name[2] = {'A', '\0'};
+
+    if (!plan)
+        return NULL;
+    for (size_t i = 0u; i < plan->temporaries.count; ++i) {
+        while (name[0] <= 'Z' && !function_temporary_name_is_available(name, &plan->variables, &plan->constants))
+            ++name[0];
+        char *copy = name[0] <= 'Z' ? expr_tostring_xstrdup(name) : NULL;
+        if (!copy) {
+            expr_function_temporaries_free(plan);
+            return NULL;
+        }
+        free(plan->temporaries.names[i]);
+        plan->temporaries.names[i] = copy;
+        ++name[0];
+    }
+    return plan;
+}
+
 /* Render declarations from a shared function-temporary plan. */
 string_t *expr_function_temporaries_declarations_text(const expr_function_temporaries_t *plan)
 {
@@ -1047,6 +1070,43 @@ string_t *expr_function_temporaries_expression_text(const expr_function_temporar
     emit_func_with_temporaries(expr, &buffer, PREC_LOWEST, plan->temporaries.nodes,
                                (const char *const *)plan->temporaries.names, plan->temporaries.count, NULL);
     text = sbuf_to_string(&buffer);
+    sbuf_free(&buffer);
+    return text;
+}
+
+/* Render exact mathematical definitions in dependency order. */
+string_t *expr_temporaries_math_definitions(const expr_function_temporaries_t *plan, style_t style)
+{
+    if (!plan || (style != style_UNBOUND && style != style_LATEX))
+        return NULL;
+    sbuf_t buffer;
+    sbuf_init(&buffer);
+    for (size_t i = 0u; i < plan->temporaries.count; ++i) {
+        if (i)
+            sbuf_puts(&buffer, style == style_LATEX ? " \\\\\n" : "\n");
+        if (style == style_LATEX)
+            emit_TeX_name(&buffer, plan->temporaries.names[i]);
+        else
+            emit_name(&buffer, plan->temporaries.names[i]);
+        sbuf_puts(&buffer, style == style_LATEX ? " &= " : " = ");
+        emit_math_with_temporaries(plan->temporaries.nodes[i], &buffer, style, plan->temporaries.nodes,
+                                   (const char *const *)plan->temporaries.names, i);
+    }
+    string_t *text = sbuf_to_string(&buffer);
+    sbuf_free(&buffer);
+    return text;
+}
+
+/* Render a mathematical row with shared exact subexpressions abbreviated. */
+string_t *expr_temporaries_math_expression(const expr_function_temporaries_t *plan, const expr_t *expr, style_t style)
+{
+    if (!plan || !expr || (style != style_UNBOUND && style != style_LATEX))
+        return NULL;
+    sbuf_t buffer;
+    sbuf_init(&buffer);
+    emit_math_with_temporaries(expr, &buffer, style, plan->temporaries.nodes,
+                               (const char *const *)plan->temporaries.names, plan->temporaries.count);
+    string_t *text = sbuf_to_string(&buffer);
     sbuf_free(&buffer);
     return text;
 }

@@ -149,13 +149,42 @@ their combined real factor
 search, preserves real coefficients for later stages, and avoids the numerical
 drift caused by deflating the two roots independently.
 
+For exact real-coefficient cubics with distinct roots, the solver attempts to
+recover a rational root from its numerical candidates. Exact synthetic division
+must leave a zero remainder before the factor is accepted. The remaining
+quadratic is solved symbolically, preserving real or complex surds in the native
+solution set, Lab cards and Ophelia RUN output. The bounded rational search may
+miss large-denominator roots. When no rational factor is certified, exact real
+coefficients use Cardano radicals instead. The cube-root branches are coupled
+through their exact product, including when all three roots are real.
+Inexact or complex coefficients retain the numerical fallback.
+Repeated-root cubics retain their existing duplicate-free exact solution path.
+
+For example, entering:
+
+~~~text
+x^3 + x = 30
+~~~
+
+produces:
+
+~~~text
+x = 3
+x = (-3 ± i·√(31))/2
+~~~
+
 For exact real-coefficient quartics, the solver also attempts to recover a
 rational quadratic factor from a non-real root. A bounded continued-fraction
 search proposes its coefficients; multiplying the proposed factors must reproduce
 every original coefficient in exact arithmetic before they are accepted. The
 quadratic solutions then retain their radicals in the native solution set,
-including Ophelia RUN output. An unverified candidate retains the numerical
-fallback; rounded root values are never promoted to exact surds.
+including Ophelia RUN output. When no rational quadratic factor is certified,
+non-degenerate exact real-coefficient quartics use Ferrari's formula with paired
+cube-root branches. These solutions retain nested square and cube roots in the
+native solution set, Lab cards and Ophelia RUN output; complex intermediate
+radicals can occur even for real roots. Degenerate cases keep the existing
+biquadratic or repeated-root handling, and inexact or complex coefficients keep
+the numerical fallback. Rounded root values are never promoted to exact surds.
 
 For example, entering this equation in MARS Lab:
 
@@ -171,6 +200,32 @@ x = (1 ± i·√(11))/2
 ```
 
 The native solution set and RUN output contain the four individual roots.
+
+For a quartic without those rational quadratic factors:
+
+```text
+6x^4 + x^3 + 3x^2 + 4x + 6 = 0
+```
+
+The output is four exact nested-radical roots. Equivalently, abbreviating repeated
+radicals with `Q` and `u`, these roots are:
+
+```text
+Q = (-2538 + 3i·√(8056905))^(1/3)
+u = √(8·(Q + 429/Q) - 47)
+x = (-1 - u ± √(-u² - 141 + 2162/u))/24
+x = (-1 + u ± √(-u² - 141 - 2162/u))/24
+```
+
+The cube root is the principal complex branch. The native solution trees retain
+the full radicals. For lengthy finite solution sets, MARS Lab displays shared
+exact definitions followed by paired root rows, instead of repeating the same
+radicals. Its single-letter definition names are chosen automatically without
+colliding with the solution coordinate or existing bindings. The `Q` and `u`
+above are explanatory abbreviations, not fixed names required by the solver.
+The Function card's algebraic Run Output uses the same compact native formatter,
+placing the shared definitions after a binding bar in a single curly-braced
+solution block. Ordinary numerical output and short exact solutions are unchanged.
 
 Deflation is implemented as an iterative constant-stack loop, so increasing
 the polynomial degree does not increase solver call-stack depth. Coefficient

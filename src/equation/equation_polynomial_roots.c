@@ -18,6 +18,44 @@
  */
 enum { EQU_POLY_NEWTON_ITERATIONS = 512u, EQU_POLY_MIN_NEWTON_SEEDS = 37u };
 
+/* Propose a bounded rational value; callers must certify it in exact arithmetic. */
+number_t equ_polynomial_rational_candidate(number_t value)
+{
+    /* Bounded continued fractions propose coefficients, never certify them. */
+    double approximate = num_to_double(value);
+    double remainder = fabs(approximate);
+    long previous_numerator = 0L, numerator = 1L;
+    long previous_denominator = 1L, denominator = 0L;
+
+    if (!isfinite(approximate) || remainder > 1000000000.0)
+        return num_clone(NUM_NAN);
+    for (size_t i = 0u; i < 32u; ++i) {
+        double integral = floor(remainder);
+        long term;
+        long next_numerator;
+        long next_denominator;
+
+        if (!isfinite(integral) || integral > 1000000000.0)
+            break;
+        term = (long)integral;
+        if ((numerator && term > (1000000000L - previous_numerator) / numerator) ||
+            (denominator && term > (1000000L - previous_denominator) / denominator))
+            break;
+        next_numerator = term * numerator + previous_numerator;
+        next_denominator = term * denominator + previous_denominator;
+        previous_numerator = numerator;
+        numerator = next_numerator;
+        previous_denominator = denominator;
+        denominator = next_denominator;
+        remainder -= integral;
+        if (remainder == 0.0)
+            break;
+        remainder = 1.0 / remainder;
+    }
+    return denominator ? num_create_from_frac(approximate < 0.0 ? -numerator : numerator, denominator)
+                       : num_clone(NUM_NAN);
+}
+
 static void equ_general_destroy_numbers(number_t *values, size_t count)
 {
     if (!values)
