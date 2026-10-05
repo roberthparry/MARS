@@ -61,6 +61,10 @@ calendar_parts as (
 ),
 calendar_dates as materialized (
     select p.*,
+           case when day_no in (1, 21, 31) then 'ˢᵗ'
+                when day_no in (2, 22) then 'ⁿᵈ'
+                when day_no in (3, 23) then 'ʳᵈ'
+                else 'ᵗʰ' end as uk_day_suffix,
            date(calendar_date, 'start of month', '+1 month', '-1 day') as month_end,
            date(calendar_date, printf('-%d days', weekday_no)) as week_start,
            date(calendar_date, printf('%+d days', 6 - weekday_no)) as week_end,
@@ -254,10 +258,7 @@ select
         (julianday(c.calendar_date) - julianday('2000-01-06')) / 29.53
         - floor((julianday(c.calendar_date) - julianday('2000-01-06')) / 29.53) - 0.5
     ) * 200.0 + 0.5 as integer) as "Moon Phase %",
-    c.day_no || case when c.day_no in (1, 21, 31) then 'ˢᵗ'
-                     when c.day_no in (2, 22) then 'ⁿᵈ'
-                     when c.day_no in (3, 23) then 'ʳᵈ'
-                     else 'ᵗʰ' end
+    c.day_no || c.uk_day_suffix
         || ' ' || uk_month.full_name || ' ' || printf('%04d', c.year_no) as [Date UK],
     month_name.short_name as "Month Name Abbrev",
     weekday_name.short_name as "Day Name Abbrev",
@@ -278,7 +279,10 @@ select
                    when 'day_padded' then printf('%02d', coalesce(hijri.day_no, hebrew.day_no, c.day_no))
                    when 'first_day_suffix' then case when coalesce(hijri.day_no, hebrew.day_no, c.day_no) = 1
                                                     then p.literal else '' end
-               end as part
+               end || case when p.field in ('day', 'day_padded')
+                                and (s.jurisdiction = 'GB' or s.jurisdiction glob 'GB-*')
+                                and (s.display_locale = 'en' or s.display_locale glob 'en_*')
+                           then c.uk_day_suffix else '' end as part
         from calendar_date_pattern_part as p
         where p.pattern_id = date_pattern.pattern_id
         order by p.position
@@ -306,6 +310,7 @@ select
         order by p.position
     )) as [Date Regional]
 from calendar_dates as c
+cross join settings as s
 left join hijri_dates as hijri on hijri.calendar_date = c.calendar_date
 left join hijri_month_names as hijri_month on hijri_month.month_no = hijri.month_no
 left join hebrew_dates as hebrew on hebrew.calendar_date = c.calendar_date

@@ -536,7 +536,9 @@ database with Hebrew selected to update an existing installation's view.
 `Date UK`, `Date Regional`, ISO date keys, numeric year/month/day fields, month-name columns,
 fiscal fields and holiday policies remain Gregorian-based. Other languages
 retain Western digits. The British superscript suffixes are not copied into
-other languages.
+other languages. For UK towns with English selected, `[Date Lingua]` adds the
+same superscript day suffix as `[Date UK]`, including `ᵗʰ` for days 11–13.
+English dates outside the UK and `[Date Regional]` retain their existing formats.
 
 With Arabic selected:
 
@@ -605,7 +607,7 @@ For a calendar installed for Shrewsbury, run this query on a SQLCipher
 connection with the database key already set:
 
 ```sql
-select FullDateAlternateKey, [Date UK], "Day Name", Sunrise, Sunset
+select FullDateAlternateKey, [Date UK], [Date Lingua], "Day Name", Sunrise, Sunset
 from calendar_local
 where FullDateAlternateKey = '2024-06-21';
 ```
@@ -613,8 +615,8 @@ where FullDateAlternateKey = '2024-06-21';
 Output (pipe-separated, with a header):
 
 ```text
-FullDateAlternateKey|Date UK|Day Name|Sunrise|Sunset
-2024-06-21|21ˢᵗ June 2024|Friday|04:47:00|21:39:00
+FullDateAlternateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset
+2024-06-21|21ˢᵗ June 2024|21ˢᵗ June 2024|Friday|04:47:00|21:39:00
 ```
 
 Sunrise and sunset retain the original approximate solar model, rounded to the
