@@ -9,6 +9,8 @@
 #include "ustring.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 static char *dup_string(const char *text)
 {
@@ -678,11 +680,25 @@ static const char *solutions_integer_branch_parameter(const equation_solutions_t
     return NULL;
 }
 
+/* Abbreviate large exact solution sets with one dependency-ordered set of native definitions. */
+static bool print_abbreviated_solutions(const equation_solutions_t *solutions, const size_t *order, bool TeX)
+{
+    string_t *text = equ_solutions_compact_text(solutions, order, TeX ? style_LATEX : style_UNBOUND);
+    if (!text)
+        return false;
+    printf("%s%s\n", TeX ? "solutions_TeX " : "display_solutions ", string_c_str(text));
+    string_free(text);
+    return true;
+}
+
 static void print_solutions(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order,
                             int precision, bool compact)
 {
     size_t count = equ_solutions_count(solutions);
     const char *heading = compact ? "display_solutions " : "solutions   ";
+
+    if (compact && print_abbreviated_solutions(solutions, order, false))
+        return;
 
     if (count == 0u) {
         printf("%s\n", heading);
@@ -772,6 +788,9 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
 static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
 {
     const char *branch_parameter;
+
+    if (print_abbreviated_solutions(solutions, order, true))
+        return;
 
     if (equ_solutions_count(solutions) == 0u) {
         /* With no solution rows, retain the problem's TeX and report the status in the Solutions card. */

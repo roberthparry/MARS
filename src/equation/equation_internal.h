@@ -52,6 +52,9 @@ int equ_append_solution_value(const expr_t *wrt, number_t value, equation_soluti
 
 int equ_append_solution_expr(const expr_t *wrt, const expr_t *rhs, equation_solutions_t *solutions);
 
+/* Propose a rational approximation without claiming that it is an exact root or coefficient. */
+number_t equ_polynomial_rational_candidate(number_t value);
+
 int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
 
 int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
@@ -61,6 +64,8 @@ int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equa
 int equ_try_solve_quartic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 
 int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
+
+int equ_try_quartic_radicals(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
 
 int equ_try_solve_quintic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 

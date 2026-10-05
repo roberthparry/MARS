@@ -2450,6 +2450,15 @@ decide whether derivative controls should be shown.
 
 ### String Conversion
 
+The native formatter keeps its public conversion, printing and serialisation
+entry points in `expr_stringout.c`. Recursive expression, Function and TeX body
+emitters live in the corresponding `expr_stringout_*_emit.c` units. Shared
+precedence and atom handling, Cartesian forms, calculus notation, polynomial
+ordering and special-function notation have separate implementation units.
+The existing style wrappers still own binding envelopes and declarations.
+These units share the existing private formatting header; rendering scopes remain
+thread-local and private to their owning implementation.
+
 Explicit univariate power series with an `O(...)` remainder are rendered in
 ascending powers of the expansion variable (or its shift), with the remainder
 last. This ordering is shared by expression, unbound, TeX, and function styles;

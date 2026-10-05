@@ -695,6 +695,129 @@ class MobileAccessTests(unittest.TestCase):
 
 
 class EquationResultTests(unittest.TestCase):
+    def test_general_cubic_radicals_reach_cards_and_run(self) -> None:
+        for precision in (32, 78, 116):
+            with self.subTest(precision=precision):
+                fields, raw, code = mars_lab.run_equation_lab_fields(
+                    mars_lab.DEFAULT_EQUATION_BIN, "x^3+3x^2+4x+6=0", precision)
+                self.assertEqual(code, 0, raw)
+                payload = mars_lab.prepare_equation_fields(fields, precision)
+                self.assertEqual(payload["solution_count"], 3)
+                self.assertIn("A = ", payload["display_solutions"])
+                self.assertEqual(payload["display_solutions"].count("±"), 1)
+                self.assertNotIn("≈", payload["display_solutions"])
+                self.assertNotRegex(payload["display_solutions"], r"\d+\.\d+")
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+                roots = [line.strip().split(" = ", 1)[1] for line in fields["solutions"].splitlines()]
+                bindings = {}
+                for line in payload["display_solutions"].splitlines():
+                    name, body = line.strip().split(" = ", 1)
+                    body = re.sub(r'\b[A-Z]\b', lambda m: '(' + bindings[m[0]] + ')'
+                                  if m[0] in bindings else m[0], body)
+                    if name != "x":
+                        bindings[name] = body
+                    elif "±" in body:
+                        centre, offset = body.split("±")
+                        roots.extend((centre + "+" + offset, centre + "-" + offset))
+                    else:
+                        roots.append(body)
+                self.assertEqual(len(roots), 6)
+                for root in roots:
+                    result, raw, code = mars_lab.run_mars_lab_fields(
+                        mars_lab.DEFAULT_BIN, root, precision, "x", "evaluate")
+                    self.assertEqual(code, 0, raw)
+                    value = complex(result["value"].replace(" ", "").replace("i", "j"))
+                    self.assertLess(abs(value**3 + 3*value**2 + 4*value + 6), 1e-12)
+                programme = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), str(precision)],
+                                           input=payload["function"], text=True, capture_output=True, timeout=20)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertIn("| A = ", programme.stdout)
+                self.assertEqual(programme.stdout.count("±"), 1)
+                self.assertNotIn("≈", programme.stdout)
+                self.assertNotRegex(programme.stdout, r"\d+\.\d+")
+
+    def test_cubic_rational_factor_preserves_surds_in_cards_and_run(self) -> None:
+        for precision in (32, 78, 116):
+            with self.subTest(precision=precision):
+                fields, raw, code = mars_lab.run_equation_lab_fields(
+                    mars_lab.DEFAULT_EQUATION_BIN, "x^3+x=30", precision)
+                self.assertEqual(code, 0, raw)
+                payload = mars_lab.prepare_equation_fields(fields, precision)
+                self.assertEqual(payload["solution_count"], 3)
+                self.assertEqual(payload["display_solutions"].splitlines(), ["x = 3", "x = (-3 ± i·√(31))/2"])
+                self.assertIn(r"\sqrt{31}", payload["full_display_TeX"])
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+                programme = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), str(precision)],
+                                           input=payload["function"], text=True, capture_output=True, timeout=20)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertEqual(programme.stdout.strip().splitlines(),
+                                 ["x = 3", "x = (-3 + i·√(31))/2", "x = (-3 - i·√(31))/2"])
+
+    def test_general_quartic_radicals_reach_cards_and_run(self) -> None:
+        binary = ROOT / "build/release/scratch/equation_lab"
+        for precision in (32, 78, 116):
+            with self.subTest(precision=precision):
+                fields, raw, code = mars_lab.run_equation_lab_fields(binary, "6x^4+x^3+3x^2+4x+6=0", precision)
+                self.assertEqual(code, 0, raw)
+                payload = mars_lab.prepare_equation_fields(fields, precision)
+                self.assertEqual(payload["solution_count"], 4)
+                for key in ("solutions", "display_solutions"):
+                    self.assertIn("√", payload[key])
+                    self.assertNotIn("≈", payload[key])
+                    self.assertNotIn("0.663446", payload[key])
+                self.assertIn(r"\sqrt", payload["full_display_TeX"])
+                self.assertNotIn(r"\approx", payload["full_display_TeX"])
+                self.assertTrue(payload.get("svg"), payload.get("render_error"))
+                self.assertNotIn("NAN", payload["full_display_TeX"])
+                self.assertEqual(payload["display_solutions"].count("±"), 2)
+                self.assertLess(max(map(len, payload["display_solutions"].splitlines())), 160)
+                programme = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), str(precision)],
+                                           input=payload["function"], text=True, capture_output=True, timeout=20)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertIn("√", programme.stdout)
+                self.assertNotIn("≈", programme.stdout)
+                self.assertTrue(programme.stdout.startswith("{ x = "))
+                self.assertIn("| A = ", programme.stdout)
+                self.assertIn("B = ", programme.stdout)
+                self.assertIn("C = ", programme.stdout)
+                self.assertEqual(programme.stdout.count("±"), 2)
+                self.assertLess(max(map(len, programme.stdout.splitlines())), 160)
+
+    def test_compact_quartic_definitions_preserve_values_and_avoid_coordinate_names(self) -> None:
+        binary = ROOT / "build/release/scratch/equation_lab"
+        for coordinate in ("x", "A"):
+            with self.subTest(coordinate=coordinate):
+                source = f"6{coordinate}^4+{coordinate}^3+3{coordinate}^2+4{coordinate}+6=0"
+                fields, raw, code = mars_lab.run_equation_lab_fields(binary, source, 40)
+                self.assertEqual(code, 0, raw)
+                programme = subprocess.run([str(ROOT / "build/release/scratch/ophelia"), "40"],
+                                           input=fields["function"], text=True, capture_output=True, timeout=20)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                equations, bindings = programme.stdout.strip().removeprefix("{ ").removesuffix(" }").split("|", 1)
+                bound_lines = bindings.strip().split(",\n") + equations.strip().split(";\n")
+                for lines in (fields["display_solutions"].splitlines(), bound_lines):
+                    definitions = {}
+                    expanded_roots = []
+                    for line in lines:
+                        name, body = line.strip().split(" = ", 1)
+                        body = re.sub(r'\b[A-Z]\b', lambda match: '(' + definitions[match[0]] + ')'
+                                      if match[0] in definitions else match[0], body)
+                        if name == coordinate:
+                            self.assertIn("±", body)
+                            centre, offset = body.split("±")
+                            expanded_roots.extend((centre + "+" + offset, centre + "-" + offset))
+                        else:
+                            self.assertNotEqual(name, coordinate)
+                            self.assertNotIn(name, definitions)
+                            definitions[name] = body
+                    self.assertGreaterEqual(len(definitions), 1)
+                    self.assertEqual(len(expanded_roots), 4)
+                    for root in expanded_roots:
+                        result, raw, code = mars_lab.run_mars_lab_fields(mars_lab.DEFAULT_BIN, root, 40, "x", "evaluate")
+                        self.assertEqual(code, 0, raw)
+                        value = complex(result["value"].replace(" ", "").replace("i", "j"))
+                        self.assertLess(abs(6*value**4 + value**3 + 3*value**2 + 4*value + 6), 1e-12)
+
     def test_exact_quartic_surds_reach_cards_and_run(self) -> None:
         binary = ROOT / "build/release/scratch/equation_lab"
         expected = ["x = -1 ± i", "x = (1 ± i·√(11))/2"]
@@ -10744,6 +10867,17 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(code, 0, raw)
         self.assertIn(expected, fields["integral"])
 
+    def test_equation_readme_exact_cubic(self) -> None:
+        # README: docs/equation.md, certified rational cubic factor and quadratic surds.
+        source = "x^3 + x = 30"
+        expected = "x = 3\nx = (-3 ± i·√(31))/2"
+        documentation = (ROOT / "docs/equation.md").read_text(encoding="utf-8")
+        self.assertIn(source, documentation)
+        self.assertIn(expected, documentation)
+        fields, raw, code = mars_lab.run_equation_lab_fields(mars_lab.DEFAULT_EQUATION_BIN, source, 40)
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(mars_lab.prepare_equation_fields(fields, 40)["display_solutions"], expected)
+
     def test_equation_readme_exact_quartic(self) -> None:
         # README: docs/equation.md, certified exact quartic roots in MARS Lab.
         fields, raw, code = mars_lab.run_equation_lab_fields(
@@ -10751,6 +10885,33 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
         self.assertEqual(code, 0, raw)
         self.assertEqual(mars_lab.prepare_equation_fields(fields, 40)["display_solutions"],
                          "x = -1 ± i\nx = (1 ± i·√(11))/2")
+
+    def test_equation_readme_general_quartic(self) -> None:
+        # README: docs/equation.md, Ferrari radicals with repeated terms abbreviated.
+        source = "6x^4 + x^3 + 3x^2 + 4x + 6 = 0"
+        output = ("Q = (-2538 + 3i·√(8056905))^(1/3)\n"
+                  "u = √(8·(Q + 429/Q) - 47)\n"
+                  "x = (-1 - u ± √(-u² - 141 + 2162/u))/24\n"
+                  "x = (-1 + u ± √(-u² - 141 - 2162/u))/24")
+        documentation = (ROOT / "docs/equation.md").read_text(encoding="utf-8")
+        self.assertIn(source, documentation)
+        self.assertIn(output, documentation)
+        fields, raw, code = mars_lab.run_equation_lab_fields(ROOT / "build/release/scratch/equation_lab", source, 40)
+        self.assertEqual(code, 0, raw)
+        self.assertIn("√", fields["solutions"])
+        self.assertNotIn("≈", fields["solutions"])
+        Q = (-2538 + 3j * cmath.sqrt(8056905)) ** (1 / 3)
+        u = cmath.sqrt(8 * (Q + 429 / Q) - 47)
+        expected = [(-1 + centre * u + sign * cmath.sqrt(-u*u - 141 - centre * 2162/u)) / 24
+                    for centre in (-1, 1) for sign in (-1, 1)]
+        actual = [complex(line.split("≈", 1)[1].replace(" ", "").replace("i", "j"))
+                  for line in fields["numeric"].splitlines()]
+        self.assertEqual(len(actual), 4)
+        for root in expected:
+            self.assertLess(abs(6*root**4 + root**3 + 3*root**2 + 4*root + 6), 1e-12)
+            closest = min(range(len(actual)), key=lambda index: abs(actual[index] - root))
+            self.assertLess(abs(actual.pop(closest) - root), 1e-12)
+        print(output)
 
     def test_laplace_tanh_readme_example(self) -> None:
         # README example: docs/expression.md, the hyperbolic tangent transform.

@@ -805,8 +805,16 @@ can show forty roots at the selected precision. The native backend compares
 the actual numbers before pairing; it does not merge rounded display values
 or sampled symbolic families. Exact algebraic conjugates are paired structurally,
 retaining surds and shared denominators with `=` rather than `≈`. Certified
-rational quadratic factors of quartics preserve these exact roots in RUN output
-as well. Both cards omit a unit coefficient before the imaginary unit in conjugate
+rational factors preserve short cubic and quartic surds. General exact
+real-coefficient cubics use coupled Cardano cube roots; non-degenerate quartics
+use Ferrari radicals when no shorter factorisation is certified. RUN output
+retains these exact forms too. Long solutions use shared, collision-free
+single-letter definitions: the cards show definitions and root rows, while
+algebraic RUN output puts the definitions after a binding bar in a curly-braced
+solution block. Degenerate cases retain their existing handling, and inexact or
+complex coefficients retain the numerical fallback. See the
+[equation guide](equation.md) for details and examples.
+Both cards omit a unit coefficient before the imaginary unit in conjugate
 pairs. The search is not exhaustive. A literal
 inverse-power series starting at one retains its convergence domain and, when
 equated to zero, reports no solutions in that domain. It does not acquire

@@ -519,6 +519,137 @@ cleanup:
     return rc;
 }
 
+static int equ_cubic_try_rational_factor(const number_t *coeffs, const number_t *roots, size_t count,
+                                         const expr_t *wrt, equation_solutions_t *solutions)
+{
+    for (size_t i = 0u; i < 4u; ++i) {
+        if (!num_is_exact(coeffs[i]) || !num_is_real(coeffs[i]) || !num_is_finite(coeffs[i]))
+            return 1;
+    }
+    /* At most three candidates: numerical roots only propose an exact factor. */
+    for (size_t i = 0u; i < count; ++i) {
+        if (!num_is_real(roots[i]))
+            continue;
+        number_t root = equ_polynomial_rational_candidate(roots[i]);
+        if (!num_is_finite(root)) {
+            num_destroy(&root);
+            continue;
+        }
+        number_t quadratic[3];
+        quadratic[2] = num_clone(coeffs[3]);
+        for (size_t j = 2u; j > 0u; --j) {
+            number_t product = num_mul(root, quadratic[j]);
+            quadratic[j - 1u] = num_add(coeffs[j], product);
+            num_destroy(&product);
+        }
+        number_t product = num_mul(root, quadratic[0]);
+        number_t remainder = num_add(coeffs[0], product);
+        bool certified = num_is_exact(remainder) && num_is_zero(remainder);
+        num_destroy(&remainder);
+        num_destroy(&product);
+        int rc = 1;
+        if (certified) {
+            /* Remove the original scale so equivalent polynomials retain the same short surds. */
+            for (size_t j = 0u; j < 3u; ++j) {
+                number_t monic = num_div(quadratic[j], coeffs[3]);
+                num_destroy(&quadratic[j]);
+                quadratic[j] = monic;
+            }
+            rc = equ_append_solution_value(wrt, root, solutions);
+            if (rc == 0)
+                rc = equ_solve_quadratic_coefficients(quadratic, wrt, solutions);
+        }
+        equ_destroy_numbers(quadratic, 3u);
+        num_destroy(&root);
+        if (certified)
+            return rc;
+    }
+    return 1;
+}
+
+static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, number_t discriminant,
+                                    const expr_t *wrt, equation_solutions_t *solutions)
+{
+    if (!num_is_exact(p) || !num_is_exact(q) || !num_is_exact(shift) ||
+        !num_is_real(p) || !num_is_real(q) || !num_is_real(shift) || num_is_zero(discriminant))
+        return 1;
+    expr_t *disc = expr_new_const(discriminant);
+    expr_t *radical = expr_sqrt(disc);
+    number_t half = equ_div_long(q, -2L);
+    expr_t *centre = expr_new_const(half);
+    expr_t *argument = expr_add(centre, radical);
+    number_t value = expr_eval(argument);
+    if (num_is_zero(value)) {
+        expr_free(argument);
+        argument = expr_sub(centre, radical);
+        num_destroy(&value);
+        value = expr_eval(argument);
+    }
+    bool negative = num_is_real(value) && num_lt(value, NUM_ZERO);
+    expr_t *positive = negative ? expr_simplify_owned(expr_neg(argument)) : expr_clone(argument);
+    expr_t *cube = equ_cubic_expr_cuberoot(positive);
+    expr_t *u = negative ? expr_simplify_owned(expr_neg(cube)) : expr_clone(cube);
+    number_t minus_p_third = equ_div_long(p, -3L);
+    expr_t *product = expr_new_const(minus_p_third);
+    /* Couple the branches through u*v=-p/3 rather than taking independent complex cube roots. */
+    expr_t *v = expr_simplify_owned(expr_div(product, u));
+    expr_t *offset = expr_new_const(shift);
+    expr_t *omega = equ_cubic_omega_expr(false);
+    expr_t *conjugate = equ_cubic_omega_expr(true);
+    expr_t *pair_centre = NULL;
+    expr_t *pair_offset = NULL;
+    if (num_is_real(discriminant) && num_gt(discriminant, NUM_ZERO)) {
+        expr_t *sum = expr_simplify_owned(expr_add(u, v));
+        expr_t *half_sum = expr_div_long(sum, -2L);
+        pair_centre = expr_simplify_owned(expr_sub(half_sum, offset));
+        expr_t *difference = expr_simplify_owned(expr_sub(u, v));
+        expr_t *three = expr_const_long(3L);
+        expr_t *sqrt_three = expr_sqrt(three);
+        expr_t *imaginary = expr_new_const(NUM_I);
+        expr_t *imaginary_sqrt = expr_mul(imaginary, sqrt_three);
+        expr_t *scaled = expr_mul(imaginary_sqrt, difference);
+        pair_offset = expr_div_long(scaled, 2L);
+        expr_free(scaled);
+        expr_free(imaginary_sqrt);
+        expr_free(imaginary);
+        expr_free(sqrt_three);
+        expr_free(three);
+        expr_free(difference);
+        expr_free(half_sum);
+        expr_free(sum);
+    }
+    int rc = -1;
+    if (u && v && offset && omega && conjugate) {
+        rc = 0;
+        for (size_t i = 0u; i < 3u && rc == 0; ++i) {
+            expr_t *root = i && pair_centre && pair_offset
+                ? (i == 1u ? expr_add(pair_centre, pair_offset) : expr_sub(pair_centre, pair_offset))
+                : equ_cubic_symbolic_root(u, v, offset, i ? (i == 1u ? omega : conjugate) : NULL,
+                                          i ? (i == 1u ? conjugate : omega) : NULL);
+            rc = root ? equ_append_solution_expr(wrt, root, solutions) : -1;
+            expr_free(root);
+        }
+    }
+    expr_free(pair_offset);
+    expr_free(pair_centre);
+    expr_free(conjugate);
+    expr_free(omega);
+    expr_free(offset);
+    expr_free(v);
+    expr_free(product);
+    expr_free(u);
+    expr_free(cube);
+    expr_free(positive);
+    expr_free(argument);
+    expr_free(centre);
+    expr_free(radical);
+    expr_free(disc);
+    num_destroy(&minus_p_third);
+    num_destroy(&value);
+    num_destroy(&half);
+    return rc;
+}
+
 int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions)
 {
     number_t p = num_new();
@@ -527,6 +658,8 @@ int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equa
     number_t discriminant = num_new();
     number_t seen[3];
     size_t seen_count = 0u;
+    equation_solutions_t numeric = {0};
+    equation_solutions_t exact = {0};
     int rc = -1;
 
     if (!coeffs || !wrt || !solutions || num_is_zero(coeffs[3]))
@@ -537,14 +670,30 @@ int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equa
     discriminant = equ_cubic_discriminant(p, q);
 
     if (num_is_real(discriminant) && num_lt(discriminant, NUM_ZERO)) {
-        rc = equ_append_cubic_trig_roots(wrt, p, q, shift, seen, &seen_count, solutions);
+        rc = equ_append_cubic_trig_roots(wrt, p, q, shift, seen, &seen_count, &numeric);
     } else if (num_is_zero(discriminant)) {
-        rc = equ_append_cubic_zero_discriminant_roots(wrt, p, q, shift, seen, &seen_count, solutions);
+        rc = equ_append_cubic_zero_discriminant_roots(wrt, p, q, shift, seen, &seen_count, &numeric);
     } else {
-        rc = equ_append_cubic_cardano_roots(wrt, p, q, shift, discriminant, seen, &seen_count, solutions);
+        rc = equ_append_cubic_cardano_roots(wrt, p, q, shift, discriminant, seen, &seen_count, &numeric);
+    }
+    if (rc == 0) {
+        /* The repeated-root branch is already exact and deliberately omits duplicate roots. */
+        int factor = num_is_zero(discriminant) ? 1
+            : equ_cubic_try_rational_factor(coeffs, seen, seen_count, wrt, &exact);
+        if (factor == 1 && !num_is_zero(discriminant))
+            factor = equ_cubic_exact_radicals(p, q, shift, discriminant, wrt, &exact);
+        if (factor < 0) {
+            rc = -1;
+            goto cleanup;
+        }
+        const equation_solutions_t *chosen = factor == 0 ? &exact : &numeric;
+        for (size_t i = 0u; i < equ_solutions_count(chosen) && rc == 0; ++i)
+            rc = equ_append_solution_expr(wrt, equ_rhs(equ_solutions_at(chosen, i)), solutions);
     }
 
 cleanup:
+    equ_solutions_clear(&exact);
+    equ_solutions_clear(&numeric);
     for (size_t i = 0u; i < seen_count; ++i)
         num_destroy(&seen[i]);
     num_destroy(&discriminant);

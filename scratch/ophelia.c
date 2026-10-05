@@ -11,6 +11,8 @@
 #include "matrix.h"
 #include "number.h"
 #include "ustring.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 #define SOURCE_LIMIT 65536u
 #define SYMBOL_LIMIT 256u
@@ -1003,10 +1005,15 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
             }
             if (result.equation || result.solutions) {
                 size_t count = result.equation ? 1u : equ_solutions_count(result.solutions);
-                for (size_t i = 0u; i < count; ++i) {
+                string_t *compact = algebraic && result.solutions
+                    ? equ_solutions_compact_text(result.solutions, NULL, style_EXPRESSION) : NULL;
+                if (compact)
+                    puts(string_c_str(compact));
+                for (size_t i = 0u; !compact && i < count; ++i) {
                     const equation_t *equation = result.equation ? result.equation : equ_solutions_at(result.solutions, i);
                     output_equation(runtime, equation, algebraic, result.solutions != NULL);
                 }
+                string_free(compact);
                 if (result.solutions) {
                     if (!count)
                         puts(equ_solutions_proven_empty(result.solutions) ? "No solutions." : "No solution established.");

@@ -449,6 +449,7 @@
         "test_equation_simplifies_real_repeated_power_roots": true,
         "test_equation_solves_affine_variable_from_rhs": true,
         "test_equation_solves_atan_sum_as_branch_valid_surd": true,
+        "test_equation_cubic_preserves_certified_surds": true,
         "test_equation_solves_cubic_complex_pair": true,
         "test_equation_solves_cubic_repeated_root_once": true,
         "test_equation_solves_cubic_three_real_roots": true,

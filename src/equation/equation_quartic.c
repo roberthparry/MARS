@@ -9,12 +9,13 @@
 #include "internal/expr_internal.h"
 
 /*
- * Quartics deliberately avoid Ferrari radicals here.  Newton iteration finds
+ * Newton iteration finds
  * one root.  A non-real root of a real-coefficient quartic contributes its
  * conjugate, allowing real quadratic deflation before the quadratic solver
  * finishes. Rational quadratic factors are certified against the original
  * coefficients before their roots are retained as exact expressions.
- * Other cases use linear deflation and the cubic solver.
+ * Other exact non-degenerate real quartics retain Ferrari radicals. Remaining
+ * cases use numerical deflation and the cubic solver.
  */
 enum {
     EQU_QUARTIC_DEGREE = 4u,
@@ -284,41 +285,19 @@ static bool equ_quartic_roots_close(number_t left, number_t right, number_t tole
     return close;
 }
 
-static number_t equ_quartic_rational_candidate(number_t value)
+
+static bool equ_quartic_certify_rational_root(const number_t *coeffs, number_t root)
 {
-    /* Bounded continued fractions propose coefficients, never certify them. */
-    double approximate = num_to_double(value);
-    double remainder = fabs(approximate);
-    long previous_numerator = 0L, numerator = 1L;
-    long previous_denominator = 1L, denominator = 0L;
+    if (!num_is_real(root))
+        return false;
+    number_t candidate = equ_polynomial_rational_candidate(root);
+    number_t residual = num_new();
 
-    if (!isfinite(approximate) || remainder > 1000000000.0)
-        return num_clone(NUM_NAN);
-    for (size_t i = 0u; i < 32u; ++i) {
-        double integral = floor(remainder);
-        long term;
-        long next_numerator;
-        long next_denominator;
-
-        if (!isfinite(integral) || integral > 1000000000.0)
-            break;
-        term = (long)integral;
-        if ((numerator && term > (1000000000L - previous_numerator) / numerator) ||
-            (denominator && term > (1000000L - previous_denominator) / denominator))
-            break;
-        next_numerator = term * numerator + previous_numerator;
-        next_denominator = term * denominator + previous_denominator;
-        previous_numerator = numerator;
-        numerator = next_numerator;
-        previous_denominator = denominator;
-        denominator = next_denominator;
-        remainder -= integral;
-        if (remainder == 0.0)
-            break;
-        remainder = 1.0 / remainder;
-    }
-    return denominator ? num_create_from_frac(approximate < 0.0 ? -numerator : numerator, denominator)
-                       : num_clone(NUM_NAN);
+    equ_quartic_eval(coeffs, candidate, &residual, NULL);
+    bool exact = num_is_exact(residual) && num_is_zero(residual);
+    num_destroy(&residual);
+    num_destroy(&candidate);
+    return exact;
 }
 
 static bool equ_quartic_certify_factors(const number_t *coeffs, const number_t *factor, const number_t *quotient)
@@ -362,7 +341,7 @@ static int equ_quartic_try_exact_factors(const number_t *coeffs, const expr_t *w
     number_t real_squared = num_mul(real, real);
     number_t imaginary_squared = num_mul(imaginary, imaginary);
     number_t constant = num_add(real_squared, imaginary_squared);
-    number_t factor[3] = {equ_quartic_rational_candidate(constant), equ_quartic_rational_candidate(linear),
+    number_t factor[3] = {equ_polynomial_rational_candidate(constant), equ_polynomial_rational_candidate(linear),
                           num_clone(NUM_ONE)};
     number_t quotient[3] = {num_new(), num_new(), num_clone(coeffs[4])};
     equation_solutions_t exact_solutions = {0};
@@ -475,6 +454,11 @@ int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, eq
         goto cleanup;
     }
     rc = equ_quartic_try_exact_factors(coeffs, wrt, first_root, solutions);
+    if (rc != 1)
+        goto cleanup;
+    /* Keep the short rational-root route, especially inside repeated-exponential inversions. */
+    rc = equ_quartic_certify_rational_root(coeffs, first_root)
+        ? 1 : equ_try_quartic_radicals(coeffs, wrt, solutions);
     if (rc != 1)
         goto cleanup;
     rc = -1;

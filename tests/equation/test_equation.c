@@ -1296,6 +1296,43 @@ static void test_equation_solves_cubic_complex_pair(void)
     equ_free(equation);
 }
 
+static void test_equation_cubic_preserves_certified_surds(void)
+{
+    const struct {
+        const char *source;
+        bool surds;
+    } cases[] = {
+        {"x^3+x=30", true},
+        {"-2x^3-2x=-60", true},
+        {"x^3/7+x/7=30/7", true},
+        {"2x^3+x^2+3x-2=0", true},
+        {"x^3-3x^2-2x+6=0", true},
+        {"x^3+x=3000000000000000000001/100000000000000000000", true},
+        {"x^3+3x^2+4x+6=0", true},
+        {"-2x^3-6x^2-8x-12=0", true},
+        {"x^3-3x+1=0", true},
+        {"x^3-2=0", true},
+        {"x^3+2=0", true},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        equation_t *equation = equ_from_string(cases[i].source);
+        ASSERT_NOT_NULL(equation);
+        equation_solutions_t *result = equ_derive_solutions(equation);
+        ASSERT_NOT_NULL(result);
+        ASSERT_EQ_INT((int)equ_solutions_count(result), 3);
+        ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, equ_binding(equation, "x"), result, "1e-35"));
+        ASSERT_EQ_INT(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{"), cases[i].surds);
+        if (i < 3u) {
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "3"));
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "(-3 + i·√(31))/2"));
+            ASSERT_TRUE(test_equation_result_has_rhs_string(result, "(-3 - i·√(31))/2"));
+        }
+        equ_solutions_free(result);
+        equ_free(equation);
+    }
+}
+
 static void test_equation_solves_cubic_repeated_root_once(void)
 {
     equation_t *equation = equ_from_string("{ x^3 - 3*x + 2 = 0 | x = NAN }");
@@ -1484,8 +1521,14 @@ static void test_equation_quartic_preserves_certified_surds(void)
         {"x^4-x^3/3+13x^2/3+6=0", 4u, true},
         {"x^4+2x^3+3x^2+2x+1=0", 2u, true},
         {"x^4+2000001x^3/1000000+3000001x^2/1000000+2000001x/1000000+1=0", 4u, true},
-        {"x^4+x^3+3x^2+4x+600000000000000000001/100000000000000000000=0", 4u, false},
-        {"x^4+x+1=0", 4u, false},
+        {"x^4+x^3+3x^2+4x+600000000000000000001/100000000000000000000=0", 4u, true},
+        {"x^4+x+1=0", 4u, true},
+        {"6x^4+x^3+3x^2+4x+6=0", 4u, true},
+        {"-12x^4-2x^3-6x^2-8x-12=0", 4u, true},
+        {"x^4+x^3/6+x^2/2+2x/3+1=0", 4u, true},
+        {"x^4-5x^2+x+1=0", 4u, true},
+        {"x^4+x-1=0", 4u, true},
+        {"x^4-3x^2+x-3/4=0", 4u, true},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -2182,6 +2225,7 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_quadratic_double_root_once, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_three_real_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_complex_pair, NULL);
+    TEST_RUN_SUBTEST(test_equation_cubic_preserves_certified_surds, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_repeated_root_once, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_cubic_with_numeric_parameter_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_cubic_cardano, NULL);
