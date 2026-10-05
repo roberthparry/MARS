@@ -8,6 +8,7 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -95,6 +96,11 @@ def arabic_hijri_text(date):
     return f"{day} {HIJRI_MONTHS[month - 1]} {year}".translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩"))
 
 
+def english_ordinal(day):
+    suffix = 'ᵗʰ' if 11 <= day % 100 <= 13 else {1: 'ˢᵗ', 2: 'ⁿᵈ', 3: 'ʳᵈ'}.get(day % 10, 'ᵗʰ')
+    return f'{day}{suffix}'
+
+
 class CalendarLocaleRenderingTests(unittest.TestCase):
     def setUp(self):
         self.connection = sqlite3.connect(":memory:")
@@ -106,6 +112,41 @@ class CalendarLocaleRenderingTests(unittest.TestCase):
         self.dates = ("2024-01-01", "2024-02-29", "2024-06-21", "2024-07-07", "2024-12-31", "2025-01-01")
         self.connection.executemany("insert into calendar_local_days values (?, null, 0, 0)",
                                     [(day,) for day in self.dates])
+
+    def test_uk_english_lingua_ordinals_for_every_day_and_jurisdiction(self):
+        self.connection.execute('delete from calendar_local_days')
+        self.connection.executemany('insert into calendar_local_days values (?, null, 0, 0)',
+                                   [(f'2026-01-{day:02d}',) for day in range(1, 32)])
+        for town, jurisdiction in (('Shrewsbury', 'GB-ENG'), ('Rhyl', 'GB-WLS'),
+                                   ('Edinburgh', 'GB-SCT'), ('Belfast', 'GB-NIR'), ('London', 'GB')):
+            for locale in ('en_GB', None):
+                with self.subTest(town=town, locale=locale):
+                    self.connection.execute('update calendar_local_settings set location=?, jurisdiction=?, locale=?',
+                                            (town, jurisdiction, locale))
+                    rows = self.connection.execute('select [Date Lingua], [Date UK], [Date Regional] '
+                                                   'from calendar_local order by FullDateAlternateKey').fetchall()
+                    self.assertEqual(rows, [(f'{english_ordinal(day)} January 2026',
+                                             f'{english_ordinal(day)} January 2026', f'{day} January 2026')
+                                            for day in range(1, 32)])
+
+    def test_uk_lingua_suffix_does_not_change_other_languages_or_overseas_english(self):
+        for locale in ('cy_GB', 'ga_GB', 'gd_GB', 'kw_GB', 'jam', 'fr_CA'):
+            with self.subTest(locale=locale):
+                self.connection.execute("update calendar_local_settings set jurisdiction='NL', locale=?", (locale,))
+                expected = self.connection.execute('select [Date Lingua] from calendar_local '
+                                                   'order by FullDateAlternateKey').fetchall()
+                self.connection.execute("update calendar_local_settings set jurisdiction='GB-WLS'")
+                self.assertEqual(self.connection.execute('select [Date Lingua] from calendar_local '
+                                 'order by FullDateAlternateKey').fetchall(), expected)
+        for jurisdiction, locale, expected in (
+                ('IE', 'en_GB', '1 January 2024'), ('NL', 'en_GB', '1 January 2024'),
+                ('US-NY', 'en_US', 'January 1, 2024'), ('CA-QC', 'en_CA', 'January 1, 2024'),
+                ('IM', 'en_GB', '1 January 2024'), ('JE', 'en_GB', '1 January 2024')):
+            with self.subTest(jurisdiction=jurisdiction):
+                self.connection.execute('update calendar_local_settings set jurisdiction=?, locale=?',
+                                        (jurisdiction, locale))
+                self.assertEqual(self.connection.execute('select [Date Lingua] from calendar_local '
+                                 "where FullDateAlternateKey='2024-01-01'").fetchone(), (expected,))
 
     def test_french_first_day_ordinal_across_locales_and_months(self):
         self.connection.execute("delete from calendar_local_days")
@@ -249,7 +290,7 @@ class CalendarLocaleRenderingTests(unittest.TestCase):
     def test_date_order_literals_eras_and_standalone_month_grammar(self):
         for locale, expected_date, expected_month in (
                 ("nl_NL", "21 juni 2024", "juni"), ("fr_CA", "21 juin 2024", "juin"),
-                ("en_US", "June 21, 2024", "June"), ("en_GB", "21 June 2024", "June"),
+                ("en_US", "June 21ˢᵗ, 2024", "June"), ("en_GB", "21ˢᵗ June 2024", "June"),
                 ("de_DE", "21. Juni 2024", "Juni"), ("ja_JP", "2024年6月21日", "6月"),
                 ("la_VA", "21 Iunii 2024", "Iunius"),
                 ("ru_RU", "21 июня 2024\u202fг.", "июнь"),
@@ -477,6 +518,10 @@ class CalendarLocaleRenderingTests(unittest.TestCase):
                     latin = locale.split("_")[0] == "la"
                     pattern = "d MMMM y" if latin else "long"
                     expected_date = format_date(day, pattern, locale=locale)
+                    if locale.split("_")[0] == "en":
+                        expected_date = re.sub(r'\b0?' + str(day.day) + r'\b',
+                                               lambda match: match[0] + english_ordinal(day.day)[len(str(day.day)):],
+                                               expected_date)
                     if locale.split("_")[0] == "fr" and day.day == 1:
                         expected_date = "1ᵉʳ" + expected_date[1:]
                     if locale.split("_")[0] == "ar":
@@ -1768,6 +1813,7 @@ where (select count(*) from calendar_locale_month as m where m.locale = calendar
                 day = datetime.date.fromisoformat(date_text)
                 expected = f"{day.day}{suffixes[day.day - 1]} {months[day.month - 1]} {day.year}"
                 self.assertEqual(row["Date UK"], expected)
+                self.assertEqual(row["Date Lingua"], expected)
 
     def test_calendar_and_fiscal_fields_for_every_date(self):
         for date_text, row in self.rows.items():
@@ -2248,15 +2294,16 @@ where FullDateAlternateKey = '2024-06-21';'''
 
     def test_readme_shrewsbury_calendar_query(self):
         """README example: docs/jurisdiction.md, Local Calendar View query."""
-        sql = '''select FullDateAlternateKey, [Date UK], "Day Name", Sunrise, Sunset
+        sql = '''select FullDateAlternateKey, [Date UK], [Date Lingua], "Day Name", Sunrise, Sunset
 from calendar_local
 where FullDateAlternateKey = '2024-06-21';'''
         self.assertIn(sql, (ROOT / "docs/jurisdiction.md").read_text())
         rows = self.query(sql)
         self.assertEqual(rows, [{"FullDateAlternateKey": "2024-06-21", "Date UK": "21ˢᵗ June 2024", "Day Name": "Friday",
+                                 "Date Lingua": "21ˢᵗ June 2024",
                                  "Sunrise": "04:47:00", "Sunset": "21:39:00"}])
-        output = ("FullDateAlternateKey|Date UK|Day Name|Sunrise|Sunset\n"
-                  "2024-06-21|21ˢᵗ June 2024|Friday|04:47:00|21:39:00")
+        output = ("FullDateAlternateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset\n"
+                  "2024-06-21|21ˢᵗ June 2024|21ˢᵗ June 2024|Friday|04:47:00|21:39:00")
         self.assertIn(output, (ROOT / "docs/jurisdiction.md").read_text())
         print(output)
 
