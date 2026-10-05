@@ -21,6 +21,72 @@ import mars_lab
 
 @unittest.skipUnless(shutil.which("gjs-console") or shutil.which("node"), "JavaScript runtime is not installed")
 class BindingEnvelopeTests(unittest.TestCase):
+    def test_goal_seek_keeps_authored_notation_and_updates_only_bindings(self) -> None:
+        names = (
+            "runGoalSeek", "expressionForEditor", "expressionForEvaluation", "expressionBodyForEditor",
+            "expressionWithBindings", "bindingParts", "splitTopLevel", "indexOfTopLevel",
+            "lastIndexOfTopLevel", "compareBindingNames", "setExpressionEditor",
+        )
+        functions = "\n".join(
+            re.search(r"^    (?:async )?function " + name + r"\([\s\S]*?^    }$",
+                      mars_lab.INDEX_HTML, re.MULTILINE).group(0) for name in names
+        )
+        script = functions + r'''
+            const body = '100-100/(@sigma*sqrt(2pi))*@S_{-inf}^x e^(-1/2(t-@mu)^2/@sigma^2) dt';
+            const source = '{ ' + body + ' | x = 140; @mu = 100, @sigma = 15 }';
+            const bindings = [
+                {name: 'x', kind: 'variable', value: '146'},
+                {name: 'μ', kind: 'constant', value: '100'},
+                {name: 'σ', kind: 'constant', value: '15'}
+            ];
+            const expr = {value: body, dataset: {}};
+            let fullExpressionText = source, displayedExpressionText = body, lastEvaluationInputText = '';
+            let lastDerivativeExpression = '', currentVariables = [], currentDifferentiable = true;
+            let seenBindings = [], resultText = '';
+            const parsed = {}, parsedMore = {}, functionStyle = {}, functionMore = {};
+            function currentMode() { return 'expression'; }
+            function currentExpressionText() { return fullExpressionText; }
+            function goalSeekExpressionAndStarts(expression, start) { return {expression, start}; }
+            function requestedValuePrecision() { return 40; }
+            function pushExpressionHistory() {}
+            function setRenderedResult() {}
+            function setExpandableText() {}
+            function setResultInputText(text) { resultText = text; }
+            function setValueText() {}
+            function variableNamesFromBindings() { return ['x']; }
+            function renderDerivativeButtons() {}
+            function hideTargetEntry() {}
+            function setStatus() {}
+            function scheduleEditorResizeGrip() {}
+            function scheduleEditedExpressionBindingRefresh() {}
+            function visibleBindingsForCurrentMode(values) { return values; }
+            function renderVariableValues(values) { seenBindings = values; }
+            async function fetch() {
+                return {ok: true, json: async () => ({
+                    ok: true, expression: '{ 100 - 100/(σ√(2π))·∫^x_-∞ e^(-(t-μ)²/(2σ²)) dt | x=146; μ=100, σ=15 }',
+                    editor_expression: 'formatted result must not replace the authored source',
+                    display_expression: 'formatted result', binding_values: bindings, evaluation_ready: 'yes'
+                })};
+            }
+            (async () => {
+                for (let attempt = 0; attempt < 2; ++attempt) {
+                    if (!await runGoalSeek(currentExpressionText(), '0.1'))
+                        throw new Error('Goal seek failed');
+                    if (expr.value !== body || expressionBodyForEditor(fullExpressionText) !== body)
+                        throw new Error('Authored notation was replaced: ' + expr.value);
+                    if (!fullExpressionText.includes('x = 146') || seenBindings[0].value !== '146')
+                        throw new Error('Solved bindings were lost');
+                    if (lastEvaluationInputText !== fullExpressionText || !resultText.includes('∫'))
+                        throw new Error('Input and rendered result were not kept separate');
+                }
+            })().catch(error => { if (typeof printerr === 'function') printerr(error); else console.error(error);
+                                  if (typeof imports !== 'undefined') imports.system.exit(1); else process.exit(1); });
+        '''
+        runtime = shutil.which("gjs-console") or shutil.which("node")
+        flag = "-c" if Path(runtime).name == "gjs-console" else "-e"
+        result = subprocess.run([runtime, flag, script], text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_native_binding_names_round_trip_through_editor_and_function(self) -> None:
         names = (
             "lastIndexOfTopLevel", "indexOfTopLevel", "bindingParts", "expressionForEditor",
@@ -4701,6 +4767,36 @@ solutions y = final
 
 
 class ExpressionResultTests(unittest.TestCase):
+    def test_goal_seek_saved_editor_expression_preserves_aliases(self) -> None:
+        source = '{ x+@mu+@sigma+exp(-inf) | x=0; @mu=100, @sigma=15 }'
+        solved, fields = mars_lab.goal_seek_expression(self.expression_binary, source, '140', 40)
+        editor = fields['editor_expression']
+        self.assertEqual(mars_lab.parse_expression_body(editor)[0], 'x+@mu+@sigma+exp(-inf)')
+        self.assertIn('x = 25', editor)
+        self.assertIn('μ', solved)
+        evaluated, raw, code = mars_lab.run_mars_lab_fields(self.expression_binary, editor, 40, 'x', 'evaluate')
+        self.assertEqual(code, 0, raw)
+        self.assertEqual(decimal.Decimal(evaluated['value']), 140)
+
+    def test_function_infinite_bounds_and_bindings_use_ascii_aliases(self) -> None:
+        for bound, expected in (("inf", math.sqrt(2 * math.pi)), ("-inf", 0.0)):
+            with self.subTest(bound=bound):
+                source = ("{@S_{-inf}^x e^(-1/2(t-@mu)^2/@sigma^2) dt | x=" + bound
+                          + ", @mu=0, @sigma=1}")
+                fields, raw, code = mars_lab.run_mars_lab_fields(
+                    self.expression_binary, source, 40, "x", "evaluate")
+                self.assertEqual(code, 0, raw)
+                for key in ("function", "operation_function"):
+                    self.assertIn(", t, -@inf, x)", fields[key])
+                    self.assertNotIn("∞", fields[key])
+                    self.assertIn("x = " + ("-@inf" if bound.startswith("-") else "@inf") + ".", fields[key])
+                self.assertIn(r"-\infty", fields["tex"])
+                programme = subprocess.run(
+                    [str(ROOT / "build/release/scratch/ophelia"), "40"],
+                    input=fields["function"], text=True, capture_output=True, timeout=10)
+                self.assertEqual(programme.returncode, 0, programme.stderr)
+                self.assertAlmostEqual(float(programme.stdout.strip()), expected, places=14)
+
     def test_improper_gaussian_evaluates_bound_parameters_without_substituting_cards(self) -> None:
         for centre, width in (("0", "1"), ("3", "2"), ("-5", "-2"), ("2", "1/2")):
             with self.subTest(centre=centre, width=width):
@@ -7000,7 +7096,8 @@ class ExpressionResultTests(unittest.TestCase):
             "            editorBody,",
             apply_binding,
         )
-        self.assertIn("data.expression || updated,", apply_binding)
+        self.assertIn("setExpressionEditor(\n            updated,", apply_binding)
+        self.assertNotIn("data.expression || updated,", apply_binding)
 
     def test_expression_value_card_visibility_follows_the_payload(self) -> None:
         expression_evaluation = mars_lab.INDEX_HTML.split(
@@ -10608,6 +10705,8 @@ class ZZMarsLabReadmeExamples(unittest.TestCase):
             mars_lab.DEFAULT_BIN, source, 40, "@mu", "evaluate")
         self.assertEqual(code, 0, raw)
         self.assertEqual(fields["value"], expected)
+        self.assertIn(", t, -@inf, @inf)", fields["function"])
+        self.assertNotIn("∞", fields["function"])
 
     def test_readme_gaussian_primitive_radicals(self) -> None:
         # README example: docs/expression.md, cancelling rational factors around roots.
