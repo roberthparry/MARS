@@ -2186,6 +2186,30 @@ static void test_updated_decimal_binding_stays_decimal(void)
     expr_free(expr);
 }
 
+static void test_function_infinity_atoms_use_callable_aliases(void)
+{
+    number_t negative_infinity = num_neg(NUM_INF);
+    const number_t values[] = {NUM_INF, negative_infinity};
+    const char *const aliases[] = {"@inf", "-@inf"};
+    const char *const symbols[] = {"∞", "-∞"};
+
+    for (size_t i = 0u; i < 2u; ++i) {
+        expr_t *expr = expr_new_const(values[i]);
+        char *function = expr_to_string(expr, style_FUNCTION);
+        char *mathematical = expr_to_string(expr, style_UNBOUND);
+        char *TeX = expr_to_string(expr, style_LATEX);
+
+        ASSERT_TRUE(function && strstr(function, aliases[i]) && !strstr(function, "∞"));
+        TEST_ASSERT_STR_EQ(mathematical, symbols[i]);
+        ASSERT_TRUE(TeX && strstr(TeX, "\\infty"));
+        free(TeX);
+        free(mathematical);
+        free(function);
+        expr_free(expr);
+    }
+    num_destroy(&negative_infinity);
+}
+
 static void test_negative_decimal_function_argument_stays_decimal(void)
 {
     const char *input = "{ normal_cdf(1.96) - normal_cdf(-1.96) }";
@@ -4730,6 +4754,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_preserved_complex_function_addend_stays_ungrouped, NULL);
     TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_negative_decimal_function_argument_stays_decimal, NULL);
+    TEST_RUN_SUBTEST(test_function_infinity_atoms_use_callable_aliases, NULL);
     TEST_RUN_SUBTEST(test_exact_decimal_literal_stays_decimal_in_expression_render, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);

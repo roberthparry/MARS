@@ -6379,7 +6379,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           );
         } else {
           setExpressionEditor(
-            data.expression || updated,
+            updated,
             bindings,
             null,
             data.evaluation_ready
@@ -11224,11 +11224,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       const solvedWithoutNan = expressionForEditor(solvedExpression).trim();
       const sourceWithoutNan = expressionForEditor(sourceText).trim();
       const unchanged = solvedWithoutNan === sourceWithoutNan;
+      const editorBody = expressionBodyForEditor(sourceText);
+      const editorExpression = expressionWithBindings(editorBody, data.binding_values || []) || editorBody;
       setRenderedResult(data);
       setExpressionEditor(
-        solvedExpression,
+        editorExpression,
         data.binding_values || null,
-        data.editor_expression || null,
+        editorBody,
         data.evaluation_ready
       );
       setExpandableText(
@@ -11245,7 +11247,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         data.full_display_function || data.function || ''
       );
       setValueText(data.value || '');
-      lastEvaluationInputText = solvedExpression;
+      lastEvaluationInputText = editorExpression;
       lastDerivativeExpression = '';
       {
         const variableBindings = variableNamesFromBindings(data.binding_values || []);
@@ -15761,6 +15763,10 @@ def goal_seek_expression(
     expression_out = fields.get("expression", "").strip()
     if not expression_out:
         raise ValueError(raw or "Goal seek did not return an expression")
+    source_body, _, _ = parse_expression_body(expression)
+    fields["editor_expression"] = expression_for_result_card(
+        source_body, mars_binding_values(fields.get("bindings"))
+    )
     return expression_out, fields
 
 
@@ -18946,7 +18952,6 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             fields["expression"] = solved
             fields["precision"] = precision
             precision_limit_result_fields(fields, precision)
-            fields["editor_expression"] = editor_expression_from_fields(fields)
             save_state_expression(fields["editor_expression"])
             if fields.get("value"):
                 fields["value"] = format_number_text_for_precision(

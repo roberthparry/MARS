@@ -6040,6 +6040,7 @@ void emit_func_fragment(sbuf_t *b, const char *text)
         {"φ", "@phi"},
         {"γ", "@eulermascheroni"},
         {"τ", "@tau"},
+        {"∞", "@inf"},
     };
     char *normalised;
     size_t input_length;

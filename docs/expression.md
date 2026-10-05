@@ -2469,7 +2469,9 @@ whitespace or end of input terminates a statement. Consequently, several
 statements may share a line when whitespace separates them. Unknown scalars use
 `?`; `[]` and `[?]` both denote an
 unspecified array and are serialised canonically as `[?]`. Symbolic assignment
-values use input aliases such as `@pi`.
+values use input aliases such as `@pi`. Positive and negative infinity use
+`@inf` and `-@inf` throughout Function output, including integral bounds and
+binding declarations; mathematical output retains the infinity symbol.
 
 Formal derivatives in Function style use the registered lowercase `derivative` callable,
 with explicit coordinate and non-negative integer order. Repeated coordinates
@@ -3243,6 +3245,12 @@ inputs and allocation failures return `NULL`. The input is unchanged.
 
 MARS Lab uses this native programme for transform Function cards. Ordinary
 `expr_to_text(..., style_FUNCTION)` still renders the result representation.
+
+The Lab input pane retains the user's notation during evaluation, binding updates
+and goal seeking. Goal seeking changes the binding values, not the authored
+expression body; the saved input retains the same notation. Mathematical result
+cards continue to use native symbol formatting. **Use as input** explicitly
+replaces the input with the selected result.
 
 ### `expr_to_calculus_function_text()`
 
