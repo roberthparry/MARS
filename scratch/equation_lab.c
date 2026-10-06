@@ -466,6 +466,22 @@ static const equation_t *ordered_solution_at(const equation_solutions_t *solutio
     return equ_solutions_at(solutions, order ? order[index] : index);
 }
 
+/* Complex storage has no blanket exactness flag; inspect both components without rounding. */
+static bool solution_value_is_exact(number_t value)
+{
+    if (num_is_exact(value))
+        return true;
+    if (!num_is_finite(value) || num_is_real(value))
+        return false;
+    number_t real = num_real_part(value);
+    number_t imaginary = num_imag_part(value);
+    bool exact = num_is_exact(real) && num_is_exact(imaginary);
+
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    return exact;
+}
+
 static bool solution_conjugate_pair(const equation_solutions_t *solutions, const size_t *order, size_t index,
                                     number_t *value_out)
 {
@@ -720,7 +736,7 @@ static void print_solutions(const equation_solutions_t *solutions, expr_bindings
 
         if (pair_text) {
             printf("%s%s %s %s\n", i == 0u ? heading : "            ", name,
-                   symbolic_pair || num_is_exact(pair) ? "=" : "≈", pair_text);
+                   symbolic_pair || solution_value_is_exact(pair) ? "=" : "≈", pair_text);
             free(pair_text);
             num_destroy(&pair);
             ++i;
@@ -762,7 +778,7 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
 
         if (pair_TeX) {
             printf("%s%s &%s %s", i == 0u ? first_separator : " \\\\\n", name,
-                   symbolic_pair || num_is_exact(pair) ? "=" : "\\approx", pair_TeX);
+                   symbolic_pair || solution_value_is_exact(pair) ? "=" : "\\approx", pair_TeX);
             free(pair_TeX);
             num_destroy(&pair);
             ++i;
@@ -911,7 +927,7 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, const 
     value = expr_eval(rhs);
     if (num_is_finite(value) && !num_is_nan(value)) {
         if (exact_out)
-            *exact_out = num_is_exact(value) || expr_is_integer_literal(rhs);
+            *exact_out = solution_value_is_exact(value) || expr_is_integer_literal(rhs);
         return value;
     }
 
@@ -924,7 +940,7 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, const 
 
         if (num_is_finite(sampled_value) && !num_is_nan(sampled_value)) {
             if (exact_out)
-                *exact_out = num_is_exact(sampled_value) || expr_is_integer_literal(simplified);
+                *exact_out = solution_value_is_exact(sampled_value) || expr_is_integer_literal(simplified);
             expr_free(simplified);
             expr_free(sampled);
             num_destroy(&value);
@@ -940,7 +956,7 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, const 
         sampled_value = simplified ? expr_eval(simplified) : num_new();
 
         if (exact_out)
-            *exact_out = num_is_exact(sampled_value) || num_is_integer(sampled_value) ||
+            *exact_out = solution_value_is_exact(sampled_value) || num_is_integer(sampled_value) ||
                          expr_is_integer_literal(simplified);
 
         expr_free(simplified);

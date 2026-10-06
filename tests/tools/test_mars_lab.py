@@ -1418,10 +1418,42 @@ class EquationResultTests(unittest.TestCase):
         )
         self.assertEqual(payload["solution_count"], 9)
         self.assertEqual(payload["display_solutions"].splitlines(), [
-            "x = -2", "x = -1", "x = 1", "x = 3", "x = 5", "x ≈ 0 ± i", "x ≈ 1 ± 2i",
+            "x = -2", "x = -1", "x = 1", "x = 3", "x = 5", "x = 0 ± i", "x = 1 ± 2i",
         ])
         self.assertEqual(payload["solutions_TeX"].count(r"\pm"), 2)
-        self.assertEqual(payload["solutions_TeX"].count(r"\approx"), 2)
+        self.assertNotIn(r"\approx", payload["solutions_TeX"])
+
+    @unittest.skipUnless(
+        (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
+        "release equation_lab helper is not built",
+    )
+    def test_exact_complex_solution_components_use_equals(self) -> None:
+        binary = ROOT / "build" / "release" / "scratch" / "equation_lab"
+        for precision in (32, 78, 116):
+            for source in ("(x+1)^4 = 1", "(2x+1)^4 = 1", "x^2 + 2x + 5 = 0"):
+                with self.subTest(source=source, precision=precision):
+                    completed = subprocess.run(
+                        [str(binary), source, str(precision)],
+                        check=True, capture_output=True, text=True, timeout=30,
+                    )
+                    fields = mars_lab.parse_equation_lab_output(completed.stdout)
+                    self.assertEqual(fields["status"], "solved")
+                    self.assertIn("±", fields["display_solutions"])
+                    self.assertNotIn("≈", fields["display_solutions"])
+                    self.assertNotIn(r"\approx", fields["solutions_TeX"])
+                    self.assertNotIn("≈", fields["numeric"])
+                    if source == "(x+1)^4 = 1":
+                        self.assertEqual([line.strip() for line in fields["display_solutions"].splitlines()],
+                                         ["x = -2", "x = 0", "x = -1 ± i"])
+                        self.assertEqual(len(fields["solutions"].splitlines()), 4)
+
+        # Irrational numerical evaluations must not acquire an equality sign.
+        completed = subprocess.run(
+            [str(binary), "(x+1)^4 = 2", "78"],
+            check=True, capture_output=True, text=True, timeout=30,
+        )
+        fields = mars_lab.parse_equation_lab_output(completed.stdout)
+        self.assertIn("≈", fields["numeric"])
 
     @unittest.skipUnless(
         (ROOT / "build" / "release" / "scratch" / "equation_lab").is_file(),
