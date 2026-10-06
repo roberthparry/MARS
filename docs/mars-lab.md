@@ -803,7 +803,9 @@ negative-even family is labelled separately. Both **Rendered TeX** and
 **Solutions** combine numerical conjugates into one `±` row, so twenty rows
 can show forty roots at the selected precision. The native backend compares
 the actual numbers before pairing; it does not merge rounded display values
-or sampled symbolic families. Exact algebraic conjugates are paired structurally,
+or sampled symbolic families. Complex roots whose real and imaginary components
+are exact rationals use `=`, including their numerical evaluations; inexact
+components retain `≈`. Exact algebraic conjugates are paired structurally,
 retaining surds and shared denominators with `=` rather than `≈`. Certified
 rational factors preserve short cubic and quartic surds. General exact
 real-coefficient cubics use coupled Cardano cube roots; non-degenerate quartics

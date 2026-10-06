@@ -109,6 +109,8 @@ starting bindings retain the existing single-root behaviour.
 The Lab combines verified numerical conjugates into one `±` row in both the
 Rendered TeX and Solutions cards. The native solution set still contains both
 roots; pairing uses the numerical values, not their rounded display text.
+Stored complex roots with exact rational real and imaginary components use `=`
+in paired output and numerical evaluations; inexact components retain `≈`.
 Exact algebraic conjugates are paired by their expression structure, retaining
 surds and a shared denominator with an equality sign. Parameterised families
 remain separate; numerical evaluations do not establish a symbolic pairing.
