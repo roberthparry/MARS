@@ -1,3 +1,14 @@
+/**
+ * @file http_soap_parse.c
+ * @brief Namespace-aware SOAP response and fault inspection.
+ *
+ * Validates envelope structure, resolves namespace aliases and extracts body and fault information. Parsed SOAP
+ * failure details remain distinct from HTTP transport status.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* Namespace-aware SOAP envelope and fault inspection. */
 #include <stdlib.h>
 #define MARS_HTTP_INTERNAL_ACCESS

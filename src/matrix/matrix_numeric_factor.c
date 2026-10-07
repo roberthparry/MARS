@@ -1,3 +1,14 @@
+/**
+ * @file matrix_numeric_factor.c
+ * @brief Numerical factorisations and eigensystems.
+ *
+ * Computes QR, Schur and eigenvalue or eigenvector results using precision-aware numerical tolerances. Factor
+ * objects own their result storage and require the associated cleanup routines.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

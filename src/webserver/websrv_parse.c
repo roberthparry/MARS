@@ -1,3 +1,14 @@
+/**
+ * @file websrv_parse.c
+ * @brief Bounded HTTP request parsing for the web server.
+ *
+ * Reads origin-form requests and validates start lines, headers and host information through string views. Strict
+ * framing and size limits protect the boundary before application route handlers run.
+ *
+ * This is part of webserver.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * implementation does not supply a production worker pool or TLS terminator.
+ */
+
 /* Strict, bounded HTTP/1.1 origin-form parsing through string_t views. */
 #include "websrv_internal.h"
 #include <errno.h>

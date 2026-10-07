@@ -1,3 +1,14 @@
+/**
+ * @file expr_binding_simplify.h
+ * @brief Private binding-expression simplification stages.
+ *
+ * Declares operation-level simplification and algebraic matching helpers for exact binding values. The binding
+ * parser and simplifier use these routines without substituting bindings into every displayed expression.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_BINDING_SIMPLIFY_H
 #define EXPR_BINDING_SIMPLIFY_H
 

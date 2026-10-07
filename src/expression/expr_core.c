@@ -1,3 +1,14 @@
+/**
+ * @file expr_core.c
+ * @brief Reference-counted expression graph lifecycle and evaluation.
+ *
+ * Allocates nodes, manages their references and caches, and constructs variables, constants and derivative graphs.
+ * This is the central ownership and evaluation machinery on which the symbolic units depend.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* expr_core.c - lazy, vtable-driven, reference-counted differentiable value DAG
  *
  * This file implements:

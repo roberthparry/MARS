@@ -1,3 +1,14 @@
+/**
+ * @file test_number_backend_parity.c
+ * @brief Numeric backend parity regressions.
+ *
+ * Compares supported real and complex mathematical operations across representations. Equivalent inputs should
+ * follow compatible domain and value conventions without erasing precision differences.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <complex.h>
 #include <math.h>
 #include <stdio.h>

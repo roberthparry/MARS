@@ -1,3 +1,14 @@
+/**
+ * @file datetime.c
+ * @brief Datetime allocation, construction and value lifecycle.
+ *
+ * Manages opaque datetime objects, initialisation, parsing, serialisation and comparison. The specialised calendar
+ * and astronomical units share this representation while public callers use datetime.h.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Datetime lifetime, construction, parsing, serialisation and comparison. */
 #include <ctype.h>
 #include <float.h>

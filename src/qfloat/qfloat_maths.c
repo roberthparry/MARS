@@ -1,3 +1,14 @@
+/**
+ * @file qfloat_maths.c
+ * @brief Double-double elementary and special functions.
+ *
+ * Implements the broad real mathematical function families, including supported multivariate and special-function
+ * series. Dedicated cylindrical and orthogonal-polynomial families are split into their own units.
+ *
+ * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * is not arbitrary precision or a universal accuracy guarantee.
+ */
+
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 

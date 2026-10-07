@@ -1,3 +1,14 @@
+/**
+ * @file test_number_support.c
+ * @brief Shared numeric test assertions and value checks.
+ *
+ * Provides validity contracts and string comparison helpers for number test groups. It keeps assertion policy
+ * consistent without adding production numeric behaviour.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

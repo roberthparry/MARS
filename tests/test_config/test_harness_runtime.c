@@ -1,3 +1,14 @@
+/**
+ * @file test_harness_runtime.c
+ * @brief Test execution, reporting and suite entry point.
+ *
+ * Runs registered cases, records timings, reports missing configuration keys and prints summaries. Individual
+ * suites supply their registration routines while this runtime supplies the common executable main.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>

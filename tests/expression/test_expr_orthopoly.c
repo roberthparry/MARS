@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_orthopoly.c
+ * @brief Orthogonal-polynomial cross-layer regressions.
+ *
+ * Checks Chebyshev and Hermite expression operations together with corresponding numeric and matrix behaviour.
+ * Documented examples verify the shared mathematical conventions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 #include "matrix.h"
 #include "qcomplex.h"

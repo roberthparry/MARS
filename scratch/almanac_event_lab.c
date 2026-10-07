@@ -1,3 +1,11 @@
+/**
+ * @file almanac_event_lab.c
+ * @brief Astronomical event backend for MARS Lab.
+ *
+ * Parses event requests, searches supported solar and lunar events and formats result fields for the Lab
+ * interface. It delegates geometry to the native almanac engine and uses configured catalogue and location data.
+ */
+
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>

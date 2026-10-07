@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_kdv.c
+ * @brief Korteweg-de Vries solution construction.
+ *
+ * Matches supported KdV forms and assembles their parameterised solution families and presentation. This is a
+ * specialised symbolic solver, not a general numerical evolution code.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

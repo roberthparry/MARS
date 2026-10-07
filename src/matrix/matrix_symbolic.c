@@ -1,3 +1,14 @@
+/**
+ * @file matrix_symbolic.c
+ * @brief Exact symbolic linear algebra helpers.
+ *
+ * Constructs exact determinants, adjugates, nullspaces, ranks and pseudoinverses where supported. Expression
+ * simplification and zero tests govern the algebraic elimination paths.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>

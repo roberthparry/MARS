@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_reverse_mode.c
+ * @brief Reverse-mode differentiation regressions.
+ *
+ * Checks gradients across supported graph operations and special-function variables. This group exercises reverse
+ * accumulation separately from ordinary symbolic derivative construction.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 static void test_reverse_gradient_polynomial(void)

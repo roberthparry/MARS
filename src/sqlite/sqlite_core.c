@@ -1,3 +1,14 @@
+/**
+ * @file sqlite_core.c
+ * @brief Encrypted SQLite database, statement and object storage.
+ *
+ * Wraps SQLCipher connections and prepared statements with key validation, typed bindings and result access. MARS
+ * object serialisation is persisted as data rather than live pointers or descriptors.
+ *
+ * This implements sqlite.h over SQLCipher. Application key management and database access policy remain separate
+ * from encryption of the stored database.
+ */
+
 /* sqlite_core.c - SQLCipher-backed opaque SQLite storage for MARS objects */
 
 #include <stdint.h>

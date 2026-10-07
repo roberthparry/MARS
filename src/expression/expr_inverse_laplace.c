@@ -1,3 +1,14 @@
+/**
+ * @file expr_inverse_laplace.c
+ * @brief Inverse Laplace rule dispatch and result nodes.
+ *
+ * Coordinates specialised inverse pairs, evaluation and simplification. Unresolved transforms and surviving domain
+ * restrictions remain explicit in the native expression result.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

@@ -1,3 +1,15 @@
+/**
+ * @file equation_stringout.c
+ * @brief Equation rendering, formatted output and persistence.
+ *
+ * Produces native, function and TeX representations, including bindings and generated function declarations.
+ * Serialisation entry points share the equation's structural representation rather than inventing a client-side
+ * format.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdarg.h>

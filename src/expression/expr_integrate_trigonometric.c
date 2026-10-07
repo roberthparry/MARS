@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_trigonometric.c
+ * @brief Trigonometric and exponential-trigonometric integrals.
+ *
+ * Recognises supported circular-function products and affine exponential combinations. The resulting
+ * antiderivatives remain expression graphs for subsequent simplification and differentiation checks.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

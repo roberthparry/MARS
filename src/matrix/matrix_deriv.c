@@ -1,3 +1,14 @@
+/**
+ * @file matrix_deriv.c
+ * @brief Symbolic matrix differentiation and derivative solves.
+ *
+ * Differentiates entries and supported spectral expressions and constructs repeated derivatives or
+ * derivative-constrained solves. It uses expression calculus while preserving matrix dimensions and ownership.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

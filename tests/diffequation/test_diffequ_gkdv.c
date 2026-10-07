@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_gkdv.c
+ * @brief Generalised KdV solution regressions.
+ *
+ * Checks recognised families and evaluates residuals of constructed solutions. The README example exercises the
+ * same symbolic path used by the regression cases.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

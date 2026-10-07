@@ -1,3 +1,14 @@
+/**
+ * @file string_view.h
+ * @brief Private borrowed-view bridges and string operations.
+ *
+ * Declares internal view-based append, insert and byte-boundary helpers. Views borrow storage and do not expose
+ * the string_t layout; public parsing should use the documented cursor and view interfaces in ustring.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef STRING_VIEW_H
 #define STRING_VIEW_H
 

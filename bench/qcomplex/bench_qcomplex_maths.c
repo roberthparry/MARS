@@ -1,3 +1,11 @@
+/**
+ * @file bench_qcomplex_maths.c
+ * @brief Double-double complex function timing.
+ *
+ * Runs selected qcomplex mathematical workloads and reports per-case costs. Use it when investigating
+ * fixed-precision complex algorithms alongside, not instead of, the numerical reference tests.
+ */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

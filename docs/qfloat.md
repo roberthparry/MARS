@@ -3,6 +3,14 @@
 `qfloat_t` is a double-double floating-point type built from the unevaluated sum
 of two IEEE-754 `double` values.
 
+## Implementation organisation
+
+The implementation groups Bessel I/K/Y and Struve H/L adapters in
+`src/qfloat/qfloat_cylindrical.c`, polynomial and signal functions in
+`qfloat_special.c`, and immutable constants and approximation tables in
+`qfloat_tables.c`. The cylindrical adapters use the guarded number-layer
+kernels and retain their real-domain checks; the public API is unchanged.
+
 ## Signal functions
 
 `qf_sgn`, `qf_step`, `qf_rect`, `qf_tri`, `qf_circ` and `qf_sinc` implement the

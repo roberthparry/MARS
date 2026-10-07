@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_print.c
+ * @brief Printf-style complex-double-double output.
+ *
+ * Formats complex values through the MARS string and output helpers. It preserves real and imaginary components
+ * rather than narrowing the result to ordinary complex double.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>

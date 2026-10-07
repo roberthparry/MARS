@@ -1,3 +1,14 @@
+/**
+ * @file sqlite_internal.h
+ * @brief Private SQLCipher native-handle access.
+ *
+ * Declares the controlled bridge from an opaque sqlite_t connection to its underlying SQLCipher handle. It is
+ * reserved for storage implementation work; ordinary queries and application code use sqlite.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_SQLITE_INTERNAL_H
 #define MARS_SQLITE_INTERNAL_H
 

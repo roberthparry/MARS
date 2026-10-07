@@ -1,3 +1,15 @@
+/**
+ * @file almanac_engine_internal.h
+ * @brief Private almanac engine state and computational interfaces.
+ *
+ * Defines computed entries, body states, model segments and the shared contracts for database loading, coordinate
+ * geometry and event refinement. The almanac implementation units use these details behind the opaque public
+ * engine.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_ALMANAC_ENGINE_INTERNAL_H
 #define MARS_ALMANAC_ENGINE_INTERNAL_H
 

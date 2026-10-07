@@ -1,3 +1,14 @@
+/**
+ * @file test_number_promotion.c
+ * @brief Numeric coercion and promotion regressions.
+ *
+ * Checks the representation selected when different numeric kinds interact. The cases protect exactness,
+ * real-to-complex transitions and precision propagation.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 
 #include "test_number.h"

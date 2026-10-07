@@ -1,3 +1,15 @@
+/**
+ * @file almanac_geometry.c
+ * @brief Angular conventions and observer-relative horizon geometry.
+ *
+ * Normalises angles and calculates topocentric vectors, altitude and horizontal coordinates. Use these helpers to
+ * connect celestial states to a specified observer rather than duplicate coordinate conversions in individual
+ * event finders.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Angular helpers and observer-relative horizon geometry. */
 #include <float.h>
 #include <math.h>

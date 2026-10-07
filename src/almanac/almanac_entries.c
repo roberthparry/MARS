@@ -1,3 +1,14 @@
+/**
+ * @file almanac_entries.c
+ * @brief Body catalogue lookup and computed almanac entries.
+ *
+ * Resolves catalogue identifiers and constructs entries and snapshots containing positions, magnitudes and related
+ * body properties. This is the boundary between internal position models and the public per-body results.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Body catalogue, computed entries, magnitudes and snapshots. */
 #include <ctype.h>
 #include <float.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_to_string.c
+ * @brief Expression rendering and reparsing regression helpers.
+ *
+ * Checks native, executable and TeX output and supports parse-value or expected-failure comparisons. It protects
+ * mathematical presentation and its round-trip contract.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file test_xml.c
+ * @brief Native XML tree and streaming regression suite.
+ *
+ * Checks construction, namespaces, Unicode fidelity, incremental parsing, limits and file or storage failures.
+ * Complete README examples exercise tree, dictionary and streaming usage after the ordinary tests.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

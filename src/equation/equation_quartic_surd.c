@@ -1,3 +1,14 @@
+/**
+ * @file equation_quartic_surd.c
+ * @brief Exact quartic solutions expressed with surds.
+ *
+ * Builds expression graphs for the quartic radical construction and manages its temporary nodes. This is a general
+ * coefficient-based construction, not a catalogue of special-case equations.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 

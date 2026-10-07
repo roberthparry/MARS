@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_functions.c
+ * @brief Matrix mathematical-function regression cases.
+ *
+ * Checks supported numeric and expression-backed matrix functions. It verifies native algebra and value behaviour
+ * rather than interpreting rendered matrix strings as the implementation.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 #define GAMMAINV_HP_INPUT_TEXT                                                                                         \

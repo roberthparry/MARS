@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_heat.c
+ * @brief Half-line heat equation regression cases.
+ *
+ * Checks supported heat-kernel solutions and representative evaluations. The example protects the documented
+ * initial or boundary-data workflow.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

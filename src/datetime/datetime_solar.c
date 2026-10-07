@@ -1,3 +1,15 @@
+/**
+ * @file datetime_solar.c
+ * @brief Solar coordinates, solstices and daily horizon events.
+ *
+ * Estimates solar longitude and sunrise or sunset, including adjacent-day and observance-boundary helpers. These
+ * routines support civil calendars and should not be confused with the almanac engine's catalogue-backed
+ * calculations.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Solar position estimates, solstices and sunrise/sunset calculations. */
 #include <float.h>
 #include <limits.h>

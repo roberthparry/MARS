@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_substitution.c
+ * @brief Exact substitution recognisers for integration.
+ *
+ * Matches compositions whose derivative factors occur in the integrand and constructs the corresponding primitive.
+ * The matcher verifies structural compatibility instead of substituting based on similar-looking text.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 

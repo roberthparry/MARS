@@ -1,3 +1,14 @@
+/**
+ * @file qfloat_clausen.c
+ * @brief Clausen function evaluation.
+ *
+ * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
+ * representation determine the evaluation path.
+ *
+ * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * is not arbitrary precision or a universal accuracy guarantee.
+ */
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>

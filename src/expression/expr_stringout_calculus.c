@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_calculus.c
+ * @brief Integral, derivative and arbitrary-function notation.
+ *
+ * Renders calculus nodes, argument lists and executable integral forms for the output styles. It keeps calculus
+ * operators and their bounds structurally distinct from surrounding coefficients.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Integral, derivative and arbitrary-function notation. */
 
 #include <ctype.h>

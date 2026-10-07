@@ -1,3 +1,14 @@
+/**
+ * @file expr_struve_h.c
+ * @brief Struve H expression construction and calculus.
+ *
+ * Provides the symbolic Struve H node with evaluation, simplification and supported derivative or integral rules.
+ * Numerical values are delegated to the number layer.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 

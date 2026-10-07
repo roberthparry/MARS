@@ -1,3 +1,14 @@
+/**
+ * @file test_file_limits.c
+ * @brief File resource-limit and delayed-error tests.
+ *
+ * Checks locking handoff, late write failures and preservation of destinations after failed copies. These cases
+ * protect failure semantics rather than only successful content output.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "test_harness.h"
 

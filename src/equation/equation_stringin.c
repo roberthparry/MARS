@@ -1,3 +1,14 @@
+/**
+ * @file equation_stringin.c
+ * @brief Equation text parsing and binding separation.
+ *
+ * Scans top-level equality and binding syntax using MARS text views, then constructs expression-backed equations.
+ * A differential-equation mode preserves undeclared function calls for that module's parser.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

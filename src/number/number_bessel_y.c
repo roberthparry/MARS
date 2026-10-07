@@ -1,3 +1,14 @@
+/**
+ * @file number_bessel_y.c
+ * @brief Bessel Y evaluation and order handling.
+ *
+ * Evaluates the Bessel function of the second kind using the supported order and argument paths. Integer and
+ * non-integer order behaviour must remain consistent with the layer's real or complex domain.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include <math.h>

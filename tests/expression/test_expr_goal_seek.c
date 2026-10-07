@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_goal_seek.c
+ * @brief Numerical expression goal-seeking regressions.
+ *
+ * Checks convergence cases and precision-dependent default tolerance or iteration policy. These tests distinguish
+ * numeric binding searches from symbolic equation solving.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <string.h>
 
 #include "test_expr.h"

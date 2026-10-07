@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_constants.c
+ * @brief Shared double-double complex constants.
+ *
+ * Defines fixed complex constants in terms of their extended real and imaginary components. These values provide
+ * common identities and special values for the complex algorithms.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include "qcomplex.h"
 
 #include <math.h>

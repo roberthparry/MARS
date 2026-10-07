@@ -1,3 +1,15 @@
+/**
+ * @file number_internal.h
+ * @brief Controlled cross-module numeric interface.
+ *
+ * Declares selected representation queries, precision conversions and scoped numeric support needed by native MARS
+ * modules. Callers should prefer number.h and use this guarded interface only where the public API is
+ * insufficient.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef NUMBER_SHARED_INTERNAL_H
 #define NUMBER_SHARED_INTERNAL_H
 

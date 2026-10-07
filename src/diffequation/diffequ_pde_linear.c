@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_linear.c
+ * @brief Parameter-dependent linear PDE reductions.
+ *
+ * Builds recognised linear solution forms with symbolic parameters and simplifies verified factors. It retains
+ * unresolved parameters rather than substituting sample values into the solution.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

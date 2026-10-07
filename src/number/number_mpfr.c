@@ -1,3 +1,14 @@
+/**
+ * @file number_mpfr.c
+ * @brief Multiprecision real arithmetic backend.
+ *
+ * Adapts MPFR-backed real values to generic numeric lifecycle, arithmetic and constants. Precision is carried by
+ * the backend rather than inferred from formatted decimal output.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <math.h>
 #include <stdlib.h>
 

@@ -1,3 +1,14 @@
+/**
+ * @file number_mpz.c
+ * @brief Exact integer arithmetic backend.
+ *
+ * Implements integer storage, arithmetic, comparison and bit-oriented helpers. Exact integers remain separate from
+ * real-valued backends until an operation requires promotion.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <stdlib.h>
 
 #define MARS_NUMBER_INTERNAL_ACCESS

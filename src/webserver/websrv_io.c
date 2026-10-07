@@ -1,3 +1,14 @@
+/**
+ * @file websrv_io.c
+ * @brief Deadline-aware web-server socket I/O.
+ *
+ * Waits on non-blocking sockets and writes one framed response per connection. It centralises deadline and
+ * partial-write handling without introducing persistent-connection scheduling.
+ *
+ * This is part of webserver.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * implementation does not supply a production worker pool or TLS terminator.
+ */
+
 /* Deadline-based non-blocking socket I/O and single-response framing. */
 #include "websrv_internal.h"
 #include <errno.h>

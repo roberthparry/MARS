@@ -1,3 +1,14 @@
+/**
+ * @file file_internal.h
+ * @brief Private Linux file handles and staged-transform contracts.
+ *
+ * Defines stream and directory state, error helpers and output staging operations shared by file implementations.
+ * Native FILE, DIR and filesystem details stay behind the public file_t abstraction.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_FILE_INTERNAL_H
 #define MARS_FILE_INTERNAL_H
 

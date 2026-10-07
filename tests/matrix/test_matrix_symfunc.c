@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_symfunc.c
+ * @brief Extended symbolic matrix-function regressions.
+ *
+ * Checks expression matrix functions over supported block and permuted structures. The cases protect structural
+ * decomposition paths beyond the basic dense examples.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 /* Borrow immortal constants in mutable matrix fixture arrays without changing the public API. */

@@ -1,3 +1,14 @@
+/**
+ * @file test_set.c
+ * @brief Generic set storage and algebra regressions.
+ *
+ * Checks membership, sorting, cloning, ownership, alignment and overflow boundaries, including fuzz cases. README
+ * examples follow the ordinary unique-value assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 // test_set.c — tests for the generic value-set container using the new test harness
 
 #include <stdbool.h>

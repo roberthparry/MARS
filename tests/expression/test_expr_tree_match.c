@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_tree_match.c
+ * @brief Expression structural matcher regressions.
+ *
+ * Checks affine, polynomial and unary-composition recognisers used by symbolic rules. These tests target graph
+ * structure rather than matching rendered strings.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

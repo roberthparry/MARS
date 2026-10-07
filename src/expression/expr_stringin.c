@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringin.c
+ * @brief Expression and function-body parsing.
+ *
+ * Parses native mathematical notation, bindings and generated function bodies into expression graphs. Shared
+ * scanner and symbol-table helpers keep Unicode aliases and variable identity consistent.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* expr_stringin.c - construct a expr_t from an expression-style string
  *
  * Accepts bare expression shorthand or strings in the format produced by

@@ -1,3 +1,14 @@
+/**
+ * @file string_grapheme.c
+ * @brief Unicode grapheme segmentation and character operations.
+ *
+ * Finds extended grapheme-cluster boundaries and supplies rune and character iteration helpers. User-visible
+ * characters can contain several code points, so this layer differs from byte and code-point navigation.
+ *
+ * This belongs to ustring.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * distinct and preserve documented view and cursor lifetimes.
+ */
+
 /* string_grapheme.c - grapheme cluster boundary detection (Unicode UAX #29)
  *
  * Implements grapheme cluster iteration and classification as defined in

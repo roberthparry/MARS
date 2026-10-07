@@ -1,3 +1,14 @@
+/**
+ * @file test_webserver.c
+ * @brief Native web-server protocol and lifecycle regressions.
+ *
+ * Checks routes, binary and document bodies, malformed requests, size limits, deadlines and response handling. The
+ * runnable greeting example is executed after ordinary server assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdlib.h>

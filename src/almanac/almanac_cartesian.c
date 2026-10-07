@@ -1,3 +1,15 @@
+/**
+ * @file almanac_cartesian.c
+ * @brief Cartesian vector arithmetic for celestial geometry.
+ *
+ * Implements three-dimensional vector addition, scaling, products, normalisation and axis rotations. These helpers
+ * connect ephemeris positions to frame and observer calculations without exposing vector storage through the
+ * public almanac API.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 #include <math.h>
 #include <stdbool.h>
 

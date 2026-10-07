@@ -1,3 +1,11 @@
+/**
+ * @file almanac_lab.c
+ * @brief Almanac snapshot backend for MARS Lab.
+ *
+ * Builds configured astronomical snapshots and formats celestial coordinates and body properties. This executable
+ * bridges Lab requests to the native almanac API rather than performing astronomy in the browser.
+ */
+
 #include <ctype.h>
 #include <math.h>
 #include <stdbool.h>

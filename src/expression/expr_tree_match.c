@@ -1,3 +1,14 @@
+/**
+ * @file expr_tree_match.c
+ * @brief Shared expression-tree recognition and integral notes.
+ *
+ * Finds structural relationships, free symbols and dummy-variable usage and assesses supported formal-integral
+ * value cases. These helpers operate on graph nodes rather than formatted strings.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>

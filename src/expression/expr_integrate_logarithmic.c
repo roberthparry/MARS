@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_logarithmic.c
+ * @brief Logarithmic and rational quadratic primitives.
+ *
+ * Builds supported logarithmic antiderivatives and related reciprocal-quadratic reductions. It handles symbolic
+ * coefficients without treating a numeric binding as an algebraic constant substitution.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

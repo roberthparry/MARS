@@ -1,3 +1,14 @@
+/**
+ * @file expr_bindings.h
+ * @brief Private binding-value parsing, evaluation and rendering.
+ *
+ * Declares the lightweight binding-expression operations shared by binding management and output code. It supports
+ * exact symbolic values and arrays separately from the main reference-counted expression graph.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_BINDINGS_H
 #define EXPR_BINDINGS_H
 

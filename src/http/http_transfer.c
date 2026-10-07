@@ -1,3 +1,14 @@
+/**
+ * @file http_transfer.c
+ * @brief Bounded synchronous libcurl request execution.
+ *
+ * Connects transport callbacks to buffered bodies, streaming sinks, cancellation and file downloads. It enforces
+ * configured limits and reports transport errors separately from HTTP error responses.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* http_transfer.c - bounded synchronous libcurl transport and streaming callbacks. */
 #include <stdint.h>
 #include <stdlib.h>

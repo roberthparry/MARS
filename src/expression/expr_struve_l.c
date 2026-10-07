@@ -1,3 +1,14 @@
+/**
+ * @file expr_struve_l.c
+ * @brief Modified Struve L expression construction and calculus.
+ *
+ * Provides the symbolic Struve L node and its supported calculus and simplification paths. It retains order and
+ * argument structure while the number layer supplies scalar evaluation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 

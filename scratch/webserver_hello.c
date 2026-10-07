@@ -1,3 +1,11 @@
+/**
+ * @file webserver_hello.c
+ * @brief Runnable local web-service example.
+ *
+ * Starts a local web server, registers a JSON greeting route and verifies it through the HTTP client. The program
+ * owns child-process and server cleanup so the example can run deterministically in tests.
+ */
+
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>

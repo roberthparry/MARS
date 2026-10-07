@@ -1,3 +1,14 @@
+/**
+ * @file test_datetime.c
+ * @brief Civil datetime and calendar regression suite.
+ *
+ * Checks construction, arithmetic, conversion, formatting and supported calendar observances, including solar and
+ * lunar boundary cases. The suite also exercises documented calendar output.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 // test_datetime.c — full test suite for datetime_t using the new test harness
 
 #include <float.h>

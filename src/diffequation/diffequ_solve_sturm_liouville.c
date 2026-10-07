@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_sturm_liouville.c
+ * @brief Sturm-Liouville normalisation and recognised bases.
+ *
+ * Reduces supported second-order equations and constructs factorised, affine or power-law Bessel solution
+ * families. The transformation is structural and subject to its coefficient and domain requirements.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <limits.h>
 #include <stdlib.h>
 

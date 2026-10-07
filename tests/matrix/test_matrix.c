@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix.c
+ * @brief Matrix suite entry point and documented examples.
+ *
+ * Registers numeric, symbolic, parsing, calculus and storage regression groups. README examples follow ordinary
+ * checks and exercise the complete public matrix workflows.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

@@ -1,3 +1,14 @@
+/**
+ * @file expr_core_support.c
+ * @brief Expression cloning and shared core helpers.
+ *
+ * Copies graph metadata and creates independent or symbol-linked clones. These helpers support transformations
+ * that must preserve symbol relationships without accidentally sharing mutable graph state.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdint.h>

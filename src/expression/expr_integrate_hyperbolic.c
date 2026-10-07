@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_hyperbolic.c
+ * @brief Hyperbolic and mixed-product integral rules.
+ *
+ * Recognises supported hyperbolic powers and products with trigonometric or exponential factors. It builds
+ * symbolic primitives through shared ownership and affine-matching helpers.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

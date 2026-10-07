@@ -1,3 +1,14 @@
+/**
+ * @file expr_simplify_terms.c
+ * @brief Term collection and product-chain rebuilding.
+ *
+ * Combines compatible terms and factors, merges radical quotients and rebuilds multiplication or division chains.
+ * It supplies canonical algebraic structure to the simplifier and beautifier.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

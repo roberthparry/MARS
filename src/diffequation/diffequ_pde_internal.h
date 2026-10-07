@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_internal.h
+ * @brief Private interfaces shared by PDE solver families.
+ *
+ * Declares derivative recognisers, coordinate matching, characteristic helpers and specialised PDE attempts. This
+ * header connects PDE implementation units to the common solver contract; it is not a general public PDE API.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef DIFFEQU_PDE_INTERNAL_H
 #define DIFFEQU_PDE_INTERNAL_H
 

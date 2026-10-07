@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequation.c
+ * @brief Differential-equation suite assembly and core regressions.
+ *
+ * Exercises problem construction, parsing, solving and result presentation and registers the specialised family
+ * tests. Runnable README cases are kept after ordinary checks in the suite.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

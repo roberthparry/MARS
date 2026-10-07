@@ -1,3 +1,14 @@
+/**
+ * @file matrix_fromstring.c
+ * @brief Matrix expressions, bindings and function-body parsing.
+ *
+ * Reads native matrices and generated matrix functions through string-backed parsing. Symbol tables connect scalar
+ * bindings and matrix values without reparsing output in the Lab client.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>

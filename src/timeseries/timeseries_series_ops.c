@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_series_ops.c
+ * @brief Series indexing, slicing and alignment.
+ *
+ * Exposes series metadata and manipulates date-indexed subsets, missing observations and aligned pairs. These
+ * operations preserve the association between values and their temporal index.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 

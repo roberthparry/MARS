@@ -1,3 +1,14 @@
+/**
+ * @file test_http_live.c
+ * @brief HTTP client integration with the native web server.
+ *
+ * Starts local MARS services and checks status, redirects, binary bodies and document validation through the
+ * client. Despite the historical name, it uses the project's own server rather than external-service tests.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>

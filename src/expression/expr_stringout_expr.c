@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_expr.c
+ * @brief Native expression wrappers and condition bindings.
+ *
+ * Assembles native result text, conditioned cases and binding sections around rendered bodies. It is responsible
+ * for the parseable expression-level envelope rather than recursive node emission.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

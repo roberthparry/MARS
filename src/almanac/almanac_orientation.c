@@ -1,3 +1,14 @@
+/**
+ * @file almanac_orientation.c
+ * @brief Sidereal time and celestial reference-frame orientation.
+ *
+ * Computes Aries hour angle, obliquity, nutation and frame rotations needed by apparent coordinates. It supplies
+ * shared orientation calculations rather than performing observer-specific event searches.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Sidereal time, nutation, obliquity and reference-frame rotation. */
 #include <float.h>
 #include <math.h>

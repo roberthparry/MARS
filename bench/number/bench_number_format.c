@@ -1,3 +1,11 @@
+/**
+ * @file bench_number_format.c
+ * @brief Numeric string-formatting benchmark.
+ *
+ * Measures number-to-string and printf-style conversion across supported values and options. It is used to compare
+ * formatting cost, while exact output correctness belongs to the number tests.
+ */
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

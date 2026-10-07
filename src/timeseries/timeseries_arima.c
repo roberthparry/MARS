@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_arima.c
+ * @brief ARIMA-family fitting and forecasting.
+ *
+ * Builds differenced responses and lag maps, fits supported seasonal or exogenous models and produces forecasts
+ * and residual diagnostics. Model cleanup preserves ownership of the fitted state and result arrays.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 

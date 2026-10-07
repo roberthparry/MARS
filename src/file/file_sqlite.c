@@ -1,3 +1,14 @@
+/**
+ * @file file_sqlite.c
+ * @brief SQLCipher file-content import and export.
+ *
+ * Stores file contents and selected metadata using manifests and chunks, then reconstructs files through verified
+ * output handling. Persistent records represent data, never live file handles or descriptors.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 #include "sqlite.h"

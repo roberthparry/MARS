@@ -1,3 +1,14 @@
+/**
+ * @file expr_goal_seek.c
+ * @brief Numerical goal seeking over bound expressions.
+ *
+ * Evaluates real-valued residuals and gradients and solves for selected variable bindings. This is a numerical
+ * search facility, distinct from the equation module's symbolic isolation and exact polynomial roots.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdlib.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS

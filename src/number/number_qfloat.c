@@ -1,3 +1,14 @@
+/**
+ * @file number_qfloat.c
+ * @brief Double-double real backend for generic numbers.
+ *
+ * Adapts qfloat_t operations to the shared numeric value interface. It keeps fixed extended precision distinct
+ * from MPFR-backed configurable precision.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <stdlib.h>
 
 #include "number.h"

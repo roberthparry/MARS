@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_affine.c
+ * @brief Affine transport partial differential equations.
+ *
+ * Constructs characteristic invariants and solutions for recognised affine transport fields. It retains parameter
+ * and coordinate assumptions when presenting the resulting families.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS

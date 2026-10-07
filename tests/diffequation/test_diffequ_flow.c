@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_flow.c
+ * @brief Coupled-flow PDE and presentation regressions.
+ *
+ * Checks supported coupled characteristic flows and their scope limits, including nested source-order TeX output.
+ * It protects both the solution structure and its readable presentation.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

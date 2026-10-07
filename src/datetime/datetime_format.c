@@ -1,3 +1,14 @@
+/**
+ * @file datetime_format.c
+ * @brief Date and time token formatting.
+ *
+ * Parses format tokens with string cursors and builds formatted text, including calendar names and ordinal forms.
+ * Use this unit for presentation conventions, not date arithmetic or timezone policy.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Date/time token formatting and string-builder helpers. */
 #include <limits.h>
 #include <stdlib.h>

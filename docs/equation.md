@@ -4,6 +4,10 @@
 two expression handles, one for the left-hand side and one for the right-hand
 side, and can also retain the bindings discovered while parsing equation text.
 
+Internally, `src/equation/equation_polynomial_match.c` groups the affine and
+quadratic coefficient recognisers. General polynomial storage and the
+degree-specific root algorithms remain separate implementation units.
+
 The intended public workflow is:
 
 1. Parse or construct an equation.

@@ -1,3 +1,11 @@
+/**
+ * @file diffequation_lab.c
+ * @brief Differential-equation backend for MARS Lab.
+ *
+ * Parses a differential problem, invokes native solving and emits status, solution forms and solver steps. It
+ * keeps symbolic reasoning in the library and provides presentation fields to the client.
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

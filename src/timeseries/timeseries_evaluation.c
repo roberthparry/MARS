@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_evaluation.c
+ * @brief Forecast accuracy and model backtesting.
+ *
+ * Aligns actual and predicted observations, computes accuracy measures and runs supported backtests. It also
+ * clears forecast result resources after callers finish inspecting them.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 

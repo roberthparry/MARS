@@ -1,3 +1,14 @@
+/**
+ * @file test_number_constants.c
+ * @brief Numeric constant representation regressions.
+ *
+ * Checks shared constants and their behaviour across supported representations. These tests protect exact or
+ * precision-aware construction rather than decimal string coincidence alone.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

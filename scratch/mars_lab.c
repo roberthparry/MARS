@@ -1,3 +1,11 @@
+/**
+ * @file mars_lab.c
+ * @brief Expression evaluation backend for MARS Lab.
+ *
+ * Parses expressions and bindings and emits simplified representations and numerical values through native APIs.
+ * It also handles requested goal seeking while keeping the browser a thin client.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdbool.h>

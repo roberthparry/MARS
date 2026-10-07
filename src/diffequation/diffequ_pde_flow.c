@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_flow.c
+ * @brief Coupled affine flow invariants.
+ *
+ * Resolves recognised time-dependent and coupled affine flows into characteristic parameters and invariants.
+ * Transport solutions use these invariants to preserve relationships between coordinates.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

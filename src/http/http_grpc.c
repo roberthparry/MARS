@@ -1,3 +1,14 @@
+/**
+ * @file http_grpc.c
+ * @brief Uncompressed unary gRPC framing over HTTP/2.
+ *
+ * Builds framed Protocol Buffers requests and validates response framing, trailers and status. Streaming RPCs,
+ * schema-generated stubs and compressed messages are not implemented here.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* Unary gRPC framing over verified HTTP/2; streaming and message compression are explicit non-features. */
 #include <stdlib.h>
 #define MARS_HTTP_INTERNAL_ACCESS

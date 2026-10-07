@@ -1,3 +1,14 @@
+/**
+ * @file test_file_coverage.c
+ * @brief File API invalid-input and boundary regressions.
+ *
+ * Checks null outputs, UTF-8 validation classes and path or directory failures. These cases exercise negative
+ * paths beyond successful filesystem round trips.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "test_harness.h"

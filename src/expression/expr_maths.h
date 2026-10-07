@@ -1,3 +1,15 @@
+/**
+ * @file expr_maths.h
+ * @brief Private mathematical expression callbacks.
+ *
+ * Declares evaluation, derivative and supporting callbacks bound to mathematical node operations. Operator-table
+ * construction and function implementations share this contract; application code uses constructors from
+ * expression.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_MATHS_H
 #define EXPR_MATHS_H
 

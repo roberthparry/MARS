@@ -1,3 +1,14 @@
+/**
+ * @file xml_write.c
+ * @brief Streaming XML output and labelled persistence.
+ *
+ * Escapes and validates XML content while writing to supported sinks and serialised storage. Output preserves tree
+ * semantics rather than the original entity spelling or whitespace layout.
+ *
+ * This is part of xml.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * features; HTTP and SOAP transport belong to the HTTP module.
+ */
+
 /* xml_write.c - Validated streaming XML output and labelled storage. */
 
 #include <stdint.h>

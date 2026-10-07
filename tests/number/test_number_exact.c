@@ -1,3 +1,14 @@
+/**
+ * @file test_number_exact.c
+ * @brief Exact arithmetic and integer-operation regressions.
+ *
+ * Checks exact integer and rational backends, number-theory operations and bit-oriented behaviour. It protects
+ * exactness before any floating-point promotion is required.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 
 #include "test_number.h"

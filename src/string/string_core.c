@@ -1,3 +1,14 @@
+/**
+ * @file string_core.c
+ * @brief Dynamic UTF-8 string lifecycle and core mutation.
+ *
+ * Allocates and manages string_t storage and implements construction, mutation and formatting. Normalisation and
+ * validation policies are maintained at text boundaries rather than delegated to raw caller buffers.
+ *
+ * This belongs to ustring.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * distinct and preserve documented view and cursor lifetimes.
+ */
+
 /* string_core.c - memory management, mutation, and formatting for string_t
  *
  * Implements the lifecycle and core mutation operations for the dynamic UTF-8

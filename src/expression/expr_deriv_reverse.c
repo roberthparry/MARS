@@ -1,3 +1,14 @@
+/**
+ * @file expr_deriv_reverse.c
+ * @brief Reverse-mode derivative evaluation.
+ *
+ * Collects a graph in dependency order and accumulates contributions through its children. Use this path to obtain
+ * derivatives for multiple variables without constructing a separate full symbolic derivative graph for each.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stddef.h>
 #include <stdlib.h>
 

@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_symshift.c
+ * @brief Centred presentation of symmetric shifts.
+ *
+ * Recognises arguments with a common centre and opposite offsets and emits that centre consistently first. The
+ * structural rule applies independently of function names or variable spellings.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Symmetric-shift presentation: retain a common centre in a+b and a-b. */
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS

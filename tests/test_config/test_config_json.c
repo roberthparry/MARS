@@ -1,3 +1,14 @@
+/**
+ * @file test_config_json.c
+ * @brief Test configuration JSON validation and pruning.
+ *
+ * Checks supported configuration shape and constructs pruned JSON objects. It separates JSON representation work
+ * from enablement-tree traversal.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* test_config_json.c - JSON helpers for test configuration */
 
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS

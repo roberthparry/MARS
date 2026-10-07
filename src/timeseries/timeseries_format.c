@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_format.c
+ * @brief Time-series display and serialisation.
+ *
+ * Formats dated observations and calendar metadata and serialises supported series values. This separates
+ * presentation and persistent representation from model estimation.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 #include "ustring.h"

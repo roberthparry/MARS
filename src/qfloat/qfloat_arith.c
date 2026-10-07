@@ -1,3 +1,14 @@
+/**
+ * @file qfloat_arith.c
+ * @brief Double-double real arithmetic primitives.
+ *
+ * Implements supported elementary arithmetic, powers and roots while maintaining the high and low component
+ * representation. These routines form the numerical base for higher mathematical functions.
+ *
+ * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * is not arbitrary precision or a universal accuracy guarantee.
+ */
+
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 

@@ -1,3 +1,14 @@
+/**
+ * @file qfloat_internal.h
+ * @brief Controlled cross-module double-double support.
+ *
+ * Exposes selected coefficient tables and numerical helpers shared with other native numeric implementations. It
+ * avoids exposing the whole qfloat private implementation; application code should include qfloat.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef QFLOAT_SHARED_INTERNAL_H
 #define QFLOAT_SHARED_INTERNAL_H
 

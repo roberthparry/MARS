@@ -1,3 +1,15 @@
+/**
+ * @file datetime_astronomy_internal.h
+ * @brief Shared private astronomy helpers for calendar calculations.
+ *
+ * Declares new- and full-moon estimates, solar terms, Delta T and local-day event helpers. The specialised
+ * calendar files use these routines to connect astronomical time to civil dates without adding public
+ * implementation details.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_DATETIME_ASTRONOMY_INTERNAL_H
 #define MARS_DATETIME_ASTRONOMY_INTERNAL_H
 

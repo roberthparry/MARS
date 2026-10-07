@@ -1,3 +1,14 @@
+/**
+ * @file expr_beautify.c
+ * @brief Structural expression beautification for presentation.
+ *
+ * Reorganises simplified graphs into readable mathematical forms, including signs and Cartesian separation. It
+ * supplies native presentation structure shared by output styles without relying on client-side algebra.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <errno.h>
 #include <float.h>
 #include <stdbool.h>

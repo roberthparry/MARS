@@ -2,6 +2,14 @@
 
 `qcomplex_t` is a double-double complex number with `qfloat_t` real and imaginary parts, providing approximately 106 bits of precision (~31–32 decimal digits) across the full complex plane.
 
+## Implementation organisation
+
+The implementation groups Bessel I/K/Y and Struve H/L adapters in
+`src/qcomplex/qcomplex_cylindrical.c` and polynomial and signal functions in
+`qcomplex_special.c`. These groups preserve the existing conversions, branch
+behaviour and numeric-scope cleanup. Core value operations, constants and
+larger mathematical algorithms remain separate.
+
 ## Signal functions
 
 `qc_sinc` is the entire complex continuation of normalised sinc, with value one

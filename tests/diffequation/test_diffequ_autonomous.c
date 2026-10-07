@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_autonomous.c
+ * @brief Autonomous transport PDE regression cases.
+ *
+ * Checks recognised autonomous characteristic solutions and rejection of out-of-scope forms. Its example keeps the
+ * documented invariant construction aligned with the native solver.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

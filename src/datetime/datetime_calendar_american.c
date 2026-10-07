@@ -1,3 +1,14 @@
+/**
+ * @file datetime_calendar_american.c
+ * @brief Cherokee, Mayan and Aztec calendar views.
+ *
+ * Constructs supported observance dates and formatted calendar representations using the module's civil and lunar
+ * helpers. These are calendar computations, not jurisdiction-specific public-holiday policy.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Cherokee, Mayan and Aztec calendar views and observances. */
 #include <limits.h>
 

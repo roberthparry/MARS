@@ -1,3 +1,14 @@
+/**
+ * @file number_qcomplex.c
+ * @brief Double-double complex backend for generic numbers.
+ *
+ * Adapts qcomplex_t construction and arithmetic to number_t dispatch and ownership. This preserves fixed extended
+ * complex precision while exposing the common scalar API.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <stdlib.h>
 
 #include "number.h"

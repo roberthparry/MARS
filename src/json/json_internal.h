@@ -1,3 +1,14 @@
+/**
+ * @file json_internal.h
+ * @brief Private JSON tree storage and text helpers.
+ *
+ * Defines node and output-builder details shared by JSON construction, parsing and serialisation. Arrays and
+ * dictionaries remain implementation choices behind the public json_t type.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef JSON_INTERNAL_H
 #define JSON_INTERNAL_H
 

@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_hyperbolic.c
+ * @brief Double-double hyperbolic function regressions.
+ *
+ * Checks hyperbolic functions and their inverses, including supported boundary behaviour. The group contributes to
+ * the common qfloat suite.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qf_atanh(void);

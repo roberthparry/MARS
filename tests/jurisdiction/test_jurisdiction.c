@@ -1,3 +1,14 @@
+/**
+ * @file test_jurisdiction.c
+ * @brief Jurisdiction policy and configured-storage regressions.
+ *
+ * Checks holiday occurrences, working days, timezone rules and configuration file handling. Fixtures and cleanup
+ * keep the tests tied to explicit policy data rather than the host's incidental location.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>

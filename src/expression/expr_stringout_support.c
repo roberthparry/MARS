@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_support.c
+ * @brief Formatting buffers and shared composition helpers.
+ *
+ * Supports output construction and reusable Cartesian composition views. Temporary display structures are owned
+ * and cleared here so wrappers and emitters can share them safely.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

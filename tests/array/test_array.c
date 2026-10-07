@@ -1,3 +1,14 @@
+/**
+ * @file test_array.c
+ * @brief Array, slice and stack regression suite.
+ *
+ * Checks ordered storage, mutation, copying, sorting, borrowed slices and stack behaviour, including callback
+ * ownership. Runnable README examples follow the ordinary container assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 // test_array.c — tests for the generic array_t container using the new test harness
 
 #include <pthread.h>

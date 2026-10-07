@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_core.c
+ * @brief Matrix construction and core algebra tests.
+ *
+ * Checks representation-independent operations, norms, conditions and conjugate-transpose behaviour. The group is
+ * registered by the matrix suite and uses shared value-comparison helpers.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 #include "test_matrix_solve.h"
 

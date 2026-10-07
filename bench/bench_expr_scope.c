@@ -1,3 +1,11 @@
+/**
+ * @file bench_expr_scope.c
+ * @brief Expression simplification and reverse-mode timing.
+ *
+ * Measures repeated simplification and derivative workloads and reports timing statistics. Use it to compare
+ * expression allocation and scope strategies; timings are diagnostic, not correctness assertions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>

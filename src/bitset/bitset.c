@@ -1,3 +1,14 @@
+/**
+ * @file bitset.c
+ * @brief Dynamic thread-safe packed bit storage.
+ *
+ * Manages growable word arrays and implements flag mutation, queries and Boolean combinations. Integer-indexed
+ * membership is stored compactly rather than as individually allocated values.
+ *
+ * This implements bitset.h for dense integer-indexed flags. Keep word storage and locking internal; callers should
+ * not access the backing words directly.
+ */
+
 #include "bitset.h"
 #include <pthread.h>
 #include <stdlib.h>

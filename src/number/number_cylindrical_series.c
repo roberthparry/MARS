@@ -1,6 +1,48 @@
+/**
+ * @file number_cylindrical_series.c
+ * @brief Guarded Bessel I and Struve H/L series with shared cylindrical precision handling.
+ *
+ * Keeps the public Bessel I and Struve wrappers alongside their common series and private logarithmic-gamma
+ * kernel. Exact component conversion, cancellation guards and numeric-scope ownership follow the existing number
+ * policy. The shared precision selector also serves the separate Bessel K and Y algorithms.
+ *
+ * This is part of number.h's implementation, not an independent special-function API. Series-family selection
+ * and logarithmic-gamma details remain private to this translation unit.
+ */
+
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include <math.h>
+
+typedef enum number_modified_family_t {
+    NUMBER_MODIFIED_BESSEL_I,
+    NUMBER_MODIFIED_STRUVE_L,
+    NUMBER_MODIFIED_STRUVE_H
+} number_modified_family_t;
+
+static size_t cylindrical_input_precision(number_t value)
+{
+    const number_private_t *impl = number_impl_const(&value);
+    if (impl->kind != NUMBER_COMPLEX)
+        return num_is_exact(value) ? num_get_default_prec_bits() : num_get_effective_prec_bits(value);
+
+    /* NUMBER_COMPLEX's backend flag is inexact even when both components are exact rationals.
+     * Such components have no stored precision, so the generic effective-precision fallback is
+     * only 106 bits. Determine each component's contribution before that fallback is applied. */
+    const complex_t *parts = impl->value.cx;
+    size_t real = num_is_exact(parts->real) ? num_get_default_prec_bits() : num_get_effective_prec_bits(parts->real);
+    size_t imag = num_is_exact(parts->imag) ? num_get_default_prec_bits() : num_get_effective_prec_bits(parts->imag);
+    size_t precision = real > imag ? real : imag;
+    return parts->precision_bits > precision ? parts->precision_bits : precision;
+}
+
+/* Retain exact complex components at the requested precision across the cylinder families. */
+size_t number_cylindrical_precision(number_t order, number_t argument)
+{
+    size_t order_precision = cylindrical_input_precision(order);
+    size_t argument_precision = cylindrical_input_precision(argument);
+    return order_precision > argument_precision ? order_precision : argument_precision;
+}
 
 enum { MODIFIED_MAX_WORK_BITS = 65536, MODIFIED_MAX_TERMS = 20000 };
 
@@ -39,7 +81,7 @@ static bool modified_finite(mpc_srcptr value)
 /* Log gamma in Re(z) >= 1. DLMF 5.11.1 with recurrence and a first-omitted-term bound at Re(w).
  * This private kernel avoids num_gamma's fixed-precision complex fallback. Bernoulli coefficients
  * use B_(2k) = (-1)^(k+1) 2 (2k)! zeta(2k)/(2*pi)^(2k). */
-bool number_modified_log_gamma(mpc_ptr out, mpc_srcptr z)
+static bool number_modified_log_gamma(mpc_ptr out, mpc_srcptr z)
 {
     mpfr_prec_t work = mpc_get_prec(out);
     if (!modified_finite(z) || mpfr_cmp_ui(mpc_realref(z), 1u) < 0 || work < 64 || work > MODIFIED_MAX_WORK_BITS)
@@ -229,7 +271,7 @@ done:
 }
 
 /* Shared principal cylinder series, retaining the widest input precision. */
-number_t number_modified_series(number_t order, number_t argument, number_modified_family_t family)
+static number_t number_modified_series(number_t order, number_t argument, number_modified_family_t family)
 {
     NUM_SCOPE(scope);
     bool struve = family != NUMBER_MODIFIED_BESSEL_I;
@@ -290,4 +332,28 @@ number_t number_modified_series(number_t order, number_t argument, number_modifi
     mpc_clear(z);
     mpc_clear(result);
     return num_scope_detach(value);
+}
+
+/* Evaluate principal modified Bessel I, including its negative-integer order limits. */
+number_t num_bessel_i(const number_t order, const number_t argument)
+{
+    number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_BESSEL_I);
+    number_scope_register_value(&value);
+    return value;
+}
+
+/* Evaluate principal ordinary Struve H through the shared guarded alternating series. */
+number_t num_struve_h(const number_t order, const number_t argument)
+{
+    number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_STRUVE_H);
+    number_scope_register_value(&value);
+    return value;
+}
+
+/* Evaluate principal modified Struve L through the shared guarded series. */
+number_t num_struve_l(const number_t order, const number_t argument)
+{
+    number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_STRUVE_L);
+    number_scope_register_value(&value);
+    return value;
 }

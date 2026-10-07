@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_common.c
+ * @brief Shared formatting atoms, precedence and temporary names.
+ *
+ * Provides the common machinery used by recursive renderers, including factors, numeric atoms and naming scopes.
+ * It centralises style-independent decisions that should not drift between output formats.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Shared atoms, precedence, factors and temporary-name scopes. */
 
 #include <ctype.h>

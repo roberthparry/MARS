@@ -1,3 +1,15 @@
+/**
+ * @file number_cdouble.c
+ * @brief Double-precision complex number backend.
+ *
+ * Implements the generic number interface for ordinary complex-double storage, including constants and same-kind
+ * operations. Backend dispatch keeps this fixed precision distinct from double-double and multiprecision complex
+ * values.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"

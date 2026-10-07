@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_func_emit.c
+ * @brief Recursive executable function-body rendering.
+ *
+ * Emits operation calls, numeric atoms and additive chains in the function syntax. This unit formats expression
+ * bodies; declaration and binding assembly belongs to the wrapper file.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Recursive executable Function body rendering. */
 
 #include <ctype.h>

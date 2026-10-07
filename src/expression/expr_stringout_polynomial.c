@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_polynomial.c
+ * @brief Polynomial and series ordering for display.
+ *
+ * Orders supported sums, series and transform terms consistently in native, function and TeX forms. It is a
+ * presentation pass over expression structure, not a separate polynomial solver.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Polynomial, series and transform term ordering. */
 
 #include <ctype.h>

@@ -1,3 +1,14 @@
+/**
+ * @file almanac_transit.c
+ * @brief Mercury and Venus transit searches across the Sun.
+ *
+ * Calculates projected transit geometry, locates contacts and constructs per-event circumstances. The search is
+ * specialised to the supported interior planets and configured ephemeris coverage.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Mercury and Venus solar-transit geometry and event searches. */
 #include <float.h>
 #include <math.h>

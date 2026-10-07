@@ -1,3 +1,15 @@
+/**
+ * @file matrix_internal.h
+ * @brief Private matrix layout and algebra implementation contracts.
+ *
+ * Defines matrix representation and the shared storage, element and algorithm interfaces used by matrix
+ * implementation units. Application code uses opaque matrices; cross-module expression access remains through its
+ * dedicated internal interface.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MATRIX_INTERNAL_H
 #define MATRIX_INTERNAL_H
 

@@ -1,3 +1,11 @@
+/**
+ * @file bench_qfloat_gamma_maths.c
+ * @brief Double-double gamma-family performance measurements.
+ *
+ * Times selected real mathematical functions with emphasis on gamma-related operations. The executable supports
+ * algorithm comparison without changing the qfloat public precision contract.
+ */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_first_derivatives.c
+ * @brief First symbolic derivative regressions.
+ *
+ * Checks derivative rules across supported operations and the ownership of cached formal derivatives. The group is
+ * registered by the expression suite rather than providing a separate executable entry point.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 void test_deriv_const(void)

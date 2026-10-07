@@ -1,3 +1,14 @@
+/**
+ * @file equation_zeta.c
+ * @brief Equation solving helpers for zeta-related roots.
+ *
+ * Recognises and processes supported zeta-equation cases within the equation solver. Keep these specialised
+ * numerical and structural rules separate from general polynomial factorisation.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdbool.h>
 #include <stdio.h>
 

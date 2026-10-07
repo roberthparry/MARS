@@ -1,3 +1,11 @@
+/**
+ * @file bench_number_cdouble_compare.c
+ * @brief Generic complex arithmetic versus native C timing.
+ *
+ * Compares selected number_t complex-double operations with ordinary C complex functions. The benchmark isolates
+ * abstraction and function overhead for developer performance work.
+ */
+
 #include <complex.h>
 #include <math.h>
 #include <stdint.h>

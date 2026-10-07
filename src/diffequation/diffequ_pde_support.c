@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_support.c
+ * @brief Shared PDE recognition and result helpers.
+ *
+ * Finds derivative structure and named coordinates, compares symbolic forms and creates solution equations. These
+ * helpers keep the individual PDE family implementations consistent.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <string.h>
 
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS

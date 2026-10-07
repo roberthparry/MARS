@@ -1,3 +1,11 @@
+/**
+ * @file datetime_lab.c
+ * @brief Datetime and daily astronomy Lab backend.
+ *
+ * Parses requested dates and location options and emits civil-date, solar and lunar result fields. Calendar and
+ * astronomical calculations stay in the library modules.
+ */
+
 #include <ctype.h>
 #include <float.h>
 #include <limits.h>

@@ -1,3 +1,14 @@
+/**
+ * @file matrix_maths.c
+ * @brief Matrix mathematical functions and powers.
+ *
+ * Coordinates supported spectral and other function-evaluation paths and their caches, including symbolic exponent
+ * handling. Dimension, domain and decomposition checks determine valid operations.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

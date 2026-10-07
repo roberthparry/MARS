@@ -1,3 +1,11 @@
+/**
+ * @file bench_integrator.c
+ * @brief Recognised and near-miss integration benchmarks.
+ *
+ * Times selected integral workloads, including shapes close to symbolic fast-path matches. It helps distinguish
+ * matching overhead from numerical work without replacing the integrator regression suite.
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

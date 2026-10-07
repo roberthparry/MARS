@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_internal.h
+ * @brief Private differential-equation solver attempt contracts.
+ *
+ * Defines matched, solved and failed attempt outcomes and common expression-construction helpers. Specialised ODE
+ * and PDE strategies use these contracts to return results consistently to the solver dispatcher.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef DIFFEQU_SOLVE_INTERNAL_H
 #define DIFFEQU_SOLVE_INTERNAL_H
 

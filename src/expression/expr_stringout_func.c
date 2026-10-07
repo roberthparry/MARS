@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_func.c
+ * @brief Executable function wrappers and binding declarations.
+ *
+ * Constructs function representations for expressions, transforms and calculus requests, including parameters and
+ * initialisations. It preserves executable syntax while sharing the same native algebra as other result styles.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

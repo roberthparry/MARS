@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_gkdv.c
+ * @brief Generalised Korteweg-de Vries solution families.
+ *
+ * Recognises supported nonlinear dispersive forms and constructs scaled travelling-wave results. Acceptance
+ * depends on the matched exponent and coefficient structure, not merely the equation's name.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

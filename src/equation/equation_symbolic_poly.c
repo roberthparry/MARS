@@ -1,3 +1,14 @@
+/**
+ * @file equation_symbolic_poly.c
+ * @brief Polynomial matching with symbolic coefficients.
+ *
+ * Collects coefficients that remain expressions rather than immediately becoming numeric values. Symbolic
+ * quadratic, quartic and general polynomial paths use these helpers to retain parameters in exact results.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>

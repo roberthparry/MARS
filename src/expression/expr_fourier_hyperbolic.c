@@ -1,3 +1,14 @@
+/**
+ * @file expr_fourier_hyperbolic.c
+ * @brief Hyperbolic Fourier pairs and beta-form inverses.
+ *
+ * Matches hyperbolic power families and related analytic spectra, including odd pairs. These specialised rules
+ * contribute formulas to the Fourier dispatcher with their parameter assumptions retained.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Hyperbolic Fourier rules: power families, analytic spectra, odd pairs and beta inverses. */
 #include "expr_fourier_internal.h"
 

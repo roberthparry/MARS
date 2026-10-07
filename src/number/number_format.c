@@ -1,3 +1,14 @@
+/**
+ * @file number_format.c
+ * @brief Numeric string conversion and formatted output.
+ *
+ * Renders supported number representations and implements printf-style numeric formatting. Exact and complex
+ * values retain their appropriate syntax rather than being forced through double conversion.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"

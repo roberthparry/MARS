@@ -1,3 +1,15 @@
+/**
+ * @file http_auth.c
+ * @brief Explicit credentials, signatures and OAuth token helpers.
+ *
+ * Prepares supported authentication data and token requests without taking over application token policy.
+ * Client-credentials and refresh-token exchanges are supported; interactive browser authorisation remains outside
+ * this unit.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* Explicit HTTP authentication; token lifecycle belongs to the application. */
 #include <arpa/inet.h>
 #include <sodium.h>

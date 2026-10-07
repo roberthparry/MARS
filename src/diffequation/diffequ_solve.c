@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve.c
+ * @brief Ordinary differential equation solver orchestration.
+ *
+ * Coordinates recognised ODE strategies and option-dependent solving paths, including supported linearisations.
+ * Specialised attempts report whether they matched, solved or failed instead of claiming universal coverage.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>

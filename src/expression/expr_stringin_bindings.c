@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringin_bindings.c
+ * @brief Parser symbol tables and binding extraction.
+ *
+ * Tracks parsed symbols and determines which bindings an expression needs, including formal integral variables. It
+ * prevents local dummy symbols from leaking into the caller's binding list.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

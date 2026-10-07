@@ -1,3 +1,14 @@
+/**
+ * @file json_core.c
+ * @brief JSON value ownership and container operations.
+ *
+ * Constructs and manages JSON trees using MARS arrays, dictionaries and strings. Typed access and mutation share
+ * this ownership layer with the parser and writer.
+ *
+ * This implements part of json.h. JSON values represent data independently of network transport; the HTTP module
+ * supplies service requests and responses.
+ */
+
 /* json_core.c - opaque JSON value storage, construction, and access */
 
 #include <stdlib.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_file_fs.c
+ * @brief Filesystem attributes, links and movement tests.
+ *
+ * Checks permissions, ownership, timestamps, access queries, links and directory movement. Truncation and
+ * synchronisation cases verify that stream and filesystem operations agree.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "test_harness.h"

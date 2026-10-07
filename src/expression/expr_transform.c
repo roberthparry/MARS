@@ -1,3 +1,14 @@
+/**
+ * @file expr_transform.c
+ * @brief Integral-transform nodes and shared dispatch.
+ *
+ * Constructs transform requests, recognises their kinds and coordinates result and derivative handling. Fourier
+ * and Laplace units provide the specialised mathematical rules.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include <string.h>

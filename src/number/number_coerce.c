@@ -1,3 +1,14 @@
+/**
+ * @file number_coerce.c
+ * @brief Numeric representation conversion and promotion.
+ *
+ * Converts or clones values between supported number backends and chooses compatible representations for
+ * operations. This is the central boundary for exactness, precision and real-to-complex promotion.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"

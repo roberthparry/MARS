@@ -1,3 +1,15 @@
+/**
+ * @file expr_integrate.c
+ * @brief Symbolic integration dispatch and integral families.
+ *
+ * Coordinates supported antiderivative rules, definite integration and iterated or best-effort results.
+ * Specialised recognisers live in companion units; unmatched integrals retain formal structure rather than
+ * pretending to have closed forms.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

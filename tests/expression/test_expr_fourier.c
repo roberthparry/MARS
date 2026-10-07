@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_fourier.c
+ * @brief Fourier transforms and signal-function regressions.
+ *
+ * Checks transform pairs, distributional cases and signal derivatives or calculus. It includes documented signal
+ * examples that run through the same native expression paths.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 #include "matrix.h"
 #include "qcomplex.h"

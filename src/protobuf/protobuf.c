@@ -1,3 +1,15 @@
+/**
+ * @file protobuf.c
+ * @brief Bounded native Protocol Buffers wire encoding.
+ *
+ * Owns ordered field records and parses or writes supported wire types with explicit byte and field limits.
+ * Repeated and unknown fields remain available to schema-aware callers; no external parser or schema compiler is
+ * used.
+ *
+ * This implements protobuf.h. Applications supply schema knowledge and manage message ownership; the HTTP module
+ * provides transport and gRPC framing.
+ */
+
 /* Native bounded Protocol Buffers wire records; no external parser or schema compiler. */
 #include "protobuf.h"
 #include <stdlib.h>

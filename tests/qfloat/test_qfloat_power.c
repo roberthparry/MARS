@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_power.c
+ * @brief Double-double powers and decimal scaling tests.
+ *
+ * Checks general powers and powers of ten across supported inputs. The tests separate exponentiation behaviour
+ * from text-formatting scale choices.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qf_pow_int()

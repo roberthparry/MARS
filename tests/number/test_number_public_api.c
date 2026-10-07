@@ -1,3 +1,14 @@
+/**
+ * @file test_number_public_api.c
+ * @brief Generic number public-contract regressions.
+ *
+ * Checks common construction, access and operation behaviour exposed by number.h. These assertions protect
+ * caller-visible semantics independently of backend-specific details.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

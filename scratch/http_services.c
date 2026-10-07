@@ -1,3 +1,11 @@
+/**
+ * @file http_services.c
+ * @brief Runnable form, SOAP and event-reader examples.
+ *
+ * Exercises request-body encoding, SOAP envelope handling and incremental event decoding. It demonstrates protocol
+ * helpers without requiring every operation to contact a remote service.
+ */
+
 #include "http.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_core.c
+ * @brief Complex-double-double value construction and predicates.
+ *
+ * Constructs by-value complex objects and classifies finite, infinite and NaN components. Arithmetic and
+ * special-function units share these representation-level checks.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include "qcomplex.h"
 qfloat_t qc_abs(qcomplex_t z)
 {

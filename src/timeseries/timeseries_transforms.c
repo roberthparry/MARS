@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_transforms.c
+ * @brief Lagging, differencing and calendar aggregation.
+ *
+ * Applies supported scalar transforms, lag or lead shifts, differences and period aggregations. The output retains
+ * time-series indexing rules rather than becoming an unlabelled numeric array.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 

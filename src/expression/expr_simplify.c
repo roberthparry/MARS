@@ -1,3 +1,14 @@
+/**
+ * @file expr_simplify.c
+ * @brief Expression graph simplification orchestration.
+ *
+ * Runs rewrite stages and tracks simplification state across graph nodes. Structural matchers, term handling and
+ * individual algebraic rules are separated into companion files.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* expr_simplify.c - algebraic simplification of differentiable value nodes
  *
  * expr_simplify() rewrites a DAG node into a canonical form using a small set

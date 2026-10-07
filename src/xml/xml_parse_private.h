@@ -1,3 +1,14 @@
+/**
+ * @file xml_parse_private.h
+ * @brief Private incremental XML parser state.
+ *
+ * Defines parser modes, element frames, namespace scopes, cursors and reader state. It is shared by the XML parser
+ * and namespace validator, not by general document consumers or application code.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_XML_PARSE_PRIVATE_H
 #define MARS_XML_PARSE_PRIVATE_H
 #if !defined(MARS_XML_INTERNAL_ACCESS)

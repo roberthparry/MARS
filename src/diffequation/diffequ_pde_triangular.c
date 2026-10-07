@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_triangular.c
+ * @brief Triangular transport characteristic charts.
+ *
+ * Recognises triangular coefficient structure, constructs characteristic charts and verifies their solution forms.
+ * Presentation retains the chart and parameter restrictions needed to interpret the result.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS

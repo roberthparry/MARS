@@ -1,3 +1,11 @@
+/**
+ * @file http_post_json.c
+ * @brief Runnable JSON POST example.
+ *
+ * Builds a JSON request, sends it and validates the echoed answer before cleanup. The optional endpoint argument
+ * lets the documentation test exercise the same executable logic locally.
+ */
+
 #include <stdlib.h>
 #include "http.h"
 

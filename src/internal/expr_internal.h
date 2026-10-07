@@ -1,3 +1,15 @@
+/**
+ * @file expr_internal.h
+ * @brief Controlled cross-module expression interface.
+ *
+ * Declares selected expression structure and transformation facilities needed by equation, matrix and other native
+ * modules. It provides the supported internal boundary instead of including the expression module's full private
+ * header directly.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_SHARED_INTERNAL_H
 #define EXPR_SHARED_INTERNAL_H
 

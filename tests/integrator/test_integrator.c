@@ -1,3 +1,14 @@
+/**
+ * @file test_integrator.c
+ * @brief Adaptive and symbolic integration regression suite.
+ *
+ * Checks configured bounds, convergence, multidimensional evaluation and recognised symbolic fast paths.
+ * Documented examples run after ordinary assertions and demonstrate the public integrator workflow.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 /* test_integrator.c — tests for the adaptive integrators */
 
 #include <math.h>

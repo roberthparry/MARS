@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_primitives.c
+ * @brief Named special-function primitive rules.
+ *
+ * Constructs supported direct antiderivatives and definite values for named primitive families, including
+ * logarithmic and exponential integrals. It is used when a recognised primitive avoids a more general reduction.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdlib.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

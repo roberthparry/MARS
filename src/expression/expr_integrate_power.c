@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_power.c
+ * @brief Powers and roots in symbolic integration.
+ *
+ * Handles supported power, square-root, cube-root and general-root nodes. The rules distinguish exponent and
+ * argument structure so integration is performed with respect to the intended variable.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <limits.h>
 #include <stdbool.h>
 #include <string.h>

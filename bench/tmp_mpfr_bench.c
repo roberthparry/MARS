@@ -1,3 +1,11 @@
+/**
+ * @file tmp_mpfr_bench.c
+ * @brief Direct MPFR baseline timing experiments.
+ *
+ * Times selected MPFR operations to provide a lower-level comparison for MARS numerical performance. It is a
+ * developer benchmark, not a supported library API or a regression pass/fail test.
+ */
+
 #include <mpfr.h>
 #include <stdint.h>
 #include <stdio.h>

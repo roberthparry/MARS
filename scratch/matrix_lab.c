@@ -1,3 +1,11 @@
+/**
+ * @file matrix_lab.c
+ * @brief Matrix operation backend for MARS Lab.
+ *
+ * Parses matrix requests and dispatches scalar, matrix, eigenvalue and decomposition operations. It formats native
+ * results for the client without introducing a separate matrix algebra implementation.
+ */
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>

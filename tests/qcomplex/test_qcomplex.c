@@ -1,3 +1,14 @@
+/**
+ * @file test_qcomplex.c
+ * @brief Double-double complex regression suite.
+ *
+ * Checks value construction, arithmetic, mathematical functions, parsing and output against expected complex
+ * behaviour. It exercises the native fixed-precision layer rather than the generic number dispatcher.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

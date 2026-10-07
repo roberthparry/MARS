@@ -1,3 +1,14 @@
+/**
+ * @file datetime_arithmetic.c
+ * @brief Calendar arithmetic, spans and elapsed durations.
+ *
+ * Adds civil units and time intervals, refreshes cached Julian values and computes differences. This is the
+ * implementation boundary for changing a date without leaving its civil fields and caches inconsistent.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Calendar arithmetic, spans and durations. */
 #include <float.h>
 #include <limits.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_arithmetic.c
+ * @brief Double-double arithmetic and stability tests.
+ *
+ * Checks elementary operations, roots, logarithms and cancellation-sensitive cases. It protects the two-component
+ * representation's numerical behaviour.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 
 #include "test_qfloat.h"
 

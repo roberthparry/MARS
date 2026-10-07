@@ -1,3 +1,14 @@
+/**
+ * @file xml_parse.c
+ * @brief Native incremental XML parsing.
+ *
+ * Consumes bounded UTF-8 chunks, builds trees or emits reader events and reports malformed input. Unsupported
+ * external entities and document-type features are rejected rather than fetched.
+ *
+ * This is part of xml.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * features; HTTP and SOAP transport belong to the HTTP module.
+ */
+
 /* xml_parse.c - bounded incremental XML 1.0 parsing over MARS strings. */
 #include <stdint.h>
 #include <stdlib.h>

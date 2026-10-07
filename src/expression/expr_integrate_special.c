@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_special.c
+ * @brief Special-function and matched-product integration.
+ *
+ * Collects supported special-function compositions and products sharing compatible affine arguments. It
+ * supplements elementary rules while keeping each accepted family explicit.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

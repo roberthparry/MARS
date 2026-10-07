@@ -1,3 +1,14 @@
+/**
+ * @file expr_beautify_radical.c
+ * @brief Surd factor normalisation for display.
+ *
+ * Combines scales and radicands and normalises root factors while preserving their mathematical meaning. This unit
+ * improves exact surd presentation after simplification rather than approximating roots numerically.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS

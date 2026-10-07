@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_second_order.c
+ * @brief Constant-coefficient second-order PDE solutions.
+ *
+ * Constructs supported homogeneous and particular solutions, including phase-based forms. The matcher determines
+ * when these formulas apply and supplies explanatory solver steps.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

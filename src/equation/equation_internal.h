@@ -1,3 +1,14 @@
+/**
+ * @file equation_internal.h
+ * @brief Private algebraic solver construction and polynomial helpers.
+ *
+ * Declares equation-owned binding construction, coefficient matching and specialised solution paths. It extends
+ * the controlled shared equation interface for implementation units inside the equation module.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EQUATION_INTERNAL_H
 #define EQUATION_INTERNAL_H
 

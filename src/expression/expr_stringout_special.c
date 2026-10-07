@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_special.c
+ * @brief Special-function names and argument notation.
+ *
+ * Supplies shared naming and style-specific forms for hypergeometric, Lommel, Lambert and related operations. It
+ * prevents individual renderers from inventing incompatible spellings.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Special-function names, arguments and TeX atoms. */
 
 #include <ctype.h>

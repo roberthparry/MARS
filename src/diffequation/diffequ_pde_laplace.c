@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_laplace.c
+ * @brief Cartesian and polar Laplace equation families.
+ *
+ * Recognises supported harmonic equations and verifies the constructed coordinate forms. It supplies general
+ * harmonic solutions where the supported problem conditions permit them.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 #include <string.h>
 

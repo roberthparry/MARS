@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction_dst.c
+ * @brief Daylight-saving transition occurrence queries.
+ *
+ * Collects named timezone-rule transitions and materialises their local display dates and times. This unit reports
+ * transitions while the timezone unit resolves effective offsets.
+ *
+ * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * currency rather than hard-coded assumptions about the host machine.
+ */
+
 /* Collect daylight-saving transitions and materialise their local display times. */
 #include "jurisdiction_internal.h"
 

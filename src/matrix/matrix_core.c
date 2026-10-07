@@ -1,3 +1,14 @@
+/**
+ * @file matrix_core.c
+ * @brief Matrix storage machinery and common internal algorithms.
+ *
+ * Implements core storage operations, element handling and shared matrix-function support, including triangular
+ * divided-difference paths. Public operations dispatch through these foundations.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

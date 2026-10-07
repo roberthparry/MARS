@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_string.c
+ * @brief Complex-double-double text conversion.
+ *
+ * Parses supported real and imaginary spellings and constructs or formats qcomplex_t values. String-backed
+ * scanning separates component signs and suffixes without exposing graph or matrix parsing.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include <stdio.h>
 
 #include "qcomplex.h"

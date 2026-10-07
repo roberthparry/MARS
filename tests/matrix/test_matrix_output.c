@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_output.c
+ * @brief Matrix printf-style formatting tests.
+ *
+ * Checks numeric precision and complex pretty-printing through formatted output APIs. Structural native or
+ * function string conversion is tested separately.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 static void test_mat_sprintf_formats(void)

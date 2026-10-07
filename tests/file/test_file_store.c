@@ -1,3 +1,14 @@
+/**
+ * @file test_file_store.c
+ * @brief SQLCipher file-content persistence tests.
+ *
+ * Checks import/export round trips, database argument guards and optional encrypted payloads. The README example
+ * verifies content and metadata storage through the public file API.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "sqlite.h"

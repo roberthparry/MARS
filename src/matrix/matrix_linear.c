@@ -1,3 +1,14 @@
+/**
+ * @file matrix_linear.c
+ * @brief Linear algebra operations and equation solving.
+ *
+ * Implements matrix arithmetic, linear systems, least squares and LU factorisation over supported element and
+ * storage types. Exact symbolic paths and numeric paths share the public matrix interface.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

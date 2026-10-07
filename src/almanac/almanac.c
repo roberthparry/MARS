@@ -1,3 +1,15 @@
+/**
+ * @file almanac.c
+ * @brief Configured astronomical engine lifecycle and persistence.
+ *
+ * Opens and closes the configured engine, manages diagnostics and database paths, and serialises its
+ * configuration. Use this unit when changing resource ownership or restoring an engine, rather than numerical
+ * event geometry.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Configured engine lifetime, diagnostics and serialisation. */
 #include <ctype.h>
 #include <stdio.h>

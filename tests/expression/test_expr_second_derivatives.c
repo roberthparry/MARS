@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_second_derivatives.c
+ * @brief Second derivative regression cases.
+ *
+ * Checks repeated differentiation of elementary, special and complex-valued expressions. The cases protect both
+ * derivative composition and evaluation.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 void test_second_deriv_var(void)

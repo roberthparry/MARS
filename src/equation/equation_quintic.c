@@ -1,3 +1,14 @@
+/**
+ * @file equation_quintic.c
+ * @brief Quintic numerical roots and distinct-solution handling.
+ *
+ * Evaluates fifth-degree polynomials and refines real and complex root candidates. It does not promise a general
+ * radical formula; exact factor reductions are handled by the polynomial solving machinery.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>

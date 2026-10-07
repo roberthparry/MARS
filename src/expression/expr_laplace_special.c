@@ -1,3 +1,14 @@
+/**
+ * @file expr_laplace_special.c
+ * @brief Special-function forward Laplace transforms.
+ *
+ * Builds recognised transforms of special functions and related inverse circular or hyperbolic forms. This unit
+ * keeps those formulas separate from elementary matching and numerical evaluation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 

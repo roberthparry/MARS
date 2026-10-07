@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction_timezone.c
+ * @brief Timezone eras and effective GMT offsets.
+ *
+ * Loads timezone histories and named transition rules and resolves offsets for civil dates. This supports default
+ * local-time policy and the transition-reporting routines.
+ *
+ * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * currency rather than hard-coded assumptions about the host machine.
+ */
+
 /* Load timezone eras and named rules, and resolve civil-date GMT offsets. */
 #include "jurisdiction_internal.h"
 

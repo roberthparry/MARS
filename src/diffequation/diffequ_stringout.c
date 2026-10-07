@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_stringout.c
+ * @brief Differential-equation native and TeX rendering.
+ *
+ * Formats problems, differential forms and derivative notation from their native representation. Display rules
+ * preserve the equation and condition structure independently of the solving strategy.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>

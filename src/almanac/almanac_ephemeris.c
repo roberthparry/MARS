@@ -1,3 +1,15 @@
+/**
+ * @file almanac_ephemeris.c
+ * @brief Ephemeris interpolation and apparent-position state calculation.
+ *
+ * Evaluates Chebyshev position segments and their derivatives, converts model coordinates and applies
+ * apparent-place corrections. Body-state requests use this unit after the database model has supplied a covering
+ * segment.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Chebyshev states and apparent-place corrections. */
 #include <float.h>
 #include <math.h>

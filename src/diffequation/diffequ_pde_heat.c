@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_heat.c
+ * @brief Half-line heat equation kernels.
+ *
+ * Constructs supported heat-equation solutions on a half-line with the recognised data and boundary structure.
+ * Kernel variables and solution notation are managed here for consistent symbolic output.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

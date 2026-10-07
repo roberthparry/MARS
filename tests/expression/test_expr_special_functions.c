@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_special_functions.c
+ * @brief Special-function expression derivative tests.
+ *
+ * Exercises supported special-function nodes and their first or higher derivative paths. The group supplements
+ * elementary arithmetic tests with function-specific identities and values.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 void test_erf(void)

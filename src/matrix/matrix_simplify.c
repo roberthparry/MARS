@@ -1,3 +1,14 @@
+/**
+ * @file matrix_simplify.c
+ * @brief Symbolic matrix simplification and common factors.
+ *
+ * Simplifies expression entries and detects compatible reciprocal or power factors shared across a matrix. It
+ * preserves exact numeric structure instead of replacing entries with approximate samples.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <limits.h>
 #include <stdlib.h>
 

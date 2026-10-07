@@ -1,3 +1,14 @@
+/**
+ * @file http_websocket.c
+ * @brief Verified WebSocket connection establishment.
+ *
+ * Performs the upgrade using the HTTP client's TLS, credential and header policies and owns connection lifetime.
+ * Message framing and deadline-aware socket operations are implemented in the I/O companion.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* WebSocket handshake using the HTTP module's TLS and header policies. */
 #include <stdlib.h>
 #define MARS_HTTP_INTERNAL_ACCESS

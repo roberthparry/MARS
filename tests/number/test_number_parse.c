@@ -1,3 +1,14 @@
+/**
+ * @file test_number_parse.c
+ * @brief Numeric text parsing regressions.
+ *
+ * Checks supported integer, fraction, real, complex and constant input forms. Parsed representation and value are
+ * verified independently of downstream algebraic parsing.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,3 +1,14 @@
+/**
+ * @file datetime_calendar_tabular.c
+ * @brief Tabular religious calendars and observance dates.
+ *
+ * Implements supported Christian, Islamic, Jewish and Ethiopian date rules and calendar text. Integer calendar
+ * conversions and fixed rules are kept separate from the astronomical lunisolar calculations.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Tabular Christian, Islamic, Jewish and Ethiopian calendars and observances. */
 #include <float.h>
 #include <limits.h>

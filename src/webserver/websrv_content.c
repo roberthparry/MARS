@@ -1,3 +1,14 @@
+/**
+ * @file websrv_content.c
+ * @brief Web-server headers, bodies and document adapters.
+ *
+ * Validates dictionary-backed response fields and manages binary, text, JSON and XML bodies. This unit prepares
+ * content independently of listener routing and socket framing.
+ *
+ * This is part of webserver.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * implementation does not supply a production worker pool or TLS terminator.
+ */
+
 /* String-backed header validation, binary bodies and native document adapters. */
 #include "websrv_internal.h"
 #include <stdlib.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_file_faults.c
+ * @brief Injected file I/O and allocation failure regressions.
+ *
+ * Exercises copy, move, synchronisation and allocation failures, including cross-device paths. Child-process
+ * isolation and cleanup prevent fault injection from contaminating later cases.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "test_harness.h"

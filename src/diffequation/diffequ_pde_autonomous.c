@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_autonomous.c
+ * @brief Autonomous transport partial differential equations.
+ *
+ * Recognises supported autonomous characteristic fields and constructs invariant solution forms. The general PDE
+ * dispatcher calls this specialised path when the coefficient structure matches.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS

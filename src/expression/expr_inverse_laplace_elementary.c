@@ -1,3 +1,14 @@
+/**
+ * @file expr_inverse_laplace_elementary.c
+ * @brief Elementary inverse Laplace pairs.
+ *
+ * Matches supported rational, shifted and hyperbolic forms and reconstructs their time-domain expressions. This
+ * unit is selected by the inverse dispatcher, not exposed as a separate public solver.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_partialfrac.c
+ * @brief Rational integration by recognised partial fractions.
+ *
+ * Decomposes supported rational forms and constructs exact logarithmic, circular or radical terms, including
+ * palindromic quartics. This is a symbolic reduction path, not numerical pole avoidance.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>

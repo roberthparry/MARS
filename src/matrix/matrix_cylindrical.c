@@ -1,3 +1,14 @@
+/**
+ * @file matrix_cylindrical.c
+ * @brief Matrix Bessel and Struve functions.
+ *
+ * Evaluates supported cylindrical functions using series, spectral or interpolation paths and detaches owned
+ * entries safely. Scalar order parameters and matrix arguments retain their distinct roles.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <limits.h>
 #include <stdlib.h>
 

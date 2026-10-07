@@ -1,3 +1,14 @@
+/**
+ * @file test_config_paths.c
+ * @brief Test configuration path resolution.
+ *
+ * Normalises source paths and locates global or local configuration records. The harness uses these helpers to
+ * identify a test consistently across invocation directories.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* test_config_paths.c - test configuration path helpers */
 
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS

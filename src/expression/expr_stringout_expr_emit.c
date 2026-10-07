@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_expr_emit.c
+ * @brief Recursive native mathematical expression rendering.
+ *
+ * Emits operators, absolute values and grouped subexpressions in native notation. The wrapper layer adds bindings
+ * and result-level conditions after body rendering.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Recursive native expression body rendering. */
 
 #include <ctype.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_probability.c
+ * @brief Double-double probability and related functions.
+ *
+ * Checks distribution densities, cumulative forms and related beta, binomial and Lambert functions. It protects
+ * both ordinary values and supported logarithmic variants.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qf_lambert_w0(void)

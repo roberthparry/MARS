@@ -1,3 +1,14 @@
+/**
+ * @file expr_maths.c
+ * @brief Mathematical node evaluation and symbolic derivatives.
+ *
+ * Implements operation callbacks for elementary and special functions, including incomplete-gamma families.
+ * Operator construction and public wrappers are defined separately in expr_maths_ops.c.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_support.c
+ * @brief Shared expression-value test adapters.
+ *
+ * Converts and evaluates expression values for expression and matrix assertions. It avoids duplicating
+ * representation-dependent comparison helpers across suites.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* Shared expression value adapters for the expression and matrix suites. */
 #include "../expression/test_expr.h"
 

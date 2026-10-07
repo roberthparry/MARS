@@ -13,13 +13,13 @@
  * and respect each entry point's bound and domain restrictions.
  *
  * All public integration entry points operate on number_t bounds, tolerances,
- * and results. The current runtime uses adaptive recursive subdivision with
- * midpoint/Simpson-style error control and bisects the subinterval with the
- * largest estimated error. Iteration stops when:
+ * and results. The numerical engine tries tanh-sinh refinement and can fall
+ * back to adaptive Gauss-Kronrod subdivision, bisecting the interval with the
+ * largest estimated error. The requested convergence criterion is:
  *
  *      total_error <= max(abs_tol, rel_tol * |result|)
  *
- * or when the maximum subinterval count is reached.
+ * Work limits may stop refinement before that criterion is met; check status.
  */
 
 #ifndef INTEGRATOR_H

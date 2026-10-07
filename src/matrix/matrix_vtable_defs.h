@@ -1,3 +1,15 @@
+/**
+ * @file matrix_vtable_defs.h
+ * @brief Private matrix operation-table declarations.
+ *
+ * Declares storage and element dispatch functions and tables used to connect numeric or symbolic values to dense
+ * and structured matrix implementations. It is intended for table definition and matrix-internal dispatch, not
+ * caller-side type switching.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MATRIX_VTABLE_DEFS_H
 #define MATRIX_VTABLE_DEFS_H
 

@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_poly.c
+ * @brief Polynomial factors in symbolic antiderivatives.
+ *
+ * Recognises low-degree polynomial products and divisions with affine or centred functions. It supplies repeated
+ * polynomial reductions to the higher-level integration rules.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

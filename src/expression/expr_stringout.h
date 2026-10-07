@@ -1,3 +1,15 @@
+/**
+ * @file expr_stringout.h
+ * @brief Shared private expression formatting services.
+ *
+ * Defines text-buffer and Cartesian composition helpers and declarations used across output wrappers and emitters.
+ * It connects native, function and TeX presentation while keeping formatting machinery outside the public
+ * expression API.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_STRINGOUT_H
 #define EXPR_STRINGOUT_H
 

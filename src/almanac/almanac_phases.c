@@ -1,3 +1,14 @@
+/**
+ * @file almanac_phases.c
+ * @brief Planetary illumination and exact Moon-phase searches.
+ *
+ * Derives phase details and refines body-Sun longitude relationships near estimated events. The phase and node
+ * helpers also support the initial candidate selection used by eclipse searches.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Phase classification, conjunction refinement and exact Moon phases. */
 #include <float.h>
 #include <math.h>

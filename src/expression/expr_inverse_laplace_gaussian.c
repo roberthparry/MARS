@@ -1,3 +1,14 @@
+/**
+ * @file expr_inverse_laplace_gaussian.c
+ * @brief Gaussian inverse Laplace families.
+ *
+ * Recognises supported Gaussian-related frequency expressions and their shifts. It constructs time-domain formulas
+ * while keeping the transformation's parameter conditions attached.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

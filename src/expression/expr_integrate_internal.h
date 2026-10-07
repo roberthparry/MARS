@@ -1,3 +1,15 @@
+/**
+ * @file expr_integrate_internal.h
+ * @brief Private symbolic integration rule interfaces.
+ *
+ * Declares structural matchers, primitive constructors and specialised integration attempts used by the expression
+ * integration units. These helpers operate under the integrator's ownership and variable-scope rules, not as
+ * independent public functions.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_INTEGRATE_INTERNAL_H
 #define EXPR_INTEGRATE_INTERNAL_H
 

@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_linear_transform.c
+ * @brief Linear coordinate transformations for ODEs.
+ *
+ * Matches supported changes of variables built from linear forms and constructs transformed solutions. It maps
+ * conditions and constants back to the original coordinates.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 

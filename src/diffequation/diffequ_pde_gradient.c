@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_gradient.c
+ * @brief Gradient-envelope PDE solutions.
+ *
+ * Matches supported gradient-dependent forms and constructs parameterised envelopes and their presentation. This
+ * specialised family is kept separate from linear transport and characteristic dispatch.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

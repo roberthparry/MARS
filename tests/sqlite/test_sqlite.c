@@ -1,3 +1,14 @@
+/**
+ * @file test_sqlite.c
+ * @brief SQLCipher connection and object-storage regressions.
+ *
+ * Checks mandatory keys, wrong-key rejection, encrypted persistence and supported MARS object round trips.
+ * Documented query and storage examples run through the same public database API.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

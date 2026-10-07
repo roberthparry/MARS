@@ -1,3 +1,14 @@
+/**
+ * @file test_number_special_functions.c
+ * @brief Generic numeric special-function regressions.
+ *
+ * Checks supported mathematical families beyond elementary arithmetic, including Struve and signal functions.
+ * Values and edge cases are exercised through the representation-independent public API.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <complex.h>
 #include <stdbool.h>
 #include <stdio.h>

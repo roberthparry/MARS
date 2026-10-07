@@ -1,3 +1,14 @@
+/**
+ * @file test_http.c
+ * @brief HTTP and web-service protocol regression suite.
+ *
+ * Exercises bounded transport, TLS, documents, forms, authentication, sessions, SOAP, events, WebSocket and unary
+ * gRPC against local fixtures. Complete README programs run after the ordinary protocol tests.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <arpa/inet.h>
 #define stack_t posix_signal_stack_t
 #include <signal.h>

@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_linear_subst.c
+ * @brief Shifted affine substitutions for ODEs.
+ *
+ * Finds supported shifted ratios and reduces them to a solvable form. Conditions are transformed consistently so
+ * the returned constant belongs to the original problem.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS

@@ -3,12 +3,17 @@
 `integrator_t` provides adaptive `number_t`-based quadrature over finite
 intervals `[a, b]`, with automatic subinterval bisection and error control:
 
-| Function | Rule | Degree | Notes |
-|---|---|---|---|
-| `intg_integral` | Turán T15/T4 | 31 | 1-D, `expr_t` expression, full `number_t` precision |
-| `intg_double_integral` | Turán T15/T4 | 31 | 2-D rectangular domain |
-| `intg_triple_integral` | Turán T15/T4 | 31 | 3-D rectangular domain |
-| `intg_integral_multi` | Turán T15/T4 | 31 | N-D rectangular domain, adaptive in the outermost variable, with symbolic fast paths for recognised `expr_t` structure |
+| Function | Domain |
+|---|---|
+| `intg_integral` | One-dimensional `expr_t` expression |
+| `intg_double_integral` | Two-dimensional rectangle |
+| `intg_triple_integral` | Three-dimensional rectangular box |
+| `intg_integral_multi` | N-dimensional rectangular domain, with recognised symbolic fast paths |
+
+All numerical entry points share the `number_t` engine described below.
+`src/integrator/integrator_core.c` owns configuration and the public
+multidimensional wrappers; `integrator_mp.c` owns numerical quadrature and
+`integrator_special.c` owns recognised structural fast paths.
 
 ---
 
@@ -28,44 +33,28 @@ by reciprocal exponential decay, without directly evaluating an undefined
 endpoint product. It is a numerical convergence check, not a general symbolic
 limit prover; a singular endpoint is never unconditionally assigned zero.
 
-### G7K15 Background
+### Adaptive Gauss–Kronrod fallback
 
 Each subinterval is evaluated with a 15-point Kronrod rule (K15) containing an
 embedded 7-point Gauss rule (G7). The per-subinterval error estimate is
 `|K15 − G7|`. The subinterval with the largest error is bisected at each step.
-Practical accuracy tops out near 21 digits, which is why the public `expr_t`
-integrator uses the higher-degree Turán path for full `number_t` precision.
+This path is available when the initial tanh–sinh attempt does not supply an
+acceptable result. Neither path evaluates second derivatives or implements a
+separate Turán rule. Requested numeric precision alone does not guarantee that
+the quadrature estimate meets the requested tolerance.
 
-### Turán T15/T4 (`intg_integral`, `intg_double_integral`, `intg_triple_integral`)
-
-Uses both `f(x)` and `f''(x)` at 8 symmetric node positions per subinterval
-(Turán quadrature), achieving degree-31 polynomial exactness versus degree 29
-for G7K15. The second derivative is computed automatically by differentiating
-the `expr_t` expression graph, so no user-supplied derivative is needed. The
-nested T4 sub-rule (4 of the 8 positions) provides the error estimate.
-
-Because the rule exploits curvature information, smooth integrands typically
-converge in far fewer subintervals than G7K15. For example, `∫₀¹ exp(x) dx`
-takes 3 subintervals with Turán T15/T4 at the default `1e-27` tolerance
-versus 39 with G7K15 at `1e-21`, and the Turán result carries an extra 6
-digits of accuracy.
-
-Integrands that are polynomial of degree ≤ 1, such as `∫₀⁵ 1 dx = 5` and
-`∫₀⁵ x dx = 12.5`, are evaluated exactly to `number_t` precision in a single
-subinterval. The G7K15 rule accumulates about `1e-25` floating-point noise
-even for constants and cannot reach `1e-27` tolerance for these cases.
-
-Both rules stop when:
+The requested convergence criterion is:
 
 ```
 total_error ≤ max(abs_tol, rel_tol × |result|)
 ```
 
-or the maximum subinterval count is reached.
+Work limits can stop refinement earlier; inspect the returned status and error
+estimate rather than assuming that a returned value has converged.
 
 ### Symbolic Fast Path (`intg_integral_multi`)
 
-Before falling back to general adaptive Turán evaluation,
+Before falling back to general adaptive numerical evaluation,
 `intg_integral_multi()` tries a symbolic plan for several important `expr_t`
 expression families:
 
@@ -316,11 +305,11 @@ All declarations are in `include/integrator.h`.
   - Reversed limits (`a > b`) are handled correctly.
   - Requires `#include "expression.h"`; that is already included transitively via `integrator.h`.
 
-- `int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var, number_t ay, number_t by, number_t *result, number_t *error_est)` — 2-D Turán T15/T4 over `[ax,bx] × [ay,by]`. Adapts in `y`; evaluates the inner `x` integral with the same `number_t` engine.
+- `int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var, number_t ay, number_t by, number_t *result, number_t *error_est)` — 2-D adaptive quadrature over `[ax,bx] × [ay,by]`. Adapts in `y`; evaluates the inner `x` integral with the same `number_t` engine.
 
-- `int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var, number_t ay, number_t by, expr_t *z_var, number_t az, number_t bz, number_t *result, number_t *error_est)` — 3-D Turán T15/T4 over `[ax,bx] × [ay,by] × [az,bz]`. Adapts in `z`.
+- `int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var, number_t ay, number_t by, expr_t *z_var, number_t az, number_t bz, number_t *result, number_t *error_est)` — 3-D adaptive quadrature over `[ax,bx] × [ay,by] × [az,bz]`. Adapts in `z`.
 
-- `int intg_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t * const *vars, const number_t *lo, const number_t *hi, number_t *result, number_t *error_est)` — N-D Turán T15/T4 over a rectangular domain.
+- `int intg_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t * const *vars, const number_t *lo, const number_t *hi, number_t *result, number_t *error_est)` — N-D adaptive quadrature over a rectangular domain.
   - `vars[0]` is the innermost variable, `vars[ndim-1]` the outermost, adapted by bisection.
   - `lo[i]` / `hi[i]` are the bounds for `vars[i]`.
   - All `2^N` mixed second-derivative expressions are built automatically.
@@ -374,12 +363,6 @@ the adaptive engine can reuse them without runtime reinitialisation.
 search for the maximum-error interval is used; this is `O(n)` per step, but
 `n` rarely exceeds tens of intervals for well-behaved integrands.
 
-**Turán degree advantage** comes from incorporating `f''` directly into the
-quadrature weights. For an 8-node symmetric rule this raises exactness from
-degree 15 (`f` only) to degree 31. The T4 nested sub-rule uses alternating
-node positions rather than consecutive ones, which keeps all weights positive
-and the rule well conditioned.
-
 **Cache coherence** in `intg_integral`: `expr_eval` detects variable changes
 automatically via epoch tracking. Each call to `expr_set_val()` advances the
 variable's epoch, and computed nodes recompute when they see a newer epoch from
@@ -395,7 +378,7 @@ locking.
 - Only finite intervals `[a, b]` are supported directly. For improper integrals, apply a substitution before passing the transformed integrand.
 - `intg_integral` and the multi-dimensional variants require the integrand to be expressible as an `expr_t` graph.
 - Functions with endpoint singularities or sharp peaks may require many subdivisions. Increase the max interval count via `intg_set_interval_count_max()` or apply a smoothing substitution.
-- The G7K15 rule evaluates the integrand at 15 points per subinterval; the Turán rule evaluates `f` and `f''` at 8 points, which is 16 evaluations in effect. For expensive point evaluations, the Turán rule's lower subinterval count usually wins despite the per-node overhead.
+- Tanh–sinh refinement and the 15-point Gauss–Kronrod fallback have different sampling costs. Difficult integrands can exhaust the configured work limit without meeting tolerance.
 
 ## Benchmark Coverage
 

@@ -1,3 +1,14 @@
+/**
+ * @file expr_inverse_laplace_special.c
+ * @brief Special-function inverse Laplace pairs.
+ *
+ * Recognises supported radical, general-power and special-function spectra. These rules extend elementary inverses
+ * without asserting that arbitrary frequency expressions are invertible in closed form.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include <stdlib.h>

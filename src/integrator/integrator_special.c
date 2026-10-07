@@ -1,3 +1,14 @@
+/**
+ * @file integrator_special.c
+ * @brief Recognised separable and affine integration paths.
+ *
+ * Matches supported expression structures and evaluates their specialised integral forms. These fast paths
+ * supplement numerical quadrature and must only accept structures whose mathematical assumptions are satisfied.
+ *
+ * This is part of integrator.h. Callers configure opaque integrator handles and inspect completion or error
+ * information rather than relying on a particular internal algorithm.
+ */
+
 #define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

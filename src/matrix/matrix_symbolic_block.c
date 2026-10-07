@@ -1,3 +1,14 @@
+/**
+ * @file matrix_symbolic_block.c
+ * @brief Characteristic polynomials and block matrix operations.
+ *
+ * Dispatches polynomial invariants, Schur complements, block inverses and block solves over supported matrices.
+ * These operations build on the common symbolic and numerical matrix machinery.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 

@@ -1,3 +1,15 @@
+/**
+ * @file expr_fourier_internal.h
+ * @brief Private Fourier rule context and construction helpers.
+ *
+ * Defines temporary-node ownership, accumulated conditions and forward or inverse transform context. Fourier rule
+ * units share these helpers to build formulas and retain domain restrictions without leaking intermediate
+ * expressions.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_EXPR_FOURIER_INTERNAL_H
 #define MARS_EXPR_FOURIER_INTERNAL_H
 

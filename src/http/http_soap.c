@@ -1,3 +1,14 @@
+/**
+ * @file http_soap.c
+ * @brief SOAP envelope construction and request preparation.
+ *
+ * Builds supported SOAP versions using XML nodes and prepares the corresponding HTTP headers and body atomically.
+ * It supplies protocol framing, not WSDL-generated service methods.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* SOAP envelope construction and atomic request preparation. */
 #include <stdlib.h>
 #define MARS_HTTP_INTERNAL_ACCESS
