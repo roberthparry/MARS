@@ -1,13 +1,22 @@
-#ifndef ARRAY_H
-#define ARRAY_H
-
 /**
  * @file array.h
  * @brief Generic, opaque, appendable, and sortable array container.
  *
+ * Use array_t for ordered collections of fixed-size elements that permit duplicates,
+ * indexed access, appending and sorting. This header also supplies array slices and
+ * a LIFO stack abstraction for views and last-in-first-out processing.
+ *
+ * Choose arrays for sequence-oriented data rather than key-based lookup or unique
+ * membership. Clone and destroy callbacks determine how stored elements manage
+ * their resources; follow each operation's lifetime rules for borrowed elements
+ * and slices when the parent collection changes.
+ *
  * Elements are stored inline in a dense arena. Supports deep copy and cleanup
  * via user-supplied clone and destroy callbacks.
  */
+
+#ifndef ARRAY_H
+#define ARRAY_H
 
 #include <stdbool.h>
 #include <stddef.h>

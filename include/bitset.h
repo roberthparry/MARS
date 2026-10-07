@@ -1,13 +1,22 @@
-#ifndef BITSET_H
-#define BITSET_H
-
 /**
  * @file bitset.h
  * @brief Dynamic, thread-safe bitset backed by a uint64_t arena.
  *
+ * Use bitset_t for compact flags and membership indexed by non-negative integers.
+ * The API provides individual bit access, Boolean combinations, counting and
+ * iteration without allocating a separate object for each flag.
+ *
+ * This is appropriate for dense identifier ranges, occupancy maps and selection
+ * masks. Use set.h instead when members are arbitrary values rather than bit
+ * positions; very sparse, widely separated positions may need a different storage
+ * strategy.
+ *
  * Bits are indexed from 0. The bitset grows automatically to accommodate
  * any index passed to a mutating function. Out-of-range reads return false.
  */
+
+#ifndef BITSET_H
+#define BITSET_H
 
 #include <stdbool.h>
 #include <stddef.h>

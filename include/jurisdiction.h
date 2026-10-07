@@ -1,3 +1,19 @@
+/**
+ * @file jurisdiction.h
+ * @brief Jurisdiction-aware holidays, working days and local-time rules.
+ *
+ * The configured jurisdiction engine combines rule data with datetime_t values to
+ * answer public-holiday, observance, weekend and working-day queries. It also
+ * provides jurisdiction-specific timezone and daylight-saving information, including
+ * dated exceptions represented in the installed catalogue.
+ *
+ * Use this module for business calendars and calculations whose result depends on
+ * local rules, rather than calendar arithmetic alone. Results depend on the
+ * coverage and currency of the configured database; they do not establish legal
+ * requirements independently of that data. Use datetime.h for the underlying
+ * date representation and ordinary date calculations.
+ */
+
 #ifndef MARS_JURISDICTION_H
 #define MARS_JURISDICTION_H
 

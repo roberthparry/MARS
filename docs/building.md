@@ -22,7 +22,7 @@ Required libraries:
 - SQLCipher
 - Zstandard, with the streaming `ZSTD_compressStream2` API
 - libsodium, with the XChaCha20-Poly1305 secretstream API
-- libcurl 7.85.0 or newer, with HTTPS and thread-safe global initialisation
+- libcurl 7.86.0 or newer, with HTTPS and thread-safe global initialisation
 
 Optional libraries:
 
@@ -66,6 +66,13 @@ Static archive consumers must also link libcurl and its transitive dependencies.
 `make check-deps` checks the minimum header version and links a transport probe.
 The ordinary HTTP tests additionally use Python 3's standard library for local
 HTTP/HTTPS fixtures; they do not contact external services.
+The WebSocket API needs a libcurl build with ws/wss enabled; unary gRPC needs
+HTTP/2 support. The runtime reports missing protocol support explicitly.
+The loopback WebSocket and HTTP/2/gRPC fixtures use only Python's standard
+library. Protocol Buffers encoding is native C and adds no external dependency.
+Recent libcurl releases are recommended; the protocol tests were verified with
+libcurl 8.18.0. Older distribution packages may need upgrading or rebuilding
+with these optional protocol features enabled.
 
 The [webserver module](webserver.md) uses Linux sockets and adds no dependency.
 Its local tests and example need loopback sockets and process creation; they do

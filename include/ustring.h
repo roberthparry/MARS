@@ -1,16 +1,16 @@
-#ifndef USTRING_H
-#define USTRING_H
-
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <wchar.h>
-
 /**
  * @file ustring.h
  * @brief Dynamic text string type with Unicode-aware operations.
+ *
+ * Use string_t for MARS text storage, parsing, construction, searching and formatting
+ * instead of managing raw C string buffers. Unicode-aware operations distinguish
+ * user-visible characters from encoded byte positions; cursor and view facilities
+ * support structured parsing without exposing the mutable representation.
+ *
+ * The normal text interface is not a container for arbitrary binary file or network
+ * data. Use the documented strict or exact input helpers when replacement of
+ * malformed UTF-8 is inappropriate, and follow each API's borrowing and lifetime
+ * rules for views and cursors.
  *
  * ## Ownership model
  *
@@ -31,6 +31,16 @@
  * U+FFFD (Unicode replacement character). Modification functions preserve
  * valid text unless explicitly documented otherwise.
  */
+
+#ifndef USTRING_H
+#define USTRING_H
+
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <wchar.h>
 
 /* =========================================================================
    Opaque type

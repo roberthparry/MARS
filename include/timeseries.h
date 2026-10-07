@@ -1,17 +1,16 @@
-#ifndef TIMESERIES_H
-#define TIMESERIES_H
-
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-
-#include "datetime.h"
-#include "matrix.h"
-#include "number.h"
-
 /**
  * @file timeseries.h
  * @brief Datetime-indexed forecasting and time-series analysis API.
+ *
+ * Use this module for dated observations, calendar-aware analysis and forecasting
+ * in scientific or business applications. Series operations keep dates associated
+ * with numeric values so that alignment, missing observations and forecast periods
+ * can be handled explicitly.
+ *
+ * It combines datetime.h indexing with number.h arithmetic and statistical model
+ * results. Choose matrix.h for unindexed numerical tables; this module adds temporal
+ * semantics and supported forecasting workflows rather than a general real-time
+ * stream-processing engine.
  *
  * `timeseries_t` is an opaque series type for regularly or irregularly
  * indexed numeric observations backed by the shared `number_t` layer.
@@ -27,6 +26,17 @@
  * frequency semantics intentionally start at daily granularity. Sub-daily
  * frequencies are left for future expansion.
  */
+
+#ifndef TIMESERIES_H
+#define TIMESERIES_H
+
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "datetime.h"
+#include "matrix.h"
+#include "number.h"
 
 /** @brief Opaque series owning observations, missing flags and optional datetime indices. */
 typedef struct timeseries_t timeseries_t;

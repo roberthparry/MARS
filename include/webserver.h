@@ -1,3 +1,21 @@
+/**
+ * @file webserver.h
+ * @brief Bounded synchronous Linux web server with opaque handles.
+ *
+ * Use websrv_t to implement a listening web service with method-and-path routing,
+ * bounded requests and application callbacks. Opaque request and response handles
+ * provide text, binary, JSON and XML body handling, while the caller controls the
+ * synchronous serving loop.
+ *
+ * This module is suitable for local services, embedded endpoints and integration
+ * tests. It supplies the shared webmethod_t type and HTTP_GET-style method constants.
+ * Use http.h for client requests. Deployment requiring encrypted connections,
+ * concurrent workers or persistent connections needs facilities beyond this server.
+ *
+ * No TLS, workers or persistent connections. Handles require external synchronisation.
+ * Callbacks must not re-enter, modify routes on, or destroy their active server.
+ */
+
 #ifndef MARS_WEBSERVER_H
 #define MARS_WEBSERVER_H
 #include <stdint.h>
@@ -5,13 +23,6 @@
 #include "ustring.h"
 #include "json.h"
 #include "xml.h"
-
-/**
- * @file webserver.h
- * @brief Bounded synchronous Linux web server with opaque handles.
- * No TLS, workers or persistent connections. Handles require external synchronisation.
- * Callbacks must not re-enter, modify routes on, or destroy their active server.
- */
 
 /** @brief HTTP request methods shared by the client and web server. */
 typedef enum {

@@ -24,6 +24,7 @@ MODULE_GUIDES = {
     "expression.h": "expression.md",
     "file.h": "file.md",
     "http.h": "http.md",
+    "protobuf.h": "protobuf.md",
     "webserver.h": "webserver.md",
     "integrator.h": "integrator.md",
     "json.h": "json.md",

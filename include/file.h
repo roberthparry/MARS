@@ -1,15 +1,26 @@
-#ifndef MARS_FILE_H
-#define MARS_FILE_H
-
 /**
  * @file file.h
  * @brief Opaque Linux file and directory streams, text helpers and filesystem operations.
+ *
+ * Use this module as the Linux filesystem interface for MARS applications: opening,
+ * reading, writing and seeking files; listing directories; inspecting attributes
+ * and symbolic-link targets; changing permissions and ownership; and copying,
+ * moving or deleting filesystem objects.
+ *
+ * The API also provides bounded streaming compression, authenticated file encryption
+ * and SQLCipher import/export of file contents and selected metadata. These helpers
+ * operate on stored data, not serialised open descriptors. Observe each operation's
+ * path, overwrite, size-limit and verification policy; network transport belongs in
+ * http.h rather than the file module.
  *
  * Paths are copied. Handles are not shared between threads without external
  * synchronisation. Failures set errno and the initiating handle's error code;
  * successful operations clear that code. Getters do not alter it.
  * Returned strings and arrays belong to the caller. No FILE or descriptor is exposed.
  */
+
+#ifndef MARS_FILE_H
+#define MARS_FILE_H
 
 #include <stdbool.h>
 #include <stddef.h>

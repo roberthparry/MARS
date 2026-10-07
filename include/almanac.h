@@ -1,3 +1,18 @@
+/**
+ * @file almanac.h
+ * @brief Catalogue-backed astronomy, ephemerides and observer-dependent sky positions.
+ *
+ * The opaque almanac_t engine combines configured ephemeris data with MARS date
+ * and numerical types to calculate apparent celestial positions. Facilities cover
+ * body catalogues, navigation coordinates, observer geometry, rise and set events,
+ * transits, phases and eclipse searches.
+ *
+ * Use this module for astronomical almanacs, sky-position queries and navigation
+ * calculations that need catalogue-backed results. Available bodies and date
+ * coverage depend on the installed data. Use datetime.h for civil date operations
+ * and its lighter solar and lunar helpers; this module owns the astronomical engine.
+ */
+
 #ifndef MARS_ALMANAC_H
 #define MARS_ALMANAC_H
 

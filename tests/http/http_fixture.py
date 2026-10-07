@@ -25,7 +25,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path
         status = 200
         headers = []
-        if path == "/get?message=MARS":
+        if path == "/inspect":
+            headers.extend([("X-Authorization", self.headers.get("Authorization", "")),
+                            ("X-Cookie", self.headers.get("Cookie", "")),
+                            ("X-Type", self.headers.get("Content-Type", "")),
+                            ("X-SOAPAction", self.headers.get("SOAPAction", ""))])
+        elif path == "/redirect-loop":
+            status, body = 302, b"loop"
+            headers.append(("Location", "/redirect-loop"))
+        elif path == "/redirect-away":
+            status, body = 302, b"blocked"
+            headers.append(("Location", "http://example.invalid/"))
+        elif path == "/get?message=MARS":
             body = b'{"args":{"message":"MARS"}}'
             headers.append(("Content-Type", "application/json"))
         elif path == "/post":
@@ -106,8 +117,11 @@ server.socket.close()
 server.socket = socket.socket(fileno=int(sys.argv[1]))
 server.server_address = server.socket.getsockname()
 server.daemon_threads = True
-if len(sys.argv) == 4:
+if len(sys.argv) >= 4:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(sys.argv[2], sys.argv[3])
+    if len(sys.argv) == 5:
+        context.load_verify_locations(sys.argv[2])
+        context.verify_mode = ssl.CERT_REQUIRED
     server.socket = context.wrap_socket(server.socket, server_side=True)
 server.serve_forever()

@@ -18,7 +18,7 @@ bool http_global_acquire(void)
         ok = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
         if (ok) {
             const curl_version_info_data *info = curl_version_info(CURLVERSION_NOW);
-            ok = info && info->version_num >= 0x075500 && (info->features & CURL_VERSION_THREADSAFE);
+            ok = info && info->version_num >= 0x075600 && (info->features & CURL_VERSION_THREADSAFE);
             if (!ok)
                 curl_global_cleanup();
         }
@@ -69,6 +69,9 @@ void http_client_free(http_client_t *client)
         return;
     curl_easy_cleanup(client->easy);
     array_destroy(client->ca);
+    array_destroy(client->certificate);
+    http_secret_free(client->private_key);
+    string_free(client->key_password);
     string_free(client->message);
     free(client);
     http_global_release();
@@ -104,28 +107,9 @@ bool http_client_set_ca_file(http_client_t *client, const string_t *path)
         client->ca = NULL;
         return true;
     }
-    file_t *file = file_new(path);
-    array_t *bytes = array_create(1, NULL, NULL);
-    unsigned char block[8192];
-    bool ok = file && bytes && file_open_read(file);
-    while (ok) {
-        size_t count = 0;
-        ok = file_read(file, block, sizeof(block), &count);
-        if (!ok || !count)
-            break;
-        if (count > 4u * 1024u * 1024u - array_size(bytes)) {
-            ok = false;
-            break;
-        }
-        ok = array_append_carray(bytes, block, count);
-    }
-    if (file && file_is_open(file) && !file_close(file))
-        ok = false;
-    file_free(file);
-    if (!ok || !array_size(bytes)) {
-        array_destroy(bytes);
+    array_t *bytes = http_read_secret_file(path);
+    if (!bytes)
         return false;
-    }
     /* Do not reuse a TLS connection established under a different trust bundle. */
     CURL *fresh = curl_easy_init();
     if (!fresh) {

@@ -72,6 +72,7 @@ def main():
     failed = 0
     server = None
     listener = None
+    protocol_peers = {}
     try:
         for ident, path, line, code, has_main, expected in examples():
             if not config.get(ident, config.get("enabled", True)):
@@ -98,6 +99,20 @@ def main():
                 try:
                     with tempfile.TemporaryDirectory(prefix="mars-readme-") as working:
                         command = [str(binary)]
+                        protocol = ("grpc" if "http_request_set_grpc(" in code else
+                                    "websocket" if "http_websocket_open(" in code else None)
+                        if protocol:
+                            if protocol not in protocol_peers:
+                                peer_socket = socket.socket()
+                                peer_socket.bind(("127.0.0.1", 0))
+                                peer_socket.listen(8)
+                                peer_process = subprocess.Popen(
+                                    ["python3", str(ROOT / f"tests/http/{protocol}_fixture.py"),
+                                     str(peer_socket.fileno())], pass_fds=[peer_socket.fileno()])
+                                protocol_peers[protocol] = (peer_socket, peer_process)
+                            peer_socket, _ = protocol_peers[protocol]
+                            route = "/mars.Test/Echo" if protocol == "grpc" else "/echo"
+                            command.append(f"http://127.0.0.1:{peer_socket.getsockname()[1]}{route}")
                         if path == "docs/file.md":
                             arity = re.search(r"argc != (\d+)", code)
                             if arity:
@@ -135,6 +150,10 @@ def main():
             else:
                 print(f"PASS README {ident}", flush=True)
     finally:
+        for peer_socket, peer_process in protocol_peers.values():
+            peer_process.terminate()
+            peer_process.wait(timeout=5)
+            peer_socket.close()
         if server is not None:
             server.terminate()
             server.wait(timeout=5)

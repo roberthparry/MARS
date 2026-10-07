@@ -1,15 +1,15 @@
-#ifndef MATRIX_H
-#define MATRIX_H
-
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-
-#include "expression.h"
-
 /**
  * @file matrix.h
  * @brief Generic high-precision matrix type over `number_t` and `expr_t`.
+ *
+ * Use matrix_t for numeric and symbolic linear algebra, including matrix arithmetic,
+ * determinants, linear systems, decompositions and supported matrix functions.
+ * The shared interface allows algorithms to work with structured or general
+ * matrices without exposing their storage layout.
+ *
+ * Element domains, dimensions and structural assumptions determine which operations
+ * are meaningful. Use number.h for scalar arithmetic and expression.h for symbolic
+ * entries; consult individual operations for ownership and singularity handling.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
  * details such as element type, storage representation, and vtables.
@@ -26,6 +26,15 @@
  * retained `expr_t *` handles. All operations dispatch through internal
  * vtables. No type switches or storage switches appear in user code.
  */
+
+#ifndef MATRIX_H
+#define MATRIX_H
+
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "expression.h"
 
 typedef struct matrix_t matrix_t;
 typedef struct mat_bindings_t mat_bindings_t;

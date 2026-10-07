@@ -162,7 +162,7 @@ static bool add_header_line(struct curl_slist **list, const char *text)
     return true;
 }
 
-static bool outgoing_headers(http_client_t *client, const http_request_t *request, struct curl_slist **list)
+bool http_outgoing_headers(http_client_t *client, const http_request_t *request, struct curl_slist **list)
 {
     size_t bytes = 0;
     for (size_t i = 0; i < dictionary_size(request->headers); ++i) {
@@ -197,7 +197,7 @@ limit:
     return false;
 }
 
-static http_response_t *perform(http_client_t *client, const http_request_t *request,
+http_response_t *http_perform_once(http_client_t *client, const http_request_t *request,
                                 http_body_fn sink, void *sink_data)
 {
     if (!client || !request || client->active || !client->easy) {
@@ -238,7 +238,7 @@ static http_response_t *perform(http_client_t *client, const http_request_t *req
         http_fail(client, HTTP_ERROR_LIMIT, "Request body limit exceeded");
         goto done;
     }
-    if (!outgoing_headers(client, request, &headers))
+    if (!http_outgoing_headers(client, request, &headers))
         goto done;
     curl_easy_reset(client->easy);
     CURLcode code = CURLE_OK;
@@ -247,6 +247,14 @@ static http_response_t *perform(http_client_t *client, const http_request_t *req
     if (code != CURLE_OK) goto curl_fail; \
 } while (0)
     SET(CURLOPT_URL, string_c_str(request->url));
+    if (request->http2) {
+        const curl_version_info_data *info = curl_version_info(CURLVERSION_NOW);
+        if (!info || !(info->features & CURL_VERSION_HTTP2)) {
+            http_fail(client, HTTP_ERROR_PROTOCOL, "This libcurl build has no HTTP/2 support");
+            goto done;
+        }
+        SET(CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
+    }
     SET(CURLOPT_PROTOCOLS_STR, "http,https");
     SET(CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
     SET(CURLOPT_FOLLOWLOCATION, 0L);
@@ -269,6 +277,10 @@ static http_response_t *perform(http_client_t *client, const http_request_t *req
     SET(CURLOPT_NOPROGRESS, 0L);
     SET(CURLOPT_XFERINFOFUNCTION, progress);
     SET(CURLOPT_XFERINFODATA, &transfer);
+    if (!http_apply_session(client)) {
+        http_fail(client, HTTP_ERROR_TRANSPORT, "Cannot configure HTTP session");
+        goto done;
+    }
     if (client->ca) {
         struct curl_blob ca = {.data = array_get(client->ca, 0), .len = array_size(client->ca), .flags = CURL_BLOB_COPY};
         SET(CURLOPT_CAINFO_BLOB, &ca);
@@ -305,7 +317,15 @@ static http_response_t *perform(http_client_t *client, const http_request_t *req
         http_fail(client, HTTP_ERROR_PROTOCOL, "No final HTTP response");
         goto done;
     }
-    ok = true;
+    long version = 0;
+    code = curl_easy_getinfo(client->easy, CURLINFO_HTTP_VERSION, &version);
+    if (code != CURLE_OK) goto curl_fail;
+    response->http2 = version == CURL_HTTP_VERSION_2_0;
+    if (request->http2 && !response->http2) {
+        http_fail(client, HTTP_ERROR_PROTOCOL, "The service did not negotiate HTTP/2");
+        goto done;
+    }
+    ok = http_check_cookies(client);
     goto done;
 curl_fail:
     if (client->error == HTTP_ERROR_NONE)
@@ -316,6 +336,7 @@ curl_fail:
 memory:
     http_fail(client, HTTP_ERROR_MEMORY, "Cannot allocate response");
 done:
+    if (response) response->header_bytes = transfer.header_bytes;
     if (transfer.upload && file_is_open(transfer.upload) && !file_close(transfer.upload)) {
         http_fail(client, HTTP_ERROR_IO, "Cannot close upload file");
         ok = false;
@@ -336,7 +357,7 @@ done:
 /* Send synchronously, retaining the bounded response body. */
 http_response_t *http_client_send(http_client_t *client, const http_request_t *request)
 {
-    return perform(client, request, NULL, NULL);
+    return http_follow_redirects(client, request);
 }
 
 /* Send synchronously to a borrowed callback sink. */
@@ -348,7 +369,7 @@ http_response_t *http_client_stream(http_client_t *client, const http_request_t 
             http_fail(client, HTTP_ERROR_ARGUMENT, "Missing response sink");
         return NULL;
     }
-    return perform(client, request, callback, user_data);
+    return http_perform_once(client, request, callback, user_data);
 }
 
 typedef struct { http_client_t *client; file_t *file; } file_sink_t;
