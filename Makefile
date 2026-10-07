@@ -195,17 +195,20 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS)
 # ------------------------------------------------------------
 check-deps:
 	@missing=0; \
+	probe_dir=$$(mktemp -d /tmp/mars-check-deps.XXXXXX) || exit 1; \
+	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
 	packages=""; \
 	check_dep() { \
 	    name="$$1"; header="$$2"; lib="$$3"; package="$$4"; body="$$5"; \
 	    if ! printf '%s\n' "#include <stdint.h>" "#include <$$header>" "int main(void) { $$body; return 0; }" \
-	        | $(CC) -x c - -o /tmp/mars-check-dep $$lib >/dev/null 2>&1; then \
+	        | $(CC) -x c - -o "$$probe_dir/probe" $$lib >/dev/null 2>&1; then \
 	        echo "Missing $$name development files."; \
 	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
 	        packages="$$packages $$package"; \
 	        missing=1; \
 	    fi; \
-	    rm -f /tmp/mars-check-dep; \
+	    rm -f "$$probe_dir/probe"; \
 	}; \
 	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
 	check_dep "libcurl >= 7.86.0" "curl/curl.h" "$(CURL_CFLAGS) $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)" "libcurl4-openssl-dev" "_Static_assert(LIBCURL_VERSION_NUM >= 0x075600, \"libcurl too old\"); CURL *c = curl_easy_init(); curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, \"https\"); size_t n = 0; char b = 0; curl_ws_send(c, &b, 0, &n, 0, CURLWS_TEXT); curl_easy_cleanup(c)"; \
@@ -365,6 +368,15 @@ FILE_COVERAGE_DIR := build/coverage/file
 FILE_COVERAGE_SRCS := $(wildcard src/file/*.c)
 FILE_COVERAGE_OBJS := $(patsubst src/file/%.c,$(FILE_COVERAGE_DIR)/%.o,$(FILE_COVERAGE_SRCS))
 FILE_TEST_HELPERS = $(filter $(TEST_BUILD_DIR)/file/%.o,$(TEST_HELPER_OBJS))
+
+# Gate each compiled or linked artefact, not just aggregate targets: sibling
+# prerequisites could otherwise start compiling before the check in parallel.
+# Order-only prerequisites avoid rebuilding current artefacts merely because
+# the dependency check is phony. Direct object and executable targets are covered.
+$(OBJS) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
+$(BENCH_OBJS) $(SCRATCH_OBJS) $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) \
+$(BENCH_BINS) $(SCRATCH_BINS) $(QFLOAT_TOOL_BIN) \
+$(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file: | check-deps
 
 $(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file.h src/file/file_internal.h Makefile
 	@mkdir -p $(dir $@)
