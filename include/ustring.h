@@ -223,6 +223,20 @@ int string_append_string(string_t *s, const string_t *suffix);
 int string_append_chars(string_t *s, const char *buffer, size_t size);
 
 /**
+ * @brief Append complete UTF-8 scalars verbatim, without Unicode normalisation.
+ *
+ * Intended for protocols whose names and values distinguish canonically equivalent Unicode sequences.
+ * Malformed, overlong, surrogate and incomplete encodings are rejected without modifying the destination.
+ * Embedded NUL scalars are allowed. The source may refer to bytes already stored in the destination.
+ *
+ * @param s Destination string; must not be NULL.
+ * @param buffer Borrowed UTF-8 bytes; NULL is allowed only for zero size.
+ * @param size Byte count, not character count; zero succeeds without changing the destination.
+ * @return Zero on success, or -1 for invalid input, size overflow or allocation failure.
+ */
+int string_append_utf8_exact(string_t *s, const char *buffer, size_t size);
+
+/**
  * @brief Append a single ASCII character.
  *
  * @param s  Destination string. Must not be @c NULL.

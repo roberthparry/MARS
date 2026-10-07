@@ -25,6 +25,7 @@ MODULE_GUIDES = {
     "file.h": "file.md",
     "integrator.h": "integrator.md",
     "json.h": "json.md",
+    "xml.h": "xml.md",
     "jurisdiction.h": "jurisdiction.md",
     "matrix.h": "matrix.md",
     "number.h": "number.md",

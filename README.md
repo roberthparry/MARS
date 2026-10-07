@@ -45,6 +45,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
+- **`xml_t`** — native streaming XML with dictionary-backed attributes, ordered mixed content and no external XML dependency
 - **`sqlite_t`** — opaque SQLCipher-backed SQLite storage for encrypted MARS object persistence
 - **`file_t`** — opaque Linux file streams, UTF-8 helpers, metadata, compression, authenticated encryption and SQLCipher transfers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -357,6 +358,7 @@ int main(void) {
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](./docs/datetime.md) |
 | `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](./docs/timeseries.md) |
 | `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](./docs/json.md) |
+| `xml_t` | Native XML trees and streaming input/output with dictionary-backed attributes | [`docs/xml.md`](./docs/xml.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](./docs/string.md) |
 | `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](./docs/dictionary.md) |
 | `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](./docs/set.md) |

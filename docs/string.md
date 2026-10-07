@@ -606,6 +606,39 @@ Reports whether the condition described by view peek rune value holds.
 bool string_view_peek_rune_value(string_view_t view, string_pos_t pos, uint32_t *out, string_pos_t *next_pos_out);
 ```
 
+## Exact UTF-8 protocol spelling
+
+`string_append_utf8_exact(s, buffer, size)` appends complete UTF-8 scalars without
+NFC normalisation. Unlike ordinary text appends, it preserves canonically
+equivalent but differently encoded spellings, which XML names and namespace
+identifiers must distinguish. It rejects malformed or incomplete UTF-8 without
+changing the destination. The source may be a slice of the destination itself.
+A NULL source is permitted only with zero length; embedded NUL scalars are
+accepted. Later ordinary mutators may normalise the result, so continue using
+this exact append operation when spelling must be retained.
+
+The return value is zero on success or -1 for invalid input, overflow or
+allocation failure. The caller owns both the destination and source storage.
+
+```c
+#include "ustring.h"
+
+int main(void)
+{
+    string_t *text = string_new();
+    int status = string_append_utf8_exact(text, "e\xcc\x81", 3);
+    string_printf("status=%d bytes=%zu\n", status, string_byte_length(text));
+    string_free(text);
+    return 0;
+}
+```
+
+Output:
+
+```text
+status=0 bytes=3
+```
+
 ### `string_vsprintf_with_callback()`
 
 Returns the public result described by vsprintf with callback.
