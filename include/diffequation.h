@@ -1,15 +1,16 @@
-#ifndef DIFFEQUATION_H
-#define DIFFEQUATION_H
-
-#include <stddef.h>
-
-#include "equation.h"
-#include "matrix.h"
-
 /**
  * @file diffequation.h
- * @brief Construction, parsing, inspection, and formatting of differential
- *        equations.
+ * @brief Construction, parsing, inspection, and formatting of differential equations.
+ *
+ * Use this module to represent and solve supported ordinary and partial differential
+ * equations with explicit variables, parameters and conditions. It builds on the
+ * expression and equation modules and exposes inspection and presentation of the
+ * problem and its results.
+ *
+ * The solver recognises particular mathematical families rather than promising a
+ * closed-form solution for every differential equation. Check the reported result
+ * and retained conditions; use equation.h for algebraic equations without
+ * differential constraints.
  *
  * A problem consists of a base equation, its independent variables, constant
  * bindings, and optional initial or boundary conditions. The first symbolic
@@ -18,12 +19,20 @@
  * changes of variables, quadratic Bernoulli, and autonomous
  * derivative-quadratic first-order ordinary differential equations, together
  * with arbitrary-order constant-coefficient linear ODEs and second-order
- * equations that can be completed through Sturm-Liouville normalization.
+ * equations that can be completed through Sturm-Liouville normalisation.
  * Two-variable constant-coefficient homogeneous transport PDEs are solved
  * from explicit axis-aligned boundary data. The two-dimensional Laplace
  * equation is solved in Cartesian and polar coordinates as a general
  * harmonic family when no boundary data are supplied.
  */
+
+#ifndef DIFFEQUATION_H
+#define DIFFEQUATION_H
+
+#include <stddef.h>
+
+#include "equation.h"
+#include "matrix.h"
 
 /**
  * @brief An opaque differential-equation problem.

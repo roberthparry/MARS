@@ -95,7 +95,8 @@ Upstream licence information:
 
 ## HTTP transport
 
-MARS links the system libcurl library for HTTP/HTTPS transport. libcurl uses
+MARS links the system libcurl library for HTTP/HTTPS and WebSocket transport,
+including HTTP/2 for unary gRPC. Protocol Buffers encoding is native C. libcurl uses
 the curl licence (SPDX identifier `curl`); the authoritative terms and
 copyright notices are at <https://curl.se/docs/copyright.html>.
 Distributors bundling libcurl must retain the licence supplied with that

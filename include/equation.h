@@ -1,3 +1,21 @@
+/**
+ * @file equation.h
+ * @brief Algebraic equations, symbolic isolation and numerical root solving.
+ *
+ * The opaque equation_t type represents two expressions joined by equality, with
+ * optional symbol bindings. The API supports constructing and parsing equations,
+ * inspecting their sides, formatting them and obtaining solution collections.
+ *
+ * Use this module to solve algebraic constraints rather than merely evaluate an
+ * expression. Supported symbolic and polynomial paths retain exact values and
+ * surds where possible; numerical solving is available where an exact solution is
+ * not obtained. General equations are not guaranteed to have closed-form solutions.
+ *
+ * Use expression.h for the underlying symbolic expressions and diffequation.h for
+ * differential equations. Respect the documented ownership of equation handles,
+ * solution collections and borrowed entries within those collections.
+ */
+
 #ifndef EQUATION_H
 #define EQUATION_H
 

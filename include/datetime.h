@@ -1,9 +1,15 @@
-#ifndef _DATETIME_H
-#define _DATETIME_H
-
 /**
  * @file datetime.h
  * @brief Gregorian calendar datetime type with astronomical calculations.
+ *
+ * Use this module for civil date and time construction, calendar arithmetic,
+ * formatting, parsing and conversion between supported calendars and time scales.
+ * Timezone and daylight-saving helpers support local-time calculations, while
+ * Julian dates and basic solar and lunar calculations connect dates to astronomy.
+ *
+ * datetime_t represents dates and times at second resolution. Use jurisdiction.h
+ * for configured public-holiday and working-day rules, and almanac.h for
+ * catalogue-backed astronomical positions rather than civil calendar operations.
  *
  * Provides an opaque datetime_t type supporting:
  *   • Construction from year/month/day and optional time-of-day components
@@ -13,9 +19,12 @@
  *   • Astronomical calculations: sunrise/sunset times, moon phase
  *   • Formatting and parsing
  *
- * All datetime_t values are heap-allocated; callers must call datetime_free()
+ * All datetime_t values are heap-allocated; callers must call datetime_dealloc()
  * exactly once for each handle returned by a constructor.
  */
+
+#ifndef _DATETIME_H
+#define _DATETIME_H
 
 #include <stdint.h>
 #include <stdbool.h>

@@ -2,6 +2,14 @@
  * @file set.h
  * @brief Generic value-set container with a dense arena and lazy sorting.
  *
+ * Use set_t to maintain unique values with hash-based membership, insertion and
+ * removal. It supports iteration and sorted access while hiding the storage layout.
+ * Equality and hashing callbacks must describe the same notion of a unique value.
+ *
+ * Clone and destroy callbacks control element resource ownership. Prefer array.h
+ * when duplicates and positional sequence semantics matter, or dictionary.h when
+ * each unique key needs an associated value.
+ *
  * Design:
  *   - Elements stored inline in a dense arena (no holes, compacted on removal)
  *   - Each element slot stores its precomputed hash (HF2)

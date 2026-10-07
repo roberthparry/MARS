@@ -1,15 +1,25 @@
-#ifndef MARS_SQLITE_H
-#define MARS_SQLITE_H
-
 /**
  * @file sqlite.h
  * @brief Opaque SQLCipher-backed storage for MARS objects.
+ *
+ * Use this module for encrypted persistent data with SQLite query semantics.
+ * Opaque database and statement handles support SQL execution, parameter binding,
+ * typed result access and transactions. Object-storage helpers persist supported
+ * MARS values without exposing database implementation details.
+ *
+ * File-content import/export is available through file.h; live handles and open
+ * descriptors are not persistent objects. Applications are responsible for key
+ * management, transaction policy and handling query or storage failures. Encryption
+ * at rest does not replace application-level access control.
  *
  * The public type is intentionally named sqlite_t because callers should think
  * in terms of SQLite semantics. The implementation uses SQLCipher and refuses
  * to open a database without a non-empty key, so files created through this API
  * are encrypted at rest.
  */
+
+#ifndef MARS_SQLITE_H
+#define MARS_SQLITE_H
 
 #include <stdbool.h>
 #include <stddef.h>

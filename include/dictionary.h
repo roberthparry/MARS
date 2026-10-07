@@ -1,7 +1,14 @@
 /**
  * @file dictionary.h
- * @brief Generic key/value dictionary with optional deep-copy semantics,
- *        opaque entry handles, and lazy sorted views.
+ * @brief Generic key/value dictionary with optional deep-copy semantics, opaque entry handles, and lazy sorted views.
+ *
+ * Use dictionary_t when values need to be retrieved by a key, for example symbol
+ * tables, named properties and metadata. Caller-supplied key comparison and
+ * hashing policies must agree about key equality.
+ *
+ * Copy and cleanup callbacks define ownership of stored keys and values. Choose
+ * array.h for positional sequences or set.h for unique values without associated
+ * payloads; dictionary entries provide the key-to-value association.
  *
  * This dictionary provides:
  *   - insertion, lookup, replacement, and removal by key

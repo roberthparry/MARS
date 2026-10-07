@@ -1298,21 +1298,33 @@
   "tests/http/test_http.c": {
     "readme_examples": {
       "enabled": true,
+      "example_http_grpc": true,
       "example_http_json": true,
       "example_http_post_json": true,
+      "example_http_services": true,
+      "example_http_websocket": true,
       "example_http_xml": true
     },
     "tests": {
       "enabled": true,
+      "test_http_client_identity": true,
+      "test_http_event_stream": true,
       "test_http_file_upload_download": true,
+      "test_http_forms_auth_and_multipart": true,
+      "test_http_grpc_unary": true,
+      "test_http_grpc_verified_tls": true,
       "test_http_headers_status_and_reuse": true,
       "test_http_json_and_xml": true,
       "test_http_limits_timeout_and_truncation": true,
       "test_http_malformed_response_headers": true,
       "test_http_methods_and_binary": true,
+      "test_http_session_redirects_oauth": true,
+      "test_http_soap_envelopes_and_faults": true,
       "test_http_stream_and_cancellation": true,
       "test_http_validation_and_encoding": true,
       "test_http_verified_tls_and_trust_reset": true,
+      "test_http_websocket_failures_and_tls": true,
+      "test_http_websocket_messages": true,
       "test_http_xml_stream_and_body_replacement": true
     }
   },
@@ -1808,6 +1820,18 @@
         "test_number_struve_h": true,
         "test_number_struve_l": true
       }
+    }
+  },
+  "tests/protobuf/test_protobuf.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_protobuf_roundtrip": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_protobuf_limits_and_boundaries": true,
+      "test_protobuf_rejects_malformed": true,
+      "test_protobuf_wire_roundtrip": true
     }
   },
   "tests/qcomplex/test_qcomplex.c": {

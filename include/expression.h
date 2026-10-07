@@ -1,15 +1,18 @@
-#ifndef EXPRESSION_H
-#define EXPRESSION_H
-
-#include "number.h"
-#include "ustring.h"
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-
 /**
  * @file expression.h
  * @brief Lazy, vtable-driven, reference-counted differentiable value type.
+ *
+ * This is MARS's symbolic mathematics layer: expr_t graphs represent constants,
+ * variables and compositions of mathematical operations. Facilities include text
+ * parsing, bindings, simplification, numerical evaluation, differentiation and
+ * supported symbolic integration, summation and transforms, with expression,
+ * function and LaTeX output.
+ *
+ * Use this module when a calculation must retain its algebra or depend on symbols,
+ * rather than immediately produce a number_t value. It supplies the expressions
+ * used by equation, differential-equation and symbolic matrix operations. Symbolic
+ * operations have mathematical domain restrictions and do not cover every possible
+ * closed-form problem.
  *
  * Ownership rules:
  *   • Constructors and derivative builders normally return owning handles, released with expr_free().
@@ -31,6 +34,15 @@
  *   • Do not read, evaluate, differentiate, or mutate the same DAG from
  *     multiple threads concurrently without external synchronisation.
  */
+
+#ifndef EXPRESSION_H
+#define EXPRESSION_H
+
+#include "number.h"
+#include "ustring.h"
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 /** @brief Opaque reference-counted expression graph node. */
 typedef struct _expr_t expr_t;

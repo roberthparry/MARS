@@ -1,3 +1,23 @@
+/**
+ * @file xml.h
+ * @brief Opaque XML trees and incremental UTF-8 input/output.
+ *
+ * Use xml_t to construct, inspect and serialise XML documents, with incremental
+ * readers and writers for bounded streaming input and output. Dictionary-backed
+ * attributes and ordered child nodes bridge XML data to the existing MARS
+ * containers while retaining mixed text and element content.
+ *
+ * This native parser requires no external XML parsing library. It is suitable for
+ * document interchange and the XML representation of SOAP payloads; http.h supplies
+ * the SOAP and network protocol handling. It is not a validating XML processor or
+ * a byte-for-byte document preservation tool.
+ *
+ * Attributes use dictionary_t with string_t * keys and values. Ordered children retain repeated elements and mixed
+ * content. CDATA is normalised to text; entity spellings and the XML declaration are not retained.
+ * DTDs and external entities are rejected. No schema validation, XPath, XInclude or network access is performed.
+ * Use separate readers in different threads; a reader, its callback and a tree must not be used concurrently.
+ */
+
 #ifndef MARS_XML_H
 #define MARS_XML_H
 
@@ -5,16 +25,6 @@
 #include <stddef.h>
 #include "dictionary.h"
 #include "ustring.h"
-
-/**
- * @file xml.h
- * @brief Opaque XML trees and incremental UTF-8 input/output.
- *
- * Attributes use dictionary_t with string_t * keys and values. Ordered children retain repeated elements and mixed
- * content. CDATA is normalised to text; entity spellings and the XML declaration are not retained.
- * DTDs and external entities are rejected. No schema validation, XPath, XInclude or network access is performed.
- * Use separate readers in different threads; a reader, its callback and a tree must not be used concurrently.
- */
 
 /** @brief Opaque owned XML node. */
 typedef struct _xml_t xml_t;

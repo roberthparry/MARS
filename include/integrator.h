@@ -2,6 +2,16 @@
  * @file integrator.h
  * @brief Adaptive number_t-based numerical integrators.
  *
+ * Use integrator_t to calculate definite integrals of MARS expressions with explicit
+ * bounds, error tolerances and subdivision limits. The API supports numerical
+ * quadrature and supported symbolic paths, including multidimensional problems
+ * through the documented entry points.
+ *
+ * This module is intended for accumulated quantities and integrals whose symbolic
+ * form is unavailable or inconvenient. Estimated numerical error is not a proof of
+ * convergence for arbitrary singular or divergent inputs; check completion status
+ * and respect each entry point's bound and domain restrictions.
+ *
  * All public integration entry points operate on number_t bounds, tolerances,
  * and results. The current runtime uses adaptive recursive subdivision with
  * midpoint/Simpson-style error control and bisects the subinterval with the

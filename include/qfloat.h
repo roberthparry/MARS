@@ -2,6 +2,15 @@
  * @file qfloat.h
  * @brief Double-double precision floating‑point type (≈106 bits, ~32 decimal digits).
  *
+ * Use qfloat_t for real numerical calculations needing more precision than a single
+ * double while retaining a fixed-size, by-value representation. The module provides
+ * arithmetic, comparisons, conversions and mathematical functions over this type.
+ *
+ * This is fixed double-double arithmetic, not arbitrary-precision or exact rational
+ * arithmetic. Use number.h when a calculation needs those facilities, or qcomplex.h
+ * for complex values built from qfloat_t components. Representation precision does
+ * not guarantee the same number of accurate digits for ill-conditioned operations.
+ *
  * This module implements a "double‑double" floating‑point number, represented as
  * the unevaluated sum of two IEEE‑754 doubles:
  *

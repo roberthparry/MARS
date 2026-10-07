@@ -46,7 +46,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
 - **`xml_t`** — native streaming XML with dictionary-backed attributes, ordered mixed content and no external XML dependency
-- **`http_client_t`** — opaque HTTP/HTTPS clients with verified TLS, bounded streaming and JSON/XML adapters
+- **`http_client_t`** — verified HTTP/HTTPS, SOAP, forms/uploads, OAuth helpers, event streams, WebSocket and unary gRPC
+- **`protobuf_t`** — bounded native Protocol Buffers wire messages, without an external parser or schema compiler
 - **`websrv_t`** — bounded Linux web services with exact routing and JSON/XML responses
 - **`sqlite_t`** — opaque SQLCipher-backed SQLite storage for encrypted MARS object persistence
 - **`file_t`** — opaque Linux file streams, UTF-8 helpers, metadata, compression, authenticated encryption and SQLCipher transfers
@@ -103,7 +104,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - GMP, MPFR, and MPC development libraries
 - SQLCipher development libraries
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
-- libcurl 7.85.0 or newer development library (HTTP/HTTPS transport)
+- libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
@@ -363,6 +364,7 @@ int main(void) {
 | `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](./docs/json.md) |
 | `xml_t` | Native XML trees and streaming input/output with dictionary-backed attributes | [`docs/xml.md`](./docs/xml.md) |
 | `http_client_t` | Verified HTTP/HTTPS, bounded streaming, JSON/XML and file transfers | [`docs/http.md`](./docs/http.md) |
+| `protobuf_t` | Bounded native Protocol Buffers wire encoding and decoding | [`docs/protobuf.md`](./docs/protobuf.md) |
 | `websrv_t` | Synchronous Linux web server, exact routes and JSON/XML responses | [`docs/webserver.md`](./docs/webserver.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](./docs/string.md) |
 | `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](./docs/dictionary.md) |

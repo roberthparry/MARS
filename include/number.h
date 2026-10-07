@@ -1,18 +1,16 @@
-#ifndef NUMBER_H
-#define NUMBER_H
-
-#include "qcomplex.h"
-#include "qfloat.h"
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
-typedef struct _string_t string_t;
-
 /**
  * @file number.h
  * @brief Generic numeric value cluster with by-value public handles.
+ *
+ * Use number_t as the common scalar type when arithmetic must combine exact values,
+ * high-precision real or complex numbers and mathematical constants. The API
+ * supplies construction, conversion, comparison, arithmetic, mathematical functions
+ * and textual presentation across its supported numeric representations.
+ *
+ * Choose this layer for general MARS numerical work and configurable multiprecision.
+ * Use qfloat.h or qcomplex.h directly only when their fixed double-double precision
+ * is specifically required. Precision and exactness depend on the input
+ * representation and the operation, rather than on the public handle's size.
  *
  * `number_t` is a fixed-size public value type that can represent several
  * numeric backends behind one uniform interface. The current implementation
@@ -51,6 +49,18 @@ typedef struct _string_t string_t;
  * Pure arithmetic helpers never mutate their by-value inputs. Functions that
  * write to an existing `number_t` take a `number_t *` destination.
  */
+
+#ifndef NUMBER_H
+#define NUMBER_H
+
+#include "qcomplex.h"
+#include "qfloat.h"
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+typedef struct _string_t string_t;
 
 /**
  * @brief Fixed-size public storage for a generic numeric value.

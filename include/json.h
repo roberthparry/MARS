@@ -1,9 +1,15 @@
-#ifndef JSON_H
-#define JSON_H
-
 /**
  * @file json.h
  * @brief Opaque JSON value tree backed by MARS string, array, and dictionary types.
+ *
+ * Use json_t for structured interchange, configuration and web-service payloads.
+ * The API constructs and inspects values, parses text or files, and serialises
+ * compact or formatted output. Objects use dictionary-backed named members and
+ * arrays preserve ordered values.
+ *
+ * The module represents data independently of HTTP transport. Use http.h to send
+ * or receive JSON over the network, and observe ownership rules when inserting,
+ * retrieving or replacing child values.
  *
  * Standard JSON numbers are read and written as ordinary JSON numbers.
  * `number_t` values that cannot be represented by standard JSON number
@@ -19,6 +25,9 @@
  * Typeable Greek aliases such as `@pi` are accepted on input, but canonical
  * output prefers mathematical spellings such as `π`.
  */
+
+#ifndef JSON_H
+#define JSON_H
 
 #include <stdbool.h>
 #include <stddef.h>
