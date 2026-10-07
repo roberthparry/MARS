@@ -1,6 +1,7 @@
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 #include "ustring.h"
+#include "file.h"
 
 static ts_arima_meta_t *ts_arima_meta_head = NULL;
 
@@ -544,19 +545,19 @@ matrix_t *ts_make_matrix_from_doubles(const double *values, size_t rows, size_t 
 
 int ts_write_text_file(const string_t *path, const string_t *text)
 {
-    FILE *f;
+    file_t *f;
+    bool ok;
 
     if (!path || !text)
         return -1;
-    f = fopen(string_c_str(path), "w");
+    f = file_new(path);
     if (!f)
         return -1;
-    if (fputs(string_c_str(text), f) == EOF) {
-        fclose(f);
-        return -1;
-    }
-    fclose(f);
-    return 0;
+    ok = file_open_follow(f, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && file_write_text(f, text);
+    if (!file_close(f))
+        ok = false;
+    file_free(f);
+    return ok ? 0 : -1;
 }
 
 ts_arima_meta_t *ts_arima_meta_find(const ts_arima_result_t *owner)

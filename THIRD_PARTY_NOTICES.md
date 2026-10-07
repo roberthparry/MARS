@@ -75,6 +75,24 @@ for Zstandard.
 OpenSSL licence information:
 <https://openssl-library.org/source/license/index.html>
 
+## File compression and encryption libraries
+
+The MARS build also directly links the system Zstandard and libsodium libraries
+for the file module's streaming compression and authenticated encryption APIs.
+Neither library is bundled with MARS.
+
+Zstandard is available under BSD 3-Clause or GPL version 2 terms. Its direct
+build dependency is separate from the transitive OpenSSL dependency above.
+Upstream licence files:
+<https://github.com/facebook/zstd/blob/dev/LICENSE> and
+<https://github.com/facebook/zstd/blob/dev/COPYING>.
+
+Libsodium's principal licence is ISC; its distribution also contains components
+with other notices. A distributor bundling it must preserve the licence and
+component notices shipped with the exact library version, not only this summary.
+Upstream licence information:
+<https://github.com/jedisct1/libsodium/blob/master/LICENSE>.
+
 ## Multiprecision and Unicode libraries
 
 MARS dynamically links to the following system libraries:

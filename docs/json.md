@@ -15,6 +15,21 @@ generic container layer without exposing those internals to callers.
 - round-trip standard JSON numbers as text and as `number_t`
 - preserve full `number_t` values through a valid JSON extension object
 
+## File I/O
+
+JSON file loading and saving use the public `file_t` API. Existing symbolic
+links are followed, and writing through a dangling link can create its target.
+Only regular files are supported: directories, FIFOs and devices are rejected
+without waiting for stream input. Saving truncates an existing target and adds
+one trailing newline; it is not an atomic replacement operation. Read, write
+and close failures report the usual NULL or -1 result.
+
+Loading collects the complete byte sequence before constructing a MARS string,
+so a UTF-8 character split across read buffers is not normalised in fragments.
+It retains the string layer's Unicode normalisation rather than imposing the
+file text helpers' stricter UTF-8 policy. Loading holds the document in memory;
+it is not a bounded-memory streaming JSON parser.
+
 ## Example: Parse and Inspect
 
 ```c

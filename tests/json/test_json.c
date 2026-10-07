@@ -1,5 +1,7 @@
 #include <stdlib.h>
+#include <string.h>
 
+#include "file.h"
 #include "json.h"
 #include "number.h"
 #include "test_harness.h"
@@ -258,6 +260,62 @@ static void test_file_round_trip(void)
     string_free(path);
 }
 
+static void test_file_stream_migration(void)
+{
+    string_t *path = s(test_case_temp_path("target.json"));
+    string_t *link_path = s(test_case_temp_path("link.json"));
+    file_t *target = file_new(path);
+    file_t *link = file_new(link_path);
+    json_t *value = json_new_bool(true);
+    TEST_ASSERT_NOT_NULL(target);
+    TEST_ASSERT_NOT_NULL(link);
+    TEST_ASSERT_NOT_NULL(value);
+    TEST_ASSERT_TRUE(file_create_symlink(target, link), "create dangling link");
+    TEST_ASSERT_INT_EQ(json_to_file(value, link_path), 0);
+    string_t *written = file_read_all_text(target);
+    TEST_ASSERT_NOT_NULL(written);
+    TEST_ASSERT_STR_EQ(string_c_str(written), "true\n");
+    string_free(written);
+    TEST_ASSERT_TRUE(!file_open_read(link), "default open still rejects links");
+    json_t *loaded = json_from_file(link_path);
+    bool result = false;
+    TEST_ASSERT_NOT_NULL(loaded);
+    TEST_ASSERT_TRUE(json_bool_value(loaded, &result) && result, "read follows existing link");
+    json_free(loaded);
+
+    char input[4100];
+    input[0] = '"';
+    memset(input + 1, 'a', 4094);
+    input[4095] = (char)0xcf;
+    input[4096] = (char)0x80;
+    input[4097] = '"';
+    input[4098] = '\n';
+    input[4099] = 0;
+    TEST_ASSERT_TRUE(file_write_all_bytes(target, input, 4099), "write split UTF-8 fixture");
+    loaded = json_from_file(path);
+    TEST_ASSERT_NOT_NULL(loaded);
+    const string_t *text = json_string_value(loaded);
+    TEST_ASSERT_NOT_NULL(text);
+    TEST_ASSERT_INT_EQ((int)string_byte_length(text), 4096);
+    TEST_ASSERT_STR_EQ(string_c_str(text) + 4094, "π");
+    json_free(loaded);
+
+    TEST_ASSERT_TRUE(file_delete(target), "remove target");
+    TEST_ASSERT_TRUE(json_from_file(path) == NULL, "missing file fails");
+    TEST_ASSERT_TRUE(file_create_directory(target, 0700, false), "create directory fixture");
+    TEST_ASSERT_TRUE(json_from_file(path) == NULL, "directory read fails");
+    TEST_ASSERT_INT_EQ(json_to_file(value, path), -1);
+    TEST_ASSERT_TRUE(json_from_file(NULL) == NULL, "null read path fails");
+    TEST_ASSERT_INT_EQ(json_to_file(value, NULL), -1);
+    TEST_ASSERT_TRUE(file_delete(link), "remove link without touching directory");
+    TEST_ASSERT_TRUE(file_remove_directory(target), "remove directory");
+    json_free(value);
+    file_free(link);
+    file_free(target);
+    string_free(link_path);
+    string_free(path);
+}
+
 static void example_json_parse_and_inspect(void)
 {
     string_t *text = s("{\"name\":\"mars\",\"enabled\":true,\"items\":[1,2,3]}");
@@ -355,6 +413,7 @@ int tests_main(void)
     TEST_SECTION("JSON Serialisation");
     TEST_RUN_IN_GROUP(test_serialise_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_round_trip, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_stream_migration, tests, NULL);
 
     TEST_SECTION("README Output Examples");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_json_parse_and_inspect, readme_examples, "json,readme,output");

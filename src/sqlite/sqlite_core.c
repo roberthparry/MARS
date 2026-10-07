@@ -1,6 +1,7 @@
 /* sqlite_core.c - SQLCipher-backed opaque SQLite storage for MARS objects */
 
 #include <stdint.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -214,6 +215,13 @@ bool sqlite_exec_cstr(sqlite_t *db, const char *sql)
     return true;
 }
 
+/* Return the filename owned by SQLite, without exposing its native handle. */
+const char *sqlite_database_path(const sqlite_t *db)
+{
+    return db && db->handle ? sqlite3_db_filename(db->handle, "main") : NULL;
+}
+
+/* Create the object store and its bounded-chunk file attachment storage. */
 bool sqlite_init_object_store(sqlite_t *db)
 {
     return sqlite_exec_cstr(db, "create table if not exists mars_object ("
@@ -223,7 +231,14 @@ bool sqlite_init_object_store(sqlite_t *db)
                                 "value blob not null,"
                                 "created_at text not null default current_timestamp,"
                                 "updated_at text not null default current_timestamp"
-                                ")");
+                                ");"
+                                "create table if not exists mars_file_chunk ("
+                                "name text not null references mars_object(name) on delete cascade,"
+                                "ordinal integer not null, value blob not null,"
+                                "primary key(name, ordinal)) without rowid;"
+                                "create trigger if not exists mars_object_clear_file_chunks "
+                                "after update of type, encoding on mars_object begin "
+                                "delete from mars_file_chunk where name = old.name; end;");
 }
 
 bool sqlite_store_object(sqlite_t *db, const string_t *name, const string_t *type, const string_t *encoding,
@@ -232,7 +247,7 @@ bool sqlite_store_object(sqlite_t *db, const string_t *name, const string_t *typ
     sqlite3_stmt *stmt = NULL;
     bool ok = false;
 
-    if (!db || !name || !type || !encoding || (!data && data_len > 0u)) {
+    if (!db || !name || !type || !encoding || (!data && data_len > 0u) || data_len > INT_MAX) {
         sqlite_set_error(db, "invalid object store argument");
         return false;
     }
@@ -250,7 +265,8 @@ bool sqlite_store_object(sqlite_t *db, const string_t *name, const string_t *typ
 
     if (sqlite_bind_text_value(stmt, 1, name) != SQLITE_OK || sqlite_bind_text_value(stmt, 2, type) != SQLITE_OK ||
         sqlite_bind_text_value(stmt, 3, encoding) != SQLITE_OK ||
-        sqlite3_bind_blob(stmt, 4, data, (int)data_len, SQLITE_TRANSIENT) != SQLITE_OK) {
+        (data_len ? sqlite3_bind_blob(stmt, 4, data, (int)data_len, SQLITE_TRANSIENT) :
+                    sqlite3_bind_zeroblob(stmt, 4, 0)) != SQLITE_OK) {
         sqlite_set_error(db, sqlite3_errmsg(db->handle));
         goto done;
     }
@@ -478,6 +494,19 @@ bool sqlite_stmt_bind_int(sqlite_stmt_t *stmt, int index, int value)
     return true;
 }
 
+/* Bind an integer without narrowing large offsets or lengths. */
+bool sqlite_stmt_bind_int64(sqlite_stmt_t *stmt, int index, int64_t value)
+{
+    if (!stmt || !stmt->handle)
+        return false;
+    int rc = sqlite3_bind_int64(stmt->handle, index, value);
+    if (rc == SQLITE_OK)
+        return true;
+    sqlite_set_error_code(stmt->db, rc);
+    sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
+    return false;
+}
+
 bool sqlite_stmt_bind_double(sqlite_stmt_t *stmt, int index, double value)
 {
     int rc;
@@ -497,9 +526,10 @@ bool sqlite_stmt_bind_blob(sqlite_stmt_t *stmt, int index, const void *value, si
 {
     int rc;
 
-    if (!stmt || !stmt->handle || (!value && value_len > 0u))
+    if (!stmt || !stmt->handle || (!value && value_len > 0u) || value_len > INT_MAX)
         return false;
-    rc = sqlite3_bind_blob(stmt->handle, index, value, (int)value_len, SQLITE_TRANSIENT);
+    rc = value_len ? sqlite3_bind_blob(stmt->handle, index, value, (int)value_len, SQLITE_TRANSIENT) :
+                     sqlite3_bind_zeroblob(stmt->handle, index, 0);
     if (rc != SQLITE_OK) {
         sqlite_set_error_code(stmt->db, rc);
         sqlite_stmt_set_error(stmt, sqlite3_errmsg(stmt->db->handle));
@@ -568,6 +598,12 @@ int sqlite_stmt_column_int(sqlite_stmt_t *stmt, int column)
     if (!stmt || !stmt->handle)
         return 0;
     return sqlite3_column_int(stmt->handle, column);
+}
+
+/* Read an integer without narrowing large offsets or lengths. */
+int64_t sqlite_stmt_column_int64(sqlite_stmt_t *stmt, int column)
+{
+    return stmt && stmt->handle ? sqlite3_column_int64(stmt->handle, column) : 0;
 }
 
 double sqlite_stmt_column_double(sqlite_stmt_t *stmt, int column)

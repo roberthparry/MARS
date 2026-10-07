@@ -22,6 +22,7 @@ MODULE_GUIDES = {
     "diffequation.h": "diffequation.md",
     "equation.h": "equation.md",
     "expression.h": "expression.md",
+    "file.h": "file.md",
     "integrator.h": "integrator.md",
     "json.h": "json.md",
     "jurisdiction.h": "jurisdiction.md",

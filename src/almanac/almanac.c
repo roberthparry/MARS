@@ -1,6 +1,7 @@
 /* Configured engine lifetime, diagnostics and serialisation. */
 #include <ctype.h>
 #include <stdio.h>
+#include "file.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -97,85 +98,70 @@ static char *almanac_config_path(void)
     return path;
 }
 
-static void trim_ascii_whitespace(char *text)
+/* Parse complete configuration lines as MARS strings; this is not a shell interpreter. */
+static char *almanac_config_lookup(const char *name)
 {
-    char *start;
-    char *end;
-
-    if (!text || *text == '\0')
-        return;
-    start = text;
-    while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
-        start++;
-    if (start != text)
-        memmove(text, start, strlen(start) + 1u);
-    end = text + strlen(text);
-    while (end > text && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
-        end--;
-    }
-    *end = '\0';
-}
-
-static char *unquote_shell_value(const char *raw_value)
-{
-    char *value;
-    size_t len;
-
-    if (!raw_value)
-        return NULL;
-    value = dup_c_string(raw_value);
-    if (!value)
-        return NULL;
-    trim_ascii_whitespace(value);
-    len = strlen(value);
-    if (len >= 2u && ((value[0] == '"' && value[len - 1u] == '"') || (value[0] == '\'' && value[len - 1u] == '\''))) {
-        memmove(value, value + 1, len - 2u);
-        value[len - 2u] = '\0';
-    }
-    return value;
-}
-
-static char *almanac_config_lookup(const char *key_name)
-{
-    FILE *fp;
-    char *config_path;
-    char line[4096];
+    char *config_path = almanac_config_path();
+    file_t *file = NULL;
+    string_t *wanted = NULL;
+    string_t *line = NULL;
     char *result = NULL;
 
-    if (!key_name || *key_name == '\0')
-        return NULL;
+    if (!config_path || !name || !*name)
+        goto done;
+    wanted = string_new_with(name);
+    file = file_new_cstr(config_path);
+    if (!wanted || !file || !file_open_follow(file, FILE_MODE_OPEN, FILE_ACCESS_READ))
+        goto done;
 
-    config_path = almanac_config_path();
-    if (!config_path)
-        return NULL;
-
-    fp = fopen(config_path, "r");
-    free(config_path);
-    if (!fp)
-        return NULL;
-
-    while (fgets(line, sizeof(line), fp)) {
-        char *eq = strchr(line, '=');
-        char *name;
-
-        if (!eq)
-            continue;
-        *eq = '\0';
-        name = line;
-        trim_ascii_whitespace(name);
-        if (strncmp(name, "export ", 7u) == 0) {
-            name += 7;
-            trim_ascii_whitespace(name);
+    while (file_read_line(file, &line) && line) {
+        string_t *key = NULL;
+        string_t *value = NULL;
+        string_trim(line);
+        if (string_starts_with(line, "export ")) {
+            string_t *body = string_substr(line, 7, string_byte_length(line) - 7);
+            string_free(line);
+            line = body;
+            if (!line)
+                break;
         }
-        if (*name == '\0' || *name == '#')
-            continue;
-        if (strcmp(name, key_name) != 0)
-            continue;
-        result = unquote_shell_value(eq + 1);
-        break;
+        string_offset_t equals = string_find(line, "=");
+        if (equals >= 0) {
+            key = string_substr(line, 0, (size_t)equals);
+            value = string_substr(line, (size_t)equals + 1, string_byte_length(line) - (size_t)equals - 1);
+        }
+        if (key)
+            string_trim(key);
+        bool matched = key && value && string_compare(key, wanted) == 0;
+        if (matched) {
+            string_trim(value);
+            if (string_byte_length(value) >= 2 &&
+                ((string_starts_with(value, "\"") && string_ends_with(value, "\"")) ||
+                 (string_starts_with(value, "'") && string_ends_with(value, "'")))) {
+                string_t *unquoted = string_substr(value, 1, string_byte_length(value) - 2);
+                string_free(value);
+                value = unquoted;
+            }
+            if (value)
+                result = dup_c_string(string_c_str(value));
+        }
+        string_free(key);
+        string_free(value);
+        string_free(line);
+        line = NULL;
+        if (matched)
+            break;
+    }
+    if (!file_close(file)) {
+        free(result);
+        result = NULL;
     }
 
-    fclose(fp);
+done:
+    string_free(line);
+    string_free(wanted);
+    file_free(file);
+    free(config_path);
     return result;
 }
 

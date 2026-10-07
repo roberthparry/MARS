@@ -15,6 +15,20 @@ of the codebase:
   internals
 - normal SQLite semantics for schema design and SQL execution
 
+The file module's `file_import_sqlite` and `file_export_sqlite` helpers store
+contents and selected metadata, not live handles or descriptors. The object
+store initialiser also creates the chunk table and replacement-cleanup trigger.
+Transfers use savepoints and bounded 64 KiB chunks, with a content hash checked
+before export publication. Database encryption already protects payloads;
+additional file encryption is explicit and optional. See the
+[file guide](file.md#transactional-sqlcipher-file-storage) for details and examples.
+
+`sqlite_database_path` returns SQLite's borrowed main-database filename.
+`sqlite_stmt_bind_int64` and `sqlite_stmt_column_int64` preserve signed 64-bit
+offsets and sizes. Blob binding and object storage reject lengths above
+`INT_MAX` before conversion; an empty blob remains a blob even when its data
+pointer is NULL. Database-specific size limits still apply.
+
 ## Capabilities
 
 - open or create an encrypted SQLCipher database

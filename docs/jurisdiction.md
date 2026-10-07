@@ -10,6 +10,23 @@ It answers questions such as:
 - whether a date is a national holiday
 - how many working days fall in a date range
 
+## Configuration files
+
+Database path and key resolution retains its existing precedence: modern
+`MARS_JURISDICTION_DB_PATH` / `MARS_JURISDICTION_DB_KEY` environment values,
+legacy `MARS_HOLIDAY_DB_PATH` / `MARS_HOLIDAY_DB_KEY` values, then configuration
+files under `MARS_HOME/config` (or `~/.mars/config`).
+The modern file is `jurisdiction-db.env`; the fallback is `holiday-db.env`.
+
+These readers use `file_t` with explicit symbolic-link following, and parse
+complete lines entirely as `string_t`. UTF-8 BOMs, LF, CRLF and CR endings
+are supported; the old 4 KiB line limit is removed. A key must immediately
+precede `=`, optionally after an `export ` prefix and leading whitespace.
+Surrounding value whitespace and matching outer single or double quotes are
+removed. The first non-empty matching value wins. Shell expansion is not
+performed. Malformed UTF-8 or an I/O error before a match leaves the lookup
+unresolved, allowing the existing fallback rules to apply.
+
 ## Scope
 
 `jurisdiction_t` is the jurisdiction-policy layer that sits above `datetime_t`.
