@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout.c
+ * @brief Public expression conversion and serialisation.
+ *
+ * Dispatches expression, function and TeX formatting and provides printing and persistence entry points. Recursive
+ * rendering is delegated to style-specific files so public wrappers remain separate from notation details.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Public expression conversion, formatting and serialisation entry points.
  * Body rendering lives in the expr_stringout_* implementation units; style wrappers
  * retain binding envelopes and executable declarations. Rendering preserves the DAG.

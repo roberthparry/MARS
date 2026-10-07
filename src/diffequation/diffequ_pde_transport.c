@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_transport.c
+ * @brief Constant transport characteristic solutions.
+ *
+ * Constructs invariants for supported constant transport fields, including multiple independent variables. It
+ * supplies explicit solution structure to the general PDE dispatcher.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 

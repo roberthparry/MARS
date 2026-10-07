@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_TeX_emit.c
+ * @brief Recursive TeX expression body rendering.
+ *
+ * Emits node operations with grouping, source ordering and style-aware mathematical notation. It renders native
+ * expression structure rather than introducing client-side simplification.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Recursive TeX body rendering and source-order scopes. */
 
 #include <ctype.h>

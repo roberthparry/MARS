@@ -1,3 +1,14 @@
+/**
+ * @file expr_bindings.c
+ * @brief Symbol binding values, evaluation and rendering.
+ *
+ * Parses, represents and evaluates binding expressions and produces their native, function and TeX forms. It
+ * separates variable metadata and supplied values from the main expression's symbolic structure.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <errno.h>
 #include <limits.h>
 #include <math.h>

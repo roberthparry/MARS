@@ -1,3 +1,14 @@
+/**
+ * @file expr_laplace_elementary.c
+ * @brief Elementary forward Laplace transform rules.
+ *
+ * Handles supported elementary, inverse-circular and hyperbolic families. It contributes parameter-aware symbolic
+ * formulas to the shared Laplace transform dispatcher.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

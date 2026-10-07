@@ -1,3 +1,14 @@
+/**
+ * @file number_vtable_defs.h
+ * @brief Private numeric backend operation-table declarations.
+ *
+ * Declares the backend implementations used to initialise generic numeric dispatch tables. These contracts bind
+ * representation-specific lifecycle and arithmetic to the shared number interface.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef NUMBER_VTABLE_DEFS_H
 #define NUMBER_VTABLE_DEFS_H
 

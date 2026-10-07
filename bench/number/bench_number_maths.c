@@ -1,3 +1,11 @@
+/**
+ * @file bench_number_maths.c
+ * @brief Generic numeric mathematical-function timing.
+ *
+ * Exercises representative constants and unary, binary and higher-arity mathematical operations. Reported timings
+ * depend on representation and input and are not numerical-accuracy guarantees.
+ */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

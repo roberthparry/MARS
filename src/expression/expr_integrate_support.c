@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_support.c
+ * @brief Shared symbolic integration construction helpers.
+ *
+ * Provides owned-node arithmetic and common matching utilities used across integral rule files. Centralising these
+ * operations keeps temporary expression cleanup and scalar factor handling consistent.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

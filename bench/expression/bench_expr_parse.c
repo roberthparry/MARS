@@ -1,3 +1,11 @@
+/**
+ * @file bench_expr_parse.c
+ * @brief Expression parser throughput benchmark.
+ *
+ * Repeatedly parses representative source strings and reports sample timings. Use it to investigate parser changes
+ * while keeping performance measurements separate from syntax and round-trip correctness tests.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

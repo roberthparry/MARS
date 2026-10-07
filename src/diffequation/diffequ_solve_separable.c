@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_separable.c
+ * @brief Separable first-order ODE integration.
+ *
+ * Separates supported dependent and independent factors, integrates them and inverts recognised primitives.
+ * Implicit results are retained when a justified explicit inversion is unavailable.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdbool.h>
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS

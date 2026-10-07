@@ -1,3 +1,14 @@
+/**
+ * @file diffequation.c
+ * @brief Differential-equation problem lifecycle and conditions.
+ *
+ * Owns problem objects, independent variables, parameters and initial or boundary conditions. Parsing, solving and
+ * formatting units share this representation without exposing it through the public API.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 
 #include "diffequation.h"

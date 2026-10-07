@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_derivative_quadratic.c
+ * @brief Autonomous derivative-quadratic ODE solutions.
+ *
+ * Extracts recognised quadratic dependence on the derivative and builds explicit or implicit solution forms. The
+ * reduction preserves the branches implied by the original derivative equation.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

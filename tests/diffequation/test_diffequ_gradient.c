@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_gradient.c
+ * @brief Gradient-envelope PDE regression cases.
+ *
+ * Checks recognised envelope solutions, non-affine cases and unsupported scope. It verifies mathematical structure
+ * rather than accepting a plausible-looking rendered formula.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

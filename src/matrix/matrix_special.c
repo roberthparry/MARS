@@ -1,3 +1,14 @@
+/**
+ * @file matrix_special.c
+ * @brief Matrix polynomial and signal-function families.
+ *
+ * Implements supported orthogonal polynomials, finite logarithmic sums and signal functions over matrices. The
+ * functions use matrix algebra where meaningful rather than assuming scalar elementwise semantics.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <math.h>
 
 #define MARS_MATRIX_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file expr_series.c
+ * @brief Symbolic series recognition and expansion text.
+ *
+ * Builds supported power and reciprocal series forms and expands recognised series requests. It preserves symbolic
+ * terms and indices instead of replacing the series with a sampled numerical approximation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>

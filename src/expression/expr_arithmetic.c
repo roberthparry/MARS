@@ -1,3 +1,14 @@
+/**
+ * @file expr_arithmetic.c
+ * @brief Arithmetic expression nodes and scalar adapters.
+ *
+ * Constructs arithmetic operations and their numeric-operand variants over reference-counted expression graphs.
+ * This is the algebra-building layer used by symbolic callers, not merely direct scalar evaluation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_bindings.h"
 #include "integrator.h"
 #include <limits.h>

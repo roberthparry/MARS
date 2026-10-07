@@ -1,3 +1,14 @@
+/**
+ * @file number_clausen.c
+ * @brief Clausen function evaluation.
+ *
+ * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
+ * representation determine the evaluation path.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <limits.h>
 
 #include "number.h"
@@ -428,4 +439,3 @@ number_t num_clausen2(const number_t theta)
 {
     return num_clausen(2ul, theta);
 }
-

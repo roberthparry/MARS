@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_special_functions.c
+ * @brief Double-double special-function regression families.
+ *
+ * Checks cylindrical and other supported special functions, including Bessel and Struve cases. These tests
+ * exercise the native real layer's approximations and edge conditions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static int qf_close_value(qfloat_t got, qfloat_t want, double tol)

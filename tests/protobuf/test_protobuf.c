@@ -1,3 +1,14 @@
+/**
+ * @file test_protobuf.c
+ * @brief Protocol Buffers codec regression suite.
+ *
+ * Checks supported wire round trips, malformed inputs and size or field-count boundaries. The complete README
+ * round-trip example runs after ordinary codec assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "protobuf.h"
 #include "test_harness.h"
 #include <limits.h>

@@ -1,3 +1,14 @@
+/**
+ * @file http_session.c
+ * @brief In-memory cookies and TLS client identities.
+ *
+ * Configures session cookies, redirect limits and verified client-certificate credentials on reusable clients.
+ * Session state stays in memory; applications retain responsibility for destination and credential policy.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* In-memory sessions and verified TLS client identities. */
 #include <sodium.h>
 #include <string.h>

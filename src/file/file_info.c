@@ -1,3 +1,14 @@
+/**
+ * @file file_info.c
+ * @brief Filesystem metadata, permissions and ownership.
+ *
+ * Inspects file attributes and implements chmod, chown, timestamps and access queries. Path-following and handle
+ * policies remain explicit in the individual operations rather than hidden in caller-side stat calls.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 

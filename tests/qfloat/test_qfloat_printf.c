@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_printf.c
+ * @brief Double-double formatted output tests.
+ *
+ * Checks sprintf-style and stream output, including captured standard output. It verifies formatting contracts
+ * rather than the mathematical algorithms themselves.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qd_sprintf_basic(void)

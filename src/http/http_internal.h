@@ -1,3 +1,15 @@
+/**
+ * @file http_internal.h
+ * @brief Private HTTP transport state and protocol helpers.
+ *
+ * Defines libcurl-backed clients, requests, responses and shared protocol-operation helpers. The HTTP
+ * implementation uses this header to enforce common limits and ownership while keeping curl types out of the
+ * public API.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_HTTP_INTERNAL_H
 #define MARS_HTTP_INTERNAL_H
 #ifndef MARS_HTTP_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file datetime_julian.c
+ * @brief Julian conversion, lazy civil fields and validation.
+ *
+ * Converts between civil dates and Julian day representations, exposes date components and validates calendar
+ * ranges. Shared day and weekday queries use these conversions to avoid inconsistent calendar arithmetic.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Julian-date conversion, lazy field access and civil calendar validation. */
 #include <float.h>
 #include <limits.h>

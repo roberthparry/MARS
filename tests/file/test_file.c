@@ -1,3 +1,14 @@
+/**
+ * @file test_file.c
+ * @brief File-module suite entry point and text examples.
+ *
+ * Registers filesystem, stream, error and transform test groups and checks ordinary file operations. Documented
+ * text and replacement examples run after ordinary assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "test_harness.h"

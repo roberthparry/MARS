@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_function_regressions.c
+ * @brief Matrix-function numerical and error regressions.
+ *
+ * Checks previously problematic function evaluations, multiprecision inputs and invalid operations. These cases
+ * supplement the ordinary mathematical-function identities.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 static void test_mat_fun_3x3(void)

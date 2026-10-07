@@ -1,3 +1,11 @@
+/**
+ * @file bench_matrix_expr.c
+ * @brief Symbolic matrix solve and inverse benchmarks.
+ *
+ * Measures expression-backed matrix workloads, including larger dense systems. Use it to observe algebraic growth
+ * and runtime after solver changes; numerical timing alone does not validate the resulting expressions.
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

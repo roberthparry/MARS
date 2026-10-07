@@ -1,3 +1,14 @@
+/**
+ * @file http_events.c
+ * @brief Incremental Server-Sent Events decoding.
+ *
+ * Consumes UTF-8 fragments into bounded event records, retaining event IDs and retry values across input chunks.
+ * The application supplies transport bytes and callbacks; this parser does not schedule reconnections.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* Incremental Server-Sent Events framing, with strict UTF-8 and bounded storage. */
 #include <stdlib.h>
 #include <string.h>

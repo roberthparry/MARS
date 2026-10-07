@@ -1,3 +1,15 @@
+/**
+ * @file integrator_mp.c
+ * @brief Precision-aware adaptive numerical integration.
+ *
+ * Evaluates expressions through number_t arithmetic and adaptively subdivides intervals, including nested
+ * multidimensional evaluation. Error estimates and work limits control termination; they do not make divergent
+ * integrals convergent.
+ *
+ * This is part of integrator.h. Callers configure opaque integrator handles and inspect completion or error
+ * information rather than relying on a particular internal algorithm.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 

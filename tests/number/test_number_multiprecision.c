@@ -1,3 +1,14 @@
+/**
+ * @file test_number_multiprecision.c
+ * @brief Multiprecision numeric value regressions.
+ *
+ * Checks configurable-precision real and complex construction and operations. The cases distinguish value accuracy
+ * and precision policy from the fixed size of number_t handles.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

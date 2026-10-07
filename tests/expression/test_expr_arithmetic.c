@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_arithmetic.c
+ * @brief Expression arithmetic construction regressions.
+ *
+ * Checks binary arithmetic and scalar-operand variants and their evaluated values. These cases protect graph
+ * construction and operand handling independently of higher-level solving.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 void test_add(void)

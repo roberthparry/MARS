@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_constant_linear.c
+ * @brief Constant-coefficient linear ODE solutions.
+ *
+ * Builds supported arbitrary-order linear solution families, including repeated quadratic operators. Root
+ * multiplicities and forcing structure determine the basis and particular solution used.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 

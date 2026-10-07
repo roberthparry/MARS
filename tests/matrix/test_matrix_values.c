@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_values.c
+ * @brief Shared numeric adapters for matrix tests.
+ *
+ * Supplies value conversion and binding helpers that let matrix tests compare results across numeric
+ * representations. These adapters belong to the test harness, not the public matrix API.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* Shared matrix value adapters for the matrix suite. */
 #include "test_matrix.h"
 

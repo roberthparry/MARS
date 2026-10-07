@@ -1,3 +1,14 @@
+/**
+ * @file string_utf8.c
+ * @brief UTF-8 code-point navigation and conversion.
+ *
+ * Decodes encoded text and provides code-point traversal, length, reversal and case-conversion helpers.
+ * Grapheme-level user-visible character operations belong to string_grapheme.c.
+ *
+ * This belongs to ustring.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * distinct and preserve documented view and cursor lifetimes.
+ */
+
 /* string_utf8.c - UTF-8 codepoint-level navigation and utilities
  *
  * Operations in this file work at the codepoint level (not grapheme cluster

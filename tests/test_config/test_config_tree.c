@@ -1,3 +1,14 @@
+/**
+ * @file test_config_tree.c
+ * @brief Hierarchical test-group lookup and enablement.
+ *
+ * Creates and traverses group paths and resolves inherited enabled state. This implements configuration semantics
+ * rather than executing the tests themselves.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* test_config_tree.c - hierarchical test configuration tree helpers */
 
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS

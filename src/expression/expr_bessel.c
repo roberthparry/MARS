@@ -1,3 +1,14 @@
+/**
+ * @file expr_bessel.c
+ * @brief Bessel expression nodes and calculus callbacks.
+ *
+ * Constructs supported Bessel operations and supplies evaluation, simplification, differentiation and reverse-mode
+ * support. Scalar numerical work is delegated to the number layer while order and argument remain symbolic.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_maths.h"
 
 static bool uses(const expr_t *e, const expr_t *x)

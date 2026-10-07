@@ -1,3 +1,14 @@
+/**
+ * @file string_internal.h
+ * @brief Private UTF-8 string representation and helpers.
+ *
+ * Defines storage details, validation, normalisation and shared helpers used by string implementation units.
+ * External callers should use ustring.h so mutation and Unicode invariants stay under module control.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef STRING_INTERNAL_H
 #define STRING_INTERNAL_H
 
@@ -5,13 +16,6 @@
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
 #error "string_internal.h is private to the string module; include ustring.h instead."
 #endif
-
-/**
- * @file string_internal.h
- * @brief Internal representation and helpers for the string_t type.
- *
- * Not for public use. External code should include only ustring.h.
- */
 
 #include <stdint.h>
 #include <stdio.h>

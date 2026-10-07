@@ -1,3 +1,11 @@
+/**
+ * @file holiday_lab.c
+ * @brief Jurisdiction holiday and location query tool.
+ *
+ * Reads jurisdiction configuration and emits holiday, location and GMT-offset information. It uses installed
+ * policy data rather than embedding a second set of holiday rules.
+ */
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

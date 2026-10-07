@@ -1,3 +1,14 @@
+/**
+ * @file integrator_internal.h
+ * @brief Private adaptive integration state and dispatch helpers.
+ *
+ * Defines tolerances, interval limits and retained exact-result state, with interfaces to numerical and recognised
+ * symbolic paths. Public users configure opaque integrator_t handles through integrator.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef INTEGRATOR_INTERNAL_H
 #define INTEGRATOR_INTERNAL_H
 

@@ -1,3 +1,14 @@
+/**
+ * @file test_number_fixed_precision.c
+ * @brief Fixed-precision numeric backend regressions.
+ *
+ * Checks double and double-double real or complex values through the generic number interface. Explicit
+ * fixed-precision construction must not silently change its representation policy.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <complex.h>
 #include <stdio.h>
 

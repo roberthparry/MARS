@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_support.c
+ * @brief Shared time-series storage and modelling helpers.
+ *
+ * Provides allocation, text construction, numeric conversion and model-metadata support used across the module. It
+ * centralises cleanup and data preparation rather than defining an independent forecasting method.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 #include "ustring.h"

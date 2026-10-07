@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_strings.c
+ * @brief Double-double parsing and round-trip tests.
+ *
+ * Checks decimal and scientific input and conversion back to text. It guards preservation of extended precision
+ * across supported string round trips.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static bool qfloat_string_value_matches(qfloat_t got, qfloat_t want, double tol)

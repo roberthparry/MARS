@@ -1,3 +1,14 @@
+/**
+ * @file almanac_solar_eclipse.c
+ * @brief Solar-eclipse geometry and local contact searches.
+ *
+ * Evaluates apparent Sun-Moon overlap, classifies local eclipse circumstances and refines event contacts. This
+ * unit supplies both interval searches and checks for an eclipse already in progress.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Solar eclipse geometry, circumstances and event searches. */
 #include <math.h>
 #include <string.h>

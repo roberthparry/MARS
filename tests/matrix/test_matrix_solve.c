@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_solve.c
+ * @brief Linear solve and least-squares regressions.
+ *
+ * Checks supported numeric and symbolic systems, including dense six-by-six symbolic elimination. The larger cases
+ * expose algebraic growth as well as correctness of the returned solution.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 #include "test_matrix_solve.h"
 

@@ -1,3 +1,15 @@
+/**
+ * @file datetime_internal.h
+ * @brief Private datetime representation and civil-date helpers.
+ *
+ * Defines civil fields and lazy Julian caches and declares internal initialisation and conversion helpers.
+ * Implementation units must keep cache sentinels and civil values consistent; callers outside the module use
+ * opaque datetime_t handles.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_DATETIME_INTERNAL_H
 #define MARS_DATETIME_INTERNAL_H
 

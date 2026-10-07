@@ -1,3 +1,14 @@
+/**
+ * @file number_vtables.c
+ * @brief Generic numeric backend dispatch tables.
+ *
+ * Binds supported numeric representations to their lifecycle, arithmetic and function implementations. These
+ * tables are the internal contract between number_core.c and the backend units.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include "number_vtable_defs.h"
 
 const number_vtable_t number_double_vt = {.kind = NUMBER_DOUBLE,

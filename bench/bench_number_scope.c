@@ -1,3 +1,11 @@
+/**
+ * @file bench_number_scope.c
+ * @brief Scoped numeric allocation benchmarks.
+ *
+ * Compares real and complex number workloads with ordinary, scoped and rolling temporary allocation. This
+ * executable measures lifetime-management overhead rather than defining public arithmetic semantics.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <time.h>

@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solution.c
+ * @brief Differential-equation result ownership and access.
+ *
+ * Stores solver status, families, constraints, steps and series metadata and exposes result queries. Solver
+ * implementations use this common representation so callers can inspect outcomes uniformly.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

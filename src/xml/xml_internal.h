@@ -1,3 +1,14 @@
+/**
+ * @file xml_internal.h
+ * @brief Private XML tree and attribute-storage contracts.
+ *
+ * Defines node storage, children and dictionary-backed attributes, together with validation and attachment
+ * helpers. Parser and writer implementations share these contracts while public callers use xml.h.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_XML_INTERNAL_H
 #define MARS_XML_INTERNAL_H
 #if !defined(MARS_XML_INTERNAL_ACCESS)

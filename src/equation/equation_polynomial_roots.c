@@ -1,3 +1,15 @@
+/**
+ * @file equation_polynomial_roots.c
+ * @brief General polynomial root candidates and refinement.
+ *
+ * Handles general-degree root searches, rational candidates and distinct-root assembly. Exact lower-degree
+ * reductions and numerical roots are kept distinguishable so presentation can preserve exactness where
+ * established.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>

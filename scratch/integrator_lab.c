@@ -1,3 +1,11 @@
+/**
+ * @file integrator_lab.c
+ * @brief Integration backend for MARS Lab.
+ *
+ * Parses integrands and bounds, selects supported symbolic or numerical paths and emits native result fields. The
+ * executable delegates integration and mathematical rendering to the library.
+ */
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>

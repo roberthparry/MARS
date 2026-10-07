@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_trig.c
+ * @brief Double-double trigonometric regression cases.
+ *
+ * Checks circular functions, their inverses and related angle operations. Identity and expected-value cases
+ * protect argument reduction and domain handling.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qf_trig()

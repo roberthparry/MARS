@@ -1,3 +1,14 @@
+/**
+ * @file expr_signal.c
+ * @brief Signal primitives and convolution expressions.
+ *
+ * Constructs supported signal operations and supplies convolution evaluation, simplification and calculus rules.
+ * Transform and integration code use these nodes as mathematical objects with explicit domains.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include <stdio.h>

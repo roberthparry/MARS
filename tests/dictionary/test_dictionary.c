@@ -1,3 +1,14 @@
+/**
+ * @file test_dictionary.c
+ * @brief Dictionary lifecycle, lookup and ordering tests.
+ *
+ * Checks key and value operations, callback ownership and sorted views over the arena-backed dictionary. README
+ * examples demonstrate the same public usage after the ordinary checks.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 /* test_dictionary.c - tests for arena-backed dictionary_t */
 
 #include <stdbool.h>

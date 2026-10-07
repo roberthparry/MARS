@@ -1,3 +1,14 @@
+/**
+ * @file file_directory.c
+ * @brief Directory stream iteration and collected listings.
+ *
+ * Opens directory handles, reads entries and creates metadata-bearing listing arrays. It centralises entry and
+ * container ownership for callers that need either incremental iteration or a complete listing.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 

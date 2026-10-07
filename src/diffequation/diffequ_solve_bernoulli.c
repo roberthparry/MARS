@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_bernoulli.c
+ * @brief Quadratic Bernoulli ODE reduction.
+ *
+ * Recognises the supported dependent-square Bernoulli family and constructs its transformed solution and
+ * integration constant. It is selected by the ordinary-equation dispatcher.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 

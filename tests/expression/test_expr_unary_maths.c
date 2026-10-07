@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_unary_maths.c
+ * @brief Elementary expression evaluation regressions.
+ *
+ * Checks unary mathematical functions and related magnitude operations over expression nodes. It exercises public
+ * construction and evaluation independently of specialised solver cases.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 void test_sin(void)

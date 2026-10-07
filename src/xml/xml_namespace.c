@@ -1,3 +1,14 @@
+/**
+ * @file xml_namespace.c
+ * @brief Scoped XML namespace validation.
+ *
+ * Tracks namespace declarations and checks expanded element and attribute names during parsing. It prevents prefix
+ * spelling from replacing namespace identity in document validation.
+ *
+ * This is part of xml.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * features; HTTP and SOAP transport belong to the HTTP module.
+ */
+
 /* xml_namespace.c - scoped XML namespace and expanded-attribute validation. */
 #define MARS_XML_INTERNAL_ACCESS
 #include "xml_parse_private.h"

@@ -1,3 +1,14 @@
+/**
+ * @file almanac_rise_set.c
+ * @brief Rise and set searches within a local civil day.
+ *
+ * Resolves local offsets and UTC search windows, accounts for horizon geometry, and locates body crossings. Sun
+ * and Moon wrappers use the same observer-dependent machinery.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Local civil-day conversion and rise/set event searches. */
 #include <float.h>
 #include <limits.h>

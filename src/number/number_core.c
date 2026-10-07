@@ -1,3 +1,14 @@
+/**
+ * @file number_core.c
+ * @brief Generic numeric lifecycle and public arithmetic dispatch.
+ *
+ * Constructs, clones and destroys number_t values and implements common queries and operations.
+ * Representation-specific work is routed through the backend tables so callers use one scalar interface.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
@@ -10,7 +21,6 @@
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "number_scope_alloc.h"
 #include "ustring.h"
 
 #include <complex.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_config.c
+ * @brief Hierarchical test configuration lifecycle.
+ *
+ * Loads and queries enabled groups and individual cases and manages configuration mode or pruning. Test
+ * executables share this implementation to honour tests/test_config.json consistently.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 /* test_config.c - hierarchical test configuration lifecycle and queries */
 
 #include <stdio.h>

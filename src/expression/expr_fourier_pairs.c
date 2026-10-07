@@ -1,3 +1,14 @@
+/**
+ * @file expr_fourier_pairs.c
+ * @brief Shared Fourier kernel pairs and periodic spectra.
+ *
+ * Recognises transform pairs using common kernel structure, including periodic principal-value families. The rules
+ * build symbolic spectra rather than sampling signals numerically.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Fourier pairs sharing kernel matching, including periodic principal-value spectra. */
 #include "expr_fourier_internal.h"
 

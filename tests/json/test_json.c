@@ -1,3 +1,14 @@
+/**
+ * @file test_json.c
+ * @brief JSON tree, parsing and persistence regressions.
+ *
+ * Checks document construction, validation, number fidelity and file round trips. Complete README examples
+ * exercise the same ownership and serialisation APIs.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

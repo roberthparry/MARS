@@ -1,3 +1,14 @@
+/**
+ * @file datetime_calendar_lunisolar.c
+ * @brief Chinese, Hindu and Buddhist calendar calculations.
+ *
+ * Combines new moons, full moons and solar terms to derive supported calendar dates and observances. It connects
+ * astronomical estimates to local-day calendar conventions.
+ *
+ * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * while catalogue-backed apparent sky positions belong to almanac.
+ */
+
 /* Chinese, Hindu and Buddhist calendar views and astronomical observances. */
 #include <float.h>
 #include <limits.h>

@@ -1,3 +1,15 @@
+/**
+ * @file qfloat_internal.h
+ * @brief Private fixed-precision real algorithm helpers.
+ *
+ * Declares implementation-only numerical support and coefficient access used by the qfloat source files. Other
+ * native modules should use the narrower src/internal/qfloat_internal.h interface where public operations are
+ * insufficient.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef QFLOAT_INTERNAL_H
 #define QFLOAT_INTERNAL_H
 

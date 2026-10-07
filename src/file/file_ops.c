@@ -1,3 +1,14 @@
+/**
+ * @file file_ops.c
+ * @brief Filesystem object creation, copying, movement and links.
+ *
+ * Implements path operations including deletion, moves, links and symbolic-link target queries. This unit handles
+ * filesystem changes; stream byte I/O belongs to file_stream.c.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 

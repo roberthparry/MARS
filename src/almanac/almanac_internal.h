@@ -1,3 +1,14 @@
+/**
+ * @file almanac_internal.h
+ * @brief Private solar-totality location search interface.
+ *
+ * Declares totality-location results and the internal geographical search operations used by almanac tooling. It
+ * is not a replacement for the public almanac API and requires the explicit internal-access guard.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_ALMANAC_INTERNAL_H
 #define MARS_ALMANAC_INTERNAL_H
 

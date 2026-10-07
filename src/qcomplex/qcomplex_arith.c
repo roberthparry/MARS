@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_arith.c
+ * @brief Double-double complex arithmetic and elementary inverses.
+ *
+ * Implements arithmetic and supported elementary complex operations using qfloat components. Branch and domain
+ * conventions must remain consistent with the public qcomplex interface.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include <math.h>
 
 #include "qcomplex.h"

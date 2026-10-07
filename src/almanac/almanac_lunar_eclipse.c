@@ -1,3 +1,14 @@
+/**
+ * @file almanac_lunar_eclipse.c
+ * @brief Lunar-eclipse geometry and event circumstances.
+ *
+ * Calculates the Moon's relation to the Earth's shadow, refines contacts and assembles lunar-eclipse results.
+ * Searches depend on the configured ephemeris and requested time window.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Lunar eclipse geometry, circumstances and event searches. */
 #include <math.h>
 #include <string.h>

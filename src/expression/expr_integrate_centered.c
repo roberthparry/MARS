@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_centered.c
+ * @brief Centred quadratic radical integration.
+ *
+ * Recognises square-root and reciprocal-root expressions centred on an affine shift, including linear factors. It
+ * retains a common centre in the constructed antiderivative so later output remains intelligible.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

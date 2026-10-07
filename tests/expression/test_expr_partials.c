@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_partials.c
+ * @brief Partial and mixed derivative regressions.
+ *
+ * Checks multivariable derivatives and their textual notation. The tests protect differentiation with respect to
+ * the intended symbols rather than positional text substitutions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 static void test_partial_xy_product(void)

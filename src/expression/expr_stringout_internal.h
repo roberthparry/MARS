@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_internal.h
+ * @brief Private expression rendering state and recursive emitters.
+ *
+ * Defines precedence, temporary names and formatting context used by style-specific recursive output. Renderer
+ * implementation units share it; other modules should request completed text through their supported interfaces.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_STRINGOUT_INTERNAL_H
 #define EXPR_STRINGOUT_INTERNAL_H
 

@@ -1,3 +1,15 @@
+/**
+ * @file http_core.c
+ * @brief HTTP client, request and response lifecycle.
+ *
+ * Initialises reusable libcurl clients, manages opaque request and response storage and exposes common
+ * configuration and accessors. Protocol-specific operations share these handles rather than allocate independent
+ * transport APIs.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* http_core.c - clients, requests and response accessors. */
 #include <limits.h>
 #include <pthread.h>

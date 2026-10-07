@@ -1,3 +1,14 @@
+/**
+ * @file equation.c
+ * @brief Algebraic equation lifecycle and solver orchestration.
+ *
+ * Owns equation and solution containers, coordinates supported solving paths and exposes solution inspection.
+ * Polynomial recognisers and specialised root algorithms live in the companion implementation units.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdbool.h>
 #include <limits.h>
 #include <math.h>

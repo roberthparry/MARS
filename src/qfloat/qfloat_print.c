@@ -1,3 +1,14 @@
+/**
+ * @file qfloat_print.c
+ * @brief Printf-style output for double-double values.
+ *
+ * Adapts qfloat values to formatted string and stream output. Numeric decimal conversion is shared with the
+ * string-conversion implementation rather than delegated to ordinary double formatting.
+ *
+ * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * is not arbitrary precision or a universal accuracy guarantee.
+ */
+
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 #include "ustring.h"

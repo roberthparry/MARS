@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_exponential.c
+ * @brief Exponential and polynomial-product integral rules.
+ *
+ * Integrates supported exponential compositions and polynomial or symbolic power factors, using special-function
+ * forms where required. Parameter and degree checks determine which reductions are valid.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file expr_laplace.c
+ * @brief Forward Laplace transform dispatch and evaluation.
+ *
+ * Matches supported time-domain expressions and constructs symbolic transform results with value notes and
+ * restrictions. Elementary and special-function families are supplied by companion rule units.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

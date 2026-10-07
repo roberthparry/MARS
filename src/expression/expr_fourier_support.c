@@ -1,3 +1,14 @@
+/**
+ * @file expr_fourier_support.c
+ * @brief Fourier construction, matching and condition helpers.
+ *
+ * Owns temporary transform expressions and supplies affine matching and parameter checks. Forward and inverse rule
+ * units share this context to keep ownership and domain handling consistent.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Shared Fourier construction, structural matching and domain-condition helpers. */
 #include "expr_fourier_internal.h"
 

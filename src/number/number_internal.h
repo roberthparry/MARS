@@ -1,3 +1,14 @@
+/**
+ * @file number_internal.h
+ * @brief Private numeric representations and backend contracts.
+ *
+ * Defines the number implementation's backend kinds, storage access and shared arithmetic helpers. Other modules
+ * should use number.h or src/internal/number_internal.h rather than depend on this complete backend layout.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_NUMBER_INTERNAL_H
 #define MARS_NUMBER_INTERNAL_H
 
@@ -11,6 +22,15 @@
 #include <mpc.h>
 
 #include "number.h"
+
+/* Scoped allocation services implemented by number_core.c. */
+void *number_scope_mem_alloc(size_t size, size_t align);
+void *number_scope_mem_calloc(size_t count, size_t size, size_t align);
+void *number_scope_mem_alloc_heap(size_t size, size_t align);
+void *number_scope_mem_calloc_heap(size_t count, size_t size, size_t align);
+void *number_scope_mem_realloc(void *ptr, size_t size, size_t align);
+void number_scope_mem_free(void *ptr);
+bool number_scope_mem_is_arena_ptr(const void *ptr);
 
 typedef enum number_kind_t {
     NUMBER_INVALID,
@@ -363,20 +383,7 @@ number_t number_neg_const_return_like(const number_t *like, number_const_id_t id
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_const_like(const number_t *like, number_const_id_t id);
 
-typedef enum number_modified_family_t {
-    NUMBER_MODIFIED_BESSEL_I,
-    NUMBER_MODIFIED_STRUVE_L,
-    NUMBER_MODIFIED_STRUVE_H
-} number_modified_family_t;
-
-/* Guarded principal series shared by Bessel I and the Struve L/H families. */
-number_t number_modified_series(number_t order, number_t argument, number_modified_family_t family);
-
 /* Widest cylindrical input precision, treating exact complex components like exact real inputs. */
 size_t number_cylindrical_precision(number_t order, number_t argument);
-
-/* Analytic log gamma for Re(z) >= 1, at out's 64..65536-bit work precision; false on failure.
- * Callers must reserve guard bits for cancellation and round their final result themselves. */
-bool number_modified_log_gamma(mpc_ptr out, mpc_srcptr z);
 
 #endif

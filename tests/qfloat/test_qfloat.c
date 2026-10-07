@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat.c
+ * @brief Double-double real suite entry point.
+ *
+ * Registers arithmetic, function, parsing and formatting groups and checks difficult numeric cases. Documented
+ * examples are included after ordinary assertions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

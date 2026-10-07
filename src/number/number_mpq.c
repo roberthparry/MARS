@@ -1,3 +1,14 @@
+/**
+ * @file number_mpq.c
+ * @brief Exact rational arithmetic backend.
+ *
+ * Implements rational storage, operations and predicates over exact numerator and denominator values. This path
+ * preserves fractions without introducing floating-point rounding.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <stdlib.h>
 
 #define MARS_NUMBER_INTERNAL_ACCESS

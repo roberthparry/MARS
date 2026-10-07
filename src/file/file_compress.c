@@ -1,3 +1,14 @@
+/**
+ * @file file_compress.c
+ * @brief Bounded streaming Zstandard file transforms.
+ *
+ * Compresses and decompresses file contents through the shared staging machinery. Decompression checks the
+ * configured output limit before publication, so compressed input cannot silently request unbounded output.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 

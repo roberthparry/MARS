@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_solve.c
+ * @brief Partial differential equation solver dispatch.
+ *
+ * Coordinates two-variable and multivariable solving strategies and recognised stationary or harmonic cases.
+ * Family-specific solvers return matched results or leave the problem unresolved.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,3 +1,14 @@
+/**
+ * @file expr_simplify_rules.c
+ * @brief Algebraic and function-specific rewrite rules.
+ *
+ * Implements supported identities and Cartesian or trigonometric rewrites used by the simplifier and presentation
+ * layer. Rules must preserve signs and domain assumptions rather than merely shorten text.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"

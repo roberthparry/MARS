@@ -1,3 +1,14 @@
+/**
+ * @file timeseries_core.c
+ * @brief Time-series construction and CSV input.
+ *
+ * Creates regular or explicitly indexed observations, owns series values and reads supported CSV data.
+ * Calendar-aware transformations and model fitting are implemented in companion units.
+ *
+ * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * constructing or transforming results.
+ */
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 #include "file.h"

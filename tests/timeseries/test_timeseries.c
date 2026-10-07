@@ -1,3 +1,14 @@
+/**
+ * @file test_timeseries.c
+ * @brief Indexed-series analysis and forecasting regressions.
+ *
+ * Checks construction, CSV input, transforms, alignment, regression and ARIMA-family workflows. Output and model
+ * checks exercise the public series interface with explicit date and predictor data.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_timeseries.h"
 #include "file.h"
 

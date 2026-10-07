@@ -1,3 +1,12 @@
+/**
+ * @file ophelia.c
+ * @brief Executable frontend for MARS function programs.
+ *
+ * Parses and executes supported scalar, equation and matrix statements, including function calls, branches and
+ * output. Mathematics is delegated to MARS APIs; this is an application interpreter rather than a public library
+ * module.
+ */
+
 /* Initial Ophelia scalar, equation and matrix frontend. Mathematics stays in the public MARS API. */
 #include <ctype.h>
 #include <stdbool.h>

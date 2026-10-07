@@ -1,3 +1,14 @@
+/**
+ * @file file_crypto.c
+ * @brief Authenticated streaming file encryption and decryption.
+ *
+ * Uses libsodium secretstream to process file data and verify encrypted streams. Decrypted output is staged until
+ * authentication and stream completion succeed; keys and sensitive buffers require the cleanup performed here.
+ *
+ * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * public error, ownership and output-publication contracts.
+ */
+
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 

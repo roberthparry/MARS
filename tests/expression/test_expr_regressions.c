@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_regressions.c
+ * @brief Expression simplification and runtime regression cases.
+ *
+ * Collects previously exposed algebra, binding, complex-function and presentation failures. Each case protects a
+ * concrete native behaviour from reappearing after shared rewrite changes.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 #include <math.h>

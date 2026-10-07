@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_series.c
+ * @brief Series solutions of differential equations.
+ *
+ * Constructs supported local solution coefficients and their compositions and records the expansion centre and
+ * degree. This supplies finite series results rather than asserting an exact closed form.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

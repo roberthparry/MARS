@@ -1,3 +1,14 @@
+/**
+ * @file test_test_config.c
+ * @brief Regression tests for the test configuration system.
+ *
+ * Checks configuration inheritance, group behaviour and JSON escaping. These tests validate the harness's
+ * selection machinery rather than a public MARS module.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

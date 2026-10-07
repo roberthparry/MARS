@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_integrate.c
+ * @brief Symbolic antiderivative regression families.
+ *
+ * Checks recognised integration rules, composition and special-function forms. The cases validate returned
+ * expressions and supported scope rather than assuming every integrand has an elementary primitive.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 
 #include "integrator.h"

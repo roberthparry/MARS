@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_affine.c
+ * @brief Affine transport PDE regression cases.
+ *
+ * Checks supported affine transport solutions and their variable or parameter handling. Documented stationary,
+ * time-dependent and symbolic-coefficient examples exercise the same solving paths.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

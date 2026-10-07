@@ -1,3 +1,11 @@
+/**
+ * @file equation_lab.c
+ * @brief Algebraic equation backend for MARS Lab.
+ *
+ * Runs native equation solving and presents exact, symbolic and numerical solution information. Sampled bindings
+ * are used only through the native APIs, not as browser-side algebraic rewriting.
+ */
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>

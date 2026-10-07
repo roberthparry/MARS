@@ -1,3 +1,14 @@
+/**
+ * @file test_string.c
+ * @brief Unicode string and parsing-helper regressions.
+ *
+ * Checks construction, mutation, normalisation, grapheme operations, cursors and views. README examples verify the
+ * documented text model after ordinary boundary and ownership checks.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_string.h"
 #include "ustring.h"
 #include <stdarg.h>

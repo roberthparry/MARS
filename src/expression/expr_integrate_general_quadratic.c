@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_general_quadratic.c
+ * @brief General symbolic quadratic radical integrals.
+ *
+ * Constructs antiderivatives for roots, inverse roots and linear-over-root quadratic forms. This extends centred
+ * cases while retaining symbolic coefficients and the associated branch assumptions.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

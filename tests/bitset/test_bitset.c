@@ -1,3 +1,14 @@
+/**
+ * @file test_bitset.c
+ * @brief Dynamic bitset regression suite.
+ *
+ * Checks growth, boundaries, counting, iteration and Boolean operations, including concurrent mutation cases.
+ * Documented flag and combination examples run after ordinary checks.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 // test_bitset.c — tests for the dynamic bitset_t container
 
 #include <pthread.h>

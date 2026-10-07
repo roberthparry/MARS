@@ -1,3 +1,14 @@
+/**
+ * @file test_file_transforms.c
+ * @brief Compression and authenticated encryption regressions.
+ *
+ * Checks successful and failing file transforms and documented compression or encryption round trips. Verification
+ * includes safe handling of invalid data and publication of output.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "file.h"
 #include "array.h"
 #include "test_harness.h"

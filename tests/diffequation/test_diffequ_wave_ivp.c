@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_wave_ivp.c
+ * @brief Wave initial-value regression cases.
+ *
+ * Checks polynomial initial data and vanishing terms in supported wave solutions. The documented zero-data case
+ * guards against spurious solution contributions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

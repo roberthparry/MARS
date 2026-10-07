@@ -1,3 +1,12 @@
+/**
+ * @file to-be-announced_lab.c
+ * @brief Time-series modelling and forecast experiment frontend.
+ *
+ * Reads configuration and observations and runs supported time-series analysis and model workflows. It is an
+ * experimental command-line frontend over datetime, matrix and timeseries APIs, not a separate forecasting
+ * library.
+ */
+
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>

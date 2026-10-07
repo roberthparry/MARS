@@ -1,3 +1,14 @@
+/**
+ * @file equation_polynomial.c
+ * @brief Polynomial coefficient extraction and reconstruction.
+ *
+ * Allocates and manipulates coefficient arrays, recognises polynomial expression shapes and rebuilds expanded
+ * expressions. Root solvers depend on this representation rather than reparsing displayed mathematics.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>

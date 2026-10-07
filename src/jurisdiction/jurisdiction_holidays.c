@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction_holidays.c
+ * @brief Holiday occurrences, exceptions and observance shifts.
+ *
+ * Builds and orders holiday events, applies occupancy and exception rules and exposes date-range queries. Returned
+ * events reflect the configured jurisdiction data rather than a fixed worldwide holiday list.
+ *
+ * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * currency rather than hard-coded assumptions about the host machine.
+ */
+
 /* Assemble holiday occurrences, apply exceptions and observances, and expose queries. */
 #include "jurisdiction_internal.h"
 

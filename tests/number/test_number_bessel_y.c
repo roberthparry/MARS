@@ -1,3 +1,14 @@
+/**
+ * @file test_number_bessel_y.c
+ * @brief Bessel Y correctness and ownership regressions.
+ *
+ * Checks scalar values, complex paths and result lifetime across numeric scopes. The documented examples exercise
+ * the same public special-function API.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_number.h"
 #include <string.h>
 

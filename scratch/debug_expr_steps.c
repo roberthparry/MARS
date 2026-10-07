@@ -1,3 +1,11 @@
+/**
+ * @file debug_expr_steps.c
+ * @brief Expression integration and derivative diagnostic tool.
+ *
+ * Prints intermediate expression steps for developer inspection of symbolic transformations. It is a debugging
+ * executable, not a stable output protocol or replacement for assertions in the test suite.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_expression.c
+ * @brief Expression suite entry point and README examples.
+ *
+ * Assembles the expression test groups and runs complete documented usage examples after ordinary tests. Shared
+ * helper files provide individual arithmetic, calculus and formatting cases.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 static bool test_expr_suite_setup(void);

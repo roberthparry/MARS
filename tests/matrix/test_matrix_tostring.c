@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_tostring.c
+ * @brief Native matrix rendering and binding regressions.
+ *
+ * Checks matrix text, common reciprocal powers and exact binding values in generated function output. It protects
+ * consistency between displayed algebra and executable representations.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_matrix.h"
 
 typedef struct {

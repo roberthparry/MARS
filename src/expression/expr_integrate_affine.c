@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_affine.c
+ * @brief Affine and symbolic square-family integral rules.
+ *
+ * Matches supported affine compositions and square-family radicals and builds their antiderivatives. These
+ * recognisers allow parameters to remain symbolic while respecting the chosen integration variable.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdbool.h>
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS

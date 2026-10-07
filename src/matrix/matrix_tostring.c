@@ -1,3 +1,14 @@
+/**
+ * @file matrix_tostring.c
+ * @brief Matrix rendering, bindings and serialisation.
+ *
+ * Produces native, function and TeX matrix text with binding information and shared-factor presentation.
+ * Serialisation uses the same structural values while preserving exact symbolic entries.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

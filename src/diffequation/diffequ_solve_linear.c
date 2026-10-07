@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_linear.c
+ * @brief First-order linear ODE solutions.
+ *
+ * Builds solutions to recognised first-order linear forms and resolves their integration constant where conditions
+ * allow. Other nonlinear reductions enter this path only after a verified transformation.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 

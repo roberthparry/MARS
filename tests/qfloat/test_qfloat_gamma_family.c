@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_gamma_family.c
+ * @brief Double-double gamma-family regressions.
+ *
+ * Checks gamma, logarithmic gamma, digamma and inverse-gamma behaviour over supported inputs. These tests protect
+ * specialised approximations and their domain handling.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 static void test_qf_gamma(void);

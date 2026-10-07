@@ -1,3 +1,14 @@
+/**
+ * @file expr_fourier.c
+ * @brief Fourier transform recognition and result construction.
+ *
+ * Coordinates forward and inverse Fourier rules, evaluation and simplification of transform nodes. Specialised
+ * pair recognisers supply formulas and domain conditions to this shared result path.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_fourier_internal.h"
 
 static bool quadratic(fourier_context_t *c, const expr_t *f, const expr_t *x,

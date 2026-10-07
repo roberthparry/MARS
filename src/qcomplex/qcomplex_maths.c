@@ -1,3 +1,14 @@
+/**
+ * @file qcomplex_maths.c
+ * @brief Double-double complex special-function algorithms.
+ *
+ * Implements supported complex mathematical functions and series, including hypergeometric families. The native
+ * fixed-precision layer does not depend on a public multiprecision representation.
+ *
+ * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * multiprecision complex arithmetic in the number module.
+ */
+
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>

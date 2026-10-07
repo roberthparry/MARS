@@ -2,6 +2,24 @@
 
 `number_t` is MARS's generic numeric value cluster.
 
+## Implementation organisation
+
+Small related function families are grouped in two implementation units:
+
+- `src/number/number_cylindrical_series.c` contains Bessel I and Struve H/L,
+  their shared guarded series and cylindrical precision selection. Bessel K
+  and Y retain separate algorithm files. The series-family selector and
+  logarithmic-gamma kernel are private to the shared series implementation.
+- `src/number/number_special.c` contains Chebyshev and Hermite recurrences
+  together with the scalar signal functions. Both groups use the existing
+  generic numeric arithmetic and precision policy.
+
+Scoped allocation declarations live in `src/number/number_internal.h`.
+Applications continue to use `number.h`; this organisation does not change
+the public API, numerical algorithms or ownership rules.
+
+## Signal functions
+
 The signal APIs `num_sgn`, `num_step`, `num_rect`, `num_tri`, `num_circ` and `num_sinc`
 follow the [expression-level definitions](expression.md#signal-functions-and-distributions),
 using the existing numeric precision policy. Piecewise functions require real

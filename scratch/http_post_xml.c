@@ -1,3 +1,11 @@
+/**
+ * @file http_post_xml.c
+ * @brief Runnable XML POST example.
+ *
+ * Constructs an XML document and verifies a parsed echo response from a compatible endpoint. It demonstrates
+ * document ownership and transport checks in a complete C main program.
+ */
+
 #include <stdlib.h>
 #include "http.h"
 

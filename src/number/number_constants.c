@@ -1,3 +1,14 @@
+/**
+ * @file number_constants.c
+ * @brief Representation-aware numeric constants.
+ *
+ * Constructs and recognises shared mathematical constants and their signed or imaginary forms. Backend-specific
+ * constant paths preserve the requested representation and ownership policy.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include <complex.h>
 #include <math.h>
 

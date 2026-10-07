@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction.c
+ * @brief Jurisdiction engine configuration and shared storage.
+ *
+ * Manages engine lifetime, diagnostics, default jurisdiction and location data, and serialised configuration.
+ * Calendar, holiday and timezone units query this shared configured state.
+ *
+ * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * currency rather than hard-coded assumptions about the host machine.
+ */
+
 /* Engine configuration, shared storage, jurisdiction defaults and serialisation. */
 #include "jurisdiction_internal.h"
 

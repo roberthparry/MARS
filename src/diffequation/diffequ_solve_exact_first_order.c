@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_exact_first_order.c
+ * @brief Exact first-order differential forms.
+ *
+ * Checks supported exact or radial-logarithmic forms and builds potential-based solutions. Initial conditions and
+ * square branches are considered when selecting admissible result families.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS

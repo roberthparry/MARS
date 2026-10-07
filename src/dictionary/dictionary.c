@@ -1,3 +1,14 @@
+/**
+ * @file dictionary.c
+ * @brief Generic key-value hashing and dense arena storage.
+ *
+ * Implements dictionary allocation, lookup, mutation, stable entry access and lazy sorted views. Key and value
+ * callbacks govern equality, copying and resource cleanup independently of the hidden storage layout.
+ *
+ * This implements dictionary.h. Hash and equality callbacks must agree, and the configured clone and destroy
+ * callbacks determine ownership of key and value resources.
+ */
+
 /* dictionary.c - generic key/value dictionary with open-addressing hash table
  *                and dense arena storage
  *

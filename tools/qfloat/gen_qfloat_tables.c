@@ -1,3 +1,11 @@
+/**
+ * @file gen_qfloat_tables.c
+ * @brief Developer generator for double-double constants and coefficients.
+ *
+ * Converts high-precision values into qfloat component literals and emits constant or approximation tables. This
+ * is generation tooling with its own historical mfloat dependency, not code linked into the native qfloat runtime.
+ */
+
 #include <stdio.h>
 #include <string.h>
 

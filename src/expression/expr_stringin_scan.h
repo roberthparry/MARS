@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringin_scan.h
+ * @brief Private Unicode-aware expression scanner interface.
+ *
+ * Declares string-cursor lookahead, token, identifier and superscript scanning helpers. Expression parsing code
+ * uses this layer to share lexical rules without exposing parser state as a public interface.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef EXPR_STRINGIN_SCAN_H
 #define EXPR_STRINGIN_SCAN_H
 

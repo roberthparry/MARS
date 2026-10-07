@@ -1,3 +1,14 @@
+/**
+ * @file test_number.c
+ * @brief Generic number suite assembly and setup.
+ *
+ * Registers backend, exactness, precision, formatting and special-function groups under the shared test harness.
+ * README examples are dispatched after the ordinary numeric checks.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_number.h"
 
 #include <stdio.h>

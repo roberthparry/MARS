@@ -1,3 +1,14 @@
+/**
+ * @file number_complex.c
+ * @brief Multiprecision complex arithmetic backend.
+ *
+ * Implements complex-number storage and supported operations using the multiprecision backend. It adapts that
+ * representation to the shared number_t interface without exposing its allocation details.
+ *
+ * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * borrowed aliases and independently owned numeric values.
+ */
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"

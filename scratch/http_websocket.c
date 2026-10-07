@@ -1,3 +1,11 @@
+/**
+ * @file http_websocket.c
+ * @brief Runnable WebSocket echo example.
+ *
+ * Connects to the supplied endpoint, sends a message and checks the received echo. The same program is used by
+ * deterministic local fixtures to test the documented client workflow.
+ */
+
 #include "http.h"
 #include "array.h"
 #include <stdlib.h>

@@ -1,3 +1,14 @@
+/**
+ * @file equation_cubic.c
+ * @brief Exact and numerical cubic equation solutions.
+ *
+ * Attempts rational factorisation and constructs supported cubic radical expressions, with coefficient-based
+ * numerical support. This unit supplies degree-three solutions to the equation dispatcher.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 

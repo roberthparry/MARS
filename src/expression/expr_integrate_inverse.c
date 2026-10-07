@@ -1,3 +1,14 @@
+/**
+ * @file expr_integrate_inverse.c
+ * @brief Inverse circular and hyperbolic integral rules.
+ *
+ * Supplies antiderivatives for supported inverse-function nodes and affine arguments. These rules are called by
+ * the integration dispatcher rather than changing the scalar inverse-function implementation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
 

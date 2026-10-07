@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_pde_fourier.c
+ * @brief Fourier-based PDE evolution solutions.
+ *
+ * Builds recognised evolution formulas using derivative and polynomial symbols in the transform domain. It also
+ * supplies solution steps and kernel notation for native presentation.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

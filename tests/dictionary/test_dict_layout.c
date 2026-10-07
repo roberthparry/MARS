@@ -1,3 +1,14 @@
+/**
+ * @file test_dict_layout.c
+ * @brief Dictionary storage-layout and size-boundary tests.
+ *
+ * Checks element-slot alignment and rejects size arithmetic overflow. These cases protect the internal arena
+ * implementation beyond the ordinary key-value behaviour tests.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdint.h>
 #include <string.h>
 

@@ -1,3 +1,22 @@
+/**
+ * @file expr_internal.h
+ * @brief Private expression graph layout and operator machinery.
+ *
+ * Defines node metadata, operation kinds, vtables and helpers used throughout the expression implementation. Other
+ * modules must use expression.h or the controlled src/internal/expr_internal.h interface rather than depend
+ * directly on this full layout.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ *
+ * Ownership model (internal summary):
+ *   • Every expr_t is a reference-counted node.
+ *   • Arithmetic builders retain their children; they never steal ownership.
+ *   • expr_get_deriv() returns a borrowed pointer to f->dx.
+ *   • Derivative builders normally produce owning handles.
+ *     expr_create_nth_deriv(0, ...) instead returns its borrowed input unchanged.
+ */
+
 #ifndef EXPR_INTERNAL_H
 #define EXPR_INTERNAL_H
 
@@ -13,23 +32,6 @@
 #include "dictionary.h"
 #include "expression.h"
 #include "qfloat.h"
-
-/**
- * @file expr_internal.h
- * @brief Internal structures and operator vtables for the differentiable
- *        value DAG.
- *
- * This header defines the full internal representation of ::expr_t and the
- * operator vtables used by the lazy evaluation and automatic differentiation
- * engine. It is not intended for public use; external code should include
- * only expression.h.
- *
- * Ownership model (internal summary):
- *   • Every expr_t is a reference-counted node.
- *   • Arithmetic builders retain their children; they never steal ownership.
- *   • expr_get_deriv() returns a borrowed pointer to f->dx.
- *   • expr_create_* functions produce owning handles.
- */
 
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 

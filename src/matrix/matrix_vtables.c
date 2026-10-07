@@ -1,3 +1,14 @@
+/**
+ * @file matrix_vtables.c
+ * @brief Matrix element and storage dispatch tables.
+ *
+ * Defines the operation tables connecting supported element kinds and storage layouts to their implementations.
+ * This centralises dispatch so public callers do not need representation-specific switches.
+ *
+ * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * must not rely on private matrix representation.
+ */
+
 #include "matrix_vtable_defs.h"
 
 const struct store_vtable dense_store = {.create = store_create_dense,

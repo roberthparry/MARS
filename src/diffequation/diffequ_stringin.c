@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_stringin.c
+ * @brief Differential-equation notation and condition parsing.
+ *
+ * Reads equation text, derivative syntax and initial or boundary conditions into native problem objects. It uses
+ * the expression and equation parsers while preserving dependent-function identity.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>

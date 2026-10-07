@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_support.c
+ * @brief Shared matrix test assertions and comparisons.
+ *
+ * Provides value, expression-text and Boolean checking helpers used by matrix test groups. It is support code, not
+ * a standalone test suite or production matrix implementation.
+ *
+ * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
+ * implementation.
+ */
+
 #include "test_matrix.h"
 
 char current_matrix_input_label[128];

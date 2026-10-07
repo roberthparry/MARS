@@ -1,3 +1,14 @@
+/**
+ * @file expr_fourier_branch.c
+ * @brief Fourier pairs with branch and pole conditions.
+ *
+ * Recognises supported branch-dependent spectra and assembles inverse forms and restrictions. It retains singular
+ * or principal-value conditions rather than silently selecting an unrestricted ordinary integral.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_fourier_internal.h"
 
 /* MARS's real-axis asin and atanh values have positive imaginary parts on both tails;

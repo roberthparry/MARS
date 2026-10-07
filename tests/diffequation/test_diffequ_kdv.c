@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_kdv.c
+ * @brief KdV solution-family regression cases.
+ *
+ * Checks recognised nonlinear dispersive solutions and their residuals. It pairs structural assertions with a
+ * documented runnable family example.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,15 @@
+/**
+ * @file expr_maths_ops.c
+ * @brief Mathematical operator definitions and public constructors.
+ *
+ * Connects expression operations to their evaluation and calculus callbacks and exposes supported function
+ * constructors. It is the registration and construction layer rather than the numerical implementation of number_t
+ * functions.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>

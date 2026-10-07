@@ -1,3 +1,14 @@
+/**
+ * @file expr_distribution_notation.c
+ * @brief Distributional result notation and domain captions.
+ *
+ * Builds readable notation for distribution-valued transform results and their conditions. This presentation unit
+ * keeps distribution semantics explicit rather than treating singular terms as ordinary numeric functions.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>

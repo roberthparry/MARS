@@ -1,3 +1,11 @@
+/**
+ * @file protobuf_roundtrip.c
+ * @brief Runnable Protocol Buffers round-trip example.
+ *
+ * Constructs a bounded message, encodes it, decodes it and checks retained field values. The documented program
+ * demonstrates ownership and cleanup without requiring a network connection.
+ */
+
 #include "protobuf.h"
 #include <inttypes.h>
 #include <stdio.h>

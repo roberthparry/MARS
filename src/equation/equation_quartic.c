@@ -1,3 +1,14 @@
+/**
+ * @file equation_quartic.c
+ * @brief Quartic root solving and factor reductions.
+ *
+ * Combines exact-factor attempts, numerical evaluation and distinct-root assembly for fourth-degree polynomials.
+ * The companion quartic surd unit constructs exact radical expressions where supported.
+ *
+ * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * internal matching or numerical attempts are not independent application APIs.
+ */
+
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>

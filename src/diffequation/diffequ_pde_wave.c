@@ -1,3 +1,15 @@
+/**
+ * @file diffequ_pde_wave.c
+ * @brief Wave equation initial-value solutions.
+ *
+ * Builds supported wave-equation solutions from initial displacement and velocity data. It manages dummy
+ * integration variables and output notation without collapsing the initial-value problem into an unrelated
+ * algebraic equation.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

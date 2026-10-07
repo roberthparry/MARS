@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction_calendar.c
+ * @brief Weekend inheritance and working-day queries.
+ *
+ * Supplies civil-date helpers and combines weekend policy with holiday occurrences to classify and count working
+ * days. Calendar arithmetic alone cannot determine these jurisdiction-dependent results.
+ *
+ * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * currency rather than hard-coded assumptions about the host machine.
+ */
+
 /* Civil-date helpers, inherited weekend policy and working-day queries. */
 #include "jurisdiction_internal.h"
 

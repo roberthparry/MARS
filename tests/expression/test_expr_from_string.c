@@ -1,3 +1,14 @@
+/**
+ * @file test_expr_from_string.c
+ * @brief Expression parser and round-trip regressions.
+ *
+ * Checks supported input notation, bindings, invalid forms and infinity rendering across round trips. It guards
+ * the native parser rather than any browser-side interpretation.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_expr.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

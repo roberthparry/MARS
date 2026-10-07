@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_fromstring.c
+ * @brief Matrix parsing and generated-function regressions.
+ *
+ * Checks matrix notation, bindings, named calculus helpers and function-body symbol handling. It protects the
+ * parser's relationship between scalar symbols and matrix entries.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdint.h>
 
 #include "test_matrix.h"

@@ -1,3 +1,14 @@
+/**
+ * @file json_parse.c
+ * @brief JSON text parsing and value construction.
+ *
+ * Reads JSON syntax into native value trees and recognises the supported MARS numeric extension. Parsing validates
+ * document structure independently of any HTTP transport or file source.
+ *
+ * This implements part of json.h. JSON values represent data independently of network transport; the HTTP module
+ * supplies service requests and responses.
+ */
+
 /* json_parse.c - JSON text parsing and file loading */
 
 #include <stdint.h>

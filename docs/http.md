@@ -10,6 +10,10 @@ Transport uses system libcurl 7.86.0 or newer, with thread-safe global
 initialisation; JSON and XML interpretation stays in the existing
 [JSON](json.md) and native [XML](xml.md) modules.
 
+Internally, `src/http/http_message.c` groups header validation and storage with
+text, JSON and XML body adapters. Transport execution and protocol-specific
+services remain separate; public calls and ownership rules are unchanged.
+
 ## Build and security
 
 Install the Debian/Ubuntu development package `libcurl4-openssl-dev`.

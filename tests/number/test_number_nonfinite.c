@@ -1,3 +1,14 @@
+/**
+ * @file test_number_nonfinite.c
+ * @brief Non-finite numeric and series regressions.
+ *
+ * Checks supported infinity, NaN and exceptional series behaviour. It guards explicit edge-case semantics rather
+ * than allowing accidental convergence or ordinary finite results.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_number.h"
 
 /* Non-finite complex inputs must not enter finite-exponent convergence arithmetic. */

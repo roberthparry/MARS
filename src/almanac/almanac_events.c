@@ -1,3 +1,14 @@
+/**
+ * @file almanac_events.c
+ * @brief Shared astronomical event search and time refinement.
+ *
+ * Validates event windows and converts numerical event times into result records. Bisection, contact searches and
+ * local minimisation support the specialised eclipse, transit and phase searches.
+ *
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * required configured data; this file is not a standalone astronomical program.
+ */
+
 /* Event times, search windows and shared numerical refinement. */
 #include <float.h>
 #include <math.h>

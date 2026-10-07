@@ -1,3 +1,14 @@
+/**
+ * @file expr_special.c
+ * @brief Orthogonal-polynomial expression nodes.
+ *
+ * Constructs Chebyshev and Hermite families and their symbolic operation support. Polynomial degree and argument
+ * remain represented in the expression layer rather than expanded indiscriminately into text.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>

@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_lie.c
+ * @brief Lie symmetry analysis and autonomous reduction.
+ *
+ * Constructs supported symmetry generators, brackets and structure constants and examines reductions of scalar
+ * differential equations. Unsupported analysis remains explicit rather than becoming an unverified solution.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

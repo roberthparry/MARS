@@ -1,3 +1,14 @@
+/**
+ * @file test_matrix_memory.c
+ * @brief Matrix numeric-scope lifetime regression cases.
+ *
+ * Checks that matrix entries and special-function results survive the temporary numeric scopes used to construct
+ * them. These are ordinary ownership assertions; running this file does not itself enable a memory-analysis tool.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <errno.h>
 
 #include "test_matrix.h"

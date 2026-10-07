@@ -1,3 +1,14 @@
+/**
+ * @file test_qfloat_examples.c
+ * @brief Double-double README examples.
+ *
+ * Executes and checks the documented qfloat usage examples. The main suite schedules this group after ordinary
+ * numeric regressions.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include "test_qfloat.h"
 
 void test_readme_examples(void)

@@ -1,3 +1,14 @@
+/**
+ * @file expr_binding_simplify.c
+ * @brief Simplification dispatch for binding expressions.
+ *
+ * Applies operation-specific simplification to the lightweight expressions retained in bindings. It keeps exact
+ * supplied values readable without substituting every binding into the main expression graph.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_binding_simplify.h"
 
 /* Binding rules consume and return the owned node. A rule that does not match

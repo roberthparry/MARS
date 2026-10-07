@@ -1,3 +1,11 @@
+/**
+ * @file http_get.c
+ * @brief Runnable HTTP GET and JSON-response example.
+ *
+ * Requests an echoed query value and checks the parsed response before printing it. An optional URL allows the
+ * same main program to run against authorised local test fixtures.
+ */
+
 #include <stdlib.h>
 #include "http.h"
 

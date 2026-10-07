@@ -1,3 +1,14 @@
+/**
+ * @file test_equation.c
+ * @brief Algebraic equation and solution regression suite.
+ *
+ * Checks parsing, bindings, exact polynomial or surd solutions and supported numerical solving. Expected output
+ * and solver boundaries are exercised through the common equation API.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>

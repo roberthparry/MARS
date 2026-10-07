@@ -1,3 +1,11 @@
+/**
+ * @file http_grpc.c
+ * @brief Runnable unary gRPC client example.
+ *
+ * Builds a Protocol Buffers payload, sends it to the supplied endpoint and validates the unary reply. It
+ * demonstrates the HTTP and protobuf APIs together without generated service stubs.
+ */
+
 #include "http.h"
 #include "protobuf.h"
 #include <inttypes.h>

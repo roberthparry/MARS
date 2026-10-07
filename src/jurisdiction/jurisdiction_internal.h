@@ -1,3 +1,14 @@
+/**
+ * @file jurisdiction_internal.h
+ * @brief Private jurisdiction engine and policy-row contracts.
+ *
+ * Defines configured storage and the holiday, observance, timezone and exception structures shared by rule loaders
+ * and queries. This is the common implementation boundary behind jurisdiction.h, not a public database schema API.
+ *
+ * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
+ * documented module boundary and preserve any explicit internal-access guards.
+ */
+
 #ifndef MARS_JURISDICTION_INTERNAL_H
 #define MARS_JURISDICTION_INTERNAL_H
 

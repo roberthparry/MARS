@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringout_cartesian.c
+ * @brief Cartesian display of complex expressions.
+ *
+ * Builds supported real and imaginary presentations and analytic-continuation notation. Shared Cartesian structure
+ * keeps the native and TeX forms consistent with the executable function form.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 /* Cartesian forms and analytic continuations. */
 
 #include <ctype.h>

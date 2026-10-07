@@ -1,3 +1,14 @@
+/**
+ * @file test_number_formatting.c
+ * @brief Generic numeric output regressions.
+ *
+ * Checks exact, real and complex textual formatting and supported precision options. It protects numeric spelling
+ * independently of the expression and matrix renderers.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <complex.h>
 #include <stdio.h>
 #include <string.h>

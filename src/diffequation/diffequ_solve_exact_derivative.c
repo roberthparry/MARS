@@ -1,3 +1,14 @@
+/**
+ * @file diffequ_solve_exact_derivative.c
+ * @brief Exact-derivative linearisation.
+ *
+ * Recognises combinations that can be integrated as an exact derivative and constructs the reduced right-hand
+ * side. This avoids treating a structurally linearised equation as a general nonlinear problem.
+ *
+ * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * families; callers must inspect result status and any retained conditions.
+ */
+
 #include <stdlib.h>
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS

@@ -1,3 +1,14 @@
+/**
+ * @file expr_deriv_reverse_maths.c
+ * @brief Reverse-mode rules for mathematical operations.
+ *
+ * Supplies local derivative contributions for supported mathematical nodes, including special functions. The graph
+ * traversal in expr_deriv_reverse.c calls these rules to accumulate numeric sensitivities.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <limits.h>
 #include <stdlib.h>
 

@@ -1,3 +1,14 @@
+/**
+ * @file expr_simplify_match.c
+ * @brief Structural matching for simplification rules.
+ *
+ * Finds common denominators, factors and compatible signed products. These helpers recognise algebraic
+ * relationships within expression graphs without parsing their rendered output.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 

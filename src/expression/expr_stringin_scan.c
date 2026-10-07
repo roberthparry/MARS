@@ -1,3 +1,14 @@
+/**
+ * @file expr_stringin_scan.c
+ * @brief Unicode-aware expression token scanning.
+ *
+ * Provides cursor lookahead, name parsing, aliases and superscript integer recognition. The main parser uses these
+ * string_t helpers instead of performing independent byte-level tokenisation.
+ *
+ * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * domain restrictions when extending these operations.
+ */
+
 #include "expr_stringin_scan.h"
 
 #include <ctype.h>

@@ -1,3 +1,14 @@
+/**
+ * @file test_number_readme.c
+ * @brief Runnable numeric documentation examples.
+ *
+ * Executes the number guide's examples and verifies their displayed values. The suite runs these after ordinary
+ * numeric tests so documentation remains an executable usage reference.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>

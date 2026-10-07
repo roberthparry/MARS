@@ -1,3 +1,14 @@
+/**
+ * @file test_almanac.c
+ * @brief Almanac engine and astronomical event regressions.
+ *
+ * Exercises configured catalogue access, coordinate results, observer events and eclipse or transit searches
+ * against reference expectations. It also runs the documented almanac example after ordinary checks.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

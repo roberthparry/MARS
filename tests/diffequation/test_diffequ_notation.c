@@ -1,3 +1,14 @@
+/**
+ * @file test_diffequ_notation.c
+ * @brief Derivative-order notation parsing regressions.
+ *
+ * Checks caret and alternative derivative-order syntax and rejects invalid orders. The example confirms that a
+ * documented PDE notation follows the same parser contract.
+ *
+ * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
+ * run suites sequentially; this source is not part of the installed library.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

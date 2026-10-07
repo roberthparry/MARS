@@ -1,3 +1,14 @@
+/**
+ * @file http_form.c
+ * @brief URL-encoded forms and multipart request bodies.
+ *
+ * Retains ordered form fields and constructs bounded multipart snapshots, including file parts. Request
+ * preparation owns the resulting bytes so transfer does not depend on caller buffers remaining mutable.
+ *
+ * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * with the shared client machinery; serving requests belongs to webserver.
+ */
+
 /* Ordered forms and bounded multipart snapshots. */
 #include <sodium.h>
 #include <stdlib.h>
