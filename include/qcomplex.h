@@ -236,6 +236,7 @@ qcomplex_t qc_mul(qcomplex_t a, qcomplex_t b); /**< a * b */
 qcomplex_t qc_div(qcomplex_t a, qcomplex_t b); /**< a / b */
 qcomplex_t qc_neg(qcomplex_t a);               /**< -a */
 qcomplex_t qc_conj(qcomplex_t a);              /**< conjugate(a) */
+
 /** @brief Return the complex conjugate of @p a; this is the long-form alias of qc_conj(). */
 qcomplex_t qc_conjugate(qcomplex_t a);
 /** @} */
@@ -252,8 +253,10 @@ qfloat_t qc_arg(qcomplex_t z); /**< arg(z) */
  * @name Polar form
  * @{
  */
+
 /** Construct z = r * exp(i*theta) from polar coordinates. */
 qcomplex_t qc_from_polar(qfloat_t r, qfloat_t theta);
+
 /** Decompose z into (r, theta) where r = |z| and theta = arg(z) in (-pi, pi]. */
 void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
 /** @} */
@@ -264,6 +267,7 @@ void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
  */
 qcomplex_t qc_exp(qcomplex_t z);               /**< exp(z) */
 qcomplex_t qc_log(qcomplex_t z);               /**< log(z) */
+
 /**
  * @brief Return the principal natural logarithm of @p z.
  *
@@ -274,6 +278,7 @@ qcomplex_t qc_log(qcomplex_t z);               /**< log(z) */
  */
 qcomplex_t qc_ln(qcomplex_t z);
 qcomplex_t qc_log10(qcomplex_t z);             /**< log10(z) */
+
 /**
  * @brief Return the principal common logarithm of @p z.
  *
@@ -285,8 +290,10 @@ qcomplex_t qc_log10(qcomplex_t z);             /**< log10(z) */
 qcomplex_t qc_lg(qcomplex_t z);
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b); /**< a^b */
 qcomplex_t qc_sqrt(qcomplex_t z);              /**< sqrt(z) */
+
 /** @brief Return the single principal cube root of @p z. */
 qcomplex_t qc_cubrt(qcomplex_t z);
+
 /** @brief Return the single principal @p n-th root of @p z, where @p n is greater than one. */
 qcomplex_t qc_root(qcomplex_t z, unsigned int n);
 /** @} */
@@ -353,6 +360,7 @@ qcomplex_t qc_erfc(qcomplex_t z);                          /**< complementary er
 qcomplex_t qc_erfinv(qcomplex_t z);                        /**< inverse error function */
 qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse complementary error function */
 qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
+
 /**
  * @brief Evaluate principal Bessel Y for real or complex order and argument, including Y_0.
  *
@@ -361,8 +369,10 @@ qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function *
  * unsupported numerical ranges and exhausted guards return NaN. See docs/qcomplex.md.
  */
 qcomplex_t qc_bessel_y(qcomplex_t order, qcomplex_t argument);
+
 /** @brief Principal modified Bessel K for complex order and non-zero argument; unsupported ranges return NaN. */
 qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
+
 /**
  * @brief Evaluate principal modified Bessel I for complex order and argument, including I_0.
  *
@@ -370,6 +380,7 @@ qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
  * above 1000, undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md.
  */
 qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument);
+
 /**
  * @brief Evaluate the principal modified Struve function L_order(argument) for complex order and argument.
  *
@@ -377,6 +388,7 @@ qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument);
  * undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md for numerical limits.
  */
 qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument);
+
 /**
  * @brief Evaluate principal ordinary Struve H for complex order and argument.
  *
@@ -387,6 +399,7 @@ qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument);
 qcomplex_t qc_struve_h(qcomplex_t order, qcomplex_t argument);
 qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
+
 /**
  * @brief Compute the complex q-digamma function.
  *
@@ -400,6 +413,7 @@ qcomplex_t qc_qdigamma(qcomplex_t q, qcomplex_t z);
 qcomplex_t qc_trigamma(qcomplex_t z);                      /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);                    /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */
+
 /**
  * @brief Compute the analytically continued Riemann zeta function.
  *
@@ -407,6 +421,7 @@ qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽�
  * @return ζ(z) at double-double complex precision.
  */
 qcomplex_t qc_zeta(qcomplex_t z);
+
 /**
  * @brief Compute the analytically continued Hurwitz zeta function.
  *
@@ -415,6 +430,7 @@ qcomplex_t qc_zeta(qcomplex_t z);
  * @return ζ(s, a) at double-double complex precision, or NaN where undefined.
  */
 qcomplex_t qc_zetah(qcomplex_t s, qcomplex_t a);
+
 /**
  * @brief Compute the first Hurwitz zeta derivative with respect to its exponent.
  *
@@ -423,6 +439,7 @@ qcomplex_t qc_zetah(qcomplex_t s, qcomplex_t a);
  * @return ∂ζ(s, a)/∂s at double-double complex precision, or NaN where undefined.
  */
 qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
+
 /**
  * @brief Compute the first derivative of the Riemann zeta function.
  *
@@ -431,6 +448,7 @@ qcomplex_t qc_zatahp(qcomplex_t s, qcomplex_t a);
  */
 qcomplex_t qc_zetap(qcomplex_t z);
 qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li₂(z) */
+
 /**
  * @brief Evaluate the holomorphic continuation of the integer-order Clausen function.
  *
@@ -453,6 +471,7 @@ qcomplex_t qc_clausen(unsigned long order, qcomplex_t z);
  * @return The holomorphic Clausen function, agreeing with qf_clausen2() on the real axis.
  */
 qcomplex_t qc_clausen2(qcomplex_t z);
+
 /**
  * @brief Compute the order-one polylogarithm Li₁(z).
  *
@@ -461,8 +480,10 @@ qcomplex_t qc_clausen2(qcomplex_t z);
  */
 qcomplex_t qc_polylog1(qcomplex_t z);
 qcomplex_t qc_polylog(qcomplex_t s, qcomplex_t z);         /**< polylogarithm Li_s(z), integer s */
+
 /** Compute the principal Lerch transcendent Phi(z,s,a) where implemented. */
 qcomplex_t qc_lerch_phi(qcomplex_t z, qcomplex_t s, qcomplex_t a);
+
 /**
  * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
  *
@@ -521,14 +542,19 @@ qcomplex_t qc_floor(qcomplex_t z);               /**< floor(z) */
  * @return The real value -1, zero or +1 (including at infinities), or NaN for NaN or non-real inputs.
  */
 qcomplex_t qc_sgn(qcomplex_t argument);
+
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 qcomplex_t qc_step(qcomplex_t argument);
+
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
 qcomplex_t qc_rect(qcomplex_t argument);
+
 /** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
 qcomplex_t qc_tri(qcomplex_t argument);
+
 /** @brief Even unit-radius aperture profile, with half-height endpoints. */
 qcomplex_t qc_circ(qcomplex_t argument);
+
 /** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
 qcomplex_t qc_sinc(qcomplex_t argument);
 qcomplex_t qc_hypot(qcomplex_t x, qcomplex_t y); /**< sqrt(|x|^2 + |y|^2) */

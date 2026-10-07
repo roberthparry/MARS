@@ -393,8 +393,25 @@ Use `%S` for `const string_t *`, `%W` for `string_view_t`, and `%R` for
 `rune_t`:
 
 ```c
-string_t *name = string_new_with("MARS");
-string_append_format(out, "name=%S first=%R", name, string_at(name, 0));
+#include <stdio.h>
+#include "ustring.h"
+
+int main(void)
+{
+    string_t *out = string_new();
+    string_t *name = string_new_with("MARS");
+    string_append_format(out, "name=%S first=%R", name, string_at(name, 0));
+    string_printf("%S\n", out);
+    string_free(out);
+    string_free(name);
+    return 0;
+}
+```
+
+Output:
+
+```text
+name=MARS first=M
 ```
 
 ### Search and Comparison

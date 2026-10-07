@@ -40,8 +40,10 @@ typedef struct _sqlite_stmt_t sqlite_stmt_t;
 typedef enum _sqlite_step_result_t {
     /** Stepping failed; inspect statement or database error text. */
     SQLITE_STEP_ERROR = -1,
+
     /** Stepping completed with no more rows. */
     SQLITE_STEP_DONE = 0,
+
     /** A row is available for column access. */
     SQLITE_STEP_ROW = 1
 } sqlite_step_result_t;

@@ -361,13 +361,17 @@ extern const expr_ops_t ops_indexed_symbol;
 extern const expr_ops_t ops_summation;
 extern const expr_ops_t ops_product;
 extern const expr_ops_t ops_formal_derivative;
+
 /** Recognise a locally integrable one-sided logarithm whose derivative must remain distributional. */
 bool expr_is_one_sided_log(const expr_t *expr);
+
 /** Recognise a half-line reciprocal with the unit-cutoff finite-part convention. */
 bool expr_is_half_line_finite_part(const expr_t *expr);
+
 /** Evaluate a distributional derivative only where its ordinary restriction is defined. */
 number_t expr_distribution_derivative_eval(expr_t *expr);
 extern const expr_ops_t ops_ordered_derivative;
+
 /** Construct an ordinary derivative of a unary symbolic function with a symbolic order. */
 expr_t *expr_new_ordered_derivative(const expr_t *function, const expr_t *order);
 extern const expr_ops_t ops_arbitrary_function;
@@ -385,42 +389,59 @@ extern const expr_ops_t ops_circ;
 extern const expr_ops_t ops_sinc;
 extern const expr_ops_t ops_delta;
 extern const expr_ops_t ops_analytic_delta;
+
 /** Identify analytic evaluation functionals within an expression tree. */
 bool expr_fourier_has_analytic_functional(const expr_t *expr);
 extern const expr_ops_t ops_principal_value;
 extern const expr_ops_t ops_finite_part;
+
 /** Construct an integral transform with explicit or inferred variable mapping. */
 expr_t *expr_integral_transform_from_args(size_t count, expr_t *const *args, const expr_ops_t *ops);
+
 /** Construct a forward Fourier transform using angular frequency. */
 expr_t *expr_fourier_from_args(size_t count, expr_t *const *args);
+
 /** Construct an inverse Fourier transform, including its normalisation. */
 expr_t *expr_inverse_fourier_from_args(size_t count, expr_t *const *args);
+
 /** Return a recognised Fourier formula, or NULL for an unsupported case. */
 expr_t *expr_fourier_result(const expr_t *transform);
+
 /** Match a hyperbolic power, returning a borrowed argument and owning effective and branch exponents. */
 bool expr_fourier_hyperbolic_parts(const expr_t *f, const expr_t **argument, expr_t **power,
                                   expr_t **branch_power, bool *singular);
+
 /** Describe hyperbolic-power convergence for an affine argument and an effective sinh or cosh exponent. */
 const char *expr_fourier_hyperbolic_note(const expr_t *power, bool singular,
                                         const expr_t *rate, const expr_t *offset);
+
 /** Return a Fourier-specific convergence or branch diagnostic, or NULL when none applies. */
 const char *expr_fourier_value_note(const expr_t *transform);
+
 /** Substitute supplied constant bindings before selecting a transform rule; return NULL if none are supplied. */
 expr_t *expr_transform_bound_constants(const expr_t *expr);
+
 /** Return whether an expression is a forward or inverse integral-transform operator. */
 bool expr_is_integral_transform(const expr_t *expr);
+
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
+
 /** Differentiate a recognised transform result, retaining its domain or a formal derivative when unresolved. */
 expr_t *expr_transform_deriv(expr_t *transform);
+
 /** Construct an inverse Laplace operator from its expression and optional variable mapping. */
 expr_t *expr_inverse_laplace_from_args(size_t count, expr_t *const *args);
+
 /** Return a recognised inverse Laplace formula, or NULL when no rule applies. */
 expr_t *expr_inverse_laplace_result(const expr_t *transform);
+
 /** Recognise Gaussian and error-function inverse pairs from a spectral expression. */
 expr_t *expr_inverse_laplace_gaussian_pair(const expr_t *f, const expr_t *s, const expr_t *t);
+
 /** Recognise special-function inverse pairs from a spectral expression. */
 expr_t *expr_inverse_laplace_special_pair(const expr_t *f, const expr_t *s, const expr_t *t);
+
 /** Recognise elementary transcendental inverse pairs from a spectral expression. */
 expr_t *expr_inverse_laplace_elementary_pair(const expr_t *f, const expr_t *s, const expr_t *t);
 extern const expr_ops_t ops_real_domain;
@@ -428,12 +449,16 @@ extern const expr_ops_t ops_nonnegative_integer;
 extern const expr_ops_t ops_real_parameter;
 extern const expr_ops_t ops_real_bound;
 extern const expr_ops_t ops_imag_coordinate;
+
 /** Construct the real coordinate retained when integrating along a vertical line. */
 expr_t *expr_real_coordinate(const expr_t *value);
+
 /** Construct the imaginary coordinate used to parameterise a vertical integration line. */
 expr_t *expr_imag_coordinate(const expr_t *value);
+
 /** Whether every occurrence of a symbol is confined to a fixed real-coordinate projection. */
 bool expr_transform_real_coordinate_only(const expr_t *expr, const expr_t *symbol);
+
 /** Return the operand of a non-zero domain condition, or NULL for other predicates. */
 const expr_t *expr_domain_nonzero_operand(const expr_t *condition);
 expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
@@ -443,13 +468,17 @@ expr_t *expr_add_integration_constant(const expr_t *antiderivative, const expr_t
 expr_t *expr_laplace_result(const expr_t *transform);
 expr_t *expr_laplace_from_args(size_t count, expr_t *const *args);
 expr_t *expr_laplace_formula(const expr_t *transform, number_t *abscissa, expr_t **conditions);
+
 /** Build a supported elementary transform, retaining sufficient convergence conditions. */
 expr_t *expr_laplace_elementary_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                    number_t *bound, expr_t **conditions);
+
 /** Construct the principal inverse-hyperbolic Laplace pair for a positive real rate magnitude. */
 expr_t *expr_laplace_invhyper_formula(const expr_t *s, const expr_t *rate, bool cosine, bool negative);
+
 /** Construct the inverse-circular Laplace pair for a positive real rate magnitude, retaining real-cut values. */
 expr_t *expr_laplace_invcircular_formula(const expr_t *s, const expr_t *rate, bool cosine, bool negative);
+
 /** Build a supported special-function transform, retaining sufficient convergence conditions. */
 expr_t *expr_laplace_special_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                number_t *bound, expr_t **conditions);
@@ -555,12 +584,15 @@ extern const expr_ops_t ops_bessel_j;
 extern const expr_ops_t ops_bessel_y;
 extern const expr_ops_t ops_bessel_k;
 extern const expr_ops_t ops_bessel_i;
+
 /** Expand a finite numerical Bessel I order into its principal hypergeometric form, reflecting negative integers. */
 expr_t *expr_bessel_i_hypergeometric(const expr_t *order, const expr_t *argument);
 extern const expr_ops_t ops_struve_l;
 extern const expr_ops_t ops_struve_h;
+
 /** Expand a finite numerical Struve H order into its alternating hypergeometric form, or return NULL at poles. */
 expr_t *expr_struve_h_hypergeometric(const expr_t *order, const expr_t *argument);
+
 /** Expand a finite numerical Struve order into its principal hypergeometric form, or return NULL at parameter poles. */
 expr_t *expr_struve_l_hypergeometric(const expr_t *order, const expr_t *argument);
 extern const expr_ops_t ops_lommel_s;
@@ -1072,8 +1104,10 @@ int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
+
 /** Render the authored operation tree without evaluating nested transforms. Returns an owning C string. */
 char *expr_to_TeX_operation_body(const expr_t *expr);
+
 /** @brief Scan an authored expression tree for calculus operations. */
 bool expr_contains_calculus_request(const expr_t *expr);
 int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);

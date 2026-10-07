@@ -15,20 +15,26 @@
  * DTDs and external entities are rejected. No schema validation, XPath, XInclude or network access is performed.
  * Use separate readers in different threads; a reader, its callback and a tree must not be used concurrently.
  */
+
 /** @brief Opaque owned XML node. */
 typedef struct _xml_t xml_t;
+
 /** @brief Opaque incremental parser. */
 typedef struct _xml_reader_t xml_reader_t;
+
 /** @brief XML node categories. */
 typedef enum { XML_INVALID = -1, XML_DOCUMENT, XML_ELEMENT, XML_TEXT, XML_COMMENT, XML_PROCESSING_INSTRUCTION } xml_type_t;
+
 /** @brief Streaming event categories; character data may arrive in several adjacent events. */
 typedef enum { XML_EVENT_START, XML_EVENT_END, XML_EVENT_TEXT, XML_EVENT_COMMENT, XML_EVENT_PI } xml_event_t;
+
 /** @brief Resource limits; zero fields select the documented defaults. */
 typedef struct {
     size_t max_bytes; /**< Encoded input limit; default 64 MiB. */
     size_t max_depth; /**< Element nesting limit; default and maximum 128. */
     size_t max_nodes; /**< Element, comment and instruction count limit; default 1000000. */
 } xml_limits_t;
+
 /**
  * @brief Receive a streaming XML event; all arguments are borrowed for the call.
  * @param event Event category.
@@ -40,6 +46,7 @@ typedef struct {
  */
 typedef bool (*xml_event_fn)(xml_event_t event, const string_t *name, const string_t *text,
                              const dictionary_t *attributes, void *user_data);
+
 /**
  * @brief Consume a UTF-8 output fragment.
  * @param text Borrowed fragment; valid for this call only.

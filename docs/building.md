@@ -22,6 +22,7 @@ Required libraries:
 - SQLCipher
 - Zstandard, with the streaming `ZSTD_compressStream2` API
 - libsodium, with the XChaCha20-Poly1305 secretstream API
+- libcurl 7.85.0 or newer, with HTTPS and thread-safe global initialisation
 
 Optional libraries:
 
@@ -30,13 +31,13 @@ Optional libraries:
 On Debian/Ubuntu, install everything used by the default build with:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev
+sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
 ```
 
 If you disable libunistring support, it is not required:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev
+sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
 make ENABLE_UNISTRING=0
 ```
 
@@ -54,6 +55,22 @@ For file-module test coverage, `make -j1 coverage-file` additionally requires
 `gcov` from the GCC toolchain and Python 3. It reports measured execution
 coverage and enforces minimums; see the
 [file testing guide](file.md#coverage-and-failure-path-tests) for details.
+
+### HTTP transport dependency
+
+The [HTTP module](http.md) uses system libcurl. Install the development package
+`libcurl4-openssl-dev`, not merely the runtime library. Make queries the
+`libcurl` pkg-config record and falls back to `-lcurl` if unavailable.
+`CURL_CFLAGS` and `CURL_LIBS` can override discovery for non-standard installs.
+Static archive consumers must also link libcurl and its transitive dependencies.
+`make check-deps` checks the minimum header version and links a transport probe.
+The ordinary HTTP tests additionally use Python 3's standard library for local
+HTTP/HTTPS fixtures; they do not contact external services.
+
+The [webserver module](webserver.md) uses Linux sockets and adds no dependency.
+Its local tests and example need loopback sockets and process creation; they do
+not need internet access. Source, header and test discovery includes the module
+automatically. Run `make -j1 test_webserver` for its dedicated suite.
 
 ### File compression and encryption dependencies
 
@@ -260,10 +277,10 @@ make help
   `__attribute__`, so GCC or Clang is required.
 - The Linux system toolchain is the supported path; MSVC/Windows builds are not
   currently guaranteed.
-- `libm`, pthreads, GMP, MPFR, MPC, SQLCipher, Zstandard and libsodium are required.
+- `libm`, pthreads, GMP, MPFR, MPC, SQLCipher, Zstandard, libsodium and libcurl are required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
 - `make install` installs MARS headers and libraries only. It does not install
-  external dependencies such as GMP, MPFR, MPC, SQLCipher, Zstandard, libsodium or libunistring;
+  external dependencies such as GMP, MPFR, MPC, SQLCipher, Zstandard, libsodium, libcurl or libunistring;
   install those through your OS package manager before building MARS.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
 - Current benchmark targets include `bench_integrator` and

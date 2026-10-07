@@ -40,17 +40,24 @@ arbitrary Jordan blocks at that point.
 README signum example:
 
 ```c
-NUM_SCOPE(scope);
-number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
-matrix_t *a = mat_create_diagonal(3u, diagonal);
-matrix_t *b = mat_sgn(a);
-if (b) {
-    printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
-           num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-           num_to_double(mat_get_num(b, 2, 2)));
+#include <stdio.h>
+#include "matrix.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *a = mat_create_diagonal(3u, diagonal);
+    matrix_t *b = mat_sgn(a);
+    if (b) {
+        printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
+               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+               num_to_double(mat_get_num(b, 2, 2)));
+    }
+    mat_free(b);
+    mat_free(a);
+    return 0;
 }
-mat_free(b);
-mat_free(a);
 ```
 
 Output:
@@ -62,17 +69,24 @@ sgn(diag(-1, 0, 1)) = diag(-1, 0, 1)
 README example:
 
 ```c
-NUM_SCOPE(scope);
-number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
-matrix_t *a = mat_create_diagonal(3u, diagonal);
-matrix_t *b = mat_step(a);
-if (b) {
-    printf("step(diag(-1, 0, 1)) = diag(%.1f, %.1f, %.1f)\n",
-           num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-           num_to_double(mat_get_num(b, 2, 2)));
+#include <stdio.h>
+#include "matrix.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *a = mat_create_diagonal(3u, diagonal);
+    matrix_t *b = mat_step(a);
+    if (b) {
+        printf("step(diag(-1, 0, 1)) = diag(%.1f, %.1f, %.1f)\n",
+               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
+               num_to_double(mat_get_num(b, 2, 2)));
+    }
+    mat_free(b);
+    mat_free(a);
+    return 0;
 }
-mat_free(b);
-mat_free(a);
 ```
 
 Output:
@@ -125,6 +139,13 @@ the API. Internally each matrix carries:
 - numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
 ## `expr_t *` Matrices
+
+For numeric matrices, `int mat_trace(const matrix_t *A, number_t *trace)`
+returns the trace through the required output pointer. It returns zero on
+success and a non-zero status on failure. Initialise the output to
+`NUM_ZERO` and release the resulting number with `num_destroy`.
+For symbolic matrices, use `mat_trace_expr` and release the returned
+`expr_t *` with `expr_free`.
 
 `matrix_t` also supports symbolic `expr_t *` elements through `MAT_TYPE_EXPR`.
 These matrices retain every stored `expr_t *` handle, so overwrites, copies,
@@ -240,8 +261,8 @@ int main(void) {
 
     mat_eigendecompose(A, eigenvalues, &evecs);
 
-    num_printf("eigenvalue[0] = %N\n", eigenvalues[0]);
-    num_printf("eigenvalue[1] = %N\n", eigenvalues[1]);
+    num_printf("eigenvalue[0] = %.0n\n", eigenvalues[0]);
+    num_printf("eigenvalue[1] = %.0n\n", eigenvalues[1]);
 
     mat_free(A);
     mat_free(evecs);
@@ -254,8 +275,8 @@ int main(void) {
 Expected output:
 
 ```text
-eigenvalue[0] = 1 + 0i
-eigenvalue[1] = 4 + 0i
+eigenvalue[0] = 1
+eigenvalue[1] = 4
 ```
 
 ### String-based symbolic example
@@ -313,11 +334,11 @@ Illustrative output:
 
 ```text
 { (
-  Δ    Ω
-  Ω   -Δ
-) | Δ = 1.5, Ω = 0.25 }
-characteristic polynomial coefficients = (1; 0; -(Δ² + Ω²))
-det(H) = { -Δ² - Ω² | Δ = 1.5; Ω = 0.25 }
+  Δ  Ω
+  Ω -Δ
+) | Δ = 1.5; Ω = 0.25 }
+characteristic polynomial coefficients = { (1; 0; -(Δ² + Ω²)) | Δ = 1.5; Ω = 0.25 }
+det(H) = { -(Δ² + Ω²) | Δ = 1.5; Ω = 0.25 }
 d/dΔ det(H) = { -2Δ | Δ = 1.5 }
 ```
 
@@ -370,8 +391,8 @@ int main(void)
     expr_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
     expr_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
 
-    mat_eigenvalues(H, evals);
-    mat_trace(H, &trace);
+    mat_eigenvalues_expr(H, evals);
+    mat_trace_expr(H, &trace);
     mat_get(P, 2, 0, &c2);
     trace_text = expr_to_text(trace, style_EXPRESSION);
     c2_text = expr_to_text(c2, style_EXPRESSION);
@@ -407,8 +428,8 @@ H = { (
   Δ  Ω
   Ω -Δ
 ) | Δ = 1.5, Ω = 0.25 }
-H² = { (Δ² + Ω², -ΔΩ + ΔΩ; -ΔΩ + ΔΩ, Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }
-tr(H) = { 0 }
+H² = { (Δ² + Ω², 0; 0, Ω² + Δ²) | Δ = 1.5, Ω = 0.25 }
+tr(H) = 0
 charpoly constant term = { -(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }
 eigenvalues = { √(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }, { -√(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }
 ```
@@ -852,30 +873,46 @@ clean exact solve, this returns the `X` that minimises the residual norm
 Example:
 
 ```c
-number_t A_data[] = {
-    num_create_from_double(0.0), num_create_from_double(1.0),
-    num_create_from_double(1.0), num_create_from_double(1.0),
-    num_create_from_double(2.0), num_create_from_double(1.0)
-};
-number_t B_data[] = {
-    num_create_from_double(1.0),
-    num_create_from_double(3.0),
-    num_create_from_double(5.1)
-};
+#include <stdio.h>
+#include "matrix.h"
 
-matrix_t *A = mat_create(3, 2, A_data);
-matrix_t *B = mat_create(3, 1, B_data);
-matrix_t *X = mat_least_squares(A, B);
+int main(void)
+{
+    number_t A_data[] = {
+        num_create_from_double(0.0), num_create_from_double(1.0),
+        num_create_from_double(1.0), num_create_from_double(1.0),
+        num_create_from_double(2.0), num_create_from_double(1.0)
+    };
+    number_t B_data[] = {
+        num_create_from_double(1.0),
+        num_create_from_double(3.0),
+        num_create_from_double(5.1)
+    };
 
-mat_print(X);
+    matrix_t *A = mat_create(3, 2, A_data);
+    matrix_t *B = mat_create(3, 1, B_data);
+    matrix_t *X = mat_least_squares(A, B);
 
-for (size_t i = 0; i < 6; ++i)
-    num_destroy(&A_data[i]);
-for (size_t i = 0; i < 3; ++i)
-    num_destroy(&B_data[i]);
-mat_free(X);
-mat_free(B);
-mat_free(A);
+    mat_print(X);
+
+    for (size_t i = 0; i < 6; ++i)
+        num_destroy(&A_data[i]);
+    for (size_t i = 0; i < 3; ++i)
+        num_destroy(&B_data[i]);
+    mat_free(X);
+    mat_free(B);
+    mat_free(A);
+    return 0;
+}
+```
+
+Output:
+
+```text
+(
+              2.05
+  0.98333333333333
+)
 ```
 
 Returns a newly allocated matrix, or NULL on error.
@@ -1208,17 +1245,24 @@ Complex coverage and working precision depend on the scalar Number backend.
 For `A = I + N`, where `N² = 0`, `Y₀(A) = Y₀(1)I − Y₁(1)N`:
 
 ```c
-number_t values[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
-matrix_t *A = mat_create(2, 2, values);
-matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+#include <stdio.h>
+#include "matrix.h"
 
-if (y0) {
-    number_t entry = mat_get_num(y0, 0, 1);
-    printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
-    num_destroy(&entry);
+int main(void)
+{
+    number_t values[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
+    matrix_t *A = mat_create(2, 2, values);
+    matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+
+    if (y0) {
+        number_t entry = mat_get_num(y0, 0, 1);
+        printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(y0);
+    mat_free(A);
+    return 0;
 }
-mat_free(y0);
-mat_free(A);
 ```
 
 Output:
@@ -1250,20 +1294,27 @@ precision-dependent norm bound with `mat_struve_l`.
 For a nilpotent matrix with `A⁴ = 0`, `H₀(A) = (2/π)(A − A³/9)`:
 
 ```c
-number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO,
-                     NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO,
-                     NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
-                     NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
-matrix_t *A = mat_create(4, 4, values);
-matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
+#include <stdio.h>
+#include "matrix.h"
 
-if (h0) {
-    number_t entry = mat_get_num(h0, 0, 3);
-    printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
-    num_destroy(&entry);
+int main(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(4, 4, values);
+    matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
+
+    if (h0) {
+        number_t entry = mat_get_num(h0, 0, 3);
+        printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(h0);
+    mat_free(A);
+    return 0;
 }
-mat_free(h0);
-mat_free(A);
 ```
 
 Output:
@@ -1311,19 +1362,26 @@ structures or failed convergence. The shared numeric series has a limit of
 For a nilpotent matrix with `A³ = 0`, `I₀(A) = I + A²/4`:
 
 ```c
-number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO,
-                     NUM_ZERO, NUM_ZERO, NUM_ONE,
-                     NUM_ZERO, NUM_ZERO, NUM_ZERO};
-matrix_t *A = mat_create(3, 3, values);
-matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
+#include <stdio.h>
+#include "matrix.h"
 
-if (I0) {
-    number_t entry = mat_get_num(I0, 0, 2);
-    printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
-    num_destroy(&entry);
+int main(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO,
+                         NUM_ZERO, NUM_ZERO, NUM_ONE,
+                         NUM_ZERO, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(3, 3, values);
+    matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
+
+    if (I0) {
+        number_t entry = mat_get_num(I0, 0, 2);
+        printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(I0);
+    mat_free(A);
+    return 0;
 }
-mat_free(I0);
-mat_free(A);
 ```
 
 Output:
@@ -1358,17 +1416,24 @@ expression entries, which can be read with `mat_get_num`.
 For a nilpotent matrix with `A² = 0`, the order-zero result is `L₀(A) = 2A/π`:
 
 ```c
-number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
-matrix_t *A = mat_create(2, 2, values);
-matrix_t *L = mat_struve_l(A, &NUM_ZERO);
+#include <stdio.h>
+#include "matrix.h"
 
-if (L) {
-    number_t entry = mat_get_num(L, 0, 1);
-    printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
-    num_destroy(&entry);
+int main(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
+    matrix_t *A = mat_create(2, 2, values);
+    matrix_t *L = mat_struve_l(A, &NUM_ZERO);
+
+    if (L) {
+        number_t entry = mat_get_num(L, 0, 1);
+        printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        num_destroy(&entry);
+    }
+    mat_free(L);
+    mat_free(A);
+    return 0;
 }
-mat_free(L);
-mat_free(A);
 ```
 
 Output:
@@ -1636,15 +1701,29 @@ To assign a value, look up the binding and update the returned `expr_t *`
 through the ordinary `expr` API:
 
 ```c
-mat_bindings_t *bindings = NULL;
-number_t x = num_create_from_double(2.0);
-matrix_t *A = mat_from_string_expr("(x, c1; x*y, [radius])", &bindings);
+#include <stdio.h>
+#include "matrix.h"
 
-expr_set_val(mat_bindings_get(bindings, "x"), x);
+int main(void)
+{
+    mat_bindings_t *bindings = NULL;
+    number_t x = num_create_from_double(2.0);
+    matrix_t *A = mat_from_string_expr("(x, c1; x*y, [radius])", &bindings);
 
-num_destroy(&x);
-mat_bindings_free(bindings);
-mat_free(A);
+    expr_set_val(mat_bindings_get(bindings, "x"), x);
+
+    printf("bound x: %.0f\n", num_to_double(expr_eval(mat_bindings_get(bindings, "x"))));
+    num_destroy(&x);
+    mat_bindings_free(bindings);
+    mat_free(A);
+    return 0;
+}
+```
+
+Output:
+
+```text
+bound x: 2
 ```
 
 If you want to stay at the matrix layer, `mat_deriv_by_name(...)`,
@@ -2006,9 +2085,19 @@ for `Tn`, `Un` and the distinct script-H Hermite notation.
 README example:
 
 ```c
-number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
-matrix_t *a = mat_create(2, 2, values);
-matrix_t *t = mat_chebyshev_t(a, 3);
+#include <stdio.h>
+#include "matrix.h"
+
+int main(void)
+{
+    number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
+    matrix_t *a = mat_create(2, 2, values);
+    matrix_t *t = mat_chebyshev_t(a, 3);
+    mat_printf("T3((0, 1; 0, 0)) = %m\n", t);
+    mat_free(t);
+    mat_free(a);
+    return 0;
+}
 ```
 
 Output:

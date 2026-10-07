@@ -65,16 +65,26 @@ Callers continue to use the unchanged public API in `include/jurisdiction.h`.
 Open a jurisdiction engine for a jurisdiction:
 
 ```c
+#include <stdio.h>
 #include "jurisdiction.h"
 
-jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
+int main(void)
+{
+    jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
+    if (!jurisdiction) return 1;
+    printf("opened GB-ENG\n");
+    jurisdict_close(jurisdiction);
+    return 0;
+}
 ```
 
-When you are finished, release it with:
+Output:
 
-```c
-jurisdict_close(jurisdiction);
+```text
+opened GB-ENG
 ```
+
+The example releases the engine with `jurisdict_close(jurisdiction)` before returning.
 
 ## Installation
 
@@ -673,7 +683,30 @@ OS-generated locales. Regeneration is version-pinned and the generator's
 `jurisdict_holidays_between()` returns an `array_t *` of `holiday_event_t` values:
 
 ```c
-array_t *events = jurisdict_holidays_between(jurisdiction, start, end);
+#include <stdio.h>
+#include "jurisdiction.h"
+
+int main(void)
+{
+    jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
+    datetime_t *start = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 24);
+    datetime_t *end = datetime_init_ymd(datetime_alloc(), 2021, DT_December, 31);
+    if (!jurisdiction || !start || !end) return 1;
+    array_t *events = jurisdict_holidays_between(jurisdiction, start, end);
+    if (!events) return 1;
+    printf("holiday count: %zu\n", array_size(events));
+    array_destroy(events);
+    datetime_dealloc(end);
+    datetime_dealloc(start);
+    jurisdict_close(jurisdiction);
+    return 0;
+}
+```
+
+Output:
+
+```text
+holiday count: 2
 ```
 
 Destroy the returned array with `array_destroy(events)`. The array performs a

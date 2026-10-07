@@ -106,12 +106,13 @@ Chinese New Year 2025: 2025-01-29
 ## Example: Sunrise and Moon Phase
 
 ```c
+#include <stdlib.h>
 #include <stdio.h>
 #include "datetime.h"
 
 int main(void) {
-    /* Today at latitude 51.5 N, longitude -0.1 W (London), UTC+0 */
-    datetime_t *today = datetime_init_now(datetime_alloc());
+    /* 21 June 2026 at latitude 51.5 N, longitude -0.1 W (London), UTC+0. */
+    datetime_t *today = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
     long jdn = datetime_jdn(today);
 
     datetime_t *sr = datetime_init_sunrise(datetime_alloc(), jdn, 51.5, -0.1, 0.0);
@@ -128,9 +129,17 @@ int main(void) {
 }
 ```
 
+Output:
+
+```text
+Sunrise: 03:42:00
+Moon phase: 2
+```
+
 ## Example: Additional Calendar Views
 
 ```c
+#include "ustring.h"
 #include <stdio.h>
 #include "datetime.h"
 

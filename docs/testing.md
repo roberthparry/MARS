@@ -68,6 +68,50 @@ command is useful when changing only qfloat or qcomplex. It rejects direct
 MPFR/MPC includes, calls and unresolved symbols in those native double-double
 modules.
 
+## Runnable C examples
+
+Executable C examples in the Markdown guides are complete programs, including
+headers and `main()`. API signatures and type-declaration reference blocks
+are not executable examples; SQL, shell and MARS-language blocks retain their
+own languages.
+
+Run `make -j1 test-readme-examples` to extract, compile, link and execute every
+C example sequentially. On success the checker reports that every checked
+README program passed with zero failures. This check also runs **last** in
+`make -j1 test`, after the native suites and their module README tests.
+
+The checker reads each program directly from its guide rather than maintaining
+a second copy. It compares its standard output with the accompanying output
+block, allowing only trailing whitespace differences. A missing `main()`,
+compiler error, non-zero exit, timeout, missing output block or output mismatch
+fails the check. It writes extracted sources, executables, compiler logs,
+captured output and a JSON report under `build/readme-examples/`.
+
+To run an extracted example yourself, execute its named binary in that
+directory. To compile a copied block independently, save it as a C source file
+and use the same compiler/linker options recorded by Make: the public headers
+are in `include/`, the archive is `build/release/libmars.a`, and the external
+libraries are listed in the [build guide](building.md). GNU C extensions are
+required; do not disable assertions in examples that use `assert`.
+
+Programs run in separate temporary working directories, so relative database
+and file names cannot overwrite project files. File examples receive fresh
+paths as command-line arguments. HTTP examples use the local fixture, while
+`make -j1 test-http-live` tests the client against the native MARS web server
+on loopback, with no external-service calls or opt-in flag. Almanac and
+jurisdiction examples require the configured databases described in their
+module guides; missing data is a failure, not a skipped success.
+
+The [webserver example](webserver.md) starts its own single-request loopback
+server on an ephemeral port and calls it with the MARS client. The dedicated
+`make -j1 test_webserver` suite runs its ordinary protocol checks before this
+README example, without contacting external services.
+
+The `tools/check_readme_examples.py` entry in `tests/test_config.json` controls
+individual README programs. Isolate a failure there, then restore all entries
+before the complete check. Identifiers combine the guide path and C-block
+number. This is functional example testing, not a memory-test run.
+
 ## Resource-Bounded Memory Checks
 
 Run memory checks only when explicitly requested. Use small, sequential batches

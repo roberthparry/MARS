@@ -130,8 +130,8 @@ int main(void) {
 
 ```text
 ∫₋₃³ exp(-x²) dx ≈ 1.7724146965190424677889691558236911591392838694905668116893266525E+00
-  error estimate   ≈ 5.107323E-53
-  subintervals used: 5000
+  error estimate   ≈ 3.829382E-290
+  subintervals used: 3205
 ```
 
 ### Expression-backed integration
@@ -284,7 +284,7 @@ int main(void) {
 
 ```text
 ∫₀¹ x^2.5 dx ≈ 2.8571428571428571428571428571428571428571428571428571428571428571E-01
-  error estimate   ≈ 6.654124E-125
+  error estimate   ≈ 2.254686E-356
 ```
 
 ---

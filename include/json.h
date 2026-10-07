@@ -56,6 +56,7 @@ const string_t *json_string_value(const json_t *json);
 
 size_t json_array_size(const json_t *json);
 const json_t *json_array_get(const json_t *json, size_t index);
+
 /**
  * @brief Append a copy of @p value to an array.
  *
@@ -71,6 +72,7 @@ const json_t *json_object_get(const json_t *json, const string_t *key);
 json_t *json_object_get_mutable(json_t *json, const string_t *key);
 const string_t *json_object_key_at(const json_t *json, size_t index);
 const json_t *json_object_value_at(const json_t *json, size_t index);
+
 /**
  * @brief Store a copy of @p value under @p key.
  *

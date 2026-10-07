@@ -46,11 +46,7 @@ equation using Kirchhoff's formula.
   `de_solve_result_steps(...)`, `de_solve_result_steps_TeX(...)`, and
   `de_solve_result_symmetry(...)` is borrowed from the solve result.
 
-The public declarations are in:
-
-```c
-#include "diffequation.h"
-```
+The public declarations are in `diffequation.h`.
 
 ## Rule-Based Solving and Derivations
 

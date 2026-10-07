@@ -30,6 +30,7 @@
 
 /** @brief Opaque series owning observations, missing flags and optional datetime indices. */
 typedef struct timeseries_t timeseries_t;
+
 /** @brief Opaque incremental builder owning appended observations and optional datetime indices. */
 typedef struct ts_builder_t ts_builder_t;
 

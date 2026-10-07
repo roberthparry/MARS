@@ -175,6 +175,7 @@ size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 
 bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
+
 /** Return whether an expression is a formal summation node. */
 bool expr_is_summation(const expr_t *expr);
 
@@ -196,6 +197,7 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  * @return `true` when the native result cards must retain the bound algebraic specialisation.
  */
 bool expr_finite_progression_requires_bound_step(const expr_t *expr);
+
 /**
  * @brief Return whether an expression is a recognised finite inverse-function progression.
  * @param expr Expression to inspect.
@@ -346,8 +348,10 @@ string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
 char *expr_tostring_texify(const char *text);
 int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
+
 /** @brief Render expression text with bindings, retaining a bound root variable symbolically. */
 string_t *expr_to_text_symbolic(const expr_t *expr);
+
 /** @brief Render owning TeX body and bindings separately, retaining a bound root variable symbolically. */
 int expr_to_TeX_symbolic_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);

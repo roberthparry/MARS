@@ -41,8 +41,8 @@ static int run_readme_example(void)
         return 1;
     }
 
-    num_printf("eigenvalue[0] = %N\n", eigenvalues[0]);
-    num_printf("eigenvalue[1] = %N\n", eigenvalues[1]);
+    num_printf("eigenvalue[0] = %.0n\n", eigenvalues[0]);
+    num_printf("eigenvalue[1] = %.0n\n", eigenvalues[1]);
 
     num_destroy(&eigenvalues[0]);
     num_destroy(&eigenvalues[1]);

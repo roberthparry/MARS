@@ -400,14 +400,19 @@ qfloat_t qf_floor(qfloat_t x);
  * @return The sign of the argument, or NaN when the argument is NaN.
  */
 qfloat_t qf_sgn(qfloat_t argument);
+
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 qfloat_t qf_step(qfloat_t argument);
+
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
 qfloat_t qf_rect(qfloat_t argument);
+
 /** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
 qfloat_t qf_tri(qfloat_t argument);
+
 /** @brief Even unit-radius aperture profile, with half-height endpoints. */
 qfloat_t qf_circ(qfloat_t argument);
+
 /** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
 qfloat_t qf_sinc(qfloat_t argument);
 
@@ -1247,6 +1252,7 @@ qfloat_t qf_polylog1(qfloat_t x);
  * @return Li_s(x), or NaN outside implemented coverage.
  */
 qfloat_t qf_polylog(qfloat_t s, qfloat_t x);
+
 /** Compute the Lerch transcendent Phi(z,s,a) in its defining convergence disc. */
 qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a);
 
@@ -1317,6 +1323,7 @@ qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
 
 /** @brief Bessel function of the first kind J_order(argument), for real order. */
 qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
+
 /**
  * @brief Evaluate the real modified Bessel function I_order(argument), including I_0.
  *
@@ -1325,6 +1332,7 @@ qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
  * See docs/qfloat.md for precision and range limits.
  */
 qfloat_t qf_bessel_i(qfloat_t order, qfloat_t argument);
+
 /** @brief Modified Bessel K for real order and positive argument; unsupported ranges return NaN. */
 qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
 
@@ -1336,6 +1344,7 @@ qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
  * orders include their vanishing reciprocal-gamma coefficients. See docs/qfloat.md for numerical limits.
  */
 qfloat_t qf_struve_l(qfloat_t order, qfloat_t argument);
+
 /**
  * @brief Evaluate the real ordinary Struve function H_order(argument).
  *
