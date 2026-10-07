@@ -2139,7 +2139,8 @@
   "tests/string/test_string.c": {
     "readme_examples": {
       "enabled": true,
-      "example_readme_examples": true
+      "example_readme_examples": true,
+      "example_utf8_exact": true
     },
     "tests": {
       "enabled": true,
@@ -2153,6 +2154,7 @@
       "test_split_basic": true,
       "test_split_edge_cases": true,
       "test_starts_with_ends_with": true,
+      "test_string_append_utf8_exact": true,
       "test_string_builder": true,
       "test_string_byte_length_counts_utf8_bytes": true,
       "test_string_cursor_parser_example": true,
@@ -2188,5 +2190,28 @@
     "test_output_and_write_file": true,
     "test_regression_and_forecast": true,
     "test_transforms_and_aggregation": true
+  },
+  "tests/xml/test_xml.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_xml_build": true,
+      "example_xml_dictionary": true,
+      "example_xml_stream": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_xml_build_clone_and_validation": true,
+      "test_xml_chunk_boundaries": true,
+      "test_xml_entities_and_content": true,
+      "test_xml_file_failures_and_empty_results": true,
+      "test_xml_files_and_storage": true,
+      "test_xml_invalid_utf8_and_truncation": true,
+      "test_xml_namespaces": true,
+      "test_xml_rejects_invalid": true,
+      "test_xml_stream_events_and_limits": true,
+      "test_xml_tree_and_dictionary": true,
+      "test_xml_unicode_spelling_and_normalisation": true,
+      "test_xml_writer_limits_and_failure": true
+    }
   }
 }

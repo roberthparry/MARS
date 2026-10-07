@@ -2,6 +2,7 @@
 #include "ustring.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -901,9 +902,43 @@ static void example_readme_examples(void)
     test_readme_example_Using_the_Builder_API();
 }
 
+
+static void test_string_append_utf8_exact(void)
+{
+    string_t *text = string_new();
+    const char decomposed[] = "e\xcc\x81";
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, decomposed, sizeof(decomposed) - 1), 0);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 3);
+    TEST_ASSERT_TRUE(memcmp(string_c_str(text), decomposed, 3) == 0, "no NFC normalisation");
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, string_c_str(text), string_byte_length(text)), 0);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 6);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\xc0\xaf", 2), -1);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\xed\xa0\x80", 3), -1);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\xf4\x90\x80\x80", 4), -1);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\xe2\x82", 2), -1);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 6);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, NULL, 0), 0);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, NULL, 1), -1);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(NULL, "", 0), -1);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\0", 1), 0);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 7);
+    string_free(text);
+}
+
+/* README example: preserve protocol spelling rather than normalising it. */
+static void example_utf8_exact(void)
+{
+    string_t *text = string_new();
+    int status = string_append_utf8_exact(text, "e\xcc\x81", 3);
+    string_printf("status=%d bytes=%zu\n", status, string_byte_length(text));
+    TEST_ASSERT_TRUE(status == 0 && string_byte_length(text) == 3, "README exact UTF-8");
+    string_free(text);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Core");
+    TEST_RUN_IN_GROUP(test_string_append_utf8_exact, tests, NULL);
     TEST_RUN_IN_GROUP(test_split_basic, tests, NULL);
     TEST_RUN_IN_GROUP(test_join_basic, tests, NULL);
     TEST_RUN_IN_GROUP(test_split_edge_cases, tests, NULL);
@@ -942,6 +977,7 @@ int tests_main(void)
 
     TEST_SECTION("README");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "string,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_utf8_exact, readme_examples, "string,readme,output");
 
     return TEST_EXIT_CODE();
 }
