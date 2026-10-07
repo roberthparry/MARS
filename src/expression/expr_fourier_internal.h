@@ -94,6 +94,7 @@ static inline expr_t *constant(fourier_context_t *c, number_t n) { return expr_f
 static inline expr_t *pi_constant(fourier_context_t *c) {
     return expr_fourier_keep(c, expr_new_named_const(NUM_PI, "@pi"));
 }
+
 /** Construct an exact Euler–Mascheroni constant with its symbolic provenance. */
 expr_t *expr_fourier_euler_constant(fourier_context_t *c);
 static inline expr_t *clean(fourier_context_t *c, const expr_t *e) { return expr_fourier_keep(c, expr_simplify(e)); }
@@ -159,22 +160,27 @@ const char *expr_fourier_odd_hyperbolic_note(const expr_t *transform);
 
 /** Match locally integrable fractional absolute powers and their dual powers. */
 expr_t *expr_fourier_absolute_power_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Recognise only the matched absolute power's own excluded singular point. */
 bool expr_fourier_absolute_power_pole_condition(fourier_context_t *c, const expr_t *f,
                                                 const expr_t *x, const expr_t *condition);
 
 /** Match real affine sign functions and their modulated reciprocal spectra. */
 expr_t *expr_fourier_sgn_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Recognise only the zero-frequency exclusion of a sign-function reciprocal spectrum. */
 bool expr_fourier_sgn_pole_condition(fourier_context_t *c, const expr_t *f,
                                     const expr_t *x, const expr_t *condition);
+
 /** Describe the symmetric-cancellation convention for the sign-function Fourier pair. */
 const char *expr_fourier_sgn_note(const expr_t *transform);
 
 /** Match real affine arctangents and their exponentially damped reciprocal spectra. */
 expr_t *expr_fourier_atan_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Match real affine inverse hyperbolic sines and their modified-Bessel reciprocal spectra. */
 expr_t *expr_fourier_asinh_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Recognise precisely the zero-frequency exclusion of an inverse-hyperbolic-sine spectrum. */
 bool expr_fourier_asinh_pole_condition(fourier_context_t *c, const expr_t *f,
                                       const expr_t *x, const expr_t *condition);
@@ -194,6 +200,7 @@ bool expr_fourier_branch_pole_condition(fourier_context_t *c, const expr_t *f, c
 
 /** Match vertical-line gamma transforms and their exponential spectra. */
 expr_t *expr_fourier_gamma_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Recombine Cartesian components in recovered gamma arguments after a vertical-line inverse. */
 expr_t *expr_fourier_gamma_cartesian_result(fourier_context_t *c, const expr_t *result);
 

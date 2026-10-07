@@ -80,8 +80,10 @@ void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *buffer);
 
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+
 /** Emit native multiplication spacing or a separator between neighbouring factors. */
 void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b);
+
 /** Collect borrowed additive terms in display order, with their signs, within the supplied capacity. */
 bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *signs, size_t *count, size_t capacity);
 void emit_func_fragment(sbuf_t *b, const char *text);

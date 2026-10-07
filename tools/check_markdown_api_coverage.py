@@ -23,6 +23,8 @@ MODULE_GUIDES = {
     "equation.h": "equation.md",
     "expression.h": "expression.md",
     "file.h": "file.md",
+    "http.h": "http.md",
+    "webserver.h": "webserver.md",
     "integrator.h": "integrator.md",
     "json.h": "json.md",
     "xml.h": "xml.md",

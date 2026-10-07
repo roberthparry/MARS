@@ -1352,8 +1352,14 @@ See also: [`file_import_sqlite`](#file_import_sqlite).
 
 ## Examples
 
-These functions take fresh, disposable paths in a directory controlled by the
-caller. They create and, unless stated otherwise, delete those named files.
+Each block is a complete C program with `main()`. Compile one block at a time
+as described in the [README-program testing guide](testing.md#runnable-c-examples).
+Pass the fresh, disposable paths requested by that program as command-line
+arguments, in the helper function's parameter order. The symlink example takes
+a new directory, its `documents` child path and its `shortcut` child path.
+Other examples take independent file paths. They create and, unless stated
+otherwise, delete those named files. Use a directory you control and do not
+pass paths containing data you want to keep.
 Assertions keep the examples short; production callers should handle failures
 using the error API.
 
@@ -1391,6 +1397,16 @@ void file_lines_example(const char *path)
     string_free(extra);
     string_free(words);
     file_free(file);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 2) {
+        fprintf(stderr, "Supply 1 fresh, disposable paths.\n");
+        return 1;
+    }
+    file_lines_example(argv[1]);
+    return 0;
 }
 ```
 
@@ -1435,6 +1451,16 @@ void file_replace_example(const char *current_path, const char *replacement_path
     file_free(replacement);
     file_free(current);
 }
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    file_replace_example(argv[1], argv[2], argv[3]);
+    return 0;
+}
 ```
 
 Output:
@@ -1477,6 +1503,16 @@ void compressed_file_example(const char *source_path, const char *compressed_pat
     file_free(restored);
     file_free(compressed);
     file_free(source);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    compressed_file_example(argv[1], argv[2], argv[3]);
+    return 0;
 }
 ```
 
@@ -1522,6 +1558,16 @@ void encrypted_only_example(const char *source_path, const char *encrypted_path,
     file_free(restored);
     file_free(encrypted);
     file_free(source);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    encrypted_only_example(argv[1], argv[2], argv[3]);
+    return 0;
 }
 ```
 
@@ -1571,6 +1617,16 @@ void encrypted_file_example(const char *source_path, const char *encrypted_path,
     file_free(encrypted);
     file_free(source);
 }
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    encrypted_file_example(argv[1], argv[2], argv[3]);
+    return 0;
+}
 ```
 
 Output:
@@ -1615,6 +1671,16 @@ void stored_file_example(const char *database_path, const char *source_path, con
     string_free(name);
     string_free(key);
     string_free(path);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    stored_file_example(argv[1], argv[2], argv[3]);
+    return 0;
 }
 ```
 
@@ -1666,6 +1732,16 @@ void symlink_listing_example(const char *directory_path, const char *documents_p
     file_free(link);
     file_free(target_directory);
     file_free(directory);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 4) {
+        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        return 1;
+    }
+    symlink_listing_example(argv[1], argv[2], argv[3]);
+    return 0;
 }
 ```
 

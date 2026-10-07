@@ -386,6 +386,7 @@ number_t num_const_prec_digits(number_t constant, size_t significant_digits);
  * independent copy with `num_clone()`.
  */
 void num_destroy(number_t *number);
+
 /** @brief Release a numeric payload through the generic lifetime dispatcher, as for num_destroy(). */
 void num_destroy_slow(number_t *number);
 /** @} */
@@ -489,8 +490,10 @@ int num_set_from_text(number_t *number, const string_t *text);
  * Returns a newly allocated string that must be released with `string_free()`.
  */
 string_t *num_to_string(const number_t number);
+
 /** @brief Returns the numeric value converted to `double`. */
 double num_to_double(const number_t number);
+
 /** @brief Returns the numeric value converted to `qfloat_t`. */
 qfloat_t num_to_qfloat(const number_t number);
 /** @} */
@@ -512,8 +515,10 @@ qfloat_t num_to_qfloat(const number_t number);
 
 /** @brief `%n` / `%N` formatting helper returning a newly allocated string. */
 string_t *num_vsprintf_text(const char *fmt, va_list ap);
+
 /** @brief `%n` / `%N` formatting helper returning a newly allocated string. */
 string_t *num_sprintf_text(const char *fmt, ...);
+
 /** @brief `%n` / `%N` formatting helpers. `number_t` arguments are passed by value. */
 int num_vsprintf(char *out, size_t out_size, const char *fmt,
                  va_list ap);                                      /**< caller-provided buffer, `va_list` form */
@@ -578,20 +583,28 @@ number_t num_conj(const number_t number);
 number_t num_real_part(const number_t number);
 number_t num_imag_part(const number_t number);
 number_t num_arg(const number_t number);
+
 /** @brief Add two values using their existing backend and precision rules. */
 number_t num_add(const number_t a, const number_t b);
+
 /** @brief Subtract two values using their existing backend and precision rules. */
 number_t num_sub(const number_t a, const number_t b);
+
 /** @brief Multiply two values using their existing backend and precision rules. */
 number_t num_mul(const number_t a, const number_t b);
+
 /** @brief Divide two values using their existing backend and precision rules. */
 number_t num_div(const number_t a, const number_t b);
+
 /** @brief Add two values through the generic dispatcher, as for num_add(). */
 number_t num_add_slow(const number_t a, const number_t b);
+
 /** @brief Subtract two values through the generic dispatcher, as for num_sub(). */
 number_t num_sub_slow(const number_t a, const number_t b);
+
 /** @brief Multiply two values through the generic dispatcher, as for num_mul(). */
 number_t num_mul_slow(const number_t a, const number_t b);
+
 /** @brief Divide two values through the generic dispatcher, as for num_div(). */
 number_t num_div_slow(const number_t a, const number_t b);
 number_t num_add_long(const number_t number, long value);
@@ -609,6 +622,7 @@ number_t num_ldexp(const number_t number, int exponent2);
  */
 number_t num_factorial(unsigned long n);
 number_t num_fibonacci(unsigned long n);
+
 /**
  * @brief Returns the integer partition count `p(n)` exactly.
  *
@@ -658,6 +672,7 @@ number_t num_shr(const number_t number, long bits);
  */
 number_t num_exp(const number_t number);
 number_t num_log(const number_t number);
+
 /**
  * @brief Return the principal natural logarithm of @p number.
  *
@@ -668,6 +683,7 @@ number_t num_log(const number_t number);
  */
 number_t num_ln(const number_t number);
 number_t num_log10(const number_t number);
+
 /**
  * @brief Return the principal common logarithm of @p number.
  *
@@ -678,12 +694,14 @@ number_t num_log10(const number_t number);
  */
 number_t num_lg(const number_t number);
 number_t num_sqrt(const number_t number);
+
 /**
  * @brief Return the single principal cube root of @p number.
  *
  * Negative real inputs are promoted to the complex domain.
  */
 number_t num_cubrt(const number_t number);
+
 /**
  * @brief Return the single principal root of @p number with integer order @p order.
  *
@@ -691,6 +709,7 @@ number_t num_cubrt(const number_t number);
  * are promoted to the complex domain.
  */
 number_t num_root(const number_t number, const number_t order);
+
 /** @brief Return the square, preserving exact integer and rational arithmetic within the precision budget. */
 number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
@@ -702,18 +721,24 @@ number_t num_ceil(const number_t number);
  * @return An owning exact -1, zero or +1, or NaN for NaN or non-real inputs. Either signed zero gives zero.
  */
 number_t num_sgn(number_t argument);
+
 /** @brief Unit step, with value one half at zero; non-real inputs are undefined. */
 number_t num_step(number_t argument);
+
 /** @brief Unit-width rectangular pulse, with half-height endpoints. */
 number_t num_rect(number_t argument);
+
 /** @brief Unit-height triangular pulse supported on the interval [-1, 1]. */
 number_t num_tri(number_t argument);
+
 /** @brief Even unit-radius aperture profile, with half-height endpoints. */
 number_t num_circ(number_t argument);
+
 /** @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero. */
 number_t num_sinc(number_t argument);
 number_t num_mul_pow10(const number_t number, int exponent10);
 number_t num_hypot(const number_t a, const number_t b);
+
 /**
  * @brief Computes `sin(x)` and `cos(x)` into caller-provided outputs.
  *
@@ -754,6 +779,7 @@ number_t num_archacoversin(const number_t number);
 number_t num_archacovercos(const number_t number);
 number_t num_sinh(const number_t number);
 number_t num_cosh(const number_t number);
+
 /**
  * @brief Computes `sinh(x)` and `cosh(x)` into caller-provided outputs.
  *
@@ -786,6 +812,7 @@ number_t num_acoth(const number_t number);
 number_t num_gamma(const number_t number);
 number_t num_lgamma(const number_t number);
 number_t num_digamma(const number_t number);
+
 /**
  * @brief Evaluate the q-digamma function using the widest participating backend.
  *
@@ -794,6 +821,7 @@ number_t num_digamma(const number_t number);
  * @return An owning number containing @f$\psi_q(z)@f$, or NaN outside the implemented domain.
  */
 number_t number_qdigamma(const number_t q, const number_t z);
+
 /**
  * @brief Evaluate the q-digamma function.
  *
@@ -807,6 +835,7 @@ number_t num_qdigamma(const number_t q, const number_t z);
 number_t num_trigamma(const number_t number);
 number_t num_tetragamma(const number_t number);
 number_t num_polygamma(unsigned int order, const number_t number);
+
 /**
  * @brief Evaluate the analytically continued Riemann zeta function.
  *
@@ -814,6 +843,7 @@ number_t num_polygamma(unsigned int order, const number_t number);
  * @return An owning number containing ζ(number).
  */
 number_t num_zeta(const number_t number);
+
 /**
  * @brief Evaluate the analytically continued Hurwitz zeta function.
  *
@@ -822,10 +852,13 @@ number_t num_zeta(const number_t number);
  * @return An owning number containing ζ(s, a).
  */
 number_t num_zetah(const number_t s, const number_t a);
+
 /** Compute the Lerch transcendent Phi(z,s,a), preserving the numeric backend. */
 number_t number_lerch_phi(const number_t z, const number_t s, const number_t a);
+
 /** Compatibility spelling following the existing num_* arithmetic API. */
 number_t num_lerch_phi(const number_t z, const number_t s, const number_t a);
+
 /**
  * @brief Evaluate the first Hurwitz zeta derivative with respect to its exponent.
  *
@@ -834,6 +867,7 @@ number_t num_lerch_phi(const number_t z, const number_t s, const number_t a);
  * @return An owning number containing ∂ζ(s, a)/∂s.
  */
 number_t num_zatahp(const number_t s, const number_t a);
+
 /**
  * @brief Evaluate the first derivative of the Riemann zeta function.
  *
@@ -842,6 +876,7 @@ number_t num_zatahp(const number_t s, const number_t a);
  */
 number_t num_zetap(const number_t number);
 number_t num_dilog(const number_t number);
+
 /**
  * @brief Evaluate the integer-order Clausen function at the number's native precision.
  *
@@ -863,6 +898,7 @@ number_t num_clausen(unsigned long order, const number_t theta);
  * @return An owning number containing Cl₂(theta).
  */
 number_t num_clausen2(const number_t theta);
+
 /**
  * @brief Evaluate the order-one polylogarithm Li₁(z).
  *
@@ -871,6 +907,7 @@ number_t num_clausen2(const number_t theta);
  */
 number_t num_polylog1(const number_t number);
 number_t num_polylog(const number_t order, const number_t number);
+
 /**
  * @brief Evaluate the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
  *
@@ -896,8 +933,10 @@ number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const
                                 const number_t argument);
 number_t num_legendre_chi(const number_t order, const number_t number);
 number_t num_bessel_j(const number_t order, const number_t argument);
+
 /** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
 number_t num_bessel_k(const number_t order, const number_t argument);
+
 /**
  * @brief Evaluate principal modified Bessel I, returning an owning number at the widest input precision.
  *
@@ -906,6 +945,7 @@ number_t num_bessel_k(const number_t order, const number_t argument);
  * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md.
  */
 number_t num_bessel_i(const number_t order, const number_t argument);
+
 /**
  * @brief Evaluate the principal modified Struve function L_order(argument), returning an owning number.
  *
@@ -914,6 +954,7 @@ number_t num_bessel_i(const number_t order, const number_t argument);
  * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md for details.
  */
 number_t num_struve_l(const number_t order, const number_t argument);
+
 /**
  * @brief Evaluate principal ordinary Struve H, returning an owning number at the widest input precision.
  *
@@ -922,6 +963,7 @@ number_t num_struve_l(const number_t order, const number_t argument);
  * undefined zero limits or exhausted numerical guards return NaN. See docs/number.md for numerical limits.
  */
 number_t num_struve_h(const number_t order, const number_t argument);
+
 /**
  * @brief Evaluate principal Bessel Y, returning an owning number at the widest input precision.
  *
@@ -953,6 +995,7 @@ number_t num_gammainc_upper(const number_t s, const number_t x);
 number_t num_gammainc_P(const number_t s, const number_t x);
 number_t num_gammainc_Q(const number_t s, const number_t x);
 number_t num_Ei(const number_t number);
+
 /** @brief Evaluate the logarithmic integral Li(x) = Ei(ln(x)). */
 number_t num_Li(const number_t number);
 number_t num_E1(const number_t number);

@@ -17,8 +17,15 @@ for positive inputs. This includes signed infinities; NaN remains NaN.
 README signum example:
 
 ```c
-printf("sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
-       qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    printf("sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
+           qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+    return 0;
+}
 ```
 
 Output:
@@ -30,8 +37,15 @@ sgn(-2), sgn(0), sgn(2) = -1, 0, 1
 README example:
 
 ```c
-double half = qf_to_double(qf_step(QF_ZERO));
-printf("step(0) = %.1f\n", half);
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    double half = qf_to_double(qf_step(QF_ZERO));
+    printf("step(0) = %.1f\n", half);
+    return 0;
+}
 ```
 
 Output:
@@ -350,8 +364,15 @@ including Y₀, return NaN. Non-finite inputs and exhausted numerical guards
 also return NaN.
 
 ```c
-qfloat_t value = qf_bessel_y(QF_ZERO, QF_ONE);
-printf("Y_0(1) = %.15f\n", qf_to_double(value));
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t value = qf_bessel_y(QF_ZERO, QF_ONE);
+    printf("Y_0(1) = %.15f\n", qf_to_double(value));
+    return 0;
+}
 ```
 
 ```text
@@ -427,13 +448,20 @@ guarded number-layer kernels that use multiprecision internally.
 Input and output for a simple pFq identity:
 
 ```c
-qfloat_t x = qf_from_string("0.2");
-qfloat_t value = qf_hypergeometric_pFq(NULL, 0, NULL, 0, x);
-qf_printf("0F0(0.2) = %.34q\n", value);
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t x = qf_from_string("0.2");
+    qfloat_t value = qf_hypergeometric_pFq(NULL, 0, NULL, 0, x);
+    qf_printf("0F0(0.2) = %.34q\n", value);
+    return 0;
+}
 ```
 
 ```text
-0F0(0.2) = 1.221402758160169833921071994639675
+0F0(0.2) = 1.2214027581601698339210719946396940
 ```
 
 ### Modified Bessel K
@@ -468,8 +496,15 @@ forward sum to series index 20000. Results are unscaled; final qfloat conversion
 can overflow to infinity or underflow to zero. There is no asymptotic kernel.
 
 ```c
-qfloat_t bessel = qf_bessel_i(QF_ZERO, QF_ONE);
-qf_printf("I_0(1) = %.16q\n", bessel);
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t bessel = qf_bessel_i(QF_ZERO, QF_ONE);
+    qf_printf("I_0(1) = %.16q\n", bessel);
+    return 0;
+}
 ```
 
 ```text
@@ -499,8 +534,15 @@ zero. No scaled or large-argument asymptotic evaluator is provided; the
 input bounds do not guarantee success at every point.
 
 ```c
-qfloat_t ordinary = qf_struve_h(QF_ZERO, QF_ONE);
-qf_printf("H_0(1) = %.15q\n", ordinary);
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t ordinary = qf_struve_h(QF_ZERO, QF_ONE);
+    qf_printf("H_0(1) = %.15q\n", ordinary);
+    return 0;
+}
 ```
 
 ```text
@@ -529,8 +571,15 @@ values; there is no asymptotic large-argument implementation. The numerical
 kernel uses MPFR/MPC internally, as does `qf_bessel_k`.
 
 ```c
-qfloat_t value = qf_struve_l(QF_ZERO, QF_ONE);
-qf_printf("L_0(1) = %.16q\n", value);
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t value = qf_struve_l(QF_ZERO, QF_ONE);
+    qf_printf("L_0(1) = %.16q\n", value);
+    return 0;
+}
 ```
 
 ```text
@@ -546,15 +595,22 @@ Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 - `int qf_vsprintf(char *out, size_t n, const char *fmt, va_list ap)` — `va_list` variant
 
 ```c
-qfloat_t x = qf_from_string("1");
-qfloat_t w = qf_lambert_w0(x);
-qf_printf("W0(1) = %.34q\n", w);   // 34 significant digits
-qf_printf("W0(1) = %Q\n",   w);    // scientific notation
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t x = qf_from_string("1");
+    qfloat_t w = qf_lambert_w0(x);
+    qf_printf("W0(1) = %.34q\n", w);   // 34 significant digits
+    qf_printf("W0(1) = %Q\n",   w);    // scientific notation
+    return 0;
+}
 ```
 
 ```text
 W0(1) = 0.5671432904097838729999686622103575
-W0(1) = 5.671432904097838729999686622103575E-01
+W0(1) = 5.671432904097838729999686622103575E-1
 ```
 
 ---
@@ -694,7 +750,15 @@ for `Tn`, `Un` and the distinct script-H Hermite notation.
 README example:
 
 ```c
-qf_chebyshev_t(3, qf_from_double(2))
+#include <stdio.h>
+#include "qfloat.h"
+
+int main(void)
+{
+    qfloat_t value = qf_chebyshev_t(3, qf_from_double(2));
+    qf_printf("T3(2) = %.0q\n", value);
+    return 0;
+}
 ```
 
 Output:

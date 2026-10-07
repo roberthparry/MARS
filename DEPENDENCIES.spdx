@@ -302,7 +302,18 @@ PackageLicenseDeclared: BSD-3-Clause
 PackageCopyrightText: NOASSERTION
 PackageComment: Essential Routines for Fundamental Astronomy used through PyERFA to generate frame rotations and test oracles.
 
+PackageName: libcurl
+SPDXID: SPDXRef-Package-libcurl
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://curl.se/download.html
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: curl
+PackageCopyrightText: NOASSERTION
+PackageComment: System HTTP/HTTPS transport library, version 7.85.0 or newer; backend and transitive dependencies depend on the installed build.
+
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-MARS
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-libcurl
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-GMP
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPFR
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPC

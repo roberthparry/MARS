@@ -20,8 +20,10 @@ typedef struct _string_t string_t;
 
 /** Opaque copied path and optional file or directory stream. */
 typedef struct _file_t file_t;
+
 /** Opaque, immutable metadata snapshot. */
 typedef struct _file_info_t file_info_t;
+
 /** Opaque secretstream key; destroy with file_key_free, never serialise the structure. */
 typedef struct _file_key_t file_key_t;
 typedef struct _sqlite_t sqlite_t;
@@ -75,35 +77,41 @@ typedef enum {
  * @return New caller-owned, closed handle, or NULL with errno set; release with file_free.
  */
 file_t *file_new(const string_t *path);
+
 /**
  * @brief Allocates a closed handle with a copied, non-empty C path; returns NULL on failure.
  * @param[in] path Required non-empty NUL-terminated Linux byte path; copied without Unicode normalisation.
  * @return New caller-owned, closed handle, or NULL with errno set; release with file_free.
  */
 file_t *file_new_cstr(const char *path);
+
 /**
  * @brief Closes and frees a handle; NULL is safe. Use file_close first to observe delayed write errors.
  * @param[in] file Owned handle to close and destroy; NULL is safe. Delayed close errors are not returned.
  */
 void file_free(file_t *file);
+
 /**
  * @brief Returns the borrowed immutable path, or NULL for a null handle.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
  * @return Borrowed immutable path valid until file_free, or NULL for a null handle; do not free it.
  */
 const char *file_path(const file_t *file);
+
 /**
  * @brief Returns the last errno-style error, zero for success, or EINVAL for a null handle.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
  * @return Last error code, zero after success, or EINVAL for NULL.
  */
 int file_last_error(const file_t *file);
+
 /**
  * @brief Returns borrowed system error text corresponding to file_last_error.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
  * @return Borrowed system error text; do not free or modify it.
  */
 const char *file_last_error_message(const file_t *file);
+
 /**
  * @brief Opens a closed handle; rejects symlinks, directories and special files. Already open gives EBUSY.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -112,6 +120,7 @@ const char *file_last_error_message(const file_t *file);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open(file_t *file, file_mode_t mode, file_access_t access);
+
 /**
  * @brief Open a regular file, explicitly allowing final symbolic links, including creation through a dangling link.
  * Other mode, access and ownership rules match file_open; this is not a confined-path operation.
@@ -121,60 +130,70 @@ bool file_open(file_t *file, file_mode_t mode, file_access_t access);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open_follow(file_t *file, file_mode_t mode, file_access_t access);
+
 /**
  * @brief Creates or truncates a read/write stream.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_create(file_t *file);
+
 /**
  * @brief Creates or truncates a write-only UTF-8 stream; emits no BOM.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_create_text(file_t *file);
+
 /**
  * @brief Opens an existing read-only stream.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open_read(file_t *file);
+
 /**
  * @brief Opens an existing UTF-8 stream for lazy file_read_line calls.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open_text(file_t *file);
+
 /**
  * @brief Opens or creates a write-only stream at offset zero without truncating existing contents.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open_write(file_t *file);
+
 /**
  * @brief Opens or creates an append-only UTF-8 stream.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_append_text(file_t *file);
+
 /**
  * @brief Closes the stream, retaining its path; closing an already closed handle succeeds.
  * @param[in,out] file Borrowed handle whose stream is to be closed; the handle itself is retained.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_close(file_t *file);
+
 /**
  * @brief Returns whether the handle currently owns an open stream.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
  * @return True for an open file or directory stream; false for a closed or NULL handle.
  */
 bool file_is_open(const file_t *file);
+
 /**
  * @brief Flushes buffered output; this does not guarantee durable storage after power failure.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_flush(file_t *file);
+
 /**
  * @brief Reads up to capacity bytes; required read_count is zero at EOF. Partial reads precede errors.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -185,6 +204,7 @@ bool file_flush(file_t *file);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_read(file_t *file, void *buffer, size_t capacity, size_t *read_count);
+
 /**
  * @brief Writes bytes; required written_count reports progress even on failure. NULL data is valid only at size zero.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -194,6 +214,7 @@ bool file_read(file_t *file, void *buffer, size_t capacity, size_t *read_count);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write(file_t *file, const void *data, size_t size, size_t *written_count);
+
 /**
  * @brief Seeks by a signed byte offset, clearing EOF; subsequent append writes still go to the end.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -202,6 +223,7 @@ bool file_write(file_t *file, const void *data, size_t size, size_t *written_cou
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_seek(file_t *file, int64_t offset, file_seek_t origin);
+
 /**
  * @brief Stores the current byte position in the required output pointer.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -209,6 +231,7 @@ bool file_seek(file_t *file, int64_t offset, file_seek_t origin);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_tell(file_t *file, int64_t *position);
+
 /**
  * @brief Takes a shared or exclusive advisory lock; non-waiting conflicts report EWOULDBLOCK.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -217,12 +240,14 @@ bool file_tell(file_t *file, int64_t *position);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_lock(file_t *file, bool exclusive, bool wait);
+
 /**
  * @brief Releases this stream's advisory lock.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_unlock(file_t *file);
+
 /**
  * @brief Reads one NFC-normalised UTF-8 line, stripping LF, CRLF or CR and an initial BOM; NULL output means EOF.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -230,6 +255,7 @@ bool file_unlock(file_t *file);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_read_line(file_t *file, string_t **line);
+
 /**
  * @brief Writes validated UTF-8 text verbatim, including embedded NUL bytes.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -237,6 +263,7 @@ bool file_read_line(file_t *file, string_t **line);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write_text(file_t *file, const string_t *text);
+
 /**
  * @brief Writes validated UTF-8 text followed by LF.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
@@ -244,24 +271,28 @@ bool file_write_text(file_t *file, const string_t *text);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write_line(file_t *file, const string_t *text);
+
 /**
  * @brief Reads a closed handle's entire file into an owned array of unsigned char; NULL means failure.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return Owned byte array, including an empty array at EOF; NULL on failure. Release with array_destroy.
  */
 array_t *file_read_all_bytes(file_t *file);
+
 /**
  * @brief Reads a closed handle's UTF-8 file into an owned NFC-normalised string, stripping an initial BOM.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return Owned NFC-normalised string, or NULL on failure; release with string_free.
  */
 string_t *file_read_all_text(file_t *file);
+
 /**
  * @brief Reads all lines into an owned array of string_t pointers; array_destroy also frees those strings.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return Owned array, or NULL on failure; array_destroy also frees the contained strings.
  */
 array_t *file_read_all_lines(file_t *file);
+
 /**
  * @brief Creates or truncates a closed handle's file and writes raw bytes, then closes it.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -270,6 +301,7 @@ array_t *file_read_all_lines(file_t *file);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write_all_bytes(file_t *file, const void *data, size_t size);
+
 /**
  * @brief Validates text before creating or truncating the file, writes it, and closes the stream.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -277,6 +309,7 @@ bool file_write_all_bytes(file_t *file, const void *data, size_t size);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write_all_text(file_t *file, const string_t *text);
+
 /**
  * @brief Validates an array of string_t pointers, writes every line with LF, and closes the stream.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -284,6 +317,7 @@ bool file_write_all_text(file_t *file, const string_t *text);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_write_all_lines(file_t *file, const array_t *lines);
+
 /**
  * @brief Appends validated UTF-8 text to a closed handle's file, creating it if necessary.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -291,6 +325,7 @@ bool file_write_all_lines(file_t *file, const array_t *lines);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_append_all_text(file_t *file, const string_t *text);
+
 /**
  * @brief Appends an array of validated string_t pointers with LF after each, creating the file if necessary.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -298,18 +333,21 @@ bool file_append_all_text(file_t *file, const string_t *text);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_append_all_lines(file_t *file, const array_t *lines);
+
 /**
  * @brief Reports existence of any directory entry, including dangling links; absence has error code zero.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
  * @return True if an entry exists; false for absence or failure. Absence leaves error code zero.
  */
 bool file_exists(file_t *file);
+
 /**
  * @brief Unlinks a closed handle's non-directory entry without following symlinks; absence is a successful no-op.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_delete(file_t *file);
+
 /**
  * @brief Copies between closed handles, staging data before installation; overwrite must be explicitly enabled.
  * @param[in,out] source Borrowed, closed source handle; receives errors and remains caller-owned.
@@ -318,6 +356,7 @@ bool file_delete(file_t *file);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_copy(file_t *source, file_t *destination, bool overwrite);
+
 /**
  * @brief Moves files, directories or links; cross-device regular files copy then unlink. Paths are not retargeted.
  * @param[in,out] source Borrowed, closed source handle; receives errors and remains caller-owned.
@@ -326,6 +365,7 @@ bool file_copy(file_t *source, file_t *destination, bool overwrite);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_move(file_t *source, file_t *destination, bool overwrite);
+
 /**
  * @brief Atomically replaces an existing destination on one filesystem; optional backup must not already exist.
  * @param[in,out] source Borrowed, closed source handle; receives errors and remains caller-owned.
@@ -334,29 +374,34 @@ bool file_move(file_t *source, file_t *destination, bool overwrite);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_replace(file_t *source, file_t *destination, file_t *backup);
+
 /**
  * @brief Returns an owned metadata snapshot for a closed path without following its final symlink.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
  * @return Owned metadata snapshot, or NULL on failure; release with file_info_free.
  */
 file_info_t *file_get_info(file_t *file);
+
 /**
  * @brief Frees a metadata snapshot; NULL is safe.
  * @param[in] info Owned snapshot to destroy; NULL is safe.
  */
 void file_info_free(file_info_t *info);
+
 /**
  * @brief Returns the snapshot's byte size, or zero for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Byte size recorded in the snapshot, or zero for NULL.
  */
 uint64_t file_info_size(const file_info_t *info);
+
 /**
  * @brief Returns snapshot attribute bits, or FILE_ATTRIBUTE_NONE for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Bitwise file_attributes_t values, or FILE_ATTRIBUTE_NONE for NULL.
  */
 unsigned file_info_attributes(const file_info_t *info);
+
 /**
  * @brief Retrieves UTC Unix seconds and nanoseconds of creation; false if unavailable, never substitutes ctime.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
@@ -365,6 +410,7 @@ unsigned file_info_attributes(const file_info_t *info);
  * @return True on success; false with errno set to EINVAL for invalid arguments or ENOTSUP if unavailable.
  */
 bool file_info_creation_time(const file_info_t *info, int64_t *seconds, long *nanoseconds);
+
 /**
  * @brief Retrieves UTC Unix seconds and nanoseconds of last content modification; outputs are required.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
@@ -373,6 +419,7 @@ bool file_info_creation_time(const file_info_t *info, int64_t *seconds, long *na
  * @return True on success; false with errno set to EINVAL for invalid arguments or ENOTSUP if unavailable.
  */
 bool file_info_last_write_time(const file_info_t *info, int64_t *seconds, long *nanoseconds);
+
 /**
  * @brief Retrieves current attribute bits into a required output pointer.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -380,6 +427,7 @@ bool file_info_last_write_time(const file_info_t *info, int64_t *seconds, long *
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_get_attributes(file_t *file, unsigned *attributes);
+
 /**
  * @brief Sets read-only permissions; clearing it restores owner-write only. Changing hidden status gives ENOTSUP.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -396,18 +444,21 @@ bool file_set_attributes(file_t *file, unsigned attributes);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_create_directory(file_t *directory, unsigned permissions, bool parents);
+
 /**
  * @brief Removes an empty directory, never recursively and never through a final symlink.
  * @param[in,out] directory Borrowed, closed directory-path handle. Receives errors; remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_remove_directory(file_t *directory);
+
 /**
  * @brief Opens a directory for lazy listing; regular stream reads are unavailable on this handle.
  * @param[in,out] directory Borrowed, closed directory-path handle. Receives errors; remains caller-owned.
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_open_directory(file_t *directory);
+
 /**
  * @brief Returns the next owned entry snapshot, excluding dot entries; success with NULL output means EOF.
  * @param[in,out] directory Borrowed directory handle opened with file_open_directory. Receives errors; remains
@@ -416,18 +467,21 @@ bool file_open_directory(file_t *directory);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_read_directory(file_t *directory, file_info_t **entry);
+
 /**
  * @brief Returns an owned array of file_info_t pointers; array_destroy frees snapshots. Order is filesystem-defined.
  * @param[in,out] directory Borrowed, closed directory-path handle. Receives errors; remains caller-owned.
  * @return Owned snapshot array, or NULL on failure; array_destroy frees its snapshots.
  */
 array_t *file_list_directory(file_t *directory);
+
 /**
  * @brief Returns the snapshot's borrowed raw basename; it remains valid until file_info_free.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Borrowed raw basename valid until file_info_free, or NULL for NULL; do not free it.
  */
 const char *file_info_name(const file_info_t *info);
+
 /**
  * @brief Returns the raw target text captured for a symbolic link.
  * @param info Borrowed metadata snapshot from a directory listing or file_get_info.
@@ -457,36 +511,42 @@ const file_info_t *file_info_target_info(const file_info_t *info);
  * Does not perform I/O or change errno or the originating handle's error.
  */
 int file_info_target_error(const file_info_t *info);
+
 /**
  * @brief Returns the inode type, or FILE_TYPE_UNKNOWN for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Recorded inode type, or FILE_TYPE_UNKNOWN for NULL.
  */
 file_type_t file_info_type(const file_info_t *info);
+
 /**
  * @brief Returns permission and special mode bits (07777), or zero for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Recorded mode bits masked to 07777, or zero for NULL.
  */
 unsigned file_info_permissions(const file_info_t *info);
+
 /**
  * @brief Returns the numeric owner UID, or UINT32_MAX for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Recorded numeric UID, or UINT32_MAX for NULL.
  */
 uint32_t file_info_owner(const file_info_t *info);
+
 /**
  * @brief Returns the numeric group GID, or UINT32_MAX for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Recorded numeric GID, or UINT32_MAX for NULL.
  */
 uint32_t file_info_group(const file_info_t *info);
+
 /**
  * @brief Returns the inode's hard-link count, or zero for NULL.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
  * @return Recorded hard-link count, or zero for NULL.
  */
 uint64_t file_info_link_count(const file_info_t *info);
+
 /**
  * @brief Retrieves UTC Unix seconds and nanoseconds of last access; outputs are required.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
@@ -495,6 +555,7 @@ uint64_t file_info_link_count(const file_info_t *info);
  * @return True on success; false with errno set to EINVAL for invalid arguments or ENOTSUP if unavailable.
  */
 bool file_info_last_access_time(const file_info_t *info, int64_t *seconds, long *nanoseconds);
+
 /**
  * @brief Retrieves UTC Unix seconds and nanoseconds of inode status change, not birth; outputs are required.
  * @param[in] info Borrowed immutable metadata snapshot; ownership is unchanged.
@@ -503,6 +564,7 @@ bool file_info_last_access_time(const file_info_t *info, int64_t *seconds, long 
  * @return True on success; false with errno set to EINVAL for invalid arguments or ENOTSUP if unavailable.
  */
 bool file_info_status_change_time(const file_info_t *info, int64_t *seconds, long *nanoseconds);
+
 /**
  * @brief Applies chmod permission/special bits to a closed file or directory; refuses final symlinks.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -510,6 +572,7 @@ bool file_info_status_change_time(const file_info_t *info, int64_t *seconds, lon
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_chmod(file_t *file, unsigned permissions);
+
 /**
  * @brief Changes numeric owner/group without following the final symlink; -1 leaves that field unchanged.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -518,6 +581,7 @@ bool file_chmod(file_t *file, unsigned permissions);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_chown(file_t *file, int64_t owner, int64_t group);
+
 /**
  * @brief Changes access and modification timestamps without following the final symlink; nanoseconds must be valid.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
@@ -529,6 +593,7 @@ bool file_chown(file_t *file, int64_t owner, int64_t group);
  */
 bool file_set_times(file_t *file, int64_t access_seconds, long access_nanoseconds,
                     int64_t write_seconds, long write_nanoseconds);
+
 /**
  * @brief Tests requested access using effective credentials; all false tests existence. Follows symlinks.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.
@@ -538,6 +603,7 @@ bool file_set_times(file_t *file, int64_t access_seconds, long access_nanosecond
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_check_access(file_t *file, bool read_access, bool write_access, bool execute_access);
+
 /**
  * @brief Truncates or extends a regular file to a non-negative byte size; an open stream must be writable.
  * @param[in,out] file Borrowed closed regular-file handle or open writable stream; receives errors.
@@ -545,6 +611,7 @@ bool file_check_access(file_t *file, bool read_access, bool write_access, bool e
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_truncate(file_t *file, int64_t size);
+
 /**
  * @brief Flushes and fsyncs an open file or directory; data_only selects fdatasync for file streams.
  * @param[in,out] file Borrowed open file or directory handle; receives errors.
@@ -552,6 +619,7 @@ bool file_truncate(file_t *file, int64_t size);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_sync(file_t *file, bool data_only);
+
 /**
  * @brief Creates a new hard link to a regular source; the destination must not exist.
  * @param[in,out] source Borrowed, closed source handle; receives errors and remains caller-owned.
@@ -559,6 +627,7 @@ bool file_sync(file_t *file, bool data_only);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_create_hard_link(file_t *source, file_t *destination);
+
 /**
  * @brief Creates a new symlink containing target's raw path, which need not exist; relative text is stored verbatim.
  * @param[in,out] target Borrowed, closed handle containing the target path to store verbatim; receives errors.
@@ -566,6 +635,7 @@ bool file_create_hard_link(file_t *source, file_t *destination);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_create_symlink(file_t *target, file_t *link);
+
 /**
  * @brief Returns an allocated raw symlink target through the required output pointer; release it with free.
  * @param[in,out] link Borrowed, closed symbolic-link path handle; ownership is unchanged.
@@ -574,6 +644,7 @@ bool file_create_symlink(file_t *target, file_t *link);
  * @return True on success; false on failure (see file_last_error).
  */
 bool file_read_link(file_t *link, char **target);
+
 /**
  * @brief Returns a new closed handle for realpath's canonical absolute path, resolving symlinks.
  * @param[in] file Borrowed handle to inspect; ownership is unchanged.

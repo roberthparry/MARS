@@ -46,6 +46,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
 - **`xml_t`** — native streaming XML with dictionary-backed attributes, ordered mixed content and no external XML dependency
+- **`http_client_t`** — opaque HTTP/HTTPS clients with verified TLS, bounded streaming and JSON/XML adapters
+- **`websrv_t`** — bounded Linux web services with exact routing and JSON/XML responses
 - **`sqlite_t`** — opaque SQLCipher-backed SQLite storage for encrypted MARS object persistence
 - **`file_t`** — opaque Linux file streams, UTF-8 helpers, metadata, compression, authenticated encryption and SQLCipher transfers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -101,13 +103,14 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - GMP, MPFR, and MPC development libraries
 - SQLCipher development libraries
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
+- libcurl 7.85.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
 On Debian/Ubuntu, install the default build requirements with:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev
+sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
 ```
 
 Use `make check-deps` to check for required development headers and link
@@ -273,6 +276,7 @@ static expr_t *make_f(expr_t *x) {
 }
 
 int main(void) {
+    num_set_default_prec_bits(384);
     number_t x0 = num_create_from_string("1.25");
     expr_t *x;
     expr_t *f;
@@ -282,7 +286,6 @@ int main(void) {
     number_t d1_val;
     number_t d2_val;
 
-    num_set_default_prec_bits(384);
     x = expr_new_named_var(x0, "x");
     num_destroy(&x0);
     f = make_f(x);
@@ -316,7 +319,7 @@ int main(void) {
 ```text
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
+f''(x)  = { 0x + 6·1 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
@@ -333,7 +336,7 @@ f''(x)   = 3.8055231012396292258221776404244325549429604624756689463326935689439
 
 int main(void) {
     mat_bindings_t *bindings = NULL;
-    matrix_t *H = mat_from_string(
+    matrix_t *H = mat_from_string_expr(
         "{ (Δ, Ω; Ω, -Δ) | Δ = 1.5; Ω = 0.25 }",
         &bindings);
 
@@ -346,9 +349,9 @@ int main(void) {
 
 ```text
 { (
-  Δ    Ω
-  Ω   -Δ
-) | Δ = 1.5, Ω = 0.25 }
+  Δ  Ω
+  Ω -Δ
+) | Δ = 1.5; Ω = 0.25 }
 ```
 
 ## Modules
@@ -359,6 +362,8 @@ int main(void) {
 | `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](./docs/timeseries.md) |
 | `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](./docs/json.md) |
 | `xml_t` | Native XML trees and streaming input/output with dictionary-backed attributes | [`docs/xml.md`](./docs/xml.md) |
+| `http_client_t` | Verified HTTP/HTTPS, bounded streaming, JSON/XML and file transfers | [`docs/http.md`](./docs/http.md) |
+| `websrv_t` | Synchronous Linux web server, exact routes and JSON/XML responses | [`docs/webserver.md`](./docs/webserver.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](./docs/string.md) |
 | `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](./docs/dictionary.md) |
 | `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](./docs/set.md) |

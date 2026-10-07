@@ -174,20 +174,28 @@ almanac_body_kind_t almanac_entry_body_kind(const almanac_entry_t *entry);
 
 /** @brief Return the civil Julian date used to compute the entry. */
 double almanac_entry_moment_jd(const almanac_entry_t *entry);
+
 /** @brief Return the entry's apparent Greenwich Hour Angle of Aries in degrees. */
 double almanac_entry_gha_aries_degrees(const almanac_entry_t *entry);
+
 /** @brief Return the entry's sidereal hour angle in degrees. */
 double almanac_entry_sha_degrees(const almanac_entry_t *entry);
+
 /** @brief Return the entry's declination in degrees. */
 double almanac_entry_declination_degrees(const almanac_entry_t *entry);
+
 /** @brief Return the entry's right ascension in hours. */
 double almanac_entry_right_ascension_hours(const almanac_entry_t *entry);
+
 /** @brief Return the entry's geocentric distance in astronomical units. */
 double almanac_entry_geocentric_distance_au(const almanac_entry_t *entry);
+
 /** @brief Return the entry's heliocentric distance in astronomical units. */
 double almanac_entry_heliocentric_distance_au(const almanac_entry_t *entry);
+
 /** @brief Return the entry's phase angle in degrees. */
 double almanac_entry_phase_angle_degrees(const almanac_entry_t *entry);
+
 /** @brief Return the entry's visual magnitude. */
 double almanac_entry_visual_magnitude(const almanac_entry_t *entry);
 
@@ -554,14 +562,19 @@ bool almanac_solar_eclipse_time(const almanac_solar_eclipse_t *event, almanac_ev
 
 /** @brief Return the Sun-Moon angular separation in degrees at greatest eclipse. */
 double almanac_solar_eclipse_separation_degrees(const almanac_solar_eclipse_t *event);
+
 /** @brief Return the solar eclipse magnitude. */
 double almanac_solar_eclipse_magnitude(const almanac_solar_eclipse_t *event);
+
 /** @brief Return the percentage of the solar disc obscured at greatest eclipse. */
 double almanac_solar_eclipse_totality_percent(const almanac_solar_eclipse_t *event);
+
 /** @brief Return the Sun's apparent semi-diameter in degrees at greatest eclipse. */
 double almanac_solar_eclipse_sun_semi_diameter_degrees(const almanac_solar_eclipse_t *event);
+
 /** @brief Return the Moon's apparent semi-diameter in degrees at greatest eclipse. */
 double almanac_solar_eclipse_moon_semi_diameter_degrees(const almanac_solar_eclipse_t *event);
+
 /** @brief Report whether the solar eclipse is central at the observer's location. */
 bool almanac_solar_eclipse_is_central(const almanac_solar_eclipse_t *event);
 
@@ -612,16 +625,22 @@ bool almanac_lunar_eclipse_time(const almanac_lunar_eclipse_t *event, almanac_ev
 
 /** @brief Return the Moon's angular distance from the antisolar direction in degrees. */
 double almanac_lunar_eclipse_opposition_error_degrees(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the lunar eclipse umbral magnitude. */
 double almanac_lunar_eclipse_umbral_magnitude(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the lunar eclipse penumbral magnitude. */
 double almanac_lunar_eclipse_penumbral_magnitude(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the percentage of the lunar disc covered by the umbra at greatest eclipse. */
 double almanac_lunar_eclipse_totality_percent(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the apparent umbral radius in degrees at greatest eclipse. */
 double almanac_lunar_eclipse_umbral_radius_degrees(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the apparent penumbral radius in degrees at greatest eclipse. */
 double almanac_lunar_eclipse_penumbral_radius_degrees(const almanac_lunar_eclipse_t *event);
+
 /** @brief Return the Moon's apparent semi-diameter in degrees at greatest eclipse. */
 double almanac_lunar_eclipse_moon_semi_diameter_degrees(const almanac_lunar_eclipse_t *event);
 
@@ -660,12 +679,16 @@ bool almanac_solar_transit_time(const almanac_solar_transit_t *event, almanac_ev
 
 /** @brief Return the Sun-planet angular separation in degrees at greatest transit. */
 double almanac_solar_transit_separation_degrees(const almanac_solar_transit_t *event);
+
 /** @brief Return the Sun's apparent semi-diameter in degrees at greatest transit. */
 double almanac_solar_transit_solar_semi_diameter_degrees(const almanac_solar_transit_t *event);
+
 /** @brief Return the planet's apparent semi-diameter in degrees at greatest transit. */
 double almanac_solar_transit_planet_semi_diameter_degrees(const almanac_solar_transit_t *event);
+
 /** @brief Return the centre separation as a fraction of the solar semi-diameter. */
 double almanac_solar_transit_chord_distance_fraction(const almanac_solar_transit_t *event);
+
 /** @brief Report whether the planet lies wholly within the solar disc at greatest transit. */
 bool almanac_solar_transit_is_interior(const almanac_solar_transit_t *event);
 

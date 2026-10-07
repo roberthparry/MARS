@@ -18,8 +18,15 @@ phase normalisation.
 README signum example:
 
 ```c
-qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
-printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
+    printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+    return 0;
+}
 ```
 
 Output:
@@ -31,8 +38,15 @@ sgn(-1 + 0i) = -1 + 0i
 README example:
 
 ```c
-qcomplex_t value = qc_sinc(qc_make(QF_ZERO, QF_ZERO));
-printf("sinc(0) = %.0f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t value = qc_sinc(qc_make(QF_ZERO, QF_ZERO));
+    printf("sinc(0) = %.0f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+    return 0;
+}
 ```
 
 Output:
@@ -100,9 +114,9 @@ int main(void) {
 ```
 
 ```text
-exp(iπ) + 1 = 0.0000000000000000000000000000000000 + 0.0000000000000000000000000000000000i
-real part    = 0.0000000000000000000000000000000000
-imag part    = 0.0000000000000000000000000000000000
+exp(iπ) + 1 = 0
+real part    = 0
+imag part    = 0
 ```
 
 ---
@@ -306,8 +320,15 @@ The shared evaluator limits work precision to 65536 bits and series to
 20000 terms; unscaled output remains subject to qfloat's exponent range.
 
 ```c
-qcomplex_t value = qc_bessel_y(QC_ZERO, QC_ONE);
-printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t value = qc_bessel_y(QC_ZERO, QC_ONE);
+    printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+    return 0;
+}
 ```
 
 ```text
@@ -348,8 +369,15 @@ are unscaled and conversion remains subject to qfloat's exponent range;
 there is no asymptotic large-argument implementation.
 
 ```c
-qcomplex_t bessel = qc_bessel_i(QC_ZERO, QC_ONE);
-qc_printf("I_0(1) = %.16z\n", bessel);
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t bessel = qc_bessel_i(QC_ZERO, QC_ONE);
+    qc_printf("I_0(1) = %.16z\n", bessel);
+    return 0;
+}
 ```
 
 ```text
@@ -380,8 +408,15 @@ range. No scaled or asymptotic kernel is provided, and not every point
 inside the input bounds is guaranteed to pass the numerical guards.
 
 ```c
-qcomplex_t ordinary = qc_struve_h(QC_ZERO, QC_ONE);
-qc_printf("H_0(1) = %.15z\n", ordinary);
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t ordinary = qc_struve_h(QC_ZERO, QC_ONE);
+    qc_printf("H_0(1) = %.15z\n", ordinary);
+    return 0;
+}
 ```
 
 ```text
@@ -412,8 +447,15 @@ subject to qfloat's exponent range. No large-argument asymptotic kernel is
 provided. See the number guide for the work-precision and iteration limits.
 
 ```c
-qcomplex_t value = qc_struve_l(QC_ZERO, QC_ONE);
-qc_printf("L_0(1) = %.16z\n", value);
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t value = qc_struve_l(QC_ZERO, QC_ONE);
+    qc_printf("L_0(1) = %.16z\n", value);
+    return 0;
+}
 ```
 
 ```text
@@ -561,7 +603,15 @@ for `Tn`, `Un` and the distinct script-H Hermite notation.
 README example:
 
 ```c
-qc_hermite_h(3, qc_make(QF_ZERO, QF_ONE))
+#include <stdio.h>
+#include "qcomplex.h"
+
+int main(void)
+{
+    qcomplex_t value = qc_hermite_h(3, qc_make(QF_ZERO, QF_ONE));
+    qc_printf("Hermite H3(i) = %.0z\n", value);
+    return 0;
+}
 ```
 
 Output:

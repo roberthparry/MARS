@@ -1535,19 +1535,33 @@ Rules are dispatched through tables where that keeps the code readable; more
 specialised pattern code remains local to the module that owns the rule family.
 
 ```c
-number_t x0 = num_create_from_double(0.0);
-number_t two = num_create_from_long(2);
-expr_t *x = expr_new_named_var(x0, "x");
-expr_t *two_x = expr_mul_num(x, &two);
-expr_t *f = expr_exp(two_x);
-expr_t *F = expr_integrate(f, x);  /* exp(2*x) / 2, or NULL if unsupported */
+#include <stdio.h>
+#include "expression.h"
 
-expr_free(F);
-expr_free(f);
-expr_free(two_x);
-expr_free(x);
-num_destroy(&two);
-num_destroy(&x0);
+int main(void)
+{
+    number_t x0 = num_create_from_double(0.0);
+    number_t two = num_create_from_long(2);
+    expr_t *x = expr_new_named_var(x0, "x");
+    expr_t *two_x = expr_mul_num(x, &two);
+    expr_t *f = expr_exp(two_x);
+    expr_t *F = expr_integrate(f, x);  /* exp(2*x) / 2, or NULL if unsupported */
+
+    printf("antiderivative available: %s\n", F ? "yes" : "no");
+    expr_free(F);
+    expr_free(f);
+    expr_free(two_x);
+    expr_free(x);
+    num_destroy(&two);
+    num_destroy(&x0);
+    return 0;
+}
+```
+
+Output:
+
+```text
+antiderivative available: yes
 ```
 
 For production code, verify a returned antiderivative the same way the tests
@@ -1604,6 +1618,7 @@ static expr_t *make_f(expr_t *x) {
 }
 
 int main(void) {
+    num_set_default_prec_bits(384);
     number_t x0 = num_create_from_string("1.25");
     expr_t *x;
     expr_t *f;
@@ -1613,7 +1628,6 @@ int main(void) {
     number_t d1_val;
     number_t d2_val;
 
-    num_set_default_prec_bits(384);
     x = expr_new_named_var(x0, "x");
     num_destroy(&x0);
     f = make_f(x);
@@ -1646,10 +1660,9 @@ int main(void) {
 ```
 
 ```text
-Example: Constructing an Expression
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { exp(sin(x))·(cos²(x) - sin(x)) + 6 | x = 1.25 }
+f''(x)  = { 0x + 6·1 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
@@ -1752,10 +1765,9 @@ int main(void) {
 ```
 
 ```text
-Example: Parsing from a String
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { exp(sin(x))·(cos²(x) - sin(x)) + 6 | x = 1.25 }
+f''(x)  = { 0x + 6·1 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
@@ -1832,23 +1844,42 @@ int main(void) {
 ```
 
 ```text
-At x=1, y=2 (384 bits, 115 significant digits):
-f        = 7.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000E+00
-∂f/∂x = 4.00000000000000E+00
-∂f/∂y = 5.00000000000000E+00
-∂²f/∂x∂y = 1.00000000000000E+00
+At x=1, y=2 (384 bits):
+f          = 7
+∂f/∂x      = 4
+∂f/∂y      = 5
+∂²f/∂x∂y   = 1
 
 After x=3:
-∂f/∂x = 8.00000000000000E+00
-∂f/∂y = 7.00000000000000E+00
+∂f/∂x      = 8
+∂f/∂y      = 7
 ```
 
 `expr_get_deriv` returns a *borrowed* pointer to the cached derivative — useful when
 you only need to evaluate it and don't want to manage another owning handle:
 
 ```c
-const expr_t *p = expr_get_deriv(f, x);   /* borrowed — do NOT free */
-num_printf("∂f/∂x = %.101N\n", expr_eval(p));
+#include <stdio.h>
+#include "expression.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_create_from_long(3);
+    expr_t *x = expr_new_named_var(value, "x");
+    expr_t *f = expr_mul(x, x);
+    const expr_t *p = expr_get_deriv(f, x);   /* borrowed — do NOT free */
+    num_printf("∂f/∂x = %.0n\n", expr_eval(p));
+    expr_free(f);
+    expr_free(x);
+    return 0;
+}
+```
+
+Output:
+
+```text
+∂f/∂x = 6
 ```
 
 The result is cached: repeated calls to `expr_get_deriv` with the same `wrt` variable
@@ -1908,11 +1939,9 @@ int main(void) {
 ```
 
 ```text
-Example: Evaluating Derivatives
-Evaluating derivatives at x=1, y=2 (384 bits, 115 significant digits):
-f        = 3.175724908574945831917149463420104893478850175303443992754304840163843037995939274550553871648852515239828467029229E+00
-∂f/∂x = -1.373086555431723754562396899591396992661743594292079049199202945953125498212517447107943691791654177506104614887117E+00
-∂f/∂y = -5.331168679958345319898145105247867803686218643261671516599414777232595600911060813569035093940364325240530479538437E-01
+f      = 3.17572490857494583191714946342010489347885017530344399275430484016384303799593927455055387164885251524E+00
+∂f/∂x  = -1.37308655543172375456239689959139699266174359429207904919920294595312549821251744710794369179165417751E+00
+∂f/∂y  = -5.33116867995834531989814510524786780368621864326167151659941477723259560091106081356903509394036432524E-01
 ```
 
 ## Design Notes

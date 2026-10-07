@@ -93,6 +93,16 @@ component notices shipped with the exact library version, not only this summary.
 Upstream licence information:
 <https://github.com/jedisct1/libsodium/blob/master/LICENSE>.
 
+## HTTP transport
+
+MARS links the system libcurl library for HTTP/HTTPS transport. libcurl uses
+the curl licence (SPDX identifier `curl`); the authoritative terms and
+copyright notices are at <https://curl.se/docs/copyright.html>.
+Distributors bundling libcurl must retain the licence supplied with that
+version and account for its TLS, compression and other linked dependencies.
+The recommended Linux development package uses OpenSSL; MARS does not vendor
+libcurl or its dependencies.
+
 ## Multiprecision and Unicode libraries
 
 MARS dynamically links to the following system libraries:

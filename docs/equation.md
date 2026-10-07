@@ -274,8 +274,8 @@ int main(void)
 ```
 
 ```text
-solution[0] = x = φ
-solution[1] = x = -0.618033988749894848204586834365638117720309179805762862135448622705260463
+solution[0] = x = (1 + √(5))/2
+solution[1] = x = (1 - √(5))/2
 ```
 
 ## Example: Sextic Solve

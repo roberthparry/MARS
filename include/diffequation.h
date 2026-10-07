@@ -136,6 +136,7 @@ equation_t *de_lie_autonomous_reduction(const de_lie_t *lie);
  */
 typedef enum de_solve_option_t {
     DE_SOLVE_OPTION_NONE = 0u,
+
     /** Construct plain-text and TeX derivations for presentation. */
     DE_SOLVE_OPTION_STEPS = 1u << 0
 } de_solve_option_t;
@@ -148,6 +149,7 @@ typedef enum {
     DE_SOLVE_STATUS_UNSUPPORTED,
     DE_SOLVE_STATUS_INVALID,
     DE_SOLVE_STATUS_FAILED,
+
     /** A local Taylor expansion with an explicit remainder, not an exact finite solution. */
     DE_SOLVE_STATUS_SERIES
 } de_solve_status_t;
@@ -177,16 +179,22 @@ typedef enum {
     DE_SOLVER_LAPLACE,
     DE_SOLVER_POWER_LAW_BESSEL,
     DE_SOLVER_TAYLOR_SERIES,
+
     /** Three-dimensional constant-speed wave equation, represented by Kirchhoff spherical means. */
     DE_SOLVER_KIRCHHOFF,
+
     /** Forced one-dimensional constant-speed wave IVP, using d'Alembert and Duhamel integrals. */
     DE_SOLVER_DALEMBERT_DUHAMEL,
+
     /** Whole-line constant-coefficient dissipative evolution, represented by a Fourier kernel. */
     DE_SOLVER_FOURIER_EVOLUTION,
+
     /** Zero-background KdV solitary waves: a particular family, not the general solution. */
     DE_SOLVER_KDV_SOLITARY_WAVE,
+
     /** Positive-integer-power generalised KdV travelling waves, with explicit branch and domain restrictions. */
     DE_SOLVER_GKDV_TRAVELLING_WAVE,
+
     /** Heat-reaction equation on the right half-line with zero initial data and a Dirichlet boundary history. */
     DE_SOLVER_HALF_LINE_HEAT
 } de_solver_t;

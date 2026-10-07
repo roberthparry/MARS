@@ -16,9 +16,16 @@ non-real inputs return NaN. The input is unchanged.
 README signum example:
 
 ```c
-NUM_SCOPE(scope);
-number_t sign = num_sgn(num_create_from_frac(-2, 3));
-printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t sign = num_sgn(num_create_from_frac(-2, 3));
+    printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+    return 0;
+}
 ```
 
 Output:
@@ -30,9 +37,16 @@ sgn(-2/3) = -1
 README example (the scope owns temporary numbers):
 
 ```c
-NUM_SCOPE(scope);
-number_t edge = num_rect(NUM_HALF);
-printf("rect(1/2) = %.1f\n", num_to_double(edge));
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t edge = num_rect(NUM_HALF);
+    printf("rect(1/2) = %.1f\n", num_to_double(edge));
+    return 0;
+}
 ```
 
 Output:
@@ -206,37 +220,83 @@ That means:
 Example:
 
 ```c
-number_t a = num_create_from_string("2");
-number_t b = num_create_from_string("5/6");
-number_t c = num_add(a, b);
+#include <stdio.h>
+#include "number.h"
 
-num_destroy(&a);
-num_destroy(&b);
-num_destroy(&c);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t a = num_create_from_string("2");
+    number_t b = num_create_from_string("5/6");
+    number_t c = num_add(a, b);
+
+    num_printf("sum = %n\n", c);
+    num_destroy(&a);
+    num_destroy(&b);
+    num_destroy(&c);
+    return 0;
+}
+```
+
+Output:
+
+```text
+sum = ¹⁷⁄₆
 ```
 
 Example with explicit precision:
 
 ```c
-num_set_default_prec_bits(768);
+#include <stdio.h>
+#include "number.h"
 
-number_t x = num_create_from_string("1.25");
-number_t y = num_const_prec(NUM_PI, 512);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    num_set_default_prec_bits(768);
 
-printf("default bits: %zu\n", num_get_default_prec_bits());
-printf("x bits: %zu\n", num_get_prec_bits(x));
-printf("y bits: %zu\n", num_get_prec_bits(y));
+    number_t x = num_create_from_string("1.25");
+    number_t y = num_const_prec(NUM_PI, 512);
 
-num_destroy(&x);
-num_destroy(&y);
+    printf("default bits: %zu\n", num_get_default_prec_bits());
+    printf("x bits: %zu\n", num_get_prec_bits(x));
+    printf("y bits: %zu\n", num_get_prec_bits(y));
+
+    num_destroy(&x);
+    num_destroy(&y);
+    return 0;
+}
+```
+
+Output:
+
+```text
+default bits: 768
+x bits: 768
+y bits: 512
 ```
 
 Named constants such as `NUM_PI`, `NUM_E`, `NUM_LN10`, `NUM_PHI`, and
 `NUM_EULER_MASCHERONI` are safe to clear as well:
 
 ```c
-number_t pi = NUM_PI;
-num_destroy(&pi);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t pi = NUM_PI;
+    num_destroy(&pi);
+    printf("constant cleared safely\n");
+    return 0;
+}
+```
+
+Output:
+
+```text
+constant cleared safely
 ```
 
 ## Temporary Scopes
@@ -264,6 +324,8 @@ Detaching behaves differently depending on how the scoped value is stored:
 Example with the public cleanup macro:
 
 ```c
+#include "number.h"
+
 number_t make_sum(void) {
     NUM_SCOPE(scope);
 
@@ -275,18 +337,39 @@ number_t make_sum(void) {
 
 int main(void) {
     number_t kept = make_sum();
+    num_printf("kept = %n\n", kept);
     num_destroy(&kept);
     return 0;
 }
+```
+
+Output:
+
+```text
+kept = ½
 ```
 
 If you need a portable manual form instead of `NUM_SCOPE(...)`, the equivalent
 sequence is:
 
 ```c
-num_scope_t *scope = num_scope_enter();
-/* ... */
-num_scope_leave(&scope);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    num_scope_t *scope = num_scope_enter();
+    number_t sum = num_add(NUM_ONE, NUM_HALF);
+    num_printf("sum = %n\n", sum);
+    num_scope_leave(&scope);
+    return 0;
+}
+```
+
+Output:
+
+```text
+sum = ³⁄₂
 ```
 
 The intended fast pattern is:
@@ -576,10 +659,17 @@ exhausted guards return NaN. Results are unscaled. The qfloat and qcomplex
 wrappers additionally have the exponent range of their component type.
 
 ```c
-NUM_SCOPE(scope);
-number_t value = num_bessel_y(NUM_ZERO, NUM_ONE);
-printf("Y_0(1) = %.15f\n", num_to_double(value));
-num_destroy(&value);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_bessel_y(NUM_ZERO, NUM_ONE);
+    printf("Y_0(1) = %.15f\n", num_to_double(value));
+    num_destroy(&value);
+    return 0;
+}
 ```
 
 ```text
@@ -652,9 +742,16 @@ describe supported numerical coverage, not a guarantee of convergence at
 every point. No scaled or large-argument asymptotic evaluator is provided.
 
 ```c
-NUM_SCOPE(scope);
-number_t bessel = num_bessel_i(NUM_ZERO, NUM_ONE);
-num_printf("I_0(1) = %.16n\n", bessel);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t bessel = num_bessel_i(NUM_ZERO, NUM_ONE);
+    num_printf("I_0(1) = %.16n\n", bessel);
+    return 0;
+}
 ```
 
 ```text
@@ -706,9 +803,16 @@ return NaN. There is no scaled or asymptotic evaluator, so the input bounds
 do not guarantee success at every point.
 
 ```c
-NUM_SCOPE(scope);
-number_t ordinary = num_struve_h(NUM_ZERO, NUM_ONE);
-num_printf("H_0(1) = %.15n\n", ordinary);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t ordinary = num_struve_h(NUM_ZERO, NUM_ONE);
+    num_printf("H_0(1) = %.15n\n", ordinary);
+    return 0;
+}
 ```
 
 ```text
@@ -762,9 +866,16 @@ large-argument evaluator, and the finite input bounds do not guarantee that
 every point passes the numerical guards.
 
 ```c
-NUM_SCOPE(scope);
-number_t value = num_struve_l(NUM_ZERO, NUM_ONE);
-num_printf("L_0(1) = %.16n\n", value);
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_struve_l(NUM_ZERO, NUM_ONE);
+    num_printf("L_0(1) = %.16n\n", value);
+    return 0;
+}
 ```
 
 ```text
@@ -840,7 +951,7 @@ int main(void) {
         return 1;
 
     printf("2 + 5/6 = %s\n", string_c_str(sum_text));
-    printf("beta(2, 3) = %s\n", string_c_str(beta_text));
+    num_printf("beta(2, 3) = %.32n\n", beta);
 
     string_free(sum_text);
     string_free(beta_text);
@@ -866,13 +977,22 @@ documented output stays tied to the public `number_t` API.
 ### Exact Rational Arithmetic
 
 ```c
-number_t a = num_create_from_frac(2, 3);
-number_t b = num_create_from_string("5/4");
-number_t product = num_mul(a, b);
-string_t *text = num_to_string(product);
+#include "ustring.h"
+#include <stdio.h>
+#include "number.h"
 
-printf("(2/3) * (5/4) = %s\n", string_c_str(text));
-string_free(text);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t a = num_create_from_frac(2, 3);
+    number_t b = num_create_from_string("5/4");
+    number_t product = num_mul(a, b);
+    string_t *text = num_to_string(product);
+
+    printf("(2/3) * (5/4) = %s\n", string_c_str(text));
+    string_free(text);
+    return 0;
+}
 ```
 
 ```text
@@ -882,13 +1002,22 @@ string_free(text);
 ### Exact Combinatorics
 
 ```c
-number_t n = num_create_from_long(52);
-number_t k = num_create_from_long(5);
-number_t c = num_binomial(n, k);
-string_t *text = num_to_string(c);
+#include "ustring.h"
+#include <stdio.h>
+#include "number.h"
 
-printf("C(52, 5) = %s\n", string_c_str(text));
-string_free(text);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t n = num_create_from_long(52);
+    number_t k = num_create_from_long(5);
+    number_t c = num_binomial(n, k);
+    string_t *text = num_to_string(c);
+
+    printf("C(52, 5) = %s\n", string_c_str(text));
+    string_free(text);
+    return 0;
+}
 ```
 
 ```text
@@ -905,20 +1034,28 @@ Dispatch preserves the active `number_t` backend, including qfloat, qcomplex,
 MPFR and MPC values.
 
 ```c
-num_set_default_prec_bits(256);
+#include <stdio.h>
+#include "number.h"
 
-number_t x = num_create_from_string("2.345");
-number_t gamma_x = num_gamma(x);
-number_t lgamma_x = num_lgamma(x);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    num_set_default_prec_bits(256);
 
-char gamma_text[256];
-char lgamma_text[256];
+    number_t x = num_create_from_string("2.345");
+    number_t gamma_x = num_gamma(x);
+    number_t lgamma_x = num_lgamma(x);
 
-num_sprintf(gamma_text, sizeof(gamma_text), "%.77n", gamma_x);
-num_sprintf(lgamma_text, sizeof(lgamma_text), "%.77n", lgamma_x);
+    char gamma_text[256];
+    char lgamma_text[256];
 
-printf("gamma(2.345)  = %s\n", gamma_text);
-printf("lgamma(2.345) = %s\n", lgamma_text);
+    num_sprintf(gamma_text, sizeof(gamma_text), "%.77n", gamma_x);
+    num_sprintf(lgamma_text, sizeof(lgamma_text), "%.77n", lgamma_x);
+
+    printf("gamma(2.345)  = %s\n", gamma_text);
+    printf("lgamma(2.345) = %s\n", lgamma_text);
+    return 0;
+}
 ```
 
 ```text
@@ -929,15 +1066,23 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 ### Multiprecision Complex Functions
 
 ```c
-num_set_default_prec_digits(50);
+#include <stdio.h>
+#include "number.h"
 
-number_t z = num_create_from_string("1 + i");
-number_t exp_z = num_exp(z);
+int main(void)
+{
+    NUM_SCOPE(scope);
+    num_set_default_prec_digits(50);
 
-char text[256];
-num_sprintf(text, sizeof(text), "%n", exp_z);
+    number_t z = num_create_from_string("1 + i");
+    number_t exp_z = num_exp(z);
 
-printf("exp(1 + i) = %s\n", text);
+    char text[256];
+    num_sprintf(text, sizeof(text), "%n", exp_z);
+
+    printf("exp(1 + i) = %s\n", text);
+    return 0;
+}
 ```
 
 ```text
@@ -1333,7 +1478,16 @@ for `Tn`, `Un` and the distinct script-H Hermite notation.
 README example:
 
 ```c
-num_hermite_h(num_create_from_long(3), NUM_TWO)
+#include <stdio.h>
+#include "number.h"
+
+int main(void)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_hermite_h(num_create_from_long(3), NUM_TWO);
+    num_printf("Hermite H3(2) = %n\n", value);
+    return 0;
+}
 ```
 
 Output:

@@ -34,6 +34,7 @@
 
 /** @brief Opaque reference-counted expression graph node. */
 typedef struct _expr_t expr_t;
+
 /** @brief Opaque symbol bindings produced while parsing an expression. */
 typedef struct expr_bindings_t expr_bindings_t;
 
@@ -361,6 +362,7 @@ void expr_goal_seek_result_clear(expr_goal_seek_result_t *result);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt);
+
 /**
  * @brief Construct the mixed second derivative with respect to wrt1 and wrt2.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -369,6 +371,7 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_create_2nd_deriv(const expr_t *expr, const expr_t *wrt1, const expr_t *wrt2);
+
 /**
  * @brief Construct the mixed third derivative with respect to wrt1, wrt2 and wrt3.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -378,6 +381,7 @@ expr_t *expr_create_2nd_deriv(const expr_t *expr, const expr_t *wrt1, const expr
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_create_3rd_deriv(const expr_t *expr, const expr_t *wrt1, const expr_t *wrt2, const expr_t *wrt3);
+
 /**
  * @brief Construct the nth successive derivative with respect to wrt.
  * @param n Number of successive differentiations; zero returns the input unchanged without retaining it.
@@ -555,6 +559,7 @@ bool expr_contains_integral_operation(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_neg(const expr_t *expr);
+
 /**
  * @brief Construct expr1 + expr2.
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -562,6 +567,7 @@ expr_t *expr_neg(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_add(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct expr1 - expr2.
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -569,6 +575,7 @@ expr_t *expr_add(const expr_t *expr1, const expr_t *expr2);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sub(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct expr1 multiplied by expr2.
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -576,6 +583,7 @@ expr_t *expr_sub(const expr_t *expr1, const expr_t *expr2);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_mul(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct expr1 divided by expr2.
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -591,6 +599,7 @@ expr_t *expr_div(const expr_t *expr1, const expr_t *expr2);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_add_num(const expr_t *expr, const number_t *value);
+
 /**
  * @brief Subtract a constant numeric value from an expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -598,6 +607,7 @@ expr_t *expr_add_num(const expr_t *expr, const number_t *value);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sub_num(const expr_t *expr, const number_t *value);
+
 /**
  * @brief Subtract an expression from a constant numeric value.
  * @param value Borrowed numeric value; copied where stored and never consumed.
@@ -605,6 +615,7 @@ expr_t *expr_sub_num(const expr_t *expr, const number_t *value);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_num_sub(const number_t *value, const expr_t *expr);
+
 /**
  * @brief Multiply an expression by a constant numeric value.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -612,6 +623,7 @@ expr_t *expr_num_sub(const number_t *value, const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_mul_num(const expr_t *expr, const number_t *value);
+
 /**
  * @brief Divide an expression by a constant numeric value.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -619,6 +631,7 @@ expr_t *expr_mul_num(const expr_t *expr, const number_t *value);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_div_num(const expr_t *expr, const number_t *value);
+
 /**
  * @brief Divide a constant numeric value by an expression.
  * @param value Borrowed numeric value; copied where stored and never consumed.
@@ -677,204 +690,238 @@ expr_t *expr_apply_unary_function(const char *name, const expr_t *argument, cons
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sin(const expr_t *expr);
+
 /**
  * @brief Construct a cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cos(const expr_t *expr);
+
 /**
  * @brief Construct a tangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_tan(const expr_t *expr);
+
 /**
  * @brief Construct a secant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sec(const expr_t *expr);
+
 /**
  * @brief Construct a cosecant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cosec(const expr_t *expr);
+
 /**
  * @brief Construct a cotangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cot(const expr_t *expr);
+
 /**
  * @brief Construct a versed sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_versin(const expr_t *expr);
+
 /**
  * @brief Construct a versed cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_vercos(const expr_t *expr);
+
 /**
  * @brief Construct a coversed sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_coversin(const expr_t *expr);
+
 /**
  * @brief Construct a coversed cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_covercos(const expr_t *expr);
+
 /**
  * @brief Construct a haversine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_haversin(const expr_t *expr);
+
 /**
  * @brief Construct a havercosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_havercos(const expr_t *expr);
+
 /**
  * @brief Construct a hacoversine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_hacoversin(const expr_t *expr);
+
 /**
  * @brief Construct a hacovercosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_hacovercos(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sinh(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cosh(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic tangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_tanh(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic secant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sech(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic cosecant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cosech(const expr_t *expr);
+
 /**
  * @brief Construct a hyperbolic cotangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_coth(const expr_t *expr);
+
 /**
  * @brief Construct an inverse sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_asin(const expr_t *expr);
+
 /**
  * @brief Construct an inverse cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acos(const expr_t *expr);
+
 /**
  * @brief Construct an inverse tangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_atan(const expr_t *expr);
+
 /**
  * @brief Construct an inverse secant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_asec(const expr_t *expr);
+
 /**
  * @brief Construct an inverse cosecant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acosec(const expr_t *expr);
+
 /**
  * @brief Construct an inverse cotangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acot(const expr_t *expr);
+
 /**
  * @brief Construct an inverse versed sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_arcversin(const expr_t *expr);
+
 /**
  * @brief Construct an inverse versed cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_arcvercos(const expr_t *expr);
+
 /**
  * @brief Construct an inverse coversed sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_arccoversin(const expr_t *expr);
+
 /**
  * @brief Construct an inverse coversed cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_arccovercos(const expr_t *expr);
+
 /**
  * @brief Construct an inverse haversine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_archaversin(const expr_t *expr);
+
 /**
  * @brief Construct an inverse havercosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_archavercos(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hacoversine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_archacoversin(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hacovercosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_archacovercos(const expr_t *expr);
+
 /**
  * @brief Construct the two-argument arctangent atan2(expr1, expr2).
  * @param expr1 Borrowed vertical coordinate (y); retained, not consumed.
@@ -882,54 +929,63 @@ expr_t *expr_archacovercos(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_atan2(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct an inverse hyperbolic sine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_asinh(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hyperbolic cosine expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acosh(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hyperbolic tangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_atanh(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hyperbolic secant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_asech(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hyperbolic cosecant expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acosech(const expr_t *expr);
+
 /**
  * @brief Construct an inverse hyperbolic cotangent expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_acoth(const expr_t *expr);
+
 /**
  * @brief Construct an exponential expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_exp(const expr_t *expr);
+
 /**
  * @brief Construct a natural logarithm expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_log(const expr_t *expr);
+
 /**
  * @brief Construct a natural-logarithm expression.
  *
@@ -939,12 +995,14 @@ expr_t *expr_log(const expr_t *expr);
  * @return A newly allocated natural-logarithm expression, or NULL on error.
  */
 expr_t *expr_ln(const expr_t *expr);
+
 /**
  * @brief Construct a base-10 logarithm expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_log10(const expr_t *expr);
+
 /**
  * @brief Construct a common-logarithm expression.
  *
@@ -954,6 +1012,7 @@ expr_t *expr_log10(const expr_t *expr);
  * @return A newly allocated common-logarithm expression, or NULL on error.
  */
 expr_t *expr_lg(const expr_t *expr);
+
 /**
  * @brief Construct the single-valued principal square root of an expression.
  *
@@ -965,6 +1024,7 @@ expr_t *expr_lg(const expr_t *expr);
  * @return A newly allocated principal-square-root expression, or NULL on error.
  */
 expr_t *expr_sqrt(const expr_t *expr);
+
 /**
  * @brief Construct the single-valued principal cube root of an expression.
  *
@@ -972,6 +1032,7 @@ expr_t *expr_sqrt(const expr_t *expr);
  * @return A newly allocated principal-cube-root expression, or NULL on error.
  */
 expr_t *expr_cubrt(const expr_t *expr);
+
 /**
  * @brief Construct the single-valued principal root of an expression.
  *
@@ -982,6 +1043,7 @@ expr_t *expr_cubrt(const expr_t *expr);
  * @return A newly allocated principal-root expression, or NULL on error.
  */
 expr_t *expr_root(const expr_t *expr, const expr_t *order);
+
 /**
  * @brief Construct a floor expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -996,6 +1058,7 @@ expr_t *expr_floor(const expr_t *expr);
  * @return A newly allocated signum expression, or NULL for a missing argument.
  */
 expr_t *expr_sgn(const expr_t *argument);
+
 /**
  * @brief Unit step, with value one half at zero; non-real inputs are undefined.
  *
@@ -1003,6 +1066,7 @@ expr_t *expr_sgn(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_step(const expr_t *argument);
+
 /**
  * @brief Unit-width rectangular pulse, with half-height endpoints.
  *
@@ -1010,6 +1074,7 @@ expr_t *expr_step(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_rect(const expr_t *argument);
+
 /**
  * @brief Unit-height triangular pulse supported on the interval [-1, 1].
  *
@@ -1017,6 +1082,7 @@ expr_t *expr_rect(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_tri(const expr_t *argument);
+
 /**
  * @brief Even unit-radius aperture profile, with half-height endpoints.
  *
@@ -1024,6 +1090,7 @@ expr_t *expr_tri(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_circ(const expr_t *argument);
+
 /**
  * @brief Normalised sinc sin(pi*x)/(pi*x), continued by one at zero.
  *
@@ -1031,6 +1098,7 @@ expr_t *expr_circ(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_sinc(const expr_t *argument);
+
 /**
  * @brief Construct a Dirac distribution, evaluating to zero off its support and NAN on it.
  *
@@ -1038,6 +1106,7 @@ expr_t *expr_sinc(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_delta(const expr_t *argument);
+
 /**
  * @brief Construct an analytic evaluation functional, not a real Dirac distribution.
  *
@@ -1050,6 +1119,7 @@ expr_t *expr_delta(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_analytic_delta(const expr_t *argument);
+
 /**
  * @brief Mark a Cauchy principal-value distribution, evaluating its regular part away from singularities.
  *
@@ -1057,6 +1127,7 @@ expr_t *expr_analytic_delta(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_principal_value(const expr_t *argument);
+
 /**
  * @brief Mark a singular expression as a Hadamard finite-part distribution, with unit cutoff.
  *
@@ -1068,12 +1139,14 @@ expr_t *expr_principal_value(const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_finite_part(const expr_t *argument);
+
 /**
  * @brief Construct a ceiling expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_ceil(const expr_t *expr);
+
 /**
  * @brief Construct a power with a constant numeric exponent.
  *
@@ -1086,6 +1159,7 @@ expr_t *expr_ceil(const expr_t *expr);
  * @return A newly allocated power expression, or NULL on error.
  */
 expr_t *expr_pow(const expr_t *expr, const number_t *exponent);
+
 /**
  * @brief Construct expr1 raised to an expression-valued exponent expr2.
  * @param expr1 Borrowed base expression; retained, not consumed.
@@ -1157,6 +1231,7 @@ expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, c
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_abs(const expr_t *expr);
+
 /**
  * @brief Construct the complex conjugate of an expression.
  *
@@ -1164,6 +1239,7 @@ expr_t *expr_abs(const expr_t *expr);
  * @return     Newly allocated conjugate expression, or NULL on error.
  */
 expr_t *expr_conj(const expr_t *expr);
+
 /**
  * @brief Construct the hypotenuse function of two expression operands.
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -1171,48 +1247,56 @@ expr_t *expr_conj(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_hypot(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct an error function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_erf(const expr_t *expr);
+
 /**
  * @brief Construct a complementary error function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_erfc(const expr_t *expr);
+
 /**
  * @brief Construct an inverse error function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_erfinv(const expr_t *expr);
+
 /**
  * @brief Construct an inverse complementary error function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_erfcinv(const expr_t *expr);
+
 /**
  * @brief Construct a gamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gamma(const expr_t *expr);
+
 /**
  * @brief Construct a log-gamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lgamma(const expr_t *expr);
+
 /**
  * @brief Construct a digamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_digamma(const expr_t *expr);
+
 /**
  * @brief Construct a q-digamma expression @f$\psi_q(z)@f$.
  *
@@ -1221,12 +1305,14 @@ expr_t *expr_digamma(const expr_t *expr);
  * @return A newly allocated q-digamma expression, or NULL on error.
  */
 expr_t *expr_qdigamma(const expr_t *q, const expr_t *z);
+
 /**
  * @brief Construct a trigamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_trigamma(const expr_t *expr);
+
 /**
  * @brief Construct the polygamma function of a fixed non-negative integer order.
  * @param order Fixed non-negative integer order.
@@ -1234,6 +1320,7 @@ expr_t *expr_trigamma(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
+
 /**
  * @brief Construct a Riemann zeta function expression.
  *
@@ -1241,6 +1328,7 @@ expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
  * @return A newly allocated ζ(expr) expression, or NULL on error.
  */
 expr_t *expr_zeta(const expr_t *expr);
+
 /**
  * @brief Construct a Hurwitz zeta function expression.
  *
@@ -1249,6 +1337,7 @@ expr_t *expr_zeta(const expr_t *expr);
  * @return A newly allocated ζ(s, a) expression, or NULL on error.
  */
 expr_t *expr_zetah(const expr_t *s, const expr_t *a);
+
 /**
  * @brief Construct a first Hurwitz zeta derivative expression.
  *
@@ -1257,6 +1346,7 @@ expr_t *expr_zetah(const expr_t *s, const expr_t *a);
  * @return A newly allocated ∂ζ(s, a)/∂s expression, or NULL on error.
  */
 expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
+
 /**
  * @brief Construct a first Riemann zeta derivative expression.
  *
@@ -1264,12 +1354,14 @@ expr_t *expr_zatahp(const expr_t *s, const expr_t *a);
  * @return A newly allocated ζ′(expr) expression, or NULL on error.
  */
 expr_t *expr_zetap(const expr_t *expr);
+
 /**
  * @brief Construct a dilogarithm expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_dilog(const expr_t *expr);
+
 /**
  * @brief Construct the Clausen integral Cl₂ of an angle in radians.
  *
@@ -1279,6 +1371,7 @@ expr_t *expr_dilog(const expr_t *expr);
  * @return An owning Clausen expression, or NULL on error.
  */
 expr_t *expr_clausen2(const expr_t *argument);
+
 /**
  * @brief Construct an integer-order Clausen function.
  *
@@ -1290,6 +1383,7 @@ expr_t *expr_clausen2(const expr_t *argument);
  * @return An owning Clausen expression, or NULL for order zero or on error.
  */
 expr_t *expr_clausen(unsigned long order, const expr_t *argument);
+
 /**
  * @brief Construct the order-one polylogarithm @f$\operatorname{Li}_1(z)@f$.
  *
@@ -1297,6 +1391,7 @@ expr_t *expr_clausen(unsigned long order, const expr_t *argument);
  * @return A newly allocated order-one polylogarithm expression, or NULL on error.
  */
 expr_t *expr_polylog1(const expr_t *expr);
+
 /**
  * @brief Construct the polylogarithm of a fixed non-negative integer order.
  * @param order Fixed non-negative integer order.
@@ -1304,6 +1399,7 @@ expr_t *expr_polylog1(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_polylog(unsigned int order, const expr_t *expr);
+
 /**
  * @brief Construct the harmonic polynomial @f$H_n(z)=\sum_{k=1}^{n}z^k/k@f$.
  *
@@ -1358,6 +1454,7 @@ expr_t *expr_convolve(const expr_t *left, const expr_t *right, const expr_t *coo
  * @param coordinate Borrowed output coordinate node; integration uses a separate local dummy.
  */
 expr_t *expr_causal_convolve(const expr_t *left, const expr_t *right, const expr_t *coordinate);
+
 /**
  * @brief Construct the Lerch transcendent @f$\Phi(z,s,a)@f$.
  *
@@ -1367,6 +1464,7 @@ expr_t *expr_causal_convolve(const expr_t *left, const expr_t *right, const expr
  * @return A newly allocated Lerch-transcendent expression, or NULL on error.
  */
 expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a);
+
 /**
  * @brief Construct the Legendre chi function of a fixed non-negative integer order.
  * @param order Fixed non-negative integer order.
@@ -1374,6 +1472,7 @@ expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
+
 /**
  * @brief Construct the Bessel function of the first kind J_order(argument).
  * @param order Borrowed order expression; retained, not consumed.
@@ -1381,6 +1480,7 @@ expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the principal modified Bessel function I_order(argument).
  *
@@ -1393,6 +1493,7 @@ expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
  * @return A newly allocated expression, or NULL for a missing operand.
  */
 expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the principal modified Bessel function K_order(argument).
  *
@@ -1401,6 +1502,7 @@ expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the principal modified Struve function L_order(argument).
  *
@@ -1415,6 +1517,7 @@ expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
  * @return A newly allocated expression, or NULL for a missing operand or allocation failure.
  */
 expr_t *expr_struve_l(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the principal ordinary Struve function H_order(argument).
  *
@@ -1429,6 +1532,7 @@ expr_t *expr_struve_l(const expr_t *order, const expr_t *argument);
  * @return A newly allocated expression, or NULL for a missing operand.
  */
 expr_t *expr_struve_h(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the principal Bessel function of the second kind Y_order(argument).
  *
@@ -1442,6 +1546,7 @@ expr_t *expr_struve_h(const expr_t *order, const expr_t *argument);
  * @return A newly allocated expression, or NULL for a missing operand.
  */
 expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
+
 /**
  * @brief Construct the Lommel function s_(mu,nu)(argument).
  * @param mu Borrowed first Lommel order expression; retained, not consumed.
@@ -1450,6 +1555,7 @@ expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument);
+
 /**
  * @brief Construct the Appell hypergeometric function F1(a; b1, b2; c; x, y).
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1462,6 +1568,7 @@ expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument
  */
 expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
                        const expr_t *y);
+
 /**
  * @brief Construct the Lauricella multivariate hypergeometric function with paired b and x arrays.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1473,6 +1580,7 @@ expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, cons
  */
 expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
                           const expr_t *const *x);
+
 /**
  * @brief Construct the generalised hypergeometric function with upper and lower parameter arrays.
  * @param upper_count Number of upper parameter expressions in upper.
@@ -1484,12 +1592,14 @@ expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *
  */
 expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count,
                                 const expr_t *const *lower, const expr_t *argument);
+
 /**
  * @brief Construct an inverse gamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gammainv(const expr_t *expr);
+
 /**
  * @brief Construct the lower incomplete gamma function gamma(s, x).
  * @param s Borrowed shape or exponent expression; retained, not consumed.
@@ -1497,6 +1607,7 @@ expr_t *expr_gammainv(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x);
+
 /**
  * @brief Construct the upper incomplete gamma function Gamma(s, x).
  * @param s Borrowed shape or exponent expression; retained, not consumed.
@@ -1504,6 +1615,7 @@ expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
+
 /**
  * @brief Construct the regularised lower incomplete gamma function P(s, x).
  * @param s Borrowed shape or exponent expression; retained, not consumed.
@@ -1511,6 +1623,7 @@ expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gammainc_P(const expr_t *s, const expr_t *x);
+
 /**
  * @brief Construct the regularised upper incomplete gamma function Q(s, x).
  * @param s Borrowed shape or exponent expression; retained, not consumed.
@@ -1518,12 +1631,14 @@ expr_t *expr_gammainc_P(const expr_t *s, const expr_t *x);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gammainc_Q(const expr_t *s, const expr_t *x);
+
 /**
  * @brief Construct a Lambert W function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lambert_w(const expr_t *expr);
+
 /**
  * @brief Construct the integer-indexed Lambert W branch.
  * @param branch Borrowed branch-index expression; must evaluate to an integer for branch evaluation.
@@ -1531,18 +1646,21 @@ expr_t *expr_lambert_w(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *expr);
+
 /**
  * @brief Construct a principal Lambert W branch expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lambert_w0(const expr_t *expr);
+
 /**
  * @brief Construct a Lambert W branch -1 expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lambert_wm1(const expr_t *expr);
+
 /**
  * @brief Construct the beta function B(expr1, expr2).
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -1550,6 +1668,7 @@ expr_t *expr_lambert_wm1(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_beta(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct the logarithm of the beta function B(expr1, expr2).
  * @param expr1 Borrowed first operand; retained by graph-building operations, not consumed.
@@ -1557,6 +1676,7 @@ expr_t *expr_beta(const expr_t *expr1, const expr_t *expr2);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_logbeta(const expr_t *expr1, const expr_t *expr2);
+
 /**
  * @brief Construct the beta-distribution probability density at x with shapes a and b.
  * @param x Borrowed argument expression; retained, not consumed.
@@ -1565,6 +1685,7 @@ expr_t *expr_logbeta(const expr_t *expr1, const expr_t *expr2);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the beta-distribution log-density at x with shapes a and b.
  * @param x Borrowed argument expression; retained, not consumed.
@@ -1573,6 +1694,7 @@ expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_logbeta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the binomial coefficient with upper argument n and lower argument k.
  * @param n Borrowed integer argument expression; retained, not consumed.
@@ -1580,30 +1702,35 @@ expr_t *expr_logbeta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_binomial(const expr_t *n, const expr_t *k);
+
 /**
  * @brief Construct the factorial value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_factorial(const expr_t *n);
+
 /**
  * @brief Construct the Fibonacci value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_fibonacci(const expr_t *n);
+
 /**
  * @brief Construct the integer partition-count value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_partition(const expr_t *n);
+
 /**
  * @brief Construct the integer square-root value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_isqrt(const expr_t *n);
+
 /**
  * @brief Construct the greatest common divisor of two integer expressions.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1611,6 +1738,7 @@ expr_t *expr_isqrt(const expr_t *n);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_gcd(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the least common multiple of two integer expressions.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1618,6 +1746,7 @@ expr_t *expr_gcd(const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_lcm(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the remainder of a modulo b.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1625,6 +1754,7 @@ expr_t *expr_lcm(const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_mod(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the modular inverse of a modulo b.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1632,24 +1762,28 @@ expr_t *expr_mod(const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_modinv(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct an integer primality-test value expression.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_is_prime(const expr_t *n);
+
 /**
  * @brief Construct the next-prime value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_next_prime(const expr_t *n);
+
 /**
  * @brief Construct the previous-prime value function.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_prev_prime(const expr_t *n);
+
 /**
  * @brief Construct the integer bitwise AND of a and b.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1657,6 +1791,7 @@ expr_t *expr_prev_prime(const expr_t *n);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bit_and(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the integer bitwise OR of a and b.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1664,6 +1799,7 @@ expr_t *expr_bit_and(const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bit_or(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the integer bitwise XOR of a and b.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1671,12 +1807,14 @@ expr_t *expr_bit_or(const expr_t *a, const expr_t *b);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bit_xor(const expr_t *a, const expr_t *b);
+
 /**
  * @brief Construct the integer bitwise complement of a.
  * @param a Borrowed first parameter expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_bit_not(const expr_t *a);
+
 /**
  * @brief Construct an integer left shift.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1684,6 +1822,7 @@ expr_t *expr_bit_not(const expr_t *a);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_shl(const expr_t *a, const expr_t *bits);
+
 /**
  * @brief Construct an integer right shift.
  * @param a Borrowed first parameter expression; retained, not consumed.
@@ -1691,54 +1830,63 @@ expr_t *expr_shl(const expr_t *a, const expr_t *bits);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_shr(const expr_t *a, const expr_t *bits);
+
 /**
  * @brief Construct a prime-factor product, evaluating a known argument when possible.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_factors(const expr_t *n);
+
 /**
  * @brief Construct a standard normal probability density expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_normal_pdf(const expr_t *expr);
+
 /**
  * @brief Construct a standard normal cumulative distribution expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_normal_cdf(const expr_t *expr);
+
 /**
  * @brief Construct a standard normal log-density expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_normal_logpdf(const expr_t *expr);
+
 /**
  * @brief Construct a standard normal probability density (alias of expr_normal_pdf) expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_pdf(const expr_t *expr);
+
 /**
  * @brief Construct a standard normal cumulative distribution (alias of expr_normal_cdf) expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_cdf(const expr_t *expr);
+
 /**
  * @brief Construct a standard normal log-density (alias of expr_normal_logpdf) expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_logpdf(const expr_t *expr);
+
 /**
  * @brief Construct an exponential integral Ei expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_Ei(const expr_t *expr);
+
 /**
  * @brief Construct the logarithmic integral Li(expr).
  *
@@ -1746,6 +1894,7 @@ expr_t *expr_Ei(const expr_t *expr);
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_Li(const expr_t *expr);
+
 /**
  * @brief Construct an exponential integral E1 expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
@@ -2254,6 +2403,7 @@ size_t expr_bindings_count(const expr_bindings_t *bnd);
  * @return Borrowed name, or NULL for a NULL table or out-of-range index; valid while the table owns it.
  */
 const char *expr_bindings_name_at(const expr_bindings_t *bnd, size_t index);
+
 /**
  * @brief Borrow the normalised binding name at a zero-based index.
  * @param bnd Borrowed binding table to inspect; not consumed.
@@ -2261,6 +2411,7 @@ const char *expr_bindings_name_at(const expr_bindings_t *bnd, size_t index);
  * @return Borrowed name string, or NULL for a NULL table or out-of-range index; do not free it.
  */
 const string_t *expr_bindings_name_text_at(const expr_bindings_t *bnd, size_t index);
+
 /**
  * @brief Borrow the expression node stored at a zero-based binding index.
  * @param bnd Borrowed binding table to inspect; not consumed.
@@ -2268,6 +2419,7 @@ const string_t *expr_bindings_name_text_at(const expr_bindings_t *bnd, size_t in
  * @return Borrowed binding node, or NULL for a NULL table or out-of-range index; do not free it.
  */
 expr_t *expr_bindings_expr_at(expr_bindings_t *bnd, size_t index);
+
 /**
  * @brief Report whether a binding at a zero-based index is a named constant.
  * @param bnd Borrowed binding table to inspect; not consumed.

@@ -18,6 +18,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
  * @brief the datetime type
@@ -83,18 +84,15 @@ typedef struct _datetime_span_t {
     double seconds;
 } datetime_span_t;
 
+/**
+ * @brief Allocate a datetime object marked as uninitialised.
+ * @return Caller-owned object, or NULL if allocation fails. Initialise before use and release with datetime_dealloc().
+ */
 datetime_t *datetime_alloc();
 
 /**
- * @brief deallocate a datetime structure. This function should be called to free the memory allocated for a datetime
- * structure when it is no longer needed. It takes a pointer to the datetime structure to be deallocated and frees the
- * memory associated with it. After calling this function, the pointer to the datetime structure should not be used, as
- * it will point to deallocated memory.
- * @param dttm the datetime structure to be deallocated.
- */
-/**
- * @brief deallocate a datetime object.
- * @param dttm the datetime to free. Passing NULL is safe and has no effect.
+ * @brief Deallocate a datetime object, invalidating all pointers to it.
+ * @param[in] dttm Owned datetime object to release. Passing NULL is safe and has no effect.
  */
 void datetime_dealloc(datetime_t *dttm);
 

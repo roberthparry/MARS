@@ -110,6 +110,12 @@ CFLAGS += $(ZSTD_CFLAGS) $(SODIUM_CFLAGS)
 LDLIBS += $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)
 LDLIBS += $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)
 
+# Verified HTTP/HTTPS transport (libcurl 7.85.0 or newer).
+CURL_CFLAGS := $(shell pkg-config --cflags libcurl 2>/dev/null)
+CURL_LIBS := $(shell pkg-config --libs libcurl 2>/dev/null)
+CFLAGS += $(CURL_CFLAGS)
+LDLIBS += $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)
+
 # ------------------------------------------------------------
 # Source discovery
 # ------------------------------------------------------------
@@ -202,6 +208,7 @@ check-deps:
 	    rm -f /tmp/mars-check-dep; \
 	}; \
 	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
+	check_dep "libcurl >= 7.85.0" "curl/curl.h" "$(CURL_CFLAGS) $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)" "libcurl4-openssl-dev" "_Static_assert(LIBCURL_VERSION_NUM >= 0x075500, \"libcurl too old\"); CURL *c = curl_easy_init(); curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, \"https\"); curl_easy_cleanup(c)"; \
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
 	check_dep "SQLCipher" "sqlcipher/sqlite3.h" "-lsqlcipher" "libsqlcipher-dev" "sqlite3 *db = 0; sqlite3_open(\":memory:\", &db); sqlite3_close(db)"; \
@@ -414,6 +421,12 @@ VALGRIND := valgrind \
     --error-exitcode=99 \
     --track-origins=$(VALGRIND_TRACK_ORIGINS)
 
+README_EXAMPLE_CHECK = python3 tools/check_readme_examples.py --cc="$(CC)" --cflags="$(CFLAGS)" --libs="$(LDLIBS)" --archive="$(STATIC_LIB)"
+
+.PHONY: test-readme-examples
+test-readme-examples: $(STATIC_LIB)
+	@$(README_EXAMPLE_CHECK)
+
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
 	    printf "  %-40s" "$$t ..."; \
@@ -422,7 +435,7 @@ test: check-public-distribution $(TEST_BINS)
 	    else \
 	        echo "FAIL"; rc=1; \
 	    fi; \
-	done; exit $$rc
+	done; $(README_EXAMPLE_CHECK) || rc=1; exit $$rc
 
 memtest: $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
@@ -440,6 +453,10 @@ mem$(1): $(2)
 endef
 
 TEST_ALIAS_EXCLUDES := test_almanac memtest_almanac
+.PHONY: test-http-live
+test-http-live: $(TEST_BUILD_DIR)/http_live/test_http_live
+	@$<
+
 $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS_EXCLUDES)),$(TEST_BINS)),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 .PHONY: test_almanac memtest_almanac
@@ -682,6 +699,9 @@ help:
 	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
 	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo "  make check-deps             Check required external development libraries"
+	@echo "  make test-http-live         Test the HTTP client against the native loopback web server"
+	@echo "  make test_webserver        Run offline Linux web server tests and its README example"
+	@echo "  make test-readme-examples   Compile/run complete Markdown C examples"
 	@echo "  make check-compliance       Verify public-path, notice, SPDX and provenance safeguards"
 	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"

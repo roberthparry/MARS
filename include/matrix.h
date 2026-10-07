@@ -39,10 +39,13 @@ typedef enum {
     MAT_STRING_LAYOUT_SCIENTIFIC,
     MAT_STRING_LAYOUT_PRETTY,
     MAT_STRING_LATEX,
+
     /** Native matrix expression with variable and constant bindings. */
     MAT_STRING_EXPRESSION,
+
     /** Native matrix expression with compact rows, or individually stacked entries when a row is long. */
     MAT_STRING_EXPRESSION_LAYOUT,
+
     /** Native MARS matrix-function representation with binding declarations. */
     MAT_STRING_FUNCTION
 } mat_string_style_t;
@@ -61,10 +64,13 @@ typedef enum { MAT_TYPE_NUMBER, MAT_TYPE_EXPR } mat_type_t;
 typedef enum {
     /** Maximum absolute column sum. */
     MAT_NORM_1,
+
     /** Maximum absolute row sum. */
     MAT_NORM_INF,
+
     /** Frobenius norm. */
     MAT_NORM_FRO,
+
     /** Spectral norm (largest singular value). */
     MAT_NORM_2
 } mat_norm_type_t;
@@ -77,8 +83,10 @@ typedef enum {
 typedef struct {
     /** Permutation matrix. */
     matrix_t *P;
+
     /** Unit lower-triangular factor. */
     matrix_t *L;
+
     /** Upper-triangular factor. */
     matrix_t *U;
 } mat_lu_factor_t;
@@ -91,6 +99,7 @@ typedef struct {
 typedef struct {
     /** Orthogonal or unitary factor. */
     matrix_t *Q;
+
     /** Upper-triangular factor. */
     matrix_t *R;
 } mat_qr_factor_t;
@@ -113,8 +122,10 @@ typedef struct {
 typedef struct {
     /** Left singular vectors. */
     matrix_t *U;
+
     /** Diagonal matrix of singular values. */
     matrix_t *S;
+
     /** Right singular vectors. */
     matrix_t *V;
 } mat_svd_factor_t;
@@ -128,6 +139,7 @@ typedef struct {
 typedef struct {
     /** Unitary Schur vectors. */
     matrix_t *Q;
+
     /** Upper-triangular Schur form. */
     matrix_t *T;
 } mat_schur_factor_t;
@@ -1346,6 +1358,7 @@ matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 
 matrix_t *mat_exp(const matrix_t *A);
 matrix_t *mat_sin(const matrix_t *A);
+
 /**
  * @brief Apply real signum through spectral functional calculus on real spectra.
  * @param A Square matrix belonging to a class supported by the spectral engine, as for mat_step().
@@ -1353,55 +1366,76 @@ matrix_t *mat_sin(const matrix_t *A);
  * Non-real scalar spectral values give NaN. Signum is discontinuous at zero and is not applied entry by entry.
  */
 matrix_t *mat_sgn(const matrix_t *A);
+
 /** @brief Apply the symmetric-endpoint unit step through spectral functional calculus on real spectra. */
 matrix_t *mat_step(const matrix_t *A);
+
 /** @brief Apply the unit-width rectangular pulse through spectral functional calculus on real spectra. */
 matrix_t *mat_rect(const matrix_t *A);
+
 /** @brief Apply the triangular pulse through spectral functional calculus on real spectra. */
 matrix_t *mat_tri(const matrix_t *A);
+
 /** @brief Apply the even unit-radius aperture profile through spectral functional calculus on real spectra. */
 matrix_t *mat_circ(const matrix_t *A);
+
 /** @brief Apply the entire normalised sinc function through spectral functional calculus. */
 matrix_t *mat_sinc(const matrix_t *A);
 matrix_t *mat_cos(const matrix_t *A);
 matrix_t *mat_tan(const matrix_t *A);
+
 /** @brief Return the matrix secant, the inverse of `cos(A)`. */
 matrix_t *mat_sec(const matrix_t *A);
+
 /** @brief Return the matrix cosecant, the inverse of `sin(A)`. */
 matrix_t *mat_cosec(const matrix_t *A);
+
 /** @brief Return the matrix cotangent. */
 matrix_t *mat_cot(const matrix_t *A);
+
 /** @brief Return the matrix versed sine. */
 matrix_t *mat_versin(const matrix_t *A);
+
 /** @brief Return the matrix versed cosine. */
 matrix_t *mat_vercos(const matrix_t *A);
+
 /** @brief Return the matrix coversed sine. */
 matrix_t *mat_coversin(const matrix_t *A);
+
 /** @brief Return the matrix coversed cosine. */
 matrix_t *mat_covercos(const matrix_t *A);
+
 /** @brief Return the matrix haversine. */
 matrix_t *mat_haversin(const matrix_t *A);
+
 /** @brief Return the matrix havercosine. */
 matrix_t *mat_havercos(const matrix_t *A);
+
 /** @brief Return the matrix hacoversine. */
 matrix_t *mat_hacoversin(const matrix_t *A);
+
 /** @brief Return the matrix hacovercosine. */
 matrix_t *mat_hacovercos(const matrix_t *A);
 
 matrix_t *mat_sinh(const matrix_t *A);
 matrix_t *mat_cosh(const matrix_t *A);
 matrix_t *mat_tanh(const matrix_t *A);
+
 /** @brief Return the matrix hyperbolic secant. */
 matrix_t *mat_sech(const matrix_t *A);
+
 /** @brief Return the matrix hyperbolic cosecant. */
 matrix_t *mat_cosech(const matrix_t *A);
+
 /** @brief Return the matrix hyperbolic cotangent. */
 matrix_t *mat_coth(const matrix_t *A);
 
 matrix_t *mat_sqrt(const matrix_t *A);
+
 /** @brief Return the principal matrix cube root. */
 matrix_t *mat_cubrt(const matrix_t *A);
 matrix_t *mat_log(const matrix_t *A);
+
 /**
  * @brief Return the principal matrix natural logarithm of @p A.
  *
@@ -1412,6 +1446,7 @@ matrix_t *mat_log(const matrix_t *A);
  */
 matrix_t *mat_ln(const matrix_t *A);
 matrix_t *mat_log10(const matrix_t *A);
+
 /**
  * @brief Return the principal matrix common logarithm of @p A.
  *
@@ -1425,36 +1460,50 @@ matrix_t *mat_lg(const matrix_t *A);
 matrix_t *mat_asin(const matrix_t *A);
 matrix_t *mat_acos(const matrix_t *A);
 matrix_t *mat_atan(const matrix_t *A);
+
 /** @brief Return the principal matrix arcsecant. */
 matrix_t *mat_asec(const matrix_t *A);
+
 /** @brief Return the principal matrix arccosecant. */
 matrix_t *mat_acosec(const matrix_t *A);
+
 /** @brief Return the principal matrix arccotangent. */
 matrix_t *mat_acot(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix versed sine. */
 matrix_t *mat_arcversin(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix versed cosine. */
 matrix_t *mat_arcvercos(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix coversed sine. */
 matrix_t *mat_arccoversin(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix coversed cosine. */
 matrix_t *mat_arccovercos(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix haversine. */
 matrix_t *mat_archaversin(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix havercosine. */
 matrix_t *mat_archavercos(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix hacoversine. */
 matrix_t *mat_archacoversin(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix hacovercosine. */
 matrix_t *mat_archacovercos(const matrix_t *A);
 
 matrix_t *mat_asinh(const matrix_t *A);
 matrix_t *mat_acosh(const matrix_t *A);
 matrix_t *mat_atanh(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix hyperbolic secant. */
 matrix_t *mat_asech(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix hyperbolic cosecant. */
 matrix_t *mat_acosech(const matrix_t *A);
+
 /** @brief Return the principal inverse matrix hyperbolic cotangent. */
 matrix_t *mat_acoth(const matrix_t *A);
 
@@ -1463,8 +1512,10 @@ matrix_t *mat_erfc(const matrix_t *A);
 matrix_t *mat_erfinv(const matrix_t *A);
 matrix_t *mat_erfcinv(const matrix_t *A);
 matrix_t *mat_gamma(const matrix_t *A);
+
 /** @brief Apply K_order to a diagonalisable numeric square matrix through spectral functional calculus. */
 matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
+
 /**
  * @brief Evaluate the principal modified Bessel matrix function I_order(A), including I_0(A).
  *
@@ -1477,6 +1528,7 @@ matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
  * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
  */
 matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order);
+
 /**
  * @brief Evaluate the principal Bessel matrix function Y_order(A), including Y_0(A).
  *
@@ -1489,6 +1541,7 @@ matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order);
  * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
  */
 matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order);
+
 /**
  * @brief Evaluate the principal ordinary Struve matrix function H_order(A).
  *
@@ -1501,6 +1554,7 @@ matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order);
  * @return A newly allocated matrix, or NULL for invalid inputs, unavailable powers or failed convergence.
  */
 matrix_t *mat_struve_h(const matrix_t *A, const number_t *order);
+
 /**
  * @brief Evaluate the principal modified Struve matrix function L_order(A).
  *
@@ -1515,6 +1569,7 @@ matrix_t *mat_struve_h(const matrix_t *A, const number_t *order);
 matrix_t *mat_struve_l(const matrix_t *A, const number_t *order);
 matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
+
 /**
  * @brief Evaluate the q-digamma matrix function @f$\psi_q(Z)@f$.
  *
@@ -1530,12 +1585,16 @@ matrix_t *mat_digamma(const matrix_t *A);
 matrix_t *mat_qdigamma(const matrix_t *Z, const number_t *q);
 matrix_t *mat_trigamma(const matrix_t *A);
 matrix_t *mat_tetragamma(const matrix_t *A);
+
 /** @brief Return the analytically continued Riemann zeta matrix function. */
 matrix_t *mat_zeta(const matrix_t *A);
+
 /** @brief Return the derivative of the Riemann zeta matrix function. */
 matrix_t *mat_zetap(const matrix_t *A);
+
 /** @brief Return the principal matrix dilogarithm. */
 matrix_t *mat_dilog(const matrix_t *A);
+
 /**
  * @brief Evaluate the order-two Clausen matrix function by functional calculus.
  *
@@ -1543,6 +1602,7 @@ matrix_t *mat_dilog(const matrix_t *A);
  * @return A newly allocated result matrix, or NULL on error.
  */
 matrix_t *mat_clausen2(const matrix_t *A);
+
 /**
  * @brief Evaluate the generalised integer-order Clausen matrix function.
  *
@@ -1555,8 +1615,10 @@ matrix_t *mat_clausen2(const matrix_t *A);
  * @return A newly allocated result matrix, or NULL for order zero or on error.
  */
 matrix_t *mat_clausen(unsigned long order, const matrix_t *A);
+
 /** @brief Return the principal order-one polylogarithm matrix function. */
 matrix_t *mat_polylog1(const matrix_t *A);
+
 /**
  * @brief Evaluate the harmonic matrix polynomial @f$H_n(A)=\sum_{k=1}^{n}A^k/k@f$.
  *
@@ -1574,6 +1636,7 @@ matrix_t *mat_chebyshev_u(const matrix_t *A, unsigned int degree);
 
 /** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
 matrix_t *mat_hermite_h(const matrix_t *A, unsigned int degree);
+
 /**
  * @brief Evaluate the Lerch matrix function Phi(Z,s,a) by its convergent power series.
  *
@@ -1591,6 +1654,7 @@ matrix_t *mat_lambert_w0(const matrix_t *A);
 matrix_t *mat_lambert_wm1(const matrix_t *A);
 matrix_t *mat_productlog(const matrix_t *A);
 matrix_t *mat_Ei(const matrix_t *A);
+
 /** @brief Evaluate the principal logarithmic integral of a square matrix. */
 matrix_t *mat_Li(const matrix_t *A);
 matrix_t *mat_E1(const matrix_t *A);
