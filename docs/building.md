@@ -41,8 +41,10 @@ sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev li
 make ENABLE_UNISTRING=0
 ```
 
-Before building or installing, you can ask MARS to check for the required
-development headers and link libraries:
+Builds automatically check the required development headers and link libraries
+before compiling or linking. This covers default, debug, release and test builds,
+including direct object and executable targets and parallel builds. The check
+does not force otherwise current artefacts to rebuild. You can also run it alone:
 
 ```sh
 make check-deps
