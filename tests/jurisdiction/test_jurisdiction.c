@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "file.h"
+#include "sqlite.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -735,8 +737,73 @@ static void holiday_suite_cleanup(void)
 {
 }
 
+/* Exercise configuration loading through public engine APIs, restoring the process environment before assertions. */
+static void test_jurisdiction_configuration_file_io(void)
+{
+    const char *root = test_case_temp_dir();
+    string_t *directory_path = string_sprintf("%s/config", root);
+    string_t *config_path = string_sprintf("%s/config/jurisdiction-db.env", root);
+    string_t *source_path = string_sprintf("%s/settings.env", root);
+    string_t *database_path = string_sprintf("%s/δοκιμή.db", root);
+    string_t *key = string_new_with("π=secret-");
+    TEST_ASSERT_NOT_NULL(key);
+    for (size_t i = 0; i < 5000; ++i)
+        TEST_ASSERT_INT_EQ(string_append_char(key, 'k'), 0);
+    file_t *directory = file_new(directory_path);
+    file_t *config = file_new(config_path);
+    file_t *source = file_new(source_path);
+    TEST_ASSERT_NOT_NULL(directory);
+    TEST_ASSERT_NOT_NULL(config);
+    TEST_ASSERT_NOT_NULL(source);
+    TEST_ASSERT_TRUE(file_create_directory(directory, 0700, false), "create isolated config directory");
+    string_t *contents = string_sprintf("\xef\xbb\xbf# settings\r\n"
+        "MARS_JURISDICTION_DB_PATH_EXTRA=ignored\r"
+        " export MARS_JURISDICTION_DB_PATH='%S'\r\n"
+        "export MARS_JURISDICTION_DB_KEY=  \"%S\"  ", database_path, key);
+    TEST_ASSERT_NOT_NULL(contents);
+    TEST_ASSERT_TRUE(file_write_all_text(source, contents), "write long Unicode configuration");
+    TEST_ASSERT_TRUE(file_create_symlink(source, config), "read configuration through symbolic link");
+    sqlite_t *database = sqlite_open_encrypted(database_path, key);
+    TEST_ASSERT_NOT_NULL(database);
+    TEST_ASSERT_TRUE(sqlite_init_object_store(database), "initialise encrypted fixture");
+    sqlite_close(database);
+    static const char *const names[] = {
+        "MARS_HOME", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY", "MARS_HOLIDAY_DB_PATH", "MARS_HOLIDAY_DB_KEY"
+    };
+    char *saved[sizeof(names) / sizeof(names[0])] = {0};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        const char *value = getenv(names[i]);
+        saved[i] = value ? strdup(value) : NULL;
+        TEST_ASSERT_TRUE(!value || saved[i], "save environment");
+    }
+    bool environment_ok = setenv(names[0], root, 1) == 0;
+    for (size_t i = 1; i < sizeof(names) / sizeof(names[0]); ++i)
+        environment_ok = unsetenv(names[i]) == 0 && environment_ok;
+    jurisdiction_t *engine = environment_ok ? jurisdict_open("GB-ENG") : NULL;
+    bool opened = engine != NULL;
+    jurisdict_close(engine);
+    bool restored = true;
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        int rc = saved[i] ? setenv(names[i], saved[i], 1) : unsetenv(names[i]);
+        restored = rc == 0 && restored;
+        free(saved[i]);
+    }
+    string_free(contents);
+    string_free(key);
+    string_free(database_path);
+    string_free(source_path);
+    string_free(config_path);
+    string_free(directory_path);
+    file_free(source);
+    file_free(config);
+    file_free(directory);
+    TEST_ASSERT_TRUE(environment_ok && restored, "restore environment after isolated configuration test");
+    TEST_ASSERT_TRUE(opened, "configuration preserves full quoted Unicode key beyond 4 KiB");
+}
+
 int tests_main(void)
 {
+    TEST_RUN_IN_GROUP(test_jurisdiction_configuration_file_io, tests, NULL);
     TEST_SECTION("Jurisdiction Rules");
     TEST_RUN_IN_GROUP(test_jurisdiction_database_builds_and_opens, tests, NULL);
     TEST_RUN_IN_GROUP(test_england_christmas_pair_substitutions_in_2021, tests, NULL);

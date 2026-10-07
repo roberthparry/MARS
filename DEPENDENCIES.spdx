@@ -98,7 +98,17 @@ FilesAnalyzed: false
 PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: BSD-3-Clause OR GPL-2.0-only
 PackageCopyrightText: NOASSERTION
-PackageComment: Transitive system dependency of the OpenSSL build verified for MARS.
+PackageComment: Direct system build dependency for streaming file compression; also a transitive dependency of the OpenSSL build verified for MARS.
+
+PackageName: libsodium
+SPDXID: SPDXRef-Package-libsodium
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/jedisct1/libsodium
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: ISC
+PackageCopyrightText: NOASSERTION
+PackageComment: Direct system build dependency for authenticated streaming file encryption. Preserve the selected distribution's component notices when redistributing.
 
 PackageName: GNU-C-Library
 SPDXID: SPDXRef-Package-glibc
@@ -297,6 +307,8 @@ Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-GMP
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPFR
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPC
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-SQLCipher
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-zstd
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-libsodium
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-glibc
 Relationship: SPDXRef-Package-libunistring OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
 Relationship: SPDXRef-Package-SQLCipher DEPENDS_ON SPDXRef-Package-SQLite

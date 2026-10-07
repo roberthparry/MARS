@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include "file.h"
 
 #define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
@@ -481,46 +482,40 @@ json_t *json_from_text(const string_t *text)
     return json;
 }
 
+/* Load through the file API, assembling complete bytes before Unicode conversion. */
 json_t *json_from_file(const string_t *path)
 {
-    FILE *file;
-    string_t *text;
+    file_t *file = file_new(path);
+    array_t *bytes = NULL;
+    string_t *text = NULL;
     char buffer[4096];
-    json_t *json;
-
-    if (!path)
-        return NULL;
-
-    file = fopen(string_c_str(path), "rb");
-    if (!file)
-        return NULL;
-
-    text = string_new();
-    if (!text) {
-        fclose(file);
-        return NULL;
-    }
+    json_t *json = NULL;
+    if (!file || !file_open_follow(file, FILE_MODE_OPEN, FILE_ACCESS_READ))
+        goto done;
+    bytes = array_create(1, NULL, NULL);
+    if (!bytes)
+        goto done;
 
     while (true) {
-        size_t got = fread(buffer, 1u, sizeof(buffer), file);
-
-        if (got > 0u && string_append_chars(text, buffer, got) != 0) {
-            string_free(text);
-            fclose(file);
-            return NULL;
-        }
-        if (got < sizeof(buffer)) {
-            if (ferror(file)) {
-                string_free(text);
-                fclose(file);
-                return NULL;
-            }
+        size_t got = 0;
+        if (!file_read(file, buffer, sizeof(buffer), &got))
+            goto done;
+        if (!got)
             break;
-        }
+        if (!array_append_carray(bytes, buffer, got))
+            goto done;
     }
-
-    fclose(file);
+    if (!file_close(file))
+        goto done;
+    text = string_new();
+    if (!text || (array_size(bytes) &&
+                  string_append_chars(text, array_get(bytes, 0), array_size(bytes)) != 0))
+        goto done;
     json = json_from_text(text);
+
+done:
     string_free(text);
+    array_destroy(bytes);
+    file_free(file);
     return json;
 }

@@ -8,6 +8,7 @@
       "enabled": true,
       "test_almanac_2027_totality_seed_uses_the_towns_local_maximum": true,
       "test_almanac_body_geographical_position_resolves_gp": true,
+      "test_almanac_configuration_file_io": true,
       "test_almanac_find_lunar_eclipses_matches_july_2028_partial_event": true,
       "test_almanac_find_lunar_eclipses_returns_events_in_2025": true,
       "test_almanac_find_solar_eclipses_returns_august_2026_event": true,
@@ -157,6 +158,8 @@
     "tests": {
       "enabled": true,
       "test_deep_deep": true,
+      "test_dictionary_size_overflow": true,
+      "test_dictionary_slot_alignment": true,
       "test_entries": true,
       "test_foreach": true,
       "test_fuzz": true,
@@ -165,9 +168,7 @@
       "test_sort_by_value": true,
       "test_sorted": true,
       "test_sorted_fuzz": true,
-      "test_str_int": true,
-      "test_dictionary_slot_alignment": true,
-      "test_dictionary_size_overflow": true
+      "test_str_int": true
     }
   },
   "tests/diffequation/test_diffequ_wave_ivp.c": {
@@ -187,53 +188,65 @@
       "enabled": true,
       "example_diffequation_abs_pde": true,
       "example_diffequation_acos_pde": true,
+      "example_diffequation_affine_transport": true,
       "example_diffequation_atanh_pde": true,
+      "example_diffequation_autonomous_transport": true,
+      "example_diffequation_caret_pde": true,
       "example_diffequation_clausen_pde": true,
       "example_diffequation_compact_parameter_derivatives": true,
+      "example_diffequation_coupled_flow": true,
       "example_diffequation_deriving_a_lie_algebra": true,
       "example_diffequation_forced_second_order_pde": true,
+      "example_diffequation_fourier_evolution": true,
+      "example_diffequation_gkdv": true,
+      "example_diffequation_gradient_envelope": true,
+      "example_diffequation_half_line_heat": true,
+      "example_diffequation_kdv": true,
       "example_diffequation_linearising_a_lie_symmetric_ode": true,
       "example_diffequation_parameter_forced_pde": true,
+      "example_diffequation_prime_time_ivp": true,
       "example_diffequation_quartic_lie_analysis": true,
       "example_diffequation_second_order_pde": true,
       "example_diffequation_single_phase_integral_pde": true,
       "example_diffequation_solving_an_ode": true,
+      "example_diffequation_symbolic_affine_transport": true,
       "example_diffequation_symbolic_wave_ivp": true,
+      "example_diffequation_time_affine_transport": true,
+      "example_diffequation_triangular_transport": true,
+      "example_diffequation_unicode_powers": true,
       "example_diffequation_wave_ivp": true,
       "example_diffequation_wave_kirchhoff": true,
+      "example_diffequation_wave_zero_data": true,
       "example_diffequation_weighted_cyclic_pde": true,
       "test_diffequ_linear_solution_retains_formal_integral": true,
       "test_diffequ_series_general_data": true,
-      "test_diffequ_series_quartic_coefficients": true,
-      "example_diffequation_unicode_powers": true,
-      "example_diffequation_autonomous_transport": true,
-      "example_diffequation_affine_transport": true,
-      "example_diffequation_triangular_transport": true,
-      "example_diffequation_gradient_envelope": true,
-      "example_diffequation_time_affine_transport": true,
-      "example_diffequation_coupled_flow": true,
-      "example_diffequation_symbolic_affine_transport": true,
-      "example_diffequation_fourier_evolution": true,
-      "example_diffequation_wave_zero_data": true,
-      "example_diffequation_kdv": true,
-      "example_diffequation_caret_pde": true,
-      "example_diffequation_gkdv": true,
-      "example_diffequation_half_line_heat": true,
-      "example_diffequation_prime_time_ivp": true
+      "test_diffequ_series_quartic_coefficients": true
     },
     "test_diffequ_abs_pde_real_residual": true,
+    "test_diffequ_affine_transport": true,
+    "test_diffequ_affine_transport_scope": true,
     "test_diffequ_applies_affine_factorized_initial_conditions": true,
     "test_diffequ_applies_dependent_square_boundary": true,
     "test_diffequ_applies_initial_condition_to_exact_differential_form": true,
     "test_diffequ_applies_quadratic_characteristic_boundary": true,
     "test_diffequ_applies_signed_dependent_square_boundary": true,
+    "test_diffequ_autonomous_transport": true,
+    "test_diffequ_autonomous_transport_scope": true,
+    "test_diffequ_calculus_coefficients_TeX": true,
+    "test_diffequ_caret_derivative_orders": true,
     "test_diffequ_compact_parameter_derivatives": true,
     "test_diffequ_constructs_from_equation": true,
+    "test_diffequ_coupled_flow": true,
+    "test_diffequ_coupled_flow_scope": true,
     "test_diffequ_defaults_bare_differential_operator": true,
     "test_diffequ_derivations_are_opt_in": true,
     "test_diffequ_derivative_quotient_TeX": true,
     "test_diffequ_does_not_invent_cubic_potential_functions": true,
+    "test_diffequ_expression_integer_powers": true,
     "test_diffequ_expression_text_round_trips": true,
+    "test_diffequ_fourier_evolution": true,
+    "test_diffequ_fourier_kernel": true,
+    "test_diffequ_fourier_scope": true,
     "test_diffequ_general_nonhomogeneous_solution": true,
     "test_diffequ_general_sixth_order_solution": true,
     "test_diffequ_general_solution_with_distinct_real_roots": true,
@@ -242,9 +255,23 @@
     "test_diffequ_general_solution_with_repeated_real_root": true,
     "test_diffequ_general_third_order_forced_solution": true,
     "test_diffequ_general_trigonometric_forcing_solution": true,
+    "test_diffequ_gkdv_family": true,
+    "test_diffequ_gkdv_residual": true,
+    "test_diffequ_gkdv_scope": true,
+    "test_diffequ_gradient_envelope": true,
+    "test_diffequ_gradient_non_affine": true,
+    "test_diffequ_gradient_scope": true,
+    "test_diffequ_half_line_heat": true,
+    "test_diffequ_half_line_heat_kernel": true,
+    "test_diffequ_half_line_heat_scope": true,
     "test_diffequ_homogeneous_solution_retains_constant": true,
+    "test_diffequ_infers_prime_coordinate": true,
     "test_diffequ_integrates_rational_homogeneous_problem": true,
+    "test_diffequ_invalid_derivative_orders": true,
     "test_diffequ_inverse_pde_real_residual": true,
+    "test_diffequ_kdv_family": true,
+    "test_diffequ_kdv_residual": true,
+    "test_diffequ_kdv_scope": true,
     "test_diffequ_lie_brackets_and_search_limits": true,
     "test_diffequ_lie_free_particle": true,
     "test_diffequ_lie_invariants_and_normalisation": true,
@@ -259,9 +286,11 @@
     "test_diffequ_linearizes_modified_emden_problem": true,
     "test_diffequ_linearizes_scaled_modified_emden_problem": true,
     "test_diffequ_modified_emden_uses_coefficient_rule": true,
+    "test_diffequ_nested_source_order_TeX": true,
     "test_diffequ_nonlinear_characteristic_uses_power_rule": true,
     "test_diffequ_normalizes_bernoulli_arbitrary_constant": true,
     "test_diffequ_normalizes_variable_coefficient_sturm_liouville": true,
+    "test_diffequ_ordered_equation_TeX": true,
     "test_diffequ_parameter_linear_pde_accepts_parameter_rate": true,
     "test_diffequ_parameter_linear_pde_uses_general_rule": true,
     "test_diffequ_parses_and_solves_prime_ode_shorthand": true,
@@ -364,47 +393,19 @@
     "test_diffequ_spiral_characteristic_uses_linear_field_rule": true,
     "test_diffequ_stationary_eigenfunction_uses_general_rule": true,
     "test_diffequ_symbolic_function_input": true,
+    "test_diffequ_time_affine_transport": true,
+    "test_diffequ_triangular_scope": true,
+    "test_diffequ_triangular_transport": true,
     "test_diffequ_uses_builtin_alias_as_dependent_symbol": true,
     "test_diffequ_wave_ivp_integral_data": true,
     "test_diffequ_wave_ivp_polynomial_data": true,
     "test_diffequ_wave_ivp_rejects_invalid_data": true,
     "test_diffequ_wave_ivp_symbolic_speed": true,
+    "test_diffequ_wave_ivp_zero_terms": true,
     "test_diffequ_wave_kirchhoff_family": true,
     "test_diffequ_wave_polynomial_data": true,
     "test_diffequ_wave_rejects_outside_family": true,
-    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true,
-    "test_diffequ_expression_integer_powers": true,
-    "test_diffequ_autonomous_transport": true,
-    "test_diffequ_autonomous_transport_scope": true,
-    "test_diffequ_affine_transport": true,
-    "test_diffequ_affine_transport_scope": true,
-    "test_diffequ_ordered_equation_TeX": true,
-    "test_diffequ_triangular_transport": true,
-    "test_diffequ_triangular_scope": true,
-    "test_diffequ_calculus_coefficients_TeX": true,
-    "test_diffequ_gradient_envelope": true,
-    "test_diffequ_gradient_scope": true,
-    "test_diffequ_gradient_non_affine": true,
-    "test_diffequ_time_affine_transport": true,
-    "test_diffequ_coupled_flow": true,
-    "test_diffequ_coupled_flow_scope": true,
-    "test_diffequ_nested_source_order_TeX": true,
-    "test_diffequ_fourier_evolution": true,
-    "test_diffequ_fourier_scope": true,
-    "test_diffequ_fourier_kernel": true,
-    "test_diffequ_wave_ivp_zero_terms": true,
-    "test_diffequ_kdv_family": true,
-    "test_diffequ_kdv_scope": true,
-    "test_diffequ_kdv_residual": true,
-    "test_diffequ_caret_derivative_orders": true,
-    "test_diffequ_invalid_derivative_orders": true,
-    "test_diffequ_gkdv_family": true,
-    "test_diffequ_gkdv_scope": true,
-    "test_diffequ_gkdv_residual": true,
-    "test_diffequ_half_line_heat": true,
-    "test_diffequ_half_line_heat_scope": true,
-    "test_diffequ_half_line_heat_kernel": true,
-    "test_diffequ_infers_prime_coordinate": true
+    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
@@ -420,6 +421,7 @@
         "enabled": true,
         "test_equation_avoids_existing_branch_parameter_name": true,
         "test_equation_collects_high_degree_composite_power": true,
+        "test_equation_cubic_preserves_certified_surds": true,
         "test_equation_deduplicates_repeated_high_degree_root": true,
         "test_equation_deduplicates_repeated_irrational_quartic_roots": true,
         "test_equation_deduplicates_repeated_quartic_root": true,
@@ -449,7 +451,6 @@
         "test_equation_simplifies_real_repeated_power_roots": true,
         "test_equation_solves_affine_variable_from_rhs": true,
         "test_equation_solves_atan_sum_as_branch_valid_surd": true,
-        "test_equation_cubic_preserves_certified_surds": true,
         "test_equation_solves_cubic_complex_pair": true,
         "test_equation_solves_cubic_repeated_root_once": true,
         "test_equation_solves_cubic_three_real_roots": true,
@@ -578,6 +579,28 @@
       }
     }
   },
+  "tests/expression/test_expr_fourier.c": {
+    "tests": {
+      "enabled": true,
+      "test_fourier_and_signal_functions": {
+        "enabled": true,
+        "test_analytic_evaluation_functional": true,
+        "test_distribution_function_qualifier_round_trips": true,
+        "test_distribution_regular_rebinding": true,
+        "test_finite_part_distribution": true,
+        "test_hyperbolic_fourier_domains_and_beta_symbol": true,
+        "test_imaginary_additive_parentheses": true,
+        "test_inverse_hyperbolic_beta_spectra": true,
+        "test_mathematical_nonzero_domains": true,
+        "test_modified_bessel_k_numeric_layers": true,
+        "test_odd_hyperbolic_fourier_copy_and_rendering": true,
+        "test_sgn_native_derivatives": true,
+        "test_signal_calculus_and_finite_sums": true,
+        "test_signal_numeric_layers": true,
+        "test_signal_spectral_matrices": true
+      }
+    }
+  },
   "tests/expression/test_expr_from_string.c": {
     "tests": {
       "enabled": true,
@@ -588,6 +611,7 @@
         "test_binding_edit_preserves_symbolic_value": true,
         "test_differential_symbolic_call_syntax": true,
         "test_from_expression_string_api": true,
+        "test_from_function_body_formal_derivatives": true,
         "test_from_function_body_syntax": true,
         "test_from_string_arithmetic": true,
         "test_from_string_array_bindings": true,
@@ -615,6 +639,9 @@
         "test_from_string_greek_binding_lookup": true,
         "test_from_string_implicit_symbolic_bindings": true,
         "test_from_string_infinity_TeX": true,
+        "test_from_string_inverse_rational": true,
+        "test_from_string_laplace": true,
+        "test_from_string_laplace_prime_shorthand": true,
         "test_from_string_name_normalisation": true,
         "test_from_string_named_consts": true,
         "test_from_string_number_literals": true,
@@ -624,11 +651,7 @@
         "test_from_string_special_functions": true,
         "test_from_string_unevaluated_integral": true,
         "test_from_text_api": true,
-        "test_greek_symbol_reverse_perfect_hash": true,
-        "test_from_string_laplace": true,
-        "test_from_string_inverse_rational": true,
-        "test_from_string_laplace_prime_shorthand": true,
-        "test_from_function_body_formal_derivatives": true
+        "test_greek_symbol_reverse_perfect_hash": true
       }
     }
   },
@@ -662,6 +685,9 @@
         "test_integrate_affine_poly_times_specials": true,
         "test_integrate_affine_powers_and_remaining_inverse_families": true,
         "test_integrate_affine_tangent": true,
+        "test_integrate_bessel_i_parameter_ownership": true,
+        "test_integrate_bessel_y_lommel_parameter_ownership": true,
+        "test_integrate_bessel_y_lommel_rejection_ownership": true,
         "test_integrate_centered_quadratic_roots": true,
         "test_integrate_clausen_family": true,
         "test_integrate_collects_repeated_inverse_and_log_terms": true,
@@ -670,9 +696,11 @@
         "test_integrate_definite_quadratic_compact_exact_result": true,
         "test_integrate_definite_symbolic_bounds": true,
         "test_integrate_exact_symbolic_atan_affine_scale": true,
+        "test_integrate_family_retains_unsupported_integral": true,
         "test_integrate_frequency_product_families": true,
         "test_integrate_hyperbolic_table_tail": true,
         "test_integrate_hypergeometric_pFq_monomial_rule": true,
+        "test_integrate_improper_gaussian_bound_parameters": true,
         "test_integrate_inverse_one_plus_unit_circle_root": true,
         "test_integrate_inverse_quartic_appell_f1": true,
         "test_integrate_inverse_sqrt_sin_cos_sin3_cos": true,
@@ -694,7 +722,6 @@
         "test_integrate_partial_fractions_quadratic_difference": true,
         "test_integrate_partial_fractions_quartic_arctangent": true,
         "test_integrate_partial_symbolic_with_unevaluated_term": true,
-        "test_integrate_family_retains_unsupported_integral": true,
         "test_integrate_poly_over_centered_quadratic": true,
         "test_integrate_poly_times_affine_power": true,
         "test_integrate_polynomial_exponential_with_symbolic_rate": true,
@@ -718,6 +745,7 @@
         "test_integrate_sec_double_angle_log_tan_cot": true,
         "test_integrate_shifted_inverse_square_with_symbolic_constant": true,
         "test_integrate_sin_integer_multiple_quotient": true,
+        "test_integrate_struve_parameter_ownership": true,
         "test_integrate_symbolic_general_quadratic_denominator": true,
         "test_integrate_symbolic_general_quadratic_roots": true,
         "test_integrate_symbolic_improper_endpoint_value": true,
@@ -732,11 +760,16 @@
         "test_integrate_unevaluated_integral_evaluation": true,
         "test_integrate_unevaluated_integral_explicit_bounds": true,
         "test_integrate_unevaluated_integral_leibniz_derivative": true,
-        "test_integrate_unsupported_product_returns_null": true,
-        "test_integrate_bessel_i_parameter_ownership": true,
-        "test_integrate_bessel_y_lommel_parameter_ownership": true,
-        "test_integrate_bessel_y_lommel_rejection_ownership": true,
-        "test_integrate_struve_parameter_ownership": true
+        "test_integrate_unsupported_product_returns_null": true
+      }
+    }
+  },
+  "tests/expression/test_expr_orthopoly.c": {
+    "tests": {
+      "enabled": true,
+      "test_orthogonal_polynomials": {
+        "enabled": true,
+        "test_orthopoly_numeric_and_matrix_layers": true
       }
     }
   },
@@ -796,7 +829,9 @@
         "test_exact_decimal_literal_stays_decimal_in_expression_render": true,
         "test_explicit_complex_cube_root_preserves_family_and_evaluates_principal_value": true,
         "test_expr_ln10_singleton": true,
+        "test_expr_singleton_rendering_first_use": true,
         "test_factorial_postfix_lowers_to_differentiable_gamma": true,
+        "test_function_infinity_atoms_use_callable_aliases": true,
         "test_gamma_successor_product_simplifies": true,
         "test_get_val_updates_after_set": true,
         "test_goal_seek_large_target_uses_significant_digit_tolerance": true,
@@ -838,6 +873,8 @@
         "test_productlog_small_complex_inverse_uses_principal_branch": true,
         "test_pure_imaginary_addend_stays_ungrouped": true,
         "test_pure_imaginary_square_root_reduces_to_cartesian_components": true,
+        "test_radical_display_cancels_rational_scales": true,
+        "test_radical_display_preserves_principal_branches": true,
         "test_real_scalar_over_square_root_combines_into_one_root": true,
         "test_removable_trig_quotient_at_zero_evaluates_to_limit": true,
         "test_repeated_preserved_log_factor_combines_as_power": true,
@@ -846,6 +883,7 @@
         "test_set_val_num_preserves_complex_precision": true,
         "test_set_val_num_preserves_mpfr_precision": true,
         "test_set_val_num_preserves_qfloat_precision": true,
+        "test_simplify_common_minus_and_reciprocal_coefficients": true,
         "test_simplify_exact_rational_square_roots": true,
         "test_simplify_exp_quarter_turns": true,
         "test_simplify_inverse_unary_pairs": true,
@@ -875,9 +913,7 @@
         "test_unit_complex_square_root_keeps_conjugate_surds_together": true,
         "test_unresolved_zero_over_zero_returns_nan_without_recursing": true,
         "test_unset_constant_clones_combine_symbolically": true,
-        "test_updated_decimal_binding_stays_decimal": true,
-        "test_expr_singleton_rendering_first_use": true,
-        "test_simplify_common_minus_and_reciprocal_coefficients": true
+        "test_updated_decimal_binding_stays_decimal": true
       }
     }
   },
@@ -887,6 +923,7 @@
       "test_reverse_mode": {
         "enabled": true,
         "test_reverse_appell_variables": true,
+        "test_reverse_bessel_y_complex_arguments": true,
         "test_reverse_gradient_complex_number_t": true,
         "test_reverse_gradient_missing_variable": true,
         "test_reverse_gradient_polynomial": true,
@@ -894,12 +931,11 @@
         "test_reverse_gradient_shared_subexpression": true,
         "test_reverse_hypergeometric_argument": true,
         "test_reverse_lauricella_variables": true,
+        "test_reverse_lerch_phi_arguments": true,
         "test_reverse_matches_symbolic_composite": true,
-        "test_reverse_qdigamma_arguments": true,
-        "test_reverse_special_function_arguments": true,
         "test_reverse_modified_cylindrical_arguments": true,
-        "test_reverse_bessel_y_complex_arguments": true,
-        "test_reverse_lerch_phi_arguments": true
+        "test_reverse_qdigamma_arguments": true,
+        "test_reverse_special_function_arguments": true
       }
     }
   },
@@ -1103,8 +1139,8 @@
         "test_square_affine_times_hyperbolic_affine_matchers": true,
         "test_square_affine_times_trig_affine_matchers": true,
         "test_substitute_and_powd": true,
-        "test_tree_match_rejections": true,
-        "test_substitute_transform_scope": true
+        "test_substitute_transform_scope": true,
+        "test_tree_match_rejections": true
       }
     }
   },
@@ -1169,8 +1205,8 @@
   "tests/expression/test_expression.c": {
     "readme_examples": {
       "enabled": true,
-      "example_readme_examples": true,
       "example_orthopoly_readme_examples": true,
+      "example_readme_examples": true,
       "example_signal_readme_examples": true
     },
     "tests": {
@@ -1182,14 +1218,81 @@
       "test_expr_t_to_string": true,
       "test_expr_tree_match_helpers": true,
       "test_first_derivatives": true,
+      "test_fourier_and_signal_functions": true,
       "test_maths_functions": true,
+      "test_orthogonal_polynomials": true,
       "test_partial_derivatives": true,
       "test_reverse_mode": true,
       "test_runtime_regressions": true,
       "test_second_derivatives": true,
-      "test_symbolic_integration": true,
-      "test_fourier_and_signal_functions": true,
-      "test_orthogonal_polynomials": true
+      "test_symbolic_integration": true
+    }
+  },
+  "tests/file/test_file.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_file_compression_round_trip": true,
+      "example_file_encrypted_round_trip": true,
+      "example_file_encryption_only": true,
+      "example_file_replace_backup": true,
+      "example_file_sqlite_round_trip": true,
+      "example_file_symlink_target": true,
+      "example_file_utf8_lines": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_file_advisory_locks": true,
+      "test_file_allocation_and_sync_failures": true,
+      "test_file_allocation_failure_sweeps": true,
+      "test_file_append_and_lines": true,
+      "test_file_binary_round_trip_and_empty": true,
+      "test_file_blocking_lock_handoff": true,
+      "test_file_chmod_chown_times_and_access": true,
+      "test_file_copy_failure_preserves_destination": true,
+      "test_file_copy_injected_io_failures": true,
+      "test_file_copy_move_and_alias_protection": true,
+      "test_file_delayed_write_failure_is_reported": true,
+      "test_file_directory_listing_and_removal": true,
+      "test_file_encryption_keys_and_wrong_key": true,
+      "test_file_explicit_follow_and_text_streams": true,
+      "test_file_invalid_utf8_does_not_truncate": true,
+      "test_file_key_invalid_arguments": true,
+      "test_file_large_sparse_offsets": true,
+      "test_file_lifecycle_and_invalid_arguments": true,
+      "test_file_links_and_directory_moves": true,
+      "test_file_linux_path_bytes_are_not_normalised": true,
+      "test_file_listing_symlink_targets": true,
+      "test_file_long_line_crosses_buffer_boundaries": true,
+      "test_file_metadata_and_linux_attributes": true,
+      "test_file_modes_and_update_stream": true,
+      "test_file_move_cross_device_paths": true,
+      "test_file_null_and_invalid_outputs": true,
+      "test_file_path_and_directory_failures": true,
+      "test_file_rejects_symlinks_directories_and_fifos": true,
+      "test_file_replace_and_backup": true,
+      "test_file_sqlite_corrupt_chunks": true,
+      "test_file_sqlite_corrupt_or_missing_manifest": true,
+      "test_file_sqlite_database_path_and_argument_guards": true,
+      "test_file_sqlite_encrypted_payload_round_trip": true,
+      "test_file_sqlite_import_rollback": true,
+      "test_file_sqlite_limits_and_destination_preservation": true,
+      "test_file_sqlite_optional_metadata": true,
+      "test_file_sqlite_replacement_clears_chunks": true,
+      "test_file_sqlite_round_trip_sizes": true,
+      "test_file_sqlite_value_api_guards": true,
+      "test_file_stream_and_metadata_failures": true,
+      "test_file_symlink_target_failures": true,
+      "test_file_transform_allocation_failures": true,
+      "test_file_transform_staging_failures": true,
+      "test_file_transform_wire_validation": true,
+      "test_file_transforms_corrupt_truncated_and_trailing": true,
+      "test_file_transforms_invalid_arguments_and_aliases": true,
+      "test_file_transforms_large_round_trip": true,
+      "test_file_transforms_limits_and_destination_preservation": true,
+      "test_file_transforms_round_trip_and_empty": true,
+      "test_file_truncate_and_sync": true,
+      "test_file_utf8_bom_endings_and_embedded_nul": true,
+      "test_file_utf8_validation_classes": true
     }
   },
   "tests/integrator/test_integrator.c": {
@@ -1210,6 +1313,7 @@
       "test_double_null_safety": true,
       "test_double_polynomial": true,
       "test_exp": true,
+      "test_exponential_endpoint_decay": true,
       "test_expr_arctan": true,
       "test_expr_exp": true,
       "test_expr_null_safety": true,
@@ -1269,7 +1373,6 @@
       "test_set_tol": true,
       "test_sin": true,
       "test_single_integral_num_high_precision_log": true,
-      "test_exponential_endpoint_decay": true,
       "test_triple_exp": true,
       "test_triple_null_safety": true,
       "test_triple_polynomial": true
@@ -1286,6 +1389,7 @@
     "tests": {
       "enabled": true,
       "test_file_round_trip": true,
+      "test_file_stream_migration": true,
       "test_number_t_constants_use_math_spelling": true,
       "test_number_t_extension_round_trip": true,
       "test_parse_object_array_and_escapes": true,
@@ -1304,6 +1408,7 @@
       "test_england_exception_holidays_land_on_correct_dates_in_2022": true,
       "test_ireland_historic_whit_monday_exists_in_1960": true,
       "test_jurisdiction_alaska_default_location_uses_juneau": true,
+      "test_jurisdiction_configuration_file_io": true,
       "test_jurisdiction_database_builds_and_opens": true,
       "test_jurisdiction_default_gmt_offset_uses_database_dst_rules": true,
       "test_jurisdiction_default_location_falls_back_for_country_only_jurisdiction": true,
@@ -1323,13 +1428,13 @@
   "tests/matrix/test_matrix.c": {
     "readme_examples": {
       "enabled": true,
-      "test_readme_example_hermitian_eigendecomposition": true,
-      "test_readme_example_string_quantum": true,
       "test_readme_example_bessel_i": true,
-      "test_readme_example_struve_l": true,
       "test_readme_example_bessel_y": true,
+      "test_readme_example_hermitian_eigendecomposition": true,
+      "test_readme_example_sgn": true,
+      "test_readme_example_string_quantum": true,
       "test_readme_example_struve_h": true,
-      "test_readme_example_sgn": true
+      "test_readme_example_struve_l": true
     },
     "tests": {
       "enabled": true,
@@ -1337,8 +1442,8 @@
       "run_matrix_fromstring_tests": true,
       "run_matrix_function_regression_tests": true,
       "run_matrix_function_tests": true,
-      "run_matrix_output_tests": true,
       "run_matrix_memory_tests": true,
+      "run_matrix_output_tests": true,
       "run_matrix_tostring_tests": true
     }
   },
@@ -1421,7 +1526,6 @@
     "test_writing": true
   },
   "tests/matrix/test_matrix_fromstring.c": {
-    "test_mat_from_function_body_with_symbols": true,
     "test_mat_bindings_from_matrix_result": true,
     "test_mat_expression_from_string": true,
     "test_mat_expression_matrix_function_registry": true,
@@ -1431,6 +1535,7 @@
     "test_mat_expression_registered_function_aliases": true,
     "test_mat_expression_scalar_determinant": true,
     "test_mat_expression_symbolic_matrix_power": true,
+    "test_mat_from_function_body_with_symbols": true,
     "test_mat_from_string_bracketed_names": true,
     "test_mat_from_string_compact_columns": true,
     "test_mat_from_string_invalid_syntax": true,
@@ -1483,6 +1588,16 @@
     "test_mat_asinh_d": true,
     "test_mat_atan_d": true,
     "test_mat_atanh_d": true,
+    "test_mat_bessel_i_nilpotent": true,
+    "test_mat_bessel_i_numeric": true,
+    "test_mat_bessel_y_invalid": true,
+    "test_mat_bessel_y_jordan": true,
+    "test_mat_bessel_y_numeric_complex_order_dense": true,
+    "test_mat_bessel_y_numeric_complex_order_diagonal": true,
+    "test_mat_bessel_y_numeric_first_order": true,
+    "test_mat_bessel_y_numeric_half_order": true,
+    "test_mat_bessel_y_numeric_negative_order": true,
+    "test_mat_bessel_y_numeric_zero_order": true,
     "test_mat_clausen_diagonal": true,
     "test_mat_clausen_jordan": true,
     "test_mat_clausen_nondiagonal": true,
@@ -1491,6 +1606,7 @@
     "test_mat_cos_d": true,
     "test_mat_cos_mp_real": true,
     "test_mat_cosh_d": true,
+    "test_mat_cylindrical_symbolic": true,
     "test_mat_erf_d": true,
     "test_mat_erfc_d": true,
     "test_mat_exp_complex": true,
@@ -1504,9 +1620,11 @@
     "test_mat_log_d": true,
     "test_mat_neg_convenience": true,
     "test_mat_nilpotent_d": true,
+    "test_mat_ordinary_cylindrical_symbolic": true,
     "test_mat_pow_int_d": true,
     "test_mat_pow_num": true,
     "test_mat_roundtrips_d": true,
+    "test_mat_sgn_numeric": true,
     "test_mat_simplify_symbolic_helper": true,
     "test_mat_sin_complex": true,
     "test_mat_sin_d": true,
@@ -1517,41 +1635,28 @@
     "test_mat_special_unary_square_extensions": true,
     "test_mat_sqrt_d": true,
     "test_mat_sqrt_mp_real": true,
+    "test_mat_struve_h_nilpotent": true,
+    "test_mat_struve_h_numeric": true,
+    "test_mat_struve_l_diagonal": true,
+    "test_mat_struve_l_invalid": true,
+    "test_mat_struve_l_jordan": true,
+    "test_mat_struve_l_nondiagonal": true,
     "test_mat_tan_d": true,
     "test_mat_tanh_d": true,
     "test_mat_trig_null_safety": true,
     "test_mat_typeof": true,
     "test_matrix_function_structure_preservation": true,
     "test_number_function_matrix_parity": true,
-    "test_number_matrix_functions": true,
-    "test_mat_bessel_i_nilpotent": true,
-    "test_mat_bessel_i_numeric": true,
-    "test_mat_cylindrical_symbolic": true,
-    "test_mat_struve_l_diagonal": true,
-    "test_mat_struve_l_invalid": true,
-    "test_mat_struve_l_jordan": true,
-    "test_mat_struve_l_nondiagonal": true,
-    "test_mat_bessel_y_invalid": true,
-    "test_mat_bessel_y_jordan": true,
-    "test_mat_bessel_y_numeric_zero_order": true,
-    "test_mat_bessel_y_numeric_first_order": true,
-    "test_mat_bessel_y_numeric_negative_order": true,
-    "test_mat_bessel_y_numeric_half_order": true,
-    "test_mat_bessel_y_numeric_complex_order_dense": true,
-    "test_mat_bessel_y_numeric_complex_order_diagonal": true,
-    "test_mat_ordinary_cylindrical_symbolic": true,
-    "test_mat_struve_h_nilpotent": true,
-    "test_mat_struve_h_numeric": true,
-    "test_mat_sgn_numeric": true
+    "test_number_matrix_functions": true
   },
   "tests/matrix/test_matrix_memory.c": {
-    "test_mat_format_entry_array_allocation_failure": true,
-    "test_mat_format_constant_array_allocation_failure": true,
+    "test_mat_bessel_y_survives_scope": true,
     "test_mat_format_additive_constant_failure": true,
+    "test_mat_format_constant_array_allocation_failure": true,
+    "test_mat_format_entry_array_allocation_failure": true,
     "test_mat_format_function_constant_failure": true,
-    "test_mat_parse_row_transfer_allocation_failure": true,
     "test_mat_numeric_storage_survives_scope": true,
-    "test_mat_bessel_y_survives_scope": true
+    "test_mat_parse_row_transfer_allocation_failure": true
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_printf_smoke": true,
@@ -1560,8 +1665,45 @@
     "test_mat_sprintf_pretty_number_complex": true,
     "test_mat_text_formatters": true
   },
+  "tests/matrix/test_matrix_solve.c": {
+    "test_solve_and_lstsq": {
+      "enabled": true,
+      "test_solve_complex": true,
+      "test_solve_diagonal_sparse_rhs": true,
+      "test_solve_least_squares": true,
+      "test_solve_lower_triangular": true,
+      "test_solve_minimum_norm": true,
+      "test_solve_numeric_pivoting": true,
+      "test_solve_rank_deficient": true,
+      "test_solve_sparse_general": true,
+      "test_solve_sparse_lower": true,
+      "test_solve_sparse_pivoting": true,
+      "test_solve_symbolic_cramer": true,
+      "test_solve_symbolic_dense": true,
+      "test_solve_symbolic_dense_six": true,
+      "test_solve_symbolic_least_squares": true,
+      "test_solve_symbolic_lower": true,
+      "test_solve_symbolic_numeric_rhs": true,
+      "test_solve_symbolic_rank_deficient": true,
+      "test_solve_upper_triangular": true
+    }
+  },
+  "tests/matrix/test_matrix_symfunc.c": {
+    "test_expr_matrix_functions_extended": {
+      "enabled": true,
+      "test_symfunc_biquadratic_four": true,
+      "test_symfunc_block_diagonal_four": true,
+      "test_symfunc_cubic_three": true,
+      "test_symfunc_dense_numeric_fallback": true,
+      "test_symfunc_jordan_exp": true,
+      "test_symfunc_jordan_special": true,
+      "test_symfunc_permuted_blocks_four": true,
+      "test_symfunc_quadratic_three": true,
+      "test_symfunc_rank_one_four": true,
+      "test_symfunc_uniform_five": true
+    }
+  },
   "tests/matrix/test_matrix_tostring.c": {
-    "test_mat_to_string_reciprocal_power_cards": true,
     "test_mat_function_preserves_exact_binding_values": true,
     "test_mat_to_string_common_positive_base_power": true,
     "test_mat_to_string_function_card_reuses_shared_calculations": true,
@@ -1569,6 +1711,7 @@
     "test_mat_to_string_numeric": true,
     "test_mat_to_string_numeric_TeX": true,
     "test_mat_to_string_numeric_function_card": true,
+    "test_mat_to_string_reciprocal_power_cards": true,
     "test_mat_to_string_result_card_styles": true,
     "test_mat_to_string_symbolic": true,
     "test_mat_to_string_symbolic_TeX": true,
@@ -1588,20 +1731,20 @@
     "tests": {
       "enabled": true,
       "run_number_backend_parity_tests": true,
+      "run_number_bessel_k_ownership_tests": true,
+      "run_number_bessel_y_qcomplex_ownership_tests": true,
+      "run_number_bessel_y_qfloat_ownership_tests": true,
+      "run_number_bessel_y_scope_lifetime_tests": true,
       "run_number_constant_tests": true,
       "run_number_exact_backend_tests": true,
       "run_number_fixed_precision_tests": true,
       "run_number_formatting_tests": true,
       "run_number_multiprecision_tests": true,
+      "run_number_nonfinite_series_tests": true,
       "run_number_parse_tests": true,
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
-      "run_number_special_function_tests": true,
-      "run_number_nonfinite_series_tests": true,
-      "run_number_bessel_y_qfloat_ownership_tests": true,
-      "run_number_bessel_y_qcomplex_ownership_tests": true,
-      "run_number_bessel_y_scope_lifetime_tests": true,
-      "run_number_bessel_k_ownership_tests": true
+      "run_number_special_function_tests": true
     }
   },
   "tests/number/test_number_backend_parity.c": {
@@ -1624,22 +1767,22 @@
       "enabled": true,
       "run_number_special_function_tests": {
         "enabled": true,
-        "test_number_bessel_i": true,
-        "test_number_struve_l": true,
         "run_number_bessel_y_tests": true,
+        "test_number_bessel_i": true,
+        "test_number_sgn": true,
         "test_number_struve_h": true,
-        "test_number_sgn": true
+        "test_number_struve_l": true
       }
     }
   },
   "tests/qcomplex/test_qcomplex.c": {
     "readme_examples": {
       "enabled": true,
-      "example_euler_identity": true,
       "example_bessel_i": true,
-      "example_struve_l": true,
+      "example_euler_identity": true,
+      "example_sgn": true,
       "example_struve_h": true,
-      "example_sgn": true
+      "example_struve_l": true
     },
     "tests": {
       "enabled": true,
@@ -1661,6 +1804,7 @@
       "test_special_group": {
         "enabled": true,
         "test_Ei_E1": true,
+        "test_bessel_i": true,
         "test_beta": true,
         "test_difficult_cases": true,
         "test_digamma": true,
@@ -1674,10 +1818,9 @@
         "test_normal": true,
         "test_polylog": true,
         "test_productlog": true,
-        "test_bessel_i": true,
-        "test_struve_l": true,
+        "test_sgn": true,
         "test_struve_h": true,
-        "test_sgn": true
+        "test_struve_l": true
       },
       "test_trig_group": {
         "enabled": true,
@@ -1711,10 +1854,10 @@
       "test_lambert_w": true,
       "test_power": true,
       "test_printf": true,
+      "test_qf_sgn": true,
       "test_strings": true,
       "test_trigonometric": true,
-      "test_vsprintf": true,
-      "test_qf_sgn": true
+      "test_vsprintf": true
     }
   },
   "tests/qfloat/test_qfloat_arithmetic.c": {
@@ -1893,11 +2036,11 @@
       "test_bessel_functions": {
         "enabled": true,
         "test_qf_bessel_half_order_identities": true,
+        "test_qf_bessel_i": true,
         "test_qf_bessel_integer_order_values": true,
         "test_qf_bessel_order_recurrence": true,
-        "test_qf_bessel_i": true,
-        "test_qf_struve_l": true,
-        "test_qf_struve_h": true
+        "test_qf_struve_h": true,
+        "test_qf_struve_l": true
       },
       "test_gammainc_Ei_E1": {
         "enabled": true,
@@ -1970,10 +2113,10 @@
       "test_deep": true,
       "test_fuzz": true,
       "test_ints": true,
-      "test_sorted": true,
-      "test_strings": true,
+      "test_size_overflow": true,
       "test_slot_alignment": true,
-      "test_size_overflow": true
+      "test_sorted": true,
+      "test_strings": true
     }
   },
   "tests/sqlite/test_sqlite.c": {
@@ -2038,80 +2181,12 @@
     "test_arimax_differences_exogenous_regressors": true,
     "test_arimax_with_moving_average_terms": true,
     "test_auto_arima_preserves_selected_model_and_scale": true,
+    "test_csv_file_module_io": true,
     "test_csv_load_and_slice": true,
     "test_exogenous_alignment_for_future_forecasts": true,
     "test_in_memory_constructors_and_builder": true,
     "test_output_and_write_file": true,
     "test_regression_and_forecast": true,
     "test_transforms_and_aggregation": true
-  },
-  "tests/matrix/test_matrix_solve.c": {
-    "test_solve_and_lstsq": {
-      "enabled": true,
-      "test_solve_numeric_pivoting": true,
-      "test_solve_lower_triangular": true,
-      "test_solve_upper_triangular": true,
-      "test_solve_sparse_lower": true,
-      "test_solve_diagonal_sparse_rhs": true,
-      "test_solve_sparse_general": true,
-      "test_solve_sparse_pivoting": true,
-      "test_solve_rank_deficient": true,
-      "test_solve_minimum_norm": true,
-      "test_solve_least_squares": true,
-      "test_solve_symbolic_least_squares": true,
-      "test_solve_symbolic_rank_deficient": true,
-      "test_solve_complex": true,
-      "test_solve_symbolic_lower": true,
-      "test_solve_symbolic_dense": true,
-      "test_solve_symbolic_numeric_rhs": true,
-      "test_solve_symbolic_cramer": true,
-      "test_solve_symbolic_dense_six": true
-    }
-  },
-  "tests/matrix/test_matrix_symfunc.c": {
-    "test_expr_matrix_functions_extended": {
-      "enabled": true,
-      "test_symfunc_jordan_special": true,
-      "test_symfunc_jordan_exp": true,
-      "test_symfunc_dense_numeric_fallback": true,
-      "test_symfunc_cubic_three": true,
-      "test_symfunc_quadratic_three": true,
-      "test_symfunc_uniform_five": true,
-      "test_symfunc_rank_one_four": true,
-      "test_symfunc_biquadratic_four": true,
-      "test_symfunc_block_diagonal_four": true,
-      "test_symfunc_permuted_blocks_four": true
-    }
-  },
-  "tests/expression/test_expr_fourier.c": {
-    "tests": {
-      "enabled": true,
-      "test_fourier_and_signal_functions": {
-        "enabled": true,
-        "test_analytic_evaluation_functional": true,
-        "test_distribution_function_qualifier_round_trips": true,
-        "test_distribution_regular_rebinding": true,
-        "test_finite_part_distribution": true,
-        "test_hyperbolic_fourier_domains_and_beta_symbol": true,
-        "test_imaginary_additive_parentheses": true,
-        "test_inverse_hyperbolic_beta_spectra": true,
-        "test_mathematical_nonzero_domains": true,
-        "test_modified_bessel_k_numeric_layers": true,
-        "test_odd_hyperbolic_fourier_copy_and_rendering": true,
-        "test_sgn_native_derivatives": true,
-        "test_signal_calculus_and_finite_sums": true,
-        "test_signal_numeric_layers": true,
-        "test_signal_spectral_matrices": true
-      }
-    }
-  },
-  "tests/expression/test_expr_orthopoly.c": {
-    "tests": {
-      "enabled": true,
-      "test_orthogonal_polynomials": {
-        "enabled": true,
-        "test_orthopoly_numeric_and_matrix_layers": true
-      }
-    }
   }
 }

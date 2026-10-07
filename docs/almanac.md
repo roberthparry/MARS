@@ -74,6 +74,17 @@ configuration file:
 
 - `~/.mars/config/almanac-db.env`
 
+With `MARS_HOME` set, its `config/almanac-db.env` is used instead.
+Configuration files are read through `file_t`, explicitly following symbolic
+links to regular files. Complete UTF-8 lines are parsed using `string_t`,
+without the former 4 KiB line limit. A leading BOM and LF, CRLF or CR line
+endings are accepted. Keys may have surrounding whitespace and an optional
+`export ` prefix; matching outer single or double quotes are removed from
+values. This is literal assignment parsing, not shell evaluation: variables,
+escapes and command substitutions are not expanded. The first matching key
+wins, including an empty value. Malformed UTF-8 or an I/O error before a match
+leaves that lookup unresolved. Environment variables retain precedence.
+
 The default database location is:
 
 - `~/.mars/almanac/almanac.db`

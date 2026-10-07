@@ -1,5 +1,6 @@
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
+#include "file.h"
 
 timeseries_t *ts_new(const number_t *values, size_t length)
 {
@@ -436,10 +437,8 @@ static bool ts_grow_csv_series_storage(number_t **values, datetime_t ***index, b
 timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column, const string_t *value_column,
                                ts_frequency_t frequency, ts_year_type_t year_type, ts_missing_policy_t missing_policy)
 {
-    FILE *f;
-    char *line = NULL;
-    size_t line_cap = 0u;
-    ssize_t line_len;
+    file_t *f;
+    bool read_ok = true;
     string_t *header_text = NULL;
     int date_idx, value_idx;
     size_t cap = 32u, len = 0u;
@@ -454,25 +453,16 @@ timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column
         free(missing);
         return NULL;
     }
-    f = fopen(string_c_str(path), "r");
-    if (!f) {
+    f = file_new(path);
+    if (!f || !file_open_follow(f, FILE_MODE_OPEN, FILE_ACCESS_READ)) {
+        file_free(f);
         free(values);
         free(index);
         free(missing);
         return NULL;
     }
-    if (getline(&line, &line_cap, f) < 0) {
-        fclose(f);
-        free(line);
-        free(values);
-        free(index);
-        free(missing);
-        return NULL;
-    }
-    header_text = string_new_with(line);
-    if (!header_text) {
-        fclose(f);
-        free(line);
+    if (!file_read_line(f, &header_text) || !header_text) {
+        file_free(f);
         free(values);
         free(index);
         free(missing);
@@ -482,27 +472,28 @@ timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column
     value_idx = ts_find_csv_column(header_text, value_column);
     string_free(header_text);
     if (date_idx < 0 || value_idx < 0) {
-        fclose(f);
-        free(line);
+        file_free(f);
         free(values);
         free(index);
         free(missing);
         return NULL;
     }
-    while ((line_len = getline(&line, &line_cap, f)) >= 0) {
+    while (true) {
         string_t *line_text = NULL;
         string_t **fields = NULL;
         size_t field_count = 0u;
         string_t *date_text;
         string_t *value_text;
 
-        if (line_len == 0)
-            continue;
-        line_text = string_new_with(line);
-        fields = line_text ? ts_split_csv_line(line_text, &field_count) : NULL;
-        string_free(line_text);
-        if (!fields)
+        read_ok = file_read_line(f, &line_text);
+        if (!read_ok || !line_text)
             break;
+        fields = ts_split_csv_line(line_text, &field_count);
+        string_free(line_text);
+        if (!fields) {
+            read_ok = false;
+            break;
+        }
 
         date_text = ts_csv_field(fields, field_count, date_idx);
         value_text = ts_csv_field(fields, field_count, value_idx);
@@ -512,6 +503,7 @@ timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column
 
                 if (!ts_grow_csv_series_storage(&values, &index, &missing, cap, new_cap)) {
                     string_split_free(fields, field_count);
+                    read_ok = false;
                     break;
                 }
                 cap = new_cap;
@@ -533,10 +525,11 @@ timeseries_t *ts_from_csv_text(const string_t *path, const string_t *date_column
         }
         string_split_free(fields, field_count);
     }
-    fclose(f);
-    free(line);
+    if (!file_close(f))
+        read_ok = false;
+    file_free(f);
 
-    series = ts_alloc_empty(len);
+    series = read_ok ? ts_alloc_empty(len) : NULL;
     if (!series) {
         size_t i;
 
@@ -602,10 +595,8 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
                                   const string_t *const *value_columns, size_t value_column_count,
                                   ts_frequency_t frequency, ts_missing_policy_t missing_policy)
 {
-    FILE *f;
-    char *line = NULL;
-    size_t line_cap = 0u;
-    ssize_t line_len;
+    file_t *f = NULL;
+    bool read_ok = true;
     string_t *header_text = NULL;
     int *indices = NULL;
     size_t rows = 0u, cap = 32u;
@@ -621,22 +612,15 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
             return NULL;
     }
 
-    f = fopen(string_c_str(path), "r");
-    if (!f)
+    f = file_new(path);
+    if (!f || !file_open_follow(f, FILE_MODE_OPEN, FILE_ACCESS_READ))
         goto fail_before_open;
-    if (getline(&line, &line_cap, f) < 0) {
-        fclose(f);
-        free(line);
-        line = NULL;
+    if (!file_read_line(f, &header_text) || !header_text) {
         goto fail_before_open;
     }
     indices = calloc(value_column_count + 1u, sizeof(*indices));
     vals = calloc(cap * value_column_count, sizeof(*vals));
-    header_text = string_new_with(line);
     if (!indices || !vals || !header_text) {
-        fclose(f);
-        free(line);
-        line = NULL;
         goto fail_before_open;
     }
     indices[0] = ts_find_csv_column(header_text, date_column);
@@ -646,24 +630,25 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
     string_free(header_text);
     header_text = NULL;
     if (indices[0] < 0) {
-        fclose(f);
-        free(line);
-        line = NULL;
         goto fail_before_open;
     }
-    while ((line_len = getline(&line, &line_cap, f)) >= 0) {
+    while (true) {
         string_t *line_text = NULL;
         string_t **fields = NULL;
         size_t field_count = 0u;
         bool keep = true;
-        string_t **selected = calloc(value_column_count + 1u, sizeof(*selected));
+        string_t **selected;
 
-        line_text = string_new_with(line);
-        fields = line_text ? ts_split_csv_line(line_text, &field_count) : NULL;
+        read_ok = file_read_line(f, &line_text);
+        if (!read_ok || !line_text)
+            break;
+        selected = calloc(value_column_count + 1u, sizeof(*selected));
+        fields = ts_split_csv_line(line_text, &field_count);
         string_free(line_text);
         if (!fields || !selected) {
             string_split_free(fields, field_count);
             free(selected);
+            read_ok = false;
             break;
         }
 
@@ -687,6 +672,7 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
                 if (!grown) {
                     string_split_free(fields, field_count);
                     free(selected);
+                    read_ok = false;
                     break;
                 }
                 vals = grown;
@@ -709,18 +695,19 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
         string_split_free(fields, field_count);
         free(selected);
     }
-    fclose(f);
-    free(line);
+    if (!file_close(f))
+        read_ok = false;
+    file_free(f);
     free(indices);
-    out = ts_make_matrix_from_doubles(vals, rows, value_column_count);
+    out = read_ok ? ts_make_matrix_from_doubles(vals, rows, value_column_count) : NULL;
     free(vals);
     return out;
 
 fail_before_open:
+    file_free(f);
     string_free(header_text);
     free(indices);
     free(vals);
-    free(line);
     return NULL;
 }
 

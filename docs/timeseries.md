@@ -68,6 +68,22 @@ The header therefore includes helpers to:
   wrappers when a caller already has ordinary C strings at the boundary
 
 This matches workflows where the target series and exogenous population series
+are read through the public `file_t` API. Parsing remains entirely in
+`string_t`: line reads, column names, field splitting, dates and numeric text
+use MARS string operations. Both CSV readers accept a leading UTF-8 BOM and
+LF, CRLF or CR line endings, including a final line without a terminator.
+Malformed UTF-8 or a read failure rejects the load instead of returning a
+partially loaded series or matrix. Line-buffer memory grows with the longest
+line; the resulting series or matrix still resides in memory.
+
+File readers and writers follow symbolic links explicitly, including creation
+through a dangling output link, but reject directories and other non-regular
+files. Writers preserve the serialiser's text without adding a newline, check
+close failures, and truncate existing output; they do not provide atomic
+replacement. The CSV field parser is unchanged and is not a general quoted,
+multiline CSV parser.
+
+Typical target series and exogenous population series
 already exist as monthly CSV files, such as:
 
 - `sample_data/Monthly Target Numbers.csv`

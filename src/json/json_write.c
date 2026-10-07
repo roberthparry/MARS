@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "file.h"
 
 #define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"
@@ -273,20 +274,20 @@ string_t *json_to_string_pretty(const json_t *json, int indent_size)
 
 static int json_write_file_text(const string_t *text, const string_t *path)
 {
-    FILE *file;
+    file_t *file;
     int ok;
 
     if (!text || !path)
         return -1;
 
-    file = fopen(string_c_str(path), "w");
+    file = file_new(path);
     if (!file)
         return -1;
 
-    ok = string_fprintf(file, "%S\n", text) >= 0 ? 0 : -1;
-    if (fclose(file) != 0)
+    ok = file_open_follow(file, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && file_write_line(file, text) ? 0 : -1;
+    if (!file_close(file))
         ok = -1;
-
+    file_free(file);
     return ok;
 }
 

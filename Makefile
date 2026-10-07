@@ -99,6 +99,18 @@ else
 endif
 
 # ------------------------------------------------------------
+# Streaming file compression and authenticated encryption
+# ------------------------------------------------------------
+ZSTD_CFLAGS := $(shell pkg-config --cflags libzstd 2>/dev/null)
+ZSTD_LIBS   := $(shell pkg-config --libs libzstd 2>/dev/null)
+SODIUM_CFLAGS := $(shell pkg-config --cflags libsodium 2>/dev/null)
+SODIUM_LIBS   := $(shell pkg-config --libs libsodium 2>/dev/null)
+
+CFLAGS += $(ZSTD_CFLAGS) $(SODIUM_CFLAGS)
+LDLIBS += $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)
+LDLIBS += $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)
+
+# ------------------------------------------------------------
 # Source discovery
 # ------------------------------------------------------------
 SRCS    := $(shell find src -name '*.c' | sort)
@@ -193,6 +205,8 @@ check-deps:
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
 	check_dep "SQLCipher" "sqlcipher/sqlite3.h" "-lsqlcipher" "libsqlcipher-dev" "sqlite3 *db = 0; sqlite3_open(\":memory:\", &db); sqlite3_close(db)"; \
+	check_dep "Zstandard" "zstd.h" "$(ZSTD_CFLAGS) $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)" "libzstd-dev" "ZSTD_CCtx *ctx = ZSTD_createCCtx(); ZSTD_inBuffer in = {0}; ZSTD_outBuffer out = {0}; ZSTD_compressStream2(ctx, &out, &in, ZSTD_e_end); ZSTD_freeCCtx(ctx)"; \
+	check_dep "libsodium secretstream" "sodium.h" "$(SODIUM_CFLAGS) $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)" "libsodium-dev" "crypto_secretstream_xchacha20poly1305_state state; unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES], header[crypto_secretstream_xchacha20poly1305_HEADERBYTES]; if (sodium_init() < 0) return 1; crypto_secretstream_xchacha20poly1305_keygen(key); return crypto_secretstream_xchacha20poly1305_init_push(&state, header, key)"; \
 	if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
 	    check_dep "libunistring" "unistr.h" "-lunistring" "libunistring-dev" "(void)u8_strlen((const uint8_t *)\"x\")"; \
 	fi; \
@@ -332,6 +346,34 @@ $(SHARED_LIB): Makefile $(OBJS)
 # Test binaries
 # ------------------------------------------------------------
 $(TEST_BUILD_DIR)/matrix/test_matrix: TEST_LINK_FLAGS = -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=string_free -Wl,--wrap=expr_to_text_symbolic
+
+FILE_TEST_WRAPS := malloc calloc realloc strdup read write rename renameat2 unlink fsync fdatasync fchownat \
+                   fdopen fdopendir readdir statx fstat fclose close fchmod ftello fseeko
+# Keep the comma literal separate from Make function argument separators.
+comma := ,
+$(TEST_BUILD_DIR)/file/test_file: TEST_LINK_FLAGS = $(foreach fn,$(FILE_TEST_WRAPS),-Wl$(comma)--wrap=$(fn))
+
+# Instrument only the file module; keep normal library objects and counters separate.
+FILE_COVERAGE_DIR := build/coverage/file
+FILE_COVERAGE_SRCS := $(wildcard src/file/*.c)
+FILE_COVERAGE_OBJS := $(patsubst src/file/%.c,$(FILE_COVERAGE_DIR)/%.o,$(FILE_COVERAGE_SRCS))
+FILE_TEST_HELPERS = $(filter $(TEST_BUILD_DIR)/file/%.o,$(TEST_HELPER_OBJS))
+
+$(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file.h src/file/file_internal.h Makefile
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -O0 -g --coverage $(INCLUDES) -c $< -o $@
+
+$(FILE_COVERAGE_DIR)/test_file: $(TEST_BUILD_DIR)/file/test_file $(FILE_COVERAGE_OBJS)
+	$(CC) --coverage $(foreach fn,$(FILE_TEST_WRAPS),-Wl$(comma)--wrap=$(fn)) -o $@ \
+	    $(TEST_BUILD_DIR)/file/test_file.o $(TEST_COMMON_HELPER_OBJS) $(FILE_TEST_HELPERS) \
+	    $(FILE_COVERAGE_OBJS) $(STATIC_LIB) $(LDLIBS)
+
+.PHONY: coverage-file
+coverage-file: $(FILE_COVERAGE_DIR)/test_file
+	rm -f $(FILE_COVERAGE_OBJS:.o=.gcda)
+	$(FILE_COVERAGE_DIR)/test_file
+	cd $(FILE_COVERAGE_DIR) && gcov -b -c -j $(notdir $(FILE_COVERAGE_OBJS))
+	python3 tools/report_file_coverage.py $(FILE_COVERAGE_DIR)
 
 define TEST_BIN_RULE
 $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \

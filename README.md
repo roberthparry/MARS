@@ -46,6 +46,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
 - **`sqlite_t`** — opaque SQLCipher-backed SQLite storage for encrypted MARS object persistence
+- **`file_t`** — opaque Linux file streams, UTF-8 helpers, metadata, compression, authenticated encryption and SQLCipher transfers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
@@ -98,12 +99,14 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
 - SQLCipher development libraries
+- Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
+- `pkg-config` for discovery of library compiler and linker flags
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
 On Debian/Ubuntu, install the default build requirements with:
 
 ```sh
-sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev
+sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev
 ```
 
 Use `make check-deps` to check for required development headers and link
@@ -369,6 +372,7 @@ int main(void) {
 | `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](./docs/almanac.md) |
 | `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](./docs/jurisdiction.md) |
 | `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](./docs/sqlite.md) |
+| `file_t`, `file_info_t`, `file_key_t` | Linux file I/O, metadata, compression, authenticated encryption and SQLCipher transfers | [`docs/file.md`](./docs/file.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](./docs/integrator.md) |
 
 ## Build

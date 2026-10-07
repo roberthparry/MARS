@@ -1,4 +1,5 @@
 #include "test_timeseries.h"
+#include "file.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -610,9 +611,60 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
     ts_free(y);
 }
 
+static void test_csv_file_module_io(void)
+{
+    const char *path = test_case_temp_path("source.csv");
+    const char *link_path = test_case_temp_path("source-link.csv");
+    const char *columns[] = {"π"};
+    file_t *source = file_new_cstr(path);
+    file_t *link = file_new_cstr(link_path);
+    const char fixture[] = "\xef\xbb\xbf" "date,π\r\n2026-01-01,1\r2026-02-01,2";
+    TEST_ASSERT_NOT_NULL(source);
+    TEST_ASSERT_NOT_NULL(link);
+    TEST_ASSERT_TRUE(file_write_all_bytes(source, fixture, sizeof(fixture) - 1), "write mixed-ending UTF-8 CSV");
+    TEST_ASSERT_TRUE(file_create_symlink(source, link), "create CSV link");
+    timeseries_t *series = ts_from_csv(link_path, "date", "π", TS_FREQ_MONTHLY, TS_YEAR_CALENDAR, TS_MISSING_KEEP);
+    TEST_ASSERT_NOT_NULL(series);
+    TEST_ASSERT_INT_EQ((int)ts_length(series), 2);
+    matrix_t *matrix = ts_matrix_from_csv(link_path, "date", columns, 1, TS_FREQ_MONTHLY, TS_MISSING_KEEP);
+    TEST_ASSERT_NOT_NULL(matrix);
+    TEST_ASSERT_INT_EQ((int)mat_get_row_count(matrix), 2);
+    number_t first = mat_get_num(matrix, 0, 0);
+    TEST_ASSERT_TRUE(num_eq(first, NUM_ONE), "numeric field parsed through string_t");
+    num_destroy(&first);
+    mat_free(matrix);
+    string_t *expected = ts_to_text(series, TS_STRING_CSV);
+    TEST_ASSERT_NOT_NULL(expected);
+    TEST_ASSERT_TRUE(file_delete(source), "make output link dangling");
+    TEST_ASSERT_INT_EQ(ts_write_file(link_path, series, TS_STRING_CSV), 0);
+    string_t *actual = file_read_all_text(source);
+    TEST_ASSERT_NOT_NULL(actual);
+    TEST_ASSERT_STR_EQ(string_c_str(actual), string_c_str(expected));
+    string_free(actual);
+    string_free(expected);
+
+    const char invalid[] = "date,π\n2026-01-01,1\n2026-02-01,\xff\n";
+    TEST_ASSERT_TRUE(file_write_all_bytes(source, invalid, sizeof(invalid) - 1), "write invalid UTF-8 after valid row");
+    TEST_ASSERT_TRUE(ts_from_csv(path, "date", "π", TS_FREQ_MONTHLY, TS_YEAR_CALENDAR, TS_MISSING_KEEP) == NULL,
+                     "series read failure must not return a partial result");
+    TEST_ASSERT_TRUE(ts_matrix_from_csv(path, "date", columns, 1, TS_FREQ_MONTHLY, TS_MISSING_KEEP) == NULL,
+                     "matrix read failure must not return a partial result");
+    TEST_ASSERT_TRUE(file_delete(source), "remove CSV");
+    TEST_ASSERT_TRUE(ts_from_csv(path, "date", "π", TS_FREQ_MONTHLY, TS_YEAR_CALENDAR, TS_MISSING_KEEP) == NULL,
+                     "missing CSV fails");
+    TEST_ASSERT_TRUE(file_create_directory(source, 0700, false), "create directory fixture");
+    TEST_ASSERT_INT_EQ(ts_write_file(path, series, TS_STRING_CSV), -1);
+    TEST_ASSERT_TRUE(file_remove_directory(source), "remove directory");
+    TEST_ASSERT_TRUE(file_delete(link), "remove dangling link");
+    ts_free(series);
+    file_free(link);
+    file_free(source);
+}
+
 void run_timeseries_core_tests(void)
 {
     TEST_RUN_CASE(test_csv_load_and_slice, NULL);
+    TEST_RUN_CASE(test_csv_file_module_io, NULL);
     TEST_RUN_CASE(test_in_memory_constructors_and_builder, NULL);
     TEST_RUN_CASE(test_transforms_and_aggregation, NULL);
 }

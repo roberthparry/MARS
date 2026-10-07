@@ -13,6 +13,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "ustring.h"
 
@@ -20,6 +21,13 @@
  * @brief Opaque encrypted SQLite database handle.
  */
 typedef struct _sqlite_t sqlite_t;
+
+/**
+ * @brief Returns the borrowed main database filename.
+ * @param db Database handle.
+ * @return Filename valid until close, an empty string for an in-memory database, or NULL for an invalid handle.
+ */
+const char *sqlite_database_path(const sqlite_t *db);
 
 /**
  * @brief Opaque prepared statement handle.
@@ -204,6 +212,15 @@ bool sqlite_stmt_bind_text(sqlite_stmt_t *stmt, int index, const char *value);
 bool sqlite_stmt_bind_int(sqlite_stmt_t *stmt, int index, int value);
 
 /**
+ * @brief Binds a signed 64-bit integer without narrowing.
+ * @param stmt Prepared statement handle.
+ * @param index 1-based parameter index.
+ * @param value Integer value.
+ * @return True on success.
+ */
+bool sqlite_stmt_bind_int64(sqlite_stmt_t *stmt, int index, int64_t value);
+
+/**
  * @brief Binds a double to a statement parameter.
  *
  * @param stmt Prepared statement handle.
@@ -279,6 +296,14 @@ const char *sqlite_stmt_column_text(sqlite_stmt_t *stmt, int column);
  * @return Integer value, or `0` if unavailable.
  */
 int sqlite_stmt_column_int(sqlite_stmt_t *stmt, int column);
+
+/**
+ * @brief Reads a signed 64-bit column value without narrowing.
+ * @param stmt Prepared statement handle.
+ * @param column Zero-based column index.
+ * @return Integer value, or zero for an invalid statement.
+ */
+int64_t sqlite_stmt_column_int64(sqlite_stmt_t *stmt, int column);
 
 /**
  * @brief Returns the current row's floating-point value for a column.
