@@ -3,7 +3,7 @@
  * @brief Test configuration path resolution.
  *
  * Normalises source paths and locates global or local configuration records. The harness uses these helpers to
- * identify a test consistently across invocation directories.
+ * identify a test consistently across invocation directories, retaining tools/<module>/tests/ namespaces.
  *
  * Linked into the relevant test executables as shared support. Production code should not depend on this test-only
  * implementation.
@@ -82,6 +82,12 @@ string_t *test_config_normalise_file_path(const string_t *file)
         return NULL;
 
     tests_pos = file ? string_find(file, "tests/") : -1;
+    /* Keep tool-local suites distinct instead of flattening them into root tests/. */
+    if (tests_pos >= 0) {
+        string_offset_t tools_pos = string_starts_with(file, "tools/") ? 0 : string_find(file, "/tools/");
+        if (tools_pos >= 0 && tools_pos < tests_pos)
+            tests_pos = tools_pos == 0 && string_starts_with(file, "tools/") ? 0 : tools_pos + 1;
+    }
     if (tests_pos >= 0) {
         string_cursor_t *cursor = string_cursor_new(file);
 

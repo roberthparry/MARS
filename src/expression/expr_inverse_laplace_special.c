@@ -10,8 +10,9 @@
  */
 
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #include <stdlib.h>
+
+#include "expr_internal.h"
 
 /* Infer a candidate from a spectral feature, then check its complete forward formula. Nothing in
  * this matcher depends on transform provenance, supplied free-variable values, or sampled values.

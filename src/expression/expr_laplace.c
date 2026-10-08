@@ -9,13 +9,14 @@
  * domain restrictions when extending these operations.
  */
 
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /* Laplace rules retain a conservative right half-plane of convergence. */
 static bool laplace_uses(const expr_t *expr, const expr_t *source)

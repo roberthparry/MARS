@@ -10,8 +10,9 @@
  * declarations and caller-visible behaviour are unchanged in number.h.
  */
 
-#include "number.h"
 #include <limits.h>
+
+#include "number.h"
 
 static number_t polynomial(number_t degree, number_t x, unsigned family)
 {

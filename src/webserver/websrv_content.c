@@ -10,9 +10,10 @@
  */
 
 /* String-backed header validation, binary bodies and native document adapters. */
-#include "websrv_internal.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "websrv_internal.h"
 
 static size_t key_hash(const void *key) { return string_hash(*(string_t *const *)key); }
 static int key_compare(const void *a, const void *b)
@@ -117,6 +118,7 @@ void websrv_request_clear(websrv_request_t *r)
 {
     string_free(r->target);
     string_free(r->path);
+    string_free(r->peer);
     free(r->body);
     websrv_headers_free(r->headers);
 }
@@ -132,6 +134,9 @@ void websrv_response_clear(websrv_response_t *r)
 
 /* Read the parsed method without transferring ownership. */
 webmethod_t websrv_request_method(const websrv_request_t *r) { return r ? r->method : HTTP_GET; }
+
+/* Borrow the verified socket peer independently of request headers. */
+const string_t *websrv_request_peer(const websrv_request_t *r) { return r ? r->peer : NULL; }
 
 /* Borrow the undecoded request target. */
 const string_t *websrv_request_target(const websrv_request_t *r) { return r ? r->target : NULL; }

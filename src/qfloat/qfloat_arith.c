@@ -10,9 +10,9 @@
  */
 
 #define MARS_QFLOAT_INTERNAL_ACCESS
-#include "qfloat_internal.h"
-
 #include <math.h>
+
+#include "qfloat_internal.h"
 
 /* Add double-double values with an error-free sum and renormalisation. */
 qfloat_t qf_add(qfloat_t a, qfloat_t b)

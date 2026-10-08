@@ -21,6 +21,11 @@ The Makefile discovers `libcurl` through pkg-config, falls back to `-lcurl`,
 and checks availability with `make check-deps`. Static consumers must link
 libcurl and its dependencies as well as MARS. See [building](building.md).
 
+The verified libcurl build uses nghttp2 for HTTP/2 and unary gRPC. This is a
+transitive client dependency; neither library implements the native MARS web server.
+See the [third-party acknowledgements](../THIRD_PARTY_NOTICES.md#http-transport)
+for libcurl and nghttp2 and the [dependency inventory](../DEPENDENCIES.spdx).
+
 HTTPS always verifies the certificate chain and hostname, with TLS 1.2 as the
 minimum. System trust is used by default. `http_client_set_ca_file` loads a
 custom PEM bundle through the file module; passing NULL restores system trust.
@@ -1445,8 +1450,9 @@ Returns: True if a valid retry delay is available; false otherwise.
 
 ## Tests
 
-Run `make -j1 test_http` from the repository root. Python 3's standard library
-provides offline loopback HTTP/HTTPS fixtures on ephemeral ports; no public
+Run `make -j1 test_http` from the repository root. Native C fixtures under
+`tests/http/fixtures/` provide offline loopback HTTP/HTTPS servers on ephemeral
+ports, with OpenSSL providing TLS support; no public
 service or network credentials are needed. Ordinary tests cover URL/header
 validation, all methods, repeated headers and trailers, response status,
 binary content, JSON/XML, file upload/download, cancellation, deadlines,

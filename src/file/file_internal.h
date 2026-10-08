@@ -20,12 +20,13 @@
 #error "file_internal.h is private to the file module; include file.h instead."
 #endif
 
+#include <dirent.h>
+#include <stdio.h>
+#include <sys/stat.h>
+
 #include "file.h"
 #include "array.h"
 #include "ustring.h"
-#include <stdio.h>
-#include <sys/stat.h>
-#include <dirent.h>
 
 struct _file_t {
     char *path;

@@ -265,7 +265,7 @@ replace their symbolic fallback.
 
 A round trip must invert the actual spectral formula, not merely cancel nested
 transform operators. The regression inventory in
-`tests/tools/test_transform_round_trips.py` serialises the forward result,
+`tools/mars_lab/tests/test_lab_math_round_trips.c` serialises the forward result,
 parses it as fresh inverse-transform input, then serialises and reparses the
 recovered function as well. This checks the native Expression rendering as
 well as the inverse rule. Fourier pairs are also checked in the opposite order.

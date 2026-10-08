@@ -3,15 +3,12 @@
  * @brief File-module suite entry point and text examples.
  *
  * Registers filesystem, stream, error and transform test groups and checks ordinary file operations. Documented
- * text and replacement examples run after ordinary assertions.
+ * text and replacement examples run after ordinary assertions. Text regressions verify exact Unicode spelling
+ * across whole-file and line reads and writes, including decomposed credentials.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
-
-#include "file.h"
-#include "array.h"
-#include "test_harness.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -21,7 +18,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "file.h"
+#include "array.h"
+#include "test_harness.h"
+
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+void test_file_sha256_failures(void);
 
 static file_t *fixture(const char *leaf)
 {
@@ -39,6 +42,113 @@ static bool put(file_t *file, const char *content)
     bool ok = file_write_all_text(file, text);
     string_free(text);
     return ok;
+}
+
+static void test_file_temporary_directory(void)
+{
+    ASSERT_TRUE(file_create_temp_directory(NULL) == NULL);
+    string_t *empty = string_new_with("");
+    ASSERT_TRUE(file_create_temp_directory(empty) == NULL);
+    string_free(empty);
+    file_t *parent = fixture("temporary-parent");
+    ASSERT_NOT_NULL(parent);
+    string_t *parent_path = string_new_with(file_path(parent));
+    ASSERT_TRUE(file_create_temp_directory(parent_path) == NULL);
+    ASSERT_TRUE(file_create_directory(parent, 0700, false));
+    file_t *first = file_create_temp_directory(parent_path);
+    file_t *second = file_create_temp_directory(parent_path);
+    ASSERT_NOT_NULL(first);
+    ASSERT_NOT_NULL(second);
+    ASSERT_TRUE(strcmp(file_path(first), file_path(second)) != 0);
+    ASSERT_TRUE(!file_is_open(first));
+    file_info_t *info = file_get_info(first);
+    ASSERT_NOT_NULL(info);
+    ASSERT_EQ_INT(file_info_type(info), FILE_TYPE_DIRECTORY);
+    ASSERT_TRUE((file_info_permissions(info) & 0077) == 0);
+    file_info_free(info);
+    ASSERT_TRUE(file_remove_directory(first));
+    ASSERT_TRUE(file_remove_directory(second));
+    ASSERT_TRUE(file_remove_directory(parent));
+    file_free(first);
+    file_free(second);
+    file_free(parent);
+    string_free(parent_path);
+}
+
+static void test_file_sha256(void)
+{
+    file_t *source = fixture("hash-source");
+    file_t *link = fixture("hash-link");
+    ASSERT_NOT_NULL(source);
+    ASSERT_NOT_NULL(link);
+    ASSERT_TRUE(file_sha256(NULL) == NULL);
+    ASSERT_TRUE(file_sha256(source) == NULL);
+    ASSERT_EQ_INT(file_last_error(source), ENOENT);
+    static const struct {
+        const char *text;
+        const char *digest;
+    } vectors[] = {
+        {"", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        {"abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}
+    };
+    for (size_t i = 0; i < sizeof(vectors) / sizeof(*vectors); ++i) {
+        ASSERT_TRUE(put(source, vectors[i].text));
+        string_t *digest = file_sha256(source);
+        ASSERT_NOT_NULL(digest);
+        TEST_ASSERT_STR_EQ(string_c_str(digest), vectors[i].digest);
+        ASSERT_TRUE(!file_is_open(source));
+        ASSERT_EQ_INT(file_last_error(source), 0);
+        string_free(digest);
+    }
+    ASSERT_TRUE(file_open_read(source));
+    ASSERT_TRUE(file_sha256(source) == NULL);
+    ASSERT_EQ_INT(file_last_error(source), EBUSY);
+    ASSERT_TRUE(file_is_open(source));
+    ASSERT_TRUE(file_close(source));
+    ASSERT_TRUE(file_create_symlink(source, link));
+    ASSERT_TRUE(file_sha256(link) == NULL);
+    ASSERT_EQ_INT(file_last_error(link), ELOOP);
+    ASSERT_TRUE(file_delete(link));
+    ASSERT_TRUE(file_create_directory(link, 0700, false));
+    ASSERT_TRUE(file_sha256(link) == NULL);
+    ASSERT_EQ_INT(file_last_error(link), EISDIR);
+    ASSERT_TRUE(file_remove_directory(link));
+    ASSERT_TRUE(file_write_all_bytes(source, "\0", 1));
+    string_t *binary_digest = file_sha256(source);
+    ASSERT_NOT_NULL(binary_digest);
+    TEST_ASSERT_STR_EQ(string_c_str(binary_digest), "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d");
+    string_free(binary_digest);
+    unsigned char block[1000];
+    memset(block, 'a', sizeof(block));
+    ASSERT_TRUE(file_create(source));
+    for (unsigned i = 0; i < 1000; ++i) {
+        size_t count;
+        ASSERT_TRUE(file_write(source, block, sizeof(block), &count));
+        ASSERT_EQ_LONG(count, sizeof(block));
+    }
+    ASSERT_TRUE(file_close(source));
+    string_t *digest = file_sha256(source);
+    ASSERT_NOT_NULL(digest);
+    TEST_ASSERT_STR_EQ(string_c_str(digest), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+    string_free(digest);
+    ASSERT_TRUE(file_delete(source));
+    file_free(link);
+    file_free(source);
+}
+
+/* README example: docs/file.md, bounded-memory content hashing. */
+static void example_file_sha256(void)
+{
+    file_t *source = fixture("hash-example.txt");
+    ASSERT_NOT_NULL(source);
+    ASSERT_TRUE(file_write_all_bytes(source, "abc", 3));
+    string_t *digest = file_sha256(source);
+    ASSERT_NOT_NULL(digest);
+    string_printf("%S\n", digest);
+    TEST_ASSERT_STR_EQ(string_c_str(digest), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    string_free(digest);
+    ASSERT_TRUE(file_delete(source));
+    file_free(source);
 }
 
 static void expect_text(file_t *file, const char *expected)
@@ -233,10 +343,65 @@ static void test_file_utf8_bom_endings_and_embedded_nul(void)
     ASSERT_TRUE(file_write_all_bytes(file, "e\xcc\x81", 3));
     text = file_read_all_text(file);
     ASSERT_NOT_NULL(text);
-    TEST_ASSERT_STR_EQ(string_c_str(text), "é");
+    ASSERT_EQ_LONG(string_byte_length(text), 3);
+    ASSERT_TRUE(memcmp(string_c_str(text), "e\xcc\x81", 3) == 0);
     string_free(text);
     ASSERT_TRUE(file_delete(file));
     file_free(file);
+}
+
+static void test_file_exact_unicode_text_round_trip(void)
+{
+    const char bytes[] = "\xef\xbb\xbf" "key=e\xcc\x81-λ😀\0suffix\r\n";
+    file_t *source = fixture("exact-source.txt");
+    file_t *destination = fixture("exact-destination.txt");
+    bool ok = source && destination && file_write_all_bytes(source, bytes, sizeof(bytes) - 1);
+    string_t *text = ok ? file_read_all_text(source) : NULL;
+    size_t length = sizeof(bytes) - 4;
+    ok = text && string_byte_length(text) == length && memcmp(string_c_str(text), bytes + 3, length) == 0 && ok;
+    bool written = text && destination && file_write_all_text(destination, text);
+    array_t *raw = written ? file_read_all_bytes(destination) : NULL;
+    ok = raw && array_size(raw) == length && memcmp(array_get(raw, 0), bytes + 3, length) == 0 && ok;
+    array_destroy(raw);
+    string_free(text);
+    bool cleaned = source && file_delete(source);
+    cleaned = destination && file_delete(destination) && cleaned;
+    file_free(source);
+    file_free(destination);
+    TEST_ASSERT_TRUE(ok && cleaned, "whole-file text preserves decomposed Unicode, NUL and line endings after BOM removal");
+}
+
+static void test_file_exact_unicode_line_round_trip(void)
+{
+    char bytes[4100];
+    memset(bytes, 'x', 4095);
+    memcpy(bytes + 4095, "e\xcc\x81\r\n", 5);
+    file_t *source = fixture("exact-line-source.txt");
+    file_t *destination = fixture("exact-line-destination.txt");
+    bool ok = source && destination && file_write_all_bytes(source, bytes, sizeof(bytes)) && file_open_text(source);
+    string_t *line = NULL;
+    ok = ok && file_read_line(source, &line) && line && string_byte_length(line) == 4098 &&
+         memcmp(string_c_str(line), bytes, 4098) == 0;
+    bool written = line && destination && file_create_text(destination) && file_write_line(destination, line);
+    string_free(line);
+    line = NULL;
+    ok = source && file_read_line(source, &line) && !line && ok;
+    string_free(line);
+    bool closed = source && file_close(source);
+    closed = destination && file_close(destination) && closed;
+    array_t *raw = written && closed ? file_read_all_bytes(destination) : NULL;
+    ok = raw && array_size(raw) == 4099 && memcmp(array_get(raw, 0), bytes, 4098) == 0 &&
+         *(const unsigned char *)array_get(raw, 4098) == '\n' && ok;
+    array_destroy(raw);
+    array_t *lines = source ? file_read_all_lines(source) : NULL;
+    const string_t *first = lines && array_size(lines) == 1 ? *(string_t **)array_get(lines, 0) : NULL;
+    ok = first && string_byte_length(first) == 4098 && memcmp(string_c_str(first), bytes, 4098) == 0 && ok;
+    array_destroy(lines);
+    bool cleaned = source && file_delete(source);
+    cleaned = destination && file_delete(destination) && cleaned;
+    file_free(source);
+    file_free(destination);
+    TEST_ASSERT_TRUE(ok && cleaned, "line APIs preserve a decomposed accent across the read buffer boundary");
 }
 
 static void test_file_linux_path_bytes_are_not_normalised(void)
@@ -576,6 +741,9 @@ static void example_file_replace_backup(void)
 int tests_main(void)
 {
     TEST_SECTION("Linux File Operations");
+    TEST_RUN_IN_GROUP(test_file_temporary_directory, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_sha256, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_sha256_failures, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_listing_symlink_targets, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_symlink_target_failures, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_lifecycle_and_invalid_arguments, tests, NULL);
@@ -583,6 +751,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_file_append_and_lines, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_binary_round_trip_and_empty, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_utf8_bom_endings_and_embedded_nul, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_exact_unicode_text_round_trip, tests, NULL);
+    TEST_RUN_IN_GROUP(test_file_exact_unicode_line_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_linux_path_bytes_are_not_normalised, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_invalid_utf8_does_not_truncate, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_long_line_crosses_buffer_boundaries, tests, NULL);
@@ -631,6 +801,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_file_sqlite_database_path_and_argument_guards, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_sqlite_encrypted_payload_round_trip, tests, NULL);
     TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_file_sha256, readme_examples, "file,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_file_utf8_lines, readme_examples, "file,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_file_replace_backup, readme_examples, "file,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_file_compression_round_trip, readme_examples, "file,readme,output");

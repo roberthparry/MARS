@@ -10,11 +10,12 @@
  */
 
 /* Deadline-based non-blocking socket I/O and single-response framing. */
-#include "websrv_internal.h"
 #include <errno.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <time.h>
+
+#include "websrv_internal.h"
 
 int64_t websrv_now(void)
 {

@@ -4,7 +4,8 @@
  *
  * Evaluates expressions through number_t arithmetic and adaptively subdivides intervals, including nested
  * multidimensional evaluation. Error estimates and work limits control termination; they do not make divergent
- * integrals convergent.
+ * integrals convergent. Nested tanh-sinh refinements reuse individual interior-node contributions at full working
+ * precision, while retaining logical work accounting and partial-level truncation.
  *
  * This is part of integrator.h. Callers configure opaque integrator handles and inspect completion or error
  * information rather than relying on a particular internal algorithm.
@@ -322,176 +323,169 @@ static number_t mp_tolerance_threshold(number_t abs_tol, number_t rel_tol, const
     return threshold;
 }
 
+typedef struct {
+    number_t contribution;
+    number_t absolute_term;
+} mp_tanh_sinh_node_t;
+
+typedef struct {
+    mp_tanh_sinh_node_t *nodes;
+    size_t count;
+} mp_tanh_sinh_cache_t;
+
+/* Only successfully evaluated interior nodes own numbers in the cache. */
+static void mp_tanh_sinh_cache_clear(mp_tanh_sinh_cache_t *cache)
+{
+    for (size_t i = 0u; i < cache->count; ++i) {
+        num_destroy(&cache->nodes[i].absolute_term);
+        num_destroy(&cache->nodes[i].contribution);
+    }
+    free(cache->nodes);
+    cache->nodes = NULL;
+    cache->count = 0u;
+}
+
+/* Return one for a rounded endpoint, zero for an interior node, or minus one for evaluation failure. */
+static int mp_tanh_sinh_node_eval(mp_eval_fn eval, void *ctx, const number_t center, const number_t half_width,
+                                  const number_t a, const number_t b, const number_t pi_over_two,
+                                  const number_t h, size_t k, mp_tanh_sinh_node_t *node)
+{
+    number_t k_num = num_create_from_long((long)k);
+    number_t t = num_mul(h, k_num);
+    number_t sh = num_sinh(t);
+    number_t scaled_sh = num_mul(pi_over_two, sh);
+    number_t u = num_tanh(scaled_sh);
+    number_t ch = num_cosh(t);
+    number_t cosh_scaled = num_cosh(scaled_sh);
+    number_t denom = num_sqr(cosh_scaled);
+    number_t numerator = num_mul(pi_over_two, ch);
+    number_t weight_core = num_div(numerator, denom);
+    number_t width_weight = num_mul(weight_core, half_width);
+    number_t weight = num_mul(width_weight, h);
+    number_t x_offset = num_mul(half_width, u);
+    number_t x_pos = num_add(center, x_offset);
+    number_t x_neg = num_sub(center, x_offset);
+    number_t f_pos = NUM_ZERO;
+    number_t f_neg = NUM_ZERO;
+    int status = -1;
+
+    /* The map is open: never evaluate or cache rounded endpoints. */
+    if (num_cmp(x_pos, a) == 0 || num_cmp(x_pos, b) == 0 ||
+        num_cmp(x_neg, a) == 0 || num_cmp(x_neg, b) == 0) {
+        status = 1;
+        goto cleanup;
+    }
+    if (eval(ctx, x_pos, &f_pos) != 0 || (k > 0u && eval(ctx, x_neg, &f_neg) != 0))
+        goto cleanup;
+
+    if (k == 0u) {
+        node->contribution = num_mul(weight, f_pos);
+    } else {
+        number_t pair_sum = num_add(f_pos, f_neg);
+        node->contribution = num_mul(weight, pair_sum);
+        num_destroy(&pair_sum);
+    }
+
+    /* Opposite signs at the two tails must not cancel the error estimate. */
+    number_t abs_pos = num_abs(f_pos);
+    number_t abs_neg = num_abs(f_neg);
+    number_t abs_pair = num_add(abs_pos, abs_neg);
+    number_t abs_weight = num_abs(weight);
+    node->absolute_term = num_mul(abs_pair, abs_weight);
+    num_destroy(&abs_weight);
+    num_destroy(&abs_pair);
+    num_destroy(&abs_neg);
+    num_destroy(&abs_pos);
+    status = 0;
+
+cleanup:
+    num_destroy(&f_neg);
+    num_destroy(&f_pos);
+    num_destroy(&x_neg);
+    num_destroy(&x_pos);
+    num_destroy(&x_offset);
+    num_destroy(&weight);
+    num_destroy(&width_weight);
+    num_destroy(&weight_core);
+    num_destroy(&numerator);
+    num_destroy(&denom);
+    num_destroy(&cosh_scaled);
+    num_destroy(&ch);
+    num_destroy(&u);
+    num_destroy(&scaled_sh);
+    num_destroy(&sh);
+    num_destroy(&t);
+    num_destroy(&k_num);
+    return status;
+}
+
 static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t center, const number_t half_width,
                                   const number_t a, const number_t b,
                                   const number_t pi_over_two, const number_t h, const number_t term_tolerance,
-                                  size_t min_steps, int max_steps, number_t *sum_out, number_t *last_term_out,
+                                  size_t min_steps, int max_steps, const mp_tanh_sinh_cache_t *previous,
+                                  mp_tanh_sinh_cache_t *current, number_t *sum_out, number_t *last_term_out,
                                   size_t *used_steps_out)
 {
     number_t sum = num_clone(NUM_ZERO);
     number_t last_term = num_clone(NUM_ZERO);
     size_t used_steps = 0u;
     int quiet_count = 0;
+    int status = 1;
 
-    if (!eval || !sum_out || !last_term_out) {
-        num_destroy(&last_term);
-        num_destroy(&sum);
-        return -1;
-    }
+    if (!eval || !sum_out || !last_term_out || max_steps < 0 ||
+        (size_t)max_steps + 1u > SIZE_MAX / sizeof(*current->nodes))
+        goto fail;
+    /* Each level is bounded by its remaining logical budget; only two levels are retained. */
+    current->nodes = malloc(((size_t)max_steps + 1u) * sizeof(*current->nodes));
+    if (!current->nodes)
+        goto fail;
 
-    for (int k = 0; k <= max_steps; ++k) {
-        number_t k_num = num_create_from_long((long)k);
-        number_t t = num_mul(h, k_num);
-        number_t sh = num_sinh(t);
-        number_t scaled_sh = num_mul(pi_over_two, sh);
-        number_t u = num_tanh(scaled_sh);
-        number_t ch = num_cosh(t);
-        number_t cosh_scaled = num_cosh(scaled_sh);
-        number_t denom = num_sqr(cosh_scaled);
-        number_t numerator = num_mul(pi_over_two, ch);
-        number_t weight_core = num_div(numerator, denom);
-        number_t width_weight = num_mul(weight_core, half_width);
-        number_t weight = num_mul(width_weight, h);
-        number_t x_offset = num_mul(half_width, u);
-        number_t x_pos = num_add(center, x_offset);
-        number_t x_neg = num_sub(center, x_offset);
-        number_t f_pos = NUM_ZERO;
-        number_t f_neg = NUM_ZERO;
-        number_t contrib = NUM_ZERO;
-        number_t term_mag = NUM_ZERO;
-        int eval_ok;
-
-        /* The map is open. Rounded endpoints are not valid quadrature samples.
-         * Retain the last interior contribution as a tail error for refinement;
-         * in particular, do not infer that an undefined endpoint means divergence. */
-        bool rounded_endpoint = num_cmp(x_pos, a) == 0 || num_cmp(x_pos, b) == 0 ||
-                                num_cmp(x_neg, a) == 0 || num_cmp(x_neg, b) == 0;
-        eval_ok = !rounded_endpoint && eval(ctx, x_pos, &f_pos) == 0;
-        if (eval_ok && k > 0)
-            eval_ok = eval(ctx, x_neg, &f_neg) == 0;
-
-        if (!eval_ok) {
-            num_destroy(&term_mag);
-            num_destroy(&contrib);
-            num_destroy(&f_neg);
-            num_destroy(&f_pos);
-            num_destroy(&x_neg);
-            num_destroy(&x_pos);
-            num_destroy(&x_offset);
-            num_destroy(&weight);
-            num_destroy(&width_weight);
-            num_destroy(&weight_core);
-            num_destroy(&numerator);
-            num_destroy(&denom);
-            num_destroy(&cosh_scaled);
-            num_destroy(&ch);
-            num_destroy(&u);
-            num_destroy(&scaled_sh);
-            num_destroy(&sh);
-            num_destroy(&t);
-            num_destroy(&k_num);
-            if (rounded_endpoint && used_steps > 0u) {
-                *sum_out = sum;
-                *last_term_out = last_term;
-                if (used_steps_out)
-                    *used_steps_out = used_steps;
-                return 1;
-            }
-            num_destroy(&last_term);
-            num_destroy(&sum);
-            return -1;
-        }
-
-        if (k == 0) {
-            num_destroy(&contrib);
-            contrib = num_mul(weight, f_pos);
+    for (size_t k = 0u; k <= (size_t)max_steps; ++k) {
+        mp_tanh_sinh_node_t node;
+        if (!(k % 2u) && k / 2u < previous->count) {
+            /* Halving h leaves this node's coordinate unchanged and halves its weight.
+             * Reuse individual nodes, not the previous sum: a final capped level may
+             * cover only a prefix of the preceding transformed interval. */
+            node.contribution = num_mul(previous->nodes[k / 2u].contribution, NUM_HALF);
+            node.absolute_term = num_mul(previous->nodes[k / 2u].absolute_term, NUM_HALF);
         } else {
-            number_t pair_sum = num_add(f_pos, f_neg);
-
-            num_destroy(&contrib);
-            contrib = num_mul(weight, pair_sum);
-            num_destroy(&pair_sum);
+            int node_status = mp_tanh_sinh_node_eval(eval, ctx, center, half_width, a, b, pi_over_two, h, k, &node);
+            if (node_status != 0) {
+                if (node_status > 0 && used_steps > 0u)
+                    break;
+                goto fail;
+            }
         }
-
-        num_destroy(&term_mag);
-        /* Opposite signs at the two tails must not cancel the error estimate. */
-        number_t abs_pos = num_abs(f_pos);
-        number_t abs_neg = num_abs(f_neg);
-        number_t abs_pair = num_add(abs_pos, abs_neg);
-        number_t abs_weight = num_abs(weight);
-        term_mag = num_mul(abs_pair, abs_weight);
-        num_destroy(&abs_weight);
-        num_destroy(&abs_pair);
-        num_destroy(&abs_neg);
-        num_destroy(&abs_pos);
-        {
-            number_t next_sum = num_add(sum, contrib);
-
-            num_destroy(&sum);
-            sum = next_sum;
-        }
+        current->nodes[current->count++] = node;
+        number_t next_sum = num_add(sum, node.contribution);
+        num_destroy(&sum);
+        sum = next_sum;
         num_destroy(&last_term);
-        last_term = num_clone(term_mag);
-        used_steps = (size_t)k + 1u;
+        last_term = num_clone(node.absolute_term);
+        /* Cached nodes still consume the same logical work units as fresh nodes. */
+        used_steps = k + 1u;
 
-        if (num_lt(term_mag, term_tolerance)) {
+        if (num_lt(node.absolute_term, term_tolerance)) {
             quiet_count += 1;
             if (quiet_count >= 4 && used_steps >= min_steps) {
-                num_destroy(&term_mag);
-                num_destroy(&contrib);
-                num_destroy(&f_neg);
-                num_destroy(&f_pos);
-                num_destroy(&x_neg);
-                num_destroy(&x_pos);
-                num_destroy(&x_offset);
-                num_destroy(&weight);
-                num_destroy(&width_weight);
-                num_destroy(&weight_core);
-                num_destroy(&numerator);
-                num_destroy(&denom);
-                num_destroy(&cosh_scaled);
-                num_destroy(&ch);
-                num_destroy(&u);
-                num_destroy(&scaled_sh);
-                num_destroy(&sh);
-                num_destroy(&t);
-                num_destroy(&k_num);
-                *sum_out = sum;
-                *last_term_out = last_term;
-                if (used_steps_out)
-                    *used_steps_out = used_steps;
-                return 0;
+                status = 0;
+                break;
             }
         } else {
             quiet_count = 0;
         }
-
-        num_destroy(&term_mag);
-        num_destroy(&contrib);
-        num_destroy(&f_neg);
-        num_destroy(&f_pos);
-        num_destroy(&x_neg);
-        num_destroy(&x_pos);
-        num_destroy(&x_offset);
-        num_destroy(&weight);
-        num_destroy(&width_weight);
-        num_destroy(&weight_core);
-        num_destroy(&numerator);
-        num_destroy(&denom);
-        num_destroy(&cosh_scaled);
-        num_destroy(&ch);
-        num_destroy(&u);
-        num_destroy(&scaled_sh);
-        num_destroy(&sh);
-        num_destroy(&t);
-        num_destroy(&k_num);
     }
 
     *sum_out = sum;
     *last_term_out = last_term;
     if (used_steps_out)
         *used_steps_out = used_steps;
-    return 1;
+    return status;
+
+fail:
+    num_destroy(&last_term);
+    num_destroy(&sum);
+    return -1;
 }
 
 static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_t b, number_t abs_tol, number_t rel_tol,
@@ -515,6 +509,8 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
     size_t used_steps = 0u;
     int refine_limit = 2;
     int status = 1;
+    mp_tanh_sinh_cache_t previous_nodes = {0};
+    mp_tanh_sinh_cache_t current_nodes = {0};
 
     if (!eval || !result_out || !error_out) {
         status = -1;
@@ -552,7 +548,8 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
         size_t level_min_steps = (size_t)level_max_steps + 1u;
         int sum_status =
             mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width, a, b, pi_over_two, h, term_tolerance, level_min_steps,
-                                   level_max_steps, &level_sum, &level_last_term, &level_steps);
+                                   level_max_steps, &previous_nodes, &current_nodes, &level_sum, &level_last_term,
+                                   &level_steps);
 
         if (sum_status < 0) {
             num_destroy(&threshold);
@@ -561,6 +558,10 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
             status = -1;
             goto cleanup;
         }
+
+        mp_tanh_sinh_cache_clear(&previous_nodes);
+        previous_nodes = current_nodes;
+        current_nodes = (mp_tanh_sinh_cache_t){0};
 
         num_destroy(&sum);
         sum = level_sum;
@@ -624,6 +625,8 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
         *steps_out = used_steps > 0u ? used_steps : 1u;
 
 cleanup:
+    mp_tanh_sinh_cache_clear(&current_nodes);
+    mp_tanh_sinh_cache_clear(&previous_nodes);
     num_destroy(&best_error);
     num_destroy(&best_sum);
     num_destroy(&error);

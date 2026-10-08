@@ -10,12 +10,13 @@
  */
 
 /* Strict, bounded HTTP/1.1 origin-form parsing through string_t views. */
-#include "websrv_internal.h"
 #include <errno.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+
+#include "websrv_internal.h"
 
 static unsigned char at(string_view_t v, size_t pos)
 {

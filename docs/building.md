@@ -5,6 +5,52 @@ build target is Linux with GCC or Clang.
 
 ## Requirements
 
+### Native maintenance applications
+
+`tools/mars_checks` owns the repository's compliance, public-distribution,
+Markdown API-coverage and executable README-example checks, measured file
+coverage reports, release evidence and source-policy audits. Its subcommands are
+`compliance`, `public-distribution`, `markdown-api`, `readme-examples`,
+`file-coverage`, `release-evidence` and `source-policy`;
+`--help` lists their options. Existing root Make check targets call this application.
+The compliance command normally requires its control files in the Git index;
+`--allow-untracked` supports checking a new working tree before its first commit.
+`COMPLIANCE_ARGS=--allow-untracked` passes that option through `make check-compliance`.
+
+`tools/mars_config` owns the `almanac`, `jurisdiction` and `weather` installation
+subcommands. Existing `install-almanac-db`, `install-jurisdiction-db` and
+`install-mars-lab` targets call it. Configuration uses `string_t` for literal
+parsing, the file module for filesystem operations and the database module for
+SQLCipher access. It does not invoke a shell to interpret credentials.
+
+Database installers build and validate private staged databases before publishing
+them. Existing databases and saved configuration are retained when validation
+fails. Database and configuration publication uses separate atomic renames with
+rollback on reported errors; the pair is not a crash-atomic filesystem
+transaction. Run installations serially and close database consumers first.
+
+For import diagnostics, set `MARS_CONFIG_IMPORT_TRACE=1` when running an
+installer. It reports bounded-source byte counts and wall/CPU timings, separating
+native SQL processing from importer parsing and I/O. Diagnostic source labels are
+allowlisted; the trace does not print credentials or SQL contents. SQLCipher's
+memory-protection settings remain enabled.
+
+Each application has one Makefile, public-to-tool headers under `include/`,
+responsibility-specific `src/` subdirectories and C tests under its own `tests/`.
+The root `native-checks` and `native-config` targets build the applications;
+running Make in either application directory delegates to the same root graph.
+Executables and object files live in that application's `build/release/` or
+`build/debug/`, with test binaries beneath `build/<mode>/tests/`. These generated
+directories are ignored by Git. The source and test directories are not ignored.
+
+The root build first prepares the static MARS library required by these tools,
+then builds both maintenance applications before the shared library, Labs,
+scratch programs, benchmarks and test executables. The `native-tools` target
+groups this bootstrap stage. Explicit order-only dependencies preserve this
+ordering with parallel Make without causing unnecessary rebuilds.
+
+### Compiler and libraries
+
 Build tools:
 
 - GCC or Clang on Linux
@@ -54,7 +100,8 @@ If a required dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`.
 
 For file-module test coverage, `make -j1 coverage-file` additionally requires
-`gcov` from the GCC toolchain and Python 3. It reports measured execution
+`gcov` from the GCC toolchain and `gzip`. The native `mars_checks file-coverage`
+command reads GCC's compressed JSON reports. It reports measured execution
 coverage and enforces minimums; see the
 [file testing guide](file.md#coverage-and-failure-path-tests) for details.
 
@@ -66,18 +113,31 @@ The [HTTP module](http.md) uses system libcurl. Install the development package
 `CURL_CFLAGS` and `CURL_LIBS` can override discovery for non-standard installs.
 Static archive consumers must also link libcurl and its transitive dependencies.
 `make check-deps` checks the minimum header version and links a transport probe.
-The ordinary HTTP tests additionally use Python 3's standard library for local
-HTTP/HTTPS fixtures; they do not contact external services.
+The ordinary HTTP tests use native C loopback fixtures; they do not contact
+external services. The fixture executable is built in
+`tests/build/<mode>/http/fixtures/` and links OpenSSL for HTTPS and mutual TLS.
+Install `libssl-dev` on Debian/Ubuntu; `check-http-fixture-deps` verifies its
+headers and link libraries. `HTTP_FIXTURE_CFLAGS` and `HTTP_FIXTURE_LIBS` may
+override pkg-config discovery. This is a test dependency, not an additional
+public MARS link requirement.
 The WebSocket API needs a libcurl build with ws/wss enabled; unary gRPC needs
 HTTP/2 support. The runtime reports missing protocol support explicitly.
-The loopback WebSocket and HTTP/2/gRPC fixtures use only Python's standard
-library. Protocol Buffers encoding is native C and adds no external dependency.
+The same native fixture supplies WebSocket and HTTP/2/gRPC peers, including
+deliberately malformed replies. Protocol Buffers encoding is native C and adds
+no external dependency.
 Recent libcurl releases are recommended; the protocol tests were verified with
 libcurl 8.18.0. Older distribution packages may need upgrading or rebuilding
 with these optional protocol features enabled.
 
 The [webserver module](webserver.md) uses Linux sockets and adds no dependency.
-Its local tests and example need loopback sockets and process creation; they do
+The verified libcurl build uses nghttp2 for HTTP/2, including unary gRPC; nghttp2
+is a transitive client dependency, not a web-server library. Building libcurl
+itself with this backend requires `libnghttp2-dev` on Debian/Ubuntu; building
+MARS against an already configured libcurl does not require direct nghttp2
+headers or linker flags. Both projects are acknowledged in the
+[third-party notices](../THIRD_PARTY_NOTICES.md) and
+[dependency inventory](../DEPENDENCIES.spdx).
+The web-server tests and example need loopback sockets and process creation; they do
 not need internet access. Source, header and test discovery includes the module
 automatically. Run `make -j1 test_webserver` for its dedicated suite.
 
@@ -109,13 +169,14 @@ See the [file guide](file.md#compression-encryption-and-object-storage)
 for API behaviour and examples, and the
 [third-party notices](../THIRD_PARTY_NOTICES.md) for redistribution information.
 
-MARS Lab requires Python 3.10 or later and uses only the Python standard
-library. It uses server-side TeX rendering, and the desktop installer uses the
-`sqlcipher` CLI to bootstrap the jurisdiction database, so the desktop Lab also
-needs `latex`, `dvisvgm`, and `sqlcipher`:
+MARS Lab's server and workers are native C programmes; starting and using the
+Lab does not require Python. TeX rendering still uses `latex` and `dvisvgm`.
+Database and weather configuration use the native `mars_config` application,
+linked directly to SQLCipher; installation needs neither Python nor the SQLCipher
+command-line programme. To install the additional rendering prerequisites:
 
 ```sh
-sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
+sudo apt install texlive-latex-base dvisvgm
 make check-lab-deps
 ```
 
@@ -207,8 +268,9 @@ MARS Lab running at http://localhost:<port>/
 
 `make mars-lab-restart` stops a Lab process belonging to the current user,
 rebuilds the helper when necessary and launches it again.
-The direct `tools/mars-lab` launcher performs the same helper build check
-before starting the browser client.
+`make mars-lab` performs the same native server and worker build check
+before starting the browser client; the installed desktop launcher starts the
+native executable directly.
 
 That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in
@@ -216,8 +278,9 @@ database, stores the resulting configuration in
 `~/.mars/jurisdiction/mars_jurisdiction_rules.db`. MARS supplies no shared
 WeatherAPI account or key. If the installer creates their own WeatherAPI
 account and chooses to enable weather lookups, that account's key is stored in
-`~/.mars/config/weather.env`. Reinstalling MARS Lab recreates `~/.mars` while
-preserving `weather.env`. Each lookup sends the configured key, selected date,
+`~/.mars/config/weather.env`. Reinstalling replaces the selected jurisdiction
+database and its configuration, preserving unrelated files and saved Lab state.
+Each lookup sends the configured key, selected date,
 latitude and longitude from the local MARS Lab server to WeatherAPI.com over
 HTTPS; the key is not sent to the browser. MARS does not cache or persist the
 weather response, although the date and coordinates remain in private local

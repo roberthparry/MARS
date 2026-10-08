@@ -53,12 +53,13 @@
 #ifndef NUMBER_H
 #define NUMBER_H
 
-#include "qcomplex.h"
-#include "qfloat.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "qcomplex.h"
+#include "qfloat.h"
 
 typedef struct _string_t string_t;
 

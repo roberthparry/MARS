@@ -3,13 +3,15 @@
  * @brief Generic numeric special-function regressions.
  *
  * Checks supported mathematical families beyond elementary arithmetic, including Struve and signal functions.
- * Values and edge cases are exercised through the representation-independent public API.
+ * Values and edge cases are exercised through the representation-independent public API. Incomplete-gamma tails
+ * are checked against independent MPFR error-function and finite integer identities at several precisions.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
 
 #include <complex.h>
+#include <mpfr.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -578,11 +580,112 @@ static void test_number_sgn(void)
     ASSERT_EQ_INT(num_get_default_prec_bits(), saved_precision);
 }
 
+/* Independent half-order erf identity and finite integer recurrences, with ample cancellation headroom. */
+static void number_gamma_reference(mpfr_ptr lower, mpfr_ptr complete, unsigned twice_order, mpfr_srcptr x)
+{
+    mpfr_t root, decay, power, temporary;
+    mpfr_inits2(mpfr_get_prec(lower), root, decay, power, temporary, (mpfr_ptr)0);
+    mpfr_neg(decay, x, MPFR_RNDN);
+    mpfr_exp(decay, decay, MPFR_RNDN);
+    if (twice_order % 2u) {
+        mpfr_const_pi(complete, MPFR_RNDN);
+        mpfr_sqrt(complete, complete, MPFR_RNDN);
+        mpfr_sqrt(root, x, MPFR_RNDN);
+        mpfr_erf(lower, root, MPFR_RNDN);
+        mpfr_mul(lower, lower, complete, MPFR_RNDN);
+        if (twice_order == 3u) {
+            mpfr_div_2ui(lower, lower, 1u, MPFR_RNDN);
+            mpfr_mul(temporary, root, decay, MPFR_RNDN);
+            mpfr_sub(lower, lower, temporary, MPFR_RNDN);
+            mpfr_div_2ui(complete, complete, 1u, MPFR_RNDN);
+        }
+    } else {
+        mpfr_neg(temporary, x, MPFR_RNDN);
+        mpfr_expm1(lower, temporary, MPFR_RNDN);
+        mpfr_neg(lower, lower, MPFR_RNDN);
+        mpfr_set_ui(complete, 1u, MPFR_RNDN);
+        for (unsigned n = 1u; n < twice_order / 2u; ++n) {
+            mpfr_mul_ui(lower, lower, n, MPFR_RNDN);
+            mpfr_pow_ui(power, x, n, MPFR_RNDN);
+            mpfr_mul(temporary, power, decay, MPFR_RNDN);
+            mpfr_sub(lower, lower, temporary, MPFR_RNDN);
+            mpfr_mul_ui(complete, complete, n, MPFR_RNDN);
+        }
+    }
+    mpfr_clears(root, decay, power, temporary, (mpfr_ptr)0);
+}
+
+static void test_number_incomplete_gamma_precision(void)
+{
+    NUM_SCOPE(scope);
+    const unsigned digits[] = {40u, 80u, 160u};
+    const unsigned twice_orders[] = {1u, 2u, 3u, 4u, 6u};
+    const char *arguments[] = {"0", "2e-30", "2e-100", "2e-300", "0.5", "1.5", "2.5", "4", "20"};
+    number_t (*const operations[])(number_t, number_t) = {
+        num_gammainc_lower, num_gammainc_P, num_gammainc_upper, num_gammainc_Q
+    };
+    size_t saved = num_get_default_prec_bits();
+    bool ok = true;
+    for (size_t d = 0u; d < sizeof(digits) / sizeof(*digits); ++d) {
+        ok = num_set_default_prec_digits(digits[d]) == 0 && ok;
+        string_t *tolerance_text = string_sprintf("1e-%u", digits[d] - 6u);
+        number_t tolerance = num_create_from_text(tolerance_text);
+        string_free(tolerance_text);
+        mpfr_t x, lower, complete, expected;
+        mpfr_inits2(4096 + (mpfr_prec_t)num_get_default_prec_bits(), x, lower, complete, expected, (mpfr_ptr)0);
+        for (size_t a = 0u; a < sizeof(twice_orders) / sizeof(*twice_orders); ++a) {
+            number_t order = num_create_from_frac(twice_orders[a], 2);
+            for (size_t i = 0u; i < sizeof(arguments) / sizeof(*arguments); ++i) {
+                mpfr_set_str(x, arguments[i], 10, MPFR_RNDN);
+                number_gamma_reference(lower, complete, twice_orders[a], x);
+                number_t argument = num_create_from_string(arguments[i]);
+                for (size_t mode = 0u; mode < sizeof(operations) / sizeof(*operations); ++mode) {
+                    if (mode < 2u)
+                        mpfr_set(expected, lower, MPFR_RNDN);
+                    else
+                        mpfr_sub(expected, complete, lower, MPFR_RNDN);
+                    if (mode % 2u)
+                        mpfr_div(expected, expected, complete, MPFR_RNDN);
+                    char *text = NULL;
+                    mpfr_asprintf(&text, "%.*Rg", (int)digits[d] + 12, expected);
+                    number_t reference = num_create_from_string(text ? text : "NAN");
+                    if (text)
+                        mpfr_free_str(text);
+                    number_t actual = operations[mode](order, argument);
+                    number_t difference = num_abs(num_sub(actual, reference));
+                    bool matched = num_is_finite(actual) &&
+                                   (num_is_zero(reference) ? num_is_zero(actual)
+                                                          : num_lt(num_div(difference, num_abs(reference)), tolerance));
+                    if (!matched)
+                        printf("incomplete gamma: digits=%u a=%u/2 x=%s mode=%zu\n",
+                               digits[d], twice_orders[a], arguments[i], mode);
+                    ok = matched && ok;
+                }
+            }
+        }
+        mpfr_clears(x, lower, complete, expected, (mpfr_ptr)0);
+    }
+    number_t one = num_create_from_string("1");
+    number_t half = num_create_from_frac(1, 2);
+    ok = num_eq(num_gammainc_lower(one, NUM_INF), NUM_ONE) && ok;
+    ok = num_eq(num_gammainc_P(one, NUM_INF), NUM_ONE) && ok;
+    ok = num_is_zero(num_gammainc_upper(one, NUM_INF)) && ok;
+    ok = num_is_zero(num_gammainc_Q(one, NUM_INF)) && ok;
+    for (size_t mode = 0u; mode < sizeof(operations) / sizeof(*operations); ++mode) {
+        ok = num_is_nan(operations[mode](half, NUM_NAN)) && ok;
+        ok = num_is_nan(operations[mode](NUM_NAN, one)) && ok;
+        ok = num_is_nan(operations[mode](half, NUM_NEG_ONE)) && ok;
+    }
+    ok = num_set_default_prec_bits(saved) == 0 && ok;
+    ASSERT_TRUE(ok);
+}
+
 void run_number_special_function_tests(void)
 {
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     test_number_clausen();
+    TEST_RUN_SUBTEST(test_number_incomplete_gamma_precision, "number,gamma,precision");
     TEST_RUN_SUBTEST(test_number_sgn, "number,signal,sgn,precision");
     TEST_RUN_SUBTEST(test_number_struve_l, "number,struve,precision");
     TEST_RUN_SUBTEST(test_number_struve_h, "number,struve,precision");

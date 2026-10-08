@@ -9,7 +9,14 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+/* The build supplies the selected mode; retain a useful editor-only default. */
+#ifndef MARS_HTTP_FIXTURE_PATH
+#define MARS_HTTP_FIXTURE_PATH "tests/build/release/http/fixtures/http_fixture"
+#endif
+
 #include <arpa/inet.h>
+#include <errno.h>
+#include <poll.h>
 #define stack_t posix_signal_stack_t
 #include <signal.h>
 #undef stack_t
@@ -18,9 +25,12 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
+
 #include "http.h"
 #include "array.h"
+#include "file.h"
 #include "protobuf.h"
 #include "test_harness.h"
 
@@ -49,8 +59,18 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static unsigned plain_port, tls_port;
 static pid_t plain_pid = -1, tls_pid = -1;
 
+static bool fixture_available(void)
+{
+    file_t *executable = file_new_cstr(MARS_HTTP_FIXTURE_PATH);
+    bool available = executable && file_check_access(executable, false, false, true);
+    file_free(executable);
+    return available;
+}
+
 static pid_t start_fixture(bool tls, bool identity, unsigned *port)
 {
+    if (!fixture_available())
+        return -1;
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
     socklen_t length = sizeof(address);
@@ -66,13 +86,13 @@ static pid_t start_fixture(bool tls, bool identity, unsigned *port)
     pid_t pid = descriptor ? fork() : -1;
     if (pid == 0) {
         if (identity)
-            execlp("python3", "python3", "tests/http/http_fixture.py", string_c_str(descriptor),
+            execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "http", string_c_str(descriptor),
                    "tests/http/test-cert.pem", "tests/http/test-key.pem", "identity", (char *)NULL);
         if (tls)
-            execlp("python3", "python3", "tests/http/http_fixture.py", string_c_str(descriptor),
+            execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "http", string_c_str(descriptor),
                    "tests/http/test-cert.pem", "tests/http/test-key.pem", (char *)NULL);
         else
-            execlp("python3", "python3", "tests/http/http_fixture.py", string_c_str(descriptor), (char *)NULL);
+            execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "http", string_c_str(descriptor), (char *)NULL);
         _exit(127);
     }
     string_free(descriptor);
@@ -84,7 +104,8 @@ static void stop_fixture(pid_t pid)
 {
     if (pid > 0) {
         kill(pid, SIGTERM);
-        waitpid(pid, NULL, 0);
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {
+        }
     }
 }
 
@@ -678,8 +699,10 @@ static void test_http_client_identity(void)
     TEST_ASSERT_TRUE(rejected, "old authenticated connection not reused");
 }
 
-static pid_t start_protocol_fixture(const char *script, bool tls, unsigned *port)
+static pid_t start_protocol_fixture_lifetime(const char *protocol, bool tls, unsigned *port, const char *lifetime)
 {
+    if (!fixture_available())
+        return -1;
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
     socklen_t length = sizeof(address);
@@ -691,20 +714,217 @@ static pid_t start_protocol_fixture(const char *script, bool tls, unsigned *port
     pid_t pid = descriptor ? fork() : -1;
     if (pid == 0) {
         if (tls)
-            execlp("python3", "python3", script, string_c_str(descriptor),
+            execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "--lifetime-ms", lifetime, protocol, string_c_str(descriptor),
                    "tests/http/test-cert.pem", "tests/http/test-key.pem", (char *)NULL);
         else
-            execlp("python3", "python3", script, string_c_str(descriptor), (char *)NULL);
+            execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "--lifetime-ms", lifetime, protocol,
+                   string_c_str(descriptor), (char *)NULL);
         _exit(127);
     }
     string_free(descriptor); close(fd);
     return pid;
 }
 
+static pid_t start_protocol_fixture(const char *protocol, bool tls, unsigned *port)
+{
+    return start_protocol_fixture_lifetime(protocol, tls, port, "15000");
+}
+
+static int64_t fixture_test_milliseconds(void)
+{
+    struct timespec now;
+    return clock_gettime(CLOCK_MONOTONIC, &now) ? -1 : (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+static bool fixture_test_poll(int fd, short events, int64_t deadline)
+{
+    for (;;) {
+        int64_t now = fixture_test_milliseconds();
+        if (now < 0 || now >= deadline)
+            return false;
+        struct pollfd descriptor = {.fd = fd, .events = events};
+        int result = poll(&descriptor, 1, (int)(deadline - now));
+        if (result > 0)
+            return !(descriptor.revents & POLLNVAL);
+        if (result < 0 && errno != EINTR)
+            return false;
+    }
+}
+
+static int fixture_test_connect(unsigned port)
+{
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    struct sockaddr_in address = {.sin_family = AF_INET, .sin_port = htons(port),
+                                 .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    if (fd < 0)
+        return -1;
+    bool ok = connect(fd, (struct sockaddr *)&address, sizeof(address)) == 0;
+    if (!ok && errno == EINPROGRESS) {
+        int error = 0;
+        socklen_t size = sizeof(error);
+        ok = fixture_test_poll(fd, POLLOUT, fixture_test_milliseconds() + 1500) &&
+             getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) == 0 && !error;
+    }
+    if (!ok) {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+static bool fixture_test_send(int fd, const char *text)
+{
+    size_t size = strlen(text), offset = 0;
+    int64_t deadline = fixture_test_milliseconds() + 1500;
+    while (offset < size) {
+        if (!fixture_test_poll(fd, POLLOUT, deadline))
+            return false;
+        ssize_t count = send(fd, text + offset, size - offset, MSG_NOSIGNAL);
+        if (count > 0)
+            offset += (size_t)count;
+        else if (count == 0 || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK))
+            return false;
+    }
+    return true;
+}
+
+static bool fixture_test_head(int fd)
+{
+    bool ok = fixture_test_send(fd, "HEAD /json HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    string_t *reply = string_new();
+    int64_t deadline = fixture_test_milliseconds() + 1500;
+    while (ok && reply && string_find(reply, "\r\n\r\n") < 0 && string_byte_length(reply) < 1024) {
+        unsigned char byte;
+        ok = fixture_test_poll(fd, POLLIN, deadline);
+        if (!ok)
+            break;
+        ssize_t count = recv(fd, &byte, 1, 0);
+        if (count == 1)
+            ok = string_append_utf8_exact(reply, (const char *)&byte, 1) == 0;
+        else if (!count || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK))
+            ok = false;
+    }
+    ok = ok && reply && string_find(reply, "HTTP/1.1 200 OK\r\n") == 0 && string_find(reply, "\r\n\r\n") >= 0;
+    string_free(reply);
+    return ok;
+}
+
+static bool fixture_test_closed(int fd, int64_t deadline)
+{
+    while (fixture_test_poll(fd, POLLIN, deadline)) {
+        unsigned char buffer[256];
+        ssize_t count = recv(fd, buffer, sizeof(buffer), 0);
+        if (!count || (count < 0 && errno == ECONNRESET))
+            return true;
+        if (count < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
+            return false;
+    }
+    return false;
+}
+
+static void test_http_fixture_worker_cap_and_recovery(void)
+{
+    unsigned port = 0;
+    pid_t pid = start_protocol_fixture("http", false, &port);
+    int connections[16];
+    for (size_t i = 0; i < 16; ++i)
+        connections[i] = -1;
+    bool ok = pid > 0;
+    /* A complete HEAD reply proves each of the sixteen workers has started. */
+    for (size_t i = 0; ok && i < 16; ++i) {
+        connections[i] = fixture_test_connect(port);
+        ok = connections[i] >= 0 && fixture_test_head(connections[i]);
+    }
+    int excess = ok ? fixture_test_connect(port) : -1;
+    ok = excess >= 0 && fixture_test_closed(excess, fixture_test_milliseconds() + 1000) && ok;
+    if (excess >= 0)
+        close(excess);
+    if (connections[0] >= 0) {
+        shutdown(connections[0], SHUT_WR);
+        ok = fixture_test_closed(connections[0], fixture_test_milliseconds() + 1000) && ok;
+        close(connections[0]);
+        connections[0] = -1;
+    }
+    /* Socket closure precedes releasing its slot by a few instructions. Retry
+     * actual handshakes until the cleanup is observable, without a blind sleep. */
+    bool recovered = false;
+    int64_t deadline = fixture_test_milliseconds() + 1500;
+    int64_t now;
+    while (ok && !recovered && (now = fixture_test_milliseconds()) >= 0 && now < deadline) {
+        int fd = fixture_test_connect(port);
+        recovered = fd >= 0 && fixture_test_head(fd);
+        if (fd >= 0)
+            close(fd);
+    }
+    for (size_t i = 0; i < 16; ++i)
+        if (connections[i] >= 0)
+            close(connections[i]);
+    stop_fixture(pid);
+    TEST_ASSERT_TRUE(ok && recovered, "sixteen live workers reject excess connections and recover a released slot");
+}
+
+static void test_http_fixture_total_deadline_and_recovery(void)
+{
+    unsigned port = 0;
+    pid_t pid = start_protocol_fixture_lifetime("http", false, &port, "1000");
+    int fd = pid > 0 ? fixture_test_connect(port) : -1;
+    int64_t start = fixture_test_milliseconds();
+    bool ok = fd >= 0 && fixture_test_head(fd) &&
+              fixture_test_send(fd, "GET /json HTTP/1.1\r\nHost: localhost\r\nX-Trickle: ");
+    bool closed = false;
+    unsigned sent = 0;
+    int64_t now;
+    while (ok && !closed && (now = fixture_test_milliseconds()) >= 0 && now - start < 2500) {
+        if (fixture_test_poll(fd, POLLIN, fixture_test_milliseconds() + 50))
+            closed = fixture_test_closed(fd, fixture_test_milliseconds() + 100);
+        else if (fixture_test_send(fd, "x"))
+            ++sent;
+        else
+            closed = fixture_test_closed(fd, fixture_test_milliseconds() + 100);
+    }
+    int64_t elapsed = fixture_test_milliseconds() - start;
+    if (fd >= 0)
+        close(fd);
+    int fresh = ok && closed ? fixture_test_connect(port) : -1;
+    bool recovered = fresh >= 0 && fixture_test_head(fresh);
+    if (fresh >= 0)
+        close(fresh);
+    stop_fixture(pid);
+    TEST_ASSERT_TRUE(ok && closed && sent >= 3 && elapsed >= 500 && elapsed < 2500 && recovered,
+                     "continuous request bytes cannot renew the total deadline; a fresh connection still succeeds");
+}
+
+static void test_http_fixture_tls_handshake_deadline(void)
+{
+    unsigned port = 0;
+    pid_t pid = start_protocol_fixture_lifetime("http", true, &port, "1000");
+    int fd = pid > 0 ? fixture_test_connect(port) : -1;
+    int64_t start = fixture_test_milliseconds();
+    bool closed = fd >= 0 && fixture_test_closed(fd, start + 2500);
+    int64_t elapsed = fixture_test_milliseconds() - start;
+    if (fd >= 0)
+        close(fd);
+    http_client_t *client = http_client_new();
+    string_t *ca = string_new_with("tests/http/test-cert.pem");
+    string_t *url = string_sprintf("https://localhost:%u/json", port);
+    http_request_t *request = http_request_new(HTTP_GET, url);
+    bool ready = closed && http_client_set_ca_file(client, ca);
+    http_response_t *response = ready ? http_client_send(client, request) : NULL;
+    bool recovered = http_response_ok(response);
+    http_response_free(response);
+    http_request_free(request);
+    http_client_free(client);
+    string_free(url);
+    string_free(ca);
+    stop_fixture(pid);
+    TEST_ASSERT_TRUE(closed && elapsed >= 500 && elapsed < 2500 && recovered,
+                     "a silent TLS handshake expires at the total deadline and verified TLS subsequently works");
+}
+
 static void test_http_grpc_unary(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/grpc_fixture.py", false, &port);
+    pid_t pid = start_protocol_fixture("grpc", false, &port);
     TEST_ASSERT_TRUE(pid > 0, "start local HTTP/2 peer");
     http_client_t *client = http_client_new();
     string_t *url = string_sprintf("http://127.0.0.1:%u/mars.Test/Echo", port);
@@ -734,7 +954,7 @@ static void test_http_grpc_unary(void)
 static void test_http_grpc_verified_tls(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/grpc_fixture.py", true, &port);
+    pid_t pid = start_protocol_fixture("grpc", true, &port);
     http_client_t *client = http_client_new();
     string_t *url = string_sprintf("https://localhost:%u/mars.Test/Echo", port);
     string_t *ca = string_new_with("tests/http/test-cert.pem");
@@ -758,7 +978,7 @@ static void test_http_grpc_verified_tls(void)
 static void test_http_websocket_messages(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/websocket_fixture.py", false, &port);
+    pid_t pid = start_protocol_fixture("websocket", false, &port);
     TEST_ASSERT_TRUE(pid > 0, "start WebSocket peer");
     http_client_t *client = http_client_new();
     string_t *url = string_sprintf("http://127.0.0.1:%u/echo", port);
@@ -798,7 +1018,7 @@ static void test_http_websocket_messages(void)
 static void test_http_websocket_failures_and_tls(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/websocket_fixture.py", false, &port);
+    pid_t pid = start_protocol_fixture("websocket", false, &port);
     TEST_ASSERT_TRUE(pid > 0, "start rejection peer");
     http_client_t *client = http_client_new();
     http_limits_t limits = {.total_timeout_ms = 300, .max_body_bytes = 1024};
@@ -820,12 +1040,12 @@ static void test_http_websocket_failures_and_tls(void)
         /* The deliberately silent peer sleeps; restart it before subsequent cases. */
         if (i == 3) {
             stop_fixture(pid);
-            pid = start_protocol_fixture("tests/http/websocket_fixture.py", false, &port);
+            pid = start_protocol_fixture("websocket", false, &port);
             if (pid <= 0) { passed = false; break; }
         }
     }
     stop_fixture(pid);
-    pid = start_protocol_fixture("tests/http/websocket_fixture.py", true, &port);
+    pid = start_protocol_fixture("websocket", true, &port);
     http_limits_t normal = {0};
     passed = passed && pid > 0 && http_client_set_limits(client, &normal);
     string_t *url = string_sprintf("https://localhost:%u/echo", port);
@@ -884,7 +1104,7 @@ static void example_http_services(void)
 static void example_http_grpc(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/grpc_fixture.py", false, &port);
+    pid_t pid = start_protocol_fixture("grpc", false, &port);
     string_t *url = string_sprintf("http://127.0.0.1:%u/mars.Test/Echo", port);
     char *argv[] = {"http_grpc", (char *)string_c_str(url), NULL};
     int status = pid > 0 && url ? http_grpc_example_main(2, argv) : EXIT_FAILURE;
@@ -896,7 +1116,7 @@ static void example_http_grpc(void)
 static void example_http_websocket(void)
 {
     unsigned port = 0;
-    pid_t pid = start_protocol_fixture("tests/http/websocket_fixture.py", false, &port);
+    pid_t pid = start_protocol_fixture("websocket", false, &port);
     string_t *url = string_sprintf("http://127.0.0.1:%u/echo", port);
     char *argv[] = {"http_websocket", (char *)string_c_str(url), NULL};
     int status = pid > 0 && url ? http_websocket_example_main(2, argv) : EXIT_FAILURE;
@@ -932,6 +1152,9 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_http_grpc_verified_tls, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_websocket_messages, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_websocket_failures_and_tls, tests, NULL);
+    TEST_RUN_IN_GROUP(test_http_fixture_worker_cap_and_recovery, tests, NULL);
+    TEST_RUN_IN_GROUP(test_http_fixture_total_deadline_and_recovery, tests, NULL);
+    TEST_RUN_IN_GROUP(test_http_fixture_tls_handshake_deadline, tests, NULL);
     TEST_SECTION("README Output Examples");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_json, readme_examples, "http,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_post_json, readme_examples, "http,readme,output");

@@ -36,6 +36,7 @@
   "test_stdout_capture_is_available_in_case": true,
   "test_temp_resources_are_available_in_case": true,
   "test_temp_resources_are_cleaned_after_case": true,
+  "test_tool_suite_paths_remain_distinct": true,
   "test_top_level_default_true": {
     "enabled": true,
     "test_subtest_default_true": true

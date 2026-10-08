@@ -1,0 +1,439 @@
+/* Result cards, zoom, syntax colouring, matrices and mathematical rendering. */
+.output-grid {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.card {
+  --result-zoom: 1;
+  --render-base-scale: 1.35;
+  --render-zoom: 1.35;
+  --result-base-font-rem: 0.92;
+  --result-font-size: 0.92rem;
+  --render-base-font-rem: 1.15;
+  --render-font-size: 1.15rem;
+  --render-base-margin-rem: 3;
+  --render-margin-bottom: 3rem;
+  border: 2px solid rgba(233, 244, 239, 0.28);
+  border-radius: 18px;
+  background: rgba(8, 29, 22, 0.62);
+  overflow: hidden;
+}
+
+.output-grid.card-expanded {
+  min-height: clamp(26rem, 68vh, 54rem);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#resultPane.card-expanded > .result-card:not(.expanded-card) {
+  display: none !important;
+}
+
+.card.expanded-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.card.expanded-card > pre,
+.card.expanded-card > .rendered {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--muted);
+  background: rgba(196, 131, 48, 0.08);
+  border-bottom: 2px solid rgba(233, 244, 239, 0.22);
+  font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.card-action {
+  padding: 0.38rem 0.65rem;
+  color: #d7e7b7;
+  background: rgba(113, 198, 180, 0.12);
+  box-shadow: none;
+  font: 0.72rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-width: 4.25rem;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.zoom-action {
+  min-width: 2.25rem;
+  padding-inline: 0.48rem;
+}
+
+.zoom-reset {
+  min-width: 3.65rem;
+}
+
+.zoom-action:disabled {
+  opacity: 0.42;
+}
+
+.card-action.copied {
+  color: #061612;
+  background: var(--accent);
+  transform: translateY(-1px);
+}
+
+.card-action.copy-failed {
+  color: white;
+  background: #991b1b;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.expandable-title {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.digit-actions {
+  justify-content: center;
+  grid-column: 2;
+}
+
+.top-card-copy {
+  justify-self: end;
+  grid-column: 3;
+}
+
+.top-card-actions {
+  justify-self: end;
+  grid-column: 3;
+}
+
+.value-title {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.precision-actions {
+  justify-content: center;
+  grid-column: 2;
+}
+
+.value-copy {
+  justify-self: end;
+  grid-column: 3;
+}
+
+.value-card-actions {
+  justify-self: end;
+  grid-column: 3;
+}
+
+pre {
+  margin: 0;
+  padding: 0.9rem;
+  overflow: auto;
+  min-height: 2.75rem;
+}
+
+*::-webkit-scrollbar {
+  width: 0.72rem;
+  height: 0.72rem;
+}
+
+*::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(8, 29, 22, 0.76), rgba(18, 53, 39, 0.58));
+  box-shadow: inset 0 0 0 1px rgba(233, 244, 239, 0.12);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(8, 29, 22, 0.82);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(227, 180, 87, 0.94), rgba(113, 198, 180, 0.82));
+  box-shadow: inset 0 0 0 1px rgba(255, 250, 220, 0.18);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(135deg, rgba(247, 205, 112, 0.98), rgba(139, 222, 195, 0.92));
+}
+
+*::-webkit-scrollbar-corner {
+  background: rgba(8, 29, 22, 0.76);
+}
+
+pre {
+  color: var(--code);
+  white-space: pre-wrap;
+  font-family: "Cascadia Code", "DejaVu Sans Mono", monospace;
+  font-size: var(--result-font-size);
+  line-height: 1.45;
+}
+
+.function-token-keyword {
+  color: #f3bd68;
+  font-weight: 700;
+}
+
+.function-token-variable {
+  color: #c7d0cb;
+  font-style: italic;
+}
+
+.function-token-array {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.function-token-function {
+  color: #72ddd0;
+  font-weight: 700;
+}
+
+.function-token-bracket {
+  color: #f3bd68;
+  font-weight: 400;
+}
+
+.function-token-number {
+  color: #e78fcb;
+}
+
+.function-token-constant {
+  color: #dca3cf;
+}
+
+.function-token-comment {
+  color: #83d49b;
+  font-style: italic;
+}
+
+#value {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#value.matrix-pretty {
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#value.matrix-pretty .matrix-sum-display,
+#value.matrix-pretty .matrix-term-display,
+#value.matrix-pretty .matrix-display,
+#value.matrix-pretty .matrix-grid {
+  min-width: 0;
+  width: 100%;
+}
+
+#value.matrix-pretty .matrix-display {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+#value.matrix-pretty .matrix-cell {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#value.matrix-tex-value {
+  overflow: auto;
+  white-space: normal;
+}
+
+#value.matrix-tex-value .rendered-zoom-frame {
+  display: inline-block;
+  min-width: 0;
+}
+
+#value.matrix-tex-value svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  overflow: visible;
+  transform-origin: left top;
+  filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%);
+}
+
+#parsed.matrix-expression-text {
+  white-space: pre-wrap;
+  tab-size: 4;
+  overflow-wrap: anywhere;
+}
+
+#functionStyle:not(.equation-function) {
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#parsed {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#functionStyle.equation-function {
+  --solver-tex-scale: 1.5;
+  padding-top: 0.15rem;
+  overflow-x: auto;
+  overflow-y: auto;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+#functionStyle.equation-function svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  overflow: visible;
+  transform-origin: left top;
+  filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
+}
+
+.matrix-pretty {
+  overflow-x: auto;
+  overflow-y: visible;
+  white-space: pre;
+  font: 1.05rem/1.5 "Cascadia Code", "DejaVu Sans Mono", monospace;
+}
+
+.matrix-term-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  width: max-content;
+}
+
+.matrix-factor,
+.matrix-product-operator {
+  flex: none;
+  white-space: nowrap;
+}
+
+.matrix-product-operator {
+  color: var(--cream);
+}
+
+.matrix-display {
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  align-items: stretch;
+  gap: 0.45rem;
+  color: var(--code);
+  font-variant-ligatures: none;
+}
+
+.matrix-sum-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: max-content;
+}
+
+.matrix-sum-operator {
+  color: var(--cream);
+  font: 2rem/1 Georgia, "Times New Roman", serif;
+}
+
+.matrix-bracket {
+  display: flex;
+  align-items: center;
+  color: #f0f5d6;
+  font: 2.7rem/1 Georgia, "Times New Roman", serif;
+  transform: scaleY(1.18);
+}
+
+.matrix-grid {
+  display: grid;
+  align-items: center;
+  gap: 0.3rem 1.25rem;
+  padding: 0.35rem 0.1rem;
+}
+
+.matrix-cell {
+  min-width: 2.5rem;
+  text-align: right;
+  white-space: nowrap;
+  font: 1.22rem/1.45 "Cascadia Code", "DejaVu Sans Mono", monospace;
+}
+
+.matrix-section-heading {
+  color: var(--cream);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+.rendered {
+  margin: 0;
+  min-width: 0;
+  min-height: 12rem;
+  padding: 2.1rem 1.6rem 3rem;
+  overflow: auto;
+  font-size: var(--render-font-size);
+}
+
+.rendered-zoom-frame {
+  position: relative;
+  display: inline-block;
+  min-width: max-content;
+  min-height: 1px;
+}
+
+.rendered svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  overflow: visible;
+  transform: scale(var(--render-zoom));
+  transform-origin: left top;
+  margin-bottom: var(--render-margin-bottom);
+  filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
+}
+
+.error,
+.rendered.error,
+#rendered.error {
+  color: #ffd99a !important;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(229, 173, 87, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(73, 23, 25, 0.88), rgba(38, 12, 19, 0.78)) !important;
+  border-color: rgba(229, 173, 87, 0.42) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 232, 181, 0.07),
+    0 0 1.35rem rgba(153, 27, 27, 0.22) !important;
+  text-shadow: 0 0 0.7rem rgba(255, 204, 112, 0.16) !important;
+}
+
+.rendered.error,
+#rendered.error {
+  font-family: Georgia, "Times New Roman", serif;
+}

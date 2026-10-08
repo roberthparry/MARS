@@ -28,6 +28,13 @@ is retained in the error estimate, and refinement preserves the transformed
 interval width as the step size decreases. Contributions from opposite tails
 are measured separately in magnitude so that cancellation cannot hide an error.
 
+Successive halved-step grids reuse their shared interior nodes through direct
+indexing. Cached contributions and absolute tail magnitudes are rescaled for
+the new step size; newly inserted nodes are evaluated at the full working
+precision. The work counter retains its logical grid-point meaning, including
+reused nodes, so existing caps and convergence/error rules are unchanged.
+Temporary caches belong to a single integration and are bounded by its work cap.
+
 This permits convergent improper integrals, including algebraic factors damped
 by reciprocal exponential decay, without directly evaluating an undefined
 endpoint product. It is a numerical convergence check, not a general symbolic

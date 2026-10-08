@@ -16,7 +16,6 @@
 
 #include "qcomplex.h"
 #include "qfloat.h"
-
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

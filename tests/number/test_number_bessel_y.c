@@ -9,8 +9,9 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_number.h"
 #include <string.h>
+
+#include "test_number.h"
 
 static void assert_bessel_y_close(number_t actual, number_t expected, const char *tolerance_text)
 {

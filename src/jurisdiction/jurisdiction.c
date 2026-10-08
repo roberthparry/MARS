@@ -10,12 +10,12 @@
  */
 
 /* Engine configuration, shared storage, jurisdiction defaults and serialisation. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
-#include "file.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "jurisdiction_internal.h"
+#include "file.h"
 
 void jurisdiction_set_error(jurisdiction_t *jurisdiction, const char *message)
 {
@@ -25,11 +25,16 @@ void jurisdiction_set_error(jurisdiction_t *jurisdiction, const char *message)
     (void)string_append_cstr(jurisdiction->error, message ? message : "jurisdiction error");
 }
 
-static string_t *string_new_from_cstr(const char *text)
+static string_t *jurisdiction_string_from_cstr(const char *text)
 {
     if (!text || *text == '\0')
         return NULL;
-    return string_new_with(text);
+    string_t *value = string_new();
+    if (value && string_append_utf8_exact(value, text, strlen(text)) != 0) {
+        string_free(value);
+        value = NULL;
+    }
+    return value;
 }
 
 char *jurisdiction_dup_c_string(const char *text)
@@ -153,13 +158,9 @@ static char *config_lookup_at_path(char *config_path, const char *name)
         bool matched = key && value && string_compare(key, wanted) == 0;
         if (matched) {
             string_trim(value);
-            if (string_byte_length(value) >= 2 &&
-                ((string_starts_with(value, "\"") && string_ends_with(value, "\"")) ||
-                 (string_starts_with(value, "'") && string_ends_with(value, "'")))) {
-                string_t *unquoted = string_substr(value, 1, string_byte_length(value) - 2);
-                string_free(value);
-                value = unquoted;
-            }
+            string_t *unquoted = string_unquote_shell(value);
+            string_free(value);
+            value = unquoted;
             if (value && string_byte_length(value))
                 result = jurisdiction_dup_c_string(string_c_str(value));
         }
@@ -500,8 +501,8 @@ jurisdiction_t *jurisdict_open(const char *jurisdiction_code)
     } else {
         detect_default_jurisdiction(jurisdiction->jurisdiction);
     }
-    path = string_new_from_cstr(resolved_path);
-    key = string_new_from_cstr(resolved_key);
+    path = jurisdiction_string_from_cstr(resolved_path);
+    key = jurisdiction_string_from_cstr(resolved_key);
     jurisdiction->db = (path && key) ? sqlite_open_encrypted(path, key) : NULL;
     string_free(key);
     string_free(path);

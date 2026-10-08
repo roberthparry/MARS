@@ -38,11 +38,12 @@
 #ifndef EXPRESSION_H
 #define EXPRESSION_H
 
-#include "number.h"
-#include "ustring.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#include "number.h"
+#include "ustring.h"
 
 /** @brief Opaque reference-counted expression graph node. */
 typedef struct _expr_t expr_t;

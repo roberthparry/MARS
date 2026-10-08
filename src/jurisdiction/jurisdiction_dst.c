@@ -10,13 +10,13 @@
  */
 
 /* Collect daylight-saving transitions and materialise their local display times. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
 #include <math.h>
+
+#include "jurisdiction_internal.h"
 
 typedef struct timezone_transition_occurrence_t {
     short year;

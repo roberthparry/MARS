@@ -25,8 +25,9 @@
 #ifndef INTEGRATOR_H
 #define INTEGRATOR_H
 
-#include "expression.h"
 #include <stddef.h>
+
+#include "expression.h"
 
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;

@@ -6,10 +6,11 @@
  * demonstrates ownership and cleanup without requiring a network connection.
  */
 
-#include "protobuf.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "protobuf.h"
 
 int main(void)
 {

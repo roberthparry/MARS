@@ -10,8 +10,6 @@
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -19,6 +17,8 @@
 #include <string.h>
 #include <sys/file.h>
 #include <unistd.h>
+
+#include "file_internal.h"
 
 bool file_fail(file_t *file, int error)
 {

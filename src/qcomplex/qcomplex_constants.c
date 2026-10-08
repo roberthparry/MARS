@@ -9,9 +9,9 @@
  * multiprecision complex arithmetic in the number module.
  */
 
-#include "qcomplex.h"
-
 #include <math.h>
+
+#include "qcomplex.h"
 
 /* Exact and sentinel values. */
 const qcomplex_t QC_ZERO = {.re = {.hi = 0.0, .lo = 0.0}, .im = {.hi = 0.0, .lo = 0.0}};

@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+
 #include "file.h"
 
 #define MARS_JSON_INTERNAL_ACCESS

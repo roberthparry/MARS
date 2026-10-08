@@ -1,0 +1,151 @@
+/* Colours, typography defaults and decorative landscape. */
+:root {
+  color-scheme: light;
+  --ink: #f3f8f2;
+  --muted: #bed3c0;
+  --paper: #071913;
+  --panel: #091f17;
+  --line: rgba(233, 244, 239, 0.34);
+  --accent: #cfa052;
+  --accent-2: #71c6b4;
+  --code: #f3f8f2;
+  --stone: #173f32;
+  --mist: #e9f4ef;
+  --torc: #cfa052;
+  --oak: #263920;
+  --shadow: rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(227, 180, 87, 0.72) rgba(8, 29, 22, 0.62);
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font: 16px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  background:
+    radial-gradient(circle at 15% 18%, rgba(107, 176, 167, 0.24), transparent 18rem),
+    radial-gradient(circle at 83% 13%, rgba(196, 131, 48, 0.24), transparent 19rem),
+    linear-gradient(145deg, #061612, #123326 46%, #263920);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse at 34% 10%, rgba(180, 255, 219, 0.46) 0 6rem, transparent 18rem),
+    radial-gradient(ellipse at 66% 12%, rgba(142, 119, 255, 0.34) 0 5rem, transparent 17rem),
+    linear-gradient(108deg, transparent 0 3%, rgba(137, 255, 211, 0.78) 8%, rgba(113, 198, 180, 0.16) 18%, transparent 32%),
+    linear-gradient(116deg, transparent 0 12%, rgba(199, 151, 255, 0.58) 18%, rgba(137, 255, 211, 0.2) 30%, transparent 46%),
+    linear-gradient(126deg, transparent 0 24%, rgba(255, 218, 125, 0.42) 31%, rgba(137, 255, 211, 0.16) 44%, transparent 58%),
+    radial-gradient(ellipse at 50% 104%, rgba(0, 0, 0, 0.52) 0 4.8rem, transparent 5rem),
+    linear-gradient(180deg, transparent 0 68%, rgba(4, 18, 12, 0.44) 68%),
+    radial-gradient(circle at 74% 22%, transparent 0 4.2rem, rgba(196, 131, 48, 0.44) 4.3rem 4.46rem, transparent 4.58rem),
+    radial-gradient(circle at 30% 54%, transparent 0 6.4rem, rgba(107, 176, 167, 0.36) 6.5rem 6.66rem, transparent 6.78rem),
+    linear-gradient(102deg, transparent 0 8%, rgba(113, 198, 180, 0.64) 8.5% 11.6%, transparent 12.5%),
+    linear-gradient(112deg, transparent 0 16%, rgba(185, 136, 235, 0.48) 16.4% 19.2%, transparent 20%),
+    linear-gradient(124deg, transparent 0 25%, rgba(207, 160, 82, 0.34) 25.3% 27.5%, transparent 28.2%),
+    linear-gradient(98deg, transparent 0 34%, rgba(89, 184, 179, 0.42) 34.2% 36.6%, transparent 37.3%),
+    repeating-linear-gradient(64deg, transparent 0 25px, rgba(233, 244, 239, 0.13) 26px 27px),
+    radial-gradient(circle at 50% 50%, transparent 0 7rem, rgba(233, 244, 239, 0.22) 7.1rem 7.22rem, transparent 7.35rem);
+  mask:
+    linear-gradient(#000 0 0) top / 100% 24px no-repeat,
+    linear-gradient(#000 0 0) bottom / 100% 24px no-repeat,
+    linear-gradient(#000 0 0) left / 24px 100% no-repeat,
+    linear-gradient(#000 0 0) right / 24px 100% no-repeat,
+    linear-gradient(#000 0 0);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto 0 0;
+  height: 12rem;
+  pointer-events: none;
+  opacity: 0.72;
+  background:
+    linear-gradient(82deg, transparent 0 8%, rgba(3, 13, 9, 0.95) 8.2% 10.9%, transparent 11.2%),
+    linear-gradient(96deg, transparent 0 17%, rgba(3, 13, 9, 0.92) 17.2% 20.3%, transparent 20.6%),
+    linear-gradient(76deg, transparent 0 27%, rgba(3, 13, 9, 0.9) 27.2% 30.1%, transparent 30.4%),
+    linear-gradient(101deg, transparent 0 38%, rgba(3, 13, 9, 0.92) 38.2% 41.6%, transparent 41.9%),
+    linear-gradient(88deg, transparent 0 53%, rgba(3, 13, 9, 0.94) 53.2% 56.3%, transparent 56.6%),
+    linear-gradient(94deg, transparent 0 67%, rgba(3, 13, 9, 0.9) 67.2% 70.1%, transparent 70.4%),
+    radial-gradient(circle at 77% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+    radial-gradient(circle at 83% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+    linear-gradient(8deg, transparent 0 75%, rgba(3, 13, 9, 0.88) 75.2% 77%, transparent 77.3%),
+    linear-gradient(0deg, rgba(3, 13, 9, 0.85), rgba(3, 13, 9, 0.38) 18%, transparent 65%);
+}
+
+.celtic-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora {
+  position: absolute;
+  left: -8vw;
+  right: -8vw;
+  top: 1.2rem;
+  height: 12rem;
+  opacity: 0.9;
+  background:
+    linear-gradient(105deg, transparent 0 7%, rgba(144, 255, 216, 0.82) 12%, rgba(144, 255, 216, 0.16) 24%, transparent 38%),
+    linear-gradient(118deg, transparent 0 17%, rgba(190, 143, 255, 0.58) 23%, rgba(144, 255, 216, 0.22) 36%, transparent 54%),
+    linear-gradient(130deg, transparent 0 34%, rgba(244, 207, 102, 0.42) 40%, rgba(144, 255, 216, 0.16) 53%, transparent 70%);
+  filter: blur(0.4px);
+  transform: skewY(-6deg);
+}
+
+.standing-stones {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2.4rem;
+  height: 12rem;
+  opacity: 0.64;
+}
+
+.stone {
+  position: absolute;
+  bottom: 0;
+  width: clamp(2.6rem, 4vw, 4rem);
+  height: clamp(7rem, 13vw, 11rem);
+  border-radius: 54% 46% 40% 42% / 12% 14% 6% 8%;
+  background: linear-gradient(145deg, rgba(27, 40, 35, 0.94), rgba(89, 107, 95, 0.68));
+  border: 1px solid rgba(233, 244, 239, 0.14);
+  box-shadow: inset 0.6rem 0.4rem 1.1rem rgba(233, 244, 239, 0.08);
+}
+
+.stone:nth-child(1) { left: 6%; height: 8rem; transform: rotate(-6deg); }
+.stone:nth-child(2) { left: 13%; height: 11rem; transform: rotate(4deg); }
+.stone:nth-child(3) { left: 22%; height: 7.8rem; transform: rotate(-3deg); }
+.stone:nth-child(4) { right: 24%; height: 8.5rem; transform: rotate(5deg); }
+.stone:nth-child(5) { right: 14%; height: 11.5rem; transform: rotate(-5deg); }
+.stone:nth-child(6) { right: 6%; height: 7.6rem; transform: rotate(7deg); }
+
+.chariot-wheel {
+  position: absolute;
+  right: 7vw;
+  bottom: 3.3rem;
+  width: 6.2rem;
+  height: 6.2rem;
+  opacity: 0.48;
+  border: 0.32rem solid rgba(4, 13, 9, 0.9);
+  border-radius: 999px;
+  background:
+    linear-gradient(0deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%),
+    linear-gradient(60deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%),
+    linear-gradient(120deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%);
+  box-shadow: 0 0 0 0.18rem rgba(196, 131, 48, 0.18);
+}

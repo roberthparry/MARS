@@ -1,4 +1,12 @@
 BasedOnStyle: LLVM
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<'
+    Priority: -1
+  - Regex: '^"'
+    Priority: 0
+  - Regex: '.*'
+    Priority: 2
 ColumnLimit: 120
 IndentWidth: 4
 ContinuationIndentWidth: 4

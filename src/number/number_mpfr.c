@@ -11,13 +11,12 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
-
-#include <stdio.h>
 
 bool number_eq_same_tol_mpfr(const number_t *a, const number_t *b);
 

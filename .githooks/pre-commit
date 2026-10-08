@@ -3,5 +3,6 @@
 set -eu
 
 repository_root=$(git rev-parse --show-toplevel)
-"$repository_root/tools/check_public_distribution.py"
-exec "$repository_root/tools/check_compliance.py"
+make --no-print-directory -s -j1 -C "$repository_root" DEBUG=0 native-checks
+"$repository_root/tools/mars_checks/build/release/mars_checks" public-distribution
+exec "$repository_root/tools/mars_checks/build/release/mars_checks" compliance

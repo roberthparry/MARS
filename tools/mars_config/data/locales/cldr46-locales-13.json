@@ -1,0 +1,6176 @@
+{
+  "yue": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2b5e8aa9e"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        }
+      ]
+    ]
+  },
+  "yue_Hans": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2a4e8afad"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "yue_Hans_CN": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2a4e8afad"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "yue_Hant": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2b5e8aa9e"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        }
+      ]
+    ]
+  },
+  "yue_Hant_CN": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2b5e8aa9e"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        }
+      ]
+    ]
+  },
+  "yue_Hant_HK": {
+    "language": "yue",
+    "english": "Cantonese",
+    "native": {
+      "utf8_hex": "e7b2b5e8aa9e"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        }
+      ]
+    ]
+  },
+  "za": {
+    "language": "za",
+    "english": "Zhuang",
+    "native": "Vahcuengh",
+    "pattern": "y MMMM d",
+    "era": "CE",
+    "months": [
+      [
+        "ndwenit",
+        "ndwenit"
+      ],
+      [
+        "ndwenngeih",
+        "ndwenngeih"
+      ],
+      [
+        "ndwensam",
+        "ndwensam"
+      ],
+      [
+        "ndwenseiq",
+        "ndwenseiq"
+      ],
+      [
+        "ndwenngux",
+        "ndwenngux"
+      ],
+      [
+        "ndwenloeg",
+        "ndwenloeg"
+      ],
+      [
+        "ndwencaet",
+        "ndwencaet"
+      ],
+      [
+        "ndwenbet",
+        "ndwenbet"
+      ],
+      [
+        "ndwengouj",
+        "ndwengouj"
+      ],
+      [
+        "ndwencib",
+        "ndwencib"
+      ],
+      [
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        },
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        }
+      ],
+      [
+        "ndwencibngeih",
+        "ndwencibngeih"
+      ]
+    ],
+    "standalone": [
+      [
+        "ndwenit",
+        "ndwenit"
+      ],
+      [
+        "ndwenngeih",
+        "ndwenngeih"
+      ],
+      [
+        "ndwensam",
+        "ndwensam"
+      ],
+      [
+        "ndwenseiq",
+        "ndwenseiq"
+      ],
+      [
+        "ndwenngux",
+        "ndwenngux"
+      ],
+      [
+        "ndwenloeg",
+        "ndwenloeg"
+      ],
+      [
+        "ndwencaet",
+        "ndwencaet"
+      ],
+      [
+        "ndwenbet",
+        "ndwenbet"
+      ],
+      [
+        "ndwengouj",
+        "ndwengouj"
+      ],
+      [
+        "ndwencib",
+        "ndwencib"
+      ],
+      [
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        },
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        }
+      ],
+      [
+        "ndwencibngeih",
+        "ndwencibngeih"
+      ]
+    ],
+    "weekdays": [
+      [
+        "singhgizit",
+        "singhgizit"
+      ],
+      [
+        "singhgizngeih",
+        "singhgizngeih"
+      ],
+      [
+        "singhgizsam",
+        "singhgizsam"
+      ],
+      [
+        "singhgizseiq",
+        "singhgizseiq"
+      ],
+      [
+        "singhgizhaj",
+        "singhgizhaj"
+      ],
+      [
+        "singhgizroek",
+        "singhgizroek"
+      ],
+      [
+        "ngoenzsinghgiz",
+        "ngoenzsinghgiz"
+      ]
+    ]
+  },
+  "za_CN": {
+    "language": "za",
+    "english": "Zhuang",
+    "native": "Vahcuengh",
+    "pattern": "y MMMM d",
+    "era": "CE",
+    "months": [
+      [
+        "ndwenit",
+        "ndwenit"
+      ],
+      [
+        "ndwenngeih",
+        "ndwenngeih"
+      ],
+      [
+        "ndwensam",
+        "ndwensam"
+      ],
+      [
+        "ndwenseiq",
+        "ndwenseiq"
+      ],
+      [
+        "ndwenngux",
+        "ndwenngux"
+      ],
+      [
+        "ndwenloeg",
+        "ndwenloeg"
+      ],
+      [
+        "ndwencaet",
+        "ndwencaet"
+      ],
+      [
+        "ndwenbet",
+        "ndwenbet"
+      ],
+      [
+        "ndwengouj",
+        "ndwengouj"
+      ],
+      [
+        "ndwencib",
+        "ndwencib"
+      ],
+      [
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        },
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        }
+      ],
+      [
+        "ndwencibngeih",
+        "ndwencibngeih"
+      ]
+    ],
+    "standalone": [
+      [
+        "ndwenit",
+        "ndwenit"
+      ],
+      [
+        "ndwenngeih",
+        "ndwenngeih"
+      ],
+      [
+        "ndwensam",
+        "ndwensam"
+      ],
+      [
+        "ndwenseiq",
+        "ndwenseiq"
+      ],
+      [
+        "ndwenngux",
+        "ndwenngux"
+      ],
+      [
+        "ndwenloeg",
+        "ndwenloeg"
+      ],
+      [
+        "ndwencaet",
+        "ndwencaet"
+      ],
+      [
+        "ndwenbet",
+        "ndwenbet"
+      ],
+      [
+        "ndwengouj",
+        "ndwengouj"
+      ],
+      [
+        "ndwencib",
+        "ndwencib"
+      ],
+      [
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        },
+        {
+          "utf8_hex": "6e6477656e636962e280996974"
+        }
+      ],
+      [
+        "ndwencibngeih",
+        "ndwencibngeih"
+      ]
+    ],
+    "weekdays": [
+      [
+        "singhgizit",
+        "singhgizit"
+      ],
+      [
+        "singhgizngeih",
+        "singhgizngeih"
+      ],
+      [
+        "singhgizsam",
+        "singhgizsam"
+      ],
+      [
+        "singhgizseiq",
+        "singhgizseiq"
+      ],
+      [
+        "singhgizhaj",
+        "singhgizhaj"
+      ],
+      [
+        "singhgizroek",
+        "singhgizroek"
+      ],
+      [
+        "ngoenzsinghgiz",
+        "ngoenzsinghgiz"
+      ]
+    ]
+  },
+  "zgh": {
+    "language": "zgh",
+    "english": "Standard Moroccan Tamazight",
+    "native": {
+      "utf8_hex": "e2b59ce2b4b0e2b58ee2b4b0e2b5a3e2b589e2b596e2b59c"
+    },
+    "pattern": "d MMMM y",
+    "era": {
+      "utf8_hex": "e2b4b7e2b4bce2b584"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "e2b589e2b58fe2b58f"
+        },
+        {
+          "utf8_hex": "e2b589e2b58fe2b58fe2b4b0e2b5a2e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0"
+        },
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0e2b5a2e2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595e2b59a"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594"
+        },
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2e2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58f"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58fe2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58d"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58de2b5a2e2b593e2b5a3"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b596e2b593e2b59b"
+        },
+        {
+          "utf8_hex": "e2b596e2b593e2b59be2b59c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b59be2b593e2b59c"
+        },
+        {
+          "utf8_hex": "e2b59be2b593e2b59ce2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593"
+        },
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593e2b4b1e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1"
+        },
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1e2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58a"
+        },
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58ae2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "e2b589e2b58fe2b58f"
+        },
+        {
+          "utf8_hex": "e2b589e2b58fe2b58fe2b4b0e2b5a2e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0"
+        },
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0e2b5a2e2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595e2b59a"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594"
+        },
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2e2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58f"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58fe2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58d"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58de2b5a2e2b593e2b5a3"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b596e2b593e2b59b"
+        },
+        {
+          "utf8_hex": "e2b596e2b593e2b59be2b59c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b59be2b593e2b59c"
+        },
+        {
+          "utf8_hex": "e2b59be2b593e2b59ce2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593"
+        },
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593e2b4b1e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1"
+        },
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1e2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58a"
+        },
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58ae2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e2b4b0e2b5a2e2b58fe2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b5a2e2b58f"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58fe2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b595e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b5a1e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b5a1"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58ee2b5a1e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58e"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b4b9e2b5a2e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b4b9"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b4b0e2b58ee2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b4b0"
+        }
+      ]
+    ]
+  },
+  "zgh_MA": {
+    "language": "zgh",
+    "english": "Standard Moroccan Tamazight",
+    "native": {
+      "utf8_hex": "e2b59ce2b4b0e2b58ee2b4b0e2b5a3e2b589e2b596e2b59c"
+    },
+    "pattern": "d MMMM y",
+    "era": {
+      "utf8_hex": "e2b4b7e2b4bce2b584"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "e2b589e2b58fe2b58f"
+        },
+        {
+          "utf8_hex": "e2b589e2b58fe2b58fe2b4b0e2b5a2e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0"
+        },
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0e2b5a2e2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595e2b59a"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594"
+        },
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2e2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58f"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58fe2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58d"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58de2b5a2e2b593e2b5a3"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b596e2b593e2b59b"
+        },
+        {
+          "utf8_hex": "e2b596e2b593e2b59be2b59c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b59be2b593e2b59c"
+        },
+        {
+          "utf8_hex": "e2b59be2b593e2b59ce2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593"
+        },
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593e2b4b1e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1"
+        },
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1e2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58a"
+        },
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58ae2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "e2b589e2b58fe2b58f"
+        },
+        {
+          "utf8_hex": "e2b589e2b58fe2b58fe2b4b0e2b5a2e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0"
+        },
+        {
+          "utf8_hex": "e2b4b1e2b595e2b4b0e2b5a2e2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b595e2b59a"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594"
+        },
+        {
+          "utf8_hex": "e2b589e2b4b1e2b594e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2"
+        },
+        {
+          "utf8_hex": "e2b58ee2b4b0e2b5a2e2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58f"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58fe2b5a2e2b593"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58d"
+        },
+        {
+          "utf8_hex": "e2b5a2e2b593e2b58de2b5a2e2b593e2b5a3"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b596e2b593e2b59b"
+        },
+        {
+          "utf8_hex": "e2b596e2b593e2b59be2b59c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b59be2b593e2b59c"
+        },
+        {
+          "utf8_hex": "e2b59be2b593e2b59ce2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593"
+        },
+        {
+          "utf8_hex": "e2b4bde2b59ce2b593e2b4b1e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1"
+        },
+        {
+          "utf8_hex": "e2b58fe2b593e2b5a1e2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58a"
+        },
+        {
+          "utf8_hex": "e2b4b7e2b593e2b58ae2b4b0e2b58fe2b4b1e2b589e2b594"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e2b4b0e2b5a2e2b58fe2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b5a2e2b58f"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58fe2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b595e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b595"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b5a1e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b4bde2b5a1"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58ee2b5a1e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b58e"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b4b9e2b5a2e2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b589e2b4b9"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e2b4b0e2b599e2b4b0e2b58ee2b4b0e2b599"
+        },
+        {
+          "utf8_hex": "e2b4b0e2b599e2b4b0"
+        }
+      ]
+    ]
+  },
+  "zh": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans_CN": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans_HK": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans_MO": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans_MY": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hans_SG": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "e4ba8ce69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "e4b889e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "e59b9be69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "e4ba94e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "e585ade69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "e4b883e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "e585abe69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "e4b99de69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4b880e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "e58d81e4ba8ce69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e591a8e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e591a8e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e591a8e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e591a8e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e591a8e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e591a8e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e591a8e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hant": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e980b1e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e980b1e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e980b1e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e980b1e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e980b1e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e980b1e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e980b1e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hant_HK": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e980b1e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e980b1e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e980b1e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e980b1e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e980b1e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e980b1e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e980b1e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hant_MO": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e585ace58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e980b1e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e980b1e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e980b1e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e980b1e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e980b1e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e980b1e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e980b1e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hant_MY": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e980b1e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e980b1e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e980b1e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e980b1e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e980b1e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e980b1e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e980b1e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Hant_TW": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": {
+      "utf8_hex": "e4b8ade69687"
+    },
+    "pattern": {
+      "utf8_hex": "79e5b9b44de69c8864e697a5"
+    },
+    "era": {
+      "utf8_hex": "e8a5bfe58583"
+    },
+    "months": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "standalone": [
+      [
+        {
+          "utf8_hex": "31e69c88"
+        },
+        {
+          "utf8_hex": "31e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "32e69c88"
+        },
+        {
+          "utf8_hex": "32e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "33e69c88"
+        },
+        {
+          "utf8_hex": "33e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "34e69c88"
+        },
+        {
+          "utf8_hex": "34e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "35e69c88"
+        },
+        {
+          "utf8_hex": "35e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "36e69c88"
+        },
+        {
+          "utf8_hex": "36e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "37e69c88"
+        },
+        {
+          "utf8_hex": "37e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "38e69c88"
+        },
+        {
+          "utf8_hex": "38e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "39e69c88"
+        },
+        {
+          "utf8_hex": "39e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3130e69c88"
+        },
+        {
+          "utf8_hex": "3130e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3131e69c88"
+        },
+        {
+          "utf8_hex": "3131e69c88"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "3132e69c88"
+        },
+        {
+          "utf8_hex": "3132e69c88"
+        }
+      ]
+    ],
+    "weekdays": [
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b880"
+        },
+        {
+          "utf8_hex": "e980b1e4b880"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba8c"
+        },
+        {
+          "utf8_hex": "e980b1e4ba8c"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4b889"
+        },
+        {
+          "utf8_hex": "e980b1e4b889"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe59b9b"
+        },
+        {
+          "utf8_hex": "e980b1e59b9b"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe4ba94"
+        },
+        {
+          "utf8_hex": "e980b1e4ba94"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe585ad"
+        },
+        {
+          "utf8_hex": "e980b1e585ad"
+        }
+      ],
+      [
+        {
+          "utf8_hex": "e6989fe69c9fe697a5"
+        },
+        {
+          "utf8_hex": "e980b1e697a5"
+        }
+      ]
+    ]
+  },
+  "zh_Latn": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": null,
+    "pattern": "y MMMM d",
+    "era": "CE",
+    "months": [
+      [
+        "M01",
+        "M01"
+      ],
+      [
+        "M02",
+        "M02"
+      ],
+      [
+        "M03",
+        "M03"
+      ],
+      [
+        "M04",
+        "M04"
+      ],
+      [
+        "M05",
+        "M05"
+      ],
+      [
+        "M06",
+        "M06"
+      ],
+      [
+        "M07",
+        "M07"
+      ],
+      [
+        "M08",
+        "M08"
+      ],
+      [
+        "M09",
+        "M09"
+      ],
+      [
+        "M10",
+        "M10"
+      ],
+      [
+        "M11",
+        "M11"
+      ],
+      [
+        "M12",
+        "M12"
+      ]
+    ],
+    "standalone": [
+      [
+        "M01",
+        "M01"
+      ],
+      [
+        "M02",
+        "M02"
+      ],
+      [
+        "M03",
+        "M03"
+      ],
+      [
+        "M04",
+        "M04"
+      ],
+      [
+        "M05",
+        "M05"
+      ],
+      [
+        "M06",
+        "M06"
+      ],
+      [
+        "M07",
+        "M07"
+      ],
+      [
+        "M08",
+        "M08"
+      ],
+      [
+        "M09",
+        "M09"
+      ],
+      [
+        "M10",
+        "M10"
+      ],
+      [
+        "M11",
+        "M11"
+      ],
+      [
+        "M12",
+        "M12"
+      ]
+    ],
+    "weekdays": [
+      [
+        "Mon",
+        "Mon"
+      ],
+      [
+        "Tue",
+        "Tue"
+      ],
+      [
+        "Wed",
+        "Wed"
+      ],
+      [
+        "Thu",
+        "Thu"
+      ],
+      [
+        "Fri",
+        "Fri"
+      ],
+      [
+        "Sat",
+        "Sat"
+      ],
+      [
+        "Sun",
+        "Sun"
+      ]
+    ]
+  },
+  "zh_Latn_CN": {
+    "language": "zh",
+    "english": "Chinese",
+    "native": null,
+    "pattern": "y MMMM d",
+    "era": "CE",
+    "months": [
+      [
+        "M01",
+        "M01"
+      ],
+      [
+        "M02",
+        "M02"
+      ],
+      [
+        "M03",
+        "M03"
+      ],
+      [
+        "M04",
+        "M04"
+      ],
+      [
+        "M05",
+        "M05"
+      ],
+      [
+        "M06",
+        "M06"
+      ],
+      [
+        "M07",
+        "M07"
+      ],
+      [
+        "M08",
+        "M08"
+      ],
+      [
+        "M09",
+        "M09"
+      ],
+      [
+        "M10",
+        "M10"
+      ],
+      [
+        "M11",
+        "M11"
+      ],
+      [
+        "M12",
+        "M12"
+      ]
+    ],
+    "standalone": [
+      [
+        "M01",
+        "M01"
+      ],
+      [
+        "M02",
+        "M02"
+      ],
+      [
+        "M03",
+        "M03"
+      ],
+      [
+        "M04",
+        "M04"
+      ],
+      [
+        "M05",
+        "M05"
+      ],
+      [
+        "M06",
+        "M06"
+      ],
+      [
+        "M07",
+        "M07"
+      ],
+      [
+        "M08",
+        "M08"
+      ],
+      [
+        "M09",
+        "M09"
+      ],
+      [
+        "M10",
+        "M10"
+      ],
+      [
+        "M11",
+        "M11"
+      ],
+      [
+        "M12",
+        "M12"
+      ]
+    ],
+    "weekdays": [
+      [
+        "Mon",
+        "Mon"
+      ],
+      [
+        "Tue",
+        "Tue"
+      ],
+      [
+        "Wed",
+        "Wed"
+      ],
+      [
+        "Thu",
+        "Thu"
+      ],
+      [
+        "Fri",
+        "Fri"
+      ],
+      [
+        "Sat",
+        "Sat"
+      ],
+      [
+        "Sun",
+        "Sun"
+      ]
+    ]
+  },
+  "zu": {
+    "language": "zu",
+    "english": "Zulu",
+    "native": "isiZulu",
+    "pattern": "MMMM d, y",
+    "era": "AD",
+    "months": [
+      [
+        "Jan",
+        "Januwari"
+      ],
+      [
+        "Feb",
+        "Februwari"
+      ],
+      [
+        "Mas",
+        "Mashi"
+      ],
+      [
+        "Eph",
+        "Ephreli"
+      ],
+      [
+        "Mey",
+        "Meyi"
+      ],
+      [
+        "Jun",
+        "Juni"
+      ],
+      [
+        "Jul",
+        "Julayi"
+      ],
+      [
+        "Aga",
+        "Agasti"
+      ],
+      [
+        "Sep",
+        "Septhemba"
+      ],
+      [
+        "Okt",
+        "Okthoba"
+      ],
+      [
+        "Nov",
+        "Novemba"
+      ],
+      [
+        "Dis",
+        "Disemba"
+      ]
+    ],
+    "standalone": [
+      [
+        "Jan",
+        "Januwari"
+      ],
+      [
+        "Feb",
+        "Februwari"
+      ],
+      [
+        "Mas",
+        "Mashi"
+      ],
+      [
+        "Eph",
+        "Ephreli"
+      ],
+      [
+        "Mey",
+        "Meyi"
+      ],
+      [
+        "Jun",
+        "Juni"
+      ],
+      [
+        "Jul",
+        "Julayi"
+      ],
+      [
+        "Aga",
+        "Agasti"
+      ],
+      [
+        "Sep",
+        "Septhemba"
+      ],
+      [
+        "Okt",
+        "Okthoba"
+      ],
+      [
+        "Nov",
+        "Novemba"
+      ],
+      [
+        "Dis",
+        "Disemba"
+      ]
+    ],
+    "weekdays": [
+      [
+        "UMsombuluko",
+        "Mso"
+      ],
+      [
+        "ULwesibili",
+        "Bil"
+      ],
+      [
+        "ULwesithathu",
+        "Tha"
+      ],
+      [
+        "ULwesine",
+        "Sin"
+      ],
+      [
+        "ULwesihlanu",
+        "Hla"
+      ],
+      [
+        "UMgqibelo",
+        "Mgq"
+      ],
+      [
+        "ISonto",
+        "Son"
+      ]
+    ]
+  },
+  "zu_ZA": {
+    "language": "zu",
+    "english": "Zulu",
+    "native": "isiZulu",
+    "pattern": "MMMM d, y",
+    "era": "AD",
+    "months": [
+      [
+        "Jan",
+        "Januwari"
+      ],
+      [
+        "Feb",
+        "Februwari"
+      ],
+      [
+        "Mas",
+        "Mashi"
+      ],
+      [
+        "Eph",
+        "Ephreli"
+      ],
+      [
+        "Mey",
+        "Meyi"
+      ],
+      [
+        "Jun",
+        "Juni"
+      ],
+      [
+        "Jul",
+        "Julayi"
+      ],
+      [
+        "Aga",
+        "Agasti"
+      ],
+      [
+        "Sep",
+        "Septhemba"
+      ],
+      [
+        "Okt",
+        "Okthoba"
+      ],
+      [
+        "Nov",
+        "Novemba"
+      ],
+      [
+        "Dis",
+        "Disemba"
+      ]
+    ],
+    "standalone": [
+      [
+        "Jan",
+        "Januwari"
+      ],
+      [
+        "Feb",
+        "Februwari"
+      ],
+      [
+        "Mas",
+        "Mashi"
+      ],
+      [
+        "Eph",
+        "Ephreli"
+      ],
+      [
+        "Mey",
+        "Meyi"
+      ],
+      [
+        "Jun",
+        "Juni"
+      ],
+      [
+        "Jul",
+        "Julayi"
+      ],
+      [
+        "Aga",
+        "Agasti"
+      ],
+      [
+        "Sep",
+        "Septhemba"
+      ],
+      [
+        "Okt",
+        "Okthoba"
+      ],
+      [
+        "Nov",
+        "Novemba"
+      ],
+      [
+        "Dis",
+        "Disemba"
+      ]
+    ],
+    "weekdays": [
+      [
+        "UMsombuluko",
+        "Mso"
+      ],
+      [
+        "ULwesibili",
+        "Bil"
+      ],
+      [
+        "ULwesithathu",
+        "Tha"
+      ],
+      [
+        "ULwesine",
+        "Sin"
+      ],
+      [
+        "ULwesihlanu",
+        "Hla"
+      ],
+      [
+        "UMgqibelo",
+        "Mgq"
+      ],
+      [
+        "ISonto",
+        "Son"
+      ]
+    ]
+  }
+}

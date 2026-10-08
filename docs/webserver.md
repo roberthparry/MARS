@@ -17,9 +17,11 @@ or -1 on a local/I/O failure, with `errno` set. A peer deadline expires with
 `ETIMEDOUT`. The listener remains usable after connection failures.
 
 A NULL address binds **127.0.0.1 only**. Port zero selects an ephemeral port,
-available through `websrv_port()`. Supply a numeric IPv4 address to change
-the binding; `0.0.0.0` explicitly exposes all IPv4 interfaces. Hostname
-resolution and IPv6 listeners are not implemented.
+available through `websrv_port()`. Supply a numeric IPv4 or IPv6 address to change
+the binding; `0.0.0.0` exposes all IPv4 interfaces and `::` enables a dual-stack
+listener on all interfaces. `::1` selects IPv6 loopback. Hostname resolution and
+scoped IPv6 address strings are not implemented. `websrv_request_peer()` gives
+the socket peer address for access checks; it never trusts forwarded headers.
 
 Routes match the method and exact path before the query string. Paths and
 targets are not percent-decoded, normalised or mapped onto the filesystem.
@@ -79,13 +81,24 @@ Do not trust forwarded headers automatically. A slow client occupies the sole
 worker until its deadline; this is intended for small local or proxied services,
 not as a hardened, high-concurrency internet-facing server.
 
+Applications may register routes before forking a fixed worker pool. Each child
+then serves the inherited listener independently; no server handle is shared
+between threads. Applications remain responsible for process supervision,
+shutdown and interprocess locking of persistent state.
+
 ## Public API
+
+### `websrv_request_peer`
+
+Borrow the numeric socket peer address during a handler. The `request` remains
+caller-owned. Returns NULL for NULL input. IPv4-mapped IPv6 peers retain mapped
+notation; applications checking network ranges must account for that form.
 
 ### `websrv_new`
 
-Bind a synchronous Linux IPv4 server.
+Bind a synchronous Linux IPv4 or IPv6 server.
 
-`address`: Borrowed numeric IPv4 address; NULL selects 127.0.0.1; use 0.0.0.0 explicitly for public binding.
+`address`: Borrowed numeric IP address; NULL selects 127.0.0.1. Use 0.0.0.0 or :: explicitly for all interfaces.
 
 `port`: TCP port; zero selects an ephemeral port.
 

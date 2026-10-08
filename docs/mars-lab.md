@@ -8,31 +8,203 @@ is sent to the local MARS helper programs, which use MARSlib.
 
 ## Installing and starting the Lab
 
-MARS Lab requires Python 3.10 or later and uses only its standard library; no
-packages from `pip` are needed. Build MARS and install Python, SQLCipher and the
-TeX rendering tools before starting the Lab:
+MARS Lab runs as a native C server with isolated native calculation workers.
+The browser still runs the existing HTML/CSS/JavaScript interface, served from
+`tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
+(served as `/index.css`), an ordered import list for the component styles in `assets/css/`.
+Browser code lives in `assets/js/`, and the formatted
+`assets/catalogue.json` contains only packaged worksheet defaults and presentation constants.
+Mathematical processing remains in the native C server and workers. The stylesheet is served
+with `text/css; charset=utf-8` and the same private-access and no-cache rules as
+the page. No Python interpreter is launched by the Lab.
+Database and weather installation use the native `mars_config` application.
+Install the external TeX rendering tools as follows:
 
 ```sh
-sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
+sudo apt install texlive-latex-base dvisvgm
 make mars-lab
 ```
 
 ```text
-MARS Lab running at http://localhost:<port>/
-Press Ctrl+C to stop.
+MARS Lab (native C) running at http://127.0.0.1:<port>/
 ```
 
-The port is selected automatically. Use `python3 tools/mars_lab.py --help` to
-see the command-line options, including a fixed host or port and
-`--no-browser`. To install the desktop launcher and its private jurisdiction
-database, run `make install-mars-lab` from the repository root.
+The port is selected automatically. Use `make mars-lab ARGS='--help'` to see the
+command-line options, including a fixed numeric host or port, `--workers`
+(one through eight; default four), and `--no-browser`. The default binding is
+IPv4 loopback; `--host ::` explicitly enables dual-stack private-network access.
+To install the desktop launcher and its private jurisdiction
+database, run `make install-mars-lab` from the repository root. Installation builds
+the C server and all native calculation workers before publishing the desktop
+launcher. The launcher retains the installation's `DEBUG` setting and starts
+only `tools/mars_lab/build/release/mars_lab` (or `build/debug/mars_lab` for `DEBUG=1`),
+directly; there is no Python server fallback. Installation also runs entirely
+in C, using the existing MARS string, file, database and calendar modules.
 
-The `tools/mars-lab` launcher checks the native expression-helper build target
-before it starts the client and rebuilds the helper when needed, so a restarted
-development instance cannot silently reuse a stale binary.
+The `make mars-lab` target builds `native-lab`, including the server and all
+calculation helpers, before starting it. `make native-lab` builds without
+launching. The Lab also has its own Makefile: `make -C tools/mars_lab` builds it,
+`make -j1 -C tools/mars_lab test` runs its regression suite, and
+`make -C tools/mars_lab run` launches it. Both entry points use the same source list,
+build rules, library dependencies and compiler options. A normal `make` at the
+repository root also invokes the Lab Makefile after its shared prerequisites
+are ready; the local build uses the leaf `native-lab` target without recursing
+back into the root `all` target. Use `DEBUG=1` for a
+separate debug build. The superseded Python server and repository shell launcher
+have been removed. Reinstall an older desktop launcher once so it references the
+native executable directly.
+
+Child processes use argument vectors rather than a shell, with deadlines,
+bounded captured output and process-group cancellation. State retains the
+existing `MARS_HOME` and `MARS_LAB_STATE_FILE` locations, uses private files and
+atomic replacement, and serialises concurrent updates with an advisory lock.
+The existing object-store key in `MARS_HOME/config/mars-lab.env` is reused;
+first-run key creation is locked and atomic, and never replaces an existing key.
+The native server uses four separate request processes by default, not threads.
+Named-town time zones use the installed Linux zoneinfo data, including daylight
+saving at each event's instant. Jurisdiction choices, default locations and town
+menus come from the configured jurisdiction database through `/jurisdictions`.
+There is no duplicated geographic catalogue in the Lab assets. Database changes
+appear on the next page load; restart workers to refresh their indexed native
+town-to-timezone lookup. A missing or unreadable database disables the country
+selectors with an explanatory notice, while mathematical worksheets remain usable.
+The packaged worksheet defaults are a snapshot of the saved Lab settings,
+including the selected mode, precision, dates and observer location. A complete
+snapshot is honoured literally rather than replaced with today's date or the
+machine locale. Existing saved worksheets still take precedence. Synchronisation
+timestamps are not copied into the defaults.
+The server rejects public-network peers, unrecognised Host names and mismatched
+browser Origins; forwarded address headers do not grant access. Public funnel
+switching remains disabled. TeX rendering additionally rejects non-mathematical
+commands and file-access primitives; unsupported TeX produces a rendering
+diagnostic rather than discarding the calculation.
+
+The C regression suite lives in `tools/mars_lab/tests/`. `make -j1 -C tools/mars_lab test`
+(or root `make -j1 test_lab_native`) checks worker execution and cancellation, mathematical
+response contracts, TeX restrictions, state persistence, cache-key preservation,
+time zones and real loopback HTTP routes. Function-card cases execute scalar,
+matrix and equation programmes, check rejected source and round-trip generated
+cards. The documented Function programmes run last as README examples. The
+browser checks also exercise RUN diagnostics, complete source submission and
+discarding stale responses. Its filesystem fixtures use private
+temporary directories, not the user's worksheets or cache.
+The executable is `tools/mars_lab/build/<configuration>/tests/test_lab_native`.
+Use `make -j1 -C tools/mars_lab memtest` for Valgrind checks. The suite uses the shared
+MARS C test harness and `tests/test_config.json`; its entries retain their
+`tools/mars_lab/tests/` paths so individual groups can be selected for bounded,
+sequential memory runs.
+
+The optional browser suite is also driven by C, in `tools/mars_lab/tests/browser/`.
+Run `make -j1 -C tools/mars_lab browser-test` after the ordinary tests; it requires
+Firefox, but no Node.js, Python, WebDriver or external service. `FIREFOX=/path/to/firefox`
+selects a particular executable. The suite starts an ephemeral loopback server
+and a private browser profile, injects browser assertions into a temporary copy
+of the page, and reports through that fixture's state endpoint. It checks native
+evaluation and TeX output, authored input, mode controls, history, result cards,
+the date picker, persistence, mobile metadata and startup failure reporting.
+It never uses the running Lab or the user's browser profile. Like the C suite,
+it uses `tests/test_config.json`; the browser test has its own source-path entry.
+
+### Browser implementation layout
+
+`index.html` holds the page structure and a small, escaped `lab-config` JSON
+block supplied by C. `index.css` imports the styles in their deliberate cascade order;
+keep that order when maintaining the component files. No CSS bundler is required.
+The styles are divided into:
+
+- `theme.css` and `layout.css`: colours, decorative background, page shell and editors.
+- `worksheets.css`: calendar/almanac layouts, tables and basic mode fields.
+- `dates.css` and `forms.css`: date picker, local calendar results, input states and selection menus.
+- `bindings.css`, `mobile.css` and `buttons.css`: binding controls, mobile access and shared buttons.
+- `results.css` and `help.css`: result rendering, help cards and visibility utilities.
+- `responsive.css`: tablet and phone overrides, loaded last.
+
+`js/app.js` loads the database catalogue
+and definition scripts before `worksheet.js` initialises shared DOM references
+and state; `events.js` attaches the remaining controls and starts the initial
+evaluation. Startup errors are shown in the result pane rather than leaving an
+apparently ready but unusable worksheet.
+
+The scripts use the existing shared lexical state and explicitly controlled
+classic-script loading, not ES module imports. This preserves the worksheet's
+behaviour without adding a bundler or framework. Responsibility boundaries are:
+
+- `api.js`: native evaluation requests; `evaluation.js`: mode-specific result handling.
+- `state.js` and `workspace.js`: persistence, history, modes and workspace controls.
+- `editor.js`, `bindings.js` and `calculus.js`: authored input, binding controls and native calculus requests.
+- `results.js`, `result_text.js` and `result_layout.js`: result cards, syntax highlighting, zoom and layout.
+- `controls.js`, `date_picker.js`, `locations.js`, `almanac.js` and `integrator.js`: specialised controls.
+- `mobile.js`: private-network access metadata.
+
+The server registers individual asset routes; it does not expose arbitrary files
+under `assets/`. JavaScript uses `text/javascript; charset=utf-8`, JSON uses
+`application/json`, and all assets retain private-access checks, `no-store` and
+`nosniff`. `lab_page_catalogue()` reads the owned, validated settings JSON.
+`lab_page_jurisdictions()` reads configured database storage through the public
+jurisdiction visitors and returns owned `options`, `locations` and `towns`
+collections, with an explicit availability flag. The browser endpoint and native
+timezone index consume that same database-backed representation.
+`lab_page_defaults()` returns the owned worksheet-default snapshot and
+`lab_page_render()` renders the escaped template with request-specific state.
+`MARS_LAB_ASSET_FILE` selects a custom template and its sibling settings
+`catalogue.json`; scripts and the static settings route use the packaged asset
+directory. Jurisdiction data always comes from the configured database, not from
+that custom template directory.
+
+### Native implementation layout
+
+The Lab follows the library's public-interface/private-implementation layout.
+These interfaces are private to the Lab application, not installed MARSlib APIs.
+
+```text
+tools/mars_lab/
+  Makefile          Local entry points, source inventory and shared build rules
+  include/          Documented interfaces between Lab modules
+  tests/            C regression suite and private test fixtures
+  src/
+    app/            Command-line options and worker-process supervision
+    server/         Opaque server ownership, routes and access checks
+    evaluate/       Mathematical worker records and TeX rendering
+    calendar/       DateTime, almanac, weather and town time zones
+    page/           Client template, defaults and escaped substitutions
+    mobile/         Private-network discovery and separate QR encoder
+    process/        Bounded child execution, input and cancellation
+    runtime/        Startup cache configuration and key preservation
+    state/          Locked, atomic worksheet persistence
+    internal/       Controlled white-box test façades
+  assets/           HTML template, CSS import list, css/ styles, catalogue.json and js/ scripts
+  build/release/    Generated mars_lab, module objects and dependencies
+```
+
+Debug output uses `build/debug/`; generated output is ignored by the root
+`.gitignore`. The single Lab `Makefile` supplies its source inventory and build
+rules when included by the root build. Invoked directly, it delegates commands
+to that same root graph, keeping compiler flags and dependencies consistent.
+`make -C tools/mars_lab clean` removes only Lab build output, leaving the
+library, calculation workers and saved worksheets intact. Calculation workers
+remain under the repository's `build/<configuration>/scratch/` directory.
+
+Both module APIs and static implementation functions use module-specific
+prefixes: `lab_cal_` for calendar, `lab_eval_` for evaluation, `lab_proc_` for
+process handling and `lab_svr_` for the server. Other modules retain prefixes
+such as `lab_page_` and `lab_mobile_`. Filenames and opaque type names are
+unchanged. The opaque `lab_server_t`
+owns its listener and route set: callers create, serve, query its port and free
+it without accessing transport internals. Stateless adapters accept borrowed
+strings or JSON and return caller-owned results; they do not need artificial
+handle types. Module-private headers stay beside their implementation, and
+tests needing white-box access use the controlled `src/internal/` façades.
+
+The desktop icon calls the installed launcher, which starts the already-built
+`tools/mars_lab/build/release/mars_lab`; its name, icon and browser address
+are unchanged. Direct binaries use their compiled repository location unless
+`MARS_ROOT` is supplied.
 
 Use `make mars-lab-stop` to stop a Lab process belonging to the current user,
 or `make mars-lab-restart` after changing the native helper or client.
+These targets also recognise older Lab binary names and locations. Restart waits
+for the old processes to exit; if shutdown takes more than ten seconds, it stops
+with an error instead of launching a competing instance.
 
 Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
@@ -1054,6 +1226,23 @@ bounds blank for an antiderivative, or enter lower and upper bounds for a
 definite integral. Mark a symbol **Free** when it is a parameter rather than an
 integration variable. The work-budget selector limits numerical fallback.
 
+The calculation deadline is separate from that numerical work ceiling. In
+seconds it is the smaller of 120 and the sum of three allowances: a 30-second
+base, the work ceiling divided by 500 and rounded down, and 10 seconds for each
+additional block of 96 requested decimal digits beyond the first. Partial
+precision blocks count as complete blocks. This gives high-precision requests
+extra time even with a small work ceiling, while every calculation remains
+bounded by two minutes. Arithmetic saturates at the upper limit before large
+precision or work-ceiling values can overflow.
+
+When that worker deadline expires, the evaluation response has HTTP status 422,
+`ok: false`, `error_code: "ETIMEDOUT"`, the deadline in `timeout_ms`, and a
+timeout-specific `error` message. Worker availability and output-limit failures
+retain a separate generic diagnostic. This deadline applies to the integration
+worker; subsequent binding and rendering work has its own time limits. Increasing
+the deadline does not change the requested precision, numerical tolerance or
+work ceiling.
+
 The captured input is `sin(x)^2` with `x` from `0` to `1`. MARS returns the
 exact antiderivative `(2x - sin(2x))/4` and the definite output
 `(2 - sin(2))/4`.
@@ -1072,11 +1261,31 @@ ending on 1 January 2027. Its output includes the weekday, sunrise and sunset,
 moonrise and moonset, moon phase, clock changes, the asynchronously added
 weather summary, the selected date range and the year's calendar observances.
 
+The ten calendar sections retain datetime's observance calculations, including
+estimated festivals and local sunset-start times. Jurisdiction rules continue
+to supply local public holidays and time-zone policy. Older cached results that
+lack the full calendar sections are bypassed and recomputed; no jurisdiction
+database reinstall or deletion of existing cache records is required.
+
 [![MARS Lab datetime mode showing calendar and astronomical results followed by asynchronously loaded weather](images/mars-lab/datetime.png?v=20260820-1)](images/mars-lab/datetime.png?v=20260820-1)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
 that account's key during desktop installation, and the service can be reached.
+The installer runs `tools/mars_config/build/release/mars_config weather`, without
+starting a listener, browser or object cache. This option can also be run later.
+Interactive setup offers an opt-out and hidden, confirmed key entry.
+`--noninteractive` suppresses prompts: `--weather-key KEY` takes precedence over
+`MARS_WEATHER_API_KEY`, then `WEATHERAPI_KEY`, then the saved configuration.
+Prefer the interactive prompt or environment to putting a secret in command-line
+history. With no key, non-interactive setup creates nothing.
+The key is saved atomically in `$MARS_HOME/config/weather.env` (by default
+`~/.mars/config/weather.env`), with directory mode 0700 and file mode 0600.
+Final symlinks, non-regular files and multiply-linked destinations are refused.
+Keys are limited to 4096 printable ASCII characters excluding apostrophes;
+outer whitespace is trimmed. Invalid input leaves existing contents intact.
+Setup prints only a confirmation or generic error, never the key. The C installer
+regressions are in `tools/mars_config/tests/test_cfg_weather.c`.
 The calendar and astronomical results do not depend on that optional service.
 They are displayed as soon as the native datetime helper completes; weather is
 fetched asynchronously and updates its own card afterwards, without delaying
@@ -1103,6 +1312,11 @@ offset, latitude, longitude and altitude. The packaged ephemeris covers
 ascension and observer-relative altitude and azimuth for the navigational
 bodies.
 
+Wide worksheet tables scroll within their own keyboard-focusable areas rather
+than overflowing the result card. Event contacts show compact times; their full
+dates and GMT offsets remain in tooltips and copied worksheet text. On mobile,
+events use stacked, labelled fields instead of tightly squeezed columns.
+
 The captured request is for London at `2026-08-08 09:02:43` GMT. The output is
 the navigational-body table headed by the Sun, Moon, Mercury, Venus, Mars,
 Jupiter and Saturn.
@@ -1111,7 +1325,7 @@ Jupiter and Saturn.
 
 ## Mobile and private remote access
 
-When MARS Lab listens on its normal wildcard address, its **Mobile** control
+When MARS Lab listens on a wildcard address (as the desktop launcher does), its **Mobile** control
 shows the best private access route currently available:
 
 - with Tailscale active, the QR code contains the private Tailscale URL;
@@ -1120,15 +1334,18 @@ shows the best private access route currently available:
 
 For access away from the local network, connect both the MARS computer and the
 mobile device to the same Tailscale network, start MARS Lab, open **Mobile** and
-scan the displayed code. MARS Lab configures private Tailscale Serve when it
-can; it deliberately does not enable public Tailscale Funnel access. A phone
+scan the displayed code. MARS Lab recognises an existing private Tailscale Serve
+configuration; it does not change Tailscale settings or enable public Funnel access. A phone
 that is not connected to the same Tailscale network cannot use the private QR
 code.
 
 ## Troubleshooting
 
 - **No rendered mathematics:** install `texlive-latex-base` and `dvisvgm`, then
-  restart the Lab.
+  restart the Lab. The renderer accepts native mathematical spacing, including
+  `\mkern`, but rejects file access and macro-definition commands. If a native
+  result reports an unsupported command, rebuild and restart the Lab to ensure
+  its renderer matches the library's current output.
 - **A helper is missing:** run `make release` and restart the Lab from the
   repository root.
 - **A mobile QR code is absent or unreachable:** confirm that MARS Lab is using

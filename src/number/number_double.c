@@ -9,13 +9,13 @@
  * borrowed aliases and independently owned numeric values.
  */
 
+#include <math.h>
+#include <stdio.h>
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
-
-#include <math.h>
-#include <stdio.h>
 
 bool number_is_zero_double(const number_t *number)
 {

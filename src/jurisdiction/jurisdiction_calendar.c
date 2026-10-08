@@ -10,11 +10,11 @@
  */
 
 /* Civil-date helpers, inherited weekend policy and working-day queries. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "jurisdiction_internal.h"
 
 bool jurisdiction_parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)
 {

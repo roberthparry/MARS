@@ -1,0 +1,61 @@
+/* Help cards and shared visibility utilities. */
+.help-pane {
+  padding: 1rem;
+}
+
+.help-card {
+  padding: 1rem;
+  border: 2px solid rgba(233, 244, 239, 0.24);
+  border-radius: 18px;
+  background: rgba(8, 29, 22, 0.62);
+}
+
+.help-card + .help-card {
+  margin-top: 1rem;
+}
+
+.help-card h3 {
+  margin: 0 0 0.65rem;
+  color: var(--accent-2);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.help-card p {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+}
+
+.help-card .help-kicker {
+  margin: 0 0 0.8rem;
+  color: #d7e7b7;
+  font: 0.76rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.help-card ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.help-card li {
+  margin: 0.35rem 0;
+}
+
+.help-card code {
+  color: var(--code);
+  font: 0.92rem/1.35 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  background: rgba(113, 198, 180, 0.12);
+  border-radius: 6px;
+  padding: 0.08rem 0.25rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.card.hidden {
+  display: none !important;
+}

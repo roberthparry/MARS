@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__LAB_NAME__</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="__THEME_COLOR__">
+  <link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div class="celtic-backdrop" aria-hidden="true">
+    <div class="aurora"></div>
+    <div class="standing-stones">
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+    </div>
+    <div class="chariot-wheel"></div>
+  </div>
+  <header>
+    <div>
+      <h1>__LAB_NAME__</h1>
+      <p class="subtitle" id="subtitle">__LAB_SUBTITLE__</p>
+    </div>
+    <div class="header-side">
+      <div class="status" id="status">Ready</div>
+      <details class="mobile-card __MOBILE_CARD_CLASS__" id="mobileAccess">
+        <summary>Mobile</summary>
+        <div class="mobile-panel">
+          <div class="mobile-copy">
+            <strong id="mobileTitle">__MOBILE_TITLE__</strong>
+            <span id="mobileHint">__MOBILE_HINT__</span>
+            <code id="mobileUrl">__MOBILE_URL__</code>
+          </div>
+          <div class="mobile-actions">
+            <div class="mobile-qr" id="mobileQr" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
+            <button class="card-action copy-result" type="button" data-copy-target="mobile">Copy URL</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </header>
+  <main id="labWorkspace">
+    <div class="lab-topbar">
+      <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
+        <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
+        <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
+        <button class="mode-tab" id="modeTabDiffequation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="diffequation">Differential Equation</button>
+        <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
+        <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
+        <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
+        <button class="mode-tab" id="modeTabAlmanac" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="almanac">Almanac</button>
+      </div>
+      <div class="precision-toolbar" aria-label="Precision controls">
+        <span class="precision-label">Precision</span>
+        <button class="card-action" id="lessPrecision" type="button">Less precision</button>
+        <button class="card-action" id="morePrecision" type="button">More precision</button>
+      </div>
+    </div>
+    <section id="workspacePanel">
+      <div class="panel-head">
+        <h2 id="leftPaneTitle">Workspace</h2>
+        <button class="card-action" id="inputCopy" type="button">Copy</button>
+      </div>
+      <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
+      <div class="mode-panel hidden" id="matrixControls">
+        <label id="matrixOperationLabel" for="matrixOperation">Matrix operation</label>
+        <select id="matrixOperation">
+          <option value="eval" selected>Evaluate expression</option>
+          <option value="inverse">Inverse</option>
+          <option value="multiply">Multiply by another matrix</option>
+          <option value="eigenvalues">Eigenvalues</option>
+          <option value="eigendecompose">Eigendecompose</option>
+          <option value="charpoly">Characteristic polynomial</option>
+          <option value="det">Determinant</option>
+          <option value="trace">Trace</option>
+          <option value="rank">Rank</option>
+          <option value="simplify">Simplify symbolic matrix</option>
+          <option value="solve">Solve A X = B</option>
+        </select>
+        <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
+        <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
+      </div>
+      <div class="mode-panel hidden" id="equationControls">
+        <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
+      </div>
+      <div class="mode-panel hidden" id="diffequationControls">
+        <p class="mode-hint">Enter an ODE such as <code>Dx(y) = x*y; y(0) = 1</code>. Derivatives, polynomial differential operators, differential forms, and optional conditions are supported; choose <code>Help</code> for the accepted notation and examples.</p>
+      </div>
+      <div class="mode-panel hidden" id="integratorControls">
+        <div class="integrator-bound-stack" id="integratorBoundStack"></div>
+        <div class="integrator-bound-actions">
+          <span class="integrator-bound-summary">Use <code>Bound</code> rows for variables you actually want to integrate. Use <code>Free</code> only for symbols that appear in the integrand but should stay as parameters.</span>
+        </div>
+        <label for="integratorIntervalCap">Work budget ceiling</label>
+        <select id="integratorIntervalCap">
+          <option value="500">Up to 500</option>
+          <option value="5000" selected>Up to 5,000</option>
+          <option value="20000">Up to 20,000</option>
+          <option value="50000">Up to 50,000</option>
+          <option value="100000">Up to 100,000</option>
+        </select>
+        <p class="mode-hint">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
+      </div>
+      <div class="mode-panel hidden datetime-controls" id="datetimeControls">
+        <div class="datetime-briefing" aria-hidden="true">
+          <div class="datetime-orbit"></div>
+          <div>
+            <div class="datetime-briefing-kicker">Sol calendar uplink</div>
+            <div class="datetime-briefing-title">Plan an Earth date from the observer location.</div>
+            <div class="datetime-briefing-copy">Choose a civil date, a range, and an observation point. The core datetime module handles the calendar and solar calculations; this panel is only the flight deck.</div>
+          </div>
+        </div>
+        <div class="datetime-field-groups">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Holiday calendar</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeJurisdiction">Holiday country or jurisdiction</label>
+                <select id="datetimeJurisdiction">
+__HOLIDAY_JURISDICTION_OPTIONS__
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Selected date</div>
+            <div class="datetime-grid selected-date-grid">
+              <div class="integrator-bound-field selected-date-field">
+                <label for="datetimeDate">Date</label>
+                <div class="mars-date-shell">
+                  <input id="datetimeDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeDate" aria-label="Open date picker for selected date"></button>
+                </div>
+              </div>
+              <div class="integrator-bound-field selected-jdn-field">
+                <label for="datetimeJdn">Julian Day Number</label>
+                <input id="datetimeJdn" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 2460117">
+              </div>
+              <div class="integrator-bound-field selected-year-field">
+                <label for="datetimeYear">Calendar year</label>
+                <input id="datetimeYear" type="number" min="1" max="9999" step="1">
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Date range</div>
+            <div class="datetime-grid two-up">
+              <div class="integrator-bound-field">
+                <label for="datetimeStart">Start date</label>
+                <div class="mars-date-shell">
+                  <input id="datetimeStart" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeStart" aria-label="Open date picker for start date"></button>
+                </div>
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeEnd">End date</label>
+                <div class="mars-date-shell">
+                  <input id="datetimeEnd" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="datetimeEnd" aria-label="Open date picker for end date"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Observer</div>
+            <div class="datetime-grid location-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeTown">Town/location</label>
+                <select id="datetimeTown"></select>
+              </div>
+              <div class="integrator-bound-field">
+                <label for="datetimeGmtOffset">GMT offset, including daylight saving</label>
+                <input id="datetimeGmtOffset" inputmode="decimal" placeholder="blank for jurisdiction local, 1 for BST">
+              </div>
+              <div class="location-coordinate-grid">
+                <div class="integrator-bound-field">
+                  <label for="datetimeLatitude">Latitude</label>
+                  <input id="datetimeLatitude" inputmode="decimal" placeholder="51.5074">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="datetimeLongitude">Longitude</label>
+                  <input id="datetimeLongitude" inputmode="decimal" placeholder="-0.1278">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="datetimeElevation">Altitude metres</label>
+                  <input id="datetimeElevation" inputmode="decimal" placeholder="0">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="mode-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
+        <div class="datetime-local hidden" id="datetimeLocal">
+          <div class="datetime-local-title">Local</div>
+          <div class="datetime-local-body" id="datetimeLocalBody"></div>
+        </div>
+      </div>
+      <div class="mode-panel hidden almanac-controls" id="almanacControls">
+        <div class="almanac-briefing" aria-hidden="true">
+          <div>
+            <div class="datetime-briefing-kicker">AstroNav worksheet</div>
+            <div class="datetime-briefing-title">Location of Navigational Bodies</div>
+            <div class="datetime-briefing-copy">Enter date and time in GMT, then zone, latitude, and longitude. The worksheet uses the live almanac engine underneath, with ephemeris coverage for __ALMANAC_COVERAGE_TEXT__.</div>
+          </div>
+        </div>
+        <div class="datetime-field-groups">
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Set the moment</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="almanacDate">Date</label>
+                <div class="mars-date-shell">
+                  <input id="almanacDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
+                  <button class="mars-date-button" type="button" data-date-target="almanacDate" aria-label="Open date picker for almanac date"></button>
+                </div>
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacTime">GMT time</label>
+                <input id="almanacTime" type="text" inputmode="decimal" placeholder="17:47:05.8" autocomplete="off">
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacZone">Zone</label>
+                <input id="almanacZone" inputmode="decimal" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Observer</div>
+            <div class="datetime-grid location-grid">
+              <div class="integrator-bound-field">
+                <label for="almanacJurisdiction">Jurisdiction</label>
+                <select id="almanacJurisdiction">
+__HOLIDAY_JURISDICTION_OPTIONS__
+                </select>
+              </div>
+              <div class="integrator-bound-field">
+                <label for="almanacTown">Town/location</label>
+                <select id="almanacTown"></select>
+              </div>
+              <div class="location-coordinate-grid">
+                <div class="integrator-bound-field">
+                  <label for="almanacLatitude">Latitude</label>
+                  <input id="almanacLatitude" inputmode="decimal" placeholder="51.5074">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="almanacLongitude">Longitude</label>
+                  <input id="almanacLongitude" inputmode="decimal" placeholder="-0.1278">
+                </div>
+                <div class="integrator-bound-field">
+                  <label for="almanacElevation">Altitude metres</label>
+                  <input id="almanacElevation" inputmode="decimal" placeholder="0">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="mode-hint">__ALMANAC_ACCURACY_NOTE__</p>
+      </div>
+      <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
+        <div class="mars-date-picker-head">
+          <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
+          <div class="mars-date-picker-title" id="marsDatePickerTitle">
+            <select id="marsDatePickerMonth" aria-label="Calendar month"></select>
+            <div class="mars-date-picker-year-group" aria-label="Calendar year controls">
+              <button class="mars-date-picker-year-step" id="marsDatePickerYearDown" type="button" aria-label="Previous year" title="Previous year; Shift for 10 years; Ctrl for 100 years" data-symbol="−">−</button>
+              <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
+              <button class="mars-date-picker-year-step" id="marsDatePickerYearUp" type="button" aria-label="Next year" title="Next year; Shift for 10 years; Ctrl for 100 years" data-symbol="+">+</button>
+            </div>
+          </div>
+          <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
+        </div>
+        <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
+        <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
+        <div class="mars-date-picker-foot">
+          <button id="marsDatePickerToday" type="button">Now</button>
+          <button id="marsDatePickerClose" type="button">Close</button>
+        </div>
+      </div>
+      <div class="target-row hidden" id="targetRow">
+        <label for="goalTarget">Target</label>
+        <input id="goalTarget" spellcheck="false" value="0">
+      </div>
+      <div class="controls">
+        <button id="run">Evaluate</button>
+        <button class="secondary" id="back">Back</button>
+        <button class="secondary" id="forward">Forward</button>
+        <button class="secondary" id="help">Help</button>
+        <button class="secondary" id="goalSeek">Goal seek</button>
+        <button class="secondary" id="clear">Clear</button>
+      </div>
+      <div class="controls derivative-controls" id="derivativeButtons"></div>
+      <div class="variable-values hidden" id="variableValues"></div>
+    </section>
+
+    <section id="resultWorkspacePanel">
+      <div class="panel-head">
+        <h2 id="rightPaneTitle">Result</h2>
+        <button class="card-action result-use-input hidden" id="resultUseInput" type="button">Use as input</button>
+      </div>
+      <div class="output-grid" id="resultPane">
+        <div class="card result-card">
+          <div class="card-title expandable-title">
+            <span id="renderedTitle">Rendered TeX</span>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="renderedMore">Show more digits</button>
+            </span>
+            <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" id="renderedCopy" data-copy-target="rendered">Copy</button>
+            </span>
+          </div>
+          <div class="rendered" id="rendered"></div>
+        </div>
+        <div class="card result-card mobile-result-extra">
+          <div class="card-title expandable-title">
+            <span id="parsedTitle">Expression</span>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="parsedMore">Show more digits</button>
+            </span>
+            <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="expression">Copy</button>
+            </span>
+          </div>
+          <pre id="parsed"></pre>
+        </div>
+        <div class="card result-card mobile-result-extra" id="functionCard">
+          <div class="card-title expandable-title">
+            <span id="functionTitle">Function</span>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="functionMore">Show more digits</button>
+            </span>
+            <span class="card-actions top-card-actions">
+              <button class="card-action" id="functionRun" type="button" title="Run this card's full-precision Ophelia programme">RUN</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="function">Copy</button>
+            </span>
+          </div>
+          <pre id="functionStyle"></pre>
+          <div id="functionRunResult" class="hidden" role="status" aria-live="polite">
+            <div class="card-title">Run output</div>
+            <pre id="functionRunOutput"></pre>
+          </div>
+        </div>
+        <div class="card result-card hidden" id="valueNoteCard" role="status">
+          <div class="card-title">Evaluation note</div>
+          <pre id="valueNote"></pre>
+        </div>
+        <div class="card result-card" id="valueCard">
+          <div class="card-title value-title">
+            <span id="valueTitle">Value</span>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="valueMore">Show more digits</button>
+            </span>
+            <span class="card-actions value-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">100%</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="value">Copy</button>
+            </span>
+          </div>
+          <pre id="value"></pre>
+        </div>
+      </div>
+      <div class="help-pane hidden" id="helpPane">
+        <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator,datetime,almanac">
+          <div class="help-kicker">Start Here</div>
+          <p>MARS Lab works best when you type the mathematical object itself in the main editor, then use the controls underneath to tell the lab what kind of job you want.</p>
+          <ul>
+            <li><code>Expression</code>: type a formula, then set any variable values needed for numeric evaluation. Symbolic operations such as <code>Dx(...)</code> can run with their differentiation variables left blank.</li>
+            <li><code>Equation</code>: type an equation and choose which variable to solve for.</li>
+            <li><code>Differential Equation</code>: type an ODE followed by optional semicolon-separated initial or boundary conditions.</li>
+            <li><code>Matrix</code>: type the complete matrix expression, then press <code>Evaluate</code>.</li>
+            <li><code>Integrator</code>: type the integrand, then add one row per variable you want to integrate over.</li>
+            <li><code>Datetime</code>: choose dates, a year, and a location to calculate calendar and solar facts.</li>
+            <li><code>Almanac</code>: choose a GMT moment and observer location to inspect navigational bodies, visibility, and local eclipse/transit events.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Differential Equations</div>
+          <p>Type the equation itself, followed by any initial or boundary conditions separated by semicolons. The notation identifies the dependent and independent variables; without enough conditions, the solution retains arbitrary constants.</p>
+          <ul>
+            <li><code>Dx(y) = x*y; y(0) = 1</code> is a first-order initial-value problem.</li>
+            <li><code>Dxx(y) = y; y(0) = 1; y'(0) = 1</code> is a second-order problem and uses prime notation in a condition.</li>
+            <li><code>Dxxx(y) + 3*Dxx(y) + 3*Dx(y) + y = x + sin(x)</code> is a forced third-order constant-coefficient ODE.</li>
+            <li><code>y'' + 4y = exp(x)</code>, <code>d²y/dx² + 4y = exp(x)</code>, and <code>Dxx(y) + 4y = exp(x)</code> are equivalent forms.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Using Matrix Mode</div>
+          <p>Enter the complete matrix expression in the main editor, choose the required matrix operation, then press <code>Evaluate</code>. A straightforward calculation can be completed as follows:</p>
+          <ol>
+            <li>Enter a matrix such as <code>(1 2; 3 4)</code>. Spaces or commas separate columns; semicolons separate rows.</li>
+            <li>Leave <code>Matrix operation</code> set to <code>Evaluate expression</code> when the operation is already written in the editor, for example <code>sin(1 2; 3 4)</code> or <code>(1 2; 3 4)^2</code>. Otherwise choose a structural operation such as <code>Inverse</code>, <code>Determinant</code>, or <code>Eigenvalues</code>.</li>
+            <li>For <code>Multiply by another matrix</code> or <code>Solve A X = B</code>, enter the second matrix in the <code>Right-hand side matrix</code> box that appears.</li>
+            <li>Press <code>Evaluate</code>. If the matrix contains symbols, their binding boxes appear below the controls. Enter values only when a numerical result is wanted, or leave them blank for a symbolic result.</li>
+            <li>Use each binding's <code>Variable</code>/<code>Constant</code> button to change its role. This changes how MARS treats the symbol without replacing the expression you typed.</li>
+            <li>Use the derivative and integral buttons that appear for variable bindings to apply entrywise matrix calculus.</li>
+          </ol>
+          <p>The result side uses the same four-card arrangement as Expression mode: <code>Rendered TeX</code> shows the symbolic result, <code>Expression</code> includes its bindings, <code>Function</code> gives reusable MARS code with shared calculations assigned once to intermediate variables, and <code>Value</code> appears when all required values are available. <code>Use as input</code> returns a reusable result to the Matrix editor.</p>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Functions</div>
+          <p>Write the complete matrix expression in the editor, then press <code>Evaluate</code>. These are genuine matrix functions calculated by MARSlib, not functions applied independently to each displayed entry.</p>
+          <ul>
+            <li><code>sin(1 2; 4 5)</code> calculates the sine of the complete 2x2 matrix. Spaces separate columns and semicolons separate rows.</li>
+            <li><code>inverse(a b; c d)</code> and <code>inv(a b; c d)</code> calculate a symbolic inverse, while <code>(a b; c d).(e f; g h)</code> performs matrix multiplication. Matrix division is not defined. Matrix operations compose, so <code>inv(a b; c d).(x; y)</code> solves the corresponding 2x2 linear system.</li>
+            <li><code>det(A)</code> and <code>determinant(A)</code> return a scalar determinant; <code>trace(A)</code> and <code>tr(A)</code> return a scalar trace.</li>
+            <li><code>transpose(A)</code>/<code>trans(A)</code> transpose a matrix. <code>hermitian(A)</code>, <code>adjoint(A)</code>, <code>ctranspose(A)</code>, <code>conjtrans(A)</code>, and <code>conjugate_transpose(A)</code> calculate its conjugate transpose.</li>
+            <li><code>Dx(ax+b cx+d; y xy)</code> differentiates every entry with respect to <code>x</code>. Repeated or mixed suffixes such as <code>Dxx(A)</code> and <code>Dxy(A)</code> request ordered higher or mixed derivatives.</li>
+            <li><code>@S(ax+b cx+d; y xy)dx</code> returns an indefinite entrywise integral plus its constant matrix. <code>@S^x(ax+b cx+d; y xy)dx</code> returns the corresponding antiderivative without additive constants. Whitespace around the matrix and differential is optional.</li>
+            <li>Matrix functions require a square matrix. A rectangular matrix is rejected rather than having the scalar function applied entry by entry.</li>
+            <li><code>exp(0 1; -1 0)</code> calculates the matrix exponential.</li>
+            <li><code>sqrt(4 0; 0 9)</code> obtains <code>(2, 0; 0, 3)</code>.</li>
+            <li>The native expression-function registry also supplies exponential, logarithmic, trigonometric, inverse-trigonometric, hyperbolic, error, gamma, normal-density, Lambert W, and exponential-integral matrix functions.</li>
+            <li>Exact symbolic matrices use an exact structured rule where one is available. Otherwise, supply numeric bindings before applying a general numeric matrix function.</li>
+            <li>Logarithms, inverse functions and special functions require a matrix whose spectrum lies in a supported domain; otherwise MARS Lab reports that the matrix function failed.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Operation Selector</div>
+          <p>Direct notation composes naturally, while the selector provides convenient access to structural operations.</p>
+          <ul>
+            <li><code>Evaluate expression</code>, <code>Inverse</code>, <code>Eigenvalues</code>, <code>Eigendecompose</code>, <code>Characteristic polynomial</code>, <code>Determinant</code>, <code>Trace</code>, <code>Rank</code>, and <code>Simplify symbolic matrix</code> use the main editor.</li>
+            <li><code>Multiply by another matrix</code> and <code>Solve A X = B</code> reveal a right-hand matrix editor.</li>
+            <li>The selected operation, right-hand operand, and Matrix editor are retained between sessions. <code>Back</code> and <code>Forward</code> navigate Matrix workspace history.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Notation And Aliases</div>
+          <p>MARSlib parses the complete expression. The browser passes your text through unchanged and does not recognise function names itself.</p>
+          <ul>
+            <li>Use <code>+/-</code> for same-sized matrices, <code>.</code> for ordered matrix multiplication, and <code>^</code> for integer, fractional, or symbolic powers. Parenthesised composite bases such as <code>((1 2; 3 4) - lambdaI)^x</code> are accepted.</li>
+            <li><code>lambdaI</code>, <code>lambda.I</code>, and <code>lambda*I</code> mean λ times the identity when the required order is clear.</li>
+            <li><code>A^dagger</code>, <code>A^H</code>, <code>A^*</code>, <code>A^†</code>, and <code>A†</code> are postfix forms of the Hermitian adjoint.</li>
+            <li><code>|A|</code>, <code>||A||</code>, and <code>‖A‖</code> are determinant forms. Both opening and closing bars are required.</li>
+            <li>Matrix division is deliberately absent: <code>A/B</code> would not say on which side <code>inv(B)</code> should multiply.</li>
+            <li><code>lambda</code>, <code>@lambda</code>, and <code>λ</code> are the same Greek symbol and render as λ.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Matrix Calculus And Values</div>
+          <ul>
+            <li>The variable derivative and integral buttons apply entrywise and remain available while the corresponding variable is present.</li>
+            <li>Direct <code>Dxx(A)</code> and <code>Dxy(A)</code> notation supports ordered higher and mixed differentiation. Matrix integration uses the same <code>@S(...)dx</code> notation as scalar expressions.</li>
+            <li>An antiderivative is displayed as <code>A(x) + C</code>, where <code>C</code> is an independent constant matrix with entries <code>C₁₁</code>, <code>C₁₂</code>, <code>C₂₁</code>, and <code>C₂₂</code> for a 2x2 result.</li>
+            <li><code>Rendered TeX</code>, <code>Expression</code>, and <code>Function</code> preserve the symbolic answer. <code>Value</code> separately shows the numerical matrix once every required binding is supplied; it remains hidden while any entry is unresolved.</li>
+            <li>The Value card never abbreviates its numerical output. Long entries wrap within their matrix columns so the complete result remains visible.</li>
+            <li><code>Use as input</code> copies the reusable result expression back into the Matrix editor.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="matrix">
+          <div class="help-kicker">Symbolic Matrix-power Calculus</div>
+          <p>For <code>A = (1 2; 3 4)</code>, enter <code>A^x</code> as <code>(1 2; 3 4)^x</code>. Its eigenvalues are <code>λ₊ = (5 + √33)/2</code> and <code>λ₋ = (5 - √33)/2</code>.</p>
+          <ul>
+            <li>With spectral projectors <code>P₊ = (A - λ₋I)/√33</code> and <code>P₋ = (λ₊I - A)/√33</code>, MARSlib represents the power exactly as <code>A^x = λ₊^x P₊ + λ₋^x P₋</code>.</li>
+            <li><code>x derivative</code> gives <code>ln(λ₊)λ₊^x P₊ + ln(λ₋)λ₋^x P₋</code>.</li>
+            <li><code>x integral</code> gives <code>λ₊^x P₊/ln(λ₊) + λ₋^x P₋/ln(λ₋) + C</code>, with an independent constant matrix <code>C</code>.</li>
+            <li>The result cards expand this compact spectral description into the exact 2x2 matrix containing √33.</li>
+            <li>The same spectral calculus applies to supported diagonalizable constant square matrices of any order. An eigenvalue-one projector differentiates to zero and integrates to a linear term.</li>
+            <li>Symbolic differentiation constructs expression DAGs. It is distinct from the scalar evaluator's numeric reverse-mode gradient path and from a future numeric forward-mode JVP path.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Bare D And Operator Polynomials</div>
+          <p><code>D</code> is a differential operator. When it acts on <code>x</code>, MARS differentiates with respect to <code>t</code>; when it acts on any other dependent variable, MARS differentiates with respect to <code>x</code>.</p>
+          <ul>
+            <li><code>D(y) = y</code> means <code>Dx(y) = y</code>, while <code>D(x) = x</code> means <code>Dt(x) = x</code>.</li>
+            <li><code>D^2(z) + z = 0</code> means <code>Dxx(z) + z = 0</code>.</li>
+            <li><code>(D^2 - @omega^2)^2(x) = 0</code> expands the squared operator, treats <code>omega</code> as a constant, and solves for <code>x(t)</code>.</li>
+            <li><code>(D^2 + @omega^2)^3x = 0</code> is also accepted. Literal positive integer powers up to 64 are expanded; solutions show every term for powers below 4 and use compact finite sums from power 4 onwards.</li>
+            <li><code>(Dx^2 + 4Dx + 20)^2(y) = 0</code> explicitly selects <code>x</code> as the differentiation variable.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Greek Symbols And Differential Forms</div>
+          <p>Prefix a Greek name with <code>@</code> to enter its symbol unambiguously. Common plain Greek names are also recognised. Differential forms may be entered as coefficients followed by differentials.</p>
+          <ul>
+            <li><code>@omega</code>, <code>@theta</code>, and <code>@phi</code> display as <code>ω</code>, <code>θ</code>, and <code>φ</code>.</li>
+            <li>When it is a dependent variable, <code>phi</code>, <code>@phi</code>, and <code>φ</code> are identical and render as <code>φ</code> everywhere; for example, <code>(D^2 + @omega^2)^4phi = 0</code>.</li>
+            <li><code>(sin(theta)-2r cos^2(theta))dr + r cos(theta)(2r sin(theta)+1)dtheta = 0</code> is accepted as a differential form.</li>
+            <li>The same form may use <code>@theta</code> and <code>d@theta</code>; MARSlib performs the parsing and solving.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="diffequation">
+          <div class="help-kicker">Partial Differential Equations And Results</div>
+          <ul>
+            <li><code>Dx(u) + Dy(u) = 0</code> is a first-order PDE; <code>u_x + u_y = 0</code> is equivalent shorthand.</li>
+            <li><code>phi_xx + phi_yy = 0</code> is the two-dimensional Laplace equation. Without boundary data, MARSlib returns its general harmonic family <code>φ = F(x + i*y) + G(x - i*y)</code>.</li>
+            <li><code>phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0</code> is the polar form. Spaces between coefficients and derivative terms imply multiplication, Greek derivative suffixes are recognised, and MARSlib returns <code>φ = F(r*exp(i*θ)) + G(r*exp(-i*θ))</code>.</li>
+            <li>Use the explicit form <code>{ Dx(y) + a*y = x | x = ?; a = 2; y(0) = 1 }</code> when you need to declare variables, constants, and conditions separately.</li>
+            <li>The result cards show the normalised problem, selected solver family, diagnostic, and every symbolic solution returned by native MARSlib.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="datetime">
+          <div class="help-kicker">Datetime Workflow</div>
+          <p>Use the calendar controls for the main date, date range, observance year, and location.</p>
+          <ul>
+            <li><code>Date</code> drives weekday, moon phase, estimated and almanac-backed actual sunrise/sunset, solar declination, inclination, and maximum altitude.</li>
+            <li><code>Start date</code> and <code>End date</code> drive the days-between result.</li>
+            <li><code>Year</code> drives Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec, and Ethiopian calendar views.</li>
+            <li><code>Holiday country or jurisdiction</code> is only used when you want the optional local holiday panel.</li>
+            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
+            <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
+            <li>MARS supplies no shared weather account or key. Weather, humidity, wind, and rain chance appear only when the installer configures a key from their own WeatherAPI account and the selected date is supported by the provider.</li>
+            <li>When enabled, the local server sends that key, the selected date, and the observer coordinates to WeatherAPI.com over HTTPS. The key is not sent to the browser, and MARS does not retain the returned weather response.</li>
+            <li>Weather is informational and must not be the sole basis for safety-critical decisions. See the provider's <a href="https://www.weatherapi.com/privacy.aspx" target="_blank" rel="noreferrer">privacy policy</a> and <a href="https://www.weatherapi.com/terms.aspx" target="_blank" rel="noreferrer">terms</a>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Almanac Workflow</div>
+          <p>Use Almanac mode when you want celestial navigation style positions for a precise moment and observer.</p>
+          <ul>
+            <li><code>Date</code> and <code>GMT time</code> define the instant used by the ephemeris. The body table is calculated for that GMT instant.</li>
+            <li><code>Zone</code> is used to present local event times, such as eclipse contacts. It does not change the GMT instant entered above.</li>
+            <li><code>Jurisdiction</code> and <code>Town/location</code> fill in latitude, longitude, altitude, and local time rules where available.</li>
+            <li>You can type latitude, longitude, and altitude directly if the exact observing point is not in the town list.</li>
+            <li>The <code>All</code>/<code>Visible</code> toggle controls the body table only;
+              events are still searched for the selected observer from the chosen GMT moment through one year ahead.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Reading The Body Table</div>
+          <ul>
+            <li><code>Declination</code>, <code>RA</code>, and <code>GHA</code> are apparent body coordinates for the selected GMT moment.</li>
+            <li><code>Altitude</code> and <code>Azimuth</code> are observer-relative horizon coordinates for the selected latitude, longitude, and altitude.</li>
+            <li><code>s.d.</code> is the apparent semi-diameter in arcminutes where the body has a visible disc.</li>
+            <li><code>Vmag.</code> is visual magnitude. Lower numbers are brighter; negative values are very bright.</li>
+            <li><code>Visible</code> means the body is above the usable local horizon and passes the daylight/eclipse visibility checks.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Eclipses And Transits</div>
+          <ul>
+            <li>The event table starts at the selected GMT moment and covers one year ahead.
+              An event already in progress remains listed until its final contact.</li>
+            <li><code>Date</code> gives the local civil date of greatest eclipse or transit, so the row remains meaningful even if nearest totality cannot be found.</li>
+            <li><code>First</code>, <code>Greatest</code>, and <code>Fourth</code> are local civil progress times. Use <code>GMT</code> when comparing against the body table.</li>
+            <li><code>Mag.</code> is eclipse magnitude; <code>Obsc.</code> is obscuration or totality percentage.</li>
+            <li><code>Nearest totality</code> lists the nearest town or location where totality can be observed when the selected observer sees only a partial eclipse.</li>
+            <li>Use the <code>Use</code> button on a nearest-totality result to jump the almanac to that town and moment.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Integrator Workflow</div>
+          <p>The integrator editor is split into two parts: the expression at the top is the integrand, and the rows underneath describe the nested integrals.</p>
+          <ul>
+            <li>A <code>Bound</code> row means "integrate with respect to this variable".</li>
+            <li>A <code>Free</code> row means "keep this symbol as a parameter".</li>
+            <li>Do not add rows for variables that are not in the integrand. A row named <code>y</code> means "integrate with respect to y", not "reserve a possible future variable".</li>
+            <li>Row order matters. The first row is the outermost integral shown on screen, and later rows sit further inside.</li>
+            <li>Use <code>+</code> and <code>-</code> on each row to insert or remove nested integrals without retyping everything.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Rows That Count</div>
+          <p>The lab sends only active rows to the integrator.</p>
+          <ul>
+            <li>A row with both bounds filled is active, such as <code>x = 0 .. 1</code>.</li>
+            <li>A row with only an upper bound is active, such as <code>t = x</code>, and gives an upper-limit integral.</li>
+            <li>A blank <code>Bound</code> row is active only when its variable appears in the integrand, or when it is the only bound row.</li>
+            <li>A <code>Free</code> row is active only when its symbol appears in the integrand.</li>
+            <li>Spare blank rows that do not match the integrand are ignored and pruned after evaluation.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Common Recipes</div>
+          <ul>
+            <li>Antiderivative: integrand <code>sin(x)</code>, row <code>x</code>, both bounds blank.</li>
+            <li>Upper-limit form: integrand <code>sin(t)</code>, row <code>t</code>, lower blank, upper <code>x</code>.</li>
+            <li>Definite integral: integrand <code>x^2</code>, row <code>x</code>, lower <code>0</code>, upper <code>1</code>.</li>
+            <li>Parameterized integral: integrand <code>exp(-a*x^2)</code>, row <code>a</code> as <code>Free</code>, row <code>x</code> with bounds.</li>
+            <li>Nested integral: add one bound row per variable, for example <code>x = 0 .. 1</code>, <code>y = 0 .. 1</code>, <code>z = 0 .. 1</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="integrator">
+          <div class="help-kicker">Reading Results</div>
+          <ul>
+            <li><code>Rendered TeX</code> shows the integral exactly as the lab interpreted it.</li>
+            <li><code>Exact result</code> explains the path taken, for example symbolic reduction, convergence, or a work-budget cap.</li>
+            <li><code>Integral</code> shows the numeric value and the reported integration error estimate.</li>
+            <li><code>work used</code> tells you how much of the numeric budget the solver spent. A value of <code>1</code> often means a fast closed-form path or a very simple special case.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+          <h3>Expression Shape</h3>
+          <p>Type the expression body in the editor. Variable and constant bindings appear as editable boxes underneath.</p>
+          <ul>
+            <li><code>x/pi</code> becomes <code>{ x/π | x = ? }</code>, but the editor keeps showing <code>x/pi</code>.</li>
+            <li>Set <code>x</code> to <code>pi/2</code> in the binding box instead of writing the binding into the editor.</li>
+            <li>Raw expr binding syntax still works when you paste it, but the lab keeps the large editor focused on the expression body.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+          <h3>Bindings</h3>
+          <p>Yellow boxes are variables and blue boxes are constants.</p>
+          <ul>
+            <li><code>x = ?</code> means unknown / <code>NAN</code>, so derivative buttons appear for <code>x</code>.</li>
+            <li><code>; H = 163</code> marks <code>H</code> as a constant, so no derivative button is made for it.</li>
+            <li>Binding values can use arithmetic: <code>3/2*pi</code>, <code>(pi^2)/2</code>, <code>3/2+pi/7+3*i/5</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>Symbolic Derivatives</h3>
+          <p>Derivative operators can be written directly inside an expression. MARS evaluates the derivative symbolically, so the differentiation variables can remain blank.</p>
+          <ul>
+            <li><code>Dx(f(x))</code> differentiates <code>f(x)</code> once with respect to <code>x</code>.</li>
+            <li><code>Dxx(f(x))</code> and <code>Dxxxxx(f(x))</code> take the second and fifth derivatives with respect to <code>x</code>.</li>
+            <li><code>Dxy(f(x,y))</code> takes a mixed derivative, first with respect to <code>x</code> and then <code>y</code>.</li>
+            <li><code>D[x^5](f(x))</code> is the compact form for a fifth derivative. Mixed compact orders such as <code>D[x^2y^3](f(x,y))</code> are also accepted.</li>
+            <li>The <code>x derivative</code> button differentiates the whole current expression. Direct <code>D...</code> syntax is useful when the derivative is only one part of a larger expression.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>When Evaluate Is Available</h3>
+          <ul>
+            <li>An ordinary expression such as <code>sin(x)</code> needs a value in every variable binding box before <code>Evaluate</code> becomes available.</li>
+            <li>A symbolic derivative such as <code>Dx(sin(x))</code> can be evaluated with <code>x</code> blank because the result is another expression.</li>
+            <li>An unevaluated integral such as <code>@S^x exp(u)du</code> can likewise be evaluated with its bindings blank.</li>
+            <li>Constants may remain blank when you want them preserved symbolically in the result.</li>
+            <li>The binding boxes and Evaluate state come from the parsed MARS expression, including while you edit or remove symbols.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>Goal Seek</h3>
+          <p>Goal seek changes variable bindings so the expression value reaches the value in the <code>Target</code> field.</p>
+          <ul>
+            <li>Leave a variable binding box blank to mark it as unknown.</li>
+            <li>Constants are not changed by goal seek.</li>
+            <li>If there is one variable, goal seek solves that variable directly.</li>
+            <li>If there are several variables, goal seek moves them together by the smallest local step it can find.</li>
+            <li>Current variable binding values become the starting point automatically.</li>
+            <li>Use the binding boxes in the main editor to seed a particular crossing or branch, for example target <code>27</code> with expression <code>{ x^x | x = 3 }</code>.</li>
+            <li>For several variables, set whichever variable bindings you want to seed. Blank or unknown bindings still fall back to the solver's defaults.</li>
+            <li>It only reports success when <code>abs(value - target)</code> is within the current working precision.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,matrix,integrator">
+          <h3>Constants And Functions</h3>
+          <ul>
+            <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
+            <li><code>ln(x)</code> is natural log; <code>log(x)</code>, <code>lg(x)</code>, and <code>log10(x)</code> are base-10 log.</li>
+            <li>Versine/haversine family names include <code>versin</code>, <code>coversin</code>, <code>haversin</code>, <code>hacoversin</code>, and their <code>arc...</code>/<code>arch...</code> inverses.</li>
+            <li><code>W(x)</code>, <code>W0(x)</code>, and <code>W_0(x)</code> mean <code>W₀(x)</code>. Use <code>W-1(x)</code> for <code>W₋₁(x)</code>.</li>
+            <li>Standard gamma notation is supported in display: <code>gamma(x)</code> shows as <code>Γ(x)</code>, and polygamma shows as <code>ψ⁽ⁿ⁾(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,integrator">
+          <h3>Unary Functions</h3>
+          <ul>
+            <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>lg(x)</code>, <code>log10(x)</code>.</li>
+            <li>Complex conjugation: <code>conj(z)</code>, <code>conjugate(z)</code>, and postfix <code>z^*</code> are equivalent.</li>
+            <li>Absolute value: <code>abs(z)</code> and paired bars <code>|z|</code> are equivalent for every scalar type. For complex values they mean <code>sqrt(z*z^*)</code>; a missing closing bar is rejected.</li>
+            <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
+            <li>Versine/haversine: <code>versin(x)</code>, <code>vercos(x)</code>, <code>coversin(x)</code>, <code>covercos(x)</code>, <code>haversin(x)</code>, <code>havercos(x)</code>, <code>hacoversin(x)</code>, <code>hacovercos(x)</code>.</li>
+            <li>Versine/haversine inverses: <code>arcversin(x)</code>, <code>arcvercos(x)</code>, <code>arccoversin(x)</code>, <code>arccovercos(x)</code>, <code>archaversin(x)</code>, <code>archavercos(x)</code>, <code>archacoversin(x)</code>, <code>archacovercos(x)</code>.</li>
+            <li>Hyperbolic: <code>sinh(x)</code>, <code>cosh(x)</code>, <code>tanh(x)</code>, <code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code>.</li>
+            <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>, <code>polygamma(n, x)</code>.</li>
+            <li>Error functions: <code>erf(x)</code>, <code>erfc(x)</code>, <code>erfinv(x)</code>, <code>erfcinv(x)</code>.</li>
+            <li>Exponential integrals: <code>Ei(x)</code>, <code>E1(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,integrator">
+          <h3>Lambert W And Normal Functions</h3>
+          <ul>
+            <li>Principal Lambert W: <code>W(x)</code>, <code>W0(x)</code>, <code>W_0(x)</code>, <code>W₀(x)</code>, <code>productlog(x)</code>, <code>lambert_w0(x)</code>.</li>
+            <li>Minus-one Lambert W branch: <code>W-1(x)</code>, <code>W_-1(x)</code>, <code>W₋₁(x)</code>, <code>lambert_wm1(x)</code>.</li>
+            <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,integrator">
+          <h3>Binary Functions</h3>
+          <ul>
+            <li><code>pow(x, y)</code> is equivalent to <code>x^y</code>.</li>
+            <li><code>atan2(y, x)</code>, <code>hypot(x, y)</code>.</li>
+            <li><code>beta(x, y)</code>, <code>logbeta(x, y)</code>, <code>binomial(n, k)</code>.</li>
+            <li>Incomplete gamma: <code>gammainc_lower(s, x)</code>, <code>gammainc_upper(s, x)</code>, <code>gammainc_P(s, x)</code>, <code>gammainc_Q(s, x)</code>.</li>
+            <li>Exact integer helpers: <code>gcd(a, b)</code>, <code>lcm(a, b)</code>, <code>mod(a, b)</code>, <code>modinv(a, b)</code>.</li>
+            <li>Bitwise helpers use function syntax: <code>AND(a, b)</code>, <code>OR(a, b)</code>, <code>XOR(a, b)</code>, <code>NOT(a)</code>, <code>SHL(a, n)</code>, <code>SHR(a, n)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>Value-Only Helpers</h3>
+          <ul>
+            <li>Discrete functions evaluate normally but are not differentiable, so derivative buttons are hidden when they control the expression.</li>
+            <li>Available helpers include <code>factorial(n)</code>, <code>n!</code>, <code>fibonacci(n)</code>, <code>partition(n)</code>, <code>isqrt(n)</code>, <code>is_prime(n)</code>, <code>next_prime(n)</code>, and <code>prev_prime(n)</code>.</li>
+            <li><code>factors(n)</code> returns the original value and shows its factorisation as constant bindings, for example <code>factors(360)</code> becomes <code>{ a₀³·a₁²·a₂ |; a₀ = 2, a₁ = 3, a₂ = 5 }</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,integrator">
+          <h3>Distribution Functions</h3>
+          <ul>
+            <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
+            <li>Beta distribution: <code>beta_pdf(x, a, b)</code>, <code>logbeta_pdf(x, a, b)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator">
+          <h3>Shortcuts</h3>
+          <ul>
+            <li><code>Ctrl+Enter</code> evaluates whenever the <code>Evaluate</code> button is available.</li>
+            <li>Derivative buttons appear from the current variable bindings.</li>
+            <li>Enter the goal-seek target in the left pane's <code>Target</code> field.</li>
+            <li>Use the binding boxes in the editor when goal seek needs better initial guesses.</li>
+            <li><code>Goal seek</code> changes all variable bindings together to move the value towards that target.</li>
+            <li>More/Less precision changes the displayed value precision without changing the expression.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script id="lab-config" type="application/json">
+    {
+      "ALMANAC_ACCURACY_NOTE_JS": __ALMANAC_ACCURACY_NOTE_JS__,
+      "ALMANAC_COVERAGE_TEXT_JS": __ALMANAC_COVERAGE_TEXT_JS__,
+      "ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS": __ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS__,
+      "ALMANAC_WORKSHEET_TITLE": __ALMANAC_WORKSHEET_TITLE__,
+      "CONTROL_QUERY_PREFIX": __CONTROL_QUERY_PREFIX__,
+      "CONTROL_TOKEN": __CONTROL_TOKEN__,
+      "DEFAULT_ALMANAC_DATE": __DEFAULT_ALMANAC_DATE__,
+      "DEFAULT_ALMANAC_ELEVATION": __DEFAULT_ALMANAC_ELEVATION__,
+      "DEFAULT_ALMANAC_LATITUDE": __DEFAULT_ALMANAC_LATITUDE__,
+      "DEFAULT_ALMANAC_LONGITUDE": __DEFAULT_ALMANAC_LONGITUDE__,
+      "DEFAULT_ALMANAC_TEXT": __DEFAULT_ALMANAC_TEXT__,
+      "DEFAULT_ALMANAC_TIME": __DEFAULT_ALMANAC_TIME__,
+      "DEFAULT_ALMANAC_VISIBILITY": __DEFAULT_ALMANAC_VISIBILITY__,
+      "DEFAULT_ALMANAC_ZONE": __DEFAULT_ALMANAC_ZONE__,
+      "DEFAULT_DATETIME_DATE": __DEFAULT_DATETIME_DATE__,
+      "DEFAULT_DATETIME_ELEVATION": __DEFAULT_DATETIME_ELEVATION__,
+      "DEFAULT_DATETIME_GMT_OFFSET": __DEFAULT_DATETIME_GMT_OFFSET__,
+      "DEFAULT_DATETIME_JURISDICTION": __DEFAULT_DATETIME_JURISDICTION__,
+      "DEFAULT_DATETIME_LATITUDE": __DEFAULT_DATETIME_LATITUDE__,
+      "DEFAULT_DATETIME_LONGITUDE": __DEFAULT_DATETIME_LONGITUDE__,
+      "DEFAULT_DATETIME_TEXT": __DEFAULT_DATETIME_TEXT__,
+      "DEFAULT_DIFFEQUATION": __DEFAULT_DIFFEQUATION__,
+      "DEFAULT_EQUATION": __DEFAULT_EQUATION__,
+      "DEFAULT_EQUATION_VARIABLE": __DEFAULT_EQUATION_VARIABLE__,
+      "DEFAULT_EXPRESSION": __DEFAULT_EXPRESSION__,
+      "DEFAULT_INTEGRATOR": __DEFAULT_INTEGRATOR__,
+      "DEFAULT_INTEGRATOR_BOUNDS": __DEFAULT_INTEGRATOR_BOUNDS__,
+      "DEFAULT_INTEGRATOR_INTERVAL_CAP": __DEFAULT_INTEGRATOR_INTERVAL_CAP__,
+      "DEFAULT_MATRIX": __DEFAULT_MATRIX__
+    }
+  </script>
+  <script defer src="/js/app.js"></script>
+</body>
+</html>

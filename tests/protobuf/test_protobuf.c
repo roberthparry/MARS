@@ -9,11 +9,12 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "protobuf.h"
-#include "test_harness.h"
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "protobuf.h"
+#include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

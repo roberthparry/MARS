@@ -10,10 +10,11 @@
  */
 
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "expr_internal.h"
 
 static bool domain_numeric(const expr_t *expr);
 

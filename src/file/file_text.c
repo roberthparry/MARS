@@ -3,18 +3,19 @@
  * @brief UTF-8 text and line-oriented file helpers.
  *
  * Validates text input and provides whole-file and line-based read, write and append operations. These wrappers
- * connect file streams to string_t while retaining explicit handling of malformed or incomplete UTF-8.
+ * connect file streams to string_t without Unicode normalisation, while retaining explicit handling of malformed
+ * or incomplete UTF-8. Only the documented BOM and line-ending removal changes text-read bytes.
  *
  * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "file_internal.h"
 
 /* Validate complete UTF-8 sequences without normalising or discarding bytes. */
 bool file_valid_utf8(const void *data, size_t size)
@@ -63,7 +64,7 @@ static string_t *file_string_from_bytes(file_t *file, const void *data, size_t s
         return NULL;
     }
     string_t *text = string_new();
-    if (!text || (size && string_append_chars(text, data, size) != 0)) {
+    if (!text || (size && string_append_utf8_exact(text, data, size) != 0)) {
         string_free(text);
         file_fail(file, ENOMEM);
         return NULL;

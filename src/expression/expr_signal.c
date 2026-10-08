@@ -10,8 +10,9 @@
  */
 
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #include <stdio.h>
+
+#include "expr_internal.h"
 
 typedef number_t (*signal_numeric_fn)(number_t);
 static const signal_numeric_fn signal_numeric[EXPR_KIND_COUNT] = {

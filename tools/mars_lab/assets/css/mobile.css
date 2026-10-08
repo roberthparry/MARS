@@ -1,0 +1,106 @@
+/* Mobile-access disclosure, connection panel and QR code. */
+.header-side {
+  display: grid;
+  justify-items: end;
+  gap: 0.55rem;
+}
+
+.mobile-card {
+  position: relative;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 2rem));
+}
+
+.mobile-card summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  list-style: none;
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  color: #061612;
+  background: #cfa052;
+  font: 0.76rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mobile-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-card summary::before {
+  content: "";
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: #71c6b4;
+  box-shadow: 0 0 0 4px rgba(113, 198, 180, 0.18);
+}
+
+.mobile-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  width: min(31rem, calc(100vw - 2rem));
+  padding: 0.75rem;
+  border: 2px solid rgba(233, 244, 239, 0.34);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(8, 29, 22, 0.99), rgba(18, 51, 38, 0.98));
+  box-shadow: 0 20px 58px rgba(0, 0, 0, 0.34);
+}
+
+.mobile-copy {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.mobile-copy strong {
+  color: #d7e7b7;
+  font: 0.82rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobile-copy span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.mobile-copy code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--code);
+  font: 0.9rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+}
+
+.mobile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.mobile-qr {
+  width: 9rem;
+  height: 9rem;
+  padding: 0.45rem;
+  border-radius: 16px;
+  background: #fffdf4;
+  border: 2px solid rgba(233, 244, 239, 0.24);
+}
+
+.mobile-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

@@ -1305,6 +1305,76 @@ typedef enum {
     NUMBER_MPFR_GAMMAINC_Q
 } number_mpfr_gammainc_mode_t;
 
+/* Sum the positive lower tail without subtracting nearly equal complete and upper gamma values. */
+static int number_mpfr_gammainc_lower_series(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr x, int regularised)
+{
+    mpfr_prec_t target = mpfr_get_prec(out), precision = target;
+    mpfr_t term, sum, denominator, remainder, exponent, factor;
+    int status = -1;
+
+    if (mpfr_zero_p(x)) {
+        mpfr_set_zero(out, 1);
+        return 0;
+    }
+    if (mpfr_get_prec(a) > precision)
+        precision = mpfr_get_prec(a);
+    if (mpfr_get_prec(x) > precision)
+        precision = mpfr_get_prec(x);
+    /* Logarithmic prefactors can lose absolute bits when a is large. */
+    mpfr_exp_t magnitude = mpfr_get_exp(a);
+    mpfr_prec_t extra = 64;
+    if (magnitude > 0) {
+        if (magnitude > MPFR_PREC_MAX - extra)
+            goto unavailable;
+        extra += magnitude;
+    }
+    if (precision > MPFR_PREC_MAX - extra)
+        goto unavailable;
+    precision += extra;
+    mpfr_inits2(precision, term, sum, denominator, remainder, exponent, factor, (mpfr_ptr)0);
+    mpfr_set_ui(term, 1u, MPFR_RNDN);
+    mpfr_set_ui(sum, 1u, MPFR_RNDN);
+    for (unsigned long n = 1u; n <= 200000u; ++n) {
+        mpfr_add_ui(denominator, a, n, MPFR_RNDN);
+        mpfr_div(factor, x, denominator, MPFR_RNDN);
+        mpfr_mul(term, term, factor, MPFR_RNDN);
+        mpfr_add(sum, sum, term, MPFR_RNDN);
+        /* Later ratios decrease: the remaining sum is at most term*x/(a+n+1-x). */
+        mpfr_add_ui(denominator, a, n + 1u, MPFR_RNDD);
+        mpfr_sub(denominator, denominator, x, MPFR_RNDD);
+        if (mpfr_sgn(denominator) <= 0)
+            continue;
+        mpfr_mul(remainder, term, x, MPFR_RNDU);
+        mpfr_div(remainder, remainder, denominator, MPFR_RNDU);
+        if (!number_special_series_converged(remainder, sum, target))
+            continue;
+
+        /* gamma(a,x) = exp(a*log(x)-x) * sum/a; P uses Gamma(a+1). */
+        mpfr_log(exponent, x, MPFR_RNDN);
+        mpfr_mul(exponent, exponent, a, MPFR_RNDN);
+        mpfr_sub(exponent, exponent, x, MPFR_RNDN);
+        if (regularised) {
+            mpfr_add_ui(factor, a, 1u, MPFR_RNDN);
+            mpfr_lngamma(factor, factor, MPFR_RNDN);
+        } else {
+            mpfr_log(factor, a, MPFR_RNDN);
+        }
+        mpfr_sub(exponent, exponent, factor, MPFR_RNDN);
+        mpfr_log(factor, sum, MPFR_RNDN);
+        mpfr_add(exponent, exponent, factor, MPFR_RNDN);
+        mpfr_exp(factor, exponent, MPFR_RNDN);
+        mpfr_set(out, factor, MPFR_RNDN);
+        status = 0;
+        break;
+    }
+    mpfr_clears(term, sum, denominator, remainder, exponent, factor, (mpfr_ptr)0);
+    if (status == 0)
+        return 0;
+unavailable:
+    mpfr_set_nan(out);
+    return -1;
+}
+
 static int number_mpfr_gammainc_mut(mpfr_t value, const mpfr_t other, number_mpfr_gammainc_mode_t mode)
 {
     mpfr_t gamma_a, upper, tmp;
@@ -1313,6 +1383,15 @@ static int number_mpfr_gammainc_mut(mpfr_t value, const mpfr_t other, number_mpf
     if (mpfr_get_prec(other) > prec)
         prec = mpfr_get_prec(other);
     mpfr_inits2(prec, gamma_a, upper, tmp, (mpfr_ptr)0);
+    if ((mode == NUMBER_MPFR_GAMMAINC_LOWER || mode == NUMBER_MPFR_GAMMAINC_P) &&
+        mpfr_number_p(value) && mpfr_sgn(value) > 0 && mpfr_number_p(other) && mpfr_sgn(other) >= 0) {
+        mpfr_add_ui(tmp, value, 1u, MPFR_RNDN);
+        if (mpfr_cmp(other, tmp) <= 0) {
+            int status = number_mpfr_gammainc_lower_series(value, value, other, mode == NUMBER_MPFR_GAMMAINC_P);
+            mpfr_clears(gamma_a, upper, tmp, (mpfr_ptr)0);
+            return status;
+        }
+    }
     mpfr_gamma(gamma_a, value, MPFR_RNDN);
     mpfr_gamma_inc(upper, value, other, MPFR_RNDN);
     if (mode == NUMBER_MPFR_GAMMAINC_LOWER) {

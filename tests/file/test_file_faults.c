@@ -9,10 +9,6 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file.h"
-#include "array.h"
-#include "test_harness.h"
-
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -23,10 +19,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "file.h"
+#include "array.h"
+#include "test_harness.h"
+
 /* Link-time fault injection is private to this test executable, never the library. */
 enum fault_id { F_MALLOC, F_CALLOC, F_REALLOC, F_STRDUP, F_READ, F_WRITE, F_RENAME, F_RENAMEAT2,
                 F_UNLINK, F_FSYNC, F_FDATASYNC, F_CHOWN, F_FDOPEN, F_FDOPENDIR, F_READDIR,
-                F_STATX, F_FSTAT, F_FCLOSE, F_CLOSE, F_FCHMOD, F_FTELLO, F_FSEEKO, F_COUNT };
+                F_STATX, F_FSTAT, F_FCLOSE, F_CLOSE, F_FCHMOD, F_FTELLO, F_FSEEKO, F_FERROR, F_COUNT };
 static struct { bool armed; unsigned skip; int error; } faults[F_COUNT];
 
 static void inject(enum fault_id id, unsigned skip, int error)
@@ -52,6 +52,60 @@ static bool hit(enum fault_id id)
 static void reset_faults(void) { memset(faults, 0, sizeof(faults)); }
 
 static void expect_text(file_t *file, const char *expected);
+
+/* Digest failures close their stream and retain the first error. */
+void test_file_sha256_failures(void)
+{
+    file_t *source = file_new_cstr(test_case_temp_path("hash-fault"));
+    ASSERT_NOT_NULL(source);
+    ASSERT_TRUE(file_write_all_bytes(source, "abc", 3));
+    static const struct {
+        enum fault_id id;
+        unsigned skip;
+    } cases[] = {{F_FSTAT, 1}, {F_FSTAT, 2}, {F_FERROR, 0}, {F_FCLOSE, 0}, {F_MALLOC, 0}};
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        int expected = cases[i].id == F_MALLOC ? ENOMEM : EIO;
+        inject(cases[i].id, cases[i].skip, expected);
+        string_t *digest = file_sha256(source);
+        int error = file_last_error(source);
+        reset_faults();
+        bool rejected = digest == NULL;
+        string_free(digest);
+        ASSERT_TRUE(rejected);
+        ASSERT_EQ_INT(error, expected);
+        ASSERT_TRUE(!file_is_open(source));
+    }
+    inject(F_FSTAT, 2, 0);
+    string_t *changed_digest = file_sha256(source);
+    int changed_error = file_last_error(source);
+    reset_faults();
+    bool changed_rejected = changed_digest == NULL;
+    string_free(changed_digest);
+    ASSERT_TRUE(changed_rejected);
+    ASSERT_EQ_INT(changed_error, ESTALE);
+    ASSERT_TRUE(!file_is_open(source));
+    static const struct {
+        enum fault_id id;
+        unsigned skip;
+        int error;
+    } paired[] = {{F_FERROR, 0, EIO}, {F_FSTAT, 1, EACCES}, {F_FSTAT, 2, EIO}};
+    for (size_t i = 0; i < sizeof(paired) / sizeof(*paired); ++i) {
+        inject(paired[i].id, paired[i].skip, paired[i].error);
+        inject(F_FCLOSE, 0, ENOSPC);
+        string_t *digest = file_sha256(source);
+        int error = file_last_error(source);
+        bool both_injected = !faults[paired[i].id].armed && !faults[F_FCLOSE].armed;
+        reset_faults();
+        bool rejected = digest == NULL;
+        string_free(digest);
+        ASSERT_TRUE(both_injected);
+        ASSERT_TRUE(rejected);
+        ASSERT_EQ_INT(error, paired[i].error);
+        ASSERT_TRUE(!file_is_open(source));
+    }
+    ASSERT_TRUE(file_delete(source));
+    file_free(source);
+}
 
 /* Target lookup errors do not hide the link; allocation failure remains a listing error. */
 void test_file_symlink_target_failures(void)
@@ -186,6 +240,7 @@ struct dirent *__real_readdir(DIR *);
 int __real_statx(int, const char *, int, unsigned, struct statx *);
 int __real_fstat(int, struct stat *);
 int __real_fclose(FILE *);
+int __real_ferror(FILE *);
 int __real_close(int);
 int __real_fchmod(int, mode_t);
 off_t __real_ftello(FILE *);
@@ -207,7 +262,18 @@ int __wrap_statx(int fd, const char *p, int flags, unsigned mask, struct statx *
     }
     return __real_statx(fd, p, flags, mask, status);
 }
-int __wrap_fstat(int fd, struct stat *status) { return hit(F_FSTAT) ? -1 : __real_fstat(fd, status); }
+int __wrap_fstat(int fd, struct stat *status)
+{
+    if (!hit(F_FSTAT))
+        return __real_fstat(fd, status);
+    if (errno)
+        return -1;
+    int rc = __real_fstat(fd, status);
+    if (!rc)
+        ++status->st_size;
+    return rc;
+}
+int __wrap_ferror(FILE *stream) { return hit(F_FERROR) ? 1 : __real_ferror(stream); }
 int __wrap_fclose(FILE *stream)
 {
     if (hit(F_FCLOSE)) {
@@ -467,8 +533,57 @@ void test_file_move_cross_device_paths(void)
     file_free(source);
 }
 
+static void test_file_temp_directory_allocation_failures(void)
+{
+    file_t *parent = file_new_cstr(test_case_temp_path("temporary-fault-parent"));
+    ASSERT_NOT_NULL(parent);
+    string_t *parent_path = string_new_with(file_path(parent));
+    ASSERT_NOT_NULL(parent_path);
+    ASSERT_TRUE(file_create_directory(parent, 0700, false));
+    const enum fault_id allocations[] = {F_CALLOC, F_STRDUP, F_MALLOC};
+    for (size_t i = 0; i < sizeof(allocations) / sizeof(*allocations); ++i) {
+        inject(allocations[i], 0, ENOMEM);
+        file_t *temporary = file_create_temp_directory(parent_path);
+        int error = errno;
+        bool injected = !faults[allocations[i]].armed;
+        reset_faults();
+        bool rejected = temporary == NULL;
+        if (temporary)
+            file_remove_directory(temporary);
+        file_free(temporary);
+        ASSERT_TRUE(injected);
+        ASSERT_TRUE(rejected);
+        ASSERT_EQ_INT(error, ENOMEM);
+        ASSERT_TRUE(file_open_directory(parent));
+        file_info_t *entry = NULL;
+        bool listed = file_read_directory(parent, &entry);
+        bool empty = entry == NULL;
+        file_info_free(entry);
+        bool closed = file_close(parent);
+        ASSERT_TRUE(listed && empty && closed);
+    }
+    ASSERT_TRUE(file_remove_directory(parent));
+    file_t *temporary = file_create_temp_directory(parent_path);
+    int error = errno;
+    bool rejected = temporary == NULL;
+    file_free(temporary);
+    ASSERT_TRUE(rejected);
+    ASSERT_EQ_INT(error, ENOENT);
+    ASSERT_TRUE(file_write_all_bytes(parent, "not a directory", 15));
+    temporary = file_create_temp_directory(parent_path);
+    error = errno;
+    rejected = temporary == NULL;
+    file_free(temporary);
+    ASSERT_TRUE(rejected);
+    ASSERT_EQ_INT(error, ENOTDIR);
+    ASSERT_TRUE(file_delete(parent));
+    string_free(parent_path);
+    file_free(parent);
+}
+
 void test_file_allocation_and_sync_failures(void)
 {
+    test_file_temp_directory_allocation_failures();
     inject(F_CALLOC, 0, ENOMEM);
     file_t *failed = file_new_cstr("unused");
     reset_faults();

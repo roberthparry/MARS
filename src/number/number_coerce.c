@@ -9,13 +9,13 @@
  * borrowed aliases and independently owned numeric values.
  */
 
+#include <complex.h>
+#include <stdlib.h>
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
-
-#include <complex.h>
-#include <stdlib.h>
 
 static bool number_kind_is_exact_real(number_kind_t kind)
 {

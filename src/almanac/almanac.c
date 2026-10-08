@@ -13,10 +13,10 @@
 /* Configured engine lifetime, diagnostics and serialisation. */
 #include <ctype.h>
 #include <stdio.h>
-#include "file.h"
 #include <stdlib.h>
 #include <string.h>
 
+#include "file.h"
 #include "almanac_engine_internal.h"
 
 void almanac_set_error(almanac_t *almanac, const char *message)
@@ -147,13 +147,9 @@ static char *almanac_config_lookup(const char *name)
         bool matched = key && value && string_compare(key, wanted) == 0;
         if (matched) {
             string_trim(value);
-            if (string_byte_length(value) >= 2 &&
-                ((string_starts_with(value, "\"") && string_ends_with(value, "\"")) ||
-                 (string_starts_with(value, "'") && string_ends_with(value, "'")))) {
-                string_t *unquoted = string_substr(value, 1, string_byte_length(value) - 2);
-                string_free(value);
-                value = unquoted;
-            }
+            string_t *unquoted = string_unquote_shell(value);
+            string_free(value);
+            value = unquoted;
             if (value)
                 result = dup_c_string(string_c_str(value));
         }
@@ -177,11 +173,16 @@ done:
     return result;
 }
 
-static string_t *string_new_from_cstr(const char *text)
+static string_t *almanac_string_from_cstr(const char *text)
 {
     if (!text || *text == '\0')
         return NULL;
-    return string_new_with(text);
+    string_t *value = string_new();
+    if (value && string_append_utf8_exact(value, text, strlen(text)) != 0) {
+        string_free(value);
+        value = NULL;
+    }
+    return value;
 }
 
 /* Open the configured almanac engine. */
@@ -213,8 +214,8 @@ almanac_t *almanac_open(void)
         configured = almanac_config_lookup("MARS_ALMANAC_DB_KEY");
     key_text = configured;
 
-    path = string_new_from_cstr(path_text);
-    key = string_new_from_cstr(key_text);
+    path = almanac_string_from_cstr(path_text);
+    key = almanac_string_from_cstr(key_text);
     if (!path || !key) {
         almanac_set_error(almanac,
                           "almanac configuration is incomplete; provide MARS_ALMANAC_DB_KEY and an almanac database");

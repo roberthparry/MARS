@@ -19,6 +19,7 @@
 #ifndef MARS_WEBSERVER_H
 #define MARS_WEBSERVER_H
 #include <stdint.h>
+
 #include "dictionary.h"
 #include "ustring.h"
 #include "json.h"
@@ -61,8 +62,9 @@ typedef struct {
 typedef bool (*websrv_handler_fn)(const websrv_request_t *request, websrv_response_t *response, void *user_data);
 
 /**
- * @brief Bind a synchronous Linux IPv4 server.
- * @param address Borrowed numeric IPv4 address; NULL selects 127.0.0.1; use 0.0.0.0 explicitly for public binding.
+ * @brief Bind a synchronous Linux IPv4 or IPv6 server.
+ * @param address Borrowed numeric IP address; NULL selects 127.0.0.1. IPv6 listeners are dual-stack;
+ * use 0.0.0.0 or :: explicitly for all interfaces. Hostnames and scoped IPv6 addresses are not accepted.
  * @param port TCP port; zero selects an ephemeral port.
  * @param limits Optional limits; NULL selects defaults.
  * @return Owned listener, or NULL with errno set; release with websrv_free().
@@ -109,6 +111,13 @@ int websrv_serve_once(websrv_t *server, unsigned wait_ms);
  * @return Method, or HTTP_GET for NULL.
  */
 webmethod_t websrv_request_method(const websrv_request_t *request);
+
+/**
+ * @brief Borrow the socket peer's numeric address, never a forwarded header.
+ * @param request Borrowed request valid during a handler.
+ * @return Borrowed IP address text, or NULL for NULL input. IPv4-mapped IPv6 addresses remain mapped.
+ */
+const string_t *websrv_request_peer(const websrv_request_t *request);
 
 /**
  * @brief Borrow the raw origin-form target including query; no URL decoding.

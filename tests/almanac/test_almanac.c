@@ -13,10 +13,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "file.h"
-#include "sqlite.h"
 #include <string.h>
 
+#include "file.h"
+#include "sqlite.h"
 #include "almanac.h"
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac/almanac_internal.h"
@@ -1086,11 +1086,16 @@ static void test_almanac_configuration_file_io(void)
     string_t *directory_path = string_sprintf("%s/config", root);
     string_t *config_path = string_sprintf("%s/config/almanac-db.env", root);
     string_t *source_path = string_sprintf("%s/settings.env", root);
-    string_t *database_path = string_sprintf("%s/δοκιμή.db", root);
+    string_t *database_path = string_sprintf("%s/", root);
+    const char database_name[] = "e\xcc\x81.db";
+    TEST_ASSERT_NOT_NULL(database_path);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(database_path, database_name, sizeof(database_name) - 1), 0);
     string_t *key = string_new_with("π=secret-");
     TEST_ASSERT_NOT_NULL(key);
     for (size_t i = 0; i < 5000; ++i)
         TEST_ASSERT_INT_EQ(string_append_char(key, 'k'), 0);
+    const char key_suffix[] = "-e\xcc\x81-😀";
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(key, key_suffix, sizeof(key_suffix) - 1), 0);
     file_t *directory = file_new(directory_path);
     file_t *config = file_new(config_path);
     file_t *source = file_new(source_path);
@@ -1098,11 +1103,15 @@ static void test_almanac_configuration_file_io(void)
     TEST_ASSERT_NOT_NULL(config);
     TEST_ASSERT_NOT_NULL(source);
     TEST_ASSERT_TRUE(file_create_directory(directory, 0700, false), "create isolated config directory");
-    string_t *contents = string_sprintf("\xef\xbb\xbf# settings\r\n"
+    string_t *contents = string_new_with("\xef\xbb\xbf# settings\r\n"
         "MARS_ALMANAC_DB_PATH_EXTRA=ignored\r"
-        " export MARS_ALMANAC_DB_PATH='%S'\r\n"
-        "export MARS_ALMANAC_DB_KEY=  \"%S\"  ", database_path, key);
+        " export MARS_ALMANAC_DB_PATH='");
     TEST_ASSERT_NOT_NULL(contents);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(database_path), string_byte_length(database_path)), 0);
+    const char key_header[] = "'\r\nexport MARS_ALMANAC_DB_KEY=  \"";
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, key_header, sizeof(key_header) - 1), 0);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(key), string_byte_length(key)), 0);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, "\"  ", 3), 0);
     TEST_ASSERT_TRUE(file_write_all_text(source, contents), "write long Unicode configuration");
     TEST_ASSERT_TRUE(file_create_symlink(source, config), "read configuration through symbolic link");
     sqlite_t *database = sqlite_open_encrypted(database_path, key);
@@ -1140,7 +1149,7 @@ static void test_almanac_configuration_file_io(void)
     file_free(config);
     file_free(directory);
     TEST_ASSERT_TRUE(environment_ok && restored, "restore environment after isolated configuration test");
-    TEST_ASSERT_TRUE(opened, "configuration preserves full quoted Unicode key beyond 4 KiB");
+    TEST_ASSERT_TRUE(opened, "configuration preserves decomposed paths and exact quoted Unicode keys beyond 4 KiB");
 }
 
 int tests_main(void)

@@ -15,6 +15,7 @@ sequences as characters.
 - fixed-capacity `string_buffer_t` for stack allocation
 - `string_builder_t` alias for incremental construction
 - hashing
+- literal shell-word unquoting without expansion or execution
 
 ## Example: Basic Text Manipulation
 
@@ -632,7 +633,8 @@ identifiers must distinguish. It rejects malformed or incomplete UTF-8 without
 changing the destination. The source may be a slice of the destination itself.
 A NULL source is permitted only with zero length; embedded NUL scalars are
 accepted. Later ordinary mutators may normalise the result, so continue using
-this exact append operation when spelling must be retained.
+this exact append operation when spelling must be retained. `string_clone()`
+preserves the original bytes, including deliberately decomposed text.
 
 The return value is zero on success or -1 for invalid input, overflow or
 allocation failure. The caller owns both the destination and source storage.
@@ -662,4 +664,51 @@ Returns the public result described by vsprintf with callback.
 
 ```c
 string_t *string_vsprintf_with_callback(const char *fmt, va_list ap, string_format_callback_t callback, void *user);
+```
+
+## Literal shell-word configuration values
+
+`string_unquote_shell(const string_t *text)` returns an owned decoded string;
+release it with `string_free()`. The input is borrowed and unchanged. Use this
+for configuration values written with shell-style quoting, including passwords
+whose apostrophes require concatenated quoted fragments. It does not run a shell,
+expand variables or substitutions, interpret operators, or access the environment.
+It is a literal decoder, not a general shell parser or an execution-safety check.
+
+Single quotes preserve everything between their delimiters. Unquoted backslashes
+escape the next character. Within double quotes, the decoder follows `shlex`:
+only a double quote or another backslash loses its preceding backslash. In
+particular, backslashes before dollar signs, backticks and ordinary letters remain
+in the result. Unlike ordinary string mutation, decoding preserves the input's
+exact Unicode spelling, including decomposed accents.
+
+Adjacent quoted and unquoted fragments form one word. ASCII spaces and tabs may
+surround it; trailing whitespace may be followed by a `#` comment. A `#` within
+the word or quotes is literal. Empty input, whitespace-only input, empty quotes
+and comment-only input produce an empty string. Unicode whitespace is literal.
+
+Multiple unquoted words, unclosed quotes, dangling escapes and any NUL, CR or LF
+are rejected with `NULL` and `errno = EINVAL`. The forbidden characters are rejected
+even in comments or escaped positions. Allocation failure gives `ENOMEM`, and an
+unrepresentable storage size gives `EOVERFLOW`. Time and storage are linear in the
+input size; output never exceeds its input byte count.
+
+```c
+#include "ustring.h"
+
+int main(void)
+{
+    string_t *quoted = string_new_with("'pa'\"'\"'ss word'");
+    string_t *value = string_unquote_shell(quoted);
+    string_printf("%S\n", value);
+    string_free(value);
+    string_free(quoted);
+    return 0;
+}
+```
+
+Output:
+
+```text
+pa'ss word
 ```

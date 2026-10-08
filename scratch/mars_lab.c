@@ -2123,15 +2123,16 @@ int main(int argc, char **argv)
             !expr_finite_weighted_cos_lerch_value(expr, &value_number) &&
             !expr_finite_qdigamma_progression_value(expr, &value_number)) {
             value_number = expr_eval(expr);
-            if (num_is_zero(value_number) && display_expr != expr) {
-                number_t display_value = expr_eval(display_expr);
+        }
+        /* Native simplification can prove a finite result despite unset input bindings. */
+        if (display_expr != expr && (num_is_nan(value_number) || num_is_zero(value_number))) {
+            number_t display_value = expr_eval(display_expr);
 
-                if (num_is_finite(display_value) && !num_is_zero(display_value)) {
-                    num_destroy(&value_number);
-                    value_number = display_value;
-                } else {
-                    num_destroy(&display_value);
-                }
+            if (num_is_finite(display_value) && (num_is_nan(value_number) || !num_is_zero(display_value))) {
+                num_destroy(&value_number);
+                value_number = display_value;
+            } else {
+                num_destroy(&display_value);
             }
         }
 

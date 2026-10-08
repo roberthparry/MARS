@@ -10,7 +10,6 @@
  */
 
 /* Linux listener lifetime and exact dictionary-backed route dispatch. */
-#include "websrv_internal.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <poll.h>
@@ -18,7 +17,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* Bind a bounded IPv4 listener; exposure beyond loopback is explicit. */
+#include "websrv_internal.h"
+
+/* Bind a bounded IP listener; exposure beyond loopback is explicit. */
 websrv_t *websrv_new(const string_t *address, uint16_t port, const websrv_limits_t *limits)
 {
     websrv_limits_t l = limits ? *limits : (websrv_limits_t){0};
@@ -30,33 +31,43 @@ websrv_t *websrv_new(const string_t *address, uint16_t port, const websrv_limits
         errno = EINVAL;
         return NULL;
     }
-    struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(port)};
-    if (address) {
-        if (!websrv_field_value(address) ||
-            inet_pton(AF_INET, string_c_str(address), &addr.sin_addr) != 1) {
-            errno = EINVAL;
-            return NULL;
-        }
+    struct sockaddr_storage addr = {0};
+    struct sockaddr_in *v4 = (struct sockaddr_in *)&addr;
+    struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)&addr;
+    socklen_t length;
+    if (!address || (websrv_field_value(address) &&
+                     inet_pton(AF_INET, string_c_str(address), &v4->sin_addr) == 1)) {
+        v4->sin_family = AF_INET;
+        v4->sin_port = htons(port);
+        if (!address) v4->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        length = sizeof(*v4);
+    } else if (websrv_field_value(address) &&
+               inet_pton(AF_INET6, string_c_str(address), &v6->sin6_addr) == 1) {
+        v6->sin6_family = AF_INET6;
+        v6->sin6_port = htons(port);
+        length = sizeof(*v6);
     } else {
-        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        errno = EINVAL;
+        return NULL;
     }
     websrv_t *s = calloc(1, sizeof(*s));
     if (!s) return NULL;
     s->fd = -1;
     s->limits = l;
     s->routes = websrv_dict_new(sizeof(websrv_routes_t));
-    s->fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    s->fd = socket(addr.ss_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     int one = 1;
-    socklen_t length = sizeof(addr);
+    int zero = 0;
     if (!s->routes || s->fd < 0 || setsockopt(s->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) ||
-        bind(s->fd, (struct sockaddr *)&addr, sizeof(addr)) || listen(s->fd, 32) ||
+        (addr.ss_family == AF_INET6 && setsockopt(s->fd, IPPROTO_IPV6, IPV6_V6ONLY, &zero, sizeof(zero))) ||
+        bind(s->fd, (struct sockaddr *)&addr, length) || listen(s->fd, 32) ||
         getsockname(s->fd, (struct sockaddr *)&addr, &length)) {
         int saved = errno;
         websrv_free(s);
         errno = saved;
         return NULL;
     }
-    s->port = ntohs(addr.sin_port);
+    s->port = ntohs(addr.ss_family == AF_INET ? v4->sin_port : v6->sin6_port);
     return s;
 }
 
@@ -122,7 +133,9 @@ int websrv_serve_once(websrv_t *s, unsigned wait_ms)
     }
     int ready = websrv_wait(s->fd, POLLIN, websrv_now() + wait_ms);
     if (ready <= 0) return ready;
-    int fd = accept4(s->fd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    struct sockaddr_storage peer = {0};
+    socklen_t peer_size = sizeof(peer);
+    int fd = accept4(s->fd, (struct sockaddr *)&peer, &peer_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
     if (fd < 0) return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
     s->active = true;
     int64_t deadline = websrv_now() + s->limits.timeout_ms;
@@ -132,7 +145,12 @@ int websrv_serve_once(websrv_t *s, unsigned wait_ms)
         .headers = websrv_dict_new(sizeof(string_t *)), .header_bytes = 192
     };
     int result = -1;
-    if (!response.headers) goto done;
+    char peer_text[INET6_ADDRSTRLEN];
+    const void *peer_address = peer.ss_family == AF_INET
+        ? (const void *)&((struct sockaddr_in *)&peer)->sin_addr
+        : (const void *)&((struct sockaddr_in6 *)&peer)->sin6_addr;
+    if (!response.headers || !inet_ntop(peer.ss_family, peer_address, peer_text, sizeof(peer_text)) ||
+        !(request.peer = string_new_with(peer_text))) goto done;
     int status = websrv_read_request(fd, &s->limits, deadline, &request);
     if (status < 0) goto done;
     if (status) {

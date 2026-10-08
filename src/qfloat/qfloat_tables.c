@@ -8,8 +8,9 @@
  */
 
 #define MARS_QFLOAT_INTERNAL_ACCESS
-#include "qfloat_internal.h"
 #include <math.h>
+
+#include "qfloat_internal.h"
 
 /* Exact and sentinel values. */
 const qfloat_t QF_ZERO = {0.0, 0.0};

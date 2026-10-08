@@ -21,7 +21,6 @@
 
 #include "datetime.h"
 #include "ustring.h"
-
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

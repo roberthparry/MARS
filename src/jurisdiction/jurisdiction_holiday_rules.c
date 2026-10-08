@@ -10,11 +10,11 @@
  */
 
 /* Load holiday policy rows and evaluate their calendar or SQL date rules. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "jurisdiction_internal.h"
 
 static bool text_equals(const char *left, const char *right)
 {

@@ -4,6 +4,8 @@
  *
  * Parses integrands and bounds, selects supported symbolic or numerical paths and emits native result fields. The
  * executable delegates integration and mathematical rendering to the library.
+ * Integrand renderings retain root variable symbols and native binding values;
+ * an unset root binding must not replace the integrand with a numerical NAN.
  */
 
 #include <ctype.h>
@@ -15,6 +17,8 @@
 #include "integrator.h"
 #include "number.h"
 #include "ustring.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 static char *wrap_expression(const char *raw_input)
 {
@@ -316,6 +320,24 @@ static char *dup_string(const char *text)
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
 {
+    if (style == style_EXPRESSION) {
+        string_t *text = expr_to_text_symbolic(expr);
+        char *result = text ? dup_string(string_c_str(text)) : NULL;
+
+        string_free(text);
+        return result;
+    }
+    if (style == style_UNBOUND && expr_is_variable(expr)) {
+        /* Render a root coordinate symbolically without changing its numerical binding. */
+        expr_t *symbol = expr_clone(expr);
+        if (!symbol)
+            return NULL;
+        expr_set_val(symbol, NUM_NAN);
+        char *result = expr_to_string(symbol, style_UNBOUND);
+
+        expr_free(symbol);
+        return result;
+    }
     return expr_to_string(expr, style);
 }
 
@@ -388,6 +410,15 @@ static char *expr_TeX_body(const expr_t *expr)
 
     if (!expr)
         return NULL;
+    if (expr_is_variable(expr)) {
+        expr_t *symbol = expr_clone(expr);
+        if (!symbol)
+            return NULL;
+        expr_set_val(symbol, NUM_NAN);
+        body = expr_to_TeX_body(symbol);
+        expr_free(symbol);
+        return body;
+    }
     body = expr_to_TeX_body(expr);
     if (body)
         return body;
@@ -400,6 +431,8 @@ static char *expr_TeX_body_display(const expr_t *expr)
 
     if (!expr)
         return NULL;
+    if (expr_is_variable(expr))
+        return expr_TeX_body(expr);
     body = expr_to_TeX_body_wrapped(expr, 110u);
     if (body)
         return body;

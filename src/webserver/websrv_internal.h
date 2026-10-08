@@ -28,7 +28,7 @@ struct _websrv_t {
 };
 struct _websrv_request_t {
     webmethod_t method;
-    string_t *target, *path;
+    string_t *target, *path, *peer;
     unsigned char *body;
     size_t body_size;
     dictionary_t *headers;

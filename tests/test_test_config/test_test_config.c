@@ -15,6 +15,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MARS_TEST_CONFIG_INTERNAL_ACCESS
+#include "test_config/test_config_internal.h"
 #include "test_harness.h"
 #include "ustring.h"
 
@@ -69,6 +71,30 @@ static void test_json_string_escapes_are_written(void);
 static const char *test_local_config_path(void)
 {
     return "tests/test_test_config/test_test_config.json";
+}
+
+static void test_tool_suite_paths_remain_distinct(void)
+{
+    static const struct {
+        const char *source;
+        const char *expected;
+    } cases[] = {
+        {"tools/mars_lab/tests/test_lab_native.c", "tools/mars_lab/tests/test_lab_native.c"},
+        {"/repo/tools/mars_lab/tests/test_lab_native.c", "tools/mars_lab/tests/test_lab_native.c"},
+        {"/tools/mars_lab/tests/test_lab_native.c", "tools/mars_lab/tests/test_lab_native.c"},
+        {"tools/other/tests/test_example.c", "tools/other/tests/test_example.c"},
+        {"/repo/tests/string/test_string.c", "tests/string/test_string.c"},
+        {"/repo/notools/tests/test_example.c", "tests/test_example.c"}
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *source = string_new_with(cases[i].source);
+        string_t *normalised = test_config_normalise_file_path(source);
+        ok = normalised && string_view_equals_literal(string_view_all(normalised), cases[i].expected) && ok;
+        string_free(normalised);
+        string_free(source);
+    }
+    TEST_ASSERT_TRUE(ok, "tool-local tests retain their repository-relative namespace");
 }
 
 static void seed_local_config_with_stale_entries(void)
@@ -456,6 +482,7 @@ int tests_main(void)
     string_printf("Running test_config tests...\n");
     TEST_SECTION("Configuration");
 
+    TEST_RUN_CASE(test_tool_suite_paths_remain_distinct, "config,paths");
     TEST_RUN_CASE(test_top_level_default_true, "config,defaults");
     TEST_RUN_IN_GROUP(test_subtest_default_true, test_top_level_default_true, "config,defaults,group");
     TEST_RUN_CASE(test_repeat_lookup_same_value, "config,regeneration");

@@ -10,14 +10,14 @@
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-#include "sqlite.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <sodium.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "file_internal.h"
+#include "sqlite.h"
 
 #define FILE_MANIFEST_SIZE 64u
 static const unsigned char manifest_magic[8] = {'M', 'A', 'R', 'S', 'F', 'I', 'L', 1};

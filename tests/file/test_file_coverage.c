@@ -9,13 +9,13 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file.h"
-#include "array.h"
-#include "test_harness.h"
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "file.h"
+#include "array.h"
+#include "test_harness.h"
 
 void test_file_explicit_follow_and_text_streams(void)
 {
