@@ -6,11 +6,12 @@
  * demonstrates the HTTP and protobuf APIs together without generated service stubs.
  */
 
-#include "http.h"
-#include "protobuf.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "http.h"
+#include "protobuf.h"
 
 int main(int argc, char **argv)
 {

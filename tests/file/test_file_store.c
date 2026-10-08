@@ -9,17 +9,17 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file.h"
-#include "array.h"
-#include "sqlite.h"
-#include "test_harness.h"
-
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include "file.h"
+#include "array.h"
+#include "sqlite.h"
+#include "test_harness.h"
 
 /* Exported tests are registered by test_file.c; this file owns no suite configuration. */
 typedef struct {

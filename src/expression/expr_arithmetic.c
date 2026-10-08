@@ -9,13 +9,14 @@
  * domain restrictions when extending these operations.
  */
 
-#include "expr_bindings.h"
-#include "integrator.h"
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "expr_bindings.h"
+#include "integrator.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

@@ -220,11 +220,13 @@ does not invent an extra empty line.
 
 `file_read_all_text` strips an initial UTF-8 BOM but retains line endings.
 Text reads validate complete UTF-8 before constructing a MARS string: malformed
-input gives `EILSEQ`, not silent replacement. Returned strings follow MARS's
-NFC normalisation convention. Embedded NUL bytes are retained; use
-`string_byte_length`, not `strlen`, to measure them. Use binary helpers when
-byte-for-byte preservation is required, including preservation of decomposed
-Unicode or a BOM. Other encodings, including UTF-16, are not decoded.
+input gives `EILSEQ`, not silent replacement. Returned strings preserve exact
+UTF-8 spelling, including decomposed Unicode and literal credentials, without
+NFC normalisation. Embedded NUL bytes are retained; use `string_byte_length`,
+not `strlen`, to measure them. Text writers preserve these bytes too; ordinary
+string mutators may normalise them, so use `string_append_utf8_exact` when adding
+text whose spelling must be retained. Use binary helpers to preserve a BOM or
+line endings removed by line readers. Other encodings, including UTF-16, are not decoded.
 
 `file_write_all_bytes`, `file_write_all_text` and `file_write_all_lines`
 create/truncate, write and close. `file_append_all_text` and
@@ -638,7 +640,7 @@ Returns: True on success; false on failure (see file_last_error).
 
 `bool file_read_line(file_t *file, string_t **line);`
 
-Reads one NFC-normalised UTF-8 line, stripping LF, CRLF or CR and an initial BOM; NULL output means EOF.
+Reads one UTF-8 line without normalisation, stripping LF, CRLF or CR and an initial BOM; NULL output means EOF.
 
 - `file` (in,out): Borrowed open regular-file stream with suitable access; receives errors.
 - `line` (out): Required output pointer; receives an owned string or NULL at EOF. Release strings with string_free.
@@ -681,11 +683,11 @@ Returns: Owned byte array, including an empty array at EOF; NULL on failure. Rel
 
 `string_t *file_read_all_text(file_t *file);`
 
-Reads a closed handle's UTF-8 file into an owned NFC-normalised string, stripping an initial BOM.
+Reads a closed handle's UTF-8 file into an owned string without normalisation, stripping an initial BOM.
 
 - `file` (in,out): Borrowed, closed path handle; receives errors and remains caller-owned.
 
-Returns: Owned NFC-normalised string, or NULL on failure; release with string_free.
+Returns: Owned string preserving UTF-8 spelling, or NULL on failure; release with string_free.
 
 ### `file_read_all_lines`
 
@@ -1350,6 +1352,32 @@ Note: An outer database rollback cannot undo an already published filesystem fil
 
 See also: [`file_import_sqlite`](#file_import_sqlite).
 
+### `file_sha256`
+
+`string_t *file_sha256(file_t *source);`
+
+Hashes a closed regular file in 64 KiB blocks and returns an owned string of 64
+lower-case hexadecimal digits. Release the result with `string_free`. On failure,
+returns NULL and sets `errno` and the handle's error code. The source is closed
+before returning; an already open handle is rejected with `EBUSY` and left open.
+Final symbolic links and non-regular files are rejected. Detected changes to size
+or modification metadata during reading give `ESTALE`; callers still need
+external synchronisation for a reliable snapshot against concurrent writers.
+SHA-256 identifies contents but does not authenticate an untrusted file.
+
+### `file_create_temp_directory`
+
+`file_t *file_create_temp_directory(const string_t *parent);`
+
+Creates an unpredictable directory exclusively beneath the supplied existing,
+trusted parent, with mode 0700 (further restricted by the process umask).
+Returns an owned closed handle, or NULL with `errno` set. Empty paths and embedded
+NUL bytes are rejected. Parent components may resolve through symbolic links.
+The caller owns cleanup: remove any created contents, call
+`file_remove_directory`, then `file_free`. Freeing the handle alone does not
+delete the directory. Native release-evidence staging uses this API so all
+filesystem operations remain in the file module.
+
 ## Examples
 
 Each block is a complete C program with `main()`. Compile one block at a time
@@ -1368,6 +1396,38 @@ Compression and encryption examples:
 - [Compress and decompress a file](#compression-and-decompression-with-zstandard).
 - [Encrypt and decrypt without compression](#encryption-and-decryption-without-compression).
 - [Compress, encrypt, decrypt and decompress](#compression-followed-by-encryption-and-decryption).
+
+### SHA-256 content hashing
+
+Pass one fresh disposable file path. This writes the standard `abc` test vector,
+hashes it, and removes the file afterwards.
+
+```c
+#include <assert.h>
+#include "file.h"
+#include "ustring.h"
+
+int main(int argc, char **argv)
+{
+    assert(argc == 2);
+    file_t *source = file_new_cstr(argv[1]);
+    assert(source);
+    assert(file_write_all_bytes(source, "abc", 3));
+    string_t *digest = file_sha256(source);
+    assert(digest);
+    string_printf("%S\n", digest);
+    string_free(digest);
+    assert(file_delete(source));
+    file_free(source);
+    return 0;
+}
+```
+
+Output:
+
+```text
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+```
 
 ### UTF-8 lines
 
@@ -1767,9 +1827,10 @@ Run the suite sequentially with `make -j1 test_file`.
 
 ### Coverage and failure-path tests
 
-Run `make -j1 coverage-file` with GCC, gcov and Python 3 installed. It builds a
+Run `make -j1 coverage-file` with GCC, gcov and gzip installed. It builds a
 separate instrumented copy of the file module in `build/coverage/file`, runs
-the file tests with README examples last, and reports per-source line and
+the file tests with README examples last, and uses the native
+`mars_checks file-coverage` command to report per-source line and
 branch-outcome counts. Normal library objects are not instrumented. Each run
 clears only that target's generated counters so old runs cannot inflate the
 result. The target fails if a test fails, any public file function remains
@@ -1777,7 +1838,7 @@ unexecuted, line coverage falls below 90%, or branch-outcome coverage falls
 below 80%.
 
 The coverage target reports current counts rather than relying on a historical
-percentage. All 83 public file functions are exercised. These are execution
+percentage. Public file functions must all be exercised. These are execution
 measurements, not a claim that every behaviour or argument combination has been proved.
 
 `test_file_coverage.c` checks explicit link-following modes, direct text-stream

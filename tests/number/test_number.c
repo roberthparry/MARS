@@ -9,9 +9,9 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_number.h"
-
 #include <stdio.h>
+
+#include "test_number.h"
 
 static bool test_number_suite_setup(void);
 

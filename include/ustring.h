@@ -6,6 +6,8 @@
  * instead of managing raw C string buffers. Unicode-aware operations distinguish
  * user-visible characters from encoded byte positions; cursor and view facilities
  * support structured parsing without exposing the mutable representation.
+ * Literal shell-word unquoting supports configuration values without expansion
+ * or execution and preserves their existing Unicode spelling.
  *
  * The normal text interface is not a container for arbitrary binary file or network
  * data. Use the documented strict or exact input helpers when replacement of
@@ -839,6 +841,29 @@ bool string_cursor_match_at(const string_cursor_t *cursor, string_pos_t pos, con
  * @param s  String to modify. Must not be @c NULL.
  */
 void string_trim(string_t *s);
+
+/**
+ * @brief Decode one literal shell-style word without expansion or execution.
+ * @param text Required borrowed string; not modified. Empty or whitespace-only
+ * input produces an empty string, as do empty quotes and a comment-only input.
+ * @return Caller-owned decoded string, freed with string_free, or NULL with errno
+ * set to EINVAL for invalid syntax/input, ENOMEM for allocation failure, or
+ * EOVERFLOW if the required storage cannot be represented.
+ * @details Concatenates unquoted, single-quoted and double-quoted fragments.
+ * Outside quotes a backslash removes the following character's special meaning;
+ * inside single quotes it is literal. Inside double quotes, matching shlex, only
+ * backslash and double quote lose a preceding backslash. Other backslashes are
+ * retained, including those before dollar signs and backticks.
+ * Leading/trailing ASCII spaces and tabs are ignored. Once whitespace ends the
+ * word, only more whitespace or a # comment is accepted. A # inside a word or
+ * quotes is literal. Rejects multiple words, unclosed quotes, dangling escapes,
+ * and NUL, CR or LF anywhere, including comments or escaped positions.
+ * Variables, substitutions, tilde, wildcards and shell operators remain literal;
+ * this is not a shell parser or an execution-safety validator. UTF-8 bytes are
+ * preserved without normalisation, and later ordinary mutators may normalise them.
+ * Processing is linear in the input size, with at most that many output bytes.
+ */
+string_t *string_unquote_shell(const string_t *text);
 
 /* =========================================================================
    printf-style formatting

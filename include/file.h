@@ -5,10 +5,10 @@
  * Use this module as the Linux filesystem interface for MARS applications: opening,
  * reading, writing and seeking files; listing directories; inspecting attributes
  * and symbolic-link targets; changing permissions and ownership; and copying,
- * moving or deleting filesystem objects.
+ * moving or deleting filesystem objects; and creating private temporary directories.
  *
- * The API also provides bounded streaming compression, authenticated file encryption
- * and SQLCipher import/export of file contents and selected metadata. These helpers
+ * The API also provides bounded streaming compression, authenticated file encryption,
+ * SHA-256 content hashing and SQLCipher import/export of file contents and selected metadata. These helpers
  * operate on stored data, not serialised open descriptors. Observe each operation's
  * path, overwrite, size-limit and verification policy; network transport belongs in
  * http.h rather than the file module.
@@ -260,7 +260,7 @@ bool file_lock(file_t *file, bool exclusive, bool wait);
 bool file_unlock(file_t *file);
 
 /**
- * @brief Reads one NFC-normalised UTF-8 line, stripping LF, CRLF or CR and an initial BOM; NULL output means EOF.
+ * @brief Reads one UTF-8 line without normalisation, stripping LF, CRLF or CR and an initial BOM; NULL means EOF.
  * @param[in,out] file Borrowed open regular-file stream with suitable access; receives errors.
  * @param[out] line Required output pointer; receives an owned string or NULL at EOF. Release strings with string_free.
  * @return True on success; false on failure (see file_last_error).
@@ -291,9 +291,9 @@ bool file_write_line(file_t *file, const string_t *text);
 array_t *file_read_all_bytes(file_t *file);
 
 /**
- * @brief Reads a closed handle's UTF-8 file into an owned NFC-normalised string, stripping an initial BOM.
+ * @brief Reads a closed handle's UTF-8 file without normalisation, stripping an initial BOM.
  * @param[in,out] file Borrowed, closed path handle; receives errors and remains caller-owned.
- * @return Owned NFC-normalised string, or NULL on failure; release with string_free.
+ * @return Owned string preserving the remaining UTF-8 bytes, or NULL on failure; release with string_free.
  */
 string_t *file_read_all_text(file_t *file);
 
@@ -815,5 +815,26 @@ bool file_import_sqlite(file_t *source, sqlite_t *db, const string_t *name, uint
  */
 bool file_export_sqlite(sqlite_t *db, const string_t *name, file_t *destination, uint64_t max_bytes,
                         bool overwrite, bool restore_metadata);
+
+/**
+ * @brief Calculate the SHA-256 digest of a regular file with bounded memory.
+ * @param[in,out] source Borrowed closed file handle, opened read-only and closed before return; receives errors.
+ * @return Owned string of 64 lower-case hexadecimal digits, or NULL on failure; release with string_free.
+ * @details Reads in 64 KiB blocks. Rejects final symbolic links and non-regular files, and leaves an already
+ * open handle untouched with EBUSY. Detected changes to size or modification metadata during reading give
+ * ESTALE; this is not a snapshot guarantee against hostile concurrent writers. A digest provides content
+ * identification and accidental-corruption detection, not authentication of an untrusted file.
+ */
+string_t *file_sha256(file_t *source);
+
+/**
+ * @brief Create an unpredictable private temporary directory beneath a trusted parent.
+ * @param[in] parent Borrowed non-empty path to an existing directory; rejects embedded NUL bytes.
+ * @return Owned closed handle for the new directory, or NULL with errno set; release with file_free.
+ * @details Creates the directory exclusively with mode 0700, further restricted by the process umask.
+ * The caller must remove its contents and call file_remove_directory when finished; freeing the handle
+ * does not delete the directory. Parent path components may follow symbolic links; use a trusted parent.
+ */
+file_t *file_create_temp_directory(const string_t *parent);
 
 #endif

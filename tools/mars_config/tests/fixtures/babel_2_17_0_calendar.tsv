@@ -1,0 +1,2595 @@
+# Independent Babel 2.17.0 / CLDR 46 reference; captured from CalendarLocaleRenderingTests expectations.
+# Copyright Unicode, Inc.; Unicode Licence v3, see THIRD_PARTY_NOTICES.md. No runtime Python dependency.
+# locale<TAB>Gregorian key<TAB>Date Lingua<TAB>Month Name<TAB>Month Name Abbrev<TAB>Day Name<TAB>Day Name Abbrev
+aa_DJ	2024-01-01	01 Qunxa Garablu 2024	Qunxa Garablu	Qun	Etleeni	Etl
+aa_DJ	2024-02-29	29 Kudo 2024	Kudo	Nah	Kamiisi	Kam
+aa_DJ	2024-06-21	21 Qasa Dirri 2024	Qasa Dirri	Qas	Gumqata	Gum
+aa_DJ	2024-07-07	07 Qado Dirri 2024	Qado Dirri	Qad	Acaada	Aca
+aa_DJ	2024-12-31	31 Kaxxa Garablu 2024	Kaxxa Garablu	Kax	Talaata	Tal
+aa_DJ	2025-01-01	01 Qunxa Garablu 2025	Qunxa Garablu	Qun	Arbaqa	Arb
+ab_GE	2024-01-01	1 Ажьырныҳəа 2024 ш.	Ажьырныҳəа	Ажь	Ашәахьа	Ашә
+ab_GE	2024-02-29	29 Жəабран 2024 ш.	Жəабран	Жəаб	Аԥшьаша	Аԥ
+ab_GE	2024-06-21	21 Рашəара 2024 ш.	Рашəара	Рашә	Ахәаша	Ахә
+ab_GE	2024-07-07	7 Ԥхынгəы 2024 ш.	Ԥхынгəы	Ԥхынгә	Амҽыша	Ам
+ab_GE	2024-12-31	31 Ԥхынҷкәын 2024 ш.	Ԥхынҷкәын	Ԥхынҷ	Аҩаша	Аҩ
+ab_GE	2025-01-01	1 Ажьырныҳəа 2025 ш.	Ажьырныҳəа	Ажь	Ахаша	Ах
+af_NA	2024-01-01	1 Januarie 2024	Januarie	Jan.	Maandag	Ma.
+af_NA	2024-02-29	29 Februarie 2024	Februarie	Feb.	Donderdag	Do.
+af_NA	2024-06-21	21 Junie 2024	Junie	Jun.	Vrydag	Vr.
+af_NA	2024-07-07	7 Julie 2024	Julie	Jul.	Sondag	So.
+af_NA	2024-12-31	31 Desember 2024	Desember	Des.	Dinsdag	Di.
+af_NA	2025-01-01	1 Januarie 2025	Januarie	Jan.	Woensdag	Wo.
+af_ZA	2024-01-01	01 Januarie 2024	Januarie	Jan.	Maandag	Ma.
+af_ZA	2024-02-29	29 Februarie 2024	Februarie	Feb.	Donderdag	Do.
+af_ZA	2024-06-21	21 Junie 2024	Junie	Jun.	Vrydag	Vr.
+af_ZA	2024-07-07	07 Julie 2024	Julie	Jul.	Sondag	So.
+af_ZA	2024-12-31	31 Desember 2024	Desember	Des.	Dinsdag	Di.
+af_ZA	2025-01-01	01 Januarie 2025	Januarie	Jan.	Woensdag	Wo.
+ak_GH	2024-01-01	Ɔpɛpɔn 1, 2024	Ɔpɛpɔn	Ɔpɛpɔn	Dwoada	Dwo
+ak_GH	2024-02-29	Ɔgyefoɔ 29, 2024	Ɔgyefoɔ	Ɔgyefoɔ	Yawoada	Yaw
+ak_GH	2024-06-21	Ayɛwohomumu 21, 2024	Ayɛwohomumu	Ayɛwohomumu	Fiada	Fia
+ak_GH	2024-07-07	Kutawonsa 7, 2024	Kutawonsa	Kutawonsa	Kwasiada	Kwe
+ak_GH	2024-12-31	Ɔpɛnimma 31, 2024	Ɔpɛnimma	Ɔpɛnimma	Benada	Ben
+ak_GH	2025-01-01	Ɔpɛpɔn 1, 2025	Ɔpɛpɔn	Ɔpɛpɔn	Wukuada	Wuk
+am_ET	2024-01-01	1 ጃንዋሪ 2024	ጃንዋሪ	ጃን	ሰኞ	ሰኞ
+am_ET	2024-02-29	29 ፌብሩዋሪ 2024	ፌብሩዋሪ	ፌብ	ሐሙስ	ሐሙስ
+am_ET	2024-06-21	21 ጁን 2024	ጁን	ጁን	ዓርብ	ዓርብ
+am_ET	2024-07-07	7 ጁላይ 2024	ጁላይ	ጁላይ	እሑድ	እሑድ
+am_ET	2024-12-31	31 ዲሴምበር 2024	ዲሴምበር	ዲሴም	ማክሰኞ	ማክሰ
+am_ET	2025-01-01	1 ጃንዋሪ 2025	ጃንዋሪ	ጃን	ረቡዕ	ረቡዕ
+ar_AE	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_AE	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_AE	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_AE	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_AE	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_AE	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_BH	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_BH	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_BH	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_BH	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_BH	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_BH	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_DJ	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_DJ	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_DJ	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_DJ	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_DJ	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_DJ	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_DZ	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	جانفي	جانفي	الاثنين	الاثنين
+ar_DZ	2024-02-29	١٩ شعبان ١٤٤٥	فيفري	فيفري	الخميس	الخميس
+ar_DZ	2024-06-21	١٤ ذو الحجة ١٤٤٥	جوان	جوان	الجمعة	الجمعة
+ar_DZ	2024-07-07	٣٠ ذو الحجة ١٤٤٥	جويلية	جويلية	الأحد	الأحد
+ar_DZ	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_DZ	2025-01-01	١ رجب ١٤٤٦	جانفي	جانفي	الأربعاء	الأربعاء
+ar_EG	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_EG	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_EG	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_EG	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_EG	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_EG	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_EH	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_EH	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_EH	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_EH	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_EH	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_EH	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_ER	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_ER	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_ER	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_ER	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_ER	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_ER	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_IL	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_IL	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_IL	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_IL	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_IL	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_IL	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_IQ	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	كانون الثاني	كانون الثاني	الاثنين	الاثنين
+ar_IQ	2024-02-29	١٩ شعبان ١٤٤٥	شباط	شباط	الخميس	الخميس
+ar_IQ	2024-06-21	١٤ ذو الحجة ١٤٤٥	حزيران	حزيران	الجمعة	الجمعة
+ar_IQ	2024-07-07	٣٠ ذو الحجة ١٤٤٥	تموز	تموز	الأحد	الأحد
+ar_IQ	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	كانون الأول	كانون الأول	الثلاثاء	الثلاثاء
+ar_IQ	2025-01-01	١ رجب ١٤٤٦	كانون الثاني	كانون الثاني	الأربعاء	الأربعاء
+ar_JO	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	كانون الثاني	كانون الثاني	الاثنين	الاثنين
+ar_JO	2024-02-29	١٩ شعبان ١٤٤٥	شباط	شباط	الخميس	الخميس
+ar_JO	2024-06-21	١٤ ذو الحجة ١٤٤٥	حزيران	حزيران	الجمعة	الجمعة
+ar_JO	2024-07-07	٣٠ ذو الحجة ١٤٤٥	تموز	تموز	الأحد	الأحد
+ar_JO	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	كانون الأول	كانون الأول	الثلاثاء	الثلاثاء
+ar_JO	2025-01-01	١ رجب ١٤٤٦	كانون الثاني	كانون الثاني	الأربعاء	الأربعاء
+ar_KM	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_KM	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_KM	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_KM	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_KM	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_KM	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_KW	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_KW	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_KW	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_KW	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_KW	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_KW	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_LB	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	كانون الثاني	كانون الثاني	الاثنين	الاثنين
+ar_LB	2024-02-29	١٩ شعبان ١٤٤٥	شباط	شباط	الخميس	الخميس
+ar_LB	2024-06-21	١٤ ذو الحجة ١٤٤٥	حزيران	حزيران	الجمعة	الجمعة
+ar_LB	2024-07-07	٣٠ ذو الحجة ١٤٤٥	تموز	تموز	الأحد	الأحد
+ar_LB	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	كانون الأول	كانون الأول	الثلاثاء	الثلاثاء
+ar_LB	2025-01-01	١ رجب ١٤٤٦	كانون الثاني	كانون الثاني	الأربعاء	الأربعاء
+ar_LY	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_LY	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_LY	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_LY	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_LY	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_LY	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_MA	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_MA	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_MA	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_MA	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليوز	يوليوز	الأحد	الأحد
+ar_MA	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	دجنبر	دجنبر	الثلاثاء	الثلاثاء
+ar_MA	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_MR	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_MR	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_MR	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_MR	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_MR	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	دجمبر	دجمبر	الثلاثاء	الثلاثاء
+ar_MR	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_OM	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_OM	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_OM	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_OM	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_OM	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_OM	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_PS	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	كانون الثاني	كانون الثاني	الاثنين	الاثنين
+ar_PS	2024-02-29	١٩ شعبان ١٤٤٥	شباط	شباط	الخميس	الخميس
+ar_PS	2024-06-21	١٤ ذو الحجة ١٤٤٥	حزيران	حزيران	الجمعة	الجمعة
+ar_PS	2024-07-07	٣٠ ذو الحجة ١٤٤٥	تموز	تموز	الأحد	الأحد
+ar_PS	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	كانون الأول	كانون الأول	الثلاثاء	الثلاثاء
+ar_PS	2025-01-01	١ رجب ١٤٤٦	كانون الثاني	كانون الثاني	الأربعاء	الأربعاء
+ar_QA	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_QA	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_QA	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_QA	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_QA	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_QA	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_SA	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_SA	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_SA	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_SA	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_SA	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_SA	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_SD	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_SD	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_SD	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_SD	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_SD	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_SD	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_SO	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_SO	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_SO	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_SO	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_SO	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_SO	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_SS	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_SS	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_SS	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_SS	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_SS	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_SS	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_SY	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	كانون الثاني	كانون الثاني	الاثنين	الاثنين
+ar_SY	2024-02-29	١٩ شعبان ١٤٤٥	شباط	شباط	الخميس	الخميس
+ar_SY	2024-06-21	١٤ ذو الحجة ١٤٤٥	حزيران	حزيران	الجمعة	الجمعة
+ar_SY	2024-07-07	٣٠ ذو الحجة ١٤٤٥	تموز	تموز	الأحد	الأحد
+ar_SY	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	كانون الأول	كانون الأول	الثلاثاء	الثلاثاء
+ar_SY	2025-01-01	١ رجب ١٤٤٦	كانون الثاني	كانون الثاني	الأربعاء	الأربعاء
+ar_TD	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_TD	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_TD	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_TD	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_TD	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_TD	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+ar_TN	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	جانفي	جانفي	الاثنين	الاثنين
+ar_TN	2024-02-29	١٩ شعبان ١٤٤٥	فيفري	فيفري	الخميس	الخميس
+ar_TN	2024-06-21	١٤ ذو الحجة ١٤٤٥	جوان	جوان	الجمعة	الجمعة
+ar_TN	2024-07-07	٣٠ ذو الحجة ١٤٤٥	جويلية	جويلية	الأحد	الأحد
+ar_TN	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_TN	2025-01-01	١ رجب ١٤٤٦	جانفي	جانفي	الأربعاء	الأربعاء
+ar_YE	2024-01-01	١٩ جمادى الآخرة ١٤٤٥	يناير	يناير	الاثنين	الاثنين
+ar_YE	2024-02-29	١٩ شعبان ١٤٤٥	فبراير	فبراير	الخميس	الخميس
+ar_YE	2024-06-21	١٤ ذو الحجة ١٤٤٥	يونيو	يونيو	الجمعة	الجمعة
+ar_YE	2024-07-07	٣٠ ذو الحجة ١٤٤٥	يوليو	يوليو	الأحد	الأحد
+ar_YE	2024-12-31	٢٩ جمادى الآخرة ١٤٤٦	ديسمبر	ديسمبر	الثلاثاء	الثلاثاء
+ar_YE	2025-01-01	١ رجب ١٤٤٦	يناير	يناير	الأربعاء	الأربعاء
+as_IN	2024-01-01	1 জানুৱাৰী, 2024	জানুৱাৰী	জানু	সোমবাৰ	সোম
+as_IN	2024-02-29	29 ফেব্ৰুৱাৰী, 2024	ফেব্ৰুৱাৰী	ফেব্ৰু	বৃহস্পতিবাৰ	বৃহ
+as_IN	2024-06-21	21 জুন, 2024	জুন	জুন	শুক্ৰবাৰ	শুক্ৰ
+as_IN	2024-07-07	7 জুলাই, 2024	জুলাই	জুলাই	দেওবাৰ	দেও
+as_IN	2024-12-31	31 ডিচেম্বৰ, 2024	ডিচেম্বৰ	ডিচে	মঙ্গলবাৰ	মঙ্গল
+as_IN	2025-01-01	1 জানুৱাৰী, 2025	জানুৱাৰী	জানু	বুধবাৰ	বুধ
+ast_ES	2024-01-01	1 de xineru de 2024	xineru	xin	llunes	llu
+ast_ES	2024-02-29	29 de febreru de 2024	febreru	feb	xueves	xue
+ast_ES	2024-06-21	21 de xunu de 2024	xunu	xun	vienres	vie
+ast_ES	2024-07-07	7 de xunetu de 2024	xunetu	xnt	domingu	dom
+ast_ES	2024-12-31	31 d’avientu de 2024	avientu	avi	martes	mar
+ast_ES	2025-01-01	1 de xineru de 2025	xineru	xin	miércoles	mié
+az_Arab_IQ	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+az_Arab_IQ	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+az_Arab_IQ	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+az_Arab_IQ	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+az_Arab_IQ	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+az_Arab_IQ	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+az_Cyrl	2024-01-01	1 јанвар 2024	Јанвар	јан	базар ертәси	Б.Е.
+az_Cyrl	2024-02-29	29 феврал 2024	Феврал	фев	ҹүмә ахшамы	Ҹ.А.
+az_Cyrl	2024-06-21	21 ијун 2024	Ијун	ијн	ҹүмә	Ҹ.
+az_Cyrl	2024-07-07	7 ијул 2024	Ијул	ијл	базар	Б.
+az_Cyrl	2024-12-31	31 декабр 2024	Декабр	дек	чәршәнбә ахшамы	Ч.А.
+az_Cyrl	2025-01-01	1 јанвар 2025	Јанвар	јан	чәршәнбә	Ч.
+az_Cyrl_AZ	2024-01-01	1 јанвар 2024	Јанвар	јан	базар ертәси	Б.Е.
+az_Cyrl_AZ	2024-02-29	29 феврал 2024	Феврал	фев	ҹүмә ахшамы	Ҹ.А.
+az_Cyrl_AZ	2024-06-21	21 ијун 2024	Ијун	ијн	ҹүмә	Ҹ.
+az_Cyrl_AZ	2024-07-07	7 ијул 2024	Ијул	ијл	базар	Б.
+az_Cyrl_AZ	2024-12-31	31 декабр 2024	Декабр	дек	чәршәнбә ахшамы	Ч.А.
+az_Cyrl_AZ	2025-01-01	1 јанвар 2025	Јанвар	јан	чәршәнбә	Ч.
+az_Latn_AZ	2024-01-01	1 yanvar 2024	yanvar	yan	bazar ertəsi	B.e.
+az_Latn_AZ	2024-02-29	29 fevral 2024	fevral	fev	cümə axşamı	C.a.
+az_Latn_AZ	2024-06-21	21 iyun 2024	iyun	iyn	cümə	C.
+az_Latn_AZ	2024-07-07	7 iyul 2024	iyul	iyl	bazar	B.
+az_Latn_AZ	2024-12-31	31 dekabr 2024	dekabr	dek	çərşənbə axşamı	Ç.a.
+az_Latn_AZ	2025-01-01	1 yanvar 2025	yanvar	yan	çərşənbə	Ç.
+ba_RU	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+ba_RU	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+ba_RU	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+ba_RU	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+ba_RU	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+ba_RU	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+be_BY	2024-01-01	1 студзеня 2024 г.	студзень	сту	панядзелак	пн
+be_BY	2024-02-29	29 лютага 2024 г.	люты	лют	чацвер	чц
+be_BY	2024-06-21	21 чэрвеня 2024 г.	чэрвень	чэр	пятніца	пт
+be_BY	2024-07-07	7 ліпеня 2024 г.	ліпень	ліп	нядзеля	нд
+be_BY	2024-12-31	31 снежня 2024 г.	снежань	сне	аўторак	аў
+be_BY	2025-01-01	1 студзеня 2025 г.	студзень	сту	серада	ср
+bem_ZM	2024-01-01	1 Januari 2024	Januari	Jan	Palichimo	Palichimo
+bem_ZM	2024-02-29	29 Februari 2024	Februari	Feb	Palichine	Palichine
+bem_ZM	2024-06-21	21 Juni 2024	Juni	Jun	Palichisano	Palichisano
+bem_ZM	2024-07-07	7 Julai 2024	Julai	Jul	Pa Mulungu	Pa Mulungu
+bem_ZM	2024-12-31	31 Disemba 2024	Disemba	Dis	Palichibuli	Palichibuli
+bem_ZM	2025-01-01	1 Januari 2025	Januari	Jan	Palichitatu	Palichitatu
+bg_BG	2024-01-01	1 януари 2024 г.	януари	яну	понеделник	пн
+bg_BG	2024-02-29	29 февруари 2024 г.	февруари	фев	четвъртък	чт
+bg_BG	2024-06-21	21 юни 2024 г.	юни	юни	петък	пт
+bg_BG	2024-07-07	7 юли 2024 г.	юли	юли	неделя	нд
+bg_BG	2024-12-31	31 декември 2024 г.	декември	дек	вторник	вт
+bg_BG	2025-01-01	1 януари 2025 г.	януари	яну	сряда	ср
+bm_ML	2024-01-01	1 zanwuye 2024	zanwuye	zan	ntɛnɛ	ntɛ
+bm_ML	2024-02-29	29 feburuye 2024	feburuye	feb	alamisa	ala
+bm_ML	2024-06-21	21 zuwɛn 2024	zuwɛn	zuw	juma	jum
+bm_ML	2024-07-07	7 zuluye 2024	zuluye	zul	kari	kar
+bm_ML	2024-12-31	31 desanburu 2024	desanburu	des	tarata	tar
+bm_ML	2025-01-01	1 zanwuye 2025	zanwuye	zan	araba	ara
+bn_BD	2024-01-01	1 জানুয়ারী, 2024	জানুয়ারী	জানু	সোমবার	সোম
+bn_BD	2024-02-29	29 ফেব্রুয়ারী, 2024	ফেব্রুয়ারী	ফেব	বৃহস্পতিবার	বৃহস্পতি
+bn_BD	2024-06-21	21 জুন, 2024	জুন	জুন	শুক্রবার	শুক্র
+bn_BD	2024-07-07	7 জুলাই, 2024	জুলাই	জুল	রবিবার	রবি
+bn_BD	2024-12-31	31 ডিসেম্বর, 2024	ডিসেম্বর	ডিসে	মঙ্গলবার	মঙ্গল
+bn_BD	2025-01-01	1 জানুয়ারী, 2025	জানুয়ারী	জানু	বুধবার	বুধ
+bn_IN	2024-01-01	1 জানুয়ারী, 2024	জানুয়ারী	জানু	সোমবার	সোম
+bn_IN	2024-02-29	29 ফেব্রুয়ারী, 2024	ফেব্রুয়ারী	ফেব	বৃহস্পতিবার	বৃহস্পতি
+bn_IN	2024-06-21	21 জুন, 2024	জুন	জুন	শুক্রবার	শুক্র
+bn_IN	2024-07-07	7 জুলাই, 2024	জুলাই	জুল	রবিবার	রবি
+bn_IN	2024-12-31	31 ডিসেম্বর, 2024	ডিসেম্বর	ডিসেঃ	মঙ্গলবার	মঙ্গল
+bn_IN	2025-01-01	1 জানুয়ারী, 2025	জানুয়ারী	জানু	বুধবার	বুধ
+bo_CN	2024-01-01	སྤྱི་ལོ་2024 ཟླ་བ་དང་པོའི་ཚེས་1	ཟླ་བ་དང་པོ་	ཟླ་༡	གཟའ་ཟླ་བ་	ཟླ་བ་
+bo_CN	2024-02-29	སྤྱི་ལོ་2024 ཟླ་བ་གཉིས་པའི་ཚེས་29	ཟླ་བ་གཉིས་པ་	ཟླ་༢	གཟའ་ཕུར་བུ་	ཕུར་བུ་
+bo_CN	2024-06-21	སྤྱི་ལོ་2024 ཟླ་བ་དྲུག་པའི་ཚེས་21	ཟླ་བ་དྲུག་པ་	ཟླ་༦	གཟའ་པ་སངས་	པ་སངས་
+bo_CN	2024-07-07	སྤྱི་ལོ་2024 ཟླ་བ་བདུན་པའི་ཚེས་7	ཟླ་བ་བདུན་པ་	ཟླ་༧	གཟའ་ཉི་མ་	ཉི་མ་
+bo_CN	2024-12-31	སྤྱི་ལོ་2024 ཟླ་བ་བཅུ་གཉིས་པའི་ཚེས་31	ཟླ་བ་བཅུ་གཉིས་པ་	ཟླ་༡༢	གཟའ་མིག་དམར་	མིག་དམར་
+bo_CN	2025-01-01	སྤྱི་ལོ་2025 ཟླ་བ་དང་པོའི་ཚེས་1	ཟླ་བ་དང་པོ་	ཟླ་༡	གཟའ་ལྷག་པ་	ལྷག་པ་
+br_FR	2024-01-01	1 Genver 2024	Genver	Gen.	Lun	Lun
+br_FR	2024-02-29	29 Cʼhwevrer 2024	Cʼhwevrer	Cʼhwe.	Yaou	Yaou
+br_FR	2024-06-21	21 Mezheven 2024	Mezheven	Mezh.	Gwener	Gwe.
+br_FR	2024-07-07	7 Gouere 2024	Gouere	Goue.	Sul	Sul
+br_FR	2024-12-31	31 Kerzu 2024	Kerzu	Kzu.	Meurzh	Meu.
+br_FR	2025-01-01	1 Genver 2025	Genver	Gen.	Mercʼher	Mer.
+bs_Cyrl_BA	2024-01-01	01. јануар 2024.	јануар	јан	понедјељак	пон
+bs_Cyrl_BA	2024-02-29	29. фебруар 2024.	фебруар	феб	четвртак	чет
+bs_Cyrl_BA	2024-06-21	21. јуни 2024.	јуни	јун	петак	пет
+bs_Cyrl_BA	2024-07-07	07. јули 2024.	јули	јул	недјеља	нед
+bs_Cyrl_BA	2024-12-31	31. децембар 2024.	децембар	дец	уторак	уто
+bs_Cyrl_BA	2025-01-01	01. јануар 2025.	јануар	јан	сриједа	сри
+bs_Latn_BA	2024-01-01	1. januar 2024.	januar	jan	ponedjeljak	pon
+bs_Latn_BA	2024-02-29	29. februar 2024.	februar	feb	četvrtak	čet
+bs_Latn_BA	2024-06-21	21. juni 2024.	juni	jun	petak	pet
+bs_Latn_BA	2024-07-07	7. juli 2024.	juli	jul	nedjelja	ned
+bs_Latn_BA	2024-12-31	31. decembar 2024.	decembar	dec	utorak	uto
+bs_Latn_BA	2025-01-01	1. januar 2025.	januar	jan	srijeda	sri
+ca_AD	2024-01-01	1 de gener del 2024	gener	de gen.	dilluns	dl.
+ca_AD	2024-02-29	29 de febrer del 2024	febrer	de febr.	dijous	dj.
+ca_AD	2024-06-21	21 de juny del 2024	juny	de juny	divendres	dv.
+ca_AD	2024-07-07	7 de juliol del 2024	juliol	de jul.	diumenge	dg.
+ca_AD	2024-12-31	31 de desembre del 2024	desembre	de des.	dimarts	dt.
+ca_AD	2025-01-01	1 de gener del 2025	gener	de gen.	dimecres	dc.
+ca_ES	2024-01-01	1 de gener del 2024	gener	de gen.	dilluns	dl.
+ca_ES	2024-02-29	29 de febrer del 2024	febrer	de febr.	dijous	dj.
+ca_ES	2024-06-21	21 de juny del 2024	juny	de juny	divendres	dv.
+ca_ES	2024-07-07	7 de juliol del 2024	juliol	de jul.	diumenge	dg.
+ca_ES	2024-12-31	31 de desembre del 2024	desembre	de des.	dimarts	dt.
+ca_ES	2025-01-01	1 de gener del 2025	gener	de gen.	dimecres	dc.
+ce_RU	2024-01-01	2024 январь 1	январь	янв	оршот	ор
+ce_RU	2024-02-29	2024 февраль 29	февраль	фев	еара	еа
+ce_RU	2024-06-21	2024 июнь 21	июнь	июн	пӀераска	пӀе
+ce_RU	2024-07-07	2024 июль 7	июль	июл	кӀира	кӀи
+ce_RU	2024-12-31	2024 декабрь 31	декабрь	дек	шинара	ши
+ce_RU	2025-01-01	2025 январь 1	январь	янв	кхаара	кха
+ceb_PH	2024-01-01	Enero 1, 2024	Enero	Ene	Lunes	Lun
+ceb_PH	2024-02-29	Pebrero 29, 2024	Pebrero	Peb	Huwebes	Huw
+ceb_PH	2024-06-21	Hunyo 21, 2024	Hunyo	Hun	Biyernes	Biy
+ceb_PH	2024-07-07	Hulyo 7, 2024	Hulyo	Hul	Domingo	Dom
+ceb_PH	2024-12-31	Disyembre 31, 2024	Disyembre	Dis	Martes	Mar
+ceb_PH	2025-01-01	Enero 1, 2025	Enero	Ene	Miyerkules	Miy
+ckb_IQ	2024-01-01	1ی کانوونی دووەمی 2024	کانوونی دووەم	کانوونی دووەم	دووشەممە	دووشەممە
+ckb_IQ	2024-02-29	29ی شوباتی 2024	شوبات	شوبات	پێنجشەممە	پێنجشەممە
+ckb_IQ	2024-06-21	21ی حوزەیرانی 2024	حوزەیران	حوزەیران	ھەینی	ھەینی
+ckb_IQ	2024-07-07	7ی تەمووزی 2024	تەمووز	تەمووز	یەکشەممە	یەکشەممە
+ckb_IQ	2024-12-31	31ی کانونی یەکەمی 2024	کانونی یەکەم	کانونی یەکەم	سێشەممە	سێشەممە
+ckb_IQ	2025-01-01	1ی کانوونی دووەمی 2025	کانوونی دووەم	کانوونی دووەم	چوارشەممە	چوارشەممە
+cs_CZ	2024-01-01	1. ledna 2024	leden	led	pondělí	po
+cs_CZ	2024-02-29	29. února 2024	únor	úno	čtvrtek	čt
+cs_CZ	2024-06-21	21. června 2024	červen	čvn	pátek	pá
+cs_CZ	2024-07-07	7. července 2024	červenec	čvc	neděle	ne
+cs_CZ	2024-12-31	31. prosince 2024	prosinec	pro	úterý	út
+cs_CZ	2025-01-01	1. ledna 2025	leden	led	středa	st
+cy_GB	2024-01-01	1 Ionawr 2024	Ionawr	Ion	Dydd Llun	Llun
+cy_GB	2024-02-29	29 Chwefror 2024	Chwefror	Chwef	Dydd Iau	Iau
+cy_GB	2024-06-21	21 Mehefin 2024	Mehefin	Meh	Dydd Gwener	Gwen
+cy_GB	2024-07-07	7 Gorffennaf 2024	Gorffennaf	Gorff	Dydd Sul	Sul
+cy_GB	2024-12-31	31 Rhagfyr 2024	Rhagfyr	Rhag	Dydd Mawrth	Maw
+cy_GB	2025-01-01	1 Ionawr 2025	Ionawr	Ion	Dydd Mercher	Mer
+da_DK	2024-01-01	1. januar 2024	januar	jan.	mandag	man.
+da_DK	2024-02-29	29. februar 2024	februar	feb.	torsdag	tors.
+da_DK	2024-06-21	21. juni 2024	juni	jun.	fredag	fre.
+da_DK	2024-07-07	7. juli 2024	juli	jul.	søndag	søn.
+da_DK	2024-12-31	31. december 2024	december	dec.	tirsdag	tirs.
+da_DK	2025-01-01	1. januar 2025	januar	jan.	onsdag	ons.
+de	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+de_AT	2024-01-01	1. Jänner 2024	Jänner	Jän.	Montag	Mo.
+de_AT	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_AT	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_AT	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_AT	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_AT	2025-01-01	1. Jänner 2025	Jänner	Jän.	Mittwoch	Mi.
+de_BE	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de_BE	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_BE	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_BE	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_BE	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_BE	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+de_CH	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de_CH	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_CH	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_CH	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_CH	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_CH	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+de_DE	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de_DE	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_DE	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_DE	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_DE	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_DE	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+de_LI	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de_LI	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_LI	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_LI	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_LI	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_LI	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+de_LU	2024-01-01	1. Januar 2024	Januar	Jan.	Montag	Mo.
+de_LU	2024-02-29	29. Februar 2024	Februar	Feb.	Donnerstag	Do.
+de_LU	2024-06-21	21. Juni 2024	Juni	Juni	Freitag	Fr.
+de_LU	2024-07-07	7. Juli 2024	Juli	Juli	Sonntag	So.
+de_LU	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dienstag	Di.
+de_LU	2025-01-01	1. Januar 2025	Januar	Jan.	Mittwoch	Mi.
+dv_MV	2024-01-01	1 M01 2024	M01	M01	Mon	Mon
+dv_MV	2024-02-29	29 M02 2024	M02	M02	Thu	Thu
+dv_MV	2024-06-21	21 M06 2024	M06	M06	Fri	Fri
+dv_MV	2024-07-07	7 M07 2024	M07	M07	Sun	Sun
+dv_MV	2024-12-31	31 M12 2024	M12	M12	Tue	Tue
+dv_MV	2025-01-01	1 M01 2025	M01	M01	Wed	Wed
+dyo_SN	2024-01-01	1 Sanvie 2024	Sanvie	Sa	Teneŋ	Ten
+dyo_SN	2024-02-29	29 Fébirie 2024	Fébirie	Fe	Aramisay	Ara
+dyo_SN	2024-06-21	21 Sueŋ 2024	Sueŋ	Su	Arjuma	Arj
+dyo_SN	2024-07-07	7 Súuyee 2024	Súuyee	Sú	Dimas	Dim
+dyo_SN	2024-12-31	31 Disambar 2024	Disambar	De	Talata	Tal
+dyo_SN	2025-01-01	1 Sanvie 2025	Sanvie	Sa	Alarbay	Ala
+dz_BT	2024-01-01	སྤྱི་ལོ་2024 ཟླ་དངཔ་ ཚེས་ 01	སྤྱི་ཟླ་དངཔ་	༡	གཟའ་མིག་དམར་	མིར་
+dz_BT	2024-02-29	སྤྱི་ལོ་2024 ཟླ་གཉིས་པ་ ཚེས་ 29	སྤྱི་ཟླ་གཉིས་པ་	༢	གཟའ་པ་སངས་	སངས་
+dz_BT	2024-06-21	སྤྱི་ལོ་2024 ཟླ་དྲུག་པ ཚེས་ 21	སྤྱི་ཟླ་དྲུག་པ	༦	གཟའ་སྤེན་པ་	སྤེན་
+dz_BT	2024-07-07	སྤྱི་ལོ་2024 ཟླ་བདུན་པ་ ཚེས་ 07	སྤྱི་ཟླ་བདུན་པ་	༧	གཟའ་ཟླ་བ་	ཟླ་
+dz_BT	2024-12-31	སྤྱི་ལོ་2024 ཟླ་བཅུ་གཉིས་པ་ ཚེས་ 31	སྤྱི་ཟླ་བཅུ་གཉིས་པ་	12	གཟའ་ལྷག་པ་	ལྷག་
+dz_BT	2025-01-01	སྤྱི་ལོ་2025 ཟླ་དངཔ་ ཚེས་ 01	སྤྱི་ཟླ་དངཔ་	༡	གཟའ་ཕུར་བུ་	ཕུར་
+ee_GH	2024-01-01	dzove 1 lia 2024	dzove	dzv	dzoɖa	dzo
+ee_GH	2024-02-29	dzodze 29 lia 2024	dzodze	dzd	yawoɖa	yaw
+ee_GH	2024-06-21	masa 21 lia 2024	masa	mas	fiɖa	fiɖ
+ee_GH	2024-07-07	siamlɔm 7 lia 2024	siamlɔm	sia	kɔsiɖa	kɔs
+ee_GH	2024-12-31	dzome 31 lia 2024	dzome	dzm	blaɖa	bla
+ee_GH	2025-01-01	dzove 1 lia 2025	dzove	dzv	kuɖa	kuɖ
+el_CY	2024-01-01	1 Ιανουαρίου 2024	Ιανουάριος	Ιαν	Δευτέρα	Δευ
+el_CY	2024-02-29	29 Φεβρουαρίου 2024	Φεβρουάριος	Φεβ	Πέμπτη	Πέμ
+el_CY	2024-06-21	21 Ιουνίου 2024	Ιούνιος	Ιουν	Παρασκευή	Παρ
+el_CY	2024-07-07	7 Ιουλίου 2024	Ιούλιος	Ιουλ	Κυριακή	Κυρ
+el_CY	2024-12-31	31 Δεκεμβρίου 2024	Δεκέμβριος	Δεκ	Τρίτη	Τρί
+el_CY	2025-01-01	1 Ιανουαρίου 2025	Ιανουάριος	Ιαν	Τετάρτη	Τετ
+el_GR	2024-01-01	1 Ιανουαρίου 2024	Ιανουάριος	Ιαν	Δευτέρα	Δευ
+el_GR	2024-02-29	29 Φεβρουαρίου 2024	Φεβρουάριος	Φεβ	Πέμπτη	Πέμ
+el_GR	2024-06-21	21 Ιουνίου 2024	Ιούνιος	Ιουν	Παρασκευή	Παρ
+el_GR	2024-07-07	7 Ιουλίου 2024	Ιούλιος	Ιουλ	Κυριακή	Κυρ
+el_GR	2024-12-31	31 Δεκεμβρίου 2024	Δεκέμβριος	Δεκ	Τρίτη	Τρί
+el_GR	2025-01-01	1 Ιανουαρίου 2025	Ιανουάριος	Ιαν	Τετάρτη	Τετ
+en	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_AG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_AG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_AG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_AG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_AG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_AG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_AI	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_AI	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_AI	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_AI	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_AI	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_AI	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_AS	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_AS	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_AS	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_AS	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_AS	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_AS	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_AU	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_AU	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_AU	2024-06-21	21ˢᵗ June 2024	June	June	Friday	Fri
+en_AU	2024-07-07	7ᵗʰ July 2024	July	July	Sunday	Sun
+en_AU	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_AU	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_BB	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_BB	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_BB	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_BB	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_BB	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_BB	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_BI	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_BI	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_BI	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_BI	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_BI	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_BI	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_BM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_BM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_BM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_BM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_BM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_BM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_BS	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_BS	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_BS	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_BS	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_BS	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_BS	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_BW	2024-01-01	01ˢᵗ January 2024	January	Jan	Monday	Mon
+en_BW	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_BW	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_BW	2024-07-07	07ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_BW	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_BW	2025-01-01	01ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_BZ	2024-01-01	01ˢᵗ January 2024	January	Jan	Monday	Mon
+en_BZ	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_BZ	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_BZ	2024-07-07	07ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_BZ	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_BZ	2025-01-01	01ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_CA	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_CA	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_CA	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_CA	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_CA	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_CA	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_CC	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_CC	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_CC	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_CC	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_CC	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_CC	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_CK	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_CK	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_CK	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_CK	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_CK	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_CK	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_CM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_CM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_CM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_CM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_CM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_CM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_CX	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_CX	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_CX	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_CX	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_CX	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_CX	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_DM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_DM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_DM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_DM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_DM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_DM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_ER	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_ER	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_ER	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_ER	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_ER	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_ER	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_FJ	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_FJ	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_FJ	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_FJ	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_FJ	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_FJ	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_FK	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_FK	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_FK	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_FK	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_FK	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_FK	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_FM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_FM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_FM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_FM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_FM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_FM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GB	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GB	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GB	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GB	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GB	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GB	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GD	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GD	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GD	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GD	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GD	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GD	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GH	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GH	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GH	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GH	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GH	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GH	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GI	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GI	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GI	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GI	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GI	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GI	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_GU	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_GU	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_GU	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_GU	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_GU	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_GU	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_GY	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_GY	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_GY	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_GY	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_GY	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_GY	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_HK	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_HK	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_HK	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_HK	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_HK	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_HK	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_IE	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_IE	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_IE	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_IE	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_IE	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_IE	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_IL	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_IL	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_IL	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_IL	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_IL	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_IL	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_IM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_IM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_IM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_IM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_IM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_IM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_IN	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_IN	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_IN	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_IN	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_IN	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_IN	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_IO	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_IO	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_IO	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_IO	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_IO	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_IO	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_JE	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_JE	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_JE	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_JE	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_JE	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_JE	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_JM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_JM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_JM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_JM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_JM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_JM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_KE	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_KE	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_KE	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_KE	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_KE	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_KE	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_KI	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_KI	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_KI	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_KI	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_KI	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_KI	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_KN	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_KN	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_KN	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_KN	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_KN	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_KN	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_KY	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_KY	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_KY	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_KY	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_KY	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_KY	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_LC	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_LC	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_LC	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_LC	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_LC	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_LC	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_LR	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_LR	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_LR	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_LR	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_LR	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_LR	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_LS	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_LS	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_LS	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_LS	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_LS	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_LS	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_MG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_MG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_MG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_MG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_MG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_MG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_MH	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_MH	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_MH	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_MH	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_MH	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_MH	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_MP	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_MP	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_MP	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_MP	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_MP	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_MP	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_MS	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_MS	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_MS	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_MS	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_MS	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_MS	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_MT	2024-01-01	01ˢᵗ January 2024	January	Jan	Monday	Mon
+en_MT	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_MT	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_MT	2024-07-07	07ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_MT	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_MT	2025-01-01	01ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_MU	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_MU	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_MU	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_MU	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_MU	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_MU	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_MW	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_MW	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_MW	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_MW	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_MW	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_MW	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NA	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NA	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NA	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NA	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NA	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NA	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NF	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NF	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NF	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NF	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NF	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NF	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NR	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NR	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NR	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NR	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NR	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NR	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NU	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NU	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NU	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NU	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NU	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NU	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_NZ	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_NZ	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_NZ	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_NZ	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_NZ	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_NZ	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_PG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_PG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_PG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_PG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_PG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_PG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_PH	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_PH	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_PH	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_PH	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_PH	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_PH	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_PK	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_PK	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_PK	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_PK	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_PK	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_PK	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_PN	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_PN	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_PN	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_PN	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_PN	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_PN	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_PR	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_PR	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_PR	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_PR	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_PR	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_PR	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_PW	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_PW	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_PW	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_PW	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_PW	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_PW	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_RW	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_RW	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_RW	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_RW	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_RW	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_RW	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SB	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SB	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SB	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SB	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SB	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SB	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SC	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SC	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SC	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SC	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SC	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SC	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SD	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SD	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SD	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SD	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SD	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SD	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SH	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SH	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SH	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SH	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SH	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SH	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SL	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SL	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SL	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SL	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SL	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SL	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SS	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SS	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SS	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SS	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SS	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SS	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SX	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SX	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SX	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SX	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SX	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SX	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_SZ	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_SZ	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_SZ	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_SZ	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_SZ	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_SZ	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TC	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TC	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TC	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TC	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TC	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TC	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TK	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TK	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TK	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TK	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TK	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TK	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TO	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TO	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TO	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TO	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TO	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TO	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TT	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TT	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TT	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TT	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TT	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TT	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TV	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TV	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TV	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TV	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TV	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TV	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_TZ	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_TZ	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_TZ	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_TZ	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_TZ	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_TZ	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_UG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_UG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_UG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_UG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_UG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_UG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_UM	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_UM	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_UM	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_UM	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_UM	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_UM	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_US	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_US	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_US	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_US	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_US	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_US	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_VC	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_VC	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_VC	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_VC	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_VC	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_VC	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_VG	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_VG	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_VG	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_VG	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_VG	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_VG	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_VI	2024-01-01	January 1ˢᵗ, 2024	January	Jan	Monday	Mon
+en_VI	2024-02-29	February 29ᵗʰ, 2024	February	Feb	Thursday	Thu
+en_VI	2024-06-21	June 21ˢᵗ, 2024	June	Jun	Friday	Fri
+en_VI	2024-07-07	July 7ᵗʰ, 2024	July	Jul	Sunday	Sun
+en_VI	2024-12-31	December 31ˢᵗ, 2024	December	Dec	Tuesday	Tue
+en_VI	2025-01-01	January 1ˢᵗ, 2025	January	Jan	Wednesday	Wed
+en_VU	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_VU	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_VU	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_VU	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_VU	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_VU	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_WS	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_WS	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_WS	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_WS	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_WS	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_WS	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_ZA	2024-01-01	01ˢᵗ January 2024	January	Jan	Monday	Mon
+en_ZA	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_ZA	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_ZA	2024-07-07	07ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_ZA	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_ZA	2025-01-01	01ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_ZM	2024-01-01	1ˢᵗ January 2024	January	Jan	Monday	Mon
+en_ZM	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_ZM	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_ZM	2024-07-07	7ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_ZM	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_ZM	2025-01-01	1ˢᵗ January 2025	January	Jan	Wednesday	Wed
+en_ZW	2024-01-01	01ˢᵗ January 2024	January	Jan	Monday	Mon
+en_ZW	2024-02-29	29ᵗʰ February 2024	February	Feb	Thursday	Thu
+en_ZW	2024-06-21	21ˢᵗ June 2024	June	Jun	Friday	Fri
+en_ZW	2024-07-07	07ᵗʰ July 2024	July	Jul	Sunday	Sun
+en_ZW	2024-12-31	31ˢᵗ December 2024	December	Dec	Tuesday	Tue
+en_ZW	2025-01-01	01ˢᵗ January 2025	January	Jan	Wednesday	Wed
+es_AR	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_AR	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_AR	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_AR	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_AR	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_AR	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_BO	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_BO	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_BO	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_BO	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_BO	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_BO	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_CL	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_CL	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_CL	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_CL	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_CL	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_CL	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_CO	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_CO	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_CO	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_CO	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_CO	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_CO	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_CR	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_CR	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_CR	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_CR	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_CR	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_CR	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_CU	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_CU	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_CU	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_CU	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_CU	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_CU	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_DO	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_DO	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_DO	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_DO	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_DO	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_DO	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_EC	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_EC	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_EC	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_EC	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_EC	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_EC	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_ES	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_ES	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_ES	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_ES	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_ES	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_ES	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_GQ	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_GQ	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_GQ	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_GQ	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_GQ	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_GQ	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_GT	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_GT	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_GT	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_GT	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_GT	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_GT	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_HN	2024-01-01	01 de enero de 2024	enero	ene	lunes	lun
+es_HN	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_HN	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_HN	2024-07-07	07 de julio de 2024	julio	jul	domingo	dom
+es_HN	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_HN	2025-01-01	01 de enero de 2025	enero	ene	miércoles	mié
+es_MX	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_MX	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_MX	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_MX	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_MX	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_MX	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_NI	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_NI	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_NI	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_NI	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_NI	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_NI	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_PA	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_PA	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_PA	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_PA	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_PA	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_PA	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_PE	2024-01-01	1 de enero de 2024	Enero	ene.	lunes	lun
+es_PE	2024-02-29	29 de febrero de 2024	Febrero	feb.	jueves	jue
+es_PE	2024-06-21	21 de junio de 2024	Junio	jun.	viernes	vie
+es_PE	2024-07-07	7 de julio de 2024	Julio	jul.	domingo	dom
+es_PE	2024-12-31	31 de diciembre de 2024	Diciembre	dic.	martes	mar
+es_PE	2025-01-01	1 de enero de 2025	Enero	ene.	miércoles	mié
+es_PR	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_PR	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_PR	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_PR	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_PR	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_PR	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_PY	2024-01-01	1 de enero de 2024	enero	ene.	lunes	lun
+es_PY	2024-02-29	29 de febrero de 2024	febrero	feb.	jueves	jue
+es_PY	2024-06-21	21 de junio de 2024	junio	jun.	viernes	vie
+es_PY	2024-07-07	7 de julio de 2024	julio	jul.	domingo	dom
+es_PY	2024-12-31	31 de diciembre de 2024	diciembre	dic.	martes	mar
+es_PY	2025-01-01	1 de enero de 2025	enero	ene.	miércoles	mié
+es_SV	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_SV	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_SV	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_SV	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_SV	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_SV	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_US	2024-01-01	1 de enero de 2024	enero	ene	lunes	lun
+es_US	2024-02-29	29 de febrero de 2024	febrero	feb	jueves	jue
+es_US	2024-06-21	21 de junio de 2024	junio	jun	viernes	vie
+es_US	2024-07-07	7 de julio de 2024	julio	jul	domingo	dom
+es_US	2024-12-31	31 de diciembre de 2024	diciembre	dic	martes	mar
+es_US	2025-01-01	1 de enero de 2025	enero	ene	miércoles	mié
+es_UY	2024-01-01	1 de enero de 2024	Enero	ene.	lunes	lun
+es_UY	2024-02-29	29 de febrero de 2024	Febrero	feb.	jueves	jue
+es_UY	2024-06-21	21 de junio de 2024	Junio	jun.	viernes	vie
+es_UY	2024-07-07	7 de julio de 2024	Julio	jul.	domingo	dom
+es_UY	2024-12-31	31 de diciembre de 2024	Diciembre	dic.	martes	mar
+es_UY	2025-01-01	1 de enero de 2025	Enero	ene.	miércoles	mié
+es_VE	2024-01-01	1 de enero de 2024	enero	ene.	lunes	lun
+es_VE	2024-02-29	29 de febrero de 2024	febrero	feb.	jueves	jue
+es_VE	2024-06-21	21 de junio de 2024	junio	jun.	viernes	vie
+es_VE	2024-07-07	7 de julio de 2024	julio	jul.	domingo	dom
+es_VE	2024-12-31	31 de diciembre de 2024	diciembre	dic.	martes	mar
+es_VE	2025-01-01	1 de enero de 2025	enero	ene.	miércoles	mié
+et_EE	2024-01-01	1. jaanuar 2024	jaanuar	jaan	esmaspäev	E
+et_EE	2024-02-29	29. veebruar 2024	veebruar	veebr	neljapäev	N
+et_EE	2024-06-21	21. juuni 2024	juuni	juuni	reede	R
+et_EE	2024-07-07	7. juuli 2024	juuli	juuli	pühapäev	P
+et_EE	2024-12-31	31. detsember 2024	detsember	dets	teisipäev	T
+et_EE	2025-01-01	1. jaanuar 2025	jaanuar	jaan	kolmapäev	K
+eu_ES	2024-01-01	2024(e)ko urtarrilaren 1(a)	urtarrila	urt.	astelehena	al.
+eu_ES	2024-02-29	2024(e)ko otsailaren 29(a)	otsaila	ots.	osteguna	og.
+eu_ES	2024-06-21	2024(e)ko ekainaren 21(a)	ekaina	eka.	ostirala	or.
+eu_ES	2024-07-07	2024(e)ko uztailaren 7(a)	uztaila	uzt.	igandea	ig.
+eu_ES	2024-12-31	2024(e)ko abenduaren 31(a)	abendua	abe.	asteartea	ar.
+eu_ES	2025-01-01	2025(e)ko urtarrilaren 1(a)	urtarrila	urt.	asteazkena	az.
+fa_AF	2024-01-01	1 جنوری 2024	جنوری	جنو	دوشنبه	دوشنبه
+fa_AF	2024-02-29	29 فبروری 2024	فبروری	فبروری	پنجشنبه	پنجشنبه
+fa_AF	2024-06-21	21 جون 2024	جون	جون	جمعه	جمعه
+fa_AF	2024-07-07	7 جولای 2024	جولای	جول	یکشنبه	یکشنبه
+fa_AF	2024-12-31	31 دسمبر 2024	دسمبر	دسم	سه‌شنبه	سه‌شنبه
+fa_AF	2025-01-01	1 جنوری 2025	جنوری	جنو	چهارشنبه	چهارشنبه
+fa_IR	2024-01-01	1 ژانویهٔ 2024	ژانویه	ژانویه	دوشنبه	دوشنبه
+fa_IR	2024-02-29	29 فوریهٔ 2024	فوریه	فوریه	پنجشنبه	پنجشنبه
+fa_IR	2024-06-21	21 ژوئن 2024	ژوئن	ژوئن	جمعه	جمعه
+fa_IR	2024-07-07	7 ژوئیهٔ 2024	ژوئیه	ژوئیه	یکشنبه	یکشنبه
+fa_IR	2024-12-31	31 دسامبر 2024	دسامبر	دسامبر	سه‌شنبه	سه‌شنبه
+fa_IR	2025-01-01	1 ژانویهٔ 2025	ژانویه	ژانویه	چهارشنبه	چهارشنبه
+ff_Latn_SN	2024-01-01	1 siilo 2024	siilo	sii	aaɓnde	aaɓ
+ff_Latn_SN	2024-02-29	29 colte 2024	colte	col	naasaande	naa
+ff_Latn_SN	2024-06-21	21 korse 2024	korse	kor	mawnde	mwd
+ff_Latn_SN	2024-07-07	7 morso 2024	morso	mor	dewo	dew
+ff_Latn_SN	2024-12-31	31 bowte 2024	bowte	bow	mawbaare	maw
+ff_Latn_SN	2025-01-01	1 siilo 2025	siilo	sii	njeslaare	nje
+fi	2024-01-01	1. tammikuuta 2024	tammikuu	tammi	maanantaina	ma
+fi	2024-02-29	29. helmikuuta 2024	helmikuu	helmi	torstaina	to
+fi	2024-06-21	21. kesäkuuta 2024	kesäkuu	kesä	perjantaina	pe
+fi	2024-07-07	7. heinäkuuta 2024	heinäkuu	heinä	sunnuntai	su
+fi	2024-12-31	31. joulukuuta 2024	joulukuu	joulu	tiistaina	ti
+fi	2025-01-01	1. tammikuuta 2025	tammikuu	tammi	keskiviikkona	ke
+fi_FI	2024-01-01	1. tammikuuta 2024	tammikuu	tammi	maanantaina	ma
+fi_FI	2024-02-29	29. helmikuuta 2024	helmikuu	helmi	torstaina	to
+fi_FI	2024-06-21	21. kesäkuuta 2024	kesäkuu	kesä	perjantaina	pe
+fi_FI	2024-07-07	7. heinäkuuta 2024	heinäkuu	heinä	sunnuntai	su
+fi_FI	2024-12-31	31. joulukuuta 2024	joulukuu	joulu	tiistaina	ti
+fi_FI	2025-01-01	1. tammikuuta 2025	tammikuu	tammi	keskiviikkona	ke
+fil_PH	2024-01-01	Enero 1, 2024	Enero	Ene	Lunes	Lun
+fil_PH	2024-02-29	Pebrero 29, 2024	Pebrero	Peb	Huwebes	Huw
+fil_PH	2024-06-21	Hunyo 21, 2024	Hunyo	Hun	Biyernes	Biy
+fil_PH	2024-07-07	Hulyo 7, 2024	Hulyo	Hul	Linggo	Lin
+fil_PH	2024-12-31	Disyembre 31, 2024	Disyembre	Dis	Martes	Mar
+fil_PH	2025-01-01	Enero 1, 2025	Enero	Ene	Miyerkules	Miy
+fo_FO	2024-01-01	1. januar 2024	januar	jan.	mánadagur	mán.
+fo_FO	2024-02-29	29. februar 2024	februar	feb.	hósdagur	hós.
+fo_FO	2024-06-21	21. juni 2024	juni	jun.	fríggjadagur	frí.
+fo_FO	2024-07-07	7. juli 2024	juli	jul.	sunnudagur	sun.
+fo_FO	2024-12-31	31. desember 2024	desember	des.	týsdagur	týs.
+fo_FO	2025-01-01	1. januar 2025	januar	jan.	mikudagur	mik.
+fr	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_BE	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_BE	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_BE	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_BE	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_BE	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_BE	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_BF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_BF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_BF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_BF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_BF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_BF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_BI	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_BI	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_BI	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_BI	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_BI	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_BI	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_BJ	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_BJ	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_BJ	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_BJ	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_BJ	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_BJ	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_BL	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_BL	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_BL	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_BL	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_BL	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_BL	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CA	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CA	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CA	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CA	2024-07-07	7 juillet 2024	juillet	juill.	dimanche	dim.
+fr_CA	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CA	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CD	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CD	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CD	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CD	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CD	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CD	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CG	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CG	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CG	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CG	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CG	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CG	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CH	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CH	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CH	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CH	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CH	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CH	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CI	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CI	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CI	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CI	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CI	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CI	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_CM	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_CM	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_CM	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_CM	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_CM	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_CM	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_DJ	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_DJ	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_DJ	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_DJ	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_DJ	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_DJ	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_DZ	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_DZ	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_DZ	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_DZ	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_DZ	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_DZ	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_FR	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_FR	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_FR	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_FR	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_FR	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_FR	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_GA	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_GA	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_GA	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_GA	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_GA	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_GA	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_GF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_GF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_GF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_GF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_GF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_GF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_GN	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_GN	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_GN	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_GN	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_GN	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_GN	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_GP	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_GP	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_GP	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_GP	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_GP	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_GP	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_GQ	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_GQ	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_GQ	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_GQ	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_GQ	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_GQ	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_HT	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_HT	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_HT	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_HT	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_HT	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_HT	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_KM	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_KM	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_KM	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_KM	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_KM	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_KM	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_LU	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_LU	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_LU	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_LU	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_LU	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_LU	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_MA	2024-01-01	1ᵉʳ janvier 2024	janvier	jan.	lundi	lun.
+fr_MA	2024-02-29	29 février 2024	février	fév.	jeudi	jeu.
+fr_MA	2024-06-21	21 juin 2024	juin	jui.	vendredi	ven.
+fr_MA	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MA	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MA	2025-01-01	1ᵉʳ janvier 2025	janvier	jan.	mercredi	mer.
+fr_MC	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_MC	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_MC	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_MC	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MC	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MC	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_MF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_MF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_MF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_MF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_MG	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_MG	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_MG	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_MG	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MG	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MG	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_ML	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_ML	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_ML	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_ML	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_ML	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_ML	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_MQ	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_MQ	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_MQ	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_MQ	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MQ	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MQ	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_MU	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_MU	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_MU	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_MU	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_MU	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_MU	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_NC	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_NC	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_NC	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_NC	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_NC	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_NC	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_NE	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_NE	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_NE	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_NE	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_NE	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_NE	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_PF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_PF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_PF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_PF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_PF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_PF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_PM	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_PM	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_PM	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_PM	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_PM	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_PM	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_RE	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_RE	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_RE	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_RE	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_RE	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_RE	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_RW	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_RW	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_RW	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_RW	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_RW	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_RW	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_SC	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_SC	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_SC	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_SC	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_SC	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_SC	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_SN	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_SN	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_SN	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_SN	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_SN	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_SN	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_SY	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_SY	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_SY	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_SY	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_SY	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_SY	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_TD	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_TD	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_TD	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_TD	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_TD	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_TD	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_TG	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_TG	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_TG	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_TG	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_TG	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_TG	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_TN	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_TN	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_TN	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_TN	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_TN	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_TN	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_VU	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_VU	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_VU	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_VU	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_VU	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_VU	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_WF	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_WF	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_WF	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_WF	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_WF	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_WF	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+fr_YT	2024-01-01	1ᵉʳ janvier 2024	janvier	janv.	lundi	lun.
+fr_YT	2024-02-29	29 février 2024	février	févr.	jeudi	jeu.
+fr_YT	2024-06-21	21 juin 2024	juin	juin	vendredi	ven.
+fr_YT	2024-07-07	7 juillet 2024	juillet	juil.	dimanche	dim.
+fr_YT	2024-12-31	31 décembre 2024	décembre	déc.	mardi	mar.
+fr_YT	2025-01-01	1ᵉʳ janvier 2025	janvier	janv.	mercredi	mer.
+frr_DE	2024-01-01	1. Janewoore 2024	Janewoore	Jan	Mundai	Mun
+frr_DE	2024-02-29	29. Febrewoore 2024	Febrewoore	Feb	Tüürsdai	Tür
+frr_DE	2024-06-21	21. Jüüne 2024	Jüüne	Jün	Freidai	Fre
+frr_DE	2024-07-07	7. Jüüle 2024	Jüüle	Jül	Söndai	Sön
+frr_DE	2024-12-31	31. Detsember 2024	Detsember	Det	Teisdai	Tei
+frr_DE	2025-01-01	1. Janewoore 2025	Janewoore	Jan	Weedensdai	Wed
+fy_NL	2024-01-01	1 Jannewaris 2024	Jannewaris	Jan	moandei	mo
+fy_NL	2024-02-29	29 Febrewaris 2024	Febrewaris	Feb	tongersdei	to
+fy_NL	2024-06-21	21 Juny 2024	Juny	Jun	freed	fr
+fy_NL	2024-07-07	7 July 2024	July	Jul	snein	si
+fy_NL	2024-12-31	31 Desimber 2024	Desimber	Des	tiisdei	ti
+fy_NL	2025-01-01	1 Jannewaris 2025	Jannewaris	Jan	woansdei	wo
+ga_GB	2024-01-01	1 Eanáir 2024	Eanáir	Ean	Dé Luain	Luan
+ga_GB	2024-02-29	29 Feabhra 2024	Feabhra	Feabh	Déardaoin	Déar
+ga_GB	2024-06-21	21 Meitheamh 2024	Meitheamh	Meith	Dé hAoine	Aoine
+ga_GB	2024-07-07	7 Iúil 2024	Iúil	Iúil	Dé Domhnaigh	Domh
+ga_GB	2024-12-31	31 Nollaig 2024	Nollaig	Noll	Dé Máirt	Máirt
+ga_GB	2025-01-01	1 Eanáir 2025	Eanáir	Ean	Dé Céadaoin	Céad
+ga_IE	2024-01-01	1 Eanáir 2024	Eanáir	Ean	Dé Luain	Luan
+ga_IE	2024-02-29	29 Feabhra 2024	Feabhra	Feabh	Déardaoin	Déar
+ga_IE	2024-06-21	21 Meitheamh 2024	Meitheamh	Meith	Dé hAoine	Aoine
+ga_IE	2024-07-07	7 Iúil 2024	Iúil	Iúil	Dé Domhnaigh	Domh
+ga_IE	2024-12-31	31 Nollaig 2024	Nollaig	Noll	Dé Máirt	Máirt
+ga_IE	2025-01-01	1 Eanáir 2025	Eanáir	Ean	Dé Céadaoin	Céad
+gaa_GH	2024-01-01	Aharabata 1, 2024	Aharabata	Aha	Ju	Ju
+gaa_GH	2024-02-29	Oflɔ 29, 2024	Oflɔ	Ofl	Soo	Soo
+gaa_GH	2024-06-21	Otukwajaŋ 21, 2024	Otukwajan	Otu	Sohaa	Soh
+gaa_GH	2024-07-07	Maawɛ 7, 2024	Maawɛ	Maa	Hɔgbaa	Hɔg
+gaa_GH	2024-12-31	Afuabe 31, 2024	Afuabe	Afu	Jufɔ	Juf
+gaa_GH	2025-01-01	Aharabata 1, 2025	Aharabata	Aha	Shɔ	Shɔ
+gd_GB	2024-01-01	1mh dhen Fhaoilleach 2024	Am Faoilleach	Faoi	DiLuain	DiL
+gd_GB	2024-02-29	29mh dhen Ghearran 2024	An Gearran	Gearr	DiarDaoin	Dia
+gd_GB	2024-06-21	21mh dhen Ògmhios 2024	An t-Ògmhios	Ògmh	DihAoine	Dih
+gd_GB	2024-07-07	7mh dhen Iuchar 2024	An t-Iuchar	Iuch	DiDòmhnaich	DiD
+gd_GB	2024-12-31	31mh dhen Dùbhlachd 2024	An Dùbhlachd	Dùbh	DiMàirt	DiM
+gd_GB	2025-01-01	1mh dhen Fhaoilleach 2025	Am Faoilleach	Faoi	DiCiadain	DiC
+gl_ES	2024-01-01	1 de xaneiro de 2024	xaneiro	xan.	luns	luns
+gl_ES	2024-02-29	29 de febreiro de 2024	febreiro	feb.	xoves	xov.
+gl_ES	2024-06-21	21 de xuño de 2024	xuño	xuño	venres	ven.
+gl_ES	2024-07-07	7 de xullo de 2024	xullo	xul.	domingo	dom.
+gl_ES	2024-12-31	31 de decembro de 2024	decembro	dec.	martes	mar.
+gl_ES	2025-01-01	1 de xaneiro de 2025	xaneiro	xan.	mércores	mér.
+gn_PY	2024-01-01	2024 Jasyteĩ 1	Jasyteĩ	Jasyteĩ	Arakõi	Arakõi
+gn_PY	2024-02-29	2024 Jasykõi 29	Jasykõi	Jasykõi	Arapo	Arapo
+gn_PY	2024-06-21	2024 Jasypoteĩ 21	Jasypoteĩ	Jasypoteĩ	Arapoteĩ	Arapoteĩ
+gn_PY	2024-07-07	2024 Jasypokõi 7	Jasypokõi	Jasypokõi	Arateĩ	Arateĩ
+gn_PY	2024-12-31	2024 Jasypakõi 31	Jasypakõi	Jasypakõi	Araapy	Araapy
+gn_PY	2025-01-01	2025 Jasyteĩ 1	Jasyteĩ	Jasyteĩ	Ararundy	Ararundy
+gsw_CH	2024-01-01	1. Januar 2024	Januar	Jan	Määntig	Mä.
+gsw_CH	2024-02-29	29. Februar 2024	Februar	Feb	Dunschtig	Du.
+gsw_CH	2024-06-21	21. Juni 2024	Juni	Jun	Friitig	Fr.
+gsw_CH	2024-07-07	7. Juli 2024	Juli	Jul	Sunntig	Su.
+gsw_CH	2024-12-31	31. Dezämber 2024	Dezämber	Dez	Ziischtig	Zi.
+gsw_CH	2025-01-01	1. Januar 2025	Januar	Jan	Mittwuch	Mi.
+gsw_LI	2024-01-01	1. Januar 2024	Januar	Jan	Määntig	Mä.
+gsw_LI	2024-02-29	29. Februar 2024	Februar	Feb	Dunschtig	Du.
+gsw_LI	2024-06-21	21. Juni 2024	Juni	Jun	Friitig	Fr.
+gsw_LI	2024-07-07	7. Juli 2024	Juli	Jul	Sunntig	Su.
+gsw_LI	2024-12-31	31. Dezämber 2024	Dezämber	Dez	Ziischtig	Zi.
+gsw_LI	2025-01-01	1. Januar 2025	Januar	Jan	Mittwuch	Mi.
+gu_IN	2024-01-01	1 જાન્યુઆરી, 2024	જાન્યુઆરી	જાન્યુ	સોમવાર	સોમ
+gu_IN	2024-02-29	29 ફેબ્રુઆરી, 2024	ફેબ્રુઆરી	ફેબ્રુ	ગુરુવાર	ગુરુ
+gu_IN	2024-06-21	21 જૂન, 2024	જૂન	જૂન	શુક્રવાર	શુક્ર
+gu_IN	2024-07-07	7 જુલાઈ, 2024	જુલાઈ	જુલાઈ	રવિવાર	રવિ
+gu_IN	2024-12-31	31 ડિસેમ્બર, 2024	ડિસેમ્બર	ડિસે	મંગળવાર	મંગળ
+gu_IN	2025-01-01	1 જાન્યુઆરી, 2025	જાન્યુઆરી	જાન્યુ	બુધવાર	બુધ
+gv_IM	2024-01-01	01 Jerrey-geuree 2024	Jerrey-geuree	J-guer	Jelhein	Jel
+gv_IM	2024-02-29	29 Toshiaght-arree 2024	Toshiaght-arree	T-arree	Jerdein	Jerd
+gv_IM	2024-06-21	21 Mean-souree 2024	Mean-souree	M-souree	Jeheiney	Jeh
+gv_IM	2024-07-07	07 Jerrey-souree 2024	Jerrey-souree	J-souree	Jedoonee	Jed
+gv_IM	2024-12-31	31 Mee ny Nollick 2024	Mee ny Nollick	M-Nollick	Jemayrt	Jem
+gv_IM	2025-01-01	01 Jerrey-geuree 2025	Jerrey-geuree	J-guer	Jercean	Jerc
+ha_NE	2024-01-01	1 Janairu, 2024	Janairu	Jan	Litinin	Lit
+ha_NE	2024-02-29	29 Faburairu, 2024	Faburairu	Fab	Alhamis	Alh
+ha_NE	2024-06-21	21 Yuni, 2024	Yuni	Yun	Jummaʼa	Jum
+ha_NE	2024-07-07	7 Yuli, 2024	Yuli	Yul	Lahadi	Lah
+ha_NE	2024-12-31	31 Disamba, 2024	Disamba	Dis	Talata	Tal
+ha_NE	2025-01-01	1 Janairu, 2025	Janairu	Jan	Laraba	Lar
+haw_US	2024-01-01	1 Ianuali 2024	Ianuali	Ian.	Poʻakahi	P1
+haw_US	2024-02-29	29 Pepeluali 2024	Pepeluali	Pep.	Poʻahā	P4
+haw_US	2024-06-21	21 Iune 2024	Iune	Iun.	Poʻalima	P5
+haw_US	2024-07-07	7 Iulai 2024	Iulai	Iul.	Lāpule	LP
+haw_US	2024-12-31	31 Kekemapa 2024	Kekemapa	Kek.	Poʻalua	P2
+haw_US	2025-01-01	1 Ianuali 2025	Ianuali	Ian.	Poʻakolu	P3
+he	2024-01-01	20 בטבת 5784	ינואר	ינו׳	יום שני	יום ב׳
+he	2024-02-29	20 באדר א׳ 5784	פברואר	פבר׳	יום חמישי	יום ה׳
+he	2024-06-21	15 בסיוון 5784	יוני	יוני	יום שישי	יום ו׳
+he	2024-07-07	1 בתמוז 5784	יולי	יולי	יום ראשון	יום א׳
+he	2024-12-31	30 בכסלו 5785	דצמבר	דצמ׳	יום שלישי	יום ג׳
+he	2025-01-01	1 בטבת 5785	ינואר	ינו׳	יום רביעי	יום ד׳
+he_IL	2024-01-01	20 בטבת 5784	ינואר	ינו׳	יום שני	יום ב׳
+he_IL	2024-02-29	20 באדר א׳ 5784	פברואר	פבר׳	יום חמישי	יום ה׳
+he_IL	2024-06-21	15 בסיוון 5784	יוני	יוני	יום שישי	יום ו׳
+he_IL	2024-07-07	1 בתמוז 5784	יולי	יולי	יום ראשון	יום א׳
+he_IL	2024-12-31	30 בכסלו 5785	דצמבר	דצמ׳	יום שלישי	יום ג׳
+he_IL	2025-01-01	1 בטבת 5785	ינואר	ינו׳	יום רביעי	יום ד׳
+hi_IN	2024-01-01	1 जनवरी 2024	जनवरी	जन॰	सोमवार	सोम
+hi_IN	2024-02-29	29 फ़रवरी 2024	फ़रवरी	फ़र॰	गुरुवार	गुरु
+hi_IN	2024-06-21	21 जून 2024	जून	जून	शुक्रवार	शुक्र
+hi_IN	2024-07-07	7 जुलाई 2024	जुलाई	जुल॰	रविवार	रवि
+hi_IN	2024-12-31	31 दिसंबर 2024	दिसंबर	दिस॰	मंगलवार	मंगल
+hi_IN	2025-01-01	1 जनवरी 2025	जनवरी	जन॰	बुधवार	बुध
+hr	2024-01-01	1. siječnja 2024.	siječanj	sij	ponedjeljak	pon
+hr	2024-02-29	29. veljače 2024.	veljača	velj	četvrtak	čet
+hr	2024-06-21	21. lipnja 2024.	lipanj	lip	petak	pet
+hr	2024-07-07	7. srpnja 2024.	srpanj	srp	nedjelja	ned
+hr	2024-12-31	31. prosinca 2024.	prosinac	pro	utorak	uto
+hr	2025-01-01	1. siječnja 2025.	siječanj	sij	srijeda	sri
+hr_BA	2024-01-01	1. siječnja 2024.	siječanj	sij	ponedjeljak	pon
+hr_BA	2024-02-29	29. veljače 2024.	veljača	velj	četvrtak	čet
+hr_BA	2024-06-21	21. lipnja 2024.	lipanj	lip	petak	pet
+hr_BA	2024-07-07	7. srpnja 2024.	srpanj	srp	nedjelja	ned
+hr_BA	2024-12-31	31. prosinca 2024.	prosinac	pro	utorak	uto
+hr_BA	2025-01-01	1. siječnja 2025.	siječanj	sij	srijeda	sri
+hr_HR	2024-01-01	1. siječnja 2024.	siječanj	sij	ponedjeljak	pon
+hr_HR	2024-02-29	29. veljače 2024.	veljača	velj	četvrtak	čet
+hr_HR	2024-06-21	21. lipnja 2024.	lipanj	lip	petak	pet
+hr_HR	2024-07-07	7. srpnja 2024.	srpanj	srp	nedjelja	ned
+hr_HR	2024-12-31	31. prosinca 2024.	prosinac	pro	utorak	uto
+hr_HR	2025-01-01	1. siječnja 2025.	siječanj	sij	srijeda	sri
+hu	2024-01-01	2024. január 1.	január	jan.	hétfő	H
+hu	2024-02-29	2024. február 29.	február	febr.	csütörtök	Cs
+hu	2024-06-21	2024. június 21.	június	jún.	péntek	P
+hu	2024-07-07	2024. július 7.	július	júl.	vasárnap	V
+hu	2024-12-31	2024. december 31.	december	dec.	kedd	K
+hu	2025-01-01	2025. január 1.	január	jan.	szerda	Sze
+hu_HU	2024-01-01	2024. január 1.	január	jan.	hétfő	H
+hu_HU	2024-02-29	2024. február 29.	február	febr.	csütörtök	Cs
+hu_HU	2024-06-21	2024. június 21.	június	jún.	péntek	P
+hu_HU	2024-07-07	2024. július 7.	július	júl.	vasárnap	V
+hu_HU	2024-12-31	2024. december 31.	december	dec.	kedd	K
+hu_HU	2025-01-01	2025. január 1.	január	jan.	szerda	Sze
+hy_AM	2024-01-01	01 հունվարի, 2024 թ.	հունվար	հնվ	երկուշաբթի	երկ
+hy_AM	2024-02-29	29 փետրվարի, 2024 թ.	փետրվար	փտվ	հինգշաբթի	հնգ
+hy_AM	2024-06-21	21 հունիսի, 2024 թ.	հունիս	հնս	ուրբաթ	ուր
+hy_AM	2024-07-07	07 հուլիսի, 2024 թ.	հուլիս	հլս	կիրակի	կիր
+hy_AM	2024-12-31	31 դեկտեմբերի, 2024 թ.	դեկտեմբեր	դեկ	երեքշաբթի	երք
+hy_AM	2025-01-01	01 հունվարի, 2025 թ.	հունվար	հնվ	չորեքշաբթի	չրք
+id_ID	2024-01-01	1 Januari 2024	Januari	Jan	Senin	Sen
+id_ID	2024-02-29	29 Februari 2024	Februari	Feb	Kamis	Kam
+id_ID	2024-06-21	21 Juni 2024	Juni	Jun	Jumat	Jum
+id_ID	2024-07-07	7 Juli 2024	Juli	Jul	Minggu	Min
+id_ID	2024-12-31	31 Desember 2024	Desember	Des	Selasa	Sel
+id_ID	2025-01-01	1 Januari 2025	Januari	Jan	Rabu	Rab
+is_IS	2024-01-01	1. janúar 2024	janúar	jan.	mánudagur	mán.
+is_IS	2024-02-29	29. febrúar 2024	febrúar	feb.	fimmtudagur	fim.
+is_IS	2024-06-21	21. júní 2024	júní	jún.	föstudagur	fös.
+is_IS	2024-07-07	7. júlí 2024	júlí	júl.	sunnudagur	sun.
+is_IS	2024-12-31	31. desember 2024	desember	des.	þriðjudagur	þri.
+is_IS	2025-01-01	1. janúar 2025	janúar	jan.	miðvikudagur	mið.
+it	2024-01-01	1 gennaio 2024	gennaio	gen	lunedì	lun
+it	2024-02-29	29 febbraio 2024	febbraio	feb	giovedì	gio
+it	2024-06-21	21 giugno 2024	giugno	giu	venerdì	ven
+it	2024-07-07	7 luglio 2024	luglio	lug	domenica	dom
+it	2024-12-31	31 dicembre 2024	dicembre	dic	martedì	mar
+it	2025-01-01	1 gennaio 2025	gennaio	gen	mercoledì	mer
+it_CH	2024-01-01	1 gennaio 2024	gennaio	gen	lunedì	lun
+it_CH	2024-02-29	29 febbraio 2024	febbraio	feb	giovedì	gio
+it_CH	2024-06-21	21 giugno 2024	giugno	giu	venerdì	ven
+it_CH	2024-07-07	7 luglio 2024	luglio	lug	domenica	dom
+it_CH	2024-12-31	31 dicembre 2024	dicembre	dic	martedì	mar
+it_CH	2025-01-01	1 gennaio 2025	gennaio	gen	mercoledì	mer
+it_IT	2024-01-01	1 gennaio 2024	gennaio	gen	lunedì	lun
+it_IT	2024-02-29	29 febbraio 2024	febbraio	feb	giovedì	gio
+it_IT	2024-06-21	21 giugno 2024	giugno	giu	venerdì	ven
+it_IT	2024-07-07	7 luglio 2024	luglio	lug	domenica	dom
+it_IT	2024-12-31	31 dicembre 2024	dicembre	dic	martedì	mar
+it_IT	2025-01-01	1 gennaio 2025	gennaio	gen	mercoledì	mer
+it_SM	2024-01-01	1 gennaio 2024	gennaio	gen	lunedì	lun
+it_SM	2024-02-29	29 febbraio 2024	febbraio	feb	giovedì	gio
+it_SM	2024-06-21	21 giugno 2024	giugno	giu	venerdì	ven
+it_SM	2024-07-07	7 luglio 2024	luglio	lug	domenica	dom
+it_SM	2024-12-31	31 dicembre 2024	dicembre	dic	martedì	mar
+it_SM	2025-01-01	1 gennaio 2025	gennaio	gen	mercoledì	mer
+it_VA	2024-01-01	1 gennaio 2024	gennaio	gen	lunedì	lun
+it_VA	2024-02-29	29 febbraio 2024	febbraio	feb	giovedì	gio
+it_VA	2024-06-21	21 giugno 2024	giugno	giu	venerdì	ven
+it_VA	2024-07-07	7 luglio 2024	luglio	lug	domenica	dom
+it_VA	2024-12-31	31 dicembre 2024	dicembre	dic	martedì	mar
+it_VA	2025-01-01	1 gennaio 2025	gennaio	gen	mercoledì	mer
+iu_CA	2024-01-01	ᔭᓐᓄᐊᓕ 1, 2024	ᔭᓐᓄᐊᓕ	ᔭᓐᓄᐊᓕ	ᓇᒡᒐᔾᔭᐅ	ᓇᒡᒐᔾᔭᐅ
+iu_CA	2024-02-29	ᕕᕝᕗᐊᓕ 29, 2024	ᕕᕝᕗᐊᓕ	ᕕᕝᕗᐊᓕ	ᓯᑕᒻᒥᖅ	ᓯᑕᒻᒥᖅ
+iu_CA	2024-06-21	ᔫᓂ 21, 2024	ᔫᓂ	ᔫᓂ	ᑕᓪᓕᒻᒥᐅᑦ	ᑕᓪᓕᒻᒥᐅᑦ
+iu_CA	2024-07-07	ᔪᓚᐃ 7, 2024	ᔪᓚᐃ	ᔪᓚᐃ	ᓈᑦᑏᖑᔭᖅ	ᓈᑦᑏᖑᔭᖅ
+iu_CA	2024-12-31	ᑎᓯᐱᕆ 31, 2024	ᑎᓯᐱᕆ	ᑎᓯᐱᕆ	ᓇᒡᒐᔾᔭᐅᓕᖅᑭ	ᓇᒡᒐᔾᔭᐅᓕᖅᑭ
+iu_CA	2025-01-01	ᔭᓐᓄᐊᓕ 1, 2025	ᔭᓐᓄᐊᓕ	ᔭᓐᓄᐊᓕ	ᐱᖓᑦᓯᖅ	ᐱᖓᑦᓯᖅ
+iu_Latn_CA	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+iu_Latn_CA	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+iu_Latn_CA	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+iu_Latn_CA	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+iu_Latn_CA	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+iu_Latn_CA	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+ja_JP	2024-01-01	2024年1月1日	1月	1月	月曜日	月
+ja_JP	2024-02-29	2024年2月29日	2月	2月	木曜日	木
+ja_JP	2024-06-21	2024年6月21日	6月	6月	金曜日	金
+ja_JP	2024-07-07	2024年7月7日	7月	7月	日曜日	日
+ja_JP	2024-12-31	2024年12月31日	12月	12月	火曜日	火
+ja_JP	2025-01-01	2025年1月1日	1月	1月	水曜日	水
+ka_GE	2024-01-01	1 იანვარი, 2024	იანვარი	იან	ორშაბათი	ორშ
+ka_GE	2024-02-29	29 თებერვალი, 2024	თებერვალი	თებ	ხუთშაბათი	ხუთ
+ka_GE	2024-06-21	21 ივნისი, 2024	ივნისი	ივნ	პარასკევი	პარ
+ka_GE	2024-07-07	7 ივლისი, 2024	ივლისი	ივლ	კვირა	კვი
+ka_GE	2024-12-31	31 დეკემბერი, 2024	დეკემბერი	დეკ	სამშაბათი	სამ
+ka_GE	2025-01-01	1 იანვარი, 2025	იანვარი	იან	ოთხშაბათი	ოთხ
+kk_KZ	2024-01-01	2024 ж. 1 қаңтар	Қаңтар	қаң.	дүйсенбі	дс
+kk_KZ	2024-02-29	2024 ж. 29 ақпан	Ақпан	ақп.	бейсенбі	бс
+kk_KZ	2024-06-21	2024 ж. 21 маусым	Маусым	мау.	жұма	жм
+kk_KZ	2024-07-07	2024 ж. 7 шілде	Шілде	шіл.	жексенбі	жс
+kk_KZ	2024-12-31	2024 ж. 31 желтоқсан	Желтоқсан	жел.	сейсенбі	сс
+kk_KZ	2025-01-01	2025 ж. 1 қаңтар	Қаңтар	қаң.	сәрсенбі	ср
+kl	2024-01-01	01 januaarip 2024	januaari	jan	ataasinngorneq	ata
+kl	2024-02-29	29 februaarip 2024	februaari	febr	sisamanngorneq	sis
+kl	2024-06-21	21 juunip 2024	juuni	jun	tallimanngorneq	tal
+kl	2024-07-07	07 juulip 2024	juuli	jul	sapaat	sap
+kl	2024-12-31	31 decembarip 2024	decembari	dec	marlunngorneq	mar
+kl	2025-01-01	01 januaarip 2025	januaari	jan	pingasunngorneq	pin
+kl_GL	2024-01-01	01 januaarip 2024	januaari	jan	ataasinngorneq	ata
+kl_GL	2024-02-29	29 februaarip 2024	februaari	febr	sisamanngorneq	sis
+kl_GL	2024-06-21	21 juunip 2024	juuni	jun	tallimanngorneq	tal
+kl_GL	2024-07-07	07 juulip 2024	juuli	jul	sapaat	sap
+kl_GL	2024-12-31	31 decembarip 2024	decembari	dec	marlunngorneq	mar
+kl_GL	2025-01-01	01 januaarip 2025	januaari	jan	pingasunngorneq	pin
+km_KH	2024-01-01	1 មករា 2024	មករា	មករា	ច័ន្ទ	ចន្ទ
+km_KH	2024-02-29	29 កុម្ភៈ 2024	កុម្ភៈ	កុម្ភៈ	ព្រហស្បតិ៍	ព្រហ
+km_KH	2024-06-21	21 មិថុនា 2024	មិថុនា	មិថុនា	សុក្រ	សុក្រ
+km_KH	2024-07-07	7 កក្កដា 2024	កក្កដា	កក្កដា	អាទិត្យ	អាទិត្យ
+km_KH	2024-12-31	31 ធ្នូ 2024	ធ្នូ	ធ្នូ	អង្គារ	អង្គារ
+km_KH	2025-01-01	1 មករា 2025	មករា	មករា	ពុធ	ពុធ
+kn_IN	2024-01-01	ಜನವರಿ 1, 2024	ಜನವರಿ	ಜನ	ಸೋಮವಾರ	ಸೋಮ
+kn_IN	2024-02-29	ಫೆಬ್ರವರಿ 29, 2024	ಫೆಬ್ರವರಿ	ಫೆಬ್ರ	ಗುರುವಾರ	ಗುರು
+kn_IN	2024-06-21	ಜೂನ್ 21, 2024	ಜೂನ್	ಜೂನ್	ಶುಕ್ರವಾರ	ಶುಕ್ರ
+kn_IN	2024-07-07	ಜುಲೈ 7, 2024	ಜುಲೈ	ಜುಲೈ	ಭಾನುವಾರ	ಭಾನು
+kn_IN	2024-12-31	ಡಿಸೆಂಬರ್ 31, 2024	ಡಿಸೆಂಬರ್	ಡಿಸೆಂ	ಮಂಗಳವಾರ	ಮಂಗಳ
+kn_IN	2025-01-01	ಜನವರಿ 1, 2025	ಜನವರಿ	ಜನ	ಬುಧವಾರ	ಬುಧ
+ko_CN	2024-01-01	2024년 1월 1일	1월	1월	월요일	월
+ko_CN	2024-02-29	2024년 2월 29일	2월	2월	목요일	목
+ko_CN	2024-06-21	2024년 6월 21일	6월	6월	금요일	금
+ko_CN	2024-07-07	2024년 7월 7일	7월	7월	일요일	일
+ko_CN	2024-12-31	2024년 12월 31일	12월	12월	화요일	화
+ko_CN	2025-01-01	2025년 1월 1일	1월	1월	수요일	수
+ko_KP	2024-01-01	2024년 1월 1일	1월	1월	월요일	월
+ko_KP	2024-02-29	2024년 2월 29일	2월	2월	목요일	목
+ko_KP	2024-06-21	2024년 6월 21일	6월	6월	금요일	금
+ko_KP	2024-07-07	2024년 7월 7일	7월	7월	일요일	일
+ko_KP	2024-12-31	2024년 12월 31일	12월	12월	화요일	화
+ko_KP	2025-01-01	2025년 1월 1일	1월	1월	수요일	수
+ko_KR	2024-01-01	2024년 1월 1일	1월	1월	월요일	월
+ko_KR	2024-02-29	2024년 2월 29일	2월	2월	목요일	목
+ko_KR	2024-06-21	2024년 6월 21일	6월	6월	금요일	금
+ko_KR	2024-07-07	2024년 7월 7일	7월	7월	일요일	일
+ko_KR	2024-12-31	2024년 12월 31일	12월	12월	화요일	화
+ko_KR	2025-01-01	2025년 1월 1일	1월	1월	수요일	수
+kok_Deva_IN	2024-01-01	1 जानेवारी 2024	जानेवारी	जानेवारी	सोमार	सोमार
+kok_Deva_IN	2024-02-29	29 फेब्रुवारी 2024	फेब्रुवारी	फेब्रुवारी	बिरेस्तार	बिरेस्तार
+kok_Deva_IN	2024-06-21	21 जून 2024	जून	जून	शुक्रार	शुक्रार
+kok_Deva_IN	2024-07-07	7 जुलय 2024	जुलय	जुलय	आयतार	आयतार
+kok_Deva_IN	2024-12-31	31 डिसेंबर 2024	डिसेंबर	डिसेंबर	मंगळार	मंगळार
+kok_Deva_IN	2025-01-01	1 जानेवारी 2025	जानेवारी	जानेवारी	बुधवार	बुधवार
+ks_Arab_IN	2024-01-01	جنؤری 1, 2024	جنؤری	جنؤری	ژٔندرٕروار	ژٔندٕروار
+ks_Arab_IN	2024-02-29	فرؤری 29, 2024	فرؤری	فرؤری	برؠسوار	برؠسوار
+ks_Arab_IN	2024-06-21	جوٗن 21, 2024	جوٗن	جوٗن	جُمہ	جُمہ
+ks_Arab_IN	2024-07-07	جُلَے 7, 2024	جوٗلایی	جُلَے	اَتھوار	آتھوار
+ks_Arab_IN	2024-12-31	دَسَمبَر 31, 2024	دسمبر	دسمبر	بۆموار	بۆموار
+ks_Arab_IN	2025-01-01	جنؤری 1, 2025	جنؤری	جنؤری	بودوار	بودوار
+kw_GB	2024-01-01	1 mis Genver 2024	mis Genver	Gen	dy Lun	Lun
+kw_GB	2024-02-29	29 mis Hwevrer 2024	mis Hwevrer	Hwe	dy Yow	Yow
+kw_GB	2024-06-21	21 mis Metheven 2024	mis Metheven	Met	dy Gwener	Gwe
+kw_GB	2024-07-07	7 mis Gortheren 2024	mis Gortheren	Gor	dy Sul	Sul
+kw_GB	2024-12-31	31 mis Kevardhu 2024	mis Kevardhu	Kev	dy Meurth	Mth
+kw_GB	2025-01-01	1 mis Genver 2025	mis Genver	Gen	dy Merher	Mhr
+ky_KG	2024-01-01	2024-ж., 1-январь	Январь	янв.	дүйшөмбү	дүй.
+ky_KG	2024-02-29	2024-ж., 29-февраль	Февраль	фев.	бейшемби	бейш.
+ky_KG	2024-06-21	2024-ж., 21-июнь	Июнь	июн.	жума	жума
+ky_KG	2024-07-07	2024-ж., 7-июль	Июль	июл.	жекшемби	жек.
+ky_KG	2024-12-31	2024-ж., 31-декабрь	Декабрь	дек.	шейшемби	шейш.
+ky_KG	2025-01-01	2025-ж., 1-январь	Январь	янв.	шаршемби	шарш.
+la_VA	2024-01-01	1 Ianuarii 2024	Ianuarius	Ian	Lunae	Lun
+la_VA	2024-02-29	29 Februarii 2024	Februarius	Feb	Iovis	Iov
+la_VA	2024-06-21	21 Iunii 2024	Iunius	Iun	Veneris	Ven
+la_VA	2024-07-07	7 Iulii 2024	Iulius	Iul	Solis	Sol
+la_VA	2024-12-31	31 Decembris 2024	December	Dec	Martis	Mar
+la_VA	2025-01-01	1 Ianuarii 2025	Ianuarius	Ian	Mercurii	Mer
+lb_LU	2024-01-01	1. Januar 2024	Januar	Jan.	Méindeg	Méi.
+lb_LU	2024-02-29	29. Februar 2024	Februar	Feb.	Donneschdeg	Don.
+lb_LU	2024-06-21	21. Juni 2024	Juni	Juni	Freideg	Fre.
+lb_LU	2024-07-07	7. Juli 2024	Juli	Juli	Sonndeg	Son.
+lb_LU	2024-12-31	31. Dezember 2024	Dezember	Dez.	Dënschdeg	Dën.
+lb_LU	2025-01-01	1. Januar 2025	Januar	Jan.	Mëttwoch	Mët.
+ln_CD	2024-01-01	1 sánzá ya yambo 2024	sánzá ya yambo	yan	mokɔlɔ mwa yambo	ybo
+ln_CD	2024-02-29	29 sánzá ya míbalé 2024	sánzá ya míbalé	fbl	mokɔlɔ ya mínéi	min
+ln_CD	2024-06-21	21 sánzá ya motóbá 2024	sánzá ya motóbá	yun	mokɔlɔ ya mítáno	mtn
+ln_CD	2024-07-07	7 sánzá ya nsambo 2024	sánzá ya nsambo	yul	eyenga	eye
+ln_CD	2024-12-31	31 sánzá ya zómi na míbalé 2024	sánzá ya zómi na míbalé	dsb	mokɔlɔ mwa míbalé	mbl
+ln_CD	2025-01-01	1 sánzá ya yambo 2025	sánzá ya yambo	yan	mokɔlɔ mwa mísáto	mst
+lo_LA	2024-01-01	1 ມັງກອນ 2024	ມັງກອນ	ມ.ກ.	ວັນຈັນ	ຈັນ
+lo_LA	2024-02-29	29 ກຸມພາ 2024	ກຸມພາ	ກ.ພ.	ວັນພະຫັດ	ພະຫັດ
+lo_LA	2024-06-21	21 ມິຖຸນາ 2024	ມິຖຸນາ	ມິ.ຖ.	ວັນສຸກ	ສຸກ
+lo_LA	2024-07-07	7 ກໍລະກົດ 2024	ກໍລະກົດ	ກ.ລ.	ວັນອາທິດ	ອາທິດ
+lo_LA	2024-12-31	31 ທັນວາ 2024	ທັນວາ	ທ.ວ.	ວັນອັງຄານ	ອັງຄານ
+lo_LA	2025-01-01	1 ມັງກອນ 2025	ມັງກອນ	ມ.ກ.	ວັນພຸດ	ພຸດ
+lt	2024-01-01	2024 m. sausio 1 d.	sausis	saus.	pirmadienis	pr
+lt	2024-02-29	2024 m. vasario 29 d.	vasaris	vas.	ketvirtadienis	kt
+lt	2024-06-21	2024 m. birželio 21 d.	birželis	birž.	penktadienis	pn
+lt	2024-07-07	2024 m. liepos 7 d.	liepa	liep.	sekmadienis	sk
+lt	2024-12-31	2024 m. gruodžio 31 d.	gruodis	gruod.	antradienis	an
+lt	2025-01-01	2025 m. sausio 1 d.	sausis	saus.	trečiadienis	tr
+lt_LT	2024-01-01	2024 m. sausio 1 d.	sausis	saus.	pirmadienis	pr
+lt_LT	2024-02-29	2024 m. vasario 29 d.	vasaris	vas.	ketvirtadienis	kt
+lt_LT	2024-06-21	2024 m. birželio 21 d.	birželis	birž.	penktadienis	pn
+lt_LT	2024-07-07	2024 m. liepos 7 d.	liepa	liep.	sekmadienis	sk
+lt_LT	2024-12-31	2024 m. gruodžio 31 d.	gruodis	gruod.	antradienis	an
+lt_LT	2025-01-01	2025 m. sausio 1 d.	sausis	saus.	trečiadienis	tr
+lv_LV	2024-01-01	2024. gada 1. janvāris	janvāris	janv.	pirmdiena	pirmd.
+lv_LV	2024-02-29	2024. gada 29. februāris	februāris	febr.	ceturtdiena	ceturtd.
+lv_LV	2024-06-21	2024. gada 21. jūnijs	jūnijs	jūn.	piektdiena	piektd.
+lv_LV	2024-07-07	2024. gada 7. jūlijs	jūlijs	jūl.	svētdiena	svētd.
+lv_LV	2024-12-31	2024. gada 31. decembris	decembris	dec.	otrdiena	otrd.
+lv_LV	2025-01-01	2025. gada 1. janvāris	janvāris	janv.	trešdiena	trešd.
+mai_IN	2024-01-01	1 जनवरी 2024	जनवरी	जन॰	सोम दिन	सोम
+mai_IN	2024-02-29	29 फरवरी 2024	फरवरी	फ़र॰	बृहस्पति दिन	गुरु
+mai_IN	2024-06-21	21 जून 2024	जून	जून	शुक्र दिन	शुक्र
+mai_IN	2024-07-07	7 जुलाई 2024	जुलाई	जुल॰	रवि दिन	रवि
+mai_IN	2024-12-31	31 दिसंबर 2024	दिसंबर	दिस॰	मंगल दिन	मंगल
+mai_IN	2025-01-01	1 जनवरी 2025	जनवरी	जन॰	बुध दिन	बुध
+mdf_RU	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+mdf_RU	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+mdf_RU	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+mdf_RU	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+mdf_RU	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+mdf_RU	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+mfe_MU	2024-01-01	1 zanvie 2024	zanvie	zan	lindi	lin
+mfe_MU	2024-02-29	29 fevriye 2024	fevriye	fev	zedi	ze
+mfe_MU	2024-06-21	21 zin 2024	zin	zin	vandredi	van
+mfe_MU	2024-07-07	7 zilye 2024	zilye	zil	dimans	dim
+mfe_MU	2024-12-31	31 desam 2024	desam	des	mardi	mar
+mfe_MU	2025-01-01	1 zanvie 2025	zanvie	zan	merkredi	mer
+mg_MG	2024-01-01	1 Janoary 2024	Janoary	Jan	Alatsinainy	Alats
+mg_MG	2024-02-29	29 Febroary 2024	Febroary	Feb	Alakamisy	Alak
+mg_MG	2024-06-21	21 Jona 2024	Jona	Jon	Zoma	Zom
+mg_MG	2024-07-07	7 Jolay 2024	Jolay	Jol	Alahady	Alah
+mg_MG	2024-12-31	31 Desambra 2024	Desambra	Des	Talata	Tal
+mg_MG	2025-01-01	1 Janoary 2025	Janoary	Jan	Alarobia	Alar
+mi_NZ	2024-01-01	1 Hānuere 2024	Hānuere	Hān	Mane	Man
+mi_NZ	2024-02-29	29 Pēpuere 2024	Pēpuere	Pēp	Tāite	Tāi
+mi_NZ	2024-06-21	21 Hune 2024	Hune	Hun	Paraire	Par
+mi_NZ	2024-07-07	7 Hūrae 2024	Hūrae	Hūr	Rātapu	Rāt
+mi_NZ	2024-12-31	31 Tīhema 2024	Tīhema	Tīh	Tūrei	Tūr
+mi_NZ	2025-01-01	1 Hānuere 2025	Hānuere	Hān	Wenerei	Wen
+mk_MK	2024-01-01	1 јануари 2024 г.	јануари	јан.	понеделник	пон.
+mk_MK	2024-02-29	29 февруари 2024 г.	февруари	фев.	четврток	чет.
+mk_MK	2024-06-21	21 јуни 2024 г.	јуни	јун.	петок	пет.
+mk_MK	2024-07-07	7 јули 2024 г.	јули	јул.	недела	нед.
+mk_MK	2024-12-31	31 декември 2024 г.	декември	дек.	вторник	вто.
+mk_MK	2025-01-01	1 јануари 2025 г.	јануари	јан.	среда	сре.
+ml_IN	2024-01-01	2024, ജനുവരി 1	ജനുവരി	ജനു	തിങ്കളാഴ്‌ച	തിങ്കൾ
+ml_IN	2024-02-29	2024, ഫെബ്രുവരി 29	ഫെബ്രുവരി	ഫെബ്രു	വ്യാഴാഴ്‌ച	വ്യാഴം
+ml_IN	2024-06-21	2024, ജൂൺ 21	ജൂൺ	ജൂൺ	വെള്ളിയാഴ്‌ച	വെള്ളി
+ml_IN	2024-07-07	2024, ജൂലൈ 7	ജൂലൈ	ജൂലൈ	ഞായറാഴ്‌ച	ഞായർ
+ml_IN	2024-12-31	2024, ഡിസംബർ 31	ഡിസംബർ	ഡിസം	ചൊവ്വാഴ്ച	ചൊവ്വ
+ml_IN	2025-01-01	2025, ജനുവരി 1	ജനുവരി	ജനു	ബുധനാഴ്‌ച	ബുധൻ
+mn_MN	2024-01-01	2024 оны нэгдүгээр сарын 1	Нэгдүгээр сар	1-р сар	даваа	Да
+mn_MN	2024-02-29	2024 оны хоёрдугаар сарын 29	Хоёрдугаар сар	2-р сар	пүрэв	Пү
+mn_MN	2024-06-21	2024 оны зургаадугаар сарын 21	Зургаадугаар сар	6-р сар	баасан	Ба
+mn_MN	2024-07-07	2024 оны долоодугаар сарын 7	Долоодугаар сар	7-р сар	ням	Ня
+mn_MN	2024-12-31	2024 оны арван хоёрдугаар сарын 31	Арван хоёрдугаар сар	12-р сар	мягмар	Мя
+mn_MN	2025-01-01	2025 оны нэгдүгээр сарын 1	Нэгдүгээр сар	1-р сар	лхагва	Лх
+mn_Mong_CN	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+mn_Mong_CN	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+mn_Mong_CN	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+mn_Mong_CN	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+mn_Mong_CN	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+mn_Mong_CN	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+mr_IN	2024-01-01	1 जानेवारी, 2024	जानेवारी	जाने	सोमवार	सोम
+mr_IN	2024-02-29	29 फेब्रुवारी, 2024	फेब्रुवारी	फेब्रु	गुरुवार	गुरु
+mr_IN	2024-06-21	21 जून, 2024	जून	जून	शुक्रवार	शुक्र
+mr_IN	2024-07-07	7 जुलै, 2024	जुलै	जुलै	रविवार	रवि
+mr_IN	2024-12-31	31 डिसेंबर, 2024	डिसेंबर	डिसें	मंगळवार	मंगळ
+mr_IN	2025-01-01	1 जानेवारी, 2025	जानेवारी	जाने	बुधवार	बुध
+ms_Arab_BN	2024-01-01	1 جانواري 2024	جانواري	جانواري	اثنين	اثنين
+ms_Arab_BN	2024-02-29	29 فيبواري 2024	فيبواري	فيبواري	خميس	خميس
+ms_Arab_BN	2024-06-21	21 جون 2024	جون	جون	جمعة	جمعة
+ms_Arab_BN	2024-07-07	7 جولاي 2024	جولاي	جولاي	احد	احد
+ms_Arab_BN	2024-12-31	31 ديسيمبر 2024	ديسيمبر	ديسيمبر	ثلاث	ثلاث
+ms_Arab_BN	2025-01-01	1 جانواري 2025	جانواري	جانواري	رابو	رابو
+ms_BN	2024-01-01	1 Januari 2024	Januari	Jan	Isnin	Isn
+ms_BN	2024-02-29	29 Februari 2024	Februari	Feb	Khamis	Kha
+ms_BN	2024-06-21	21 Jun 2024	Jun	Jun	Jumaat	Jum
+ms_BN	2024-07-07	7 Julai 2024	Julai	Jul	Ahad	Ahd
+ms_BN	2024-12-31	31 Disember 2024	Disember	Dis	Selasa	Sel
+ms_BN	2025-01-01	1 Januari 2025	Januari	Jan	Rabu	Rab
+ms_MY	2024-01-01	1 Januari 2024	Januari	Jan	Isnin	Isn
+ms_MY	2024-02-29	29 Februari 2024	Februari	Feb	Khamis	Kha
+ms_MY	2024-06-21	21 Jun 2024	Jun	Jun	Jumaat	Jum
+ms_MY	2024-07-07	7 Julai 2024	Julai	Jul	Ahad	Ahd
+ms_MY	2024-12-31	31 Disember 2024	Disember	Dis	Selasa	Sel
+ms_MY	2025-01-01	1 Januari 2025	Januari	Jan	Rabu	Rab
+ms_SG	2024-01-01	1 Januari 2024	Januari	Jan	Isnin	Isn
+ms_SG	2024-02-29	29 Februari 2024	Februari	Feb	Khamis	Kha
+ms_SG	2024-06-21	21 Jun 2024	Jun	Jun	Jumaat	Jum
+ms_SG	2024-07-07	7 Julai 2024	Julai	Jul	Ahad	Ahd
+ms_SG	2024-12-31	31 Disember 2024	Disember	Dis	Selasa	Sel
+ms_SG	2025-01-01	1 Januari 2025	Januari	Jan	Rabu	Rab
+mt_MT	2024-01-01	1 ta’ Jannar 2024	Jannar	Jan	It-Tnejn	Tne
+mt_MT	2024-02-29	29 ta’ Frar 2024	Frar	Fra	Il-Ħamis	Ħam
+mt_MT	2024-06-21	21 ta’ Ġunju 2024	Ġunju	Ġun	Il-Ġimgħa	Ġim
+mt_MT	2024-07-07	7 ta’ Lulju 2024	Lulju	Lul	Il-Ħadd	Ħad
+mt_MT	2024-12-31	31 ta’ Diċembru 2024	Diċembru	Diċ	It-Tlieta	Tli
+mt_MT	2025-01-01	1 ta’ Jannar 2025	Jannar	Jan	L-Erbgħa	Erb
+my_MM	2024-01-01	2024 ဇန်နဝါရီ 1	ဇန်နဝါရီ	ဇန်	တနင်္လာ	တနင်္လာ
+my_MM	2024-02-29	2024 ဖေဖော်ဝါရီ 29	ဖေဖော်ဝါရီ	ဖေ	ကြာသပတေး	ကြာသပတေး
+my_MM	2024-06-21	2024 ဇွန် 21	ဇွန်	ဇွန်	သောကြာ	သောကြာ
+my_MM	2024-07-07	2024 ဇူလိုင် 7	ဇူလိုင်	ဇူ	တနင်္ဂနွေ	တနင်္ဂနွေ
+my_MM	2024-12-31	2024 ဒီဇင်ဘာ 31	ဒီဇင်ဘာ	ဒီ	အင်္ဂါ	အင်္ဂါ
+my_MM	2025-01-01	2025 ဇန်နဝါရီ 1	ဇန်နဝါရီ	ဇန်	ဗုဒ္ဓဟူး	ဗုဒ္ဓဟူး
+myv_RU	2024-01-01	2024 якшамков 1	якшамков	якшамков	атяньчистэ	атя
+myv_RU	2024-02-29	2024 даволков 29	даволков	даволков	калоньчистэ	кал
+myv_RU	2024-06-21	2024 аштемков 21	аштемков	аштемков	сюконьчистэ	сюк
+myv_RU	2024-07-07	2024 медьков 7	медьков	медьков	таргочистэ	тар
+myv_RU	2024-12-31	2024 ацамков 31	ацамков	ацамков	вастаньчистэ	вас
+myv_RU	2025-01-01	2025 якшамков 1	якшамков	якшамков	куншкачистэ	кун
+nb_NO	2024-01-01	1. januar 2024	januar	jan.	mandag	man.
+nb_NO	2024-02-29	29. februar 2024	februar	feb.	torsdag	tor.
+nb_NO	2024-06-21	21. juni 2024	juni	juni	fredag	fre.
+nb_NO	2024-07-07	7. juli 2024	juli	juli	søndag	søn.
+nb_NO	2024-12-31	31. desember 2024	desember	des.	tirsdag	tir.
+nb_NO	2025-01-01	1. januar 2025	januar	jan.	onsdag	ons.
+nb_SJ	2024-01-01	1. januar 2024	januar	jan.	mandag	man.
+nb_SJ	2024-02-29	29. februar 2024	februar	feb.	torsdag	tor.
+nb_SJ	2024-06-21	21. juni 2024	juni	juni	fredag	fre.
+nb_SJ	2024-07-07	7. juli 2024	juli	juli	søndag	søn.
+nb_SJ	2024-12-31	31. desember 2024	desember	des.	tirsdag	tir.
+nb_SJ	2025-01-01	1. januar 2025	januar	jan.	onsdag	ons.
+nd_ZW	2024-01-01	1 Zibandlela 2024	Zibandlela	Zib	Mvulo	Mvu
+nd_ZW	2024-02-29	29 Nhlolanja 2024	Nhlolanja	Nhlo	Sine	Sin
+nd_ZW	2024-06-21	21 Nhlangula 2024	Nhlangula	Nhla	Sihlanu	Sih
+nd_ZW	2024-07-07	7 Ntulikazi 2024	Ntulikazi	Ntu	Sonto	Son
+nd_ZW	2024-12-31	31 Mpalakazi 2024	Mpalakazi	Mpal	Sibili	Sib
+nd_ZW	2025-01-01	1 Zibandlela 2025	Zibandlela	Zib	Sithathu	Sit
+ne_IN	2024-01-01	2024 जनवरी 1	जनवरी	जनवरी	सोमबार	सोम
+ne_IN	2024-02-29	2024 फेब्रुअरी 29	फेब्रुअरी	फेब्रुअरी	बिहिबार	बिहि
+ne_IN	2024-06-21	2024 जुन 21	जुन	जुन	शुक्रबार	शुक्र
+ne_IN	2024-07-07	2024 जुलाई 7	जुलाई	जुलाई	आइतबार	आइत
+ne_IN	2024-12-31	2024 डिसेम्बर 31	डिसेम्बर	डिसेम्बर	मङ्गलबार	मङ्गल
+ne_IN	2025-01-01	2025 जनवरी 1	जनवरी	जनवरी	बुधबार	बुध
+ne_NP	2024-01-01	2024 जनवरी 1	जनवरी	जनवरी	सोमबार	सोम
+ne_NP	2024-02-29	2024 फेब्रुअरी 29	फेब्रुअरी	फेब्रुअरी	बिहिबार	बिहि
+ne_NP	2024-06-21	2024 जुन 21	जुन	जुन	शुक्रबार	शुक्र
+ne_NP	2024-07-07	2024 जुलाई 7	जुलाई	जुलाई	आइतबार	आइत
+ne_NP	2024-12-31	2024 डिसेम्बर 31	डिसेम्बर	डिसेम्बर	मङ्गलबार	मङ्गल
+ne_NP	2025-01-01	2025 जनवरी 1	जनवरी	जनवरी	बुधबार	बुध
+nl_AW	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_AW	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_AW	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_AW	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_AW	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_AW	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_BE	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_BE	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_BE	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_BE	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_BE	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_BE	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_BQ	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_BQ	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_BQ	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_BQ	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_BQ	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_BQ	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_CW	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_CW	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_CW	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_CW	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_CW	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_CW	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_NL	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_NL	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_NL	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_NL	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_NL	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_NL	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_SR	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_SR	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_SR	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_SR	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_SR	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_SR	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nl_SX	2024-01-01	1 januari 2024	januari	jan	maandag	ma
+nl_SX	2024-02-29	29 februari 2024	februari	feb	donderdag	do
+nl_SX	2024-06-21	21 juni 2024	juni	jun	vrijdag	vr
+nl_SX	2024-07-07	7 juli 2024	juli	jul	zondag	zo
+nl_SX	2024-12-31	31 december 2024	december	dec	dinsdag	di
+nl_SX	2025-01-01	1 januari 2025	januari	jan	woensdag	wo
+nn_NO	2024-01-01	1. januar 2024	januar	jan.	måndag	må.
+nn_NO	2024-02-29	29. februar 2024	februar	feb.	torsdag	to.
+nn_NO	2024-06-21	21. juni 2024	juni	juni	fredag	fr.
+nn_NO	2024-07-07	7. juli 2024	juli	juli	søndag	sø.
+nn_NO	2024-12-31	31. desember 2024	desember	des.	tysdag	ty.
+nn_NO	2025-01-01	1. januar 2025	januar	jan.	onsdag	on.
+no	2024-01-01	1. januar 2024	januar	jan.	mandag	man.
+no	2024-02-29	29. februar 2024	februar	feb.	torsdag	tor.
+no	2024-06-21	21. juni 2024	juni	juni	fredag	fre.
+no	2024-07-07	7. juli 2024	juli	juli	søndag	søn.
+no	2024-12-31	31. desember 2024	desember	des.	tirsdag	tir.
+no	2025-01-01	1. januar 2025	januar	jan.	onsdag	ons.
+nr_ZA	2024-01-01	2024 Janabari 1	Janabari	Jan	uMvulo	Mvu
+nr_ZA	2024-02-29	2024 uFeberbari 29	uFeberbari	Feb	uLesine	Ne
+nr_ZA	2024-06-21	2024 Juni 21	Juni	Jun	ngoLesihlanu	Hla
+nr_ZA	2024-07-07	2024 Julayi 7	Julayi	Jul	uSonto	Son
+nr_ZA	2024-12-31	2024 Disemba 31	Disemba	Dis	uLesibili	Bil
+nr_ZA	2025-01-01	2025 Janabari 1	Janabari	Jan	Lesithathu	Tha
+nso_ZA	2024-01-01	2024 Janeware 1	Janeware	Phere	Mošupologo	Mos
+nso_ZA	2024-02-29	2024 Febereware 29	Febereware	Dibo	Labone	Ne
+nso_ZA	2024-06-21	2024 June 21	June	June	Labohlano	Hla
+nso_ZA	2024-07-07	2024 Julae 7	Julae	Mose	Lamorena	Lam
+nso_ZA	2024-12-31	2024 Disemere 31	Disemere	Manth	Labobedi	Bed
+nso_ZA	2025-01-01	2025 Janeware 1	Janeware	Phere	Laboraro	Rar
+ny_MW	2024-01-01	2024 Januwale 1	Januwale	Jan	Lolemba	Lem
+ny_MW	2024-02-29	2024 Febuluwale 29	Febuluwale	Feb	Lachinayi	Nai
+ny_MW	2024-06-21	2024 Juni 21	Juni	Jun	Lachisanu	San
+ny_MW	2024-07-07	2024 Julai 7	Julai	Jul	Lamulungu	Mul
+ny_MW	2024-12-31	2024 Disemba 31	Disemba	Dis	Lachiwiri	Wir
+ny_MW	2025-01-01	2025 Januwale 1	Januwale	Jan	Lachitatu	Tat
+oc_ES	2024-01-01	1 de gèr de 2024	gèr	gèr	deluns	del
+oc_ES	2024-02-29	29 de hereuèr de 2024	hereuèr	her	dijaus	dij
+oc_ES	2024-06-21	21 de junh de 2024	junh	jun	diuendres	diu
+oc_ES	2024-07-07	7 de juriòl de 2024	juriòl	jur	dimenge	dim
+oc_ES	2024-12-31	31 de deseme de 2024	deseme	dec	dimars	dma
+oc_ES	2025-01-01	1 de gèr de 2025	gèr	gèr	dimèrcles	dmè
+or_IN	2024-01-01	ଜାନୁଆରୀ 1, 2024	ଜାନୁଆରୀ	ଜାନୁଆରୀ	ସୋମବାର	ସୋମ
+or_IN	2024-02-29	ଫେବୃଆରୀ 29, 2024	ଫେବୃଆରୀ	ଫେବୃଆରୀ	ଗୁରୁବାର	ଗୁରୁ
+or_IN	2024-06-21	ଜୁନ 21, 2024	ଜୁନ	ଜୁନ	ଶୁକ୍ରବାର	ଶୁକ୍ର
+or_IN	2024-07-07	ଜୁଲାଇ 7, 2024	ଜୁଲାଇ	ଜୁଲାଇ	ରବିବାର	ରବି
+or_IN	2024-12-31	ଡିସେମ୍ବର 31, 2024	ଡିସେମ୍ବର	ଡିସେମ୍ବର	ମଙ୍ଗଳବାର	ମଙ୍ଗଳ
+or_IN	2025-01-01	ଜାନୁଆରୀ 1, 2025	ଜାନୁଆରୀ	ଜାନୁଆରୀ	ବୁଧବାର	ବୁଧ
+os_GE	2024-01-01	1 январы, 2024 аз	Январь	янв.	къуырисӕр	крс
+os_GE	2024-02-29	29 февралы, 2024 аз	Февраль	фев.	цыппӕрӕм	цпр
+os_GE	2024-06-21	21 июны, 2024 аз	Июнь	июны	майрӕмбон	мрб
+os_GE	2024-07-07	7 июлы, 2024 аз	Июль	июлы	хуыцаубон	хцб
+os_GE	2024-12-31	31 декабры, 2024 аз	Декабрь	дек.	дыццӕг	дцг
+os_GE	2025-01-01	1 январы, 2025 аз	Январь	янв.	ӕртыццӕг	ӕрт
+pa_Guru_IN	2024-01-01	1 ਜਨਵਰੀ 2024	ਜਨਵਰੀ	ਜਨ	ਸੋਮਵਾਰ	ਸੋਮ
+pa_Guru_IN	2024-02-29	29 ਫ਼ਰਵਰੀ 2024	ਫ਼ਰਵਰੀ	ਫ਼ਰ	ਵੀਰਵਾਰ	ਵੀਰ
+pa_Guru_IN	2024-06-21	21 ਜੂਨ 2024	ਜੂਨ	ਜੂਨ	ਸ਼ੁੱਕਰਵਾਰ	ਸ਼ੁੱਕਰ
+pa_Guru_IN	2024-07-07	7 ਜੁਲਾਈ 2024	ਜੁਲਾਈ	ਜੁਲਾ	ਐਤਵਾਰ	ਐਤ
+pa_Guru_IN	2024-12-31	31 ਦਸੰਬਰ 2024	ਦਸੰਬਰ	ਦਸੰ	ਮੰਗਲਵਾਰ	ਮੰਗਲ
+pa_Guru_IN	2025-01-01	1 ਜਨਵਰੀ 2025	ਜਨਵਰੀ	ਜਨ	ਬੁੱਧਵਾਰ	ਬੁੱਧ
+pap_AW	2024-01-01	1 Yanüari 2024	Yanüari	Yan	djaluna	djaluna
+pap_AW	2024-02-29	29 Febrüari 2024	Febrüari	Feb	djaweps	djaweps
+pap_AW	2024-06-21	21 Yüni 2024	Yüni	Yün	djabièrnè	djabièrnè
+pap_AW	2024-07-07	7 Yüli 2024	Yüli	Yül	djadumingu	djadumingu
+pap_AW	2024-12-31	31 Desèmber 2024	Desèmber	Des	djamars	djamars
+pap_AW	2025-01-01	1 Yanüari 2025	Yanüari	Yan	djarason	djarason
+pap_CW	2024-01-01	1 Yanüari 2024	Yanüari	Yan	djaluna	djaluna
+pap_CW	2024-02-29	29 Febrüari 2024	Febrüari	Feb	djaweps	djaweps
+pap_CW	2024-06-21	21 Yüni 2024	Yüni	Yün	djabièrnè	djabièrnè
+pap_CW	2024-07-07	7 Yüli 2024	Yüli	Yül	djadumingu	djadumingu
+pap_CW	2024-12-31	31 Desèmber 2024	Desèmber	Des	djamars	djamars
+pap_CW	2025-01-01	1 Yanüari 2025	Yanüari	Yan	djarason	djarason
+pl_PL	2024-01-01	1 stycznia 2024	styczeń	sty	poniedziałek	pon.
+pl_PL	2024-02-29	29 lutego 2024	luty	lut	czwartek	czw.
+pl_PL	2024-06-21	21 czerwca 2024	czerwiec	cze	piątek	pt.
+pl_PL	2024-07-07	7 lipca 2024	lipiec	lip	niedziela	niedz.
+pl_PL	2024-12-31	31 grudnia 2024	grudzień	gru	wtorek	wt.
+pl_PL	2025-01-01	1 stycznia 2025	styczeń	sty	środa	śr.
+ps_AF	2024-01-01	2024 جنوري 1	جنوري	جنوري	دونۍ	دونۍ
+ps_AF	2024-02-29	2024 فبروري 29	فېبروري	فبروري	پينځنۍ	پينځنۍ
+ps_AF	2024-06-21	2024 جون 21	جون	جون	جمعه	جمعه
+ps_AF	2024-07-07	2024 جولای 7	جولای	جولای	يونۍ	يونۍ
+ps_AF	2024-12-31	2024 دسمبر 31	دسمبر	دسمبر	درېنۍ	درېنۍ
+ps_AF	2025-01-01	2025 جنوري 1	جنوري	جنوري	څلرنۍ	څلرنۍ
+pt_AO	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_AO	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_AO	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_AO	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_AO	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_AO	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_BR	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	seg.
+pt_BR	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	qui.
+pt_BR	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sex.
+pt_BR	2024-07-07	7 de julho de 2024	julho	jul.	domingo	dom.
+pt_BR	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	ter.
+pt_BR	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	qua.
+pt_CV	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_CV	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_CV	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_CV	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_CV	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_CV	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_GQ	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_GQ	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_GQ	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_GQ	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_GQ	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_GQ	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_GW	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_GW	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_GW	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_GW	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_GW	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_GW	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_MO	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_MO	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_MO	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_MO	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_MO	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_MO	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_MZ	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_MZ	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_MZ	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_MZ	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_MZ	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_MZ	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_PT	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_PT	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_PT	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_PT	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_PT	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_PT	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_ST	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_ST	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_ST	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_ST	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_ST	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_ST	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+pt_TL	2024-01-01	1 de janeiro de 2024	janeiro	jan.	segunda-feira	segunda
+pt_TL	2024-02-29	29 de fevereiro de 2024	fevereiro	fev.	quinta-feira	quinta
+pt_TL	2024-06-21	21 de junho de 2024	junho	jun.	sexta-feira	sexta
+pt_TL	2024-07-07	7 de julho de 2024	julho	jul.	domingo	domingo
+pt_TL	2024-12-31	31 de dezembro de 2024	dezembro	dez.	terça-feira	terça
+pt_TL	2025-01-01	1 de janeiro de 2025	janeiro	jan.	quarta-feira	quarta
+qu_BO	2024-01-01	1 Enero 2024	Enero	Ene	Lunes	Lun
+qu_BO	2024-02-29	29 Febrero 2024	Febrero	Feb	Jueves	Jue
+qu_BO	2024-06-21	21 Junio 2024	Junio	Jun	Viernes	Vie
+qu_BO	2024-07-07	7 Julio 2024	Julio	Jul	Domingo	Dom
+qu_BO	2024-12-31	31 Diciembre 2024	Diciembre	Dic	Martes	Mar
+qu_BO	2025-01-01	1 Enero 2025	Enero	Ene	Miércoles	Mié
+qu_EC	2024-01-01	1 Enero 2024	Enero	Ene	Lunes	Lun
+qu_EC	2024-02-29	29 Febrero 2024	Febrero	Feb	Jueves	Jue
+qu_EC	2024-06-21	21 Junio 2024	Junio	Jun	Viernes	Vie
+qu_EC	2024-07-07	7 Julio 2024	Julio	Jul	Domingo	Dom
+qu_EC	2024-12-31	31 Diciembre 2024	Diciembre	Dic	Martes	Mar
+qu_EC	2025-01-01	1 Enero 2025	Enero	Ene	Miércoles	Mié
+qu_PE	2024-01-01	1 Enero 2024	Enero	Ene	Lunes	Lun
+qu_PE	2024-02-29	29 Febrero 2024	Febrero	Feb	Jueves	Jue
+qu_PE	2024-06-21	21 Junio 2024	Junio	Jun	Viernes	Vie
+qu_PE	2024-07-07	7 Julio 2024	Julio	Jul	Domingo	Dom
+qu_PE	2024-12-31	31 Diciembre 2024	Diciembre	Dic	Martes	Mar
+qu_PE	2025-01-01	1 Enero 2025	Enero	Ene	Miércoles	Mié
+quc_GT	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+quc_GT	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+quc_GT	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+quc_GT	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+quc_GT	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+quc_GT	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+rm_CH	2024-01-01	1 da schaner 2024	schaner	schan.	glindesdi	gli
+rm_CH	2024-02-29	29 da favrer 2024	favrer	favr.	gievgia	gie
+rm_CH	2024-06-21	21 da zercladur 2024	zercladur	zercl.	venderdi	ve
+rm_CH	2024-07-07	7 da fanadur 2024	fanadur	fan.	dumengia	du
+rm_CH	2024-12-31	31 da december 2024	december	dec.	mardi	ma
+rm_CH	2025-01-01	1 da schaner 2025	schaner	schan.	mesemna	me
+rn_BI	2024-01-01	1 Nzero 2024	Nzero	Mut.	Ku wa mbere	mbe.
+rn_BI	2024-02-29	29 Ruhuhuma 2024	Ruhuhuma	Gas.	Ku wa kane	kan.
+rn_BI	2024-06-21	21 Ruheshi 2024	Ruheshi	Kam.	Ku wa gatanu	gnu.
+rn_BI	2024-07-07	7 Mukakaro 2024	Mukakaro	Nya.	Ku w’indwi	cu.
+rn_BI	2024-12-31	31 Kigarama 2024	Kigarama	Uku.	Ku wa kabiri	kab.
+rn_BI	2025-01-01	1 Nzero 2025	Nzero	Mut.	Ku wa gatatu	gtu.
+ro	2024-01-01	1 ianuarie 2024	ianuarie	ian.	luni	lun.
+ro	2024-02-29	29 februarie 2024	februarie	feb.	joi	joi
+ro	2024-06-21	21 iunie 2024	iunie	iun.	vineri	vin.
+ro	2024-07-07	7 iulie 2024	iulie	iul.	duminică	dum.
+ro	2024-12-31	31 decembrie 2024	decembrie	dec.	marți	mar.
+ro	2025-01-01	1 ianuarie 2025	ianuarie	ian.	miercuri	mie.
+ro_MD	2024-01-01	1 ianuarie 2024	ianuarie	ian.	luni	Lun
+ro_MD	2024-02-29	29 februarie 2024	februarie	feb.	joi	Joi
+ro_MD	2024-06-21	21 iunie 2024	iunie	iun.	vineri	Vin
+ro_MD	2024-07-07	7 iulie 2024	iulie	iul.	duminică	Dum
+ro_MD	2024-12-31	31 decembrie 2024	decembrie	dec.	marți	Mar
+ro_MD	2025-01-01	1 ianuarie 2025	ianuarie	ian.	miercuri	Mie
+ro_RO	2024-01-01	1 ianuarie 2024	ianuarie	ian.	luni	lun.
+ro_RO	2024-02-29	29 februarie 2024	februarie	feb.	joi	joi
+ro_RO	2024-06-21	21 iunie 2024	iunie	iun.	vineri	vin.
+ro_RO	2024-07-07	7 iulie 2024	iulie	iul.	duminică	dum.
+ro_RO	2024-12-31	31 decembrie 2024	decembrie	dec.	marți	mar.
+ro_RO	2025-01-01	1 ianuarie 2025	ianuarie	ian.	miercuri	mie.
+ru_BY	2024-01-01	1 января 2024 г.	январь	янв.	понедельник	пн
+ru_BY	2024-02-29	29 февраля 2024 г.	февраль	февр.	четверг	чт
+ru_BY	2024-06-21	21 июня 2024 г.	июнь	июн.	пятница	пт
+ru_BY	2024-07-07	7 июля 2024 г.	июль	июл.	воскресенье	вс
+ru_BY	2024-12-31	31 декабря 2024 г.	декабрь	дек.	вторник	вт
+ru_BY	2025-01-01	1 января 2025 г.	январь	янв.	среда	ср
+ru_KG	2024-01-01	1 января 2024 г.	январь	янв.	понедельник	пн
+ru_KG	2024-02-29	29 февраля 2024 г.	февраль	февр.	четверг	чт
+ru_KG	2024-06-21	21 июня 2024 г.	июнь	июн.	пятница	пт
+ru_KG	2024-07-07	7 июля 2024 г.	июль	июл.	воскресенье	вс
+ru_KG	2024-12-31	31 декабря 2024 г.	декабрь	дек.	вторник	вт
+ru_KG	2025-01-01	1 января 2025 г.	январь	янв.	среда	ср
+ru_KZ	2024-01-01	1 января 2024 г.	январь	янв.	понедельник	пн
+ru_KZ	2024-02-29	29 февраля 2024 г.	февраль	февр.	четверг	чт
+ru_KZ	2024-06-21	21 июня 2024 г.	июнь	июн.	пятница	пт
+ru_KZ	2024-07-07	7 июля 2024 г.	июль	июл.	воскресенье	вс
+ru_KZ	2024-12-31	31 декабря 2024 г.	декабрь	дек.	вторник	вт
+ru_KZ	2025-01-01	1 января 2025 г.	январь	янв.	среда	ср
+ru_RU	2024-01-01	1 января 2024 г.	январь	янв.	понедельник	пн
+ru_RU	2024-02-29	29 февраля 2024 г.	февраль	февр.	четверг	чт
+ru_RU	2024-06-21	21 июня 2024 г.	июнь	июн.	пятница	пт
+ru_RU	2024-07-07	7 июля 2024 г.	июль	июл.	воскресенье	вс
+ru_RU	2024-12-31	31 декабря 2024 г.	декабрь	дек.	вторник	вт
+ru_RU	2025-01-01	1 января 2025 г.	январь	янв.	среда	ср
+ru_UA	2024-01-01	1 января 2024 г.	январь	янв.	понедельник	пн
+ru_UA	2024-02-29	29 февраля 2024 г.	февраль	февр.	четверг	чт
+ru_UA	2024-06-21	21 июня 2024 г.	июнь	июн.	пятница	пт
+ru_UA	2024-07-07	7 июля 2024 г.	июль	июл.	воскресенье	вс
+ru_UA	2024-12-31	31 декабря 2024 г.	декабрь	дек.	вторник	вт
+ru_UA	2025-01-01	1 января 2025 г.	январь	янв.	среда	ср
+rw_RW	2024-01-01	2024 Mutarama 1	Mutarama	mut.	Kuwa mbere	mbe.
+rw_RW	2024-02-29	2024 Gashyantare 29	Gashyantare	gas.	Kuwa kane	kan.
+rw_RW	2024-06-21	2024 Kamena 21	Kamena	kam.	Kuwa gatanu	gnu.
+rw_RW	2024-07-07	2024 Nyakanga 7	Nyakanga	nya.	Ku cyumweru	cyu.
+rw_RW	2024-12-31	2024 Ukuboza 31	Ukuboza	uku.	Kuwa kabiri	kab.
+rw_RW	2025-01-01	2025 Mutarama 1	Mutarama	mut.	Kuwa gatatu	gtu.
+sa_IN	2024-01-01	1 जनवरीमासः 2024	जनवरीमासः	जनवरी:	सोमवासरः	सोम
+sa_IN	2024-02-29	29 फरवरीमासः 2024	फरवरीमासः	फरवरी:	गुरुवासर:	गुरु
+sa_IN	2024-06-21	21 जूनमासः 2024	जूनमासः	जून:	शुक्रवासरः	शुक्र
+sa_IN	2024-07-07	7 जुलाईमासः 2024	जुलाईमासः	जुलाई:	रविवासरः	रवि
+sa_IN	2024-12-31	31 दिसंबरमासः 2024	दिसंबरमासः	दिसंबर:	मंगलवासरः	मंगल
+sa_IN	2025-01-01	1 जनवरीमासः 2025	जनवरीमासः	जनवरी:	बुधवासरः	बुध
+sah_RU	2024-01-01	2024, Тохсунньу 1	тохсунньу	Тохс	бэнидиэнньик	бн
+sah_RU	2024-02-29	2024, Олунньу 29	олунньу	Олун	чэппиэр	чп
+sah_RU	2024-06-21	2024, Бэс ыйын 21	бэс ыйа	Бэс	Бээтиҥсэ	бэ
+sah_RU	2024-07-07	2024, От ыйын 7	от ыйа	Отй	баскыһыанньа	бс
+sah_RU	2024-12-31	2024, ахсынньы 31	ахсынньы	Ахс	оптуорунньук	оп
+sah_RU	2025-01-01	2025, Тохсунньу 1	тохсунньу	Тохс	сэрэдэ	сэ
+sat_Olck_IN	2024-01-01	1 ᱡᱟᱱᱣᱟᱨᱤ 2024	ᱡᱟᱱᱣᱟᱨᱤ	ᱡᱟᱱ	ᱚᱛᱮ	ᱚᱛ
+sat_Olck_IN	2024-02-29	29 ᱯᱷᱟᱨᱣᱟᱨᱤ 2024	ᱯᱷᱟᱨᱣᱟᱨᱤ	ᱯᱷᱟ	ᱥᱟᱹᱨᱫᱤ	ᱥᱟᱹᱨ
+sat_Olck_IN	2024-06-21	21 ᱡᱩᱱ 2024	ᱡᱩᱱ	ᱡᱩᱱ	ᱡᱟᱹᱨᱩᱢ	ᱡᱟᱹ
+sat_Olck_IN	2024-07-07	7 ᱡᱩᱞᱟᱭ 2024	ᱡᱩᱞᱟᱭ	ᱡᱩᱞ	ᱥᱤᱸᱜᱮ	ᱥᱤᱸ
+sat_Olck_IN	2024-12-31	31 ᱫᱤᱥᱟᱢᱵᱟᱨ 2024	ᱫᱤᱥᱟᱢᱵᱟᱨ	ᱫᱤᱥ	ᱵᱟᱞᱮ	ᱵᱟ
+sat_Olck_IN	2025-01-01	1 ᱡᱟᱱᱣᱟᱨᱤ 2025	ᱡᱟᱱᱣᱟᱨᱤ	ᱡᱟᱱ	ᱥᱟᱹᱜᱩᱱ	ᱥᱟᱹ
+sd_Deva_IN	2024-01-01	जनवरी 1, 2024	जनवरी	जन	सूमर	सू
+sd_Deva_IN	2024-02-29	फेबरवरी 29, 2024	फेबरवरी	फर	विस्पत	विस
+sd_Deva_IN	2024-06-21	जून 21, 2024	जून	जून	जुमो	जुम
+sd_Deva_IN	2024-07-07	जुलाई 7, 2024	जुलाई	जु	आर्तवार	आर्त
+sd_Deva_IN	2024-12-31	डिसंबर 31, 2024	डिसंबर	डिसं	मंगलु	मंग
+sd_Deva_IN	2025-01-01	जनवरी 1, 2025	जनवरी	जन	ॿुधर	बु॒ध
+se_NO	2024-01-01	2024 ođđajagemánnu 1	ođđajagemánnu	ođđj	vuossárga	vuos
+se_NO	2024-02-29	2024 guovvamánnu 29	guovvamánnu	guov	duorasdat	duor
+se_NO	2024-06-21	2024 geassemánnu 21	geassemánnu	geas	bearjadat	bear
+se_NO	2024-07-07	2024 suoidnemánnu 7	suoidnemánnu	suoi	sotnabeaivi	sotn
+se_NO	2024-12-31	2024 juovlamánnu 31	juovlamánnu	juov	maŋŋebárga	maŋ
+se_NO	2025-01-01	2025 ođđajagemánnu 1	ođđajagemánnu	ođđj	gaskavahkku	gask
+sg_CF	2024-01-01	1 Nyenye 2024	Nyenye	Nye	Bïkua-ûse	Bk2
+sg_CF	2024-02-29	29 Fulundïgi 2024	Fulundïgi	Ful	Bïkua-okü	Bk5
+sg_CF	2024-06-21	21 Föndo 2024	Föndo	Fön	Lâpôsö	Lâp
+sg_CF	2024-07-07	7 Lengua 2024	Lengua	Len	Bikua-ôko	Bk1
+sg_CF	2024-12-31	31 Kakauka 2024	Kakauka	Kak	Bïkua-ptâ	Bk3
+sg_CF	2025-01-01	1 Nyenye 2025	Nyenye	Nye	Bïkua-usïö	Bk4
+si_LK	2024-01-01	2024 ජනවාරි 1	ජනවාරි	ජන	සඳුදා	සඳුදා
+si_LK	2024-02-29	2024 පෙබරවාරි 29	පෙබරවාරි	පෙබ	බ්‍රහස්පතින්දා	බ්‍රහස්
+si_LK	2024-06-21	2024 ජූනි 21	ජූනි	ජූනි	සිකුරාදා	සිකු
+si_LK	2024-07-07	2024 ජූලි 7	ජූලි	ජූලි	ඉරිදා	ඉරිදා
+si_LK	2024-12-31	2024 දෙසැම්බර් 31	දෙසැම්බර්	දෙසැ	අඟහරුවාදා	අඟහ
+si_LK	2025-01-01	2025 ජනවාරි 1	ජනවාරි	ජන	බදාදා	බදාදා
+sk	2024-01-01	1. januára 2024	január	jan	pondelok	po
+sk	2024-02-29	29. februára 2024	február	feb	štvrtok	št
+sk	2024-06-21	21. júna 2024	jún	jún	piatok	pi
+sk	2024-07-07	7. júla 2024	júl	júl	nedeľa	ne
+sk	2024-12-31	31. decembra 2024	december	dec	utorok	ut
+sk	2025-01-01	1. januára 2025	január	jan	streda	st
+sk_SK	2024-01-01	1. januára 2024	január	jan	pondelok	po
+sk_SK	2024-02-29	29. februára 2024	február	feb	štvrtok	št
+sk_SK	2024-06-21	21. júna 2024	jún	jún	piatok	pi
+sk_SK	2024-07-07	7. júla 2024	júl	júl	nedeľa	ne
+sk_SK	2024-12-31	31. decembra 2024	december	dec	utorok	ut
+sk_SK	2025-01-01	1. januára 2025	január	jan	streda	st
+sl	2024-01-01	1. januar 2024	januar	jan.	ponedeljek	pon.
+sl	2024-02-29	29. februar 2024	februar	feb.	četrtek	čet.
+sl	2024-06-21	21. junij 2024	junij	jun.	petek	pet.
+sl	2024-07-07	7. julij 2024	julij	jul.	nedelja	ned.
+sl	2024-12-31	31. december 2024	december	dec.	torek	tor.
+sl	2025-01-01	1. januar 2025	januar	jan.	sreda	sre.
+sl_SI	2024-01-01	1. januar 2024	januar	jan.	ponedeljek	pon.
+sl_SI	2024-02-29	29. februar 2024	februar	feb.	četrtek	čet.
+sl_SI	2024-06-21	21. junij 2024	junij	jun.	petek	pet.
+sl_SI	2024-07-07	7. julij 2024	julij	jul.	nedelja	ned.
+sl_SI	2024-12-31	31. december 2024	december	dec.	torek	tor.
+sl_SI	2025-01-01	1. januar 2025	januar	jan.	sreda	sre.
+sms_FI	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+sms_FI	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+sms_FI	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+sms_FI	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+sms_FI	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+sms_FI	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+sn_ZW	2024-01-01	2024 Ndira 1	Ndira	Ndi	Muvhuro	Muv
+sn_ZW	2024-02-29	2024 Kukadzi 29	Kukadzi	Kuk	China	Chn
+sn_ZW	2024-06-21	2024 Chikumi 21	Chikumi	Chk	Chishanu	Chs
+sn_ZW	2024-07-07	2024 Chikunguru 7	Chikunguru	Chg	Svondo	Svo
+sn_ZW	2024-12-31	2024 Zvita 31	Zvita	Zvi	Chipiri	Chp
+sn_ZW	2025-01-01	2025 Ndira 1	Ndira	Ndi	Chitatu	Cht
+so_SO	2024-01-01	Janaayo 1, 2024	Jannaayo	Jan	Isniin	Isn
+so_SO	2024-02-29	Febraayo 29, 2024	Febraayo	Feb	Khamiis	Khms
+so_SO	2024-06-21	Juun 21, 2024	Juun	Jun	Jimco	Jmc
+so_SO	2024-07-07	Luulyo 7, 2024	Luulyo	Lul	Axad	Axd
+so_SO	2024-12-31	Diseembar 31, 2024	Diseembar	Dis	Talaado	Tldo
+so_SO	2025-01-01	Janaayo 1, 2025	Jannaayo	Jan	Arbaco	Arbc
+sq_AL	2024-01-01	1 janar 2024	janar	jan	e hënë	hën
+sq_AL	2024-02-29	29 shkurt 2024	shkurt	shk	e enjte	enj
+sq_AL	2024-06-21	21 qershor 2024	qershor	qer	e premte	pre
+sq_AL	2024-07-07	7 korrik 2024	korrik	korr	e diel	die
+sq_AL	2024-12-31	31 dhjetor 2024	dhjetor	dhj	e martë	mar
+sq_AL	2025-01-01	1 janar 2025	janar	jan	e mërkurë	mër
+sq_MK	2024-01-01	1 janar 2024	janar	jan	e hënë	hën
+sq_MK	2024-02-29	29 shkurt 2024	shkurt	shk	e enjte	enj
+sq_MK	2024-06-21	21 qershor 2024	qershor	qer	e premte	pre
+sq_MK	2024-07-07	7 korrik 2024	korrik	korr	e diel	die
+sq_MK	2024-12-31	31 dhjetor 2024	dhjetor	dhj	e martë	mar
+sq_MK	2025-01-01	1 janar 2025	janar	jan	e mërkurë	mër
+sr_Cyrl_BA	2024-01-01	1. јануар 2024.	јануар	јан	понедјељак	пон
+sr_Cyrl_BA	2024-02-29	29. фебруар 2024.	фебруар	феб	четвртак	чет
+sr_Cyrl_BA	2024-06-21	21. јун 2024.	јун	јун	петак	пет
+sr_Cyrl_BA	2024-07-07	7. јул 2024.	јул	јул	недјеља	нед
+sr_Cyrl_BA	2024-12-31	31. децембар 2024.	децембар	дец	уторак	уто
+sr_Cyrl_BA	2025-01-01	1. јануар 2025.	јануар	јан	сриједа	сри
+sr_Cyrl_RS	2024-01-01	1. јануар 2024.	јануар	јан	понедељак	пон
+sr_Cyrl_RS	2024-02-29	29. фебруар 2024.	фебруар	феб	четвртак	чет
+sr_Cyrl_RS	2024-06-21	21. јун 2024.	јун	јун	петак	пет
+sr_Cyrl_RS	2024-07-07	7. јул 2024.	јул	јул	недеља	нед
+sr_Cyrl_RS	2024-12-31	31. децембар 2024.	децембар	дец	уторак	уто
+sr_Cyrl_RS	2025-01-01	1. јануар 2025.	јануар	јан	среда	сре
+sr_Latn_BA	2024-01-01	1. januar 2024.	januar	jan	ponedjeljak	pon
+sr_Latn_BA	2024-02-29	29. februar 2024.	februar	feb	četvrtak	čet
+sr_Latn_BA	2024-06-21	21. jun 2024.	jun	jun	petak	pet
+sr_Latn_BA	2024-07-07	7. jul 2024.	jul	jul	nedjelja	ned
+sr_Latn_BA	2024-12-31	31. decembar 2024.	decembar	dec	utorak	uto
+sr_Latn_BA	2025-01-01	1. januar 2025.	januar	jan	srijeda	sri
+sr_Latn_ME	2024-01-01	1. januar 2024.	januar	jan	ponedeljak	pon
+sr_Latn_ME	2024-02-29	29. februar 2024.	februar	feb	četvrtak	čet
+sr_Latn_ME	2024-06-21	21. jun 2024.	jun	jun	petak	pet
+sr_Latn_ME	2024-07-07	7. jul 2024.	jul	jul	nedjelja	ned
+sr_Latn_ME	2024-12-31	31. decembar 2024.	decembar	dec	utorak	uto
+sr_Latn_ME	2025-01-01	1. januar 2025.	januar	jan	srijeda	sre
+sr_Latn_RS	2024-01-01	1. januar 2024.	januar	jan	ponedeljak	pon
+sr_Latn_RS	2024-02-29	29. februar 2024.	februar	feb	četvrtak	čet
+sr_Latn_RS	2024-06-21	21. jun 2024.	jun	jun	petak	pet
+sr_Latn_RS	2024-07-07	7. jul 2024.	jul	jul	nedelja	ned
+sr_Latn_RS	2024-12-31	31. decembar 2024.	decembar	dec	utorak	uto
+sr_Latn_RS	2025-01-01	1. januar 2025.	januar	jan	sreda	sre
+ss_SZ	2024-01-01	2024 Bhimbidvwane 1	Bhimbidvwane	Bhi	uMsombuluko	Mso
+ss_SZ	2024-02-29	2024 iNdlovana 29	iNdlovana	Van	Lesine	Ne
+ss_SZ	2024-06-21	2024 iNhlaba 21	iNhlaba	Nhl	Lesihlanu	Hla
+ss_SZ	2024-07-07	2024 Kholwane 7	Kholwane	Kho	Lisontfo	Son
+ss_SZ	2024-12-31	2024 iNgongoni 31	iNgongoni	Ngo	Lesibili	Bil
+ss_SZ	2025-01-01	2025 Bhimbidvwane 1	Bhimbidvwane	Bhi	Lesitsatfu	Tsa
+ss_ZA	2024-01-01	2024 Bhimbidvwane 1	Bhimbidvwane	Bhi	uMsombuluko	Mso
+ss_ZA	2024-02-29	2024 iNdlovana 29	iNdlovana	Van	Lesine	Ne
+ss_ZA	2024-06-21	2024 iNhlaba 21	iNhlaba	Nhl	Lesihlanu	Hla
+ss_ZA	2024-07-07	2024 Kholwane 7	Kholwane	Kho	Lisontfo	Son
+ss_ZA	2024-12-31	2024 iNgongoni 31	iNgongoni	Ngo	Lesibili	Bil
+ss_ZA	2025-01-01	2025 Bhimbidvwane 1	Bhimbidvwane	Bhi	Lesitsatfu	Tsa
+st_LS	2024-01-01	2024 Pherekgong 1	Pherekgong	Phe	Mantaha	Mma
+st_LS	2024-02-29	2024 Hlakola 29	Hlakola	Kol	Labone	Ne
+st_LS	2024-06-21	2024 Phupjane 21	Phupjane	Jan	Labohlano	Hla
+st_LS	2024-07-07	2024 Phupu 7	Phupu	Upu	Sontaha	Son
+st_LS	2024-12-31	2024 Tshitwe 31	Tshitwe	Tsh	Labobedi	Bed
+st_LS	2025-01-01	2025 Pherekgong 1	Pherekgong	Phe	Laboraro	Rar
+st_ZA	2024-01-01	2024 Pherekgong 1	Pherekgong	Phe	Mantaha	Mma
+st_ZA	2024-02-29	2024 Hlakola 29	Hlakola	Kol	Labone	Ne
+st_ZA	2024-06-21	2024 Phupjane 21	Phupjane	Jan	Labohlano	Hla
+st_ZA	2024-07-07	2024 Phupu 7	Phupu	Upu	Sontaha	Son
+st_ZA	2024-12-31	2024 Tshitwe 31	Tshitwe	Tsh	Labobedi	Bed
+st_ZA	2025-01-01	2025 Pherekgong 1	Pherekgong	Phe	Laboraro	Rar
+sv_AX	2024-01-01	1 januari 2024	januari	jan.	måndag	mån
+sv_AX	2024-02-29	29 februari 2024	februari	feb.	torsdag	tors
+sv_AX	2024-06-21	21 juni 2024	juni	juni	fredag	fre
+sv_AX	2024-07-07	7 juli 2024	juli	juli	söndag	sön
+sv_AX	2024-12-31	31 december 2024	december	dec.	tisdag	tis
+sv_AX	2025-01-01	1 januari 2025	januari	jan.	onsdag	ons
+sv_FI	2024-01-01	1 januari 2024	januari	jan.	måndag	mån
+sv_FI	2024-02-29	29 februari 2024	februari	feb.	torsdag	tors
+sv_FI	2024-06-21	21 juni 2024	juni	juni	fredag	fre
+sv_FI	2024-07-07	7 juli 2024	juli	juli	söndag	sön
+sv_FI	2024-12-31	31 december 2024	december	dec.	tisdag	tis
+sv_FI	2025-01-01	1 januari 2025	januari	jan.	onsdag	ons
+sv_SE	2024-01-01	1 januari 2024	januari	jan.	måndag	mån
+sv_SE	2024-02-29	29 februari 2024	februari	feb.	torsdag	tors
+sv_SE	2024-06-21	21 juni 2024	juni	juni	fredag	fre
+sv_SE	2024-07-07	7 juli 2024	juli	juli	söndag	sön
+sv_SE	2024-12-31	31 december 2024	december	dec.	tisdag	tis
+sv_SE	2025-01-01	1 januari 2025	januari	jan.	onsdag	ons
+sw_CD	2024-01-01	1 Januari 2024	Januari	Jan	Jumatatu	Jumatatu
+sw_CD	2024-02-29	29 Februari 2024	Februari	Feb	Alhamisi	Alhamisi
+sw_CD	2024-06-21	21 Juni 2024	Juni	Jun	Ijumaa	Ijumaa
+sw_CD	2024-07-07	7 Julai 2024	Julai	Jul	Jumapili	Jumapili
+sw_CD	2024-12-31	31 Desemba 2024	Desemba	Des	Jumanne	Jumanne
+sw_CD	2025-01-01	1 Januari 2025	Januari	Jan	Jumatano	Jumatano
+sw_KE	2024-01-01	1 Januari 2024	Januari	Jan	Jumatatu	Jumatatu
+sw_KE	2024-02-29	29 Februari 2024	Februari	Feb	Alhamisi	Alhamisi
+sw_KE	2024-06-21	21 Juni 2024	Juni	Jun	Ijumaa	Ijumaa
+sw_KE	2024-07-07	7 Julai 2024	Julai	Jul	Jumapili	Jumapili
+sw_KE	2024-12-31	31 Desemba 2024	Desemba	Des	Jumanne	Jumanne
+sw_KE	2025-01-01	1 Januari 2025	Januari	Jan	Jumatano	Jumatano
+sw_TZ	2024-01-01	1 Januari 2024	Januari	Jan	Jumatatu	Jumatatu
+sw_TZ	2024-02-29	29 Februari 2024	Februari	Feb	Alhamisi	Alhamisi
+sw_TZ	2024-06-21	21 Juni 2024	Juni	Jun	Ijumaa	Ijumaa
+sw_TZ	2024-07-07	7 Julai 2024	Julai	Jul	Jumapili	Jumapili
+sw_TZ	2024-12-31	31 Desemba 2024	Desemba	Des	Jumanne	Jumanne
+sw_TZ	2025-01-01	1 Januari 2025	Januari	Jan	Jumatano	Jumatano
+sw_UG	2024-01-01	1 Januari 2024	Januari	Jan	Jumatatu	Jumatatu
+sw_UG	2024-02-29	29 Februari 2024	Februari	Feb	Alhamisi	Alhamisi
+sw_UG	2024-06-21	21 Juni 2024	Juni	Jun	Ijumaa	Ijumaa
+sw_UG	2024-07-07	7 Julai 2024	Julai	Jul	Jumapili	Jumapili
+sw_UG	2024-12-31	31 Desemba 2024	Desemba	Des	Jumanne	Jumanne
+sw_UG	2025-01-01	1 Januari 2025	Januari	Jan	Jumatano	Jumatano
+ta_IN	2024-01-01	1 ஜனவரி, 2024	ஜனவரி	ஜன.	திங்கள்	திங்.
+ta_IN	2024-02-29	29 பிப்ரவரி, 2024	பிப்ரவரி	பிப்.	வியாழன்	வியா.
+ta_IN	2024-06-21	21 ஜூன், 2024	ஜூன்	ஜூன்	வெள்ளி	வெள்.
+ta_IN	2024-07-07	7 ஜூலை, 2024	ஜூலை	ஜூலை	ஞாயிறு	ஞாயி.
+ta_IN	2024-12-31	31 டிசம்பர், 2024	டிசம்பர்	டிச.	செவ்வாய்	செவ்.
+ta_IN	2025-01-01	1 ஜனவரி, 2025	ஜனவரி	ஜன.	புதன்	புத.
+ta_LK	2024-01-01	1 ஜனவரி, 2024	ஜனவரி	ஜன.	திங்கள்	திங்.
+ta_LK	2024-02-29	29 பிப்ரவரி, 2024	பிப்ரவரி	பிப்.	வியாழன்	வியா.
+ta_LK	2024-06-21	21 ஜூன், 2024	ஜூன்	ஜூன்	வெள்ளி	வெள்.
+ta_LK	2024-07-07	7 ஜூலை, 2024	ஜூலை	ஜூலை	ஞாயிறு	ஞாயி.
+ta_LK	2024-12-31	31 டிசம்பர், 2024	டிசம்பர்	டிச.	செவ்வாய்	செவ்.
+ta_LK	2025-01-01	1 ஜனவரி, 2025	ஜனவரி	ஜன.	புதன்	புத.
+ta_SG	2024-01-01	1 ஜனவரி, 2024	ஜனவரி	ஜன.	திங்கள்	திங்.
+ta_SG	2024-02-29	29 பிப்ரவரி, 2024	பிப்ரவரி	பிப்.	வியாழன்	வியா.
+ta_SG	2024-06-21	21 ஜூன், 2024	ஜூன்	ஜூன்	வெள்ளி	வெள்.
+ta_SG	2024-07-07	7 ஜூலை, 2024	ஜூலை	ஜூலை	ஞாயிறு	ஞாயி.
+ta_SG	2024-12-31	31 டிசம்பர், 2024	டிசம்பர்	டிச.	செவ்வாய்	செவ்.
+ta_SG	2025-01-01	1 ஜனவரி, 2025	ஜனவரி	ஜன.	புதன்	புத.
+te_IN	2024-01-01	1 జనవరి, 2024	జనవరి	జన	సోమవారం	సోమ
+te_IN	2024-02-29	29 ఫిబ్రవరి, 2024	ఫిబ్రవరి	ఫిబ్ర	గురువారం	గురు
+te_IN	2024-06-21	21 జూన్, 2024	జూన్	జూన్	శుక్రవారం	శుక్ర
+te_IN	2024-07-07	7 జులై, 2024	జులై	జులై	ఆదివారం	ఆది
+te_IN	2024-12-31	31 డిసెంబర్, 2024	డిసెంబర్	డిసెం	మంగళవారం	మంగళ
+te_IN	2025-01-01	1 జనవరి, 2025	జనవరి	జన	బుధవారం	బుధ
+tg_TJ	2024-01-01	01 Январ 2024	Январ	Янв	Душанбе	Дшб
+tg_TJ	2024-02-29	29 Феврал 2024	Феврал	Фев	Панҷшанбе	Пшб
+tg_TJ	2024-06-21	21 Июн 2024	Июн	Июн	Ҷумъа	Ҷмъ
+tg_TJ	2024-07-07	07 Июл 2024	Июл	Июл	Якшанбе	Яшб
+tg_TJ	2024-12-31	31 Декабр 2024	Декабр	Дек	Сешанбе	Сшб
+tg_TJ	2025-01-01	01 Январ 2025	Январ	Янв	Чоршанбе	Чшб
+th_TH	2024-01-01	1 มกราคม ค.ศ. 2024	มกราคม	ม.ค.	วันจันทร์	จ.
+th_TH	2024-02-29	29 กุมภาพันธ์ ค.ศ. 2024	กุมภาพันธ์	ก.พ.	วันพฤหัสบดี	พฤ.
+th_TH	2024-06-21	21 มิถุนายน ค.ศ. 2024	มิถุนายน	มิ.ย.	วันศุกร์	ศ.
+th_TH	2024-07-07	7 กรกฎาคม ค.ศ. 2024	กรกฎาคม	ก.ค.	วันอาทิตย์	อา.
+th_TH	2024-12-31	31 ธันวาคม ค.ศ. 2024	ธันวาคม	ธ.ค.	วันอังคาร	อ.
+th_TH	2025-01-01	1 มกราคม ค.ศ. 2025	มกราคม	ม.ค.	วันพุธ	พ.
+ti_ER	2024-01-01	ጥሪ 1, 2024	ጥሪ	ጥሪ	ሰኑይ	ሰኑ
+ti_ER	2024-02-29	ለካቲት 29, 2024	ለካቲት	ለካ	ሓሙስ	ሓሙ
+ti_ER	2024-06-21	ሰነ 21, 2024	ሰነ	ሰነ	ዓርቢ	ዓር
+ti_ER	2024-07-07	ሓምለ 7, 2024	ሓምለ	ሓም	ሰንበት	ሰን
+ti_ER	2024-12-31	ታሕሳስ 31, 2024	ታሕሳስ	ታሕ	ሰሉስ	ሰሉ
+ti_ER	2025-01-01	ጥሪ 1, 2025	ጥሪ	ጥሪ	ረቡዕ	ረቡ
+tk	2024-01-01	1 ýanwar 2024	Ýanwar	ýan	duşenbe	duş
+tk	2024-02-29	29 fewral 2024	Fewral	few	penşenbe	pen
+tk	2024-06-21	21 iýun 2024	Iýun	iýun	anna	ann
+tk	2024-07-07	7 iýul 2024	Iýul	iýul	ýekşenbe	ýek
+tk	2024-12-31	31 dekabr 2024	Dekabr	dek	sişenbe	siş
+tk	2025-01-01	1 ýanwar 2025	Ýanwar	ýan	çarşenbe	çar
+tk_TM	2024-01-01	1 ýanwar 2024	Ýanwar	ýan	duşenbe	duş
+tk_TM	2024-02-29	29 fewral 2024	Fewral	few	penşenbe	pen
+tk_TM	2024-06-21	21 iýun 2024	Iýun	iýun	anna	ann
+tk_TM	2024-07-07	7 iýul 2024	Iýul	iýul	ýekşenbe	ýek
+tk_TM	2024-12-31	31 dekabr 2024	Dekabr	dek	sişenbe	siş
+tk_TM	2025-01-01	1 ýanwar 2025	Ýanwar	ýan	çarşenbe	çar
+tn_BW	2024-01-01	2024 Ferikgong 1	Ferikgong	Fer	Mosupologo	Mos
+tn_BW	2024-02-29	2024 Tlhakole 29	Tlhakole	Tlh	Labone	Labn
+tn_BW	2024-06-21	2024 Seetebosigo 21	Seetebosigo	See	Labotlhano	Labt
+tn_BW	2024-07-07	2024 Phukwi 7	Phukwi	Phu	Tshipi	Tsh
+tn_BW	2024-12-31	2024 Sedimonthole 31	Sedimonthole	Sed	Labobedi	Labb
+tn_BW	2025-01-01	2025 Ferikgong 1	Ferikgong	Fer	Laboraro	Labr
+tn_ZA	2024-01-01	2024 Ferikgong 1	Ferikgong	Fer	Mosupologo	Mos
+tn_ZA	2024-02-29	2024 Tlhakole 29	Tlhakole	Tlh	Labone	Labn
+tn_ZA	2024-06-21	2024 Seetebosigo 21	Seetebosigo	See	Labotlhano	Labt
+tn_ZA	2024-07-07	2024 Phukwi 7	Phukwi	Phu	Tshipi	Tsh
+tn_ZA	2024-12-31	2024 Sedimonthole 31	Sedimonthole	Sed	Labobedi	Labb
+tn_ZA	2025-01-01	2025 Ferikgong 1	Ferikgong	Fer	Laboraro	Labr
+to_TO	2024-01-01	1 Sānuali 2024	Sānuali	Sān	Mōnite	Mōn
+to_TO	2024-02-29	29 Fēpueli 2024	Fēpueli	Fēp	Tuʻapulelulu	Tuʻa
+to_TO	2024-06-21	21 Sune 2024	Sune	Sun	Falaite	Fal
+to_TO	2024-07-07	7 Siulai 2024	Siulai	Siu	Sāpate	Sāp
+to_TO	2024-12-31	31 Tīsema 2024	Tīsema	Tīs	Tūsite	Tūs
+to_TO	2025-01-01	1 Sānuali 2025	Sānuali	Sān	Pulelulu	Pul
+tpi_PG	2024-01-01	01 Janueri 2024	Janueri	Jan	Mande	Man
+tpi_PG	2024-02-29	29 Februeri 2024	Februeri	Feb	Fonde	Fon
+tpi_PG	2024-06-21	21 Jun 2024	Jun	Jun	Fraide	Fra
+tpi_PG	2024-07-07	07 Julai 2024	Julai	Jul	Sande	San
+tpi_PG	2024-12-31	31 Desemba 2024	Desemba	Des	Tunde	Tun
+tpi_PG	2025-01-01	01 Janueri 2025	Janueri	Jan	Trinde	Tri
+tr_CY	2024-01-01	1 Ocak 2024	Ocak	Oca	Pazartesi	Pzt
+tr_CY	2024-02-29	29 Şubat 2024	Şubat	Şub	Perşembe	Per
+tr_CY	2024-06-21	21 Haziran 2024	Haziran	Haz	Cuma	Cum
+tr_CY	2024-07-07	7 Temmuz 2024	Temmuz	Tem	Pazar	Paz
+tr_CY	2024-12-31	31 Aralık 2024	Aralık	Ara	Salı	Sal
+tr_CY	2025-01-01	1 Ocak 2025	Ocak	Oca	Çarşamba	Çar
+tr_TR	2024-01-01	1 Ocak 2024	Ocak	Oca	Pazartesi	Pzt
+tr_TR	2024-02-29	29 Şubat 2024	Şubat	Şub	Perşembe	Per
+tr_TR	2024-06-21	21 Haziran 2024	Haziran	Haz	Cuma	Cum
+tr_TR	2024-07-07	7 Temmuz 2024	Temmuz	Tem	Pazar	Paz
+tr_TR	2024-12-31	31 Aralık 2024	Aralık	Ara	Salı	Sal
+tr_TR	2025-01-01	1 Ocak 2025	Ocak	Oca	Çarşamba	Çar
+ts_ZA	2024-01-01	2024 Sunguti 1	Sunguti	Sun	Musumbhunuku	Mus
+ts_ZA	2024-02-29	2024 Nyenyenyani 29	Nyenyenyani	Yan	Ravumune	Ne
+ts_ZA	2024-06-21	2024 Khotavuxika 21	Khotavuxika	Kho	Ravuntlhanu	Tlh
+ts_ZA	2024-07-07	2024 Mawuwani 7	Mawuwani	Maw	Sonta	Son
+ts_ZA	2024-12-31	2024 N’wendzamhala 31	N’wendzamhala	N’w	Ravumbirhi	Bir
+ts_ZA	2025-01-01	2025 Sunguti 1	Sunguti	Sun	Ravunharhu	Har
+tt_RU	2024-01-01	1 гыйнвар, 2024 ел	гыйнвар	гыйн.	дүшәмбе	дүш.
+tt_RU	2024-02-29	29 февраль, 2024 ел	февраль	фев.	пәнҗешәмбе	пәнҗ.
+tt_RU	2024-06-21	21 июнь, 2024 ел	июнь	июнь	җомга	җом.
+tt_RU	2024-07-07	7 июль, 2024 ел	июль	июль	якшәмбе	якш.
+tt_RU	2024-12-31	31 декабрь, 2024 ел	декабрь	дек.	сишәмбе	сиш.
+tt_RU	2025-01-01	1 гыйнвар, 2025 ел	гыйнвар	гыйн.	чәршәмбе	чәр.
+tyv_RU	2024-01-01	2024 M01 1	M01	M01	Mon	Mon
+tyv_RU	2024-02-29	2024 M02 29	M02	M02	Thu	Thu
+tyv_RU	2024-06-21	2024 M06 21	M06	M06	Fri	Fri
+tyv_RU	2024-07-07	2024 M07 7	M07	M07	Sun	Sun
+tyv_RU	2024-12-31	2024 M12 31	M12	M12	Tue	Tue
+tyv_RU	2025-01-01	2025 M01 1	M01	M01	Wed	Wed
+tzm_MA	2024-01-01	1 Yennayer 2024	Yennayer	Yen	Aynas	Ayn
+tzm_MA	2024-02-29	29 Yebrayer 2024	Yebrayer	Yeb	Akwas	Akw
+tzm_MA	2024-06-21	21 Yunyu 2024	Yunyu	Yun	Asimwas	Asm
+tzm_MA	2024-07-07	7 Yulyuz 2024	Yulyuz	Yul	Asamas	Asa
+tzm_MA	2024-12-31	31 Dujanbir 2024	Dujanbir	Duj	Asinas	Asn
+tzm_MA	2025-01-01	1 Yennayer 2025	Yennayer	Yen	Akras	Akr
+ug_CN	2024-01-01	1-يانۋار، 2024	يانۋار	يانۋار	دۈشەنبە	دۈ
+ug_CN	2024-02-29	29-فېۋرال، 2024	فېۋرال	فېۋرال	پەيشەنبە	پە
+ug_CN	2024-06-21	21-ئىيۇن، 2024	ئىيۇن	ئىيۇن	جۈمە	جۈ
+ug_CN	2024-07-07	7-ئىيۇل، 2024	ئىيۇل	ئىيۇل	يەكشەنبە	يە
+ug_CN	2024-12-31	31-دېكابىر، 2024	دېكابىر	دېكابىر	سەيشەنبە	سە
+ug_CN	2025-01-01	1-يانۋار، 2025	يانۋار	يانۋار	چارشەنبە	چا
+uk	2024-01-01	1 січня 2024 р.	січень	січ.	понеділок	пн
+uk	2024-02-29	29 лютого 2024 р.	лютий	лют.	четвер	чт
+uk	2024-06-21	21 червня 2024 р.	червень	черв.	пʼятниця	пт
+uk	2024-07-07	7 липня 2024 р.	липень	лип.	неділя	нд
+uk	2024-12-31	31 грудня 2024 р.	грудень	груд.	вівторок	вт
+uk	2025-01-01	1 січня 2025 р.	січень	січ.	середа	ср
+uk_UA	2024-01-01	1 січня 2024 р.	січень	січ.	понеділок	пн
+uk_UA	2024-02-29	29 лютого 2024 р.	лютий	лют.	четвер	чт
+uk_UA	2024-06-21	21 червня 2024 р.	червень	черв.	пʼятниця	пт
+uk_UA	2024-07-07	7 липня 2024 р.	липень	лип.	неділя	нд
+uk_UA	2024-12-31	31 грудня 2024 р.	грудень	груд.	вівторок	вт
+uk_UA	2025-01-01	1 січня 2025 р.	січень	січ.	середа	ср
+ur_IN	2024-01-01	1 جنوری، 2024	جنوری	جنوری	پیر	پیر
+ur_IN	2024-02-29	29 فروری، 2024	فروری	فروری	جمعرات	جمعرات
+ur_IN	2024-06-21	21 جون، 2024	جون	جون	جمعہ	جمعہ
+ur_IN	2024-07-07	7 جولائی، 2024	جولائی	جولائی	اتوار	اتوار
+ur_IN	2024-12-31	31 دسمبر، 2024	دسمبر	دسمبر	منگل	منگل
+ur_IN	2025-01-01	1 جنوری، 2025	جنوری	جنوری	بدھ	بدھ
+ur_PK	2024-01-01	1 جنوری، 2024	جنوری	جنوری	پیر	پیر
+ur_PK	2024-02-29	29 فروری، 2024	فروری	فروری	جمعرات	جمعرات
+ur_PK	2024-06-21	21 جون، 2024	جون	جون	جمعہ	جمعہ
+ur_PK	2024-07-07	7 جولائی، 2024	جولائی	جولائی	اتوار	اتوار
+ur_PK	2024-12-31	31 دسمبر، 2024	دسمبر	دسمبر	منگل	منگل
+ur_PK	2025-01-01	1 جنوری، 2025	جنوری	جنوری	بدھ	بدھ
+uz_Arab_AF	2024-01-01	1 نچی جنوری 2024	جنوری	جنو	دوشنبه	د.
+uz_Arab_AF	2024-02-29	29 نچی فبروری 2024	فبروری	فبر	پنجشنبه	پ.
+uz_Arab_AF	2024-06-21	21 نچی جون 2024	جون	جون	جمعه	ج.
+uz_Arab_AF	2024-07-07	7 نچی جولای 2024	جولای	جول	یکشنبه	ی.
+uz_Arab_AF	2024-12-31	31 نچی دسمبر 2024	دسمبر	دسم	سه‌شنبه	س.
+uz_Arab_AF	2025-01-01	1 نچی جنوری 2025	جنوری	جنو	چهارشنبه	چ.
+uz_Cyrl_UZ	2024-01-01	1 январ, 2024	январ	янв	душанба	душ
+uz_Cyrl_UZ	2024-02-29	29 феврал, 2024	феврал	фев	пайшанба	пай
+uz_Cyrl_UZ	2024-06-21	21 июн, 2024	июн	июн	жума	жум
+uz_Cyrl_UZ	2024-07-07	7 июл, 2024	июл	июл	якшанба	якш
+uz_Cyrl_UZ	2024-12-31	31 декабр, 2024	декабр	дек	сешанба	сеш
+uz_Cyrl_UZ	2025-01-01	1 январ, 2025	январ	янв	чоршанба	чор
+uz_Latn_UZ	2024-01-01	1-yanvar, 2024	Yanvar	yan	dushanba	Dush
+uz_Latn_UZ	2024-02-29	29-fevral, 2024	Fevral	fev	payshanba	Pay
+uz_Latn_UZ	2024-06-21	21-iyun, 2024	Iyun	iyn	juma	Jum
+uz_Latn_UZ	2024-07-07	7-iyul, 2024	Iyul	iyl	yakshanba	Yak
+uz_Latn_UZ	2024-12-31	31-dekabr, 2024	Dekabr	dek	seshanba	Sesh
+uz_Latn_UZ	2025-01-01	1-yanvar, 2025	Yanvar	yan	chorshanba	Chor
+ve_ZA	2024-01-01	2024 Phando 1	Phando	Pha	Musumbuluwo	Mus
+ve_ZA	2024-02-29	2024 Luhuhi 29	Luhuhi	Luh	Ḽavhuṋa	Ṋa
+ve_ZA	2024-06-21	2024 Fulwi 21	Fulwi	Lwi	Ḽavhuṱanu	Ṱan
+ve_ZA	2024-07-07	2024 Fulwana 7	Fulwana	Lwa	Swondaha	Swo
+ve_ZA	2024-12-31	2024 Nyendavhusiku 31	Nyendavhusiku	Nye	Ḽavhuvhili	Vhi
+ve_ZA	2025-01-01	2025 Phando 1	Phando	Pha	Ḽavhuraru	Rar
+vec	2024-01-01	1 jenaro 2024	jenaro	jen	luni	lun
+vec	2024-02-29	29 febraro 2024	febraro	feb	zoba	zob
+vec	2024-06-21	21 jugno 2024	jugno	jug	vènare	vèn
+vec	2024-07-07	7 lujo 2024	lujo	luj	doménega	dom
+vec	2024-12-31	31 dezenbre 2024	dezenbre	dez	marti	mar
+vec	2025-01-01	1 jenaro 2025	jenaro	jen	mèrcore	mer
+vec_IT	2024-01-01	1 jenaro 2024	jenaro	jen	luni	lun
+vec_IT	2024-02-29	29 febraro 2024	febraro	feb	zoba	zob
+vec_IT	2024-06-21	21 jugno 2024	jugno	jug	vènare	vèn
+vec_IT	2024-07-07	7 lujo 2024	lujo	luj	doménega	dom
+vec_IT	2024-12-31	31 dezenbre 2024	dezenbre	dez	marti	mar
+vec_IT	2025-01-01	1 jenaro 2025	jenaro	jen	mèrcore	mer
+vi_VN	2024-01-01	1 tháng 1, 2024	Tháng 1	thg 1	Thứ Hai	Th 2
+vi_VN	2024-02-29	29 tháng 2, 2024	Tháng 2	thg 2	Thứ Năm	Th 5
+vi_VN	2024-06-21	21 tháng 6, 2024	Tháng 6	thg 6	Thứ Sáu	Th 6
+vi_VN	2024-07-07	7 tháng 7, 2024	Tháng 7	thg 7	Chủ Nhật	CN
+vi_VN	2024-12-31	31 tháng 12, 2024	Tháng 12	thg 12	Thứ Ba	Th 3
+vi_VN	2025-01-01	1 tháng 1, 2025	Tháng 1	thg 1	Thứ Tư	Th 4
+wo_SN	2024-01-01	1 Samwiyee, 2024	Samwiyee	Sam	Altine	Alt
+wo_SN	2024-02-29	29 Fewriyee, 2024	Fewriyee	Few	Alxamis	Alx
+wo_SN	2024-06-21	21 Suwe, 2024	Suwe	Suw	Àjjuma	Àjj
+wo_SN	2024-07-07	7 Sulet, 2024	Sulet	Sul	Dibéer	Dib
+wo_SN	2024-12-31	31 Desàmbar, 2024	Desàmbar	Des	Talaata	Tal
+wo_SN	2025-01-01	1 Samwiyee, 2025	Samwiyee	Sam	Àlarba	Àla
+xh_ZA	2024-01-01	Janyuwari 1, 2024	Janyuwari	Jan	Mvulo	Mvu
+xh_ZA	2024-02-29	Februwari 29, 2024	Februwari	Feb	Lwesine	Sin
+xh_ZA	2024-06-21	Juni 21, 2024	Juni	Jun	Lwesihlanu	Hla
+xh_ZA	2024-07-07	Julayi 7, 2024	Julayi	Jul	Cawe	Caw
+xh_ZA	2024-12-31	Disemba 31, 2024	Disemba	Dis	Lwesibini	Lwesb
+xh_ZA	2025-01-01	Janyuwari 1, 2025	Janyuwari	Jan	Lwesithathu	Tha
+yi	2024-01-01	1טן יאַנואַר 2024	יאַנואַר	יאַנואַר	מאָנטיק	מאָנטיק
+yi	2024-02-29	29טן פֿעברואַר 2024	פֿעברואַר	פֿעברואַר	דאנערשטיק	דאנערשטיק
+yi	2024-06-21	21טן יוני 2024	יוני	יוני	פֿרײַטיק	פֿרײַטיק
+yi	2024-07-07	7טן יולי 2024	יולי	יולי	זונטיק	זונטיק
+yi	2024-12-31	31טן דעצעמבער 2024	דעצעמבער	דעצעמבער	דינסטיק	דינסטיק
+yi	2025-01-01	1טן יאַנואַר 2025	יאַנואַר	יאַנואַר	מיטוואך	מיטוואך
+yo_NG	2024-01-01	1 Oṣù Ṣẹ́rẹ́ 2024	Oṣù Ṣẹ́rẹ́	Oṣù Ṣẹ́rẹ́	Ọjọ́ Ajé	Ajé
+yo_NG	2024-02-29	29 Oṣù Èrèlè 2024	Oṣù Èrèlè	Oṣù Èrèlè	Ọjọ́bọ	Ọjọ́bọ
+yo_NG	2024-06-21	21 Oṣù Òkúdu 2024	Oṣù Òkúdu	Oṣù Òkúdu	Ọjọ́ Ẹtì	Ẹtì
+yo_NG	2024-07-07	7 Oṣù Agẹmọ 2024	Oṣù Agẹmọ	Oṣù Agẹmọ	Ọjọ́ Àìkú	Àìkú
+yo_NG	2024-12-31	31 Oṣù Ọ̀pẹ̀ 2024	Oṣù Ọ̀pẹ̀	Oṣù Ọ̀pẹ̀	Ọjọ́ Ìsẹ́gun	Ìsẹ́gun
+yo_NG	2025-01-01	1 Oṣù Ṣẹ́rẹ́ 2025	Oṣù Ṣẹ́rẹ́	Oṣù Ṣẹ́rẹ́	Ọjọ́rú	Ọjọ́rú
+za_CN	2024-01-01	2024 ndwenit 1	ndwenit	ndwenit	singhgizit	singhgizit
+za_CN	2024-02-29	2024 ndwenngeih 29	ndwenngeih	ndwenngeih	singhgizseiq	singhgizseiq
+za_CN	2024-06-21	2024 ndwenloeg 21	ndwenloeg	ndwenloeg	singhgizhaj	singhgizhaj
+za_CN	2024-07-07	2024 ndwencaet 7	ndwencaet	ndwencaet	ngoenzsinghgiz	ngoenzsinghgiz
+za_CN	2024-12-31	2024 ndwencibngeih 31	ndwencibngeih	ndwencibngeih	singhgizngeih	singhgizngeih
+za_CN	2025-01-01	2025 ndwenit 1	ndwenit	ndwenit	singhgizsam	singhgizsam
+zh_Hans_CN	2024-01-01	2024年1月1日	一月	1月	星期一	周一
+zh_Hans_CN	2024-02-29	2024年2月29日	二月	2月	星期四	周四
+zh_Hans_CN	2024-06-21	2024年6月21日	六月	6月	星期五	周五
+zh_Hans_CN	2024-07-07	2024年7月7日	七月	7月	星期日	周日
+zh_Hans_CN	2024-12-31	2024年12月31日	十二月	12月	星期二	周二
+zh_Hans_CN	2025-01-01	2025年1月1日	一月	1月	星期三	周三
+zh_Hans_SG	2024-01-01	2024年1月1日	一月	1月	星期一	周一
+zh_Hans_SG	2024-02-29	2024年2月29日	二月	2月	星期四	周四
+zh_Hans_SG	2024-06-21	2024年6月21日	六月	6月	星期五	周五
+zh_Hans_SG	2024-07-07	2024年7月7日	七月	7月	星期日	周日
+zh_Hans_SG	2024-12-31	2024年12月31日	十二月	12月	星期二	周二
+zh_Hans_SG	2025-01-01	2025年1月1日	一月	1月	星期三	周三
+zh_Hant_HK	2024-01-01	2024年1月1日	1月	1月	星期一	週一
+zh_Hant_HK	2024-02-29	2024年2月29日	2月	2月	星期四	週四
+zh_Hant_HK	2024-06-21	2024年6月21日	6月	6月	星期五	週五
+zh_Hant_HK	2024-07-07	2024年7月7日	7月	7月	星期日	週日
+zh_Hant_HK	2024-12-31	2024年12月31日	12月	12月	星期二	週二
+zh_Hant_HK	2025-01-01	2025年1月1日	1月	1月	星期三	週三
+zh_Hant_MO	2024-01-01	2024年1月1日	1月	1月	星期一	週一
+zh_Hant_MO	2024-02-29	2024年2月29日	2月	2月	星期四	週四
+zh_Hant_MO	2024-06-21	2024年6月21日	6月	6月	星期五	週五
+zh_Hant_MO	2024-07-07	2024年7月7日	7月	7月	星期日	週日
+zh_Hant_MO	2024-12-31	2024年12月31日	12月	12月	星期二	週二
+zh_Hant_MO	2025-01-01	2025年1月1日	1月	1月	星期三	週三
+zh_Hant_TW	2024-01-01	2024年1月1日	1月	1月	星期一	週一
+zh_Hant_TW	2024-02-29	2024年2月29日	2月	2月	星期四	週四
+zh_Hant_TW	2024-06-21	2024年6月21日	6月	6月	星期五	週五
+zh_Hant_TW	2024-07-07	2024年7月7日	7月	7月	星期日	週日
+zh_Hant_TW	2024-12-31	2024年12月31日	12月	12月	星期二	週二
+zh_Hant_TW	2025-01-01	2025年1月1日	1月	1月	星期三	週三
+zu_ZA	2024-01-01	Januwari 1, 2024	Januwari	Jan	UMsombuluko	Mso
+zu_ZA	2024-02-29	Februwari 29, 2024	Februwari	Feb	ULwesine	Sin
+zu_ZA	2024-06-21	Juni 21, 2024	Juni	Jun	ULwesihlanu	Hla
+zu_ZA	2024-07-07	Julayi 7, 2024	Julayi	Jul	ISonto	Son
+zu_ZA	2024-12-31	Disemba 31, 2024	Disemba	Dis	ULwesibili	Bil
+zu_ZA	2025-01-01	Januwari 1, 2025	Januwari	Jan	ULwesithathu	Tha

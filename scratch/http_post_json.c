@@ -7,6 +7,7 @@
  */
 
 #include <stdlib.h>
+
 #include "http.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */

@@ -66,7 +66,8 @@ static void trace_timing(const char *label, double *last_seconds)
     *last_seconds = now;
 }
 
-#define DATETIME_LAB_CACHE_SCHEMA "datetime_lab_output_v4"
+/* The native cards require complete multiline calendar sections, absent from legacy v4 caches. */
+#define DATETIME_LAB_CACHE_SCHEMA "datetime_lab_output_v5"
 #define DATETIME_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define DATETIME_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
 

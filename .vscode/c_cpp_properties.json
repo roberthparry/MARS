@@ -5,9 +5,16 @@
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
             "intelliSenseMode": "linux-gcc-x64",
+            "mergeConfigurations": true,
             "defines": [
                 "HAVE_UNISTRING",
-                "_GNU_SOURCE"
+                "_GNU_SOURCE",
+                "MARS_CONFIG_ROOT_DIR=\"${workspaceFolder}\"",
+                "MARS_CONFIG_PROGRAM=\"${workspaceFolder}/tools/mars_config/build/release/mars_config\"",
+                "MARS_CHECKS_ROOT_DIR=\"${workspaceFolder}\"",
+                "MARS_HTTP_FIXTURE_PATH=\"${workspaceFolder}/tests/build/release/http/fixtures/http_fixture\"",
+                "MARS_CHECKS_BENCHMARK_PATH=\"${workspaceFolder}/build/release/bench/expression/bench_expr_parse\"",
+                "MARS_CHECKS_PROCESS_FIXTURE_PATH=\"${workspaceFolder}/tools/mars_checks/build/release/tests/fixtures/checks_process_fixture\""
             ],
             "includePath": [
                 "${workspaceFolder}",
@@ -16,7 +23,17 @@
                 "${workspaceFolder}/src/**",
                 "${workspaceFolder}/tests",
                 "${workspaceFolder}/tests/include",
-                "${workspaceFolder}/tests/**"
+                "${workspaceFolder}/tests/**",
+                "${workspaceFolder}/tools/mars_lab/include",
+                "${workspaceFolder}/tools/mars_lab/src",
+                "${workspaceFolder}/tools/to_be_announced_lab/include",
+                "${workspaceFolder}/tools/to_be_announced_lab/src",
+                "${workspaceFolder}/tools/mars_config/include",
+                "${workspaceFolder}/tools/mars_config/src",
+                "${workspaceFolder}/tools/mars_config/tests",
+                "${workspaceFolder}/tools/mars_checks/include",
+                "${workspaceFolder}/tools/mars_checks/src",
+                "${workspaceFolder}/tools/mars_checks/tests"
             ],
             "browse": {
                 "path": [
@@ -24,7 +41,17 @@
                     "${workspaceFolder}/include",
                     "${workspaceFolder}/src",
                     "${workspaceFolder}/tests",
-                    "${workspaceFolder}/tests/include"
+                    "${workspaceFolder}/tests/include",
+                    "${workspaceFolder}/tools/mars_lab/include",
+                    "${workspaceFolder}/tools/mars_lab/src",
+                    "${workspaceFolder}/tools/to_be_announced_lab/include",
+                    "${workspaceFolder}/tools/to_be_announced_lab/src",
+                    "${workspaceFolder}/tools/mars_config/include",
+                    "${workspaceFolder}/tools/mars_config/src",
+                    "${workspaceFolder}/tools/mars_config/tests",
+                    "${workspaceFolder}/tools/mars_checks/include",
+                    "${workspaceFolder}/tools/mars_checks/src",
+                    "${workspaceFolder}/tools/mars_checks/tests"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }

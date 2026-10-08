@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "file.h"
 
 #define MARS_XML_INTERNAL_ACCESS

@@ -9,12 +9,13 @@
  * domain restrictions when extending these operations.
  */
 
+#include <stdio.h>
+#include <string.h>
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include <stdio.h>
-#include <string.h>
 
 typedef expr_t *(*elementary_rule_fn)(const expr_t *, const expr_t *, const expr_t *, number_t *, expr_t **);
 

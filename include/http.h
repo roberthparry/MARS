@@ -24,15 +24,16 @@
 #ifndef MARS_HTTP_H
 #define MARS_HTTP_H
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "dictionary.h"
 #include "file.h"
 #include "json.h"
 #include "ustring.h"
 #include "webserver.h"
 #include "xml.h"
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 
 /** @brief Opaque Protocol Buffers message; include protobuf.h to construct or inspect it. */
 typedef struct _protobuf_t protobuf_t;

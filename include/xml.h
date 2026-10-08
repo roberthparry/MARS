@@ -23,6 +23,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+
 #include "dictionary.h"
 #include "ustring.h"
 

@@ -21,7 +21,6 @@ CFLAGS += -D_GNU_SOURCE
 CC := gcc
 AR := ar rcs
 INSTALL ?= install
-SQLCIPHER ?= sqlcipher
 
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
@@ -139,14 +138,42 @@ BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
 SCRATCH_SRCS      := $(shell find scratch -name '*.c' 2>/dev/null | sort)
 SCRATCH_OBJS      := $(SCRATCH_SRCS:scratch/%.c=$(BUILD_DIR)/scratch/%.o)
 SCRATCH_BINS      := $(patsubst scratch/%.c,$(BUILD_DIR)/scratch/%,$(SCRATCH_SRCS))
-QFLOAT_TOOL_BIN   := $(BUILD_DIR)/tools/qfloat/gen_qfloat_tables
 
 HEADERS      := $(wildcard include/*.h)
 
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
+# Test-only native protocol peers; OpenSSL is not an additional MARS link requirement.
+HTTP_FIXTURE_BIN := $(TEST_BUILD_DIR)/http/fixtures/http_fixture
+HTTP_FIXTURE_SRCS := $(sort $(wildcard tests/http/fixtures/*.c))
+HTTP_FIXTURE_CFLAGS := $(shell pkg-config --cflags openssl 2>/dev/null)
+HTTP_FIXTURE_LIBS := $(shell pkg-config --libs openssl 2>/dev/null)
+ifeq ($(strip $(HTTP_FIXTURE_LIBS)),)
+HTTP_FIXTURE_LIBS := -lssl -lcrypto
+endif
+
+# The included Lab rules precede the root's targets; retain the root default.
+.DEFAULT_GOAL := all
+include tools/mars_lab/Makefile
+include tools/to_be_announced_lab/Makefile
+include tools/mars_config/Makefile
+include tools/mars_checks/Makefile
+
 TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
+TEST_BINS += $(TBA_TEST_BIN) $(LAB_TEST_BIN) $(CONFIG_TEST_BIN) $(CHECKS_TEST_BIN)
+
+# Bootstrap the maintenance applications before compiling downstream programs.
+# Their common static library must remain outside this barrier: both tools link it.
+# Order-only prerequisites enforce this even with parallel make, without forcing
+# otherwise up-to-date outputs to rebuild because native-tools is phony.
+.PHONY: native-tools
+native-tools: $(CHECKS_BIN) $(CONFIG_PROGRAM)
+
+$(SHARED_LIB) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
+$(TEST_BINS) $(BENCH_OBJS) $(BENCH_BINS) $(SCRATCH_OBJS) $(SCRATCH_BINS) \
+$(LAB_OBJS) $(LAB_TEST_OBJS) $(LAB_SERVER) $(TBA_OBJS) $(TBA_SERVER) \
+$(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-tools
 
 .SECONDEXPANSION:
 .SECONDARY: $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS)
@@ -156,7 +183,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 .PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
-all: check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
+all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS) lab-build native-tba-lab
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -165,20 +192,25 @@ release: check-compliance
 	$(MAKE) DEBUG=0 all
 
 release-evidence: release
-	@tools/write_release_evidence.py --library "$(RELEASE_LIBRARY)" --output "$(RELEASE_EVIDENCE)"
+	@tools/mars_checks/build/release/mars_checks release-evidence --library "$(RELEASE_LIBRARY)" --output "$(RELEASE_EVIDENCE)"
 
 # Private reference material may remain on the developer's machine, but it
 # must never enter the public repository index.
-check-public-distribution:
-	@tools/check_public_distribution.py
+check-public-distribution: native-tools
+	@"$(CHECKS_BIN)" public-distribution
 
-check-compliance: check-public-distribution
-	@tools/check_compliance.py --quiet
-	@tools/check_markdown_api_coverage.py
+check-compliance: check-public-distribution $(CHECKS_BIN)
+	@"$(CHECKS_BIN)" compliance --quiet $(COMPLIANCE_ARGS)
+	@"$(CHECKS_BIN)" markdown-api
+	@"$(CHECKS_BIN)" source-policy
+
+.PHONY: check-source-policy
+check-source-policy: $(CHECKS_BIN)
+	@"$(CHECKS_BIN)" source-policy
 
 # qfloat and qcomplex are native double-double modules.  MPFR and MPC belong
 # to the number backend and must not leak across this module boundary.
-check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS)
+check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 	@if grep -ERn '#include[[:space:]]*[<"](mpfr|mpc)\.h|(^|[^[:alnum:]_])(mpfr_|mpc_)' \
 		include/qfloat.h include/qcomplex.h src/qfloat src/qcomplex; then \
 		echo "qfloat/qcomplex must not use MPFR or MPC."; \
@@ -228,26 +260,8 @@ check-deps:
 	    exit 1; \
 	fi
 
+# Installers link the SQLCipher library directly; no interpreter or SQL CLI is needed.
 check-jurisdiction-db-deps: check-deps
-	@missing=0; \
-	packages=""; \
-	check_tool() { \
-	    name="$$1"; command="$$2"; package="$$3"; note="$$4"; \
-	    if ! command -v "$$command" >/dev/null 2>&1; then \
-	        echo "Missing $$name$$note."; \
-	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
-	        packages="$$packages $$package"; \
-	        missing=1; \
-	    fi; \
-	}; \
-	check_tool "SQLCipher CLI" "$(SQLCIPHER)" "sqlcipher" " for jurisdiction database installation"; \
-	if [ "$$missing" -ne 0 ]; then \
-	    echo; \
-	    echo "Install the missing jurisdiction database runtime tool(s), then rerun make."; \
-	    echo "Debian/Ubuntu command:"; \
-	    echo "  sudo apt install$$packages"; \
-	    exit 1; \
-	fi
 
 check-lab-deps: check-jurisdiction-db-deps
 	@missing=0; \
@@ -261,24 +275,11 @@ check-lab-deps: check-jurisdiction-db-deps
 	        missing=1; \
 	    fi; \
 	}; \
-	check_python() { \
-	    if ! command -v python3 >/dev/null 2>&1; then \
-	        echo "Missing Python 3.10 or later for MARS Lab."; \
-	        echo "  Debian/Ubuntu: sudo apt install python3"; \
-	        packages="$$packages python3"; \
-	        missing=1; \
-	    elif ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then \
-	        echo "MARS Lab requires Python 3.10 or later."; \
-	        echo "  Found: $$(python3 --version 2>&1)"; \
-	        missing=1; \
-	    fi; \
-	}; \
-	check_python; \
 	check_tool "LaTeX" "latex" "texlive-latex-base"; \
 	check_tool "dvisvgm" "dvisvgm" "dvisvgm"; \
 	if [ "$$missing" -ne 0 ]; then \
 	    echo; \
-	    echo "Install the missing MARS Lab runtime tool(s), then rerun make."; \
+	    echo "Install the missing MARS Lab installation/rendering tool(s), then rerun make."; \
 	    echo "Debian/Ubuntu command:"; \
 	    echo "  sudo apt install$$packages"; \
 	    exit 1; \
@@ -317,7 +318,7 @@ uninstall:
 # Dependency tracking
 # ------------------------------------------------------------
 DEPFLAGS = -MT $@ -MMD -MP -MF $(dir $@).deps/$(subst /,_,$*).d
-DEPS     := $(shell find build tests/build -name '*.d' 2>/dev/null)
+DEPS     := $(shell find build tests/build tools/mars_lab/build -name '*.d' 2>/dev/null)
 -include $(DEPS)
 
 # ------------------------------------------------------------
@@ -358,10 +359,33 @@ $(SHARED_LIB): Makefile $(OBJS)
 $(TEST_BUILD_DIR)/matrix/test_matrix: TEST_LINK_FLAGS = -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=string_free -Wl,--wrap=expr_to_text_symbolic
 
 FILE_TEST_WRAPS := malloc calloc realloc strdup read write rename renameat2 unlink fsync fdatasync fchownat \
-                   fdopen fdopendir readdir statx fstat fclose close fchmod ftello fseeko
+                   fdopen fdopendir readdir statx fstat fclose close fchmod ftello fseeko ferror
 # Keep the comma literal separate from Make function argument separators.
 comma := ,
 $(TEST_BUILD_DIR)/file/test_file: TEST_LINK_FLAGS = $(foreach fn,$(FILE_TEST_WRAPS),-Wl$(comma)--wrap=$(fn))
+
+# Standalone native protocol fixtures keep malformed peer behaviour outside the library under test.
+.PHONY: check-http-fixture-deps
+check-http-fixture-deps:
+	@probe_dir=$$(mktemp -d /tmp/mars-http-deps.XXXXXX) || exit 1; \
+	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	if ! printf '%s\n' '#include <openssl/ssl.h>' \
+	    'int main(void) { SSL_CTX *ctx = SSL_CTX_new(TLS_server_method()); SSL_CTX_free(ctx); return 0; }' \
+	    | $(CC) $(HTTP_FIXTURE_CFLAGS) -x c - -o "$$probe_dir/probe" $(HTTP_FIXTURE_LIBS); then \
+	    echo 'Native HTTPS test fixtures require OpenSSL development files (Debian/Ubuntu: libssl-dev).'; \
+	    exit 1; \
+	fi
+
+$(HTTP_FIXTURE_BIN): $(HTTP_FIXTURE_SRCS) $(wildcard tests/http/fixtures/*.h) $(STATIC_LIB) Makefile | check-http-fixture-deps
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(HTTP_FIXTURE_CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $(HTTP_FIXTURE_SRCS) \
+	    $(STATIC_LIB) $(LDLIBS) $(HTTP_FIXTURE_LIBS)
+
+$(TEST_BUILD_DIR)/http/test_http.o $(CHECKS_BUILD_DIR)/fixtures/checks_fixtures.o \
+$(CHECKS_BUILD_DIR)/tests/test_checks_readme.o: CFLAGS += -DMARS_HTTP_FIXTURE_PATH='"$(abspath $(HTTP_FIXTURE_BIN))"'
+$(TEST_BUILD_DIR)/http/test_http $(CHECKS_TEST_BIN): $(HTTP_FIXTURE_BIN)
+$(CHECKS_TEST_BIN): $(BUILD_DIR)/bench/expression/bench_expr_parse
 
 # Instrument only the file module; keep normal library objects and counters separate.
 FILE_COVERAGE_DIR := build/coverage/file
@@ -375,8 +399,9 @@ FILE_TEST_HELPERS = $(filter $(TEST_BUILD_DIR)/file/%.o,$(TEST_HELPER_OBJS))
 # the dependency check is phony. Direct object and executable targets are covered.
 $(OBJS) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
 $(BENCH_OBJS) $(SCRATCH_OBJS) $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) \
-$(BENCH_BINS) $(SCRATCH_BINS) $(QFLOAT_TOOL_BIN) \
-$(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file: | check-deps
+$(BENCH_BINS) $(SCRATCH_BINS) \
+$(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) \
+$(CONFIG_OBJS) $(CONFIG_PROGRAM) $(CONFIG_TEST_OBJS) $(CHECKS_OBJS) $(CHECKS_BIN) $(CHECKS_TEST_OBJS): | check-deps
 
 $(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file.h src/file/file_internal.h Makefile
 	@mkdir -p $(dir $@)
@@ -388,11 +413,11 @@ $(FILE_COVERAGE_DIR)/test_file: $(TEST_BUILD_DIR)/file/test_file $(FILE_COVERAGE
 	    $(FILE_COVERAGE_OBJS) $(STATIC_LIB) $(LDLIBS)
 
 .PHONY: coverage-file
-coverage-file: $(FILE_COVERAGE_DIR)/test_file
+coverage-file: $(CHECKS_BIN) $(FILE_COVERAGE_DIR)/test_file
 	rm -f $(FILE_COVERAGE_OBJS:.o=.gcda)
 	$(FILE_COVERAGE_DIR)/test_file
 	cd $(FILE_COVERAGE_DIR) && gcov -b -c -j $(notdir $(FILE_COVERAGE_OBJS))
-	python3 tools/report_file_coverage.py $(FILE_COVERAGE_DIR)
+	"$(CHECKS_BIN)" file-coverage $(FILE_COVERAGE_DIR)
 
 define TEST_BIN_RULE
 $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
@@ -418,10 +443,6 @@ $(BUILD_DIR)/scratch/%: $(BUILD_DIR)/scratch/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
-$(QFLOAT_TOOL_BIN): tools/qfloat/gen_qfloat_tables.c $(STATIC_LIB)
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< $(STATIC_LIB) $(LDLIBS)
-
 # ------------------------------------------------------------
 # Test targets
 # ------------------------------------------------------------
@@ -433,14 +454,14 @@ VALGRIND := valgrind \
     --error-exitcode=99 \
     --track-origins=$(VALGRIND_TRACK_ORIGINS)
 
-README_EXAMPLE_CHECK = python3 tools/check_readme_examples.py --cc="$(CC)" --cflags="$(CFLAGS)" --libs="$(LDLIBS)" --archive="$(STATIC_LIB)"
+README_EXAMPLE_CHECK = "$(CHECKS_BIN)" readme-examples --cc="$(CC)" --cflags="$(CFLAGS)" --libs="$(LDLIBS)" --archive="$(STATIC_LIB)"
 
 .PHONY: test-readme-examples
-test-readme-examples: $(STATIC_LIB)
+test-readme-examples: $(STATIC_LIB) $(CHECKS_BIN) $(HTTP_FIXTURE_BIN)
 	@$(README_EXAMPLE_CHECK)
 
 test: check-public-distribution $(TEST_BINS)
-	@rc=0; for t in $(TEST_BINS); do \
+	@rc=0; "$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
 	    printf "  %-40s" "$$t ..."; \
 	    if $$t > /dev/null 2>&1; then \
 	        echo "PASS"; \
@@ -472,7 +493,7 @@ test-http-live: $(TEST_BUILD_DIR)/http_live/test_http_live
 $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS_EXCLUDES)),$(TEST_BINS)),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 .PHONY: test_almanac memtest_almanac
-test_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
+test_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
 	{ stdbuf -oL -eL $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
@@ -484,13 +505,13 @@ test_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_
 	fi; \
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
 	    rm -f "$$tmp_out"; \
-	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
+	    "$(CONFIG_PROGRAM)" almanac || exit $$?; \
 	    exec stdbuf -oL -eL $<; \
 	fi; \
 	rm -f "$$tmp_out"; \
 	exit 1
 
-memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_lab_almanac_db.py
+memtest_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
 	{ $(VALGRIND) $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
@@ -502,7 +523,7 @@ memtest_almanac: tests/build/release/almanac/test_almanac tools/configure_mars_l
 	fi; \
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
 	    rm -f "$$tmp_out"; \
-	    python3 tools/configure_mars_lab_almanac_db.py || exit $$?; \
+	    "$(CONFIG_PROGRAM)" almanac || exit $$?; \
 	    exec $(VALGRIND) $<; \
 	fi; \
 	rm -f "$$tmp_out"; \
@@ -531,12 +552,21 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 scratch: $(SCRATCH_BINS)
 
 .PHONY: mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
-mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
-	@tools/mars-lab
+mars-lab: native-lab
+	@MARS_ROOT="$(CURDIR)" "$(LAB_SERVER)" $(ARGS)
 
 mars-lab-stop:
-	@if pgrep -u "$$USER" -f '[p]ython3 tools/mars_lab.py' >/dev/null; then \
-		pkill -u "$$USER" -f '[p]ython3 tools/mars_lab.py'; \
+	@pattern='([t]ools/(mars_lab|lab)/build/(release|debug)/mars_lab(_server)?|[b]uild/(release|debug)/tools/mars_lab_server)([[:space:]]|$$)'; \
+	if pgrep -u "$$(id -u)" -f "$$pattern" >/dev/null; then \
+		pkill -u "$$(id -u)" -f "$$pattern"; status=$$?; \
+		if [ "$$status" -gt 1 ]; then echo "Could not stop MARS Lab." >&2; exit "$$status"; fi; \
+		attempts=0; \
+		while pgrep -u "$$(id -u)" -f "$$pattern" >/dev/null; do \
+			if [ "$$attempts" -ge 100 ]; then \
+				echo "MARS Lab is still shutting down; restart cancelled. Try again shortly." >&2; exit 1; \
+			fi; \
+			sleep 0.1; attempts=$$((attempts + 1)); \
+		done; \
 		echo "Stopped MARS Lab."; \
 	else \
 		echo "MARS Lab is not running."; \
@@ -546,11 +576,11 @@ mars-lab-restart: mars-lab-stop
 	@$(MAKE) --no-print-directory mars-lab
 
 .PHONY: to-be-announced-lab
-to-be-announced-lab: $(BUILD_DIR)/scratch/to-be-announced_lab
-	@tools/to-be-announced-lab
+to-be-announced-lab: native-tba-lab
+	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
 
-install-almanac-db: check-jurisdiction-db-deps tools/configure_mars_lab_almanac_db.py $(ALMANAC_RULES_SOURCES)
-	@python3 tools/configure_mars_lab_almanac_db.py
+install-almanac-db: check-jurisdiction-db-deps native-config $(ALMANAC_RULES_SOURCES)
+	@"$(CONFIG_PROGRAM)" almanac
 
 uninstall-almanac-db:
 	rm -f "$(HOME)/.mars/almanac/almanac.db" "$(HOME)/.mars/config/almanac-db.env"
@@ -576,14 +606,14 @@ endif
 install-jurisdiction-db: export MARS_CALENDAR_LOCATION_ARGUMENT = $(if $(LOCATION),$(LOCATION),$(CALENDAR_LOCATION_GOAL))
 install-jurisdiction-db: export MARS_CALENDAR_LANGUAGE_ARGUMENT = $(CALENDAR_LANGUAGE)
 install-jurisdiction-db: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
-install-jurisdiction-db: check-jurisdiction-db-deps $(SHARED_LIB) tools/configure_mars_lab_jurisdiction_db.py tools/jurisdiction_calendar.py tools/jurisdiction_calendar_languages.py $(JURISDICTION_RULES_SOURCES)
-	@python3 tools/configure_mars_lab_jurisdiction_db.py
+install-jurisdiction-db: check-jurisdiction-db-deps native-config $(JURISDICTION_RULES_SOURCES)
+	@"$(CONFIG_PROGRAM)" jurisdiction
 
 uninstall-jurisdiction-db:
 	rm -rf "$(HOME)/.mars"
 
 install-mars-lab: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
-install-mars-lab: check-lab-deps $(SHARED_LIB) tools/mars-lab tools/configure_mars_lab_jurisdiction_db.py tools/jurisdiction_calendar.py tools/jurisdiction_calendar_languages.py tools/configure_mars_lab_weather.py $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -595,13 +625,12 @@ install-mars-lab: check-lab-deps $(SHARED_LIB) tools/mars-lab tools/configure_ma
 		'open_browser=1' \
 		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
 		'unit="mars-lab-$$(date +%s%N)"' \
-		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/mars-lab" --host :: --port 8765 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" --working-directory="$(CURDIR)" "$(CURDIR)/$(LAB_SERVER)" --host :: --port 8765 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
 		'status=$$?' \
 		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
 		'  sleep 0.8' \
-		'  lab_url="$$(cd "$(CURDIR)" && python3 -c "import sys; sys.path.insert(0, \"tools\"); import mars_lab as m; print(m.browser_access_url(\"::\", 8765))" 2>/dev/null || true)"' \
-		'  if [ -z "$$lab_url" ]; then lab_url="http://localhost:8765/"; fi' \
+		'  lab_url="http://localhost:8765/"' \
 		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$$lab_url" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "$$lab_url" >/dev/null 2>&1 & fi' \
 		'fi' \
 		'exit "$$status"' \
@@ -618,11 +647,11 @@ install-mars-lab: check-lab-deps $(SHARED_LIB) tools/mars-lab tools/configure_ma
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
 	@$(MAKE) install-jurisdiction-db
-	@python3 tools/configure_mars_lab_weather.py
+	@"$(CONFIG_PROGRAM)" weather
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 
-install-to-be-announced-lab: tools/to-be-announced-lab packaging/linux/to-be-announced-lab.desktop.in packaging/linux/to-be-announced-lab.svg
+install-to-be-announced-lab: native-tba-lab packaging/linux/to-be-announced-lab.desktop.in packaging/linux/to-be-announced-lab.svg
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	@printf '%s\n' \
 		'#!/bin/sh' \
@@ -633,13 +662,12 @@ install-to-be-announced-lab: tools/to-be-announced-lab packaging/linux/to-be-ann
 		'open_browser=1' \
 		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
 		'unit="to-be-announced-lab-$$(date +%s%N)"' \
-		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/to-be-announced-lab" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" --working-directory="$(CURDIR)" "$(CURDIR)/$(TBA_SERVER)" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
 		'status=$$?' \
 		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
 		'  sleep 0.8' \
-		'  lab_url="$$(cd "$(CURDIR)" && python3 -c "import sys; sys.path.insert(0, \"tools\"); import to_be_announced_lab as t; print(t.to_be_announced_browser_access_url(\"::\", 8766))" 2>/dev/null || true)"' \
-		'  if [ -z "$$lab_url" ]; then lab_host="$$(hostname -s 2>/dev/null | tr "[:upper:]" "[:lower:]")"; [ -n "$$lab_host" ] || lab_host="lenovo"; lab_url="http://$$lab_host.local:8766/to-be-announced/"; fi' \
+		'  lab_url="http://localhost:8766/to-be-announced/"' \
 		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$$lab_url" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "$$lab_url" >/dev/null 2>&1 & fi' \
 		'fi' \
 		'exit "$$status"' \
@@ -666,13 +694,6 @@ uninstall-to-be-announced-lab:
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
-
-.PHONY: gen_qfloat_tables gen_qfloat_constants
-gen_qfloat_tables: $(QFLOAT_TOOL_BIN)
-	@$(QFLOAT_TOOL_BIN) --exp-coef
-
-gen_qfloat_constants: $(QFLOAT_TOOL_BIN)
-	@$(QFLOAT_TOOL_BIN)
 
 # ------------------------------------------------------------
 # Help
@@ -715,6 +736,9 @@ help:
 	@echo "  make test_webserver        Run offline Linux web server tests and its README example"
 	@echo "  make test-readme-examples   Compile/run complete Markdown C examples"
 	@echo "  make check-compliance       Verify public-path, notice, SPDX and provenance safeguards"
+	@echo "  make check-source-policy    Audit inline sizes, expression registries and absence of Python"
+	@echo "  make native-checks         Build tools/mars_checks/build/<mode>/mars_checks"
+	@echo "  make native-config         Build tools/mars_config/build/<mode>/mars_config"
 	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
 	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
@@ -724,5 +748,5 @@ help:
 # ------------------------------------------------------------
 # Clean
 # ------------------------------------------------------------
-clean:
+clean: clean-lab clean-tba-lab clean-config clean-checks
 	rm -rf build tests/build

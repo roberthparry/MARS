@@ -13,14 +13,14 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "file.h"
-#include "sqlite.h"
 #include <stdlib.h>
 #include <string.h>
 
 #include "array.h"
 #include "datetime.h"
+#include "file.h"
 #include "jurisdiction.h"
+#include "sqlite.h"
 #include "test_harness.h"
 #include "ustring.h"
 
@@ -744,6 +744,74 @@ static bool holiday_suite_setup(void)
     return false;
 }
 
+struct catalogue_counts {
+    size_t count;
+    bool stop;
+    bool valid;
+};
+
+static bool count_catalogue_choice(const char *code, const char *label, void *context)
+{
+    struct catalogue_counts *counts = context;
+    ++counts->count;
+    counts->valid = counts->valid && code && *code && label && *label;
+    return !counts->stop;
+}
+
+static bool count_catalogue_place(const jurisdict_place_t *place, void *context)
+{
+    struct catalogue_counts *counts = context;
+    ++counts->count;
+    counts->valid = counts->valid && place && place->jurisdiction_code && *place->jurisdiction_code && place->name &&
+                    *place->name && place->latitude && *place->latitude && place->longitude && *place->longitude &&
+                    place->timezone && *place->timezone;
+    return !counts->stop;
+}
+
+static void test_jurisdiction_catalogue_visitors(void)
+{
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    struct catalogue_counts counts = {.valid = true};
+    bool ok = engine && jurisdict_each_choice(engine, count_catalogue_choice, &counts) && counts.valid && counts.count;
+    counts.count = 0;
+    ok = jurisdict_each_location(engine, count_catalogue_place, &counts) && counts.valid && counts.count && ok;
+    counts.count = 0;
+    ok = jurisdict_each_town(engine, count_catalogue_place, &counts) && counts.valid && counts.count && ok;
+    counts.stop = true;
+    counts.count = 0;
+    ok = jurisdict_each_choice(engine, count_catalogue_choice, &counts) && counts.count == 1 && ok;
+    counts.count = 0;
+    ok = jurisdict_each_location(engine, count_catalogue_place, &counts) && counts.count == 1 && ok;
+    counts.count = 0;
+    ok = jurisdict_each_town(engine, count_catalogue_place, &counts) && counts.count == 1 && ok;
+    ok = !jurisdict_each_choice(engine, NULL, NULL) && !jurisdict_each_location(engine, NULL, NULL) &&
+         !jurisdict_each_town(engine, NULL, NULL) && !jurisdict_each_choice(NULL, count_catalogue_choice, &counts) &&
+         !jurisdict_each_location(NULL, count_catalogue_place, &counts) &&
+         !jurisdict_each_town(NULL, count_catalogue_place, &counts) && ok;
+    jurisdict_close(engine);
+    TEST_ASSERT_TRUE(ok, "catalogue enumeration, borrowed records, early stop and invalid arguments");
+}
+
+static bool readme_location(const jurisdict_place_t *place, void *context)
+{
+    bool *found = context;
+    if (strcmp(place->jurisdiction_code, "AD"))
+        return true;
+    printf("%s: %s (%s, %s), %s\n", place->jurisdiction_code, place->name, place->latitude, place->longitude,
+           place->timezone);
+    *found = true;
+    return false;
+}
+
+static void example_jurisdiction_catalogue_readme(void)
+{
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    bool found = false;
+    bool ok = engine && jurisdict_each_location(engine, readme_location, &found);
+    jurisdict_close(engine);
+    TEST_ASSERT_TRUE(ok && found, "README database location visitor");
+}
+
 static void holiday_suite_cleanup(void)
 {
 }
@@ -755,11 +823,16 @@ static void test_jurisdiction_configuration_file_io(void)
     string_t *directory_path = string_sprintf("%s/config", root);
     string_t *config_path = string_sprintf("%s/config/jurisdiction-db.env", root);
     string_t *source_path = string_sprintf("%s/settings.env", root);
-    string_t *database_path = string_sprintf("%s/δοκιμή.db", root);
+    string_t *database_path = string_sprintf("%s/", root);
+    const char database_name[] = "e\xcc\x81.db";
+    TEST_ASSERT_NOT_NULL(database_path);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(database_path, database_name, sizeof(database_name) - 1), 0);
     string_t *key = string_new_with("π=secret-");
     TEST_ASSERT_NOT_NULL(key);
     for (size_t i = 0; i < 5000; ++i)
         TEST_ASSERT_INT_EQ(string_append_char(key, 'k'), 0);
+    const char key_suffix[] = "-e\xcc\x81-😀";
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(key, key_suffix, sizeof(key_suffix) - 1), 0);
     file_t *directory = file_new(directory_path);
     file_t *config = file_new(config_path);
     file_t *source = file_new(source_path);
@@ -767,20 +840,23 @@ static void test_jurisdiction_configuration_file_io(void)
     TEST_ASSERT_NOT_NULL(config);
     TEST_ASSERT_NOT_NULL(source);
     TEST_ASSERT_TRUE(file_create_directory(directory, 0700, false), "create isolated config directory");
-    string_t *contents = string_sprintf("\xef\xbb\xbf# settings\r\n"
-        "MARS_JURISDICTION_DB_PATH_EXTRA=ignored\r"
-        " export MARS_JURISDICTION_DB_PATH='%S'\r\n"
-        "export MARS_JURISDICTION_DB_KEY=  \"%S\"  ", database_path, key);
+    string_t *contents = string_new_with("\xef\xbb\xbf# settings\r\n"
+                                        "MARS_JURISDICTION_DB_PATH_EXTRA=ignored\r"
+                                        " export MARS_JURISDICTION_DB_PATH='");
     TEST_ASSERT_NOT_NULL(contents);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(database_path), string_byte_length(database_path)), 0);
+    const char key_header[] = "'\r\nexport MARS_JURISDICTION_DB_KEY=  \"";
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, key_header, sizeof(key_header) - 1), 0);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(key), string_byte_length(key)), 0);
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, "\"  ", 3), 0);
     TEST_ASSERT_TRUE(file_write_all_text(source, contents), "write long Unicode configuration");
     TEST_ASSERT_TRUE(file_create_symlink(source, config), "read configuration through symbolic link");
     sqlite_t *database = sqlite_open_encrypted(database_path, key);
     TEST_ASSERT_NOT_NULL(database);
     TEST_ASSERT_TRUE(sqlite_init_object_store(database), "initialise encrypted fixture");
     sqlite_close(database);
-    static const char *const names[] = {
-        "MARS_HOME", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY", "MARS_HOLIDAY_DB_PATH", "MARS_HOLIDAY_DB_KEY"
-    };
+    static const char *const names[] = {"MARS_HOME", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
+                                        "MARS_HOLIDAY_DB_PATH", "MARS_HOLIDAY_DB_KEY"};
     char *saved[sizeof(names) / sizeof(names[0])] = {0};
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
         const char *value = getenv(names[i]);
@@ -809,7 +885,7 @@ static void test_jurisdiction_configuration_file_io(void)
     file_free(config);
     file_free(directory);
     TEST_ASSERT_TRUE(environment_ok && restored, "restore environment after isolated configuration test");
-    TEST_ASSERT_TRUE(opened, "configuration preserves full quoted Unicode key beyond 4 KiB");
+    TEST_ASSERT_TRUE(opened, "configuration preserves decomposed paths and exact quoted Unicode keys beyond 4 KiB");
 }
 
 int tests_main(void)
@@ -834,9 +910,11 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_jurisdiction_default_gmt_offset_uses_database_dst_rules, tests, NULL);
     TEST_RUN_IN_GROUP(test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_changes, tests, NULL);
     TEST_RUN_IN_GROUP(test_jurisdiction_working_days_between_counts_business_days, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_catalogue_visitors, tests, NULL);
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_holiday_readme_queries, readme_examples, "holiday,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_jurisdiction_catalogue_readme, readme_examples, "jurisdiction,readme,output");
     return TEST_EXIT_CODE();
 }

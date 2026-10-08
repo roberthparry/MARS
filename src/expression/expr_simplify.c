@@ -29,14 +29,13 @@
  * borrowed; its refcount is not changed.
  */
 
-#include "ustring.h"
-
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "ustring.h"
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"

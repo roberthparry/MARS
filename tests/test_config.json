@@ -1235,6 +1235,7 @@
       "example_file_encrypted_round_trip": true,
       "example_file_encryption_only": true,
       "example_file_replace_backup": true,
+      "example_file_sha256": true,
       "example_file_sqlite_round_trip": true,
       "example_file_symlink_target": true,
       "example_file_utf8_lines": true
@@ -1254,6 +1255,8 @@
       "test_file_delayed_write_failure_is_reported": true,
       "test_file_directory_listing_and_removal": true,
       "test_file_encryption_keys_and_wrong_key": true,
+      "test_file_exact_unicode_line_round_trip": true,
+      "test_file_exact_unicode_text_round_trip": true,
       "test_file_explicit_follow_and_text_streams": true,
       "test_file_invalid_utf8_does_not_truncate": true,
       "test_file_key_invalid_arguments": true,
@@ -1270,6 +1273,8 @@
       "test_file_path_and_directory_failures": true,
       "test_file_rejects_symlinks_directories_and_fifos": true,
       "test_file_replace_and_backup": true,
+      "test_file_sha256": true,
+      "test_file_sha256_failures": true,
       "test_file_sqlite_corrupt_chunks": true,
       "test_file_sqlite_corrupt_or_missing_manifest": true,
       "test_file_sqlite_database_path_and_argument_guards": true,
@@ -1282,6 +1287,7 @@
       "test_file_sqlite_value_api_guards": true,
       "test_file_stream_and_metadata_failures": true,
       "test_file_symlink_target_failures": true,
+      "test_file_temporary_directory": true,
       "test_file_transform_allocation_failures": true,
       "test_file_transform_staging_failures": true,
       "test_file_transform_wire_validation": true,
@@ -1310,6 +1316,9 @@
       "test_http_client_identity": true,
       "test_http_event_stream": true,
       "test_http_file_upload_download": true,
+      "test_http_fixture_tls_handshake_deadline": true,
+      "test_http_fixture_total_deadline_and_recovery": true,
+      "test_http_fixture_worker_cap_and_recovery": true,
       "test_http_forms_auth_and_multipart": true,
       "test_http_grpc_unary": true,
       "test_http_grpc_verified_tls": true,
@@ -1365,6 +1374,7 @@
       "test_expr_exp": true,
       "test_expr_null_safety": true,
       "test_expr_sin": true,
+      "test_high_precision_logarithmic_exponential": true,
       "test_last_intervals": true,
       "test_linear": true,
       "test_log": true,
@@ -1413,6 +1423,7 @@
       "test_multi_4d_exp_affine": true,
       "test_multi_nd1": true,
       "test_multi_null_safety": true,
+      "test_nested_refinement_partial_budget": true,
       "test_nested_unevaluated_integral_integrand": true,
       "test_null_safety": true,
       "test_polynomial": true,
@@ -1447,7 +1458,8 @@
   "tests/jurisdiction/test_jurisdiction.c": {
     "readme_examples": {
       "enabled": true,
-      "example_holiday_readme_queries": true
+      "example_holiday_readme_queries": true,
+      "example_jurisdiction_catalogue_readme": true
     },
     "tests": {
       "enabled": true,
@@ -1455,6 +1467,7 @@
       "test_england_exception_holidays_land_on_correct_dates_in_2022": true,
       "test_ireland_historic_whit_monday_exists_in_1960": true,
       "test_jurisdiction_alaska_default_location_uses_juneau": true,
+      "test_jurisdiction_catalogue_visitors": true,
       "test_jurisdiction_configuration_file_io": true,
       "test_jurisdiction_database_builds_and_opens": true,
       "test_jurisdiction_default_gmt_offset_uses_database_dst_rules": true,
@@ -1816,6 +1829,7 @@
         "enabled": true,
         "run_number_bessel_y_tests": true,
         "test_number_bessel_i": true,
+        "test_number_incomplete_gamma_precision": true,
         "test_number_sgn": true,
         "test_number_struve_h": true,
         "test_number_struve_l": true
@@ -2199,6 +2213,7 @@
     "readme_examples": {
       "enabled": true,
       "example_readme_examples": true,
+      "example_unquote_shell": true,
       "example_utf8_exact": true
     },
     "tests": {
@@ -2223,6 +2238,9 @@
       "test_string_object_first_api": true,
       "test_string_replace": true,
       "test_string_trim_unicode_whitespace": true,
+      "test_string_unquote_shell_exact_unicode": true,
+      "test_string_unquote_shell_invalid": true,
+      "test_string_unquote_shell_words": true,
       "test_string_view": true,
       "test_text_ascii_stays_stable": true,
       "test_text_character_api": true,
@@ -2265,6 +2283,9 @@
       "test_websrv_lifetime": true,
       "test_websrv_limits_and_timeout": true,
       "test_websrv_malformed": true,
+      "test_websrv_peer_dual_stack": true,
+      "test_websrv_peer_ipv4": true,
+      "test_websrv_peer_ipv6": true,
       "test_websrv_routing": true,
       "test_websrv_setters": true
     }
@@ -2292,7 +2313,7 @@
       "test_xml_writer_limits_and_failure": true
     }
   },
-  "tools/check_readme_examples.py": {
+  "tools/mars_checks/src/readme/checks_readme.c": {
     "readme_examples": {
       "README_001": true,
       "README_002": true,
@@ -2415,6 +2436,863 @@
       "docs_xml_002": true,
       "docs_xml_003": true,
       "enabled": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_controls.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_checksum_rows": true,
+      "test_checks_compliance_allow_untracked_and_safeguards": true,
+      "test_checks_git_index_and_staged_paths": true,
+      "test_checks_installation_variables": true,
+      "test_checks_markdown_command_failures": true,
+      "test_checks_private_path_policy": true,
+      "test_checks_process_capture_timeout_and_errors": true,
+      "test_checks_process_descendant_cleanup": true,
+      "test_checks_process_interrupt_cleanup": true,
+      "test_checks_spdx_valid_and_invalid": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_coverage.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_coverage_aggregate_and_filtering": true,
+      "test_checks_coverage_counter_spelling": true,
+      "test_checks_coverage_empty_inventories": true,
+      "test_checks_coverage_inventory": true,
+      "test_checks_coverage_malformed_and_duplicate_records": true,
+      "test_checks_coverage_thresholds": true,
+      "test_checks_coverage_usage_and_io": true,
+      "test_checks_coverage_zero_and_unexecuted": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_documentation.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_every_public_function_is_covered_by_its_module_guide": true,
+      "test_checks_guide_formulae_are_indented_unbroken_paragraphs": true,
+      "test_checks_laplace_documentation_uses_markdown_math_delimiters": true,
+      "test_checks_preview_formula_alignment_applies_to_every_guide": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_evidence.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_evidence_arguments_and_publication": true,
+      "test_checks_evidence_complete_report": true,
+      "test_checks_evidence_dependency_failure_safety": true,
+      "test_checks_evidence_git_failure_safety": true,
+      "test_checks_evidence_optional_packages": true,
+      "test_checks_evidence_output_aliases": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_parsers.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_extractor_finds_prototypes_and_inline_functions_only": true,
+      "test_checks_function_identifier_boundaries": true,
+      "test_checks_header_comments_directives_duplicates": true,
+      "test_checks_markdown_fences_and_reference_indices": true,
+      "test_checks_markdown_missing_output_and_fences": true,
+      "test_checks_output_normalisation": true,
+      "test_checks_shell_words": true,
+      "test_checks_shell_words_reject_malformed": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_policy.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_policy_readme_parser_benchmark": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_policy_binding_perfect_hash": true,
+      "test_policy_blank_and_comment_lines": true,
+      "test_policy_command_and_exclusions": true,
+      "test_policy_comments_and_literals": true,
+      "test_policy_concealed_inline_macros": true,
+      "test_policy_crlf_and_identifier_boundaries": true,
+      "test_policy_inline_perfect_hash_and_columns": true,
+      "test_policy_nested_braces": true,
+      "test_policy_preprocessor_branches": true,
+      "test_policy_project_inline_definitions": true,
+      "test_policy_prototypes_and_ordinary_functions": true,
+      "test_policy_python_exclusions_and_prose": true,
+      "test_policy_python_sources_and_shebangs": true,
+      "test_policy_registry_rejects_corruption": true,
+      "test_policy_three_line_limit": true,
+      "test_policy_unterminated_inline": true
+    }
+  },
+  "tools/mars_checks/tests/test_checks_readme.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_checks_readme_config_and_compile_only": true,
+      "test_checks_readme_interrupt_cleanup": true,
+      "test_checks_readme_negative_results": true,
+      "test_checks_readme_option_errors": true,
+      "test_checks_readme_success_and_separate_stderr": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_checks_readme_fixture_startup_cleanup": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_calendar.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_calendar_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_calendar_catalogue": true,
+      "test_calendar_historical": true,
+      "test_calendar_languages": true,
+      "test_calendar_menus": true,
+      "test_calendar_offsets": true,
+      "test_calendar_seed_reload": true,
+      "test_calendar_snapshot": true,
+      "test_calendar_translation_snapshots": true,
+      "test_calendar_translations": true,
+      "test_calendar_unicode_keys": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_database.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_database_bounds": true,
+      "test_cfg_database_conflicts": true,
+      "test_cfg_database_failure": true,
+      "test_cfg_database_jurisdiction": true,
+      "test_cfg_database_large": true,
+      "test_cfg_database_packaged_almanac": true,
+      "test_cfg_database_paths": true,
+      "test_cfg_database_precedence": true,
+      "test_cfg_database_stream": true,
+      "test_cfg_database_trace": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_locales.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_cfg_locales_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_cfg_locales_check": true,
+      "test_cfg_locales_cli": true,
+      "test_cfg_locales_missing": true,
+      "test_cfg_locales_output": true,
+      "test_cfg_locales_parity": true,
+      "test_cfg_locales_quoting": true,
+      "test_cfg_locales_validation": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_make.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_make_dry": true,
+      "test_cfg_make_forward": true,
+      "test_cfg_make_reject": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_rendering.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_cfg_rendering_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_cfg_rendering_babel": true,
+      "test_cfg_rendering_boundaries": true,
+      "test_cfg_rendering_fields": true,
+      "test_cfg_rendering_french": true,
+      "test_cfg_rendering_hebrew": true,
+      "test_cfg_rendering_hijri": true,
+      "test_cfg_rendering_regional": true,
+      "test_cfg_rendering_seed": true,
+      "test_cfg_rendering_solar": true,
+      "test_cfg_rendering_supplements": true,
+      "test_cfg_rendering_uk": true,
+      "test_cfg_rendering_working": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_storage.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_storage_literals": true,
+      "test_cfg_storage_path_resolution": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_terminal.c": {
+    "tests": {
+      "enabled": true,
+      "test_calendar_terminal": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_weather.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_weather_command": true,
+      "test_cfg_weather_rejection": true,
+      "test_cfg_weather_storage": true
+    }
+  },
+  "tools/mars_lab/tests/browser/test_lab_browser.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_browser": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_calendar_extra.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_calendar_datetime_cards": true,
+      "test_lab_calendar_location_timezone": true,
+      "test_lab_calendar_named_timezones": true,
+      "test_lab_calendar_worker_observances": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_evaluation.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_calendar_validation": true,
+      "test_lab_evaluation_validation": true,
+      "test_lab_expression_contract": true,
+      "test_lab_function_input": true,
+      "test_lab_integrator_deadline_policy": true,
+      "test_lab_integrator_high_precision_deadline": true,
+      "test_lab_math_modes": true,
+      "test_lab_worker_deadline_diagnostic": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_evaluation_extra.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_extra_binding_edit": true,
+      "test_lab_extra_bindings": true,
+      "test_lab_extra_calendar_fallback": true,
+      "test_lab_extra_constant_identity": true,
+      "test_lab_extra_derivative": true,
+      "test_lab_extra_diffequation": true,
+      "test_lab_extra_editor_and_cards": true,
+      "test_lab_extra_equation": true,
+      "test_lab_extra_equation_explicit_bindings": true,
+      "test_lab_extra_equation_greek_binding": true,
+      "test_lab_extra_equation_inferred_binding": true,
+      "test_lab_extra_excess_precision": true,
+      "test_lab_extra_expression": true,
+      "test_lab_extra_function": true,
+      "test_lab_extra_function_precision_limit": true,
+      "test_lab_extra_goal_seek": true,
+      "test_lab_extra_integral": true,
+      "test_lab_extra_integrator": true,
+      "test_lab_extra_invalid_bounds": true,
+      "test_lab_extra_invalid_operation": true,
+      "test_lab_extra_invalid_precision": true,
+      "test_lab_extra_invalid_type": true,
+      "test_lab_extra_matrix": true,
+      "test_lab_extra_native_records": true,
+      "test_lab_extra_render_TeX": true,
+      "test_lab_extra_unsafe_TeX_environment": true,
+      "test_lab_extra_unsafe_TeX_escape": true,
+      "test_lab_extra_unsafe_TeX_input": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_function.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_function_generated_cards": true,
+      "test_lab_function_guards_and_names": true,
+      "test_lab_function_matrix_regressions": true,
+      "test_lab_function_readme_examples": true,
+      "test_lab_function_rejected_programmes": true,
+      "test_lab_function_scalar_regressions": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_cylindrical_bessel_i.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_bessel_i_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_bessel_i_aliases_and_renderings": true,
+      "test_bessel_i_cylindrical_unicode_expression_round_trips": true,
+      "test_bessel_i_derivatives_and_finite_sum": true,
+      "test_bessel_i_half_integer_formulas": true,
+      "test_bessel_i_integer_orders_and_complex_arguments": true,
+      "test_bessel_i_precision": true,
+      "test_bessel_i_primitives_differentiate_back": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_cylindrical_bessel_y.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_bessel_y_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_bessel_y_aliases": true,
+      "test_bessel_y_complex_derivatives_and_finite_sum": true,
+      "test_bessel_y_half_integer_principal_values": true,
+      "test_bessel_y_independent_quadrature": true,
+      "test_bessel_y_integer_cut_and_parity": true,
+      "test_bessel_y_integer_primitives_differentiate_back": true,
+      "test_bessel_y_near_integer_orders": true,
+      "test_bessel_y_origin_limits_and_recurrence": true,
+      "test_bessel_y_tiny_negative_half_order": true,
+      "test_bessel_y_y0_complex_precision": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_cylindrical_struve_h.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_struve_h_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_struve_h_aliases_renderings_and_hermite_distinction": true,
+      "test_struve_h_derivatives_parity_origin_and_sum": true,
+      "test_struve_h_half_integer_identities": true,
+      "test_struve_h_laplace_native_formula_and_copied_inverse": true,
+      "test_struve_h_precision": true,
+      "test_struve_h_primitives_differentiate_back": true,
+      "test_struve_h_real_orders_and_complex_arguments": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_cylindrical_struve_l.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_struve_l_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_struve_l_affine_primitives_differentiate_back": true,
+      "test_struve_l_aliases_and_rendering": true,
+      "test_struve_l_derivative_and_sum": true,
+      "test_struve_l_general_hypergeometric_notation": true,
+      "test_struve_l_half_integer_closed_forms": true,
+      "test_struve_l_integer_parity_and_origin": true,
+      "test_struve_l_laplace_notation_and_round_trip": true,
+      "test_struve_l_precision": true,
+      "test_struve_l_real_orders_and_complex_arguments": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_absolute_half_power": true,
+      "test_readme_bracketed_fourier_coordinate": true,
+      "test_readme_fourier_examples": true,
+      "test_readme_implicit_modulus_products": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_absolute_half_power_spellings_and_run": true,
+      "test_absolute_power_inverse_and_copied_spectrum": true,
+      "test_absolute_power_preserves_unrelated_source_domains": true,
+      "test_absolute_power_strip_affine_scaling_and_scalar_factors": true,
+      "test_affine_scaling_shifts_and_modulation": true,
+      "test_arbitrary_functions_and_scope": true,
+      "test_bracketed_gamma_coordinate_and_run": true,
+      "test_conditioned_output_round_trips": true,
+      "test_conventional_coordinate_pairs_keep_their_defaults": true,
+      "test_custom_coordinate_defaults_both_directions": true,
+      "test_custom_coordinate_targets_do_not_capture_or_hide_ambiguity": true,
+      "test_frequency_derivatives_and_product_association": true,
+      "test_gaussian_against_independent_quadrature": true,
+      "test_gaussians_both_directions": true,
+      "test_hyperbolic_secant": true,
+      "test_implicit_modulus_exponential_transform": true,
+      "test_implicit_modulus_products": true,
+      "test_impulses_and_step_distribution": true,
+      "test_negated_integer_powers": true,
+      "test_one_sided_exponentials": true,
+      "test_parameters_are_not_free_variable_samples": true,
+      "test_parser_aliases_and_explicit_mapping": true,
+      "test_pulses_and_sinc": true,
+      "test_radical_quotient_simplification_preserves_branches": true,
+      "test_round_trips_and_step_distribution_inverse": true,
+      "test_signal_greek_arguments_remain_function_calls": true,
+      "test_symbolic_polynomial_distributions": true,
+      "test_two_sided_exponential_and_rational_pair": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_analytic.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_analytic_sinh": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_evaluation_action_and_duality": true,
+      "test_finite_exponential_families_round_trip_both_directions": true,
+      "test_imaginary_shifts_do_not_keep_factor_parentheses": true,
+      "test_no_pointwise_value_even_at_real_regular_points": true,
+      "test_no_unsupported_delta_scaling_or_non_entire_extension": true,
+      "test_polynomial_multiplier_and_derivative_round_trip": true,
+      "test_requested_sinh_pair_is_visible_and_copies": true,
+      "test_required_complex_grouping_preserves_values": true,
+      "test_symbolic_affine_parameters_and_cancellation": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_asinh.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_asinh_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_aliases_derivative_integral_and_sum": true,
+      "test_basic_pair_and_numeric_domain": true,
+      "test_copied_spectra_both_directions": true,
+      "test_direct_formula_modulation_and_rejections": true,
+      "test_inverse_by_independent_integral": true,
+      "test_numeric_orders_and_complex_arguments": true,
+      "test_requested_precision_is_preserved": true,
+      "test_symbolic_affine_pair": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_atan.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_atan_fourier_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_basic_pair_both_directions": true,
+      "test_copied_formulas_round_trip": true,
+      "test_damped_reciprocal_with_modulation": true,
+      "test_direct_inverse_equivalent_spectra": true,
+      "test_domains_and_generated_conditional": true,
+      "test_quadrature_without_the_transform_formula": true,
+      "test_symbolic_real_scale_and_shift": true,
+      "test_zero_rate_and_rejected_cases": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_bessel.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_bessel_fourier_examples": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_bessel_affine_scaling": true,
+      "test_bessel_fourier_integer_orders_both_directions": true,
+      "test_bessel_indexed_parser_and_bindings": true,
+      "test_bessel_specialised_order_simplifies_absolute_value": true,
+      "test_bessel_spectrum_against_independent_inverse_quadrature": true,
+      "test_scalar_factors_in_fourier_products_and_quotients": true,
+      "test_scaled_chebyshev_spectrum_inverse": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_branch.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_acosh_spectrum": true,
+      "test_readme_branch_fourier_round_trips": true,
+      "test_readme_gamma_fourier_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_acosh_boundary_values_and_constants": true,
+      "test_acosh_distribution_against_gaussian_test_functions": true,
+      "test_asin_distribution_against_gaussian_test_function": true,
+      "test_copied_branch_round_trips": true,
+      "test_direct_spectra_and_zero_frequency_constants": true,
+      "test_full_distribution_and_mathematical_notation": true,
+      "test_gamma_existence_conditions": true,
+      "test_gamma_independent_inverse_quadrature": true,
+      "test_gamma_pairs_and_round_trips": true,
+      "test_legacy_derivative_spectra": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_distribution.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_distribution_notation": true,
+      "test_readme_distribution_regular_values": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_aliases": true,
+      "test_bound_spectrum_retains_inverse_information": true,
+      "test_bound_symbols_and_conditions_survive": true,
+      "test_complete_copied_expression_inside_transform": true,
+      "test_distribution_regular_values_preserve_symbolic_nodes": true,
+      "test_duplicates_mixed_and_nested_operators": true,
+      "test_grouping_preserves_scope_before_simplification": true,
+      "test_impulse_support_and_derivatives": true,
+      "test_invalid_or_ambiguous_qualifications_are_rejected": true,
+      "test_nested_order_is_preserved": true,
+      "test_regularised_derivatives_and_finite_sums": true,
+      "test_single_qualification_shares_domain_area": true,
+      "test_transform_shorthand_braces_keep_free_symbols": true,
+      "test_transform_values_off_singular_support": true,
+      "test_unwrapped_duplicate_remains_unwrapped": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_gamma_contour.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_vertical_line_gamma_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_aliases_and_real_axis_are_not_reinterpreted": true,
+      "test_both_directions_and_affine_arguments": true,
+      "test_copied_spectra_restore_complex_argument": true,
+      "test_default_coordinate_and_conditions": true,
+      "test_independent_inverse_integral": true,
+      "test_numeric_spectrum_and_domain": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_hyperbolic.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_hyperbolic_fourier_examples": true,
+      "test_readme_inverse_beta_spectrum": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_beta_duality_and_reverse_round_trip": true,
+      "test_beta_pair_does_not_accept_near_misses_or_invalid_domains": true,
+      "test_beta_round_trip_with_complex_power_and_swapped_arguments": true,
+      "test_beta_symbol_and_callable_aliases": true,
+      "test_complex_exponent_in_convergence_strip": true,
+      "test_constant_cases_and_binding_specialisation": true,
+      "test_copied_beta_spectrum_recovers_shifted_sinh": true,
+      "test_cosh_and_sech_powers": true,
+      "test_growth_and_singularities_are_not_unsupported_formula_notes": true,
+      "test_hyperbolic_beta_round_trips": true,
+      "test_negative_imaginary_products_survive_expression_round_trip": true,
+      "test_proven_growth_is_rejected_in_both_directions": true,
+      "test_reciprocals_and_absolute_powers_preserve_branches": true,
+      "test_requested_symbolic_power_and_conditions": true,
+      "test_sinh_powers_against_independent_quadrature": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_logarithm.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_logarithmic_fourier_examples": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_finite_part_fourier_pair_and_inverse": true,
+      "test_log_absolute_spellings_and_cards": true,
+      "test_log_affine_domains_and_finite_part_calculus": true,
+      "test_log_fourier_action_on_gaussian_test_functions": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_periodic.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_tangent_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_arbitrary_domain_restrictions_are_not_discarded": true,
+      "test_copied_periodic_pairs_both_directions": true,
+      "test_finite_or_altered_series_are_not_matched": true,
+      "test_fourier_coefficients_by_independent_quadrature": true,
+      "test_independent_handwritten_spectra": true,
+      "test_native_pole_conditions_and_values": true,
+      "test_nonreal_rates_do_not_use_real_pole_prescription": true,
+      "test_nonzero_condition_syntax_round_trips": true,
+      "test_parameter_pole_conditions_are_retained": true,
+      "test_principal_value_diagnostic": true,
+      "test_series_dummy_does_not_capture_a_parameter": true,
+      "test_spatial_coordinates_round_trip_with_inferred_and_explicit_inverse": true,
+      "test_symbolic_free_binding_is_not_substituted": true,
+      "test_symbolic_numeric_quotient_keeps_denominator_grouping": true,
+      "test_symbolic_real_scale_and_shift": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_fourier_tanh.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_readme_coth_fourier_pair": true,
+      "test_readme_tanh_fourier_pair": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_basic_pairs_both_directions": true,
+      "test_copied_formulas_round_trip": true,
+      "test_coth_aliases_poles_and_conditional": true,
+      "test_direct_inverse_and_reciprocal_aliases": true,
+      "test_numerical_domain_and_conditional": true,
+      "test_quadrature_independent_of_the_transform_formula": true,
+      "test_symbolic_scale_shift_and_copied_inverse": true,
+      "test_unrelated_domains_and_nonreal_rates_are_not_accepted": true,
+      "test_zero_rate_is_a_constant_transform": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_inverse_elementary.c": {
+    "tests": {
+      "enabled": true,
+      "test_asinh_offset_in_independent_common_denominator_spectra": true,
+      "test_atanh_retains_both_exterior_cut_values": true,
+      "test_cancelled_imaginary_units_produce_real_rates": true,
+      "test_clausen_finite_recurrence_is_independent_of_dummy_name": true,
+      "test_clausen_orders_inferred_from_spectral_degree": true,
+      "test_complete_formula_verification_preserves_changed_branch_terms": true,
+      "test_digamma_hyperbolic_pairs": true,
+      "test_independent_atanh_branch_formula": true,
+      "test_independent_digamma_spectra": true,
+      "test_independent_geometric_spectra": true,
+      "test_inverse_circular_and_asinh_pairs": true,
+      "test_real_scaled_staircases": true,
+      "test_scalar_multiples_and_constant_offsets": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_inverse_gaussian.c": {
+    "tests": {
+      "enabled": true,
+      "test_cartesian_exponential_spectrum_recovers_complex_gaussian": true,
+      "test_copied_error_functions_with_both_scale_signs": true,
+      "test_copied_exponentially_modulated_error_functions": true,
+      "test_copied_gaussian_formulae": true,
+      "test_copied_normal_distributions_with_both_scale_signs": true,
+      "test_copied_polynomial_weighted_gaussians": true,
+      "test_exact_nested_radical_scales_in_copied_normal_cdf": true,
+      "test_independent_weighted_and_frequency_shifted_formulae": true,
+      "test_independently_written_kernel_and_its_integral": true,
+      "test_initial_value_impulses_are_not_silently_discarded": true,
+      "test_nonmatching_exponents_and_wrong_root_branch_remain_symbolic": true,
+      "test_symbolic_error_function_formulae": true,
+      "test_symbolic_error_kernel_cancels_reciprocal_radical_factors": true,
+      "test_symbolic_frequency_shift_keeps_the_whole_spectrum_consistent": true,
+      "test_symbolic_gaussian_retains_parameter_restrictions": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_inverse_general.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_inverse_general_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_causal_delays_and_reciprocal_exponentials": true,
+      "test_conditioned_spectrum_preserves_parameter_guards": true,
+      "test_fractional_source_functions_round_trip": true,
+      "test_independent_finite_sum_inverse_preserves_index_scope": true,
+      "test_independent_fractional_and_shifted_spectra": true,
+      "test_linearity_through_a_common_denominator": true,
+      "test_nested_integer_powers_of_rational_spectra": true,
+      "test_scalar_association_and_decimal_logarithm": true,
+      "test_symbolic_power_and_delay_keep_their_domains": true,
+      "test_unbound_affine_hyperbolic_powers_and_half_planes": true,
+      "test_unbound_hyperbolic_powers_round_trip_through_every_supported_order": true,
+      "test_unsupported_branch_choices_are_not_assumed": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_inverse_rational.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_inverse_rational_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_inverse_rational_equation": true,
+      "test_inverse_rational_factors": true,
+      "test_inverse_rational_parameters": true,
+      "test_inverse_rational_series": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_inverse_special.c": {
+    "tests": {
+      "enabled": true,
+      "test_affine_logarithms_and_scalar_multiples": true,
+      "test_bessel_orders_and_scales": true,
+      "test_constant_parameters_are_specialised": true,
+      "test_copied_bessel_spectra": true,
+      "test_copied_gamma_spectrum_and_symbolic_conditions": true,
+      "test_copied_logarithmic_spectra": true,
+      "test_copied_lower_gamma_spectra_preserve_small_tails": true,
+      "test_copied_upper_gamma_spectra_preserve_small_tails": true,
+      "test_exponential_integrals": true,
+      "test_free_parameter_bindings_do_not_remove_guards": true,
+      "test_incomplete_gamma_families": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_circular.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_laplace_circular_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_laplace_circular_domains": true,
+      "test_laplace_circular_independent_inverses": true,
+      "test_laplace_circular_quadrature": true,
+      "test_laplace_circular_rendering": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_derivatives.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_laplace_derivative_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_laplace_derivative_order": true,
+      "test_laplace_derivative_primes": true,
+      "test_laplace_derivative_shorthand": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_elementary.c": {
+    "tests": {
+      "enabled": true,
+      "test_laplace_elementary_affine": true,
+      "test_laplace_elementary_circular": true,
+      "test_laplace_elementary_cuts": true,
+      "test_laplace_elementary_inverse_functions": true,
+      "test_laplace_elementary_logs_and_powers": true,
+      "test_laplace_elementary_periodic_logs": true,
+      "test_laplace_elementary_sech": true,
+      "test_laplace_elementary_staircases": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_gaussian.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_laplace_gaussian_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_laplace_gaussian_antiderivatives": true,
+      "test_laplace_gaussian_exact_rates": true,
+      "test_laplace_gaussian_inventory": true,
+      "test_laplace_gaussian_values": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_special.c": {
+    "tests": {
+      "enabled": true,
+      "test_laplace_special_bessel": true,
+      "test_laplace_special_clausen": true,
+      "test_laplace_special_guards": true,
+      "test_laplace_special_integral_families": true,
+      "test_laplace_special_parameters": true,
+      "test_laplace_special_unsupported": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_laplace_time.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_laplace_time_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_laplace_time_integrals": true,
+      "test_laplace_time_translation_domains": true,
+      "test_laplace_time_translation_history": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_polynomial.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_polynomial_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_polynomial_calculus": true,
+      "test_polynomial_convolution": true,
+      "test_polynomial_fourier": true,
+      "test_polynomial_names": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_round_trips.c": {
+    "tests": {
+      "enabled": true,
+      "test_transform_distribution_round_trips": true,
+      "test_transform_family_round_trips": true,
+      "test_transform_symbolic_power_round_trips": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_sgn.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_sgn_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_sgn_aliases_and_real_domain": true,
+      "test_sgn_calculus": true,
+      "test_sgn_fourier": true,
+      "test_sgn_function_run": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_style.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_style_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_derivative_function_style": true,
+      "test_transform_function_style": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_mobile.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_mobile_invalid_hosts": true,
+      "test_lab_mobile_loopback": true,
+      "test_lab_mobile_qr_capacity": true,
+      "test_lab_mobile_qr_geometry": true,
+      "test_lab_mobile_qr_unsupported": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_native.c": {
+    "tests": {
+      "enabled": true,
+      "test_process_cancellation": true,
+      "test_process_cwd": true,
+      "test_process_descendant_overflow": true,
+      "test_process_descendant_timeout": true,
+      "test_process_exit_status": true,
+      "test_process_input": true,
+      "test_process_invalid_arguments": true,
+      "test_process_missing_executable": true,
+      "test_process_output_limits": true,
+      "test_process_success": true,
+      "test_process_timeout": true,
+      "test_process_unicode": true,
+      "test_process_worker_paths": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_routes.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_http_catalogue": true,
+      "test_lab_http_contracts": true,
+      "test_lab_http_rejections": true,
+      "test_lab_server_lifetime": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_runtime.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_runtime_creation": true,
+      "test_lab_runtime_preservation": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_state.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_packaged_defaults": true,
+      "test_lab_page_escaping": true,
+      "test_lab_state_corruption": true,
+      "test_lab_state_round_trip": true
+    }
+  },
+  "tools/to_be_announced_lab/tests/test_tba_native.c": {
+    "tests": {
+      "enabled": true,
+      "test_tba_native_routes": true
     }
   }
 }

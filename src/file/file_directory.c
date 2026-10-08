@@ -3,20 +3,56 @@
  * @brief Directory stream iteration and collected listings.
  *
  * Opens directory handles, reads entries and creates metadata-bearing listing arrays. It centralises entry and
- * container ownership for callers that need either incremental iteration or a complete listing.
+ * container ownership for callers that need either incremental iteration or a complete listing. Also creates
+ * ordinary directories and exclusive private temporary directories for staged tool output.
  *
  * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "file_internal.h"
+
+/* Create a private directory exclusively; handle destruction never removes its contents. */
+file_t *file_create_temp_directory(const string_t *parent)
+{
+    file_t *validated = file_new(parent);
+    if (!validated)
+        return NULL;
+    size_t length = strlen(validated->path);
+    static const char suffix[] = "/.mars-directory-XXXXXX";
+    if (length > SIZE_MAX - sizeof(suffix)) {
+        file_free(validated);
+        errno = EOVERFLOW;
+        return NULL;
+    }
+    char *path = malloc(length + sizeof(suffix));
+    if (!path) {
+        int error = errno;
+        file_free(validated);
+        errno = error;
+        return NULL;
+    }
+    memcpy(path, validated->path, length);
+    memcpy(path + length, suffix, sizeof(suffix));
+    /* Finish allocating the owned handle before creating anything to roll back. */
+    free(validated->path);
+    validated->path = path;
+    if (!mkdtemp(validated->path)) {
+        int error = errno;
+        file_free(validated);
+        errno = error;
+        return NULL;
+    }
+    errno = 0;
+    return validated;
+}
 
 static int file_mkdir_component(const char *path, mode_t permissions)
 {

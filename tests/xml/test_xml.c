@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "file.h"
 #include "xml.h"
 #include "test_harness.h"

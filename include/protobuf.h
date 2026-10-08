@@ -19,10 +19,12 @@
 
 #ifndef MARS_PROTOBUF_H
 #define MARS_PROTOBUF_H
-#include "array.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "array.h"
 
 /**
  * @brief Opaque ordered Protocol Buffers wire message; field meaning comes from the application's schema.

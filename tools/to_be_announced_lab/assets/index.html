@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>To-Be-Announced Lab</title>
+  <meta name="theme-color" content="#071913">
+  <meta name="description" content="Forecasting and time-series workbench for MARS.">
+  <link rel="manifest" href="__BASE_PATH__/manifest.webmanifest">
+  <link rel="icon" href="__BASE_PATH__/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="__BASE_PATH__/apple-touch-icon.png">
+  <link rel="stylesheet" href="__BASE_PATH__/index.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <h1>To-Be-Announced Lab</h1>
+          <p>Forecast from real dated series, pair it with exogenous drivers, and export the results without dropping back into the expression playground. This lab is for regression, ARIMA, ARIMAX, SARIMA, and SARIMAX workflows.</p>
+        </div>
+        <div class="header-side">
+          <div id="mobile-status" class="status">Ready</div>
+          <details class="mobile-card" id="mobileAccess">
+            <summary>Mobile</summary>
+            <div class="mobile-panel">
+              <div class="mobile-copy">
+                <strong id="mobile-title">__MOBILE_TITLE__</strong>
+                <span id="mobile-hint">__MOBILE_HINT__</span>
+                <a id="mobile-url" href="__MOBILE_URL__" target="_blank" rel="noreferrer">__MOBILE_URL__</a>
+              </div>
+              <div class="mobile-actions">
+                <div class="mobile-qr" id="qr-box" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
+                <button id="refresh-mobile" class="secondary" type="button">Copy URL</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="hero-badges">
+        <span class="badge">Forecasting-first scratch app</span>
+        <span class="badge">Phone-ready with QR access</span>
+        <span class="badge">Private by default</span>
+        <span class="badge">Suggested settings available</span>
+      </div>
+    </section>
+
+    <section class="layout">
+      <section class="panel setup-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Forecast Setup</h2>
+            <p>Point this at your dated CSVs, choose the model family, and let the lab return a summary plus a downloadable forecast table.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <form id="forecast-form" novalidate action="__BASE_PATH__/forecast-form" method="post" target="forecast-transport" onsubmit="return window.__to_be_announcedPrepareForecastSubmit ? window.__to_be_announcedPrepareForecastSubmit() : true;">
+            <input type="hidden" name="target_display_name" value="__TARGET_DISPLAY_NAME__">
+            <input type="hidden" name="xreg_display_name" value="__XREG_DISPLAY_NAME__">
+            <div class="grid-2">
+              <div class="field-block"><span>Target CSV</span>
+                <div class="upload-stack">
+                  <input type="hidden" name="target_path" value="__TARGET_PATH__">
+                  <input id="target-path-readout" class="path-readout" value="__TARGET_DISPLAY_NAME__" title="__TARGET_DISPLAY_NAME__" readonly>
+                  <div class="upload-row">
+                    <input id="target-upload" type="file" accept=".csv,text/csv">
+                    <label class="upload-trigger" for="target-upload">Choose CSV</label>
+                    <span id="target-upload-name" class="upload-filename">__TARGET_UPLOAD_LABEL__</span>
+                  </div>
+                </div>
+                <div id="target-meta" class="detected-meta">__TARGET_META_HTML__</div>
+                <span class="field-hint">Upload the file from your machine. The lab will save it locally for this lab and read the header row for you.</span>
+              </div>
+              <div class="target-right-stack">
+                <label class="compact-field">Target value column
+                  <select name="target_value_column" title="__TARGET_VALUE_COLUMN__">
+                    __TARGET_VALUE_OPTIONS__
+                  </select>
+                  <span class="helper-row">
+                    <span class="field-hint">Choose the series to forecast from the uploaded CSV header.</span>
+                    <span id="target-picker-status" class="picker-status">__TARGET_PICKER_STATUS__</span>
+                  </span>
+                </label>
+                <div class="detected-meta outlier-panel __OUTLIER_PANEL_CLASS__">
+                  <div class="outlier-panel-head">
+                    <strong>Target outliers</strong>
+                    <span id="outlier-status" class="picker-status">__OUTLIER_STATUS__</span>
+                  </div>
+                  <div id="outlier-controls" class="outlier-controls">
+                    <label>Outlier handling
+                      <select name="outlier_mode">
+                        <option value="none">None</option>
+                        <option value="flag">Flag only</option>
+                        <option value="cap">Cap extreme values</option>
+                        <option value="exclude">Exclude from fit (interpolate)</option>
+                      </select>
+                    </label>
+                    <input type="hidden" name="outlier_dates" value="__OUTLIER_DATES__">
+                    <div class="multi-select-list-frame">
+                      <div id="outlier-list" class="multi-select-list outlier-list">__OUTLIER_PICKER_HTML__</div>
+                    </div>
+                  </div>
+                  <span class="field-hint">Tick any flagged points you want the lab to treat specially. Excluding points keeps the dates and interpolates only for fitting.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <label>Target date column
+                <select name="target_date_column">
+                  __TARGET_DATE_OPTIONS__
+                </select>
+                <span class="field-hint">Choose the target date column from the likely candidates the lab found in the uploaded file.</span>
+              </label>
+              <label>Forecast until
+                <select name="forecast_end_date">
+                  __FORECAST_END_OPTIONS__
+                </select>
+                <span class="field-hint">Choose the last month, quarter, year, or day you want the forecast to reach. The lab lists only valid period ends, defaults to the furthest possible one, and remembers the choice when you come back.</span>
+              </label>
+            </div>
+
+            <div class="grid-2">
+              <div class="field-block"><span>Exogenous CSV</span>
+                <div class="upload-stack">
+                  <input type="hidden" name="xreg_path" value="__XREG_PATH__">
+                  <input id="xreg-path-readout" class="path-readout" value="__XREG_DISPLAY_NAME__" title="__XREG_DISPLAY_NAME__" readonly>
+                  <div class="upload-row">
+                    <input id="xreg-upload" type="file" accept=".csv,text/csv">
+                    <label class="upload-trigger" for="xreg-upload">Choose CSV</label>
+                    <span id="xreg-upload-name" class="upload-filename">__XREG_UPLOAD_LABEL__</span>
+                  </div>
+                </div>
+                <div id="xreg-meta" class="detected-meta">__XREG_META_HTML__</div>
+                <span class="field-hint">Optional supporting file with outside drivers such as population.</span>
+              </div>
+              <label>Exogenous columns
+                <input type="hidden" name="xreg_columns" value="__XREG_COLUMNS__">
+                <div class="multi-select-shell">
+                  <div id="xreg-columns-summary" class="multi-select-summary">__XREG_SUMMARY_HTML__</div>
+                  <div class="multi-select-list-frame">
+                    <div id="xreg-columns-list" class="multi-select-list">
+                      __XREG_PICKER_HTML__
+                    </div>
+                  </div>
+                </div>
+                <span class="field-hint">Choose one or more numeric driver columns from the supporting CSV.</span>
+                <span id="xreg-columns-status" class="picker-status">__XREG_PICKER_STATUS__</span>
+                <span id="xreg-columns-debug" class="picker-status">Will send: __XREG_COLUMNS__</span>
+              </label>
+            </div>
+
+            <div class="grid-2">
+              <label>Exogenous date column
+                <select name="xreg_date_column">
+                  __XREG_DATE_OPTIONS__
+                </select>
+                <span class="field-hint">Choose the exogenous date column from the likely candidates the lab found in the supporting file.</span>
+              </label>
+              <label>Model
+                <input type="hidden" name="models" value="__MODELS__">
+                <div id="model-summary" class="multi-select-summary">Selected: __MODEL_SUMMARY__</div>
+                <div class="multi-select-list-frame">
+                  <div id="model-list" class="multi-select-list model-list">__MODEL_PICKER_HTML__</div>
+                </div>
+                <span class="field-hint">Tick one or more model families. If unsure, start with <code>SARIMAX</code> for monthly data with an outside driver, or <code>ARIMA</code> without one. Suggested settings respond to the selected model set.</span>
+              </label>
+            </div>
+
+            <div class="grid-4 criteria-grid">
+              <div class="field-block"><span class="field-title">Detected frequency</span>
+                <input id="detected-frequency-readout" value="__DETECTED_FREQUENCY_LABEL__" readonly>
+                <input type="hidden" name="frequency" value="__FREQUENCY__">
+                <span class="field-hint">The lab detects this from the target dates and uses it for the forecast cadence.</span>
+              </div>
+              <label><span class="field-title">Reporting year</span>
+                <select name="year_type">
+                  <option value="calendar">Calendar</option>
+                  <option value="fiscal">Fiscal Apr-Mar</option>
+                </select>
+                <span class="field-hint">Choose Fiscal Apr-Mar if you want reporting aligned to the UK financial year.</span>
+              </label>
+              <label><span class="field-title">Model comparison rule</span>
+                <select name="criterion" title="AIC compares models fitted to the same data by balancing fit against complexity. Lower is better.">
+                  <option value="aic">AIC</option>
+                  <option value="aicc">AICc</option>
+                  <option value="bic">BIC</option>
+                </select>
+                <span class="field-hint">Used when comparing models. AIC is the usual starting choice. It balances fit against complexity, and lower is better.</span>
+              </label>
+              <label><span class="field-title">Confidence level</span>
+                <input name="level" value="__LEVEL__">
+                <span class="field-hint">Confidence level for the forecast range. <code>0.95</code> is the normal choice.</span>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button id="suggest-button" class="secondary" type="button">Use suggested settings</button>
+            </div>
+
+            <div class="grid-4">
+              <label><span class="field-title">Recent history <code>(p)</code></span><input name="p" type="number" min="0" value="__P__"><span class="field-hint">How much the model leans on recent past values from the series itself. A common starting value is <code>1</code>.</span></label>
+              <label><span class="field-title">Trend removal <code>(d)</code></span><input name="d" type="number" min="0" value="__D_LOWER__"><span class="field-hint">How much trend needs removing before forecasting. For many monthly series, <code>1</code> is a sensible first try.</span></label>
+              <label><span class="field-title">Short-term error adjustment <code>(q)</code></span><input name="q" type="number" min="0" value="__Q__"><span class="field-hint">How much the model corrects short-term error patterns. Start with <code>0</code> or <code>1</code>.</span></label>
+              <label><span class="field-title">Season length</span><select name="season_period">__SEASON_PERIOD_OPTIONS__</select><span class="field-hint">For <code>SARIMA</code>/<code>SARIMAX</code> and potentially <code>Auto-ARIMA</code>.</span></label>
+            </div>
+
+            <div class="grid-3">
+              <label><span class="field-title">Yearly repeating pattern <code>(P)</code></span><input name="P" type="number" min="0" value="__P_SEASONAL__"><span class="field-hint">Seasonal version of recent history. Start with <code>1</code> if the yearly pattern repeats.</span></label>
+              <label><span class="field-title">Seasonal trend removal <code>(D)</code></span><input name="D" type="number" min="0" value="__D_SEASONAL__"><span class="field-hint">Seasonal version of trend removal. Try <code>0</code> first, then <code>1</code> if seasonality is strong.</span></label>
+              <label><span class="field-title">Seasonal error adjustment <code>(Q)</code></span><input name="Q" type="number" min="0" value="__Q_SEASONAL__"><span class="field-hint">Seasonal version of short-term error adjustment. Usually start with <code>0</code>.</span></label>
+            </div>
+
+            <div id="seasonal-setup-warning" class="setup-advisory hidden"></div>
+
+            <div class="actions">
+              <button id="run-button" type="submit">Run forecast</button>
+            </div>
+            <div id="status" class="status">Ready when you are.</div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Forecast Output</h2>
+            <p>Summary statistics, forecast rows, and downloadable text/CSV come back here.</p>
+          </div>
+          <div class="panel-head-actions">
+            <button id="chart-toggle" class="secondary" type="button">Chart</button>
+            <button id="help-toggle" class="secondary" type="button">Help</button>
+          </div>
+        </div>
+        <div class="panel-body result-grid">
+          <div class="card-grid">
+            <div class="metric"><span>Model used</span><strong id="metric-model">Not run yet</strong></div>
+            <div class="metric"><span>Historic rows used</span><strong id="metric-fit-rows">-</strong></div>
+            <div class="metric"><span>Series stability check</span><strong id="metric-stationary">-</strong></div>
+            <div class="metric"><span>Error-pattern check</span><strong id="metric-invertible">-</strong></div>
+          </div>
+
+          <div class="download-row">
+            <a id="download-summary" class="button-link secondary disabled" href="__BASE_PATH__/download-summary" download aria-disabled="true">Download summary.txt</a>
+            <a id="download-forecast" class="button-link secondary disabled" href="__BASE_PATH__/download-forecast" download aria-disabled="true">Download forecast.csv</a>
+          </div>
+
+          <div class="result-box summary-box">
+            <h3>Summary</h3>
+            <p class="summary-note">Plain-language ratings are shown in brackets. If something looks poor or mediocre, the summary explains what a better result would usually look like.</p>
+            <p id="drivers-used-note" class="summary-note">The target and any drivers used in this run will appear here.</p>
+            <p class="summary-note">If the first few historic fitted rows show <code>NAN</code>, that is usually expected for ARIMA-family models. It means the model needs a little earlier history before it can start calculating fitted values.</p>
+            <div id="summary-box" class="summary-report">
+              <div class="summary-line note-line">Run a forecast to see model statistics here.</div>
+            </div>
+          </div>
+
+          <div class="table-wrap forecast-table-wrap">
+            <div class="table-caption">Actual vs forecast comparison. Historic rows show actual figures beside fitted values, and future rows continue as far as the exogenous data allows.</div>
+            <div class="table-scroll">
+              <table id="forecast-table">
+                <thead id="forecast-head"><tr><th>Date</th><th>Actual</th><th>Mean</th><th>StdErr</th><th>Lower</th><th>Upper</th></tr></thead>
+                <tbody id="forecast-body">
+                  <tr><td colspan="6">Run a forecast to populate this scrollable actual-versus-forecast table.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+        <div class="panel-body chart-pane hidden" id="chart-pane">
+          <div class="result-box forecast-chart-box">
+            <div class="chart-head">
+              <div>
+                <h3>Actuals and forecasts</h3>
+                <p>Actual values are plotted against each selected model's fitted and forecast mean. The table remains the source of the exact numbers.</p>
+              </div>
+            </div>
+            <div id="forecast-chart-body" class="forecast-chart-body forecast-chart-empty">Run a forecast to draw the chart.</div>
+          </div>
+        </div>
+        <div class="panel-body help-pane hidden" id="help-pane">
+          <div class="help-card">
+            <h3>Quick Start</h3>
+            <ul>
+              <li>Start with your current file choices and press <code>Use suggested settings</code> if you want a sensible first setup.</li>
+              <li>Use <code>Target CSV</code> for the numbers you want to predict, such as monthly demand, caseload, or activity.</li>
+              <li>Use <code>Exogenous CSV</code> for outside drivers that may help explain changes, such as population.</li>
+              <li>Tick one or more model families. If you choose several, the lab compares them side by side.</li>
+              <li>Use <code>Chart</code> after a run to open a full-width plot of actuals and each selected model's forecast line.</li>
+              <li>The app returns a summary, a forecast table, and downloads you can open in Excel.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>What Each Main Field Means</h3>
+            <ul>
+              <li><code>Target CSV</code>: the file holding the historic figures you want to forecast.</li>
+              <li><code>Target value column</code>: the exact column name containing the values to predict.</li>
+              <li><code>Target date column</code>: the date column for the target file. Leave this blank if the first column contains the dates.</li>
+              <li><code>Forecast until</code>: the last date you want the forecast to cover. The lab works out the number of future periods for you.</li>
+              <li><code>Exogenous CSV</code>: a second file with related information that may help the forecast.</li>
+              <li><code>Exogenous columns</code>: tick one or more supporting columns from the scrollable list.</li>
+              <li><code>Exogenous date column</code>: the date column in the exogenous file, usually <code>DATE</code>.</li>
+              <li><code>Models</code>: tick one or more model families. The output table shows a mean and standard error for each selected model.</li>
+              <li><code>Detected frequency</code>: how often the target data appears to be recorded. Most council reporting here will usually be <code>Monthly</code>.</li>
+              <li><code>Year type</code>: choose <code>Fiscal Apr-Mar</code> if you want the forecast to align with the UK financial year.</li>
+              <li><code>Confidence level</code>: the confidence level for the forecast bands. <code>0.95</code> is the usual choice.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>Which Model Should I Pick?</h3>
+            <p>If you are unsure, start simple and only move to a more complex model if it clearly helps. You can also tick several models and compare them in one run.</p>
+            <ul>
+              <li><code>Regression</code>: best when you mainly believe another dataset, such as population, explains the future pattern.</li>
+              <li><code>ARIMA</code>: best when you want the model to use the history of the target series by itself.</li>
+              <li><code>ARIMAX</code>: use this when you want both the target history and outside drivers such as population.</li>
+              <li><code>SARIMA</code>: use this when the pattern repeats over the year, for example monthly seasonal swings.</li>
+              <li><code>SARIMAX</code>: usually the strongest practical choice for monthly council data when you have both seasonality and outside drivers.</li>
+              <li><code>Auto-ARIMA</code>: helpful if you do not want to choose all the order settings by hand, but still check the results rather than assuming the search is always best.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>What The ARIMA Variables Mean</h3>
+            <p>These settings control how much the model learns from recent history, trend, and repeating seasonal patterns.</p>
+            <ul>
+              <li><code>Recent history (p)</code>: how much the forecast uses recent past values from the series itself. A good starting value is often <code>1</code>.</li>
+              <li><code>Trend removal (d)</code>: how much trend-removal is needed before forecasting. For many monthly service series, <code>1</code> is a sensible first try.</li>
+              <li><code>Short-term error adjustment (q)</code>: how much the model corrects for short-term error patterns. Start with <code>0</code> or <code>1</code>.</li>
+              <li><code>Yearly repeating pattern (P)</code>: the seasonal version of <code>p</code>. For monthly data, this looks back roughly one year at a time.</li>
+              <li><code>Seasonal trend removal (D)</code>: the seasonal version of <code>d</code>. Use this if the same months behave similarly year after year.</li>
+              <li><code>Seasonal error adjustment (Q)</code>: the seasonal version of <code>q</code>. Start at <code>0</code> unless you have a reason to add it.</li>
+              <li><code>Season length</code>: the repeating pattern to use for <code>SARIMA</code>, <code>SARIMAX</code>, and potentially <code>Auto-ARIMA</code>. Choose labels such as <code>None</code>, <code>Quarterly</code>, <code>Every 4 months</code>, <code>Half-yearly</code>, or <code>Yearly</code>; the lab converts the choice to the model's numeric setting.</li>
+            </ul>
+            <p>The lab can suggest a sensible first set of these settings for you from the detected frequency and chosen model. Use <code>Use suggested settings</code> if you want a good practical starting point.</p>
+            <p>Good practical starting points for monthly council data are often:</p>
+            <ul>
+              <li><code>ARIMA</code>: <code>p=1, d=1, q=0</code></li>
+              <li><code>SARIMA</code>: <code>p=1, d=1, q=0</code>, with <code>P=1</code> only when a strong repeating pattern is detected.</li>
+              <li><code>SARIMAX</code>: the same as <code>SARIMA</code>, with selected exogenous drivers included.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>How Driver Checks Work</h3>
+            <p>Driver evidence is model-specific. A population column can look very strong in plain regression but weaker in <code>SARIMAX</code> if the target's own history, trend removal, or seasonal pattern already explains much of the movement.</p>
+            <ul>
+              <li>For <code>Regression</code>, the lab checks drivers against the target levels directly.</li>
+              <li>For <code>ARIMAX</code>, <code>SARIMAX</code>, and <code>Auto-ARIMA</code> runs that use differencing, the lab checks the drivers on the same transformed scale as the target, so changes are compared with changes.</li>
+              <li>The table headed <code>How the drivers look in this model</code> is therefore about that run only. It is not a permanent verdict on whether a column is good or bad.</li>
+              <li>If a driver looks weak in a seasonal model but strong in regression, compare the forecast table and try a simpler model or fewer seasonal terms before throwing the driver away.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>What Usually Makes A Better Forecast?</h3>
+            <ul>
+              <li>Use as much clean historic data as you can, especially if it covers several years.</li>
+              <li>Make sure the dates line up properly between the target file and any exogenous file.</li>
+              <li>For monthly local authority data, try a seasonal model before assuming the pattern is non-seasonal.</li>
+              <li>Keep the model as simple as possible at first. A very complicated model is not automatically a better one.</li>
+              <li>If you have a sensible outside driver, such as population, test a model with and without it and compare the outputs.</li>
+              <li>Be cautious with very long horizons. A 6- to 12-month forecast is usually easier to trust than a much longer one.</li>
+            </ul>
+          </div>
+          <div class="help-card">
+            <h3>How To Judge Whether The Result Looks Reasonable</h3>
+            <ul>
+              <li>The forecast should broadly follow the shape of the historical series unless there is a strong reason for a sudden change.</li>
+              <li>The confidence range should usually widen as the forecast moves further into the future.</li>
+              <li>If the numbers jump wildly, go negative unexpectedly, or look implausible, try a simpler model or different settings.</li>
+              <li>If several models give similar answers, prefer the simpler one.</li>
+            </ul>
+            <p>If the first few fitted rows in the historic part of the table show <code>NAN</code>, that is usually not a fault. It means the model needs one or more earlier periods to get started, so those first rows are real dates with real actuals but not yet enough prior history for a fitted value.</p>
+          </div>
+          <div class="help-card">
+            <h3>What Counts As Exceptional, Excellent, Good, Or Poor?</h3>
+            <p>Before using the score bands below, it helps to know what each measure is trying to tell you in plain English.</p>
+            <ul>
+              <li><code>R²</code>: how much of the movement in the historic data the model manages to explain. Higher is usually better. Broadly, above <code>0.80</code> is very good, around <code>0.65</code> to <code>0.80</code> is often good, and below <code>0.40</code> is usually poor.</li>
+              <li><code>Adj R²</code>: similar to <code>R²</code>, but stricter. It adjusts for model complexity, so it is often a better guide than plain <code>R²</code> when comparing regression-style models. The same rough good and bad bands as <code>R²</code> are useful here.</li>
+              <li><code>RMSE</code>: the typical size of the model's mistakes. Lower is better. This is often the easiest measure for non-specialists to understand. As a rule of thumb, under about <code>10%</code> of the usual monthly level is excellent, under <code>25%</code> is often good, and above <code>40%</code> is usually poor.</li>
+              <li><code>AIC</code>: a model comparison score that balances fit against complexity. Lower is better, but only when comparing models built on the same series. A lower AIC is good; a higher AIC is worse. The actual raw number is not “good” or “bad” by itself.</li>
+              <li><code>BIC</code>: similar to <code>AIC</code>, but it penalises extra complexity even more strongly. Lower is better, again only when comparing models on the same series. Like AIC, the useful question is which model has the lower score, not whether the number looks big or small on its own.</li>
+            </ul>
+            <p>There is no single universal score that always means “good”. Different services and datasets behave differently. Use the guidance below as a practical rule of thumb, not a rigid rule.</p>
+            <ul>
+              <li><code>R²</code> or <code>Adj R²</code> for regression:
+                Exceptional: above <code>0.95</code>.
+                Excellent: <code>0.90</code> to <code>0.95</code>.
+                Very good: <code>0.80</code> to <code>0.90</code>.
+                Good: <code>0.65</code> to <code>0.80</code>.
+                Mediocre: <code>0.40</code> to <code>0.65</code>.
+                Poor: below <code>0.40</code>.
+              </li>
+              <li><code>RMSE</code>, <code>MSE</code>, and forecast error measures:
+                lower is better, but there is no universal “good” number.
+                Judge them against the scale of the service.
+                As a rough guide, if the typical error is under about <code>5%</code> of the usual monthly value, that is exceptional;
+                <code>5%–10%</code> is excellent;
+                <code>10%–15%</code> is very good;
+                <code>15%–25%</code> is good;
+                <code>25%–40%</code> is mediocre;
+                above <code>40%</code> is poor.
+              </li>
+              <li><code>AIC</code>, <code>AICc</code>, and <code>BIC</code>:
+                these are only useful for comparing models fitted to the same target data.
+                Smaller is better.
+                Do not judge them by their raw size.
+                A difference of less than about <code>2</code> is usually very small,
+                <code>2–6</code> is a meaningful improvement,
+                <code>6–10</code> is strong,
+                and more than <code>10</code> is very strong.
+              </li>
+              <li><code>Sigma²</code>:
+                lower is better, but again only in comparison with other models on the same series.
+                There is no fixed “excellent” sigma² across different services.
+              </li>
+              <li>Forecast intervals:
+                narrower intervals are better only if the forecast still looks realistic.
+                Very narrow bands on a volatile series may be overconfident.
+              </li>
+            </ul>
+            <p>For council use, a practical summary is:
+            Exceptional means the forecast is accurate, stable, and easy to explain.
+            Excellent and very good are usually strong enough for planning.
+            Good may still be useful if the service is volatile.
+            Mediocre means use caution.
+            Poor means revisit the data, the model, or both.</p>
+          </div>
+          <div class="help-card">
+            <h3>Exports</h3>
+            <ul>
+              <li><code>Download summary.txt</code> gives you the readable model summary.</li>
+              <li><code>Download forecast.csv</code> gives you <code>date</code>, <code>actual</code>, and the forecast columns. With one model, it includes <code>mean</code>, <code>stderr</code>, <code>lower</code>, and <code>upper</code>. With several models, it gives each model's <code>mean</code> and <code>stderr</code> side by side.</li>
+              <li>The QR/mobile card in the header points to this same lab, including the separate <code>/to-be-announced/</code> path.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </section>
+
+  </main>
+
+  <iframe name="forecast-transport" title="forecast transport" hidden></iframe>
+
+  <script defer src="__BASE_PATH__/js/transport.js"></script>
+
+  <script id="tba-config" type="application/json">__CLIENT_CONFIG__</script>
+  <script defer src="__BASE_PATH__/js/app.js"></script>
+</body>
+</html>

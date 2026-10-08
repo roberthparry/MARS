@@ -10,13 +10,13 @@
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "file_internal.h"
 
 bool file_stat_regular(file_t *file, struct stat *status)
 {

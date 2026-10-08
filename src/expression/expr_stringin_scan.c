@@ -9,11 +9,11 @@
  * domain restrictions when extending these operations.
  */
 
-#include "expr_stringin_scan.h"
-
 #include <ctype.h>
 #include <limits.h>
 #include <string.h>
+
+#include "expr_stringin_scan.h"
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"

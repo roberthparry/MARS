@@ -16,9 +16,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "test_harness.h"
-
 #include "expression.h"
 #include "integrator.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -684,6 +684,73 @@ void test_exponential_endpoint_decay(void)
         }
     }
     ASSERT_EQ_INT(num_set_default_prec_bits(old_bits), 0);
+}
+
+static void test_high_precision_logarithmic_exponential(void)
+{
+    /* Retain the pre-optimisation 394-digit result for the reported Lab workload. */
+    static const char reference[] =
+        "0.624329988543550870992936383100837244179642620180529286973551902495638088855113254462460276195539868869"
+        "140410394062743141565559118325420596284465847978987572474465109280189639441135184902499148494723256112"
+        "116584065441939968109786892702851901251736946466418221619108140395530136969289919254527356107137893643"
+        "6613158615059567277645326294309690705417802557051000502247237669143862954818111944441168";
+    const size_t caps[] = {5000u, 20000u};
+    size_t old_bits = num_get_default_prec_bits();
+    bool ok = num_set_default_prec_digits(394u) == 0;
+    for (size_t i = 0; ok && i < sizeof(caps) / sizeof(*caps); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string("exp(Li(x))", &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        integrator_t *ig = intg_new();
+        number_t result = NUM_ZERO, error = NUM_ZERO;
+        number_t want = num_create_from_string(reference);
+        number_t tolerance = num_create_from_string("1e-350");
+        struct timespec start, end;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        intg_set_interval_count_max(ig, caps[i]);
+        int status = expr && x && ig ? intg_integral(ig, expr, x, NUM_ZERO, NUM_ONE, &result, &error) : -1;
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        size_t used = intg_get_interval_count_used(ig);
+        ok = status == 0 && used < 5000u && num_ge(error, NUM_ZERO) && num_lt(error, tolerance);
+        if (ok)
+            ok = test_assert_integrator_number_close_tol(result, want, "1e-350", __FILE__, __LINE__);
+        printf("  exp(Li(x)), 0..1, 394 digits: cap=%zu used=%zu elapsed=%.3fs\n", caps[i], used,
+               (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / 1e9);
+        num_destroy(&tolerance);
+        num_destroy(&want);
+        num_destroy(&error);
+        num_destroy(&result);
+        intg_free(ig);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+    bool restored = num_set_default_prec_bits(old_bits) == 0;
+    TEST_ASSERT_TRUE(ok && restored, "high-precision logarithmic exponential converges within both Lab work budgets");
+}
+
+static void test_nested_refinement_partial_budget(void)
+{
+    size_t old_bits = num_get_default_prec_bits();
+    bool ok = num_set_default_prec_digits(96u) == 0;
+    const size_t caps[] = {1u, 2u, 9u, 17u, 35u, 100u};
+    for (size_t i = 0; ok && i < sizeof(caps) / sizeof(*caps); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string("exp(x)", &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        integrator_t *ig = intg_new();
+        number_t result = NUM_ZERO, error = NUM_ZERO;
+        intg_set_interval_count_max(ig, caps[i]);
+        int status = expr && x && ig ? intg_integral(ig, expr, x, NUM_ZERO, NUM_ONE, &result, &error) : -1;
+        ok = status >= 0 && num_is_finite(result) && num_is_finite(error) && num_ge(error, NUM_ZERO) &&
+             intg_get_interval_count_used(ig) <= caps[i];
+        num_destroy(&error);
+        num_destroy(&result);
+        intg_free(ig);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
+    bool restored = num_set_default_prec_bits(old_bits) == 0;
+    TEST_ASSERT_TRUE(ok && restored, "partial nested grids respect the work cap and retain a finite error estimate");
 }
 
 void test_sin(void)
@@ -3619,6 +3686,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_expr_arctan, tests, NULL);
     TEST_RUN_IN_GROUP(test_single_integral_num_high_precision_log, tests, NULL);
     TEST_RUN_IN_GROUP(test_exponential_endpoint_decay, tests, NULL);
+    TEST_RUN_IN_GROUP(test_high_precision_logarithmic_exponential, tests, NULL);
+    TEST_RUN_IN_GROUP(test_nested_refinement_partial_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_null_safety, tests, NULL);
 
     TEST_SECTION("intg_double_integral Tests");

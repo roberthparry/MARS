@@ -10,8 +10,9 @@
  */
 
 #define MARS_NUMBER_INTERNAL_ACCESS
-#include "number_internal.h"
 #include <math.h>
+
+#include "number_internal.h"
 
 static void replace_value(number_t *value, number_t next)
 {

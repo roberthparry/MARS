@@ -1,0 +1,577 @@
+{
+  "format": "mars-calendar-supplements-1",
+  "provenance": "Explicit application supplements migrated from tools/generate_calendar_locales.py, not CLDR.",
+  "conventions": "Supplemental abbreviations and Gregorian display patterns are explicit application conventions; Latin labels omit redundant day wording and era suffixes.",
+  "first_day_suffix_source": "https://nos-langues.canada.ca/fr/cles-de-la-redaction/date-regles-decriture",
+  "sources": [
+    "https://www.lsu.edu/hss/french/undergraduate_program/cajun_french/cajun_french_by_themes.php",
+    "https://inupiaq.tusaalanga.ca/glossary/english?showall=1",
+    "https://www.inupiaqonline.com/appendix/29",
+    "https://beringstraits.com/wp-content/uploads/2024/01/Abridged-lnupiaq-and-English-Dictionary-by-Edna-Maclean.pdf",
+    "https://jamaicanpatwah.com/b/talk-like-a-jamaican-how-to-say-the-weekdays-and-months",
+    "https://kantoniko.com/listas/dias-de-la-semana",
+    "https://sefaradies.cl/wp-content/uploads/2021/01/Diccionario_Online_Ladino_Espa%C3%B1ol.pdf",
+    "https://padutch101.com/services-and-resources/pa-dutch-learning-resources/"
+  ],
+  "options": {
+    "CA-QC": {
+      "en": "additional"
+    },
+    "FR": {
+      "br": "regional"
+    },
+    "GB": {
+      "kw": "regional"
+    },
+    "IL": {
+      "ar": "additional",
+      "en": "additional",
+      "he": "additional",
+      "lad": "additional",
+      "yi": "additional"
+    },
+    "JM": {
+      "jam": "additional"
+    },
+    "PS": {
+      "ar": "additional",
+      "en": "additional",
+      "he": "additional",
+      "lad": "additional",
+      "yi": "additional"
+    },
+    "US": {
+      "frc": "additional",
+      "lad": "additional",
+      "pdc": "additional",
+      "yi": "additional"
+    },
+    "US-AK": {
+      "ik": "official_regional"
+    }
+  },
+  "towns": {
+    "GB": {
+      "jam": [
+        "Birmingham",
+        "Bristol",
+        "Leeds",
+        "Leicester",
+        "London",
+        "Manchester",
+        "Nottingham"
+      ]
+    }
+  },
+  "locales": {
+    "frc": {
+      "english_name": "Cajun French",
+      "native_name": {
+        "utf8_hex": "6672616ec3a76169732063616469656e"
+      },
+      "date_pattern": "d 'de' MMMM y",
+      "months": [
+        [
+          "janv.",
+          "janvier"
+        ],
+        [
+          {
+            "utf8_hex": "66c3a976722e"
+          },
+          {
+            "utf8_hex": "66c3a97672696572"
+          }
+        ],
+        [
+          "mars",
+          "mars"
+        ],
+        [
+          "avr.",
+          "avril"
+        ],
+        [
+          "mai",
+          "mai"
+        ],
+        [
+          "juin",
+          "juin"
+        ],
+        [
+          "juil.",
+          "juillet"
+        ],
+        [
+          {
+            "utf8_hex": "616fc3bb74"
+          },
+          {
+            "utf8_hex": "616fc3bb74"
+          }
+        ],
+        [
+          "sept.",
+          "septembre"
+        ],
+        [
+          "oct.",
+          "octobre"
+        ],
+        [
+          "nov.",
+          "novembre"
+        ],
+        [
+          {
+            "utf8_hex": "64c3a9632e"
+          },
+          {
+            "utf8_hex": "64c3a963656d627265"
+          }
+        ]
+      ],
+      "weekdays": [
+        [
+          "lundi",
+          "lun."
+        ],
+        [
+          "mardi",
+          "mar."
+        ],
+        [
+          "mercredi",
+          "mer."
+        ],
+        [
+          "jeudi",
+          "jeu."
+        ],
+        [
+          "vendredi",
+          "ven."
+        ],
+        [
+          "samedi",
+          "sam."
+        ],
+        [
+          "dimanche",
+          "dim."
+        ]
+      ]
+    },
+    "ik": {
+      "english_name": {
+        "utf8_hex": "49c3b1757069617120284e6f72746820536c6f706529"
+      },
+      "native_name": {
+        "utf8_hex": "49c3b17570696174756e"
+      },
+      "date_pattern": "MMMM d, y",
+      "months": [
+        [
+          {
+            "utf8_hex": "53697169c3b1c3b16161742e"
+          },
+          {
+            "utf8_hex": "53697169c3b1c3b16161746368696171"
+          }
+        ],
+        [
+          {
+            "utf8_hex": "53697169c3b1c3b16161732e"
+          },
+          {
+            "utf8_hex": "53697169c3b1c3b1616173756772756b"
+          }
+        ],
+        [
+          "Pani.",
+          "Paniqsiqsiivik"
+        ],
+        [
+          "Umia.",
+          "Umiaqqavik"
+        ],
+        [
+          "Supp.",
+          "Suppivik"
+        ],
+        [
+          {
+            "utf8_hex": "49c4a1c3b12e"
+          },
+          {
+            "utf8_hex": "49c4a1c3b16976696b"
+          }
+        ],
+        [
+          {
+            "utf8_hex": "49c3b1756b2e"
+          },
+          {
+            "utf8_hex": "49c3b1756b6b756b73616976696b"
+          }
+        ],
+        [
+          {
+            "utf8_hex": "416d69c4a12e"
+          },
+          {
+            "utf8_hex": "416d69c4a1616971736976696b"
+          }
+        ],
+        [
+          "Siku.",
+          {
+            "utf8_hex": "53696b7561717475c4a176696b"
+          }
+        ],
+        [
+          "Sikk.",
+          "Sikkuvik"
+        ],
+        [
+          "Nipp.",
+          "Nippivik"
+        ],
+        [
+          {
+            "utf8_hex": "53697169c3b1c4a1692e"
+          },
+          {
+            "utf8_hex": "53697169c3b1c4a169e1b8b76171"
+          }
+        ]
+      ],
+      "weekdays": [
+        [
+          {
+            "utf8_hex": "417461757463686969c4a1c3b16971"
+          },
+          "Ata."
+        ],
+        [
+          {
+            "utf8_hex": "4169707069c4a1c3b16971"
+          },
+          "Aip."
+        ],
+        [
+          {
+            "utf8_hex": "5069c58b6174636869c4a1c3b16971"
+          },
+          {
+            "utf8_hex": "5069c58b2e"
+          }
+        ],
+        [
+          {
+            "utf8_hex": "536973616d6d69c4a1c3b16971"
+          },
+          "Sis."
+        ],
+        [
+          {
+            "utf8_hex": "54616c6c696d6d69c4a1c3b16971"
+          },
+          "Tal."
+        ],
+        [
+          {
+            "utf8_hex": "49746368616b737269c4a1c3b16971"
+          },
+          "Itc."
+        ],
+        [
+          {
+            "utf8_hex": "5361766169c3b1c3b16971"
+          },
+          "Sav."
+        ]
+      ]
+    },
+    "jam": {
+      "english_name": "Jamaican Patois",
+      "native_name": "Patwa",
+      "date_pattern": "d MMMM y",
+      "months": [
+        [
+          "Jan.",
+          "Januari"
+        ],
+        [
+          "Feb.",
+          "Febiweri"
+        ],
+        [
+          "Maa.",
+          "Maach"
+        ],
+        [
+          "Apr.",
+          "April"
+        ],
+        [
+          "May",
+          "May"
+        ],
+        [
+          "Juun",
+          "Juun"
+        ],
+        [
+          "July",
+          "July"
+        ],
+        [
+          "Aag.",
+          "Aagus"
+        ],
+        [
+          "Sep.",
+          "Septemba"
+        ],
+        [
+          "Akt.",
+          "Aktoba"
+        ],
+        [
+          "Nov.",
+          "Novemba"
+        ],
+        [
+          "Dis.",
+          "Disemba"
+        ]
+      ],
+      "weekdays": [
+        [
+          "Mondeh",
+          "Mon."
+        ],
+        [
+          "Tuesdeh",
+          "Tue."
+        ],
+        [
+          "Wenzdeh",
+          "Wen."
+        ],
+        [
+          "Turzdeh",
+          "Tur."
+        ],
+        [
+          "Frideh",
+          "Fri."
+        ],
+        [
+          "Satdeh",
+          "Sat."
+        ],
+        [
+          "Sundeh",
+          "Sun."
+        ]
+      ]
+    },
+    "lad": {
+      "english_name": "Ladino",
+      "native_name": "Djudeo-espanyol",
+      "date_pattern": "d 'de' MMMM 'de' y",
+      "months": [
+        [
+          "jen.",
+          "jenero"
+        ],
+        [
+          "fev.",
+          "fevrero"
+        ],
+        [
+          "mar.",
+          "marso"
+        ],
+        [
+          "avr.",
+          "avril"
+        ],
+        [
+          "may.",
+          "mayo"
+        ],
+        [
+          "djun.",
+          "djunyo"
+        ],
+        [
+          "djul.",
+          "djulyo"
+        ],
+        [
+          "ago.",
+          "agosto"
+        ],
+        [
+          "sep.",
+          "septembre"
+        ],
+        [
+          "okt.",
+          "oktovre"
+        ],
+        [
+          "nov.",
+          "novembre"
+        ],
+        [
+          "des.",
+          "desembre"
+        ]
+      ],
+      "weekdays": [
+        [
+          "lunes",
+          "lun."
+        ],
+        [
+          "martes",
+          "mar."
+        ],
+        [
+          "mierkoles",
+          "mie."
+        ],
+        [
+          "djueves",
+          "dju."
+        ],
+        [
+          "viernes",
+          "vie."
+        ],
+        [
+          "shabat",
+          "sha."
+        ],
+        [
+          "alhad",
+          "alh."
+        ]
+      ]
+    },
+    "pdc": {
+      "english_name": "Pennsylvania Dutch (Amish)",
+      "native_name": "Pennsilfaanisch Deitsch",
+      "date_pattern": "d'.' MMMM y",
+      "months": [
+        [
+          "Yen.",
+          "Yenner"
+        ],
+        [
+          "Han.",
+          "Hanning"
+        ],
+        [
+          "Matz",
+          "Matz"
+        ],
+        [
+          "Abr.",
+          "Abrill"
+        ],
+        [
+          "Moi",
+          "Moi"
+        ],
+        [
+          "Tschun.",
+          "Tschunn"
+        ],
+        [
+          "Tschul.",
+          "Tschulei"
+        ],
+        [
+          "Aag.",
+          "Aaguscht"
+        ],
+        [
+          "Sep.",
+          "September"
+        ],
+        [
+          "Okt.",
+          "Oktower"
+        ],
+        [
+          "Nof.",
+          "Nofember"
+        ],
+        [
+          "Die.",
+          "Diesember"
+        ]
+      ],
+      "weekdays": [
+        [
+          "Mundaag",
+          "Mu."
+        ],
+        [
+          "Dinschdaag",
+          "Di."
+        ],
+        [
+          "Mittwoch",
+          "Mi."
+        ],
+        [
+          "Dunnerschdaag",
+          "Du."
+        ],
+        [
+          "Freidaag",
+          "Fr."
+        ],
+        [
+          "Samschdaag",
+          "Sa."
+        ],
+        [
+          "Sunndaag",
+          "Su."
+        ]
+      ]
+    }
+  },
+  "patterns": {
+    "la": "d MMMM y"
+  },
+  "weekday_prefixes": {
+    "la": "dies "
+  },
+  "first_day_suffixes": {
+    "fr": {
+      "utf8_hex": "e1b589cab3"
+    }
+  },
+  "defaults": {
+    "CA-QC": "fr_CA"
+  },
+  "forced_official": {
+    "CA-QC": {
+      "fr": "official"
+    }
+  },
+  "extra_official": {
+    "VA": {
+      "la": "holy_see"
+    }
+  }
+}

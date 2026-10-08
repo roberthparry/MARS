@@ -2,7 +2,7 @@
  * @file test_webserver.c
  * @brief Native web-server protocol and lifecycle regressions.
  *
- * Checks routes, binary and document bodies, malformed requests, size limits, deadlines and response handling. The
+ * Checks routes, binary and document bodies, malformed requests, size limits, deadlines, socket peers and IPv6. The
  * runnable greeting example is executed after ordinary server assertions.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
 #include "webserver.h"
 #include "test_harness.h"
 
@@ -97,17 +98,23 @@ static websrv_t *fixture(websrv_handler_fn handler, void *context, const websrv_
 }
 
 /* Fork only the server; all test cases and clients run strictly sequentially. */
-static string_t *exchange(websrv_t *server, const void *data, size_t size, bool shutdown_write, int expected)
+static string_t *exchange_family(websrv_t *server, const void *data, size_t size, bool shutdown_write, int expected,
+                                 int family)
 {
     if (!server) return NULL;
-    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    int fd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
     struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(websrv_port(server)),
                               .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    struct sockaddr_in6 addr6 = {.sin6_family = AF_INET6, .sin6_port = htons(websrv_port(server)),
+                                .sin6_addr = IN6ADDR_LOOPBACK_INIT};
+    const struct sockaddr *destination = family == AF_INET ? (const struct sockaddr *)&addr :
+                                                           (const struct sockaddr *)&addr6;
+    socklen_t length = family == AF_INET ? sizeof(addr) : sizeof(addr6);
     struct timeval timeout = {.tv_sec = 3};
     if (fd < 0) return NULL;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr))) { close(fd); return NULL; }
+    if (connect(fd, destination, length)) { close(fd); return NULL; }
     pid_t pid = fork();
     if (pid == 0) {
         close(fd);
@@ -140,6 +147,11 @@ static string_t *exchange(websrv_t *server, const void *data, size_t size, bool 
     return reply;
 }
 
+static string_t *exchange(websrv_t *server, const void *data, size_t size, bool shutdown_write, int expected)
+{
+    return exchange_family(server, data, size, shutdown_write, expected, AF_INET);
+}
+
 static string_t *send_text(websrv_t *server, const char *text)
 {
     string_t *input = string_new_with(text);
@@ -158,7 +170,7 @@ static void test_websrv_lifetime(void)
     string_t *address = string_new_with("localhost");
     websrv_t *invalid = websrv_new(address, 0, NULL);
     string_free(address);
-    TEST_ASSERT_TRUE(!invalid, "numeric IPv4 only");
+    TEST_ASSERT_TRUE(!invalid, "numeric IPv4 or IPv6 only");
     websrv_t *server = websrv_new(NULL, 0, NULL);
     TEST_ASSERT_NOT_NULL(server);
     bool ok = websrv_port(server) != 0 && websrv_serve_once(server, 0) == 0;
@@ -420,6 +432,80 @@ static void test_websrv_header_boundary(void)
     TEST_ASSERT_TRUE(ok, "headers cross receive boundaries and pipelined requests are not dispatched");
 }
 
+static bool peer_response(const websrv_request_t *request, websrv_response_t *response, void *context)
+{
+    (void)context;
+    const string_t *peer = websrv_request_peer(request);
+    return peer && peer == websrv_request_peer(request) && websrv_response_text(response, peer);
+}
+
+/* Probe the OS directly: server regressions must never become IPv6 skips. */
+static int ipv6_available(void)
+{
+    int fd = socket(AF_INET6, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+        return errno == EAFNOSUPPORT || errno == EPROTONOSUPPORT ? 0 : -1;
+    struct sockaddr_in6 address = {.sin6_family = AF_INET6, .sin6_addr = IN6ADDR_LOOPBACK_INIT};
+    int result = bind(fd, (struct sockaddr *)&address, sizeof(address));
+    int error = errno;
+    close(fd);
+    if (!result)
+        return 1;
+    return error == EADDRNOTAVAIL || error == EAFNOSUPPORT || error == ENODEV ? 0 : -1;
+}
+
+static bool peer_exchange(const char *listen_address, int family, const char *expected)
+{
+    string_t *address = string_new_with(listen_address);
+    string_t *path = string_new_with("/peer");
+    websrv_t *server = address ? websrv_new(address, 0, NULL) : NULL;
+    bool ok = server && path && websrv_route(server, HTTP_GET, path, peer_response, NULL);
+    static const char request[] = "GET /peer HTTP/1.1\r\nHost: localhost\r\n"
+                                  "X-Forwarded-For: 203.0.113.8\r\nForwarded: for=203.0.113.9\r\n\r\n";
+    string_t *reply = ok ? exchange_family(server, request, sizeof(request) - 1, true, 1, family) : NULL;
+    string_t *ending = string_sprintf("\r\n\r\n%s", expected);
+    size_t length = string_byte_length(ending);
+    ok = reply && ending && contains(reply, "200 Response") && string_byte_length(reply) >= length &&
+         string_view_equals_view(string_view(reply, string_byte_length(reply) - length, length), string_view_all(ending));
+    string_free(ending);
+    string_free(reply);
+    string_free(path);
+    string_free(address);
+    websrv_free(server);
+    return ok;
+}
+
+static void test_websrv_peer_ipv4(void)
+{
+    TEST_ASSERT_TRUE(websrv_request_peer(NULL) == NULL, "NULL request has no peer");
+    TEST_ASSERT_TRUE(peer_exchange("127.0.0.1", AF_INET, "127.0.0.1"),
+                     "IPv4 socket peer ignores spoofed forwarding headers");
+}
+
+static void test_websrv_peer_ipv6(void)
+{
+    int available = ipv6_available();
+    if (!available) {
+        TEST_SKIP("OS IPv6 loopback is unavailable");
+        return;
+    }
+    TEST_ASSERT_INT_EQ(available, 1);
+    TEST_ASSERT_TRUE(peer_exchange("::1", AF_INET6, "::1"), "IPv6 loopback peer is reported without brackets");
+}
+
+static void test_websrv_peer_dual_stack(void)
+{
+    int available = ipv6_available();
+    if (!available) {
+        TEST_SKIP("OS IPv6 loopback is unavailable");
+        return;
+    }
+    TEST_ASSERT_INT_EQ(available, 1);
+    TEST_ASSERT_TRUE(peer_exchange("::", AF_INET, "::ffff:127.0.0.1"),
+                     "IPv4 connection to the IPv6 wildcard retains its mapped IPv6 peer");
+    TEST_ASSERT_TRUE(peer_exchange("::", AF_INET6, "::1"), "IPv6 wildcard also accepts IPv6 loopback");
+}
+
 /* README example: execute the complete documented program last. */
 static void example_webserver_hello(void)
 {
@@ -439,6 +525,9 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_websrv_setters, tests, NULL);
     TEST_RUN_IN_GROUP(test_websrv_exact_bytes, tests, NULL);
     TEST_RUN_IN_GROUP(test_websrv_header_boundary, tests, NULL);
+    TEST_RUN_IN_GROUP(test_websrv_peer_ipv4, tests, NULL);
+    TEST_RUN_IN_GROUP(test_websrv_peer_ipv6, tests, NULL);
+    TEST_RUN_IN_GROUP(test_websrv_peer_dual_stack, tests, NULL);
     TEST_SECTION("README Output Examples");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_webserver_hello, readme_examples, "webserver,readme,output");
     return TEST_EXIT_CODE();

@@ -6,6 +6,8 @@
  * answer public-holiday, observance, weekend and working-day queries. It also
  * provides jurisdiction-specific timezone and daylight-saving information, including
  * dated exceptions represented in the installed catalogue.
+ * Read-only visitors enumerate jurisdiction choices, representative locations and
+ * towns, retaining stored coordinate precision and explicit default-town markers.
  *
  * Use this module for business calendars and calculations whose result depends on
  * local rules, rather than calendar arithmetic alone. Results depend on the
@@ -30,6 +32,66 @@
  * behaviour, and dated exceptions for a requested jurisdiction.
  */
 typedef struct _jurisdiction_t jurisdiction_t;
+
+/**
+ * @brief Borrowed database location or town, valid only during its visitor callback.
+ *
+ * Coordinate text retains the database's precision. Default locations have elevation
+ * "0" when no altitude is stored. Do not free or retain these pointers.
+ */
+typedef struct jurisdict_place_t {
+    const char *jurisdiction_code; /**< Owning jurisdiction code. */
+    const char *name;              /**< Locality or town name. */
+    const char *latitude;          /**< Latitude in decimal degrees, as stored. */
+    const char *longitude;         /**< Longitude in decimal degrees, as stored. */
+    const char *elevation;         /**< Elevation in metres, or "0" when unspecified. */
+    const char *timezone;          /**< IANA timezone name. */
+    bool is_default;               /**< Whether this is the jurisdiction's selected default. */
+} jurisdict_place_t;
+
+/**
+ * @brief Visit a jurisdiction choice; return false to stop successfully.
+ * @param code Borrowed jurisdiction code, valid during this callback only.
+ * @param label Borrowed name, prefixed with the parent name for subdivisions.
+ * @param context Caller-owned context passed unchanged.
+ * @return True to continue, false to stop.
+ */
+typedef bool (*jurisdict_choice_visit_fn)(const char *code, const char *label, void *context);
+
+/**
+ * @brief Visit a location or town; return false to stop successfully.
+ * @param place Borrowed record valid during this callback only.
+ * @param context Caller-owned context passed unchanged.
+ * @return True to continue, false to stop.
+ */
+typedef bool (*jurisdict_place_visit_fn)(const jurisdict_place_t *place, void *context);
+
+/**
+ * @brief Enumerate database jurisdiction choices in case-insensitive label order.
+ * @param jurisdiction Open engine; enumeration covers the whole database, not just its selected code.
+ * @param visitor Required callback; must not close or re-enter this engine.
+ * @param context Caller-owned context, optionally NULL.
+ * @return True on completion or requested early stop, false on invalid arguments or database failure.
+ */
+bool jurisdict_each_choice(jurisdiction_t *jurisdiction, jurisdict_choice_visit_fn visitor, void *context);
+
+/**
+ * @brief Enumerate database default locations in jurisdiction-code order.
+ * @param jurisdiction Open engine; enumeration covers all complete database location records.
+ * @param visitor Required callback; must not close or re-enter this engine.
+ * @param context Caller-owned context, optionally NULL.
+ * @return True on completion or requested early stop, false on invalid arguments or database failure.
+ */
+bool jurisdict_each_location(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn visitor, void *context);
+
+/**
+ * @brief Enumerate database towns by jurisdiction, default first, then case-insensitive name.
+ * @param jurisdiction Open engine; enumeration covers all complete database town records.
+ * @param visitor Required callback; must not close or re-enter this engine.
+ * @param context Caller-owned context, optionally NULL.
+ * @return True on completion or requested early stop, false on invalid arguments or database failure.
+ */
+bool jurisdict_each_town(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn visitor, void *context);
 
 /**
  * @brief One holiday occurrence.

@@ -9,12 +9,13 @@
  * destroy and borrowing rules rather than depend on the private arena layout.
  */
 
-#include "array.h"
-#include "ustring.h"
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "array.h"
+#include "ustring.h"
 
 #define ARRAY_INIT_CAPACITY 8
 #define STACK_CHUNK_SIZE 32

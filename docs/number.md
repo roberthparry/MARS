@@ -629,6 +629,34 @@ their existing backend-specific precision and representation.
 | `num_lauricella_f(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
 | `num_hypergeometric_pFq(upper, p, lower, q, x)` | Evaluates the generalised hypergeometric function with `p` upper and `q` lower parameters. |
 
+#### Incomplete gamma precision
+
+For finite real `a > 0` and `0 <= x <= a + 1`, the multiprecision
+implementations of `num_gammainc_lower(a, x)` and `num_gammainc_P(a, x)`
+evaluate the lower tail directly. They use the positive series with initial
+term `1` and recurrence `term[n] = term[n-1] * x / (a + n)`.
+The sum is scaled by `exp(a*log(x) - x)/a` for the unnormalised lower gamma,
+or by `exp(a*log(x) - x - log(Gamma(a+1)))` for P. Logarithmic scaling avoids
+unnecessarily overflowing intermediate powers or complete gamma values.
+Both lower-tail functions return zero at `x = 0` in this domain.
+
+This preserves small tails that would otherwise lose significant digits when
+subtracting the upper incomplete gamma from the complete gamma. Working
+precision includes 64 guard bits, plus the positive binary exponent of `a`
+when needed for the logarithmic prefactor. Convergence uses a geometric bound
+on the entire remaining positive tail and the shared relative series criterion,
+requiring more than the requested precision plus 16 bits of exponent separation.
+The computation is bounded to 200,000 series terms; exhaustion or an
+unrepresentable working precision returns an invalid numeric result rather than
+silently reverting to cancellation-prone subtraction. Ordinary MPFR exponent-range
+underflow and overflow still apply.
+
+Outside this lower-tail region the existing complete-minus-upper calculation
+remains in use. `num_gammainc_upper` and `num_gammainc_Q` retain their direct
+MPFR upper-tail calculation, and existing non-finite, non-positive-parameter
+and complex-domain behaviour is unchanged. The fixed-precision qfloat backend
+already evaluates its lower tail directly.
+
 #### Clausen functions
 
 `num_clausen(order, theta)` takes a positive integer order and an angle in

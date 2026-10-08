@@ -117,13 +117,14 @@ sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev li
 Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
-MARS Lab requires Python 3.10 or later, using only its standard library, and
-renders TeX through `latex` and `dvisvgm`. The desktop Lab uses the `sqlcipher`
-CLI to bootstrap the jurisdiction database during installation. Install the
-runtime tools and check them with:
+MARS Lab runs as a native C server with native calculation workers and renders
+TeX through `latex` and `dvisvgm`. Its browser interface remains HTML, CSS and
+JavaScript. Native `mars_config` handles installation and links SQLCipher
+directly; neither Python nor the `sqlcipher` CLI is required for installing or
+running the Lab. Install and check its rendering tools with:
 
 ```sh
-sudo apt install python3 texlive-latex-base dvisvgm sqlcipher
+sudo apt install texlive-latex-base dvisvgm
 make check-lab-deps
 ```
 
@@ -424,8 +425,9 @@ the resulting configuration in `~/.mars/config/jurisdiction-db.env`, and builds 
 encrypted jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
 MARS supplies no shared WeatherAPI account or key. If you choose to enable
 weather lookups, create your own WeatherAPI account; its key is stored in
-`~/.mars/config/weather.env`. Reinstalling MARS Lab recreates `~/.mars`, while
-preserving `weather.env`. A lookup sends that key, the selected date and the
+`~/.mars/config/weather.env`. Reinstalling replaces the selected jurisdiction
+database and its configuration, preserving unrelated files and saved Lab state.
+A lookup sends that key, the selected date and the
 observer latitude and longitude from the local server to WeatherAPI.com over
 HTTPS; the key is not sent to the browser. MARS does not cache or persist the
 weather response, although the date and coordinates remain in private local Lab

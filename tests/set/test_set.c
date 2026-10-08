@@ -19,7 +19,6 @@
 #include <time.h>
 
 #include "test_harness.h"
-
 #include "set.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

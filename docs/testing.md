@@ -20,6 +20,38 @@ make test_qfloat
 
 ## Run Tests
 
+The maintenance applications have native C suites in
+`tools/mars_checks/tests/` and `tools/mars_config/tests/`. Their root targets are
+`test_mars_checks` and `test_mars_config`; `make -j1 test` in either application
+directory delegates to the corresponding root target. Test binaries remain in
+the application's own `build/<mode>/tests/` directory. Run these suites
+sequentially, just like library and Lab suites.
+
+Installer tests use disposable private directories beneath `/tmp`, not the
+user's configured databases. The checker suite exercises passing and failing
+fixtures; failures deliberately produced inside a test are not suite failures.
+The README checker reuses the native C loopback protocol fixtures for HTTP,
+HTTPS, WebSocket and gRPC examples. OpenSSL development files are required for
+their TLS support; Python is not used. Fixtures belong under `tests/http/fixtures/`
+and their executable is built under `tests/build/<mode>/http/fixtures/`.
+
+The checker suite also tests coverage-report validation and release-evidence
+publication with disposable synthetic inputs. `make check-source-policy` runs
+the native inline-size, expression perfect-hash layout and no-Python audits.
+These audits also run as part of `make test` and `make check-compliance`.
+The `mars_checks source-policy` selectors `inline`, `functiontables` and `python`
+can run these independently. Generated build trees and third-party sources are
+excluded; historical data-provenance prose is not treated as executable code.
+
+Mathematical worker integration regressions live in the native
+`tools/mars_lab/tests/test_lab_math_*.c` suites. They exercise the prebuilt C
+workers, decode their output through the native evaluator interface and compare
+against numerical references and exact renderings. They are registered in
+`test_lab_native`, with mathematical README examples after all ordinary cases.
+Use `tests/test_config.json` to isolate a failing case; the corresponding source
+file is the configuration key. The shared helper owns per-case strings and
+worker results and releases them between cases.
+
 ```sh
 make test_number
 make test_qfloat
@@ -107,7 +139,7 @@ server on an ephemeral port and calls it with the MARS client. The dedicated
 `make -j1 test_webserver` suite runs its ordinary protocol checks before this
 README example, without contacting external services.
 
-The `tools/check_readme_examples.py` entry in `tests/test_config.json` controls
+The `tools/mars_checks/src/readme/checks_readme.c` entry in `tests/test_config.json` controls
 individual README programs. Isolate a failure there, then restore all entries
 before the complete check. Identifiers combine the guide path and C-block
 number. This is functional example testing, not a memory-test run.
@@ -358,10 +390,15 @@ then passed again under the sanitizers, after the ordinary cases. The full
 test configuration was restored at the end of the audit.
 
 MARS Lab expression-presentation regressions live in
-`tests/tools/test_mars_lab.py`. They exercise native Cartesian complex
-evaluation, differentiation and integration as well as the browser's Function
-syntax colouring. Markdown examples are collected in
-`ZZMarsLabReadmeExamples`, which runs after the other Lab tests.
+`tools/mars_lab/tests/`. The C route suite and browser checks exercise the
+native adapters and result cards without a Python server. README examples run
+after the ordinary native cases.
+
+Lab test fixtures honour `TMPDIR` and otherwise use `/tmp`. The `lab-browser-test`
+target sets `TMPDIR` to its absolute build directory so Snap-packaged Firefox can
+access the disposable profile: Snap's private `/tmp` cannot see the host's `/tmp`.
+Each fixture creates a private directory and removes it after the browser exits;
+the installed Lab and browser profile are untouched.
 
 ### Recorded Check: 1–2 October 2026
 
@@ -562,6 +599,12 @@ allowance raised to 120 seconds, within the existing 15-minute isolated-case
 limit. Only the temporary verification runner adjusts this timeout; the test's
 inputs and assertions are unchanged, and its neighbouring tests pass with
 their original limits.
+
+The migrated native mathematical worker tests use a bounded 120-second deadline
+per worker call, including generated-function calls, to retain that allowance
+under the 50% CPU cap. Their mathematical inputs, precision and assertions are
+unchanged. Worker failures report the deadline, errno and source expression;
+this test-only allowance does not change the Lab's request deadlines.
 
 ## Notes
 

@@ -6,9 +6,10 @@
  * deterministic local fixtures to test the documented client workflow.
  */
 
+#include <stdlib.h>
+
 #include "http.h"
 #include "array.h"
-#include <stdlib.h>
 
 int main(int argc, char **argv)
 {

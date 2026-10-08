@@ -16,14 +16,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <complex.h>
 
 #define MARS_NUMBER_IMPLEMENTATION
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
-
-#include <complex.h>
 #undef complex
 
 /* Resolve a valid storage kind through the backend registry. */

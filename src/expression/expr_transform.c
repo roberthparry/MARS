@@ -10,8 +10,9 @@
  */
 
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #include <string.h>
+
+#include "expr_internal.h"
 
 typedef struct {
     const char *preferred_source;

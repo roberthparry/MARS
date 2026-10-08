@@ -33,10 +33,11 @@
  * mutation or evaluation.
  */
 
-#include "expr_bindings.h"
-#include "number.h"
 #include <limits.h>
 #include <stdlib.h>
+
+#include "expr_bindings.h"
+#include "number.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expression.h"

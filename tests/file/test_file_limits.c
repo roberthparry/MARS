@@ -9,14 +9,14 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file.h"
-#include "test_harness.h"
-
 #include <errno.h>
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include "file.h"
+#include "test_harness.h"
 
 /* Pipes synchronise processes; all regular-file operations still use the file API. */
 void test_file_blocking_lock_handoff(void)

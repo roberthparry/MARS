@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "file.h"
 
 #define MARS_JSON_INTERNAL_ACCESS

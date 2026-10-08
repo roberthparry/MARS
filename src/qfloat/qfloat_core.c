@@ -10,9 +10,9 @@
  */
 
 #define MARS_QFLOAT_INTERNAL_ACCESS
-#include "qfloat_internal.h"
-
 #include <math.h>
+
+#include "qfloat_internal.h"
 
 /* Split addition into its rounded sum and rounding residual. */
 void qf_two_sum(double a, double b, double *s, double *e)

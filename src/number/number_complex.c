@@ -9,13 +9,13 @@
  * borrowed aliases and independently owned numeric values.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "number.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #include "ustring.h"
-
-#include <stdio.h>
-#include <stdlib.h>
 
 bool number_eq_same_tol_complex(const number_t *a, const number_t *b);
 

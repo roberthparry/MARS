@@ -10,11 +10,11 @@
  */
 
 #define MARS_QFLOAT_INTERNAL_ACCESS
-#include "qfloat_internal.h"
-#include "ustring.h"
-
 #include <math.h>
 #include <stdio.h>
+
+#include "qfloat_internal.h"
+#include "ustring.h"
 
 static qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 {

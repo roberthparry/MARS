@@ -10,11 +10,11 @@
  */
 
 /* Assemble holiday occurrences, apply exceptions and observances, and expose queries. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "jurisdiction_internal.h"
 
 typedef struct holiday_event_row_t {
     int holiday_id;

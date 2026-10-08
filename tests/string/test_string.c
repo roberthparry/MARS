@@ -2,18 +2,20 @@
  * @file test_string.c
  * @brief Unicode string and parsing-helper regressions.
  *
- * Checks construction, mutation, normalisation, grapheme operations, cursors and views. README examples verify the
- * documented text model after ordinary boundary and ownership checks.
+ * Checks construction, mutation, normalisation, grapheme operations, cursors, views and literal shell-word decoding.
+ * README examples verify the documented text model after ordinary boundary and ownership checks.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_string.h"
-#include "ustring.h"
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "test_string.h"
+#include "ustring.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -921,6 +923,10 @@ static void test_string_append_utf8_exact(void)
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, decomposed, sizeof(decomposed) - 1), 0);
     TEST_ASSERT_INT_EQ(string_byte_length(text), 3);
     TEST_ASSERT_TRUE(memcmp(string_c_str(text), decomposed, 3) == 0, "no NFC normalisation");
+    string_t *clone = string_clone(text);
+    TEST_ASSERT_TRUE(clone && string_byte_length(clone) == 3 && memcmp(string_c_str(clone), decomposed, 3) == 0,
+                     "cloning preserves exact UTF-8 for dictionary and JSON ownership");
+    string_free(clone);
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, string_c_str(text), string_byte_length(text)), 0);
     TEST_ASSERT_INT_EQ(string_byte_length(text), 6);
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(text, "\xc0\xaf", 2), -1);
@@ -946,10 +952,129 @@ static void example_utf8_exact(void)
     string_free(text);
 }
 
+static void test_string_unquote_shell_words(void)
+{
+    static const struct { const char *input; const char *expected; } cases[] = {
+        {"", ""},
+        {" \t ", ""},
+        {"''", ""},
+        {"\"\"", ""},
+        {" \t# comment", ""},
+        {"literal", "literal"},
+        {"  literal\t ", "literal"},
+        {"'two words'", "two words"},
+        {"\"two words\"", "two words"},
+        {"one\\ two", "one two"},
+        {"one\\\ttwo", "one\ttwo"},
+        {"'pa'\"'\"'ss word'", "pa'ss word"},
+        {"'pa'\\''ss'", "pa'ss"},
+        {"un'quo'\"ted\"", "unquoted"},
+        {"a''b\"\"c", "abc"},
+        {"a#b", "a#b"},
+        {"'a'#b", "a#b"},
+        {"a\\#b", "a#b"},
+        {"'a # b' # trailing comment", "a # b"},
+        {"a \t# unmatched ' and dangling \\", "a"},
+        {"\\'\\\"\\\\", "'\"\\"},
+        {"'a\\b'", "a\\b"},
+        {"\"a\\\\b\"", "a\\b"},
+        {"\"a\\\"b\"", "a\"b"},
+        {"\"a\\qb\"", "a\\qb"},
+        {"\"a\\'b\"", "a\\'b"},
+        {"\"\\$HOME\\`id\\`\"", "\\$HOME\\`id\\`"},
+        {"a\\nb", "anb"},
+        {"'$HOME $(id) `id` ~ * ; | &'", "$HOME $(id) `id` ~ * ; | &"},
+        {"$HOME", "$HOME"},
+        {"$(id)", "$(id)"},
+        {"~/*.env", "~/*.env"},
+        {"'é'\"λ\"😀", "éλ😀"},
+        {"a\xc2\xa0" "b", "a\xc2\xa0" "b"}
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *input = string_new_with(cases[i].input);
+        string_t *output = input ? string_unquote_shell(input) : NULL;
+        bool ok = output && input != output && string_byte_length(output) == strlen(cases[i].expected) &&
+                  memcmp(string_c_str(output), cases[i].expected, strlen(cases[i].expected)) == 0 &&
+                  strcmp(string_c_str(input), cases[i].input) == 0;
+        string_free(output);
+        string_free(input);
+        if (!ok)
+            test_set_failure_detailf("shell-word fixture %zu", i);
+        TEST_ASSERT_TRUE(ok, "single literal word, quoted fragments, escapes and comments");
+    }
+}
+
+static void test_string_unquote_shell_invalid(void)
+{
+    static const char *const cases[] = {
+        "one two", "'one' two", "one \"two\"", "'' ''", "one\ttwo", "one # comment\n",
+        "'unterminated", "\"unterminated", "trailing\\", "\"trailing\\", "a\nb", "a\rb",
+        "'a\nb'", "\"a\rb\"", "a\\\nb", "a\\\rb", "\"a\\\nb\"", "# comment\r"
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *input = string_new_with(cases[i]);
+        errno = 0;
+        string_t *output = input ? string_unquote_shell(input) : NULL;
+        bool ok = input && !output && errno == EINVAL;
+        string_free(output);
+        string_free(input);
+        if (!ok)
+            test_set_failure_detailf("invalid shell-word fixture %zu", i);
+        TEST_ASSERT_TRUE(ok, "malformed words and line breaks are rejected");
+    }
+    const char embedded[][8] = {"a\0b", "a\\\0b", "a #\0b"};
+    for (size_t i = 0; i < sizeof(embedded) / sizeof(*embedded); ++i) {
+        string_t *input = string_new();
+        bool ready = input && string_append_utf8_exact(input, embedded[i], sizeof(embedded[i]) - 1) == 0;
+        errno = 0;
+        string_t *output = ready ? string_unquote_shell(input) : NULL;
+        bool ok = ready && !output && errno == EINVAL;
+        string_free(output);
+        string_free(input);
+        TEST_ASSERT_TRUE(ok, "embedded NUL is rejected in words, escapes and comments");
+    }
+    errno = 0;
+    string_t *output = string_unquote_shell(NULL);
+    bool ok = !output && errno == EINVAL;
+    string_free(output);
+    TEST_ASSERT_TRUE(ok, "NULL input reports EINVAL");
+}
+
+static void test_string_unquote_shell_exact_unicode(void)
+{
+    const char encoded[] = "'e\xcc\x81'\"😀\"\\λ";
+    const char expected[] = "e\xcc\x81😀λ";
+    string_t *input = string_new();
+    bool ready = input && string_append_utf8_exact(input, encoded, sizeof(encoded) - 1) == 0;
+    string_t *output = ready ? string_unquote_shell(input) : NULL;
+    bool ok = output && string_byte_length(output) == sizeof(expected) - 1 &&
+              memcmp(string_c_str(output), expected, sizeof(expected) - 1) == 0 &&
+              string_byte_length(input) == sizeof(encoded) - 1 &&
+              memcmp(string_c_str(input), encoded, sizeof(encoded) - 1) == 0;
+    string_free(output);
+    string_free(input);
+    TEST_ASSERT_TRUE(ok, "unquoting preserves decomposed Unicode and leaves borrowed input unchanged");
+}
+
+/* README example: installer-style concatenated quotes preserve an apostrophe and a space. */
+static void example_unquote_shell(void)
+{
+    string_t *quoted = string_new_with("'pa'\"'\"'ss word'");
+    string_t *value = string_unquote_shell(quoted);
+    string_printf("%S\n", value);
+    bool ok = value && string_view_equals_literal(string_view_all(value), "pa'ss word");
+    string_free(value);
+    string_free(quoted);
+    TEST_ASSERT_TRUE(ok, "README literal shell-word output");
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Core");
     TEST_RUN_IN_GROUP(test_string_append_utf8_exact, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_unquote_shell_words, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_unquote_shell_invalid, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_unquote_shell_exact_unicode, tests, NULL);
     TEST_RUN_IN_GROUP(test_split_basic, tests, NULL);
     TEST_RUN_IN_GROUP(test_join_basic, tests, NULL);
     TEST_RUN_IN_GROUP(test_split_edge_cases, tests, NULL);
@@ -989,6 +1114,7 @@ int tests_main(void)
     TEST_SECTION("README");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "string,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_utf8_exact, readme_examples, "string,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_unquote_shell, readme_examples, "string,readme,output");
 
     return TEST_EXIT_CODE();
 }

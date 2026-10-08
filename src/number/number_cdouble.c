@@ -10,15 +10,15 @@
  * borrowed aliases and independently owned numeric values.
  */
 
-#include "number.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number_internal.h"
-#include "ustring.h"
-
 #include <complex.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number_internal.h"
+#include "ustring.h"
 
 static double complex number_cdouble_value(const number_t *number)
 {

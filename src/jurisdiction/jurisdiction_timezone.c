@@ -10,11 +10,11 @@
  */
 
 /* Load timezone eras and named rules, and resolve civil-date GMT offsets. */
-#include "jurisdiction_internal.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "jurisdiction_internal.h"
 
 void jurisdiction_free_timezone_era_rows(jurisdiction_vec_t *rows)
 {

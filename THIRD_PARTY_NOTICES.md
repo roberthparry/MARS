@@ -12,8 +12,8 @@ this file do not replace those obligations.
 
 ## SQLCipher Community Edition
 
-MARS links to SQLCipher and uses its command-line program to create encrypted
-databases. SQLCipher incorporates SQLite and normally uses a separately
+MARS links to SQLCipher; the native configuration tool uses its library API to
+create encrypted databases. SQLCipher incorporates SQLite and normally uses a separately
 supplied cryptographic provider. SQLCipher is a registered trademark of
 Zetetic, LLC. MARS is not affiliated with or endorsed by Zetetic.
 
@@ -62,6 +62,11 @@ cryptographic provider. The normal Debian and Ubuntu build uses OpenSSL. OpenSSL
 OpenSSL and original SSLeay licences. A distributor must use the notice that
 matches the provider and version it actually ships.
 
+The native HTTP, WebSocket and gRPC test fixtures also link OpenSSL directly
+for TLS connections. They are test executables, not part of libmars or the
+public webserver module. Retain the applicable OpenSSL notices if distributing
+these test binaries.
+
 Copyright (c) The OpenSSL Project Authors. All rights reserved.
 
 This product includes software developed by the OpenSSL Project for use in the
@@ -90,6 +95,7 @@ Upstream licence files:
 Libsodium's principal licence is ISC; its distribution also contains components
 with other notices. A distributor bundling it must preserve the licence and
 component notices shipped with the exact library version, not only this summary.
+The HTTP module also uses libsodium for authentication and random-data helpers.
 Upstream licence information:
 <https://github.com/jedisct1/libsodium/blob/master/LICENSE>.
 
@@ -103,6 +109,18 @@ Distributors bundling libcurl must retain the licence supplied with that
 version and account for its TLS, compression and other linked dependencies.
 The recommended Linux development package uses OpenSSL; MARS does not vendor
 libcurl or its dependencies.
+
+MARS acknowledges Daniel Stenberg and the curl contributors for libcurl, and
+Tatsuhiro Tsujikawa and the nghttp2 contributors for the HTTP/2 library used by
+the verified libcurl build. nghttp2 is distributed under the MIT (Expat) licence.
+It is a transitive dependency of that libcurl build, not a direct MARS link
+dependency. Retain its copyright and permission notice when bundling it, using
+the terms supplied with the exact version. Upstream licence information:
+<https://github.com/nghttp2/nghttp2/blob/v1.68.0/COPYING>.
+
+The MARS `webserver` module is an original Linux-socket implementation and adds
+no third-party server library. Native XML and Protocol Buffers code likewise
+do not introduce libxml2, libprotobuf or a separate gRPC runtime dependency.
 
 ## Multiprecision and Unicode libraries
 
@@ -187,18 +205,19 @@ Unicode CLDR 46 through Babel 2.17.0, except for the explicitly hand-maintained
 Ladino, Cajun French, North Slope Iñupiaq, Jamaican Patois and Pennsylvania Dutch supplements. Their common calendar
 vocabulary and chosen abbreviations are not attributed to CLDR; Yiddish calendar
 names do use CLDR. Sources for the supplementary vocabulary are identified in
-the generator and the jurisdiction guide; no dictionary prose is bundled.
+the native generator's supplementary input and the jurisdiction guide; no dictionary prose is bundled.
 Language names, official-language options
 and territory-to-locale defaults use CLDR's
-likely-subtag and territory-language data. The pinned generator is
-`tools/generate_calendar_locales.py`; its Babel dependency is used only to
-regenerate the SQL seed and is not imported by installers or MARS Lab.
+likely-subtag and territory-language data. The native `mars_config locales`
+generator uses a pinned, resolved CLDR snapshot and separate curated supplements
+under `tools/mars_config/data/`. Babel 2.17.0 was used to extract the original
+snapshot; neither Babel nor Python is required to regenerate the SQL seed.
 Hebrew month spellings in `packaging/jurisdiction-db/mars_calendar_local.sql`
 also follow [CLDR's Hebrew locale data](https://github.com/unicode-org/cldr/blob/main/common/main/he.xml).
 The CLDR 46 source is
 [unicode-org/cldr, release-46](https://github.com/unicode-org/cldr/tree/release-46).
-Babel is separately installed generation tooling under the BSD 3-Clause licence;
-no Babel code is bundled in the seed. Unicode CLDR data files are distributed
+Babel's original extraction tooling is under the BSD 3-Clause licence;
+no Babel code is bundled in the snapshot or seed. Unicode CLDR data files are distributed
 under the Unicode Licence v3.
 The required notice follows.
 
@@ -249,8 +268,9 @@ The coefficient-generation process used NumPy, SpiceyPy and PyERFA. NumPy and
 PyERFA are distributed under the BSD 3-Clause Licence; SpiceyPy is distributed
 under the MIT Licence. PyERFA contains the independently maintained ERFA
 implementation of the IAU's Standards of Fundamental Astronomy routines under
-the BSD 3-Clause Licence. These are generation-time tools rather than MARS
-runtime dependencies.
+the BSD 3-Clause Licence. These historical generation tools remain recorded
+for data provenance; they are not dependencies of the maintained native C
+tooling or the MARS runtime.
 
 The source URLs, versions, transformations and checksums are recorded in
 [`docs/almanac-data-provenance.md`](docs/almanac-data-provenance.md). Use of
@@ -295,11 +315,16 @@ services and relevant authorities where accuracy is critical.
 
 ## Separately installed tools
 
-MARS Lab invokes Python 3, TeX Live, dvisvgm and, optionally, Tailscale and
-desktop integration tools. These programs are installed separately and are not
+MARS Lab invokes TeX Live, dvisvgm and, optionally, Tailscale and desktop
+integration tools. These programs are installed separately and are not
 incorporated into MARS. Their licences govern their own programs. TeX Live is a
 collection with per-package licences; dvisvgm is licensed under the GNU GPL
 version 3 or later.
+
+Maintained MARS application, configuration, generation, test, coverage and
+release-evidence tooling is native C and does not require a Python interpreter.
+The historical generation packages recorded above remain part of the bundled
+data's provenance, with their licences and notices retained.
 
 ## Distribution note
 

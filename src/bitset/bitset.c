@@ -9,10 +9,11 @@
  * not access the backing words directly.
  */
 
-#include "bitset.h"
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "bitset.h"
 
 #define BITSET_WORD_BITS 64u
 #define BITSET_INIT_WORDS 1u

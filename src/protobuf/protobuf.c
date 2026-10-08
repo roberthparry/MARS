@@ -11,9 +11,10 @@
  */
 
 /* Native bounded Protocol Buffers wire records; no external parser or schema compiler. */
-#include "protobuf.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "protobuf.h"
 
 typedef struct {
     uint32_t field;

@@ -9,11 +9,12 @@
  * domain restrictions when extending these operations.
  */
 
+#include <stdlib.h>
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include <stdlib.h>
 
 /* Infer a candidate from a spectral feature, then check its complete forward formula. Nothing in
  * this matcher depends on transform provenance, supplied free-variable values, or sampled values.

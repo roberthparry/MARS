@@ -9,12 +9,13 @@
  * domain restrictions when extending these operations.
  */
 
+#include <stdlib.h>
+#include <string.h>
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include <stdlib.h>
-#include <string.h>
 
 /* These pairs share exp(q(s))*erfc(c*s+d), optionally divided by s. Collect only the
  * algebra surrounding this kernel, never the provenance of a previous transform. */

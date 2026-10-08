@@ -4,6 +4,8 @@
  *
  * Runs native equation solving and presents exact, symbolic and numerical solution information. Sampled bindings
  * are used only through the native APIs, not as browser-side algebraic rewriting.
+ * Emits tab-separated variable and constant binding records for the Lab editor,
+ * including unset values and names rendered in native Expression syntax.
  */
 
 #include <ctype.h>
@@ -1023,6 +1025,30 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
     }
 }
 
+static void print_equation_bindings(const equation_t *equation)
+{
+    expr_bindings_t *bindings = equ_bindings(equation);
+
+    /* Every binding is emitted once in its native order; no name lookup is needed. */
+    for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+        const char *name = expr_bindings_name_at(bindings, i);
+        expr_t *binding = expr_bindings_expr_at(bindings, i);
+        if (!name || !binding)
+            continue;
+
+        number_t value = expr_get_val(binding);
+        string_t *value_text = num_to_string(value);
+        expr_t *named = expr_new_named_var(NUM_NAN, name);
+        char *expression_name = named ? expr_to_string(named, style_UNBOUND) : NULL;
+        printf("binding     %s\t%s\t%s\n", expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable",
+               expression_name ? expression_name : name, value_text ? string_c_str(value_text) : "NAN");
+        free(expression_name);
+        expr_free(named);
+        string_free(value_text);
+        num_destroy(&value);
+    }
+}
+
 static void print_equation_fields(const equation_t *equation, const equation_solutions_t *solutions,
                                   expr_bindings_t *bindings, const char *input, const char *status, int precision)
 {
@@ -1050,6 +1076,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     printf("search_note %s\n", equ_solutions_search_note(solutions) ? equ_solutions_search_note(solutions) : "");
     printf("family_note %s\n", equ_solutions_family_note(solutions) ? equ_solutions_family_note(solutions) : "");
     printf("interpretation_note %s\n", equ_interpretation_note(equation) ? equ_interpretation_note(equation) : "");
+    print_equation_bindings(equation);
     print_solutions(solutions, bindings, solution_order, precision, false);
     print_solutions(solutions, bindings, solution_order, precision, true);
     print_solutions_TeX(solutions, bindings, solution_order);

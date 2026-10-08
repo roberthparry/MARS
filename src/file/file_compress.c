@@ -10,14 +10,14 @@
  */
 
 #define MARS_FILE_INTERNAL_ACCESS
-#include "file_internal.h"
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sodium.h>
 #include <zstd.h>
 #include <zstd_errors.h>
+
+#include "file_internal.h"
 
 struct file_decoder_t {
     ZSTD_DCtx *context;

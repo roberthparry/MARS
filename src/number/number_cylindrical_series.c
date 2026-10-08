@@ -11,8 +11,9 @@
  */
 
 #define MARS_NUMBER_INTERNAL_ACCESS
-#include "number_internal.h"
 #include <math.h>
+
+#include "number_internal.h"
 
 typedef enum number_modified_family_t {
     NUMBER_MODIFIED_BESSEL_I,

@@ -59,7 +59,7 @@ is equivalent to:
 
 MARS infers one shared binding table before parsing the two sides, so every
 occurrence of a name resolves to the same expression leaf. Callers should pass
-the bare equation unchanged; Python, scratch programs, and other clients do not
+the bare equation unchanged; MARS Lab, scratch programs and other clients do not
 need to add braces or binding declarations.
 
 Calculus operators retain their expression-level scope within an equation.

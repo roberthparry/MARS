@@ -10,8 +10,7 @@ The following artwork was created specifically for MARS during the project's
 development under the direction of Robert H. Parry (Rob), the project's sole
 creator and maintainer:
 
-- `packaging/linux/mars-lab.svg`;
-- `packaging/linux/to-be-announced-lab.svg`; and
+- `packaging/linux/mars-lab.svg`; and
 - the SVG and PNG concepts in `packaging/linux/icon-concepts/`.
 
 These assets are original MARS material. They were not copied or adapted from
@@ -20,7 +19,7 @@ confirms that MARS has the right to distribute them under the repository's MIT
 Licence.
 
 The concept artwork first entered the repository on 23 May 2026. The selected
-MARS Lab and To Be Announced Lab icons entered the repository during the same
+MARS Lab icon entered the repository during the same
 project design process in May and June 2026. Git history remains the detailed
 record of their subsequent revisions.
 

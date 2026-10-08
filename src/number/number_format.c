@@ -9,16 +9,16 @@
  * borrowed aliases and independently owned numeric values.
  */
 
-#include "number.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number_internal.h"
-#include "ustring.h"
-
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number_internal.h"
+#include "ustring.h"
 
 char *number_strdup(const char *text)
 {

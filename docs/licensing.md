@@ -53,24 +53,31 @@ Every MARS release should apply the following controls:
 
 ## Dependency risk register
 
+Maintained MARS application, configuration, generation, test, coverage and
+release-evidence tooling is native C; no Python interpreter is required.
+Historical generation packages remain in this register because their provenance
+and notices accompany the bundled data.
+
 | Component | Role | Present licence model | Continuity risk | MARS response |
 |---|---|---|---|---|
 | SQLite | Database engine within SQLCipher | Public domain | Very low | Preserve the exact upstream release and public-domain statement. A future owner cannot withdraw the existing dedication. |
 | SQLCipher Community Edition | Encrypted SQLite storage | BSD 3-Clause | Medium | Preserve a known-good Community Edition source release and its full notice. If future releases close, maintain or adopt a community fork and keep database migration tests. |
+| libcurl | HTTP/HTTPS and WebSocket client transport; HTTP/2 for unary gRPC | curl licence | Low | Retain the exact curl licence and contributor notices; inventory the selected TLS, HTTP/2 and compression backends for binary distributions. |
+| nghttp2 | Transitive HTTP/2 dependency of the verified libcurl build | MIT (Expat) | Low | Retain its copyright and permission notice when bundled. It is not an additional dependency of the native MARS web server. |
+| libsodium | Streaming file encryption and HTTP authentication/randomness helpers | ISC, with additional component notices | Low | Preserve the selected distribution's full licence material and component notices when bundling. |
 | OpenSSL, zlib and Zstandard | Normal SQLCipher cryptographic provider and its verified transitive compression libraries on Debian and Ubuntu | Apache 2.0; zlib Licence; BSD 3-Clause or GPL 2 | Low | Use distribution security updates; record the actual dynamic closure in binary SBOMs because SQLCipher and OpenSSL can be built with alternatives. |
 | GMP, MPFR and MPC | Multiprecision number backends | GNU LGPL/GPL families | Low | Dynamically link to distribution packages, retain notices and avoid copying private implementation code. Existing releases remain available under their granted terms. |
 | libunistring | Optional Unicode support | GNU LGPL/GPL families | Low | Keep it optional and preserve the internal fallback path. |
 | glibc, libm and pthreads | GNU/Linux platform runtime | Primarily GNU LGPL, with per-file exceptions | Low | Depend on the target distribution and include its exact copyright material when shipping a self-contained runtime. |
-| Python 3 standard library | MARS Lab server and installers | PSF Licence | Low | Use only the standard library and keep the Lab client free of package-manager dependencies. |
 | TeX Live and dvisvgm | MARS Lab TeX rendering | Per-package licences; dvisvgm is GPL 3 or later | Low to medium | Invoke separately installed programs. A packaged appliance must inventory the actual TeX packages included. |
-| python-holidays and Workalendar | Generation sources for bundled holiday data | MIT | Low | Retain versioned provenance in the SQL source and notices; they are not runtime dependencies. |
+| python-holidays and Workalendar | Historical generation sources for bundled holiday data | MIT | Low | Retain versioned provenance in the SQL source and notices; they are not dependencies of the maintained native tooling or runtime. |
 | IANA Time Zone Database | Country and time-zone seed data | Public domain | Very low | Retain the release identifier and source URL in generated data provenance. |
 | Unicode CLDR | Calendar identifiers, territory weekend conventions and localised calendar names | Unicode Licence v3 | Very low | Retain the version, source URL and Unicode copyright and permission notice with distributions of derived jurisdiction data. |
-| Babel 2.17.0 | Generation of packaged CLDR 46 month and weekday names | BSD 3-Clause | Low | Generation-only tooling; installers and MARS Lab continue to use only the Python standard library. |
+| Babel 2.17.0 | Historical extraction of packaged CLDR 46 month and weekday names | BSD 3-Clause | Low | Retain the original extraction provenance and licence; native mars_config regenerates the SQL seed from the pinned snapshot without Python or Babel. |
 | Tailscale | Optional private access to MARS Lab | BSD 3-Clause client | Low to medium | Keep it optional; normal local and LAN operation must not depend on it. |
 | WeatherAPI.com | Optional hosted weather data | Revocable service terms rather than an open-source licence | Medium | Supply no shared account or key; require an installer who enables weather to use their own account; keep the integration optional and server-side; publish the privacy notice; credit the provider; disclose transmitted and locally retained fields; display the mandatory end-user warning; retain no weather responses; protect the API key; and review the terms before each release. Calendar and astronomical output must remain independent of the service. |
 | JPL DE440 and NAIF auxiliary kernels | Generation sources for bundled almanac coefficients and workbook Moon data | NASA/JPL/Caltech NAIF use and redistribution rules | Low to medium | Do not bundle the kernels or SPICE Toolkit; retain official source URLs, kernel versions, published checksums, transformation details and output hashes in the almanac provenance record. Acknowledge NASA, JPL, Caltech and NAIF without implying endorsement. |
-| NumPy, SpiceyPy, PyERFA and ERFA | Generation tools for almanac coefficients, frame rotations and test oracles | BSD 3-Clause or MIT | Low | They are not runtime dependencies. Retain their licences and record exact package versions for every future regeneration. |
+| NumPy, SpiceyPy, PyERFA and ERFA | Historical generation tools for almanac coefficients, frame rotations and test oracles | BSD 3-Clause or MIT | Low | Retain their licences and historical provenance; they are not dependencies of the maintained native tooling or runtime. Record the exact tools and versions used for any future regeneration. |
 | AstroNav 2000-2040 workbook | Original MARS navigation worksheet | MIT | Low | Preserve the dated authorship statement, repository history and checksum in the almanac provenance record. |
 
 ## SQLCipher contingency
@@ -103,11 +110,19 @@ discover that closure, but their output must be reviewed because dynamically
 loaded providers and data packages may not appear there.
 
 `make release-evidence` builds the release library from a clean worktree and
-writes `build/compliance/release-evidence.json`. The record contains the source
+writes `build/compliance/release-evidence.json` through the native
+`mars_checks release-evidence` command. The record contains the source
 commit, artefact and dependency hashes, available tool versions, package
 versions and installed package-copyright hashes. Retain that JSON file with
 the release artefacts and review entries that have no package ownership or
 licence record.
+
+The evidence writer uses the file module's streaming SHA-256 API. Git revision
+and worktree inspection must succeed; missing dynamic libraries or failed
+required hashes prevent publication. Optional unavailable version and package
+probes are recorded as unknown. `--allow-dirty` is for local trials only, never
+published releases. Only inspect trusted, locally built artefacts: the `ldd`
+probe is not a safe way to inspect arbitrary untrusted executables.
 
 The current automated controls and matters that still require a human decision
 are recorded in the [compliance status](./compliance-status.md).

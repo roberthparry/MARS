@@ -9,15 +9,15 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file.h"
-#include "array.h"
-#include "test_harness.h"
-
 #include <errno.h>
 #include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "file.h"
+#include "array.h"
+#include "test_harness.h"
 
 typedef struct {
     bool encrypted;

@@ -9,14 +9,14 @@
  * information rather than relying on a particular internal algorithm.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define MARS_INTEGRATOR_INTERNAL_ACCESS
 #include "integrator_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 enum { IG_POLY_COEFF_COUNT = 6, IG_POLY_WORK_COUNT = 11 };
 

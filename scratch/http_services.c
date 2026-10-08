@@ -6,9 +6,10 @@
  * helpers without requiring every operation to contact a remote service.
  */
 
-#include "http.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "http.h"
 
 static bool show_event(const string_t *event, const string_t *data, const string_t *id, bool has_retry,
                        uint64_t retry_ms, void *context)
