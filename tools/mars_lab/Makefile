@@ -7,7 +7,10 @@ ifeq ($(abspath $(firstword $(MAKEFILE_LIST))),$(abspath $(lastword $(MAKEFILE_L
 MARS_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 DEBUG ?= 0
 
-.PHONY: all test browser-test memtest run clean help
+.PHONY: all test browser-test memtest run clean help check-wasm-deps
+check-wasm-deps:
+	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) check-lab-wasm-deps
+
 all:
 	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) native-lab
 
@@ -46,6 +49,43 @@ LAB_TEST_OBJS := $(patsubst tools/mars_lab/tests/%.c,$(LAB_BUILD_DIR)/tests/%.o,
 LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
 LAB_WORKERS := mars_lab equation_lab diffequation_lab matrix_lab integrator_lab datetime_lab almanac_lab almanac_event_lab holiday_lab ophelia
 LAB_WORKER_BINS := $(addprefix $(BUILD_DIR)/scratch/,$(LAB_WORKERS))
+
+# Probe the actual compiler target and linker, not merely their presence on PATH.
+# Keep this Lab-specific: native library builds do not need a WebAssembly toolchain.
+LAB_WASM_CC ?= clang
+LAB_WASM_LD ?= wasm-ld
+.PHONY: check-lab-wasm-deps
+check-lab-wasm-deps:
+	@set -eu; \
+	for tool in "$(LAB_WASM_CC)" "$(LAB_WASM_LD)"; do \
+	    if ! command -v "$$tool" >/dev/null 2>&1; then \
+	        echo "Missing MARS Lab WebAssembly tool: $$tool" >&2; \
+	        echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	        exit 1; \
+	    fi; \
+	done; \
+	probe_dir=$$(mktemp -d /tmp/mars-check-wasm.XXXXXX); \
+	trap 'rm -f "$$probe_dir/probe.o" "$$probe_dir/probe.wasm" "$$probe_dir/probe.log"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	if ! printf '%s\n' 'int mars_wasm_probe(int value) { return value + 1; }' \
+	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -nostdlib -x c -c - \
+	        -o "$$probe_dir/probe.o" >"$$probe_dir/probe.log" 2>&1; then \
+	    echo "MARS Lab requires Clang with the wasm32-unknown-unknown target." >&2; \
+	    cat "$$probe_dir/probe.log" >&2; \
+	    echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	    exit 1; \
+	fi; \
+	if ! "$(LAB_WASM_LD)" --no-entry --export=mars_wasm_probe "$$probe_dir/probe.o" \
+	    -o "$$probe_dir/probe.wasm" >"$$probe_dir/probe.log" 2>&1; then \
+	    echo "MARS Lab requires a working LLVM WebAssembly linker (wasm-ld)." >&2; \
+	    cat "$$probe_dir/probe.log" >&2; \
+	    echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	    exit 1; \
+	fi; \
+	test -s "$$probe_dir/probe.wasm"; \
+	echo "MARS Lab WebAssembly compile/link probe passed."
+
+$(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) $(LAB_TEST_BIN) $(LAB_BUILD_DIR)/tests/test_lab_browser: | check-lab-wasm-deps
 
 # Native Lab build rules. Included by the root Makefile after library variables.
 # The local Makefile delegates to this same graph, reusing MARS dependency checks.

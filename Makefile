@@ -263,7 +263,7 @@ check-deps:
 # Installers link the SQLCipher library directly; no interpreter or SQL CLI is needed.
 check-jurisdiction-db-deps: check-deps
 
-check-lab-deps: check-jurisdiction-db-deps
+check-lab-deps: check-jurisdiction-db-deps check-lab-wasm-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -740,7 +740,8 @@ help:
 	@echo "  make native-checks         Build tools/mars_checks/build/<mode>/mars_checks"
 	@echo "  make native-config         Build tools/mars_config/build/<mode>/mars_config"
 	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
-	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
+	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX/WebAssembly tools"
+	@echo "  make check-lab-wasm-deps    Probe Clang's WebAssembly target and the LLVM linker"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
 	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"
 	@echo "  make clean                  Remove all build artifacts"

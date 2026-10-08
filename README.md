@@ -121,12 +121,23 @@ MARS Lab runs as a native C server with native calculation workers and renders
 TeX through `latex` and `dvisvgm`. Its browser interface remains HTML, CSS and
 JavaScript. Native `mars_config` handles installation and links SQLCipher
 directly; neither Python nor the `sqlcipher` CLI is required for installing or
-running the Lab. Install and check its rendering tools with:
+running the Lab. Lab builds also check Clang's WebAssembly target and LLVM's
+`wasm-ld` linker in preparation for the C browser migration. Install and check
+its rendering and WebAssembly tools with:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm
+sudo apt install texlive-latex-base dvisvgm clang lld
 make check-lab-deps
 ```
+
+The WebAssembly check compiles and links a small freestanding C function and
+reports `MARS Lab WebAssembly compile/link probe passed.` on success. Run it
+alone with `make check-lab-wasm-deps`, or `make check-wasm-deps` from
+`tools/mars_lab`. Override `LAB_WASM_CC` and `LAB_WASM_LD` with executable names
+or paths when using a versioned toolchain. Lab artefacts have order-only
+dependencies on this check, so it also runs for direct build targets without
+forcing otherwise current artefacts to rebuild. Native library-only builds do
+not require these tools. This check does not yet change the browser interface.
 
 ## Benchmark Highlights
 
