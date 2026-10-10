@@ -3,7 +3,7 @@
  * @brief Native MARS Lab calendar and navigation route adapter.
  *
  * Accepts the browser's DateTime, weather, jurisdiction and almanac payloads.
- * Results are owned JSON trees. Scratch executables run through lab_process;
+ * Results are owned JSON trees. Built-in server calculations run through lab_process;
  * database configuration remains the responsibility of the native backends.
  * Call from the repository root, or set MARS_LAB_ROOT to that directory.
  * Named-town conversions temporarily change TZ and restore it before returning;

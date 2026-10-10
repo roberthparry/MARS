@@ -1,8 +1,8 @@
 /**
- * @file equation_lab.c
+ * @file lab_worker_equation.c
  * @brief Algebraic equation backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Runs native equation solving and presents exact, symbolic and numerical solution information. Sampled bindings
  * are used only through the native APIs, not as browser-side algebraic rewriting.
  * Emits tab-separated variable and constant binding records for the Lab editor,
@@ -22,6 +22,7 @@
 #include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#include "lab_worker_internal.h"
 
 static char *dup_string(const char *text)
 {
@@ -1097,7 +1098,8 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     expr_free(residual);
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_equation(int argc, char **argv)
 {
     const char *input = argc > 1 ? argv[1] : "{ 2*x + 3 = 7 | x = NAN }";
     int precision = argc > 2 ? atoi(argv[2]) : 64;

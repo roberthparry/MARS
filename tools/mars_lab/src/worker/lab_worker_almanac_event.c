@@ -1,8 +1,8 @@
 /**
- * @file almanac_event_lab.c
+ * @file lab_worker_almanac_event.c
  * @brief Astronomical event backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses event requests, searches supported solar and lunar events and formats result fields for the Lab
  * interface. It delegates geometry to the native almanac engine and uses configured catalogue and location data.
  */
@@ -19,7 +19,8 @@
 #include "sqlite.h"
 
 #define MARS_ALMANAC_INTERNAL_ACCESS
-#include "almanac/almanac_internal.h"
+#include "internal/almanac_internal.h"
+#include "lab_worker_internal.h"
 
 typedef enum almanac_event_lab_kind_t {
     ALMANAC_EVENT_LAB_KIND_ALL = 0,
@@ -593,7 +594,8 @@ static void append_lunar_events(string_t *out, const array_t *events)
     }
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_almanac_event(int argc, char **argv)
 {
     almanac_event_lab_options_t options;
     string_t *cached_output = NULL;

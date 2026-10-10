@@ -6,9 +6,9 @@
  * a non-blocking capture pipe and monotonic deadlines. Child output is retained
  * in the public string module's storage. POSIX descriptor I/O is necessary here:
  * the current public file.h API has no descriptor-adoption operation and opens
- * regular files only, so it cannot represent this anonymous pipe. Worker resolution
- * uses a fixed sorted table to share build defaults and environment overrides
- * between mathematical and calendar adapters without probing the filesystem.
+ * regular files only, so it cannot represent this anonymous pipe. This execution
+ * core has no dependency on the Lab's calculation registry or server entry points.
+ * Built-in calculation command construction lives separately in lab_process_worker.c.
  *
  * Each invocation owns its descriptors and direct child. An exited child remains
  * waitable until collection ends, protecting its process-group identifier from
@@ -38,47 +38,6 @@
 
 extern char **environ;
 
-#ifndef MARS_LAB_WORKER_DIR
-#define MARS_LAB_WORKER_DIR "tools/mars_lab/build/release/workers"
-#endif
-
-typedef struct {
-    const char *name;
-    const char *environment;
-} lab_process_worker_t;
-
-static int lab_proc_compare_worker(const void *name, const void *entry)
-{
-    return strcmp(name, ((const lab_process_worker_t *)entry)->name);
-}
-
-/* Resolve a worker without building it or interpreting any shell syntax. */
-string_t *lab_proc_worker_path(const char *name)
-{
-    static const lab_process_worker_t workers[] = {{"almanac_event_lab", "MARS_LAB_ALMANAC_EVENT_BINARY"},
-                                                   {"almanac_lab", "MARS_LAB_ALMANAC_BINARY"},
-                                                   {"datetime_lab", "MARS_LAB_DATETIME_BINARY"},
-                                                   {"diffequation_lab", "MARS_LAB_DIFFEQUATION_BINARY"},
-                                                   {"equation_lab", "MARS_LAB_EQUATION_BINARY"},
-                                                   {"holiday_lab", "MARS_LAB_HOLIDAY_BINARY"},
-                                                   {"integrator_lab", "MARS_LAB_INTEGRATOR_BINARY"},
-                                                   {"mars_lab", "MARS_LAB_BINARY"},
-                                                   {"matrix_lab", "MARS_LAB_MATRIX_BINARY"},
-                                                   {"ophelia", "MARS_LAB_OPHELIA_BINARY"}};
-    const lab_process_worker_t *worker =
-        name ? bsearch(name, workers, sizeof(workers) / sizeof(*workers), sizeof(*workers), lab_proc_compare_worker)
-             : NULL;
-    if (!worker) {
-        errno = EINVAL;
-        return NULL;
-    }
-    const char *override = getenv(worker->environment);
-    string_t *path =
-        override && *override ? string_new_with(override) : string_sprintf("%s/%s", MARS_LAB_WORKER_DIR, worker->name);
-    if (!path)
-        errno = ENOMEM;
-    return path;
-}
 
 static const volatile sig_atomic_t *lab_process_cancel_flag;
 

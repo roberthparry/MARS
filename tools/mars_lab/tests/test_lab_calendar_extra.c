@@ -254,8 +254,8 @@ static bool calendar_worker_fixture(const char *directory)
     ok = db && sqlite_load_string(db, name, &retained) && string_compare(retained, legacy) == 0 && ok;
     string_free(retained);
     sqlite_close(db);
-    string_t *binary = lab_proc_worker_path("datetime_lab");
-    const char *argv[] = {binary ? string_c_str(binary) : "",
+
+    const char *argv[] = {"datetime_lab",
                           "date=2026-10-05",
                           "year=2026",
                           "lat=52.7077",
@@ -268,9 +268,9 @@ static bool calendar_worker_fixture(const char *directory)
                           NULL};
     string_t *output = NULL;
     int status = -1;
-    bool stored = ok && binary && lab_proc_run_input(argv, NULL, diagnostic, 10000, 4096, &output, &status) && !status;
+    bool stored = ok && lab_proc_run_worker(argv, NULL, diagnostic, 10000, 4096, &output, &status) && !status;
     string_free(output);
-    string_free(binary);
+
     lab_cal_set(options, "cache_only", "1");
     json_t *cached = stored ? lab_cal_run("datetime_lab", options, 10000, NULL) : NULL;
     string_t *original_text = fields ? json_to_string(fields) : NULL;

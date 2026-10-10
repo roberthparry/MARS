@@ -1,8 +1,8 @@
 /**
- * @file matrix_lab.c
+ * @file lab_worker_matrix.c
  * @brief Matrix operation backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses matrix requests and dispatches scalar, matrix, eigenvalue and decomposition operations. It formats native
  * results for the client without introducing a separate matrix algebra implementation.
  */
@@ -18,6 +18,7 @@
 #include "ustring.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#include "lab_worker_internal.h"
 
 static matrix_t *matrix_real_copy_if_possible(const matrix_t *matrix)
 {
@@ -1027,7 +1028,8 @@ static int run_eigendecompose_operation(const matrix_t *matrix)
     }
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_matrix(int argc, char **argv)
 {
     const char *input = argc > 1 ? argv[1] : "(1, 2; 3, 4)";
     const char *operation = argc > 2 ? argv[2] : "eval";

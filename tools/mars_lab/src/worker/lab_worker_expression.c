@@ -1,8 +1,8 @@
 /**
- * @file mars_lab.c
+ * @file lab_worker_expression.c
  * @brief Expression evaluation backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses expressions and bindings and emits simplified representations and numerical values through native APIs.
  * It also handles requested goal seeking while keeping the browser a thin client.
  */
@@ -20,6 +20,7 @@
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#include "lab_worker_internal.h"
 
 static char *xstrdup_local(const char *text)
 {
@@ -1950,7 +1951,8 @@ cleanup:
     return rc;
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_expression(int argc, char **argv)
 {
     const char *raw_input = argc > 1 ? argv[1] : "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }";
     const char *wrt_name = argc > 2 ? argv[2] : "x";

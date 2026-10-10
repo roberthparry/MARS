@@ -3,7 +3,8 @@
  * @brief Native Linux MARS Lab launcher and bounded worker supervisor.
  *
  * Owns an IP listener and a fixed pool of separate request processes. Mathematical
- * workers and TeX utilities remain isolated child programmes. No Python interpreter
+ * calculations run as built-in modes of this executable in isolated children;
+ * TeX utilities remain external programmes. No Python interpreter
  * is loaded or launched. Uses the compiled repository location unless MARS_ROOT
  * supplies an explicit alternative.
  */
@@ -20,6 +21,7 @@
 #include "lab_process.h"
 #include "lab_runtime.h"
 #include "lab_server.h"
+#include "lab_worker.h"
 
 static volatile sig_atomic_t stopping;
 
@@ -111,6 +113,8 @@ static pid_t lab_app_start_worker(lab_server_t *server)
 /* Parse options, start request workers and synchronously reap them on shutdown. */
 int main(int argc, char **argv)
 {
+    if (argc > 1 && lab_app_option(argv[1], "--worker"))
+        return lab_worker_dispatch(argc - 2, argv + 2);
     const char *host = "127.0.0.1", *browser = "xdg-open";
     unsigned port = 0, workers = 4;
     bool no_browser = false;
@@ -118,6 +122,7 @@ int main(int argc, char **argv)
         if (lab_app_option(argv[i], "--help")) {
             puts("MARS Lab (native C)\nUsage: mars_lab [--host IP] [--port 0..65535] [--workers 1..8]\n"
                  "                       [--no-browser] [--browser PROGRAM]\n"
+                 "       mars_lab --worker MODE [calculation arguments...]\n"
                  "Uses the compiled MARS repository unless MARS_ROOT is set. Default: IPv4 loopback, four workers.");
             return 0;
         }

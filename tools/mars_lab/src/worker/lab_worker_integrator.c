@@ -1,8 +1,8 @@
 /**
- * @file integrator_lab.c
+ * @file lab_worker_integrator.c
  * @brief Integration backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses integrands and bounds, selects supported symbolic or numerical paths and emits native result fields. The
  * executable delegates integration and mathematical rendering to the library.
  * Integrand renderings retain root variable symbols and native binding values;
@@ -20,6 +20,7 @@
 #include "ustring.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#include "lab_worker_internal.h"
 
 static char *wrap_expression(const char *raw_input)
 {
@@ -640,7 +641,8 @@ static char *integral_TeX(const char *body, size_t ndim, const bound_kind_t *kin
     return result;
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_integrator(int argc, char **argv)
 {
     int argi = 1;
     size_t max_intervals = 0u;

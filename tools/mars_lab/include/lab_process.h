@@ -6,7 +6,7 @@
  * standard error in caller-owned string_t storage. Deadlines and byte limits
  * bound collection, and failed runs terminate their process group and reap the
  * direct child. This is a tools-only interface, not part of the MARS library API.
- * Worker paths share build-directory defaults and per-worker environment overrides.
+ * Calculations use built-in server modes, with optional diagnostic executable overrides.
  * Calls have independent state; callers must not reap these children elsewhere
  * or configure SIGCHLD with SIG_IGN or SA_NOCLDWAIT.
  */
@@ -20,21 +20,34 @@
 typedef struct _string_t string_t;
 
 /**
- * @brief Resolves a known Lab worker basename into a caller-owned executable path.
- * @param name One of mars_lab, equation_lab, diffequation_lab, matrix_lab,
- * integrator_lab, datetime_lab, almanac_lab, almanac_event_lab, holiday_lab or ophelia.
- * @return Owned path released with string_free; NULL with EINVAL for an unknown or
- * NULL name, or ENOMEM on allocation failure. Does not test existence or execute it.
- * @details A non-empty per-worker environment override takes precedence. mars_lab
- * uses MARS_LAB_BINARY; the others use MARS_LAB_EQUATION_BINARY,
- * MARS_LAB_DIFFEQUATION_BINARY, MARS_LAB_MATRIX_BINARY, MARS_LAB_INTEGRATOR_BINARY,
- * MARS_LAB_DATETIME_BINARY, MARS_LAB_ALMANAC_BINARY, MARS_LAB_ALMANAC_EVENT_BINARY,
- * MARS_LAB_HOLIDAY_BINARY and MARS_LAB_OPHELIA_BINARY respectively. Empty overrides
- * select the default MARS_LAB_WORKER_DIR/name; the compile-time directory falls
- * back to tools/mars_lab/build/release/workers. Paths are not shell-expanded or whitespace-trimmed.
- * Relative paths are interpreted in the spawned child's working directory.
+ * @brief Resolves a known calculation mode to the server or an explicit diagnostic override.
+ * @param name Borrowed built-in mode name; see lab_worker.h.
+ * @return Owned executable path released with string_free; NULL with EINVAL for
+ * an unknown name, or ENOMEM on allocation failure.
+ * @details By default every mode resolves to MARS_LAB_SERVER_PATH, compiled for
+ * the active build configuration. A non-empty per-mode MARS_LAB_*_BINARY override
+ * selects an external diagnostic executable. Use lab_proc_run_worker to supply
+ * the necessary --worker dispatch arguments; this path alone is not a command.
  */
 string_t *lab_proc_worker_path(const char *name);
+
+/**
+ * @brief Runs a built-in calculation in an isolated instance of the server executable.
+ * @param argv Borrowed NULL-terminated vector: mode name followed by its arguments.
+ * At most 255 entries including the mode name are accepted; excess gives E2BIG.
+ * @param cwd Optional child working directory; NULL inherits the current directory.
+ * @param input Optional borrowed standard-input contents; NULL selects /dev/null.
+ * @param timeout_ms Execution deadline in milliseconds; zero disables the deadline.
+ * @param max_output Maximum captured output bytes.
+ * @param output Required owned output destination, initialised to NULL; release with string_free.
+ * @param exit_status Required child exit status destination, initialised to -1.
+ * @return Collection success as for lab_proc_run_input; an unknown mode gives EINVAL.
+ * @details Uses the same cancellation, descriptor, output-limit and process-group
+ * cleanup as lab_proc_run_input. Explicit per-mode executable overrides receive
+ * the original calculation arguments without the server's --worker prefix.
+ */
+bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
+                         size_t max_output, string_t **output, int *exit_status);
 
 /**
  * @brief Registers a borrowed, process-wide cancellation flag, or NULL to disable cancellation.

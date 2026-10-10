@@ -684,14 +684,14 @@ tools/mars_lab/
     calendar/       DateTime, almanac, weather and town time zones
     page/           Client template, defaults and escaped substitutions
     mobile/         Private-network discovery and separate QR encoder
-    process/        Bounded child execution, input and cancellation
+    process/        Independent child execution core and built-in calculation adapter
     runtime/        Startup cache configuration and key preservation
     state/          Locked, atomic worksheet persistence
     wire/           Native typed Protobuf adaptation
+    worker/         Built-in calculation modes, including Ophelia
     internal/       Controlled white-box test façades
   assets/           HTML template, CSS import list, css/ styles and js/ scripts
   proto/            Versioned Lab wire schema
-  workers/          Isolated native calculation and Ophelia worker sources
   wasm/             Freestanding C browser modules
   build/release/    Generated mars_lab, module objects and dependencies
 ```
@@ -701,15 +701,25 @@ Debug output uses `build/debug/`; generated output is ignored by the root
 rules when included by the root build. Invoked directly, it delegates commands
 to that same root graph, keeping compiler flags and dependencies consistent.
 `make -C tools/mars_lab clean` removes only Lab build output, leaving the
-library and saved worksheets intact. Calculation workers are built from
-`tools/mars_lab/workers/` into `tools/mars_lab/build/<configuration>/workers/`
-and are removed by the Lab clean target too. They remain separate processes for
-timeout enforcement and failure isolation. `make lab-workers` builds all ten;
-`make tools/mars_lab/workers/ophelia` builds just the Ophelia worker. Existing
-worker command targets such as `make mars_lab` still build and run that worker;
-`make mars-lab` starts the web application. Per-worker executable environment
-overrides are unchanged. The repository's `scratch/` directory retains standalone
-examples and experiments, not these production Lab workers.
+library and saved worksheets intact. All ten calculation modes are compiled from
+`tools/mars_lab/src/worker/` and linked into the single
+`tools/mars_lab/build/<configuration>/mars_lab` executable. There are no separate
+calculation binaries. A request starts an isolated instance of that executable
+with `--worker MODE`, before listener, browser or cache initialisation; the child
+receives only the calculation's arguments and optional standard input. This keeps
+timeouts, cancellation, output limits and mathematical global state isolated from
+the request handler without depending on scratch console applications.
+
+`make lab-workers` now builds that same server executable. Existing convenience
+targets such as `make mars_lab` and `make ophelia` invoke its built-in modes;
+`make mars-lab` starts the web application. Explicit per-mode executable
+environment overrides remain available for diagnostics and failure-injection
+tests, but are not required in normal operation. The repository's `scratch/`
+directory retains standalone examples and experiments, not production Lab workers.
+
+The reusable process core in `lab_process.c` has no calculation-registry dependency.
+Server-specific command construction is isolated in `lab_process_worker.c`, so
+consumers of generic process execution need not link the calculation modules.
 
 Both module APIs and static implementation functions use module-specific
 prefixes: `lab_cal_` for calendar, `lab_eval_` for evaluation, `lab_proc_` for
@@ -1484,9 +1494,10 @@ current expression semantics; an unresolved transform or formal derivative can
 remain symbolic. Unsupported statement forms report an error rather than being
 sent to a shell or silently ignored.
 
-The separate native target is `tools/mars_lab/workers/ophelia`; the resulting
-`tools/mars_lab/build/release/workers/ophelia` reads programme source from standard input and
-accepts an optional decimal-precision argument. Lab requests have a 30-second
+Ophelia is a built-in server mode. The command
+`tools/mars_lab/build/release/mars_lab --worker ophelia` reads programme source
+from standard input and accepts an optional decimal-precision argument after
+`ophelia`. Lab requests have a 30-second
 execution timeout. The prototype limits source to 64 KiB, scope size to 256
 symbols, parameters to 64, nesting to 32, executed statements to 2048 and output
 calls to 128. Shell, network and file-access operations are not language features.

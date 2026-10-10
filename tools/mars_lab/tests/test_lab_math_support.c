@@ -60,16 +60,13 @@ void lab_math_reset(void)
 const json_t *lab_math_worker(const char *worker, const char *source, const char *variable, const char *action,
                              unsigned precision, int *status, const char **raw)
 {
-    string_t *path = lab_proc_worker_path(worker);
     string_t *digits = string_sprintf("%u", precision < 17 ? 17 : precision);
     string_t *output = NULL;
-    const char *expression_args[] = {path ? string_c_str(path) : "", source, variable,
-                                     digits ? string_c_str(digits) : "40", action, NULL};
-    const char *equation_args[] = {path ? string_c_str(path) : "", source,
-                                   digits ? string_c_str(digits) : "40", NULL};
+    const char *expression_args[] = {worker, source, variable, digits ? string_c_str(digits) : "40", action, NULL};
+    const char *equation_args[] = {worker, source, digits ? string_c_str(digits) : "40", NULL};
     bool equation = !strcmp(worker, "equation_lab");
-    bool ok = path && digits && lab_proc_run(equation ? equation_args : expression_args, NULL,
-                                           lab_math_worker_timeout_ms, 4u * 1024u * 1024u, &output, status);
+    bool ok = digits && lab_proc_run_worker(equation ? equation_args : expression_args, NULL, NULL,
+                                            lab_math_worker_timeout_ms, 4u * 1024u * 1024u, &output, status);
     if (!ok)
         string_printf("Mathematical worker failed: errno=%d, deadline=%d ms, source=%s\n",
                       errno, lab_math_worker_timeout_ms, source);
@@ -79,7 +76,6 @@ const json_t *lab_math_worker(const char *worker, const char *source, const char
     const char *text = lab_math_retain(output, fields);
     if (raw)
         *raw = text;
-    string_free(path);
     string_free(digits);
     return fields;
 }
@@ -162,20 +158,19 @@ const char *lab_math_read(const char *path)
 /* Execute generated Function text, preserving its stdout and checking the exit. */
 const char *lab_math_programme(const char *source, unsigned precision)
 {
-    string_t *path = lab_proc_worker_path("ophelia");
     string_t *input = string_new_with(source);
     const char *digits = lab_math_format("%u", precision);
-    const char *args[] = {path ? string_c_str(path) : "", digits, NULL};
+    const char *args[] = {"ophelia", digits, NULL};
     string_t *output = NULL;
     int status = -1;
-    bool ok = path && input && lab_proc_run_input(args, NULL, input, lab_math_worker_timeout_ms,
-                                                4u * 1024u * 1024u, &output, &status);
+    bool ok = input && lab_proc_run_worker(args, NULL, input, lab_math_worker_timeout_ms,
+                                           4u * 1024u * 1024u, &output, &status);
     if (!ok)
         string_printf("Mathematical function worker failed: errno=%d, deadline=%d ms, source=%s\n",
                       errno, lab_math_worker_timeout_ms, source);
     lab_math_check(ok && status == 0, source);
     string_free(input);
-    string_free(path);
+
     if (output)
         string_trim(output);
     return lab_math_retain(output, NULL);

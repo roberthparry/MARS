@@ -1,8 +1,8 @@
 /**
- * @file ophelia.c
+ * @file lab_worker_ophelia.c
  * @brief Executable frontend for MARS function programs.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses and executes supported scalar, equation and matrix statements, including function calls, branches and
  * output. Mathematics is delegated to MARS APIs; this is an application interpreter rather than a public library
  * module.
@@ -23,6 +23,7 @@
 #include "ustring.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#include "lab_worker_internal.h"
 
 #define SOURCE_LIMIT 65536u
 #define SYMBOL_LIMIT 256u
@@ -1117,7 +1118,8 @@ static bool remove_comments(runtime_t *runtime)
 }
 
 /* Read source from standard input; never execute shell commands or source-supplied files. */
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_ophelia(int argc, char **argv)
 {
     runtime_t runtime = {0};
     scope_t global;

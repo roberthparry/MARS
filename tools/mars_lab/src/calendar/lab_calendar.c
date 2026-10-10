@@ -181,21 +181,12 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
     const char *root = getenv("MARS_LAB_ROOT");
     if (!root || !*root)
         root = ".";
-    string_t *path = lab_proc_worker_path(name);
-    if (!path) {
-        int resolution_error = errno;
-        if (diagnostic)
-            *diagnostic = string_sprintf("Cannot resolve native calendar worker %s.", name);
-        errno = resolution_error;
-        return NULL;
-    }
+
     size_t count = json_object_size(options);
-    if (count > 24) {
-        string_free(path);
+    if (count > 24)
         return NULL;
-    }
     string_t *arguments[24] = {0};
-    const char *argv[26] = {string_c_str(path)};
+    const char *argv[26] = {name};
     for (size_t i = 0; i < count; ++i) {
         const string_t *key = json_object_key_at(options, i);
         arguments[i] = string_sprintf("%s=%s", string_c_str(key), lab_cal_text(options, string_c_str(key)));
@@ -203,7 +194,7 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
     }
     string_t *output = NULL;
     int exit_status = -1;
-    bool ran = lab_proc_run(argv, root, timeout, 4u * 1024u * 1024u, &output, &exit_status);
+    bool ran = lab_proc_run_worker(argv, root, NULL, timeout, 4u * 1024u * 1024u, &output, &exit_status);
     int process_error = errno;
     json_t *fields = ran && exit_status == 0 && output ? lab_cal_parse_output(output) : NULL;
     if (!fields) {
@@ -219,7 +210,6 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
         string_free(output);
     for (size_t i = 0; i < count; ++i)
         string_free(arguments[i]);
-    string_free(path);
     errno = ran ? (exit_status == 0 ? 0 : EIO) : process_error;
     return fields;
 }

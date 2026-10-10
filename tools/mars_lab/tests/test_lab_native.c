@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
@@ -63,7 +64,7 @@ static bool worker_path_checks(const char *directory)
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         bool cleared = unsetenv(cases[i].environment) == 0;
         string_t *fallback = cleared ? lab_proc_worker_path(cases[i].name) : NULL;
-        string_t *suffix = string_sprintf("/tools/mars_lab/build/%s/workers/%s", configuration, cases[i].name);
+        string_t *suffix = string_sprintf("/tools/mars_lab/build/%s/mars_lab", configuration);
         ok = fallback && suffix && string_ends_with(fallback, string_c_str(suffix)) && ok;
         file_t *executable = fallback ? file_new(fallback) : NULL;
         file_info_t *info = executable ? file_get_info(executable) : NULL;
@@ -96,7 +97,128 @@ static bool worker_path_checks(const char *directory)
 static void test_process_worker_paths(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(worker_path_checks),
-                     "all ten Lab-local workers exist in the active build; overrides and invalid names are handled");
+                     "all ten calculation modes resolve to the server; overrides and invalid names are handled");
+}
+
+static bool lab_test_builtin_workers(const char *directory)
+{
+    static const char *const modes[] = {"mars_lab", "equation_lab", "diffequation_lab", "matrix_lab",
+                                        "integrator_lab", "datetime_lab", "almanac_lab", "almanac_event_lab",
+                                        "holiday_lab", "ophelia"};
+    bool ok = setenv("MARS_ROOT", "/nonexistent-mars-worker-root", 1) == 0;
+    for (size_t i = 0; i < sizeof(modes) / sizeof(*modes); ++i) {
+        const char *argv[] = {modes[i], "--help", NULL};
+        string_t *output = NULL;
+        int status = -1;
+        bool ran = lab_proc_run_worker(argv, directory, NULL, 5000, 65536, &output, &status);
+        ok = ran && status >= 0 && output && string_byte_length(output) > 0 &&
+             string_find(output, "Unknown or missing MARS Lab calculation mode") < 0 && ok;
+        string_free(output);
+    }
+    string_t *path = lab_proc_worker_path("mars_lab");
+    const char *unknown[] = {path ? string_c_str(path) : "", "--worker", "unknown-mode", NULL};
+    const char *missing[] = {path ? string_c_str(path) : "", "--worker", NULL};
+    const char *const *commands[] = {unknown, missing};
+    for (size_t i = 0; i < sizeof(commands) / sizeof(*commands); ++i) {
+        string_t *output = NULL;
+        int status = -1;
+        bool ran = path && lab_proc_run(commands[i], directory, 5000, 4096, &output, &status);
+        ok = ran && status == 2 && output &&
+             string_find(output, "Unknown or missing MARS Lab calculation mode") >= 0 && ok;
+        string_free(output);
+    }
+    string_free(path);
+    return ok;
+}
+
+static void test_process_builtin_workers(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(lab_test_builtin_workers),
+                     "all ten calculations are inside the server and dispatch before listener/root setup");
+}
+
+static bool lab_test_worker_execution(const char *directory)
+{
+    const char *argv[] = {"ophelia", "40", NULL};
+    string_t *input = string_new_with("output(40+2).");
+    string_t *output = NULL;
+    int status = -1;
+    bool ok = unsetenv("MARS_LAB_OPHELIA_BINARY") == 0 && input &&
+              lab_proc_run_worker(argv, directory, input, 5000, 4096, &output, &status) && status == 0 &&
+              output_equals(output, "42\n");
+    if (!ok)
+        string_fprintf(stderr, "Built-in stdin result: status=%d errno=%d output=[%S]\n", status, errno, output);
+    string_free(output);
+    output = NULL;
+    bool ran = lab_proc_run_worker(argv, directory, input, 5000, 1, &output, &status);
+    ok = !ran && errno == EFBIG && ok;
+    if (!ok)
+        string_fprintf(stderr, "Built-in output limit: ran=%d status=%d errno=%d\n", ran, status, errno);
+    string_free(output);
+    output = NULL;
+    bool configured = setenv("MARS_LAB_OPHELIA_BINARY", "/bin/cat", 1) == 0;
+    const char *cat[] = {"ophelia", NULL};
+    ran = configured && lab_proc_run_worker(cat, directory, input, 5000, 4096, &output, &status);
+    ok = ran && status == 0 && output && string_compare(input, output) == 0 && ok;
+    if (!ok)
+        string_fprintf(stderr, "Worker cat override: ran=%d status=%d errno=%d output=[%S]\n", ran, status, errno, output);
+    string_free(output);
+    output = NULL;
+    configured = setenv("MARS_LAB_OPHELIA_BINARY", "/bin/echo", 1) == 0;
+    const char *echo[] = {"ophelia", "literal ; $(not-a-shell)", NULL};
+    ran = configured && lab_proc_run_worker(echo, directory, NULL, 5000, 4096, &output, &status);
+    ok = ran && status == 0 && output_equals(output, "literal ; $(not-a-shell)\n") && ok;
+    if (!ok)
+        string_fprintf(stderr, "Worker echo override: ran=%d status=%d errno=%d output=[%S]\n", ran, status, errno, output);
+    string_free(output);
+    output = NULL;
+    configured = setenv("MARS_LAB_OPHELIA_BINARY", "/bin/sleep", 1) == 0;
+    const char *sleep[] = {"ophelia", "10", NULL};
+    ran = configured && lab_proc_run_worker(sleep, directory, NULL, 50, 4096, &output, &status);
+    ok = !ran && errno == ETIMEDOUT && ok;
+    if (!ok)
+        string_fprintf(stderr, "Worker deadline: ran=%d status=%d errno=%d\n", ran, status, errno);
+    string_free(output);
+    output = NULL;
+    configured = setenv("MARS_LAB_OPHELIA_BINARY", "/missing-lab-worker", 1) == 0;
+    ran = configured && lab_proc_run_worker(cat, directory, NULL, 5000, 4096, &output, &status);
+    ok = !ran && errno == ENOENT && status == -1 && ok;
+    if (!ok)
+        string_fprintf(stderr, "Missing worker override: ran=%d status=%d errno=%d\n", ran, status, errno);
+    string_free(output);
+    string_free(input);
+    return ok;
+}
+
+static void test_process_worker_execution(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(lab_test_worker_execution),
+                     "built-in stdin/output and explicit overrides preserve limits, deadlines and literal arguments");
+}
+
+static void test_process_worker_invalid_arguments(void)
+{
+    const char *unknown[] = {"unknown", NULL};
+    const char *const *cases[] = {NULL, unknown};
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *output = NULL;
+        int status = 99;
+        bool ran = lab_proc_run_worker(cases[i], NULL, NULL, 1000, 128, &output, &status);
+        ok = !ran && errno == EINVAL && !output && status == -1 && ok;
+        string_free(output);
+    }
+    const char *excess[257];
+    excess[0] = "mars_lab";
+    for (size_t i = 1; i < 256; ++i)
+        excess[i] = "x";
+    excess[256] = NULL;
+    string_t *output = NULL;
+    int status = 99;
+    bool ran = lab_proc_run_worker(excess, NULL, NULL, 1000, 128, &output, &status);
+    ok = !ran && errno == E2BIG && !output && status == -1 && ok;
+    string_free(output);
+    TEST_ASSERT_TRUE(ok, "invalid calculation modes and oversized argument vectors are rejected before spawning");
 }
 
 static void test_process_success(void)
@@ -376,6 +498,9 @@ int tests_main(void)
 {
     TEST_SECTION("Native MARS Lab child processes");
     TEST_RUN_IN_GROUP(test_process_worker_paths, tests, NULL);
+    TEST_RUN_IN_GROUP(test_process_builtin_workers, tests, NULL);
+    TEST_RUN_IN_GROUP(test_process_worker_execution, tests, NULL);
+    TEST_RUN_IN_GROUP(test_process_worker_invalid_arguments, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_success, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_exit_status, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_missing_executable, tests, NULL);
