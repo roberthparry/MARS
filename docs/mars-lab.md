@@ -495,6 +495,13 @@ and scoped DOM access respectively. Worksheet state, requests, bindings,
 presentation and the other browser modules have their own matching headers.
 These interfaces are tool-private, not installed MARS library headers.
 All implementations compile into one `lab_browser.wasm` asset.
+`lab_memory.c` supplies freestanding `memset`, `memcpy`, `memmove` and `memcmp`
+for compiler-generated memory operations, without requiring JavaScript libc
+shims. Only browser bridge functions listed in `wasm/lab_browser.imports`
+(declared in `lab_host.h` and `lab_dom.h`) may remain unresolved. Keep this
+allowlist synchronised when changing the bridge; other missing functions fail the link
+rather than producing a module that fails during browser startup. This also
+catches compiler/toolchain differences when building on another machine.
 The WASM compiler checks that exported functions have prior declarations, and
 generated dependency files rebuild the implementations affected by a header change.
 Objects and dependency files mirror the source layout under

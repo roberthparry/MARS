@@ -60,8 +60,10 @@ $(LAB_BUILD_DIR)/wasm/src/%.o: tools/mars_lab/wasm/src/%.c tools/mars_lab/Makefi
 
 -include $(LAB_WASM_OBJS:.o=.d)
 
-$(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/Makefile
-	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined --initial-memory=67108864 --max-memory=67108864 \
+# Only the declared browser bridge may remain unresolved; never import missing libc or module functions.
+$(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
+	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
+	    --initial-memory=67108864 --max-memory=67108864 \
 	    $(LAB_WASM_OBJS) -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.
