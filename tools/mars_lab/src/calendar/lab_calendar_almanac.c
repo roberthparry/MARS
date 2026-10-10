@@ -169,7 +169,7 @@ static json_t *lab_cal_body_rows(const json_t *fields, string_t **error)
     string_free(text);
     if (!valid || !json_array_size(rows)) {
         *error = string_new_with(
-            "Almanac backend returned no valid body snapshot; run make tools/mars_lab/workers/almanac_lab.");
+            "Almanac backend returned no valid body snapshot; rebuild with make native-lab.");
         json_free(rows);
         return NULL;
     }

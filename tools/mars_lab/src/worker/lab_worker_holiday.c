@@ -1,8 +1,8 @@
 /**
- * @file holiday_lab.c
+ * @file lab_worker_holiday.c
  * @brief Jurisdiction holiday and location query tool.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Reads jurisdiction configuration and emits holiday, location and GMT-offset information. It uses installed
  * policy data rather than embedding a second set of holiday rules.
  */
@@ -15,6 +15,7 @@
 #include "datetime.h"
 #include "jurisdiction.h"
 #include "ustring.h"
+#include "lab_worker_internal.h"
 
 typedef struct holiday_lab_options_t {
     short date_year;
@@ -206,7 +207,8 @@ static bool print_jurisdiction_gmt_offset_from_database(jurisdiction_t *holiday,
     return true;
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_holiday(int argc, char **argv)
 {
     datetime_t *date = NULL;
     holiday_lab_options_t options;

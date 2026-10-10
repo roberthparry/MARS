@@ -3272,6 +3272,7 @@
   "tools/mars_lab/tests/test_lab_native.c": {
     "tests": {
       "enabled": true,
+      "test_process_builtin_workers": true,
       "test_process_cancellation": true,
       "test_process_cwd": true,
       "test_process_descendant_overflow": true,
@@ -3284,6 +3285,8 @@
       "test_process_success": true,
       "test_process_timeout": true,
       "test_process_unicode": true,
+      "test_process_worker_execution": true,
+      "test_process_worker_invalid_arguments": true,
       "test_process_worker_paths": true
     }
   },

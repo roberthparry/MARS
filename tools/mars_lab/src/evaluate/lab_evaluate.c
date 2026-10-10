@@ -257,15 +257,10 @@ static void lab_eval_integrator_bindings(json_t *fields, const char *precision)
     const char *expression = lab_eval_text(fields, "binding_expression");
     if (!*expression)
         return;
-    string_t *worker = lab_proc_worker_path("mars_lab");
-    if (!worker) {
-        lab_eval_set(fields, "binding_error", "Could not resolve the native binding worker path.");
-        return;
-    }
-    const char *argv[] = {string_c_str(worker), expression, "x", precision, "bindings", NULL};
+    const char *argv[] = {"mars_lab", expression, "x", precision, "bindings", NULL};
     string_t *output = NULL;
     int exit_status = -1;
-    if (lab_proc_run(argv, ".", 10000u, 4u * 1024u * 1024u, &output, &exit_status) && !exit_status) {
+    if (lab_proc_run_worker(argv, ".", NULL, 10000u, 4u * 1024u * 1024u, &output, &exit_status) && !exit_status) {
         json_t *bindings = lab_eval_fields(output);
         lab_eval_set(fields, "bindings", lab_eval_text(bindings, "bindings"));
         json_free(bindings);
@@ -273,7 +268,6 @@ static void lab_eval_integrator_bindings(json_t *fields, const char *precision)
         lab_eval_set(fields, "binding_error", "The native binding worker could not enumerate integrand bindings.");
     }
     string_free(output);
-    string_free(worker);
 }
 
 static json_t *lab_eval_function_run(const string_t *source, unsigned precision, unsigned *status)
@@ -281,15 +275,10 @@ static json_t *lab_eval_function_run(const string_t *source, unsigned precision,
     string_t *digits = string_sprintf("%u", precision);
     if (!digits)
         return NULL;
-    string_t *worker = lab_proc_worker_path("ophelia");
-    if (!worker) {
-        string_free(digits);
-        return lab_eval_failure(status, 422u, "Could not resolve the Ophelia worker path");
-    }
-    const char *argv[] = {string_c_str(worker), string_c_str(digits), NULL};
+    const char *argv[] = {"ophelia", string_c_str(digits), NULL};
     string_t *output = NULL;
     int exit_status = -1;
-    bool completed = lab_proc_run_input(argv, ".", source, 30000u, 4u * 1024u * 1024u, &output, &exit_status);
+    bool completed = lab_proc_run_worker(argv, ".", source, 30000u, 4u * 1024u * 1024u, &output, &exit_status);
     json_t *result = json_new_object();
     bool ok = completed && exit_status == 0;
     lab_eval_put(result, "ok", json_new_bool(ok));
@@ -305,7 +294,7 @@ static json_t *lab_eval_function_run(const string_t *source, unsigned precision,
         *status = ok ? 200u : 422u;
     string_free(output);
     string_free(digits);
-    string_free(worker);
+
     return result;
 }
 
@@ -351,12 +340,10 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
         return lab_eval_function_run(input, precision, status);
 
     arguments_t args = {0};
-    string_t *worker = lab_proc_worker_path(entry->worker);
-    if (!worker)
-        return lab_eval_failure(status, 422u, "Could not resolve the native worker path");
+
     string_t *digits = string_sprintf("%u", precision);
     unsigned timeout_ms = entry->timeout_ms;
-    bool valid = worker && digits && lab_eval_argument(&args, string_c_str(worker));
+    bool valid = digits && lab_eval_argument(&args, entry->worker);
     if (valid && !strcmp(entry->mode, "goal_seek"))
         valid = lab_eval_argument(&args, "--goal-seek");
     if (valid && !strcmp(entry->mode, "integrator")) {
@@ -386,7 +373,7 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     int exit_status = -1;
     if (!valid) {
         result = lab_eval_failure(status, 400u, "Invalid operation, binding, bounds or argument size");
-    } else if (!lab_proc_run(args.argv, ".", timeout_ms, 4u * 1024u * 1024u, &output, &exit_status)) {
+    } else if (!lab_proc_run_worker(args.argv, ".", NULL, timeout_ms, 4u * 1024u * 1024u, &output, &exit_status)) {
         int process_error = errno;
         result = lab_eval_worker_failure(status, process_error, timeout_ms);
         if (output)
@@ -429,7 +416,7 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     string_free(output);
     for (size_t i = 0u; i < args.count; ++i)
         string_free(args.owned[i]);
-    string_free(worker);
+
     string_free(digits);
     return result;
 }

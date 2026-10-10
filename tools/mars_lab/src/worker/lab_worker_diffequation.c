@@ -1,8 +1,8 @@
 /**
- * @file diffequation_lab.c
+ * @file lab_worker_diffequation.c
  * @brief Differential-equation backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses a differential problem, invokes native solving and emits status, solution forms and solver steps. It
  * keeps symbolic reasoning in the library and provides presentation fields to the client.
  */
@@ -15,6 +15,7 @@
 #include "equation.h"
 #include "expression.h"
 #include "ustring.h"
+#include "lab_worker_internal.h"
 
 static const char *solve_status_name(de_solve_status_t status)
 {
@@ -123,7 +124,8 @@ static void print_solver_steps(const diffequ_solve_result_t *result)
         printf("steps_TeX %s\n", steps_TeX);
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_diffequation(int argc, char **argv)
 {
     const char *source;
     diffequ_t *de;

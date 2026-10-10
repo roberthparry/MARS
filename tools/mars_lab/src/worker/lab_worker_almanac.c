@@ -1,8 +1,8 @@
 /**
- * @file almanac_lab.c
+ * @file lab_worker_almanac.c
  * @brief Almanac snapshot backend for MARS Lab.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Builds configured astronomical snapshots and formats celestial coordinates and body properties. This executable
  * bridges Lab requests to the native almanac API rather than performing astronomy in the browser.
  */
@@ -18,6 +18,7 @@
 
 #include "almanac.h"
 #include "sqlite.h"
+#include "lab_worker_internal.h"
 
 typedef struct almanac_lab_options_t {
     short year;
@@ -596,7 +597,8 @@ static void append_snapshot_row(string_t *out, const char *code, const char *nam
                                azimuth_display, semi_diameter_display);
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_almanac(int argc, char **argv)
 {
     almanac_lab_options_t options;
     string_t *cached_output = NULL;

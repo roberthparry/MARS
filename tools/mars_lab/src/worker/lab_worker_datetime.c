@@ -1,8 +1,8 @@
 /**
- * @file datetime_lab.c
+ * @file lab_worker_datetime.c
  * @brief Datetime and daily astronomy Lab backend.
  *
- * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Linked into the MARS Lab server and dispatched in an isolated calculation process.
  * Parses requested dates and location options and emits civil-date, solar and lunar result fields. Calendar and
  * astronomical calculations stay in the library modules.
  */
@@ -24,6 +24,7 @@
 #include "jurisdiction.h"
 #include "sqlite.h"
 #include "ustring.h"
+#include "lab_worker_internal.h"
 
 typedef struct datetime_lab_options_t {
     short date_year;
@@ -1330,7 +1331,8 @@ static bool print_moon_times(const datetime_lab_options_t *options, almanac_t *a
     return true;
 }
 
-int main(int argc, char **argv)
+/* Execute this built-in calculation mode in a fresh server child process. */
+int lab_worker_datetime(int argc, char **argv)
 {
     datetime_lab_options_t options;
     string_t *cached_output = NULL;
