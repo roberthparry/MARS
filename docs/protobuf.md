@@ -34,6 +34,64 @@ For fixed-width floating-point fields, copy IEEE-754 bits using `memcpy`
 rather than aliasing a pointer. Strings are byte fields: validate/decode UTF-8
 with `string_t` before treating them as text.
 
+## MARS Lab browser wire contract
+
+MARS Lab's schema is maintained in `tools/mars_lab/proto/lab.proto`. Its
+version-one `Envelope` contains a root object made of typed `Value` records:
+null, boolean, finite IEEE-754 double, UTF-8 text, array or object. Object entries
+retain keys; this is not a JSON string wrapped inside a Protobuf byte field.
+Mathematical expressions and exact results remain text and are never rounded
+into the double field. This general value-tree schema preserves existing route
+contracts; it does not yet provide separate generated types for each operation.
+
+The browser sends `Content-Type: application/x-protobuf` and
+`Accept: application/x-protobuf`. The native Lab accepts Protobuf request objects
+and returns Protobuf results regardless of the Accept header. Startup
+configuration comes from `/bootstrap`; application errors use the binary format.
+The Lab bridge requires Protobuf response content types, and its server rejects
+JSON request bodies with HTTP 415. `response.labData()` decodes the binary message;
+there is no legacy JSON transport fallback.
+Calendar fallback snapshots in browser local storage also use this envelope,
+encoded and decoded in C/WASM. A base64 browser adapter accommodates the
+string-only storage API. Invalid snapshots are ignored without affecting other
+saved settings; old JSON snapshot keys are not consumed. Native saved-state
+files remain JSON independently of this browser representation.
+This is ordinary HTTP, not gRPC. Authentication, private-network restrictions,
+request cancellation and HTTP status codes are unchanged.
+
+Both implementations enforce a 4 MiB envelope limit, 65,536 value nodes and
+maximum value depth 32 (root depth zero). They reject duplicate known singular
+fields, duplicate object keys, mismatched payload kinds, non-finite numbers,
+invalid UTF-8, truncation and unknown envelope versions. Supported unknown wire
+fields are ignored; removed field numbers must not be reused. The browser C
+module has a fixed 64 MiB linear memory and copies each encoded request before
+asynchronous network work begins. Its JavaScript adapter uses own properties
+for decoded keys, including `__proto__`, without modifying prototypes. Encoding
+rejects accessors, sparse arrays and recursive codec invocation. Decoding honours
+typed-view offsets, including `DataView`, and rejects shared or fake byte buffers.
+Native fractional numbers use binary64 rounding; lossy integer conversion,
+overflow and nonzero-to-zero underflow are rejected. Signed zero and nonzero
+subnormal values are preserved. Exact mathematical values must remain text.
+
+`lab_wire_encode` and `lab_wire_decode` in the Lab's private `lab_wire.h` adapt
+existing `json_t` in-memory trees through the public Protobuf API. Returned
+byte arrays and trees are caller-owned. The browser module is freestanding C
+with host imports for value access and UTF-8 copying; it does not link the
+native library or use a second JavaScript wire codec. Separate C modules own
+worksheet state and history, precision and integration-budget validation,
+request lifecycles and calendar arithmetic. History uses a bounded 32 MiB pool,
+up to 128 entries per stack, and a 4 MiB individual-value limit; allocation
+failure is explicit rather than silently truncating a worksheet. Browser APIs,
+DOM updates and rendering remain JavaScript adapters. Native presentation
+metadata keeps mathematical parsing and formatting on the server.
+
+The golden empty-object envelope is `08 01 12 02 08 05`. Native tests and the
+real-browser tests check these exact bytes, nested scalar round trips, malformed
+input and a live Protobuf state request. Run the native Lab tests followed by
+its browser target sequentially; browser tests require Firefox. Route tests
+check rejection of JSON requests, and browser tests cover stored Protobuf
+round trips, malformed snapshots, size limits and recovery after corruption.
+
 ## Ownership, limits and errors
 
 Builders and decoders return opaque owned `protobuf_t` handles; release them

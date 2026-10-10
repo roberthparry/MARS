@@ -20,7 +20,7 @@
 typedef struct _string_t string_t;
 
 /**
- * @brief Resolves a known scratch worker basename into a caller-owned executable path.
+ * @brief Resolves a known Lab worker basename into a caller-owned executable path.
  * @param name One of mars_lab, equation_lab, diffequation_lab, matrix_lab,
  * integrator_lab, datetime_lab, almanac_lab, almanac_event_lab, holiday_lab or ophelia.
  * @return Owned path released with string_free; NULL with EINVAL for an unknown or
@@ -31,7 +31,7 @@ typedef struct _string_t string_t;
  * MARS_LAB_DATETIME_BINARY, MARS_LAB_ALMANAC_BINARY, MARS_LAB_ALMANAC_EVENT_BINARY,
  * MARS_LAB_HOLIDAY_BINARY and MARS_LAB_OPHELIA_BINARY respectively. Empty overrides
  * select the default MARS_LAB_WORKER_DIR/name; the compile-time directory falls
- * back to build/release/scratch. Paths are not shell-expanded or whitespace-trimmed.
+ * back to tools/mars_lab/build/release/workers. Paths are not shell-expanded or whitespace-trimmed.
  * Relative paths are interpreted in the spawned child's working directory.
  */
 string_t *lab_proc_worker_path(const char *name);

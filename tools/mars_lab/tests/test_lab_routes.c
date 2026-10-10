@@ -12,6 +12,10 @@
 #endif
 #include <arpa/inet.h>
 #include <errno.h>
+/* Keep the POSIX alternate signal-stack typedef distinct from the MARS stack API. */
+#define stack_t posix_signal_stack_t
+#include <signal.h>
+#undef stack_t
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +27,7 @@
 #include "file.h"
 #include "http.h"
 #include "lab_server.h"
+#include "lab_wire.h"
 #include "sqlite.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -52,12 +57,17 @@ static http_response_t *route_request(webmethod_t method, const char *path, cons
     http_request_t *request = url ? http_request_new(method, url) : NULL;
     string_t *payload = body ? string_new_with(body) : NULL;
     string_t *content_type = type ? string_new_with(type) : NULL;
+    json_t *object = body && type && !strcmp(type, "application/x-protobuf") ? test_lab_json(body) : NULL;
+    array_t *encoded = object ? lab_wire_encode(object) : NULL;
+    json_free(object);
     http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 4194304};
     bool ready =
         client && request && http_client_set_limits(client, &limits) &&
         (!host || request_header(request, "Host", host)) && (!origin || request_header(request, "Origin", origin)) &&
-        (!body ||
-         (payload && http_request_set_body(request, string_c_str(payload), string_byte_length(payload), content_type)));
+        (!body || (payload &&
+                   http_request_set_body(request, encoded ? array_get(encoded, 0) : (const void *)string_c_str(payload),
+                                         encoded ? array_size(encoded) : string_byte_length(payload), content_type)));
+    array_destroy(encoded);
     struct timespec start = {0}, finish = {0};
     clock_gettime(CLOCK_MONOTONIC, &start);
     pid_t child = ready ? fork() : -1;
@@ -123,7 +133,8 @@ static bool route_check(const http_response_t *response, unsigned expected, bool
                       response_header_equals(response, "X-Content-Type-Options", "nosniff");
     bool ok = response && http_response_status(response) == expected && content_ok && headers_ok;
     if (!ok) {
-        json_t *error = response ? http_response_json(response) : NULL;
+        json_t *error =
+            response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
         string_fprintf(stderr, "Lab HTTP %s: expected=%u, received=%u, bytes=%zu, content=%d, headers=%d, error=%s\n",
                        description, expected, response ? http_response_status(response) : 0,
                        response ? http_response_body_size(response) : 0, content_ok, headers_ok,
@@ -186,7 +197,7 @@ static bool route_contracts(const char *directory)
     bool stylesheet_ok = response_contains(response, "<link rel=\"stylesheet\" href=\"/index.css\">") &&
                          !response_contains(response, "<style>");
     bool scripts_ok = response_contains(response, "<script defer src=\"/js/app.js\"></script>") &&
-                      response_contains(response, "id=\"lab-config\" type=\"application/json\"") &&
+                      !response_contains(response, "id=\"lab-config\"") &&
                       !response_contains(response, "function evaluateExpression") &&
                       !response_contains(response, "JURISDICTION_TOWN_OPTIONS");
     bool type_ok = response_header_equals(response, "Content-Type", "text/html; charset=utf-8");
@@ -234,10 +245,43 @@ static bool route_contracts(const char *directory)
     response = route_request(HTTP_GET, "/css/missing.css", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
-    static const char *const scripts[] = {"almanac",    "api",         "app",       "bindings",      "calculus",
-                                          "controls",   "date_picker", "editor",    "evaluation",    "events",
-                                          "integrator", "locations",   "mobile",    "result_layout", "result_text",
-                                          "results",    "state",       "worksheet", "workspace"};
+    response = route_request(HTTP_GET, "/js/calculus.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/mobile.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/date_picker.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/result_text.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/editor.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/integrator.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/almanac.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/result_layout.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/controls.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/events.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/worksheet.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/js/evaluation.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    static const char *const scripts[] = {"api", "app", "bindings", "locations", "results", "state", "workspace"};
     for (size_t i = 0; i < sizeof scripts / sizeof *scripts; ++i) {
         string_t *url = string_sprintf("/js/%s.js", scripts[i]);
         string_t *path = string_sprintf("tools/mars_lab/assets/js/%s.js", scripts[i]);
@@ -255,14 +299,15 @@ static bool route_contracts(const char *directory)
         string_free(url);
         http_response_free(response);
     }
-    response = route_request(HTTP_GET, "/catalogue.json", NULL, NULL, NULL, NULL);
-    json_t *catalogue = response ? http_response_json(response) : NULL;
+    response = route_request(HTTP_GET, "/catalogue", NULL, NULL, NULL, NULL);
+    json_t *catalogue =
+        response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     ok = route_check(response, 200,
                      json_type(test_lab_member(catalogue, "defaults")) == JSON_OBJECT &&
                          !test_lab_member(catalogue, "towns") && !test_lab_member(catalogue, "locations") &&
                          !test_lab_member(catalogue, "options") &&
-                         response_header_equals(response, "Content-Type", "application/json"),
-                     "GET /catalogue.json") &&
+                         response_header_equals(response, "Content-Type", "application/x-protobuf"),
+                     "GET /catalogue") &&
          ok;
     json_free(catalogue);
     http_response_free(response);
@@ -273,8 +318,8 @@ static bool route_contracts(const char *directory)
     ok = route_check(response, 200, response_contains(response, "<svg"), "GET /favicon.svg") && ok;
     http_response_free(response);
     response = route_request(HTTP_POST, "/state", "{\"expression\":\"x+8\",\"expression_updated_at\":500}",
-                             "application/json", NULL, NULL);
-    json_t *state = response ? http_response_json(response) : NULL;
+                             "application/x-protobuf", NULL, NULL);
+    json_t *state = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     const string_t *expression = json_string_value(test_lab_member(state, "expression"));
     ok = route_check(response, 200, expression && string_view_equals_literal(string_view_all(expression), "x+8"),
                      "POST /state saved expression") &&
@@ -282,15 +327,15 @@ static bool route_contracts(const char *directory)
     json_free(state);
     http_response_free(response);
     response = route_request(HTTP_GET, "/state", NULL, NULL, NULL, NULL);
-    state = response ? http_response_json(response) : NULL;
+    state = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     expression = json_string_value(test_lab_member(state, "expression"));
     ok = route_check(response, 200, expression && string_view_equals_literal(string_view_all(expression), "x+8"),
                      "GET /state persisted expression") &&
          ok;
     json_free(state);
     http_response_free(response);
-    response = route_request(HTTP_POST, "/eval", "{\"expression\":\"2+3\"}", "application/json", NULL, NULL);
-    json_t *result = response ? http_response_json(response) : NULL;
+    response = route_request(HTTP_POST, "/eval", "{\"expression\":\"2+3\"}", "application/x-protobuf", NULL, NULL);
+    json_t *result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     const string_t *value = json_string_value(test_lab_member(result, "value"));
     ok = route_check(response, 200,
                      test_lab_ok(result, true) && value && string_view_equals_literal(string_view_all(value), "5"),
@@ -353,7 +398,9 @@ static bool hostile_request(const char *host, const char *origin)
             eof = count == 0;
             break;
         }
-        ok = string_append_utf8_exact(reply, buffer, (size_t)count) == 0;
+        /* Only the ASCII header is text; the response body is arbitrary Protobuf bytes. */
+        for (ssize_t i = 0; ok && i < count && !string_ends_with(reply, "\r\n\r\n"); ++i)
+            ok = string_append_char(reply, buffer[i]) == 0;
     }
     if (fd >= 0)
         close(fd);
@@ -368,15 +415,14 @@ static bool hostile_request(const char *host, const char *origin)
     string_t *body =
         separator >= 0 ? string_substr(reply, (size_t)separator + 4, string_byte_length(reply) - (size_t)separator - 4)
                        : NULL;
-    json_t *result = body ? json_from_text(body) : NULL;
     ok = ok && eof && child > 0 && waited == child && WIFEXITED(status) && !WEXITSTATUS(status) &&
-         string_starts_with(reply, "HTTP/1.1 403 ") && test_lab_ok(result, false) && *test_lab_text(result, "error") &&
+         string_starts_with(reply, "HTTP/1.1 403 ") &&
+         string_find(reply, "content-type: application/x-protobuf\r\n") >= 0 &&
          string_find(reply, "cache-control: no-store\r\n") >= 0 &&
          string_find(reply, "x-content-type-options: nosniff\r\n") >= 0;
     if (!ok)
         string_fprintf(stderr, "Lab hostile request: host=%s, origin=%s, setup=%d, EOF=%d, status=%d, bytes=%zu\n",
                        host, origin ? origin : "none", ready, eof, status, reply ? string_byte_length(reply) : 0);
-    json_free(result);
     string_free(body);
     string_free(reply);
     string_free(wire);
@@ -395,15 +441,16 @@ static bool route_rejections(const char *directory)
         const char *host;
         const char *origin;
         unsigned status;
-    } cases[] = {{"/eval", "{}", "application/json", NULL, NULL, 400},
-                 {"/eval", "{", "application/json", NULL, NULL, 400},
-                 {"/eval", "[]", "application/json", NULL, NULL, 400},
+    } cases[] = {{"/eval", "{}", "application/json", NULL, NULL, 415},
+                 {"/eval", "{}", "application/x-protobuf", NULL, NULL, 400},
+                 {"/eval", "{", "application/x-protobuf", NULL, NULL, 400},
+                 {"/eval", "[]", "application/x-protobuf", NULL, NULL, 400},
                  {"/eval", "{}", "text/plain", NULL, NULL, 415},
-                 {"/eval", "{}", "application/json", "example.invalid", NULL, 403},
-                 {"/eval", "{}", "application/json", "203.0.113.10", NULL, 403},
-                 {"/eval", "{}", "application/json", "[2001:db8::1]", NULL, 403},
-                 {"/eval", "{}", "application/json", "localhost", "https://example.invalid", 403},
-                 {"/funnel-toggle", "{}", "application/json", NULL, NULL, 410}};
+                 {"/eval", "{}", "application/x-protobuf", "example.invalid", NULL, 403},
+                 {"/eval", "{}", "application/x-protobuf", "203.0.113.10", NULL, 403},
+                 {"/eval", "{}", "application/x-protobuf", "[2001:db8::1]", NULL, 403},
+                 {"/eval", "{}", "application/x-protobuf", "localhost", "https://example.invalid", 403},
+                 {"/funnel-toggle", "{}", "application/x-protobuf", NULL, NULL, 410}};
     bool ok = true;
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         if (cases[i].host) {
@@ -412,7 +459,8 @@ static bool route_rejections(const char *directory)
         }
         http_response_t *response =
             route_request(HTTP_POST, cases[i].path, cases[i].body, cases[i].type, cases[i].host, cases[i].origin);
-        json_t *result = response ? http_response_json(response) : NULL;
+        json_t *result =
+            response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
         bool passed = route_check(response, cases[i].status,
                                   test_lab_ok(result, false) && *test_lab_text(result, "error"), cases[i].path);
         if (!passed)
@@ -436,13 +484,16 @@ static bool route_catalogue(const char *directory)
     if (!test_lab_catalogue_database(directory))
         return false;
     http_response_t *response = route_request(HTTP_GET, "/jurisdictions", NULL, NULL, NULL, NULL);
-    json_t *data = response ? http_response_json(response) : NULL;
+    json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     bool available = false;
     const json_t *towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");
     const json_t *location = test_lab_member(test_lab_member(data, "locations"), "GB-WLS");
     bool ok = data && json_bool_value(test_lab_member(data, "available"), &available) && available &&
               json_array_size(test_lab_member(data, "options")) == 4 && json_array_size(towns) == 1 &&
-              !strcmp(test_lab_text(json_array_get(towns, 0), "name"), "Rhyl") && json_array_size(location) == 4;
+              !strcmp(test_lab_text(json_array_get(towns, 0), "name"), "Rhyl") &&
+              !strcmp(test_lab_text(json_array_get(towns, 0), "value"), "Rhyl|53.3190|-3.4916|5") &&
+              !strcmp(test_lab_text(json_array_get(towns, 0), "detail"), "+53.3190  -003.4916") &&
+              json_array_size(location) == 4;
     ok = route_check(response, 200, ok, "GET /jurisdictions database rows") && ok;
     json_free(data);
     http_response_free(response);
@@ -457,7 +508,7 @@ static bool route_catalogue(const char *directory)
     sqlite_close(db);
     string_free(path);
     response = route_request(HTTP_GET, "/jurisdictions", NULL, NULL, NULL, NULL);
-    data = response ? http_response_json(response) : NULL;
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");
     ok = route_check(response, 200, !strcmp(test_lab_text(json_array_get(towns, 0), "name"), "Changed database town"),
                      "GET /jurisdictions reflects database change") &&
@@ -467,7 +518,7 @@ static bool route_catalogue(const char *directory)
 
     ok = !setenv("MARS_JURISDICTION_DB_KEY", "wrong-fixture-key", 1) && ok;
     response = route_request(HTTP_GET, "/jurisdictions", NULL, NULL, NULL, NULL);
-    data = response ? http_response_json(response) : NULL;
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     available = true;
     bool unavailable = data && json_bool_value(test_lab_member(data, "available"), &available) && !available &&
                        !json_array_size(test_lab_member(data, "options")) &&

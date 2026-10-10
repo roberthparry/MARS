@@ -56,6 +56,21 @@ void test_lab_runtime_cases(void);
 /** Register and run HTTP route integration assertions with sequential server children. */
 void test_lab_route_cases(void);
 
+/** @brief Run bounded native Protobuf schema regressions. @return No value. */
+void test_lab_wire_cases(void);
+
+/** @brief Run native presentation and structured editor regressions. @return No value. */
+void test_lab_presentation_cases(void);
+
+/** @brief Run native form parsing and validation regressions. @return No value. */
+void test_lab_forms_cases(void);
+
+/** @brief Run native Function lexical metadata regressions. @return No value. */
+void test_lab_syntax_cases(void);
+
+/** @brief Run native almanac display and clipboard regressions. @return No value. */
+void test_lab_almanac_presentation_cases(void);
+
 /** @brief Register native mathematical worker regressions. @return No value. */
 void test_lab_math_cases(void);
 

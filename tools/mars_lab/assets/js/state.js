@@ -1,656 +1,423 @@
 /**
- * Worksheet persistence, history snapshots and restoration.
+ * Worksheet storage adapters, asynchronous restoration and history coordination.
+ * C owns saved-field normalisation, recovery records and guarded DOM projection.
  * Definition-only client script; app.js loads it before shared worksheet state.
  */
 
+// localStorage accepts text only; base64 is a browser adapter around the C codec.
+function saveLabLocalState(key, state) {
+    const bytes = new Uint8Array(labWire.encode(state));
+    const chunks = [];
+    for (let offset = 0; offset < bytes.length; offset += 8192)
+        chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 8192)));
+    localStorage.setItem(`${key}.protobuf`, btoa(chunks.join('')));
+}
+
+function loadLabLocalState(key) {
+    try {
+        const text = localStorage.getItem(`${key}.protobuf`);
+        if (!text || text.length > 5592408)
+            return null;
+        const bytes = Uint8Array.from(atob(text), character => character.charCodeAt(0));
+        return labWire.decode(bytes.buffer);
+    } catch (_) {
+        // One damaged or inaccessible fallback must not prevent other state restoration.
+        return null;
+    }
+}
+
 function validPrecisionBits(bits, fallback) {
-  const parsed = parseInt(String(bits), 10);
-  if (!Number.isFinite(parsed))
-    return fallback;
-  return Math.max(DOUBLE_PRECISION_DIGITS, Math.min(MAX_PRECISION_BITS, parsed));
+    return labDOM.call('lab_storage_precision', [bits, fallback]);
 }
 
 function validIntegratorIntervalCap(value) {
-  const parsed = parseInt(String(value), 10);
-  if (!Number.isFinite(parsed))
-    return DEFAULT_INTEGRATOR_INTERVAL_CAP;
-  const allowed = [500, 5000, 20000, 50000, 100000];
-  return allowed.includes(parsed) ? parsed : DEFAULT_INTEGRATOR_INTERVAL_CAP;
+    return labDOM.call('lab_storage_intervals', [value], labConfig);
 }
 
 function validMatrixOperation(value) {
-  const operation = String(value || '').trim();
-  const allowed = Array.from(matrixOperation.options).map((option) => option.value);
-  return allowed.includes(operation) ? operation : 'eval';
+    return labDOM.call('lab_storage_operation', [value]);
 }
 
 function validLabMode(value) {
-  const mode = String(value || '').trim();
-  return mode === 'equation' || mode === 'diffequation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac' ? mode : 'expression';
+    return WORKSPACE_MODE_NAMES[workspaceModeId(value)];
 }
 
-function applySavedState(data) {
-  const saved = String(data.expression || '').trim();
-  if (saved) {
-    lastExpressionUpdatedAt = Number(data.expression_updated_at || 0);
-    modeEditorText.expression = saved;
-    setExpressionEditor(saved);
-  }
+async function restoreWorksheetEditors(read, local = false) {
+    return labFlowContinue(16, {read, local});
+}
 
-  const savedMatrix = String(data.matrix || '').trim();
-  if (savedMatrix && !savedMatrix.includes('...'))
-    modeEditorText.matrix = savedMatrix;
+async function restoreWorksheetControls(read, local = false) {
+    return labFlowContinue(17, {read, local});
+}
 
-  const savedEquation = String(data.equation || '').trim();
-  if (savedEquation)
-    modeEditorText.equation = expressionWithSortedConstants(savedEquation);
+async function applySavedState(data) {
+    return labFlowContinue(18, {data});
+}
 
-  const savedDiffequation = String(data.diffequation || '').trim();
-  if (savedDiffequation && !savedDiffequation.includes('...'))
-    modeEditorText.diffequation = savedDiffequation;
-
-  const savedEquationVariable = String(data.equation_variable || '').trim();
-  if (equationVariable)
-    equationVariable.value = savedEquationVariable || DEFAULT_EQUATION_VARIABLE_TEXT;
-
-  const savedMatrixOperation = validMatrixOperation(data.matrix_operation);
-  if (matrixOperation)
-    matrixOperation.value = savedMatrixOperation;
-
-  const savedMatrixOperand = String(data.matrix_operand || '').trim();
-  if (matrixOperand)
-    matrixOperand.value = savedMatrixOperand;
-
-  const savedIntegrator = String(data.integrator_expression || '').trim();
-  if (savedIntegrator && !savedIntegrator.includes('...')) {
-    modeEditorText.integrator = savedIntegrator;
-    expr.dataset.savedIntegratorExpression = savedIntegrator;
-  }
-
-  const savedBounds = String(data.integrator_bounds || '').trim();
-  if (savedBounds)
-    restoreIntegratorBoundsText(savedBounds);
-
-  const savedCap = validIntegratorIntervalCap(data.integrator_interval_cap);
-  if (integratorIntervalCap)
-    integratorIntervalCap.value = String(savedCap);
-
-  if (datetimeDate)
-    datetimeDate.value = validDateText(data.datetime_date, DEFAULT_DATETIME_DATE);
-  if (datetimeJdn)
-    datetimeJdn.value = String(data.datetime_jdn || '');
-  if (datetimeStart)
-    datetimeStart.value = validDateText(data.datetime_start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-  if (datetimeEnd)
-    datetimeEnd.value = validDateText(data.datetime_end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-  if (datetimeYear)
-    datetimeYear.value = String(data.datetime_year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
-  if (datetimeJurisdiction)
-    setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(data.datetime_jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-  if (datetimeLatitude)
-    datetimeLatitude.value = String(data.datetime_latitude || DEFAULT_DATETIME_LATITUDE);
-  if (datetimeLongitude)
-    datetimeLongitude.value = String(data.datetime_longitude || DEFAULT_DATETIME_LONGITUDE);
-  if (datetimeElevation)
-    datetimeElevation.value = String(data.datetime_elevation || DEFAULT_DATETIME_ELEVATION);
-  if (datetimeGmtOffset) {
-    datetimeGmtOffset.value = String(data.datetime_gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
-    datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
-    datetimeGmtOffsetTouched = false;
-  }
-  if (almanacDate)
-    almanacDate.value = validDateText(data.almanac_date, DEFAULT_ALMANAC_DATE);
-  if (almanacTime)
-    almanacTime.value = String(data.almanac_time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
-  if (almanacZone)
-    almanacZone.value = String(data.almanac_zone || DEFAULT_ALMANAC_ZONE).trim();
-  if (almanacJurisdiction)
-    setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(data.almanac_jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-  if (almanacLatitude)
-    almanacLatitude.value = String(data.almanac_latitude || DEFAULT_ALMANAC_LATITUDE).trim();
-  if (almanacLongitude)
-    almanacLongitude.value = String(data.almanac_longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-  if (almanacElevation)
-    almanacElevation.value = String(data.almanac_elevation || DEFAULT_ALMANAC_ELEVATION).trim();
-  almanacVisibilityMode = validAlmanacVisibility(data.almanac_visibility, DEFAULT_ALMANAC_VISIBILITY);
-
-  if (data.precision_bits && typeof data.precision_bits === 'object') {
-    Object.entries(data.precision_bits).forEach(([mode, bits]) => {
-      if (modePrecisionBits[mode] !== undefined)
-        modePrecisionBits[mode] = validPrecisionBits(bits, modePrecisionBits[mode]);
-    });
-  } else if (data.precision_bits !== undefined) {
-    modePrecisionBits.expression = validPrecisionBits(data.precision_bits, modePrecisionBits.expression);
-  }
-	      workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
-	      syncTownSelectors({selectDefault: false});
-  restoreTownSelection(
-    datetimeTown,
-    datetimeJurisdiction && datetimeJurisdiction.value,
-    data.datetime_town,
-    datetimeLatitude && datetimeLatitude.value,
-    datetimeLongitude && datetimeLongitude.value
-  );
-  restoreTownSelection(
-    almanacTown,
-    almanacJurisdiction && almanacJurisdiction.value,
-    data.almanac_town,
-    almanacLatitude && almanacLatitude.value,
-    almanacLongitude && almanacLongitude.value
-  );
-
-	      applyLabMode(validLabMode(data.lab_mode));
+async function restoreNewerLocalEditors(data) {
+    return labFlowContinue(19, {data});
 }
 
 async function loadLastState() {
-  try {
-    const response = await fetch('/state');
-    const data = await response.json();
-    applySavedState(data || {});
-    try {
-      const serverExpression = String(data.expression || '').trim();
-      const serverExpressionUpdatedAt = Number(data.expression_updated_at || 0);
-      const localExpression = String(localStorage.getItem('mars.exprLab.lastExpression') || '').trim();
-      const localExpressionUpdatedAt = Number(localStorage.getItem(EXPRESSION_TIMESTAMP_STORAGE_KEY) || 0);
-      if (localExpression && (
-        localExpressionUpdatedAt > serverExpressionUpdatedAt ||
-        !serverExpression ||
-        serverExpression === DEFAULT_EXPRESSION_TEXT
-      )) {
-        lastExpressionUpdatedAt = localExpressionUpdatedAt || Date.now();
-        modeEditorText.expression = localExpression;
-        if (currentMode() === 'expression')
-          setExpressionEditor(localExpression);
-        saveLabState({
-          expression: localExpression,
-          expression_updated_at: localExpressionUpdatedAt || Date.now()
-        });
-      }
-
-      const serverEquation = String(data.equation || '').trim();
-      const serverEquationUpdatedAt = Number(data.equation_updated_at || 0);
-      const localEquation = String(localStorage.getItem('mars.exprLab.lastEquation') || '').trim();
-      const localEquationUpdatedAt = Number(localStorage.getItem(EQUATION_TIMESTAMP_STORAGE_KEY) || 0);
-      if (localEquation && (
-        localEquationUpdatedAt > serverEquationUpdatedAt ||
-        !serverEquation ||
-        serverEquation === DEFAULT_EQUATION_TEXT
-      )) {
-        modeEditorText.equation = expressionWithSortedConstants(localEquation);
-        if (currentMode() === 'equation')
-          restoreModeEditor('equation');
-        saveLabState({
-          equation: modeEditorText.equation,
-          equation_updated_at: localEquationUpdatedAt || Date.now()
-        });
-      }
-    } catch (_) {
-      // The server copy remains authoritative when localStorage is unavailable.
-    }
-    return;
-  } catch (_) {
-    // Fall back to localStorage below.
-  }
-
-  try {
-    const saved = localStorage.getItem('mars.exprLab.lastExpression');
-    if (saved) {
-      lastExpressionUpdatedAt = Number(localStorage.getItem(EXPRESSION_TIMESTAMP_STORAGE_KEY) || Date.now());
-      modeEditorText.expression = saved;
-      setExpressionEditor(saved);
-    }
-    const matrixText = localStorage.getItem('mars.exprLab.lastMatrix');
-    if (matrixText && !matrixText.includes('...'))
-      modeEditorText.matrix = matrixText;
-    const matrixOperationText = localStorage.getItem('mars.exprLab.lastMatrixOperation');
-    if (matrixOperation && matrixOperationText)
-      matrixOperation.value = validMatrixOperation(matrixOperationText);
-    const matrixOperandText = localStorage.getItem('mars.exprLab.lastMatrixOperand');
-    if (matrixOperand && matrixOperandText !== null)
-      matrixOperand.value = matrixOperandText;
-    const equationText = localStorage.getItem('mars.exprLab.lastEquation');
-    if (equationText)
-      modeEditorText.equation = expressionWithSortedConstants(equationText);
-    const diffequationText = localStorage.getItem('mars.exprLab.lastDiffequation');
-    if (diffequationText && !diffequationText.includes('...'))
-      modeEditorText.diffequation = diffequationText;
-    const equationVariableText = localStorage.getItem('mars.exprLab.lastEquationVariable');
-    if (equationVariable && equationVariableText)
-      equationVariable.value = equationVariableText;
-    const integratorExpression = localStorage.getItem('mars.exprLab.lastIntegratorExpression');
-    if (integratorExpression && !integratorExpression.includes('...'))
-      modeEditorText.integrator = integratorExpression;
-    const integratorBoundsText = localStorage.getItem('mars.exprLab.lastIntegratorBounds');
-    if (integratorBoundsText)
-      restoreIntegratorBoundsText(integratorBoundsText);
-    const integratorCap = localStorage.getItem('mars.exprLab.lastIntegratorIntervalCap');
-    if (integratorIntervalCap && integratorCap)
-      integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorCap));
-    const datetimeStateText = localStorage.getItem('mars.exprLab.lastDatetimeState');
-    if (datetimeStateText) {
-      const state = JSON.parse(datetimeStateText);
-      if (datetimeDate)
-        datetimeDate.value = validDateText(state.date, DEFAULT_DATETIME_DATE);
-      if (datetimeJdn)
-        datetimeJdn.value = String(state.jdn || '');
-      if (datetimeStart)
-        datetimeStart.value = validDateText(state.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-      if (datetimeEnd)
-        datetimeEnd.value = validDateText(state.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-      if (datetimeYear)
-        datetimeYear.value = String(state.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
-    if (datetimeJurisdiction)
-      setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-    if (datetimeLatitude)
-      datetimeLatitude.value = String(state.latitude || DEFAULT_DATETIME_LATITUDE);
-    if (datetimeLongitude)
-      datetimeLongitude.value = String(state.longitude || DEFAULT_DATETIME_LONGITUDE);
-    if (datetimeElevation)
-      datetimeElevation.value = String(state.elevation || DEFAULT_DATETIME_ELEVATION);
-    if (datetimeGmtOffset) {
-      datetimeGmtOffset.value = String(state.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
-      datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
-      datetimeGmtOffsetTouched = false;
-    }
-    }
-    const almanacStateText = localStorage.getItem('mars.exprLab.lastAlmanacState');
-    if (almanacStateText) {
-      const state = JSON.parse(almanacStateText);
-      if (almanacDate)
-        almanacDate.value = validDateText(state.date, DEFAULT_ALMANAC_DATE);
-      if (almanacTime)
-        almanacTime.value = String(state.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
-      if (almanacZone)
-        almanacZone.value = String(state.zone || DEFAULT_ALMANAC_ZONE).trim();
-      if (almanacJurisdiction)
-        setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(state.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-      if (almanacLatitude)
-        almanacLatitude.value = String(state.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
-      if (almanacLongitude)
-        almanacLongitude.value = String(state.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-      if (almanacElevation)
-        almanacElevation.value = String(state.elevation || DEFAULT_ALMANAC_ELEVATION).trim();
-      almanacVisibilityMode = validAlmanacVisibility(state.visibility, DEFAULT_ALMANAC_VISIBILITY);
-    }
-	        const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
-	        syncTownSelectors({selectDefault: false});
-    restoreTownSelection(
-      datetimeTown,
-      datetimeJurisdiction && datetimeJurisdiction.value,
-      datetimeStateText ? JSON.parse(datetimeStateText).town : '',
-      datetimeLatitude && datetimeLatitude.value,
-      datetimeLongitude && datetimeLongitude.value
-    );
-    restoreTownSelection(
-      almanacTown,
-      almanacJurisdiction && almanacJurisdiction.value,
-      almanacStateText ? JSON.parse(almanacStateText).town : '',
-      almanacLatitude && almanacLatitude.value,
-      almanacLongitude && almanacLongitude.value
-    );
-	        if (labMode)
-	          applyLabMode(labMode);
-  } catch (_) {
-    // Private browsing or locked-down webviews can disable localStorage.
-  }
+    return labFlowContinue(20, {});
 }
 
 function saveLabState(patch, options = {}) {
-  const payload = {...patch};
-  fetch('/state', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
-    keepalive: !!options.keepalive
-  }).catch(() => {
-    // Persistence is helpful, not essential.
-  });
+    const payload = {...patch};
+    // Snapshot only our trusted native getter view; the codec still rejects arbitrary accessors.
+    if (payload.precision_bits === modePrecisionBits)
+        payload.precision_bits = {...modePrecisionBits};
+    labFetch('/state', {method: 'POST', body: labWire.encode(payload), keepalive: !!options.keepalive})
+        .catch(
+            () => {
+                // Persistence is helpful, not essential.
+            });
 }
 
 function savePrecisionState() {
-  saveLabState({precision_bits: modePrecisionBits});
+    saveLabState({precision_bits: modePrecisionBits});
 }
 
 function saveLastLabMode(mode = currentMode()) {
-  const labMode = validLabMode(mode);
-  try {
-    localStorage.setItem(LAB_MODE_STORAGE_KEY, labMode);
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-  saveLabState({lab_mode: labMode});
+    labStateSync(3, {mode});
 }
 
-function saveLastExpression(text, options = {}) {
-  text = String(text || '').trim();
-  const updatedAt = Date.now();
-  lastExpressionUpdatedAt = updatedAt;
-  if (text)
-    modeEditorText.expression = text;
-
-  try {
-    if (text)
-      localStorage.setItem('mars.exprLab.lastExpression', text);
-    localStorage.setItem(EXPRESSION_TIMESTAMP_STORAGE_KEY, String(updatedAt));
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  if (!text)
-    return;
-
-  const patch = {
-    expression: text,
-    expression_updated_at: updatedAt,
-    precision_bits: modePrecisionBits
-  };
-  clearTimeout(expressionStateSaveTimer);
-  expressionStateSaveTimer = null;
-  if (options.debounce) {
-    expressionStateSaveTimer = setTimeout(() => {
-      expressionStateSaveTimer = null;
-      saveLabState(patch);
-    }, 250);
-  } else {
-    saveLabState(patch, {keepalive: !!options.keepalive});
-  }
+const worksheetSaveTimers = new Map();
+function worksheetSaveSchema(mode) {
+    return labDOM.call('lab_persist_schema', mode);
 }
 
-function saveLastMatrixState() {
-  const text = String(currentExpressionText() || expr.value || '').trim();
-  const operation = validMatrixOperation(matrixOperation && matrixOperation.value);
-  const operand = String(matrixOperand && matrixOperand.value || '').trim();
-  if (text)
-    modeEditorText.matrix = text;
-
-  try {
-    if (text)
-      localStorage.setItem('mars.exprLab.lastMatrix', text);
-    localStorage.setItem('mars.exprLab.lastMatrixOperation', operation);
-    localStorage.setItem('mars.exprLab.lastMatrixOperand', operand);
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  saveLabState({
-    matrix: text,
-    matrix_operation: operation,
-    matrix_operand: operand,
-    precision_bits: modePrecisionBits
-  });
+// The host captures browser values and performs I/O; C supplies the schema and save ownership.
+function saveWorksheetState(mode, text = currentExpressionText() || expr.value || '', options = {}) {
+    labStateSync(0, {index: workspaceModeId(mode), text, options});
 }
 
-function saveLastEquationState(options = {}) {
-  const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
-  const updatedAt = Date.now();
-  if (text)
-    modeEditorText.equation = text;
-
-  try {
-    if (text)
-      localStorage.setItem('mars.exprLab.lastEquation', text);
-    localStorage.setItem(EQUATION_TIMESTAMP_STORAGE_KEY, String(updatedAt));
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  const patch = {
-    equation: text,
-    equation_updated_at: updatedAt,
-    precision_bits: modePrecisionBits
-  };
-  clearTimeout(equationStateSaveTimer);
-  equationStateSaveTimer = null;
-  if (options.debounce) {
-    equationStateSaveTimer = setTimeout(() => {
-      equationStateSaveTimer = null;
-      saveLabState(patch);
-    }, 250);
-  } else {
-    saveLabState(patch, {keepalive: !!options.keepalive});
-  }
-}
-
-function saveLastDiffequationState() {
-  const text = String(currentExpressionText() || expr.value || '').trim();
-  if (text)
-    modeEditorText.diffequation = text;
-
-  try {
-    if (text)
-      localStorage.setItem('mars.exprLab.lastDiffequation', text);
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  saveLabState({
-    diffequation: text,
-    precision_bits: modePrecisionBits
-  });
-}
-
-function saveLastIntegratorState() {
-  const text = expressionWithSortedConstants(String(currentExpressionText() || expr.value || '').trim());
-  const bounds = currentIntegratorBoundsText();
-  const cap = requestedIntegratorIntervalCap();
-  if (text)
-    modeEditorText.integrator = text;
-
-  try {
-    if (text)
-      localStorage.setItem('mars.exprLab.lastIntegratorExpression', text);
-    if (bounds)
-      localStorage.setItem('mars.exprLab.lastIntegratorBounds', bounds);
-    localStorage.setItem('mars.exprLab.lastIntegratorIntervalCap', String(cap));
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  saveLabState({
-    integrator_expression: text,
-    integrator_bounds: bounds,
-    integrator_interval_cap: cap,
-    precision_bits: modePrecisionBits
-  });
+function saveCalendarState(mode) {
+    labStateSync(2, {mode});
 }
 
 function saveLastDatetimeState() {
-  const state = currentDatetimeState();
-  modeEditorText.datetime = DEFAULT_DATETIME_TEXT;
-
-  try {
-    localStorage.setItem('mars.exprLab.lastDatetimeState', JSON.stringify(state));
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  saveLabState({
-    datetime_date: state.date,
-    datetime_jdn: state.jdn,
-    datetime_start: state.start,
-    datetime_end: state.end,
-    datetime_year: state.year,
-    datetime_jurisdiction: state.jurisdiction,
-    datetime_town: state.town,
-    datetime_latitude: state.latitude,
-    datetime_longitude: state.longitude,
-    datetime_elevation: state.elevation,
-    datetime_gmt_offset: state.gmt_offset,
-    precision_bits: modePrecisionBits
-  });
+    saveCalendarState('datetime');
 }
 
 function saveLastAlmanacState() {
-  const state = currentAlmanacState();
-  modeEditorText.almanac = DEFAULT_ALMANAC_TEXT;
-
-  try {
-    localStorage.setItem('mars.exprLab.lastAlmanacState', JSON.stringify(state));
-  } catch (_) {
-    // The lab still works fine without persistence.
-  }
-
-  saveLabState({
-    almanac_date: state.date,
-    almanac_time: state.time,
-    almanac_zone: state.zone,
-    almanac_jurisdiction: state.jurisdiction,
-    almanac_town: state.town,
-    almanac_latitude: state.latitude,
-    almanac_longitude: state.longitude,
-    almanac_elevation: state.elevation,
-    almanac_visibility: state.visibility,
-    precision_bits: modePrecisionBits
-  });
+    saveCalendarState('almanac');
 }
 
 function modeHistoryStack(store, mode = currentMode()) {
-  return store[mode] || [];
+    const index = workspaceModeId(mode);
+    // Compatibility with DOM event wiring: every operation reaches the native owner.
+    return {
+        get length() {
+            return labWire.exports().lab_workspace_history_count(index, store);
+        },
+        push(snapshot) {
+            const length = workspaceStageSnapshot(snapshot);
+            const count = labWire.exports().lab_workspace_history_push(index, store, length, !!snapshot?.text, 0);
+            if (count < 0)
+                throw new Error('Could not retain worksheet history');
+            return count;
+        },
+        pop() {
+            return workspaceReadSnapshot(labWire.exports().lab_workspace_history_pop(index, store));
+        }
+    };
+}
+
+// Event handlers can use this atomic operation instead of paired stack pop/push calls.
+function navigateWorksheetHistory(direction) {
+    const native = labWire.exports();
+    const current = historyStateForMode();
+    const length = workspaceStageSnapshot(current);
+    const restored = native.lab_workspace_navigate(native.lab_workspace_mode(), direction, length, !!current.text);
+    return workspaceReadSnapshot(restored);
 }
 
 function currentHistoryLength() {
-  return modeHistoryStack(expressionHistory).length;
+    return modeHistoryStack(expressionHistory).length;
 }
 
 function currentForwardHistoryLength() {
-  return modeHistoryStack(forwardHistory).length;
+    return modeHistoryStack(forwardHistory).length;
 }
 
 function historyStateForMode(mode = currentMode(), textOverride = null) {
-  let text = String(
-    textOverride === null || textOverride === undefined
-      ? (currentExpressionText() || expr.value || '')
-      : textOverride
-  ).trim();
-  const state = {mode, text};
-
-  if (mode === 'equation' && equationVariable) {
-    state.variable = String(equationVariable.value || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
-      DEFAULT_EQUATION_VARIABLE_TEXT;
-  } else if (mode === 'matrix') {
-    state.operation = matrixOperation.value;
-    state.operand = String(matrixOperand.value || '').trim();
-  } else if (mode === 'integrator') {
-    state.bounds = currentIntegratorBoundsText();
-    state.intervalCap = String(validIntegratorIntervalCap(
-      integratorIntervalCap && integratorIntervalCap.value
-    ));
-  } else if (mode === 'datetime') {
-    state.datetime = currentDatetimeState();
-    if (textOverride === null || textOverride === undefined)
-      text = datetimeSummaryText(state.datetime);
-    state.text = text || DEFAULT_DATETIME_TEXT;
-  } else if (mode === 'almanac') {
-    state.almanac = currentAlmanacState();
-    if (textOverride === null || textOverride === undefined)
-      text = almanacSummaryText(state.almanac);
-    state.text = text || DEFAULT_ALMANAC_TEXT;
-  }
-
-  return state;
+    return labStateSync(9, {index: workspaceModeId(mode), textOverride});
 }
 
 function historyStatesEqual(left, right) {
-  return JSON.stringify(left || null) === JSON.stringify(right || null);
+    const leftLength = workspaceStageSnapshot(left, 0);
+    const rightLength = workspaceStageSnapshot(right, 1);
+    return !!labWire.exports().lab_workspace_equal(leftLength, rightLength);
 }
 
 function previousModeStateForHistory(nextState) {
-  const previous = modeCommittedState[nextState && nextState.mode || currentMode()];
-
-  if (!previous || historyStatesEqual(previous, nextState))
-    return null;
-  return previous;
+    const mode = workspaceModeId(nextState && nextState.mode || currentMode());
+    const length = workspaceStageSnapshot(nextState);
+    return workspaceReadSnapshot(labWire.exports().lab_workspace_previous(mode, length));
 }
 
 function commitModeState(mode = currentMode(), textOverride = null) {
-  modeCommittedState[mode] = historyStateForMode(mode, textOverride);
+    const index = workspaceModeId(mode);
+    const length = workspaceStageSnapshot(historyStateForMode(mode, textOverride));
+    if (!labWire.exports().lab_workspace_commit(index, length))
+        throw new Error('Could not commit worksheet state');
 }
 
-function restoreHistoryState(state) {
-  if (!state)
-    return;
-
-  if (state.mode === 'equation' && equationVariable) {
-    equationVariable.value = String(state.variable || DEFAULT_EQUATION_VARIABLE_TEXT).trim() ||
-      DEFAULT_EQUATION_VARIABLE_TEXT;
-  } else if (state.mode === 'matrix') {
-    matrixOperation.value = state.operation || 'eval';
-    matrixOperand.value = String(state.operand || '').trim();
-  } else if (state.mode === 'integrator') {
-    restoreIntegratorBoundsText(state.bounds || DEFAULT_INTEGRATOR_BOUNDS_TEXT);
-    if (integratorIntervalCap)
-      integratorIntervalCap.value = String(validIntegratorIntervalCap(state.intervalCap));
-  } else if (state.mode === 'datetime') {
-    const datetimeState = state.datetime || {};
-    if (datetimeDate)
-      datetimeDate.value = validDateText(datetimeState.date, DEFAULT_DATETIME_DATE);
-    if (datetimeJdn)
-      datetimeJdn.value = String(datetimeState.jdn || '');
-    if (datetimeStart)
-      datetimeStart.value = validDateText(datetimeState.start, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-    if (datetimeEnd)
-      datetimeEnd.value = validDateText(datetimeState.end, datetimeDate?.value || DEFAULT_DATETIME_DATE);
-    if (datetimeYear)
-      datetimeYear.value = String(datetimeState.year || (datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
-    if (datetimeJurisdiction)
-      setSelectValue(datetimeJurisdiction, validDatetimeJurisdiction(datetimeState.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-    if (datetimeLatitude)
-      datetimeLatitude.value = String(datetimeState.latitude || DEFAULT_DATETIME_LATITUDE);
-    if (datetimeLongitude)
-      datetimeLongitude.value = String(datetimeState.longitude || DEFAULT_DATETIME_LONGITUDE);
-    if (datetimeElevation)
-      datetimeElevation.value = String(datetimeState.elevation || DEFAULT_DATETIME_ELEVATION);
-    if (datetimeGmtOffset) {
-      datetimeGmtOffset.value = String(datetimeState.gmt_offset || DEFAULT_DATETIME_GMT_OFFSET);
-      datetimeAutoGmtOffset = String(datetimeGmtOffset.value || '').trim();
-      datetimeGmtOffsetTouched = false;
-    }
-    restoreTownSelection(
-      datetimeTown,
-      datetimeJurisdiction && datetimeJurisdiction.value,
-      datetimeState.town,
-      datetimeLatitude && datetimeLatitude.value,
-      datetimeLongitude && datetimeLongitude.value
-    );
-  } else if (state.mode === 'almanac') {
-    const almanacState = state.almanac || {};
-    if (almanacDate)
-      almanacDate.value = validDateText(almanacState.date, DEFAULT_ALMANAC_DATE);
-    if (almanacTime)
-      almanacTime.value = String(almanacState.time || DEFAULT_ALMANAC_TIME).trim() || DEFAULT_ALMANAC_TIME;
-    if (almanacZone)
-      almanacZone.value = String(almanacState.zone || DEFAULT_ALMANAC_ZONE).trim();
-    if (almanacJurisdiction)
-      setSelectValue(almanacJurisdiction, validDatetimeJurisdiction(almanacState.jurisdiction, DEFAULT_DATETIME_JURISDICTION));
-    if (almanacLatitude)
-      almanacLatitude.value = String(almanacState.latitude || DEFAULT_ALMANAC_LATITUDE).trim();
-    if (almanacLongitude)
-      almanacLongitude.value = String(almanacState.longitude || DEFAULT_ALMANAC_LONGITUDE).trim();
-    if (almanacElevation)
-      almanacElevation.value = String(almanacState.elevation || DEFAULT_ALMANAC_ELEVATION).trim();
-    almanacVisibilityMode = validAlmanacVisibility(almanacState.visibility, DEFAULT_ALMANAC_VISIBILITY);
-    restoreTownSelection(
-      almanacTown,
-      almanacJurisdiction && almanacJurisdiction.value,
-      almanacState.town,
-      almanacLatitude && almanacLatitude.value,
-      almanacLongitude && almanacLongitude.value
-    );
-  }
-
-  if (state.mode === 'datetime') {
-    expr.value = DEFAULT_DATETIME_TEXT;
-    clearExpressionSource();
-    clearVariableValues();
-  } else if (state.mode === 'almanac') {
-    expr.value = DEFAULT_ALMANAC_TEXT;
-    clearExpressionSource();
-    clearVariableValues();
-  } else {
-    applyUpdatedBindingExpression(state.text || '');
-  }
+async function restoreHistoryState(state, isCurrent = () => true) {
+    return labFlowContinue(21, {state, isCurrent});
 }
 
 function clearForwardHistory(mode = currentMode()) {
-  forwardHistory[mode] = [];
+    labWire.exports().lab_workspace_history_clear(workspaceModeId(mode), 1);
+}
+
+async function navigateHistoryFromEvent(direction) {
+    return labRequests.runUI('evaluate', currentMode(), request => labFlowContinue(22, {direction, request}));
+}
+
+// Resolve browser capabilities lazily, after definition-only scripts have loaded.
+function labStateFlowServices() {
+    return {
+        stateClearPrelude: () => {
+            clearTimeout(expressionBindingRefreshTimer);
+            labRequests.cancel('evaluate');
+            labRequests.cancel('bindings');
+            labRequests.cancel('function');
+        },
+        stateClearOwned: () =>
+            labRequests.runUI('evaluate', currentMode(), request => labFlowContinue(72, {stage: 3, request})),
+        stateClearProjection: () => labDOM.call('lab_events_clear', workspaceModeId(currentMode()), labConfig),
+        stateBlankBounds: () => resetIntegratorBoundsToBlank(),
+        stateResetCalendar: () => applyCalendarState(currentMode(), {}, 3),
+        stateFormsRequest: payload => requestLabForms(payload),
+        stateFormsExpression: () => integratorFormsExpression(),
+        stateFormsMetadata: (expression, result) => installIntegratorReferenceMetadata(expression, result),
+        // Box the property once: null and undefined survive native handle scopes distinctly.
+        stateFormsRows: result => ({value: result.rows}),
+        stateFormsRender: rows => renderIntegratorRows(rows.value),
+        stateRead: (read, key) => read(key),
+        stateNow: () => Date.now(),
+        statePrepare: text => prepareLabEditor(text),
+        stateCanonical: text => expressionWithSortedConstants(text),
+        stateEditor: (index, text) => modeEditorText[WORKSPACE_MODE_NAMES[index]] = text,
+        stateExpression: (text, timestamp) => {
+            lastExpressionUpdatedAt = timestamp;
+            setExpressionEditor(text);
+        },
+        stateTimestamp: timestamp => lastExpressionUpdatedAt = timestamp,
+        stateSetExpression: text => setExpressionEditor(text),
+        stateIntegratorSource: text => expr.dataset.savedIntegratorExpression = text,
+        stateControl: (field, value, local) => labDOM.call('lab_storage_control', field, [value], local, labConfig),
+        stateBounds: (...args) => restoreIntegratorBoundsText(...args),
+        stateServerEditors: data => restoreWorksheetEditors(key => data[key]),
+        stateServerControls: data => restoreWorksheetControls(key => data[key]),
+        stateCalendar: (...args) => applyCalendarState(...args),
+        stateSyncTowns: () => syncTownSelectors({selectDefault: false}),
+        stateTown: (index, town) => {
+            const [select, jurisdiction, latitude, longitude] = [
+                [datetimeTown, datetimeJurisdiction, datetimeLatitude, datetimeLongitude],
+                [almanacTown, almanacJurisdiction, almanacLatitude, almanacLongitude]
+            ][index];
+            return restoreTownSelection(
+                select, jurisdiction && jurisdiction.value, town, latitude && latitude.value,
+                longitude && longitude.value);
+        },
+        stateMode: value => validLabMode(value),
+        statePrepareMode: mode => prepareLabEditor(modeEditorText[mode]),
+        stateApplyMode: mode => applyLabMode(mode),
+        stateRecovery: (index, data) => {
+            const fields = worksheetSaveSchema(index);
+            return labDOM.call(
+                'lab_storage_recovery', index, data,
+                [localStorage.getItem(fields[0].local), localStorage.getItem(fields[1].local)], labConfig);
+        },
+        stateRecovered: (index, recovery, text, now) =>
+            labDOM.call('lab_storage_recovered', index, recovery, [text], now),
+        stateModeIndex: () => workspaceModeId(currentMode()),
+        stateRestoreEditor: mode => restoreModeEditor(mode),
+        stateSave: (...args) => saveLabState(...args),
+        stateFetch: () => labFetch('/state'),
+        stateDecode: response => response.labData(),
+        stateApplySaved: data => applySavedState(data),
+        stateRecover: data => restoreNewerLocalEditors(data),
+        stateLocalEditors: () => restoreWorksheetEditors(key => localStorage.getItem(key), true),
+        stateLocalControls: () => restoreWorksheetControls(key => localStorage.getItem(key), true),
+        stateLocalCalendar: key => loadLabLocalState(key),
+        stateLocalMode: () => localStorage.getItem(LAB_MODE_STORAGE_KEY),
+        stateGuard: guard => guard(),
+        stateHistoryPlan: (phase, state) => labDOM.call('lab_storage_history', phase, state, labConfig),
+        stateCalendarHistory: (...args) => restoreCalendarHistory(...args),
+        stateUpdated: text => applyUpdatedBindingExpression(text),
+        stateClearSource: () => clearExpressionSource(),
+        stateClearBindings: () => clearVariableValues(),
+        stateCommitBindings: (...args) => commitVisibleBindingInputs(...args),
+        stateNavigate: direction => navigateWorksheetHistory(direction),
+        stateHistoryButtons: () => updateHistoryButtons(),
+        stateCancelBindings: () => {
+            clearTimeout(expressionBindingRefreshTimer);
+            labRequests.cancel('bindings');
+        },
+        stateRestoreHistory: (state, request) => restoreHistoryState(state, () => labRequests.current(request)),
+        stateEvaluateHistory: () => evaluateCurrentMode({skipHistoryUpdate: true}),
+        stateCaptureGuard: isCurrent => {
+            const mode = currentMode(), context = labRequests.context();
+            return () => isCurrent() && currentMode() === mode && labRequests.context() === context;
+        },
+        stateCaptureEditor: () => {
+            const native = labWire.exports(), index = native.lab_workspace_mode();
+            const length = workspaceStageText(currentExpressionText() || expr.value.trim());
+            const defaultLength = workspaceStageText(workspaceDefaultText(index), 1);
+            if (!native.lab_workspace_editor_capture(index, length, defaultLength))
+                throw new Error('Could not retain worksheet editor text');
+            return index;
+        },
+        stateSaveEditor: index => labStateSync(15, {index}),
+        stateSaveCalendar: index => saveCalendarState(WORKSPACE_MODE_NAMES[index]),
+        stateCaptureRequest: request => captureCurrentModeEditor(() => labRequests.current(request)),
+        stateSaveResult: () => saveCurrentModeResultState(),
+        stateSetMode: mode => setMode(mode),
+        stateSelectionGuard: () => {
+            const context = labRequests.context(), main = labRequests.latestMain();
+            return () => context === labRequests.context() && main === labRequests.latestMain();
+        },
+        stateSaveMode: () => saveLastLabMode(currentMode()),
+        stateHideTarget: () => hideTargetEntry(),
+        stateRestoreCurrentEditor: () => restoreModeEditor(currentMode()),
+        stateSyncUI: () => syncModeUI(),
+        stateRestoreResult: () => restoreModeResultState(currentMode()),
+        stateNeedsBounds: () => labStateSync(16, {}),
+        stateResetBounds: () => resetIntegratorBoundsToDefault(),
+        stateFinishIntegrator: () => {
+            if (integratorIntervalCap)
+                integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
+            expr.focus();
+        },
+        stateFinishDatetime: () => {
+            restoreDatetimeDefaultsIfBlank();
+            datetimeDate?.focus();
+        },
+        stateFinishAlmanac: () => {
+            restoreAlmanacDefaultsIfBlank();
+            almanacDate?.focus();
+        },
+        stateFocusEditor: () => expr.focus(),
+        stateStatus: text => setStatus(text),
+        statePrecisionStep: direction => setRequestedPrecisionBits(
+            labWire.exports().lab_workspace_precision_step(requestedPrecisionBits(), direction)),
+        stateSavePrecision: () => savePrecisionState(),
+        statePrecisionPlan: () => {
+            const source = currentGoalSeekSource(), target = labEditorState.goalTarget || '';
+            return {
+                source,
+                target,
+                action: labWire.exports().lab_events_precision(workspaceModeId(currentMode()), !!source, !!target)
+            };
+        },
+        statePrecisionGoal: plan => runGoalSeek(
+            plan.source, plan.target,
+            solvedStartValuesForGoalSeek(plan.source, labEditorState.fullText || currentExpressionText()),
+            {skipHistoryUpdate: true}),
+        statePrecisionExpression: () => evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true}),
+        stateEvaluate: () => evaluateCurrentMode(),
+        ...labStateSyncServices()
+    };
+}
+
+// Synchronous counterpart of the promise interpreter: plans contain no awaited operations.
+function labStateSync(kind, frame) {
+    return labDOM.sync('lab_state_sync', kind, frame, labFlowCapabilities());
+}
+
+function labStateSyncServices() {
+    return {
+        stateRetainText: (index, text) => {
+            if (!labWire.exports().lab_workspace_editor_capture(index, workspaceStageText(text), 0))
+                throw new Error('Could not retain worksheet text');
+        },
+        stateMatrixOperation: () => validMatrixOperation(matrixOperation && matrixOperation.value),
+        stateMatrixOperand: () => String(matrixOperand && matrixOperand.value || '').trim(),
+        stateCurrentBounds: () => currentIntegratorBoundsText(),
+        stateIntervalCap: () => requestedIntegratorIntervalCap(),
+        stateRecords: (index, values) => labDOM.call('lab_persist_records', index, values, modePrecisionBits),
+        stateLocalRecords: records => {
+            for (const [key, value] of Object.entries(records)) localStorage.setItem(key, String(value));
+        },
+        stateCancelSaveTimer: index => {
+            clearTimeout(worksheetSaveTimers.get(index));
+            worksheetSaveTimers.delete(index);
+        },
+        stateForgetSaveTimer: index => worksheetSaveTimers.delete(index),
+        stateScheduleSave: save =>
+            worksheetSaveTimers.set(save.index, setTimeout(() => labStateSync(1, {save}), save.delay)),
+        statePublishSave: save => labStateSync(1, {save}),
+        stateDatetime: () => currentDatetimeState(),
+        stateAlmanac: () => currentAlmanacState(),
+        stateDefaultEditor: (mode, index) => modeEditorText[mode] = workspaceDefaultText(index),
+        stateWriteCalendar: (key, state) => saveLabLocalState(key, state),
+        stateCalendarPatch: (mode, state) =>
+            labDOM.call('lab_persist_calendar', workspaceModeId(mode), state, modePrecisionBits),
+        stateWriteMode: mode => localStorage.setItem(LAB_MODE_STORAGE_KEY, mode),
+        stateRestoredText: index => {
+            const length = labWire.exports().lab_workspace_editor_restore(
+                index, workspaceStageText(workspaceDefaultText(index), 1));
+            return workspaceDecoder.decode(workspaceReadBytes(length));
+        },
+        stateBindingParts: text => bindingParts(text),
+        stateClearFunction: () => clearFunctionRun(),
+        stateResultProjection: mode => labDOM.call('lab_workspace_dom_result_restore', modeResultState[mode]),
+        stateClearResult: () => clearResultPane(),
+        stateResultValues: state => {
+            ({lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable, resultInputBindings} = state);
+        },
+        stateDerivativeButtons: () => renderDerivativeButtons(currentVariables),
+        stateRenderedFit: () => scheduleRenderedTeXFit(),
+        stateSolverFit: () => scheduleSolverTexFit(),
+        stateNotifyMode: () => labRequests.modeChanged(currentMode()),
+        stateResetEditorSize: () => resetEditorManualSize(),
+        stateSyncTabs: () => syncModeTabs(),
+        stateForceMode: mode => setMode(validLabMode(mode), {force: true}),
+        stateRenderActiveRows: () => renderIntegratorRows(activeIntegratorRows()),
+        stateDatetimeDefaults: () => restoreDatetimeDefaultsIfBlank(),
+        stateAlmanacDefaults: () => restoreAlmanacDefaultsIfBlank(),
+        stateRefreshLocation: () => {
+            refreshDatetimeJurisdictionLocation().then(() => labStateSync(13, {}));
+        },
+        stateSaveDatetime: () => saveLastDatetimeState(),
+        stateSaveAlmanac: () => saveLastAlmanacState(),
+        stateBoundCount: () => currentIntegratorBoundRows().length,
+        stateNormaliseCap: () => {
+            if (integratorIntervalCap)
+                integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
+        },
+        stateReady: () => expressionReadyToEvaluate(),
+        stateClearForward: () => clearForwardHistory(),
+        stateEvaluateExpression: () => evaluateExpression(),
+        stateEvaluateEquation: () => evaluateEquation(),
+        stateEvaluateDiffequation: () => evaluateDiffequation(),
+        stateEvaluateMatrix: () => evaluateMatrix(),
+        stateEvaluateIntegrator: () => evaluateIntegrator(),
+        stateEvaluateDatetime: () => evaluateDatetime(),
+        stateDatetimeSummary: state => datetimeSummaryText(state),
+        stateAlmanacSummary: state => almanacSummaryText(state),
+        stateEditorText: () => currentExpressionText() || expr.value || '',
+        stateHistoryCap: () => String(validIntegratorIntervalCap(integratorIntervalCap?.value)),
+        stateHistoryRecord: (...args) => labDOM.call('lab_persist_history', ...args, labConfig),
+        stateCurrentHistory: (...args) => historyStateForMode(currentMode(), ...args),
+        statePushSnapshot: snapshot => {
+            const mode = workspaceModeId(snapshot.mode), length = workspaceStageSnapshot(snapshot);
+            if (labWire.exports().lab_workspace_history_push(mode, 0, length, !!snapshot.text, 3) < 0)
+                throw new Error('Could not retain worksheet history');
+        },
+        stateValidOperation: value => validMatrixOperation(value),
+        stateValidCap: value => String(validIntegratorIntervalCap(value)),
+        stateSyncMatrix: () => syncMatrixControls(),
+        stateSaveWorksheet: (...args) => saveWorksheetState(...args),
+        stateSaveNamedEditor: index => saveWorksheetState(WORKSPACE_MODE_NAMES[index]),
+        stateExpressionSavedText: () => modeEditorText.expression,
+        stateNamedIndex: mode => workspaceModeId(mode),
+        stateFlushSave: mode => saveWorksheetState(mode, undefined, {keepalive: true}),
+        stateMergeRows: data => labDOM.call('lab_binding_rows_merge', currentIntegratorRows(), data),
+        stateRenderRows: rows => renderIntegratorRows(rows)
+    };
 }

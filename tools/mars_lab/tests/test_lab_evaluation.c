@@ -3,7 +3,7 @@
  * @brief Native worker and browser response-contract integration regressions.
  *
  * Calls the public-to-tools evaluation and calendar adapters with real prebuilt
- * scratch workers. Mathematical modes must return native result fields and typed
+ * Lab workers. Mathematical modes must return native result fields and typed
  * binding arrays. Optional TeX rendering may fail without losing the result.
  * Validation cases avoid external weather requests and database dependencies.
  * Deadline policy and failure-response cases call pure private helpers, without

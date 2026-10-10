@@ -1,0 +1,29 @@
+syntax = "proto3";
+package mars.lab.v1;
+
+// HTTP application/x-protobuf. Version must be 1; root must be an object.
+// Limits: 4 MiB per envelope, 65536 values, and 32 nested containers.
+// Exact mathematical values remain text, never binary floating-point numbers.
+message Envelope {
+  uint32 version = 1;
+  Value root = 2;
+}
+
+message Value {
+  enum Kind { NULL_VALUE = 0; BOOL = 1; NUMBER = 2; TEXT = 3; ARRAY = 4; OBJECT = 5; }
+  optional Kind kind = 1;
+  optional bool boolean = 2;
+  optional double number = 3;
+  optional string text = 4;
+  repeated Value items = 5;
+  repeated Entry entries = 6;
+}
+
+message Entry {
+  string key = 1;
+  Value value = 2;
+}
+
+// Known singular fields must not repeat. Kind must match its payload; numbers
+// must be finite, strings valid UTF-8, and object keys unique. Unknown fields
+// of supported protobuf wire types are skipped. Removed numbers stay reserved.

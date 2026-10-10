@@ -148,6 +148,10 @@
     "C_Cpp.default.defines": [
         "HAVE_UNISTRING",
         "_GNU_SOURCE",
+        "MARS_LAB_ROOT_DIR=\"${workspaceFolder}\"",
+        "MARS_LAB_ASSET_PATH=\"${workspaceFolder}/tools/mars_lab/assets/index.html\"",
+        "MARS_LAB_WORKER_DIR=\"${workspaceFolder}/tools/mars_lab/build/release/workers\"",
+        "MARS_LAB_WASM_PATH=\"${workspaceFolder}/tools/mars_lab/build/release/wasm/lab_browser.wasm\"",
         "MARS_CONFIG_ROOT_DIR=\"${workspaceFolder}\"",
         "MARS_CONFIG_PROGRAM=\"${workspaceFolder}/tools/mars_config/build/release/mars_config\"",
         "MARS_CHECKS_ROOT_DIR=\"${workspaceFolder}\"",
@@ -164,6 +168,7 @@
         "${workspaceFolder}/tests/include",
         "${workspaceFolder}/tests/*",
         "${workspaceFolder}/tools/mars_lab/include",
+        "${workspaceFolder}/tools/mars_lab/wasm/include",
         "${workspaceFolder}/tools/mars_lab/src",
         "${workspaceFolder}/tools/to_be_announced_lab/include",
         "${workspaceFolder}/tools/to_be_announced_lab/src",

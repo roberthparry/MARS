@@ -1,0 +1,2358 @@
+/**
+ * @file mars_lab.c
+ * @brief Expression evaluation backend for MARS Lab.
+ *
+ * Built as a separate MARS Lab worker so calculations remain isolated from the server.
+ * Parses expressions and bindings and emits simplified representations and numerical values through native APIs.
+ * It also handles requested goal seeking while keeping the browser a thin client.
+ */
+
+#include <ctype.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "equation.h"
+#include "expression.h"
+#include "ustring.h"
+
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+
+static char *xstrdup_local(const char *text)
+{
+    size_t len;
+    char *copy;
+
+    if (!text)
+        text = "";
+    len = strlen(text);
+    copy = (char *)malloc(len + 1u);
+    if (copy)
+        memcpy(copy, text, len + 1u);
+    return copy;
+}
+
+static bool replace_literal_once_owned(char **text, const char *needle, const char *replacement)
+{
+    char *match;
+    char *replaced;
+    size_t prefix_length;
+    size_t needle_length;
+    size_t replacement_length;
+    size_t suffix_length;
+
+    if (!text || !*text || !needle || !replacement)
+        return false;
+    match = strstr(*text, needle);
+    if (!match)
+        return true;
+    prefix_length = (size_t)(match - *text);
+    needle_length = strlen(needle);
+    replacement_length = strlen(replacement);
+    suffix_length = strlen(match + needle_length);
+    replaced = malloc(prefix_length + replacement_length + suffix_length + 1u);
+    if (!replaced)
+        return false;
+    memcpy(replaced, *text, prefix_length);
+    memcpy(replaced + prefix_length, replacement, replacement_length);
+    memcpy(replaced + prefix_length + replacement_length, match + needle_length, suffix_length + 1u);
+    free(*text);
+    *text = replaced;
+    return true;
+}
+
+static void normalise_double_minus_owned(char **text)
+{
+    if (!text || !*text)
+        return;
+    while (strstr(*text, " -  -") && replace_literal_once_owned(text, " -  -", " + ")) {
+    }
+    while (strstr(*text, " - -") && replace_literal_once_owned(text, " - -", " + ")) {
+    }
+}
+
+static char *expr_text_dup(const expr_t *expr, style_t style)
+{
+    return expr_to_string(expr, style);
+}
+
+static char *expr_TeX_body_dup(const expr_t *expr)
+{
+    char *body = expr_finite_progression_identity_TeX(expr);
+
+    if (!body &&
+        (expr_is_finite_weighted_sinh_lerch_form(expr) || expr_is_finite_weighted_cosh_lerch_form(expr)))
+        body = expr_to_TeX_body(expr);
+    if (!body)
+        body = expr_to_TeX_body_wrapped(expr, 280u);
+
+    return body ? body : expr_text_dup(expr, style_LATEX);
+}
+
+/* Annotate a complete result without inserting an equality into a nested expression. */
+static char *expr_result_TeX_dup(const expr_t *expr)
+{
+    expr_t *order = NULL;
+    expr_t *closed = expr_infinite_power_sum_closed_form(expr, &order);
+    expr_t *simplified = closed ? expr_display_simplified(closed) : NULL;
+    const char *order_name = order ? expr_symbol_name(order) : NULL;
+    expr_t *display_order = order_name ? expr_new_named_var(NUM_NAN, order_name)
+                                      : order ? expr_display_simplified(order) : NULL;
+    char *series_TeX = closed ? expr_to_TeX_body(expr) : NULL;
+    char *closed_TeX = simplified ? expr_to_TeX_body(simplified) : NULL;
+    char *order_TeX = display_order ? expr_to_TeX_body(display_order) : NULL;
+    char *result = NULL;
+
+    if (series_TeX && closed_TeX && order_TeX) {
+        size_t length = strlen(series_TeX) + strlen(closed_TeX) + strlen(order_TeX) + 80u;
+
+        result = malloc(length);
+        if (result)
+            snprintf(result, length, "%s = %s,\\qquad \\operatorname{Re}\\{%s\\}>1",
+                     series_TeX, closed_TeX, order_TeX);
+    }
+    free(series_TeX);
+    free(closed_TeX);
+    free(order_TeX);
+    expr_free(simplified);
+    expr_free(display_order);
+    expr_free(closed);
+    expr_free(order);
+    return result ? result : expr_TeX_body_dup(expr);
+}
+
+static char *expr_Ei_derivative_cartesian_TeX_dup(const expr_t *source, const char *wrt_name,
+                                                   const expr_t *derivative)
+{
+    const expr_t *argument = NULL;
+    const expr_t *unused = NULL;
+    expr_t *real = NULL;
+    expr_t *imaginary = NULL;
+    char *argument_TeX = NULL;
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *out = NULL;
+    bool has_imaginary = false;
+    size_t length;
+
+    if (!source || !wrt_name || !derivative || !expr_is_unary_pattern_kind(source, EXPR_PATTERN_UNARY_EI) ||
+        !expr_child_exprs(source, &argument, &unused) || !argument ||
+        !expr_cartesian_parts_for_display(derivative, &real, &imaginary, &has_imaginary) || !has_imaginary)
+        goto cleanup;
+
+    argument_TeX = expr_to_TeX_body(argument);
+    real_TeX = expr_to_TeX_body(real);
+    imaginary_TeX = expr_to_TeX_body(imaginary);
+    if (!argument_TeX || !real_TeX || !imaginary_TeX)
+        goto cleanup;
+
+    length = strlen(argument_TeX) + strlen(wrt_name) + strlen(real_TeX) + strlen(imaginary_TeX) + 192u;
+    out = malloc(length);
+    if (out)
+        snprintf(out, length,
+                 "\\begin{aligned}\n"
+                 "\\frac{\\partial}{\\partial %s}\\operatorname{Ei}\\left(%s\\right)&=p+q\\mkern-2mu i,\\\\\n"
+                 "p&=%s,\\\\\n"
+                 "q&=%s\\end{aligned}",
+                 wrt_name, argument_TeX, real_TeX, imaginary_TeX);
+
+cleanup:
+    free(imaginary_TeX);
+    free(real_TeX);
+    free(argument_TeX);
+    expr_free(imaginary);
+    expr_free(real);
+    return out;
+}
+
+static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
+                                        const expr_t **imaginary_out, int *imaginary_sign_out);
+
+static expr_t *expr_expand_all_complex_unary_for_display(const expr_t *expr)
+{
+    expr_t *current = expr_clone(expr);
+
+    for (size_t pass = 0u; current && pass < 8u; ++pass) {
+        expr_t *next = expr_complex_unary_cartesian_for_display(current);
+
+        if (!next)
+            break;
+        expr_free(current);
+        current = next;
+    }
+    return current;
+}
+
+static bool expr_contains_summation_for_display(const expr_t *expr);
+
+/* Display probes must never run numerical quadrature or summation. */
+static number_t expr_display_probe_value(const expr_t *expr)
+{
+    if (expr_contains_integral_operation(expr) || expr_contains_summation_for_display(expr))
+        return num_clone(NUM_NAN);
+    return expr_eval(expr);
+}
+
+static bool expr_contains_imaginary_unit_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = (number_t){0};
+    bool matched = false;
+
+    if (!expr)
+        return false;
+    value = expr_display_probe_value(expr);
+    matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
+    num_destroy(&value);
+    if (matched)
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_imaginary_unit_for_display(left) || expr_contains_imaginary_unit_for_display(right);
+}
+
+static bool expr_contains_cartesian_component_symbol(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const char *name = expr_symbol_name(expr);
+
+    if (name && (strcmp(name, "x") == 0 || strcmp(name, "y") == 0))
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_cartesian_component_symbol(left) || expr_contains_cartesian_component_symbol(right);
+}
+
+static bool expr_contains_summation_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+
+    if (!expr)
+        return false;
+    if (expr_is_summation(expr))
+        return true;
+    if (!expr_child_exprs(expr, &left, &right))
+        return false;
+    return expr_contains_summation_for_display(left) || expr_contains_summation_for_display(right);
+}
+
+static expr_t *expr_domain_specialised_inverse_power_derivative(const expr_t *expr, expr_bindings_t *bindings,
+                                                                 const expr_t *wrt)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    expr_t *endpoint = NULL;
+    expr_t *expected_digamma = NULL;
+    expr_t *riemann_derivative = NULL;
+    expr_t *hurwitz_derivative = NULL;
+    expr_t *derivative = NULL;
+    expr_t *n;
+    bool subtract = false;
+
+    if (!expr || !bindings || !wrt || !expr_match_add_sub_expr(expr, &left, &right, &subtract) || subtract)
+        return NULL;
+    n = expr_bindings_get(bindings, "n");
+    endpoint = n ? expr_add_long(n, 1L) : NULL;
+    expected_digamma = endpoint ? expr_digamma(endpoint) : NULL;
+    if (!expected_digamma || (!expr_struct_eq(left, expected_digamma) && !expr_struct_eq(right, expected_digamma)))
+        goto cleanup;
+
+    riemann_derivative = expr_zetap(wrt);
+    hurwitz_derivative = expr_zatahp(wrt, endpoint);
+    derivative = riemann_derivative && hurwitz_derivative ? expr_sub(riemann_derivative, hurwitz_derivative) : NULL;
+
+cleanup:
+    expr_free(hurwitz_derivative);
+    expr_free(riemann_derivative);
+    expr_free(expected_digamma);
+    expr_free(endpoint);
+    return derivative;
+}
+
+static expr_t *expr_derivative_from_unbound_source(const char *source, expr_bindings_t *bindings, const char *wrt_name)
+{
+    const char *bindings_separator = source ? strchr(source, '|') : NULL;
+    char *unbound_source = NULL;
+    string_t *variable_source = NULL;
+    expr_bindings_t *unbound_bindings = NULL;
+    expr_t *unbound_expr = NULL;
+    expr_t *unbound_wrt = NULL;
+    expr_t *derivative = NULL;
+
+    if (!source || !bindings || !wrt_name)
+        return NULL;
+    variable_source = string_new();
+    unbound_source = bindings_separator ? strndup(source, (size_t)(bindings_separator - source)) : strdup(source);
+    if (unbound_source && variable_source) {
+        (void)string_append_cstr(variable_source, unbound_source);
+        (void)string_append_cstr(variable_source, " | ");
+        (void)string_append_cstr(variable_source, wrt_name);
+        (void)string_append_cstr(variable_source, "=NAN");
+        for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+            const char *name = expr_bindings_name_at(bindings, i);
+            expr_t *binding = expr_bindings_expr_at(bindings, i);
+            number_t binding_value = binding ? expr_get_val(binding) : (number_t){0};
+            string_t *value = binding ? num_to_string(binding_value) : NULL;
+
+            if (name && strcmp(name, wrt_name) != 0 && value) {
+                (void)string_append_cstr(variable_source, "; ");
+                (void)string_append_cstr(variable_source, name);
+                (void)string_append_cstr(variable_source, "=");
+                (void)string_append_cstr(variable_source, string_c_str(value));
+            }
+            string_free(value);
+            if (binding)
+                num_destroy(&binding_value);
+        }
+    }
+    unbound_expr = unbound_source && variable_source
+                       ? expr_from_string(string_c_str(variable_source), &unbound_bindings)
+                       : NULL;
+    unbound_wrt = unbound_bindings ? expr_bindings_get(unbound_bindings, wrt_name) : NULL;
+    derivative = unbound_expr && unbound_wrt ? expr_create_deriv(unbound_expr, unbound_wrt) : NULL;
+
+    expr_free(unbound_expr);
+    expr_bindings_free(unbound_bindings);
+    string_free(variable_source);
+    free(unbound_source);
+    return derivative;
+}
+
+static bool expr_is_complex_cartesian_elementary_request(const expr_t *expr)
+{
+    static const expr_pattern_unary_affine_kind_t kinds[] = {
+        EXPR_PATTERN_UNARY_EXP,     EXPR_PATTERN_UNARY_LOG,     EXPR_PATTERN_UNARY_LOG10,
+        EXPR_PATTERN_UNARY_SIN,     EXPR_PATTERN_UNARY_COS,     EXPR_PATTERN_UNARY_TAN,
+        EXPR_PATTERN_UNARY_SEC,     EXPR_PATTERN_UNARY_COSEC,   EXPR_PATTERN_UNARY_COT,
+        EXPR_PATTERN_UNARY_SINH,    EXPR_PATTERN_UNARY_COSH,    EXPR_PATTERN_UNARY_TANH,
+        EXPR_PATTERN_UNARY_SECH,    EXPR_PATTERN_UNARY_COSECH,  EXPR_PATTERN_UNARY_COTH,
+        EXPR_PATTERN_UNARY_ASIN,    EXPR_PATTERN_UNARY_ACOS,    EXPR_PATTERN_UNARY_ATAN,
+        EXPR_PATTERN_UNARY_ASEC,    EXPR_PATTERN_UNARY_ACOSEC,  EXPR_PATTERN_UNARY_ACOT,
+        EXPR_PATTERN_UNARY_ASINH,   EXPR_PATTERN_UNARY_ACOSH,   EXPR_PATTERN_UNARY_ATANH,
+        EXPR_PATTERN_UNARY_ASECH,   EXPR_PATTERN_UNARY_ACOSECH, EXPR_PATTERN_UNARY_ACOTH,
+        EXPR_PATTERN_UNARY_EI,
+    };
+
+    if (!expr_contains_cartesian_component_symbol(expr) || !expr_contains_imaginary_unit_for_display(expr))
+        return false;
+    for (size_t index = 0u; index < sizeof(kinds) / sizeof(kinds[0]); ++index) {
+        if (expr_is_unary_pattern_kind(expr, kinds[index]))
+            return true;
+    }
+    return false;
+}
+
+static bool expr_is_cartesian_sum_with_unit_imaginary_for_display(const expr_t *expr)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    number_t value = (number_t){0};
+    bool subtract = false;
+    bool matched;
+
+    if (!expr_match_add_sub_expr(expr, &left, &right, &subtract))
+        return false;
+    (void)left;
+    (void)subtract;
+    value = expr_display_probe_value(right);
+    matched = num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I);
+    num_destroy(&value);
+    return matched;
+}
+
+static expr_t *display_polynomial_simplified(const expr_t *expr, const expr_t *wrt, bool complex_cartesian)
+{
+    expr_t *zero = NULL;
+    expr_t *display = NULL;
+    equation_t *polynomial = NULL;
+    equation_t *expanded = NULL;
+    expr_t *result;
+    expr_t *preserved_expanded = NULL;
+    expr_t *pre_beautified_cartesian = NULL;
+    expr_t *beautified;
+
+    if (!expr)
+        return NULL;
+    if (expr_contains_integral_operation(expr))
+        return NULL;
+
+    if (wrt && complex_cartesian) {
+        display = expr_clone(expr);
+    } else if (wrt) {
+        zero = expr_new_const(NUM_ZERO);
+        polynomial = zero ? equ_new(expr, zero) : NULL;
+        expanded = polynomial ? equ_display_expanded(polynomial, wrt) : NULL;
+        if (expanded) {
+            expr_t *rebound;
+
+            display = expr_clone(equ_lhs(expanded));
+            rebound = display ? expr_substitute(display, wrt, wrt) : NULL;
+            if (rebound) {
+                expr_free(display);
+                display = rebound;
+            }
+        }
+    }
+
+    equ_free(expanded);
+    equ_free(polynomial);
+    expr_free(zero);
+    result = display ? display : expr_simplify(expr);
+    preserved_expanded = wrt && complex_cartesian && result ? expr_expand_preserved_for_display(result) : NULL;
+    pre_beautified_cartesian = preserved_expanded ? expr_expand_all_complex_unary_for_display(preserved_expanded) : NULL;
+    beautified = result ? expr_beautify_presimplified(pre_beautified_cartesian
+                                                          ? pre_beautified_cartesian
+                                                          : (preserved_expanded ? preserved_expanded : result))
+                        : NULL;
+    if (beautified) {
+        expr_t *reciprocal_cartesian =
+            wrt ? expr_beautify_symbolic_complex_square_root_reciprocal_for_display(beautified) : NULL;
+        const expr_t *reciprocal_source = reciprocal_cartesian ? reciprocal_cartesian : beautified;
+        expr_t *rotated_cartesian =
+            wrt ? expr_beautify_imaginary_cartesian_product_for_display(reciprocal_source) : NULL;
+        const expr_t *beautified_source = rotated_cartesian ? rotated_cartesian : reciprocal_source;
+        expr_t *cartesian_unary = complex_cartesian
+                                      ? expr_expand_all_complex_unary_for_display(beautified_source)
+                                      : expr_complex_unary_cartesian_for_display(beautified_source);
+        const expr_t *cartesian_source = cartesian_unary ? cartesian_unary : beautified_source;
+        const expr_t *cartesian_scale = NULL;
+        const expr_t *cartesian_real = NULL;
+        const expr_t *cartesian_imaginary = NULL;
+        int cartesian_imaginary_sign = 1;
+        bool scaled_cartesian =
+            expr_scaled_cartesian_parts(cartesian_source, &cartesian_scale, &cartesian_real, &cartesian_imaginary,
+                                        &cartesian_imaginary_sign);
+        bool already_cartesian =
+            (scaled_cartesian && !expr_contains_imaginary_unit_for_display(cartesian_scale)) ||
+            expr_is_cartesian_sum_with_unit_imaginary_for_display(cartesian_source);
+        bool force_cartesian = wrt && complex_cartesian;
+        expr_t *cartesian_separated =
+            force_cartesian ? expr_separate_cartesian_for_display(cartesian_source) : NULL;
+        expr_t *cartesian_expanded = NULL;
+
+        if (!cartesian_separated && force_cartesian) {
+            cartesian_expanded = expr_display_expanded(cartesian_source);
+            if (cartesian_expanded)
+                cartesian_separated = expr_separate_cartesian_for_display(cartesian_expanded);
+        }
+
+        expr_free(result);
+        if (cartesian_separated) {
+            result = cartesian_separated;
+            expr_free(cartesian_expanded);
+        } else if (already_cartesian) {
+            result = expr_clone(cartesian_source);
+            expr_free(cartesian_expanded);
+        } else if (cartesian_expanded) {
+            result = cartesian_expanded;
+        } else {
+            result = expr_clone(cartesian_source);
+        }
+        if (wrt && complex_cartesian && result) {
+            expr_t *final_rotated = expr_beautify_imaginary_cartesian_product_for_display(result);
+
+            if (final_rotated) {
+                expr_free(result);
+                result = final_rotated;
+            }
+        }
+        if (result) {
+            expr_t *imaginary_unit_last = expr_move_imaginary_unit_last_for_display(result);
+
+            if (imaginary_unit_last) {
+                expr_free(result);
+                result = imaginary_unit_last;
+            }
+        }
+        if (wrt && complex_cartesian && result) {
+            expr_t *final_separated = expr_separate_cartesian_for_display(result);
+
+            if (final_separated) {
+                expr_t *imaginary_unit_last = expr_move_imaginary_unit_last_for_display(final_separated);
+
+                expr_free(result);
+                result = imaginary_unit_last ? imaginary_unit_last : final_separated;
+                if (imaginary_unit_last)
+                    expr_free(final_separated);
+            }
+        }
+        expr_free(cartesian_unary);
+        expr_free(rotated_cartesian);
+        expr_free(reciprocal_cartesian);
+        expr_free(beautified);
+    }
+    expr_free(pre_beautified_cartesian);
+    expr_free(preserved_expanded);
+    return result;
+}
+
+static char *trim_ascii_in_place(char *text)
+{
+    size_t start = 0u;
+    size_t end;
+
+    if (!text)
+        return NULL;
+
+    end = strlen(text);
+    while (start < end && isspace((unsigned char)text[start]))
+        start++;
+    while (end > start && isspace((unsigned char)text[end - 1u]))
+        end--;
+    if (start > 0u)
+        memmove(text, &text[start], end - start);
+    text[end - start] = '\0';
+    return text;
+}
+
+static void trim_fraction_tail(char *text)
+{
+    size_t dot;
+    size_t end;
+
+    if (!text)
+        return;
+    dot = strcspn(text, ".");
+    if (text[dot] != '.')
+        return;
+
+    end = strlen(text);
+    while (end > dot + 1u && text[end - 1u] == '0') {
+        end--;
+        text[end] = '\0';
+    }
+    if (end == dot + 1u)
+        text[dot] = '\0';
+}
+
+static int parse_long_suffix(const char *text, size_t start, long *out)
+{
+    size_t i = start;
+    unsigned long value = 0u;
+    unsigned long limit;
+    int negative = 0;
+    int saw_digit = 0;
+
+    if (!text || !out)
+        return 0;
+
+    if (text[i] == '-' || text[i] == '+') {
+        negative = text[i] == '-';
+        i++;
+    }
+
+    limit = negative ? (unsigned long)LONG_MAX + 1u : (unsigned long)LONG_MAX;
+    for (; text[i] != '\0'; ++i) {
+        unsigned int digit;
+
+        if (!isdigit((unsigned char)text[i]))
+            return 0;
+        digit = (unsigned int)(text[i] - '0');
+        if (value > (limit - digit) / 10u)
+            return 0;
+        value = value * 10u + digit;
+        saw_digit = 1;
+    }
+
+    if (!saw_digit)
+        return 0;
+
+    *out = negative && value == (unsigned long)LONG_MAX + 1u ? LONG_MIN : (negative ? -(long)value : (long)value);
+    return 1;
+}
+
+static char *format_scientific_as_general(char *scientific, int precision)
+{
+    size_t exponent_pos;
+    size_t mantissa_pos = 0u;
+    char *digits;
+    char *out;
+    char sign = '\0';
+    long exponent;
+    size_t digit_count = 0u;
+    size_t out_cap;
+    size_t pos = 0u;
+    long decimal_pos;
+
+    exponent_pos = strcspn(scientific, "Ee");
+    if (scientific[exponent_pos] == '\0') {
+        trim_fraction_tail(scientific);
+        return scientific;
+    }
+
+    if (!parse_long_suffix(scientific, exponent_pos + 1u, &exponent))
+        return scientific;
+    scientific[exponent_pos] = '\0';
+    if (scientific[mantissa_pos] == '-' || scientific[mantissa_pos] == '+') {
+        sign = scientific[mantissa_pos];
+        mantissa_pos++;
+    }
+
+    digits = malloc(strlen(&scientific[mantissa_pos]) + 1u);
+    if (!digits)
+        return scientific;
+
+    for (size_t i = mantissa_pos; scientific[i] != '\0'; ++i) {
+        if (isdigit((unsigned char)scientific[i]))
+            digits[digit_count++] = scientific[i];
+    }
+    digits[digit_count] = '\0';
+
+    while (digit_count > 1u && digits[digit_count - 1u] == '0')
+        digits[--digit_count] = '\0';
+
+    if (exponent < -4 || exponent >= precision) {
+        if (digit_count > 1u) {
+            memmove(digits + 2u, digits + 1u, digit_count);
+            digits[1] = '.';
+        }
+        out_cap = digit_count + 32u;
+        out = malloc(out_cap);
+        if (!out) {
+            free(digits);
+            return scientific;
+        }
+        snprintf(out, out_cap, "%s%sE%+ld", sign == '-' ? "-" : "", digits, exponent);
+        free(digits);
+        free(scientific);
+        {
+            size_t dot_pos = strcspn(out, ".");
+
+            if (out[dot_pos] == '.') {
+                size_t tail_pos = strcspn(out, "E");
+
+                while (tail_pos > dot_pos + 1u && out[tail_pos - 1u] == '0') {
+                    memmove(&out[tail_pos - 1u], &out[tail_pos], strlen(&out[tail_pos]) + 1u);
+                    tail_pos--;
+                }
+                if (tail_pos == dot_pos + 1u)
+                    memmove(&out[dot_pos], &out[dot_pos + 1u], strlen(&out[dot_pos + 1u]) + 1u);
+            }
+        }
+        return out;
+    }
+
+    decimal_pos = 1 + exponent;
+    out_cap = digit_count + (size_t)labs(decimal_pos) + 8u;
+    out = malloc(out_cap);
+    if (!out) {
+        free(digits);
+        return scientific;
+    }
+
+    if (sign == '-')
+        out[pos++] = '-';
+
+    if (decimal_pos <= 0) {
+        out[pos++] = '0';
+        out[pos++] = '.';
+        for (long i = 0; i < -decimal_pos; ++i)
+            out[pos++] = '0';
+        memcpy(&out[pos], digits, digit_count);
+        pos += digit_count;
+    } else if ((size_t)decimal_pos >= digit_count) {
+        memcpy(&out[pos], digits, digit_count);
+        pos += digit_count;
+        for (size_t i = digit_count; i < (size_t)decimal_pos; ++i)
+            out[pos++] = '0';
+    } else {
+        memcpy(&out[pos], digits, (size_t)decimal_pos);
+        pos += (size_t)decimal_pos;
+        out[pos++] = '.';
+        memcpy(&out[pos], &digits[decimal_pos], digit_count - (size_t)decimal_pos);
+        pos += digit_count - (size_t)decimal_pos;
+    }
+    out[pos] = '\0';
+
+    trim_fraction_tail(out);
+    free(digits);
+    free(scientific);
+    return out;
+}
+
+static char *format_real_number(number_t value, int precision)
+{
+    number_t zero = num_new();
+    number_t floating = num_add(value, zero);
+    char fmt[32];
+    char *text = NULL;
+    int scientific_precision = precision > 0 ? precision - 1 : 0;
+    int needed;
+
+    if (num_is_inf(value)) {
+        char *text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
+
+        num_destroy(&zero);
+        num_destroy(&value);
+        return text;
+    }
+
+    num_destroy(&zero);
+    num_destroy(&value);
+    value = floating;
+
+    snprintf(fmt, sizeof(fmt), "%%.%dN", scientific_precision);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed >= 0) {
+        text = malloc((size_t)needed + 1u);
+        if (text) {
+            num_sprintf(text, (size_t)needed + 1u, fmt, value);
+            text = format_scientific_as_general(text, precision);
+        }
+    }
+
+    num_destroy(&value);
+    return text;
+}
+
+static bool format_is_negligible(number_t value, int precision)
+{
+    number_t mag = num_abs(value);
+    number_t tolerance = num_pow10(-(precision > 0 ? precision : 64));
+    bool negligible = num_is_zero(value) || num_lt(mag, tolerance);
+
+    num_destroy(&tolerance);
+    num_destroy(&mag);
+    return negligible;
+}
+
+static char *format_complex_number(number_t value, int precision)
+{
+    number_t real = num_real_part(value);
+    number_t imag = num_imag_part(value);
+    char *real_text = NULL;
+    char *imag_text = NULL;
+    char *text = NULL;
+    size_t len;
+
+    if (format_is_negligible(imag, precision)) {
+        num_destroy(&imag);
+        return format_real_number(real, precision);
+    }
+
+    if (format_is_negligible(real, precision)) {
+        num_destroy(&real);
+        imag_text = format_real_number(num_clone(imag), precision);
+        if (imag_text) {
+            if (strcmp(imag_text, "1") == 0) {
+                text = xstrdup_local("i");
+            } else if (strcmp(imag_text, "-1") == 0) {
+                text = xstrdup_local("-i");
+            } else {
+                len = strlen(imag_text) + 2u;
+                text = malloc(len);
+                if (text)
+                    snprintf(text, len, "%si", imag_text);
+            }
+        }
+        free(imag_text);
+        num_destroy(&imag);
+        return text;
+    }
+
+    real_text = format_real_number(real, precision);
+    if (num_get_sign(imag) < 0) {
+        number_t abs_imag = num_abs(imag);
+        bool imag_is_unit = num_eq(abs_imag, NUM_ONE);
+
+        imag_text = format_real_number(abs_imag, precision);
+        if (real_text && imag_text) {
+            const char *imag_coeff = imag_is_unit ? "" : imag_text;
+
+            len = strlen(real_text) + strlen(imag_coeff) + 6u;
+            text = malloc(len);
+            if (text)
+                snprintf(text, len, "%s - %si", real_text, imag_coeff);
+        }
+    } else {
+        number_t abs_imag = num_clone(imag);
+        bool imag_is_unit = num_eq(imag, NUM_ONE);
+
+        imag_text = format_real_number(abs_imag, precision);
+        if (real_text && imag_text) {
+            const char *imag_coeff = imag_is_unit ? "" : imag_text;
+
+            len = strlen(real_text) + strlen(imag_coeff) + 6u;
+            text = malloc(len);
+            if (text)
+                snprintf(text, len, "%s + %si", real_text, imag_coeff);
+        }
+    }
+
+    free(imag_text);
+    free(real_text);
+    num_destroy(&imag);
+    return text;
+}
+
+static char *owned_number_text(number_t value, int precision)
+{
+    char *text = NULL;
+    int display_precision = precision > 0 ? precision : 64;
+
+    if (num_is_nan(value)) {
+        text = xstrdup_local("NAN");
+    } else if (num_is_inf(value)) {
+        text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
+    } else {
+        text = num_is_real(value) ? format_real_number(num_real_part(value), display_precision)
+                                  : format_complex_number(value, display_precision);
+    }
+
+    num_destroy(&value);
+    return text;
+}
+
+static void print_owned_number(const char *label, number_t value, int precision)
+{
+    char *text = owned_number_text(value, precision);
+
+    printf("%-12s %s\n", label, text ? text : "(num_to_string failed)");
+    free(text);
+}
+
+static bool explicit_reciprocal_power(const expr_t *expr, expr_t **base_out, long *order_out)
+{
+    if (!expr || !base_out || !order_out)
+        return false;
+    *base_out = expr_explicit_root_base(expr, order_out);
+    return *base_out != NULL;
+}
+
+static bool root_family_texts_dup(const expr_t *seed, long order, char **expression_out, char **function_out)
+{
+    expr_bindings_t *bindings = NULL;
+    char *source = NULL;
+    size_t source_size = 0u;
+    FILE *stream;
+    expr_t *rotation_expr = NULL;
+    expr_t *family_expr = NULL;
+    char *expression = NULL;
+    char *function = NULL;
+    char *name;
+
+    if (!seed || order < 2L || !expression_out || !function_out)
+        return false;
+    *expression_out = NULL;
+    *function_out = NULL;
+    stream = open_memstream(&source, &source_size);
+    if (!stream)
+        return false;
+    fputs("{ ", stream);
+    if (order == 2L)
+        fputs("(-1)^k", stream);
+    else if (order % 2L == 0L)
+        fprintf(stream, "exp(i*k*pi/%ld)", order / 2L);
+    else
+        fprintf(stream, "exp(2*i*k*pi/%ld)", order);
+    fputs(" | ; k = [", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        if (root_index > 0L)
+            fputs(", ", stream);
+        fprintf(stream, "%ld", root_index);
+    }
+    fputs("] }", stream);
+    fclose(stream);
+
+    rotation_expr = expr_from_string(source, &bindings);
+    family_expr = rotation_expr ? expr_mul(seed, rotation_expr) : NULL;
+    expression = family_expr ? expr_text_dup(family_expr, style_EXPRESSION) : NULL;
+    function = family_expr ? expr_text_dup(family_expr, style_FUNCTION) : NULL;
+    if (function) {
+        if (!replace_literal_once_owned(&function, "expression expr(", "expression roots(") ||
+            !replace_literal_once_owned(&function, "output(expr(", "output(roots(")) {
+            free(function);
+            function = NULL;
+        }
+    }
+    if (function) {
+        name = strstr(function, "\narray const k = [");
+        if (name)
+            memmove(name + 1u, name + 1u + strlen("array "), strlen(name + 1u + strlen("array ")) + 1u);
+        name = strstr(function, "π.i.k");
+        if (name)
+            memcpy(name, "i.k.π", strlen("i.k.π"));
+    }
+
+    expr_free(family_expr);
+    expr_free(rotation_expr);
+    expr_bindings_free(bindings);
+    free(source);
+    if (!expression || !function) {
+        free(expression);
+        free(function);
+        return false;
+    }
+    *expression_out = expression;
+    *function_out = function;
+    return true;
+}
+
+static char *numeric_root_family_dup(const number_t seed, long order, int precision)
+{
+    char *roots = NULL;
+    size_t roots_size = 0u;
+    FILE *stream;
+
+    if (!num_is_finite(seed) || order < 2L)
+        return NULL;
+    stream = open_memstream(&roots, &roots_size);
+    if (!stream)
+        return NULL;
+
+    fputs("[", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        number_t root;
+        char *root_text;
+
+        if (root_index == 0L) {
+            root = num_clone(seed);
+        } else if (order == 2L) {
+            root = num_neg(seed);
+        } else {
+            number_t turn = num_new();
+            number_t angle;
+            number_t sine = num_new();
+            number_t cosine = num_new();
+            number_t imaginary;
+            number_t rotation;
+
+            num_set_frac(&turn, 2L * root_index, order);
+            angle = num_mul(NUM_PI, turn);
+            num_sincos(angle, &sine, &cosine);
+            imaginary = num_mul(NUM_I, sine);
+            rotation = num_add(cosine, imaginary);
+            root = num_mul(seed, rotation);
+            num_destroy(&rotation);
+            num_destroy(&imaginary);
+            num_destroy(&cosine);
+            num_destroy(&sine);
+            num_destroy(&angle);
+            num_destroy(&turn);
+        }
+
+        root_text = owned_number_text(root, precision);
+        if (root_index > 0L)
+            fputs(", ", stream);
+        fputs(root_text ? root_text : "NAN", stream);
+        free(root_text);
+    }
+    fputs("]", stream);
+    fclose(stream);
+    return roots;
+}
+
+static expr_t *expr_principal_root_display(const expr_t *base, long order)
+{
+    expr_bindings_t *bindings = NULL;
+    char *base_text = base ? expr_text_dup(base, style_UNBOUND) : NULL;
+    char *source = NULL;
+    size_t source_size = 0u;
+    FILE *stream;
+    expr_t *parsed = NULL;
+    expr_t *display = NULL;
+
+    if (!base_text)
+        return NULL;
+    stream = open_memstream(&source, &source_size);
+    if (stream) {
+        fprintf(stream, "root(%s,%ld)", base_text, order);
+        fclose(stream);
+        parsed = expr_from_string(source, &bindings);
+        display = parsed ? expr_beautify_presimplified(parsed) : NULL;
+    }
+    expr_bindings_free(bindings);
+    expr_free(parsed);
+    free(source);
+    free(base_text);
+    return display;
+}
+
+static bool expr_imaginary_product_parts(const expr_t *expr, const expr_t **coefficient_out, int *sign_out)
+{
+    const expr_t *left;
+    const expr_t *right;
+    number_t value = (number_t){0};
+    bool matched = false;
+
+    if (!expr || !coefficient_out || !sign_out || !expr_match_mul_expr(expr, &left, &right))
+        goto cleanup;
+    value = expr_display_probe_value(left);
+    if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
+        *coefficient_out = right;
+        *sign_out = num_eq(value, NUM_I) ? 1 : -1;
+        matched = true;
+        goto cleanup;
+    }
+    num_destroy(&value);
+    value = (number_t){0};
+    value = expr_display_probe_value(right);
+    if (num_eq(value, NUM_I) || num_eq(value, NUM_NEG_I)) {
+        *coefficient_out = left;
+        *sign_out = num_eq(value, NUM_I) ? 1 : -1;
+        matched = true;
+    }
+
+cleanup:
+    num_destroy(&value);
+    return matched;
+}
+
+static bool expr_scaled_cartesian_parts(const expr_t *expr, const expr_t **scale_out, const expr_t **real_out,
+                                        const expr_t **imaginary_out, int *imaginary_sign_out)
+{
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *inner_left;
+    const expr_t *inner_right;
+    bool subtract;
+    int imaginary_sign;
+
+    if (!expr || !scale_out || !real_out || !imaginary_out || !imaginary_sign_out)
+        return false;
+    *scale_out = NULL;
+    if (expr_match_add_sub_expr(expr, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    if (!expr_match_mul_expr(expr, &left, &right))
+        return false;
+    if (expr_match_add_sub_expr(right, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *scale_out = left;
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    if (expr_match_add_sub_expr(left, &inner_left, &inner_right, &subtract) &&
+        expr_imaginary_product_parts(inner_right, imaginary_out, &imaginary_sign)) {
+        *scale_out = right;
+        *real_out = inner_left;
+        *imaginary_sign_out = subtract ? -imaginary_sign : imaginary_sign;
+        return true;
+    }
+    return false;
+}
+
+static char *expr_quarter_turn_root_TeX_dup(const expr_t *seed, long root_index)
+{
+    const expr_t *scale;
+    const expr_t *real;
+    const expr_t *imaginary;
+    const expr_t *real_source;
+    const expr_t *imaginary_source;
+    char *scale_TeX = NULL;
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *display_TeX = NULL;
+    FILE *stream = NULL;
+    size_t display_TeX_size = 0U;
+    int seed_imaginary_sign;
+    int real_sign;
+    int imaginary_sign;
+
+    if (!seed || root_index < 0L || root_index > 3L ||
+        !expr_scaled_cartesian_parts(seed, &scale, &real, &imaginary, &seed_imaginary_sign))
+        return root_index == 0L ? expr_TeX_body_dup(seed) : NULL;
+
+    switch (root_index) {
+        case 0L:
+            real_source = real;
+            imaginary_source = imaginary;
+            real_sign = 1;
+            imaginary_sign = seed_imaginary_sign;
+            break;
+
+        case 1L:
+            real_source = imaginary;
+            imaginary_source = real;
+            real_sign = -seed_imaginary_sign;
+            imaginary_sign = 1;
+            break;
+
+        case 2L:
+            real_source = real;
+            imaginary_source = imaginary;
+            real_sign = -1;
+            imaginary_sign = -seed_imaginary_sign;
+            break;
+
+        default:
+            real_source = imaginary;
+            imaginary_source = real;
+            real_sign = seed_imaginary_sign;
+            imaginary_sign = -1;
+            break;
+    }
+
+    scale_TeX = scale ? expr_TeX_body_dup(scale) : NULL;
+    real_TeX = expr_TeX_body_dup(real_source);
+    imaginary_TeX = expr_TeX_body_dup(imaginary_source);
+    if (!real_TeX || !imaginary_TeX || (scale && !scale_TeX))
+        goto cleanup;
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    if (scale_TeX) {
+        fputs(scale_TeX, stream);
+        fputs("\\mkern-2mu \\left(", stream);
+    }
+    if (real_sign < 0)
+        fputs("\\mathord{-}\\mkern-2mu ", stream);
+    fputs(real_TeX, stream);
+    fputs(imaginary_sign > 0 ? " + i\\mkern-2mu " : " - i\\mkern-2mu ", stream);
+    fputs(imaginary_TeX, stream);
+    if (scale_TeX)
+        fputs("\\right)", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(imaginary_TeX);
+    free(real_TeX);
+    free(scale_TeX);
+    return display_TeX;
+}
+
+static bool expr_contains_root_turn_trig(const expr_t *expr)
+{
+    char *text = expr ? expr_text_dup(expr, style_UNBOUND) : NULL;
+    bool contains_trig = text && (strstr(text, "sin(") || strstr(text, "cos("));
+
+    free(text);
+    return contains_trig;
+}
+
+static expr_t *expr_root_turn_trig_display(long root_index, long order, bool sine)
+{
+    expr_bindings_t *bindings = NULL;
+    char source[96];
+    expr_t *parsed;
+    expr_t *display;
+
+    if (root_index < 0L || order < 2L)
+        return NULL;
+    snprintf(source, sizeof(source), "%s(%ld*pi/%ld)", sine ? "sin" : "cos", 2L * root_index, order);
+    parsed = expr_from_string(source, &bindings);
+    display = parsed ? expr_beautify(parsed) : NULL;
+    expr_free(parsed);
+    expr_bindings_free(bindings);
+    if (expr_contains_root_turn_trig(display)) {
+        expr_free(display);
+        return NULL;
+    }
+    return display;
+}
+
+static unsigned long root_display_gcd(unsigned long a, unsigned long b)
+{
+    while (b != 0u) {
+        unsigned long remainder = a % b;
+
+        a = b;
+        b = remainder;
+    }
+    return a ? a : 1u;
+}
+
+static bool expr_complex_argument_pi_ratio(const expr_t *expr, long *numerator_out, unsigned long *denominator_out)
+{
+    number_t value = (number_t){0};
+    number_t real = (number_t){0};
+    number_t imaginary = (number_t){0};
+    number_t ratio = (number_t){0};
+    number_t three = (number_t){0};
+    number_t sqrt_three_over_three = (number_t){0};
+    number_t negative_sqrt_three = (number_t){0};
+    number_t negative_sqrt_three_over_three = (number_t){0};
+    long numerator = 0L;
+    unsigned long denominator = 1u;
+    bool matched = false;
+
+    if (!expr || !numerator_out || !denominator_out)
+        goto cleanup;
+    value = expr_display_probe_value(expr);
+    if (!num_is_finite(value) || num_is_real(value))
+        goto cleanup;
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    if (num_is_zero(real)) {
+        numerator = num_get_sign(imaginary) < 0 ? -1L : 1L;
+        denominator = 2u;
+        matched = true;
+        goto normalise;
+    }
+    ratio = num_div(imaginary, real);
+    three = num_create_from_long(3L);
+    sqrt_three_over_three = num_div(NUM_SQRT3, three);
+    negative_sqrt_three = num_neg(NUM_SQRT3);
+    negative_sqrt_three_over_three = num_neg(sqrt_three_over_three);
+    if (num_eq(ratio, NUM_NEG_ONE)) {
+        numerator = -1L;
+        denominator = 4u;
+    } else if (num_eq(ratio, negative_sqrt_three_over_three)) {
+        numerator = -1L;
+        denominator = 6u;
+    } else if (num_eq(ratio, NUM_ZERO)) {
+        numerator = 0L;
+        denominator = 1u;
+    } else if (num_eq(ratio, sqrt_three_over_three)) {
+        numerator = 1L;
+        denominator = 6u;
+    } else if (num_eq(ratio, NUM_ONE)) {
+        numerator = 1L;
+        denominator = 4u;
+    } else if (num_eq(ratio, NUM_SQRT3)) {
+        numerator = 1L;
+        denominator = 3u;
+    } else if (num_eq(ratio, negative_sqrt_three)) {
+        numerator = -1L;
+        denominator = 3u;
+    } else {
+        goto cleanup;
+    }
+    if (num_get_sign(real) < 0)
+        numerator += num_get_sign(imaginary) < 0 ? -(long)denominator : (long)denominator;
+
+normalise:
+    while (numerator < 0L)
+        numerator += 2L * (long)denominator;
+    while (numerator >= 2L * (long)denominator)
+        numerator -= 2L * (long)denominator;
+    *numerator_out = numerator;
+    *denominator_out = denominator;
+    matched = true;
+
+cleanup:
+    num_destroy(&negative_sqrt_three_over_three);
+    num_destroy(&negative_sqrt_three);
+    num_destroy(&sqrt_three_over_three);
+    num_destroy(&three);
+    num_destroy(&ratio);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return matched;
+}
+
+static void print_pi_ratio_TeX(FILE *stream, long numerator, unsigned long denominator)
+{
+    unsigned long magnitude;
+    unsigned long divisor;
+
+    if (!stream)
+        return;
+    magnitude = (unsigned long)(numerator < 0L ? -numerator : numerator);
+    divisor = root_display_gcd(magnitude, denominator);
+    numerator /= (long)divisor;
+    denominator /= divisor;
+    if (numerator == 0L) {
+        fputs("0", stream);
+    } else if (denominator == 1u) {
+        if (numerator == -1L)
+            fputs("-", stream);
+        else if (numerator != 1L)
+            fprintf(stream, "%ld", numerator);
+        fputs("\\pi", stream);
+    } else {
+        fputs("\\frac{", stream);
+        if (numerator == -1L)
+            fputs("-", stream);
+        else if (numerator != 1L)
+            fprintf(stream, "%ld", numerator);
+        fprintf(stream, "\\pi}{%lu}", denominator);
+    }
+}
+
+static char *expr_polar_cartesian_root_TeX_dup(const expr_t *base, long root_index, long order)
+{
+    number_t value = (number_t){0};
+    number_t real = (number_t){0};
+    number_t imaginary = (number_t){0};
+    number_t real_squared = (number_t){0};
+    number_t imaginary_squared = (number_t){0};
+    number_t modulus_squared = (number_t){0};
+    expr_t *modulus_squared_expr = NULL;
+    expr_t *root_order = NULL;
+    expr_t *radial = NULL;
+    expr_t *radial_display = NULL;
+    char *radial_TeX = NULL;
+    char *display_TeX = NULL;
+    FILE *stream = NULL;
+    size_t display_TeX_size = 0u;
+    long phase_numerator;
+    unsigned long phase_denominator;
+    long angle_numerator;
+    unsigned long angle_denominator;
+
+    if (!base || root_index < 0L || order < 2L || order > LONG_MAX / 2L ||
+        !expr_complex_argument_pi_ratio(base, &phase_numerator, &phase_denominator))
+        goto cleanup;
+    if (phase_denominator > ULONG_MAX / (unsigned long)order ||
+        root_index > (LONG_MAX - phase_numerator) / (2L * (long)phase_denominator))
+        goto cleanup;
+    value = expr_display_probe_value(base);
+    real = num_real_part(value);
+    imaginary = num_imag_part(value);
+    real_squared = num_mul(real, real);
+    imaginary_squared = num_mul(imaginary, imaginary);
+    modulus_squared = num_add(real_squared, imaginary_squared);
+    modulus_squared_expr = expr_new_const(modulus_squared);
+    root_order = expr_const_long(2L * order);
+    radial = (modulus_squared_expr && root_order) ? expr_root(modulus_squared_expr, root_order) : NULL;
+    radial_display = radial ? expr_beautify(radial) : NULL;
+    radial_TeX = radial_display ? expr_TeX_body_dup(radial_display) : NULL;
+    if (!radial_TeX)
+        goto cleanup;
+
+    angle_numerator = phase_numerator + 2L * root_index * (long)phase_denominator;
+    angle_denominator = phase_denominator * (unsigned long)order;
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    fprintf(stream, "%s\\mkern-2mu \\cos\\left(", radial_TeX);
+    print_pi_ratio_TeX(stream, angle_numerator, angle_denominator);
+    fprintf(stream, "\\right) + i\\mkern-2mu %s\\mkern-2mu \\sin\\left(", radial_TeX);
+    print_pi_ratio_TeX(stream, angle_numerator, angle_denominator);
+    fputs("\\right)", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(radial_TeX);
+    expr_free(radial_display);
+    expr_free(radial);
+    expr_free(root_order);
+    expr_free(modulus_squared_expr);
+    num_destroy(&modulus_squared);
+    num_destroy(&imaginary_squared);
+    num_destroy(&real_squared);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return display_TeX;
+}
+
+static expr_t *expr_reorder_positive_sum_for_display(const expr_t *expr)
+{
+    const expr_t *left;
+    const expr_t *right;
+    number_t left_value = (number_t){0};
+    number_t right_value = (number_t){0};
+    expr_t *left_magnitude = NULL;
+    expr_t *reordered = NULL;
+    bool subtract;
+
+    if (!expr_match_add_sub_expr(expr, &left, &right, &subtract) || subtract)
+        goto cleanup;
+    left_value = expr_display_probe_value(left);
+    right_value = expr_display_probe_value(right);
+    if (!num_is_real(left_value) || !num_is_real(right_value) || num_get_sign(left_value) >= 0 ||
+        num_get_sign(right_value) < 0)
+        goto cleanup;
+    left_magnitude = expr_distribute_negative_for_display(left);
+    reordered = left_magnitude ? expr_sub(right, left_magnitude) : NULL;
+
+cleanup:
+    expr_free(left_magnitude);
+    num_destroy(&right_value);
+    num_destroy(&left_value);
+    return reordered;
+}
+
+static char *expr_rotated_cartesian_root_TeX_dup(const expr_t *seed, long root_index, long order)
+{
+    const expr_t *scale;
+    const expr_t *real;
+    const expr_t *imaginary;
+    number_t seed_value = (number_t){0};
+    number_t real_value = (number_t){0};
+    number_t imaginary_value = (number_t){0};
+    number_t imaginary_magnitude = (number_t){0};
+    expr_t *owned_real = NULL;
+    expr_t *owned_imaginary = NULL;
+    expr_t *cosine = NULL;
+    expr_t *sine = NULL;
+    expr_t *signed_imaginary = NULL;
+    expr_t *real_cosine = NULL;
+    expr_t *imaginary_sine = NULL;
+    expr_t *real_sine = NULL;
+    expr_t *imaginary_cosine = NULL;
+    expr_t *real_part = NULL;
+    expr_t *imaginary_part = NULL;
+    expr_t *scaled_real = NULL;
+    expr_t *scaled_imaginary = NULL;
+    expr_t *real_display = NULL;
+    expr_t *imaginary_display = NULL;
+    expr_t *positive_imaginary = NULL;
+    expr_t *positive_imaginary_display = NULL;
+    expr_t *ordered_display = NULL;
+    number_t displayed_real_value = (number_t){0};
+    number_t displayed_imaginary_value = (number_t){0};
+    char *real_TeX = NULL;
+    char *imaginary_TeX = NULL;
+    char *display_TeX = NULL;
+    size_t display_TeX_size = 0u;
+    FILE *stream = NULL;
+    bool real_is_zero;
+    bool imaginary_is_zero;
+    bool imaginary_is_unit;
+    bool imaginary_is_negative;
+    int imaginary_sign;
+
+    if (!seed || root_index <= 0L || order < 2L)
+        goto cleanup;
+    if (!expr_scaled_cartesian_parts(seed, &scale, &real, &imaginary, &imaginary_sign)) {
+        seed_value = expr_display_probe_value(seed);
+        real_value = num_real_part(seed_value);
+        imaginary_value = num_imag_part(seed_value);
+        if (!num_is_finite(seed_value) || num_is_zero(imaginary_value))
+            goto cleanup;
+        imaginary_sign = num_get_sign(imaginary_value) < 0 ? -1 : 1;
+        imaginary_magnitude = num_abs(imaginary_value);
+        owned_real = expr_new_const(real_value);
+        owned_imaginary = expr_new_const(imaginary_magnitude);
+        scale = NULL;
+        real = owned_real;
+        imaginary = owned_imaginary;
+    }
+    cosine = expr_root_turn_trig_display(root_index, order, false);
+    sine = expr_root_turn_trig_display(root_index, order, true);
+    if (!cosine || !sine)
+        goto cleanup;
+
+    signed_imaginary = imaginary_sign > 0 ? expr_clone(imaginary) : expr_neg(imaginary);
+    real_cosine = expr_mul(real, cosine);
+    imaginary_sine = signed_imaginary ? expr_mul(signed_imaginary, sine) : NULL;
+    real_sine = expr_mul(real, sine);
+    imaginary_cosine = signed_imaginary ? expr_mul(signed_imaginary, cosine) : NULL;
+    real_part = real_cosine && imaginary_sine ? expr_sub(real_cosine, imaginary_sine) : NULL;
+    imaginary_part = real_sine && imaginary_cosine ? expr_add(real_sine, imaginary_cosine) : NULL;
+    scaled_real = real_part ? (scale ? expr_mul(scale, real_part) : expr_clone(real_part)) : NULL;
+    scaled_imaginary = imaginary_part ? (scale ? expr_mul(scale, imaginary_part) : expr_clone(imaginary_part)) : NULL;
+    real_display = scaled_real ? expr_display_expanded(scaled_real) : NULL;
+    imaginary_display = scaled_imaginary ? expr_beautify(scaled_imaginary) : NULL;
+    if (!real_display || !imaginary_display)
+        goto cleanup;
+    ordered_display = expr_reorder_positive_sum_for_display(real_display);
+    if (ordered_display) {
+        expr_free(real_display);
+        real_display = ordered_display;
+        ordered_display = NULL;
+    }
+
+    displayed_real_value = expr_display_probe_value(real_display);
+    displayed_imaginary_value = expr_display_probe_value(imaginary_display);
+    real_is_zero = num_is_zero(displayed_real_value);
+    imaginary_is_zero = num_is_zero(displayed_imaginary_value);
+    imaginary_is_negative = num_get_sign(displayed_imaginary_value) < 0;
+    if (imaginary_is_negative) {
+        positive_imaginary = expr_distribute_negative_for_display(imaginary_display);
+        positive_imaginary_display = positive_imaginary ? expr_display_expanded(positive_imaginary) : NULL;
+        if (!positive_imaginary_display)
+            goto cleanup;
+        expr_free(imaginary_display);
+        imaginary_display = positive_imaginary_display;
+        positive_imaginary_display = NULL;
+        num_destroy(&displayed_imaginary_value);
+        displayed_imaginary_value = expr_display_probe_value(imaginary_display);
+    }
+    ordered_display = expr_reorder_positive_sum_for_display(imaginary_display);
+    if (ordered_display) {
+        expr_free(imaginary_display);
+        imaginary_display = ordered_display;
+        ordered_display = NULL;
+    }
+    imaginary_is_unit = num_eq(displayed_imaginary_value, NUM_ONE);
+    real_TeX = real_is_zero ? NULL : expr_TeX_body_dup(real_display);
+    imaginary_TeX = imaginary_is_zero || imaginary_is_unit ? NULL : expr_TeX_body_dup(imaginary_display);
+    if ((!real_is_zero && !real_TeX) || (!imaginary_is_zero && !imaginary_is_unit && !imaginary_TeX))
+        goto cleanup;
+
+    stream = open_memstream(&display_TeX, &display_TeX_size);
+    if (!stream)
+        goto cleanup;
+    if (!real_is_zero)
+        fputs(real_TeX, stream);
+    if (!imaginary_is_zero) {
+        if (!real_is_zero)
+            fputs(imaginary_is_negative ? " - " : " + ", stream);
+        else if (imaginary_is_negative)
+            fputs("\\mathord{-}\\mkern-2mu ", stream);
+        if (!imaginary_is_unit) {
+            const expr_t *sum_left;
+            const expr_t *sum_right;
+            bool sum_subtract;
+            bool needs_parentheses = expr_match_add_sub_expr(imaginary_display, &sum_left, &sum_right, &sum_subtract);
+
+            if (needs_parentheses)
+                fputs("\\left(", stream);
+            fputs(imaginary_TeX, stream);
+            if (needs_parentheses)
+                fputs("\\right)", stream);
+            fputs("\\mkern-2mu ", stream);
+        }
+        fputs("i", stream);
+    } else if (real_is_zero) {
+        fputs("0", stream);
+    }
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(imaginary_TeX);
+    free(real_TeX);
+    num_destroy(&displayed_imaginary_value);
+    num_destroy(&displayed_real_value);
+    expr_free(ordered_display);
+    expr_free(positive_imaginary_display);
+    expr_free(positive_imaginary);
+    expr_free(imaginary_display);
+    expr_free(real_display);
+    expr_free(owned_imaginary);
+    expr_free(owned_real);
+    num_destroy(&imaginary_magnitude);
+    num_destroy(&imaginary_value);
+    num_destroy(&real_value);
+    num_destroy(&seed_value);
+    expr_free(scaled_imaginary);
+    expr_free(scaled_real);
+    expr_free(imaginary_part);
+    expr_free(real_part);
+    expr_free(imaginary_cosine);
+    expr_free(real_sine);
+    expr_free(imaginary_sine);
+    expr_free(real_cosine);
+    expr_free(signed_imaginary);
+    expr_free(sine);
+    expr_free(cosine);
+    return display_TeX;
+}
+
+static char *expr_branch_family_TeX_dup(const expr_t *seed, long order)
+{
+    char *seed_TeX = NULL;
+    char *family_TeX = NULL;
+    size_t family_TeX_size = 0u;
+    FILE *stream = NULL;
+
+    if (!seed || order < 2L)
+        return NULL;
+    seed_TeX = expr_TeX_body_dup(seed);
+    if (!seed_TeX)
+        return NULL;
+    stream = open_memstream(&family_TeX, &family_TeX_size);
+    if (!stream)
+        goto cleanup;
+    fputs("\\begin{aligned}[t]", stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        char *branch_TeX = NULL;
+
+        if (root_index > 0L)
+            fputs("\\\\[0.65em]", stream);
+        fputs("&", stream);
+        if (root_index == 0L) {
+            branch_TeX = xstrdup_local(seed_TeX);
+        } else if (order == 2L) {
+            branch_TeX = expr_quarter_turn_root_TeX_dup(seed, 2L);
+            if (!branch_TeX) {
+                expr_t *negative = expr_distribute_negative_for_display(seed);
+
+                branch_TeX = negative ? expr_TeX_body_dup(negative) : NULL;
+                expr_free(negative);
+            }
+        } else if (order == 4L) {
+            branch_TeX = expr_quarter_turn_root_TeX_dup(seed, root_index * (4L / order));
+        } else {
+            branch_TeX = expr_rotated_cartesian_root_TeX_dup(seed, root_index, order);
+        }
+        if (branch_TeX) {
+            fputs(branch_TeX, stream);
+        } else {
+            fprintf(stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index, order);
+        }
+        free(branch_TeX);
+    }
+    fputs("\\end{aligned}", stream);
+    fclose(stream);
+    stream = NULL;
+
+cleanup:
+    if (stream)
+        fclose(stream);
+    free(seed_TeX);
+    return family_TeX;
+}
+
+static void print_explicit_root_family(const expr_t *expr, int precision)
+{
+    number_t seed = (number_t){0};
+    number_t seed_value = (number_t){0};
+    expr_t *base = NULL;
+    long order = 0L;
+    expr_t *seed_expr = NULL;
+    expr_t *negative_seed = NULL;
+    char *seed_TeX;
+    char *negative_expression = NULL;
+    char *negative_TeX = NULL;
+    char *root_expression = NULL;
+    char *root_TeX = NULL;
+    char *root_function = NULL;
+    char *root_value = NULL;
+    size_t root_TeX_size = 0u;
+    FILE *TeX_stream;
+    bool exact_seed;
+    bool seed_has_cartesian_parts;
+    const expr_t *seed_scale;
+    const expr_t *seed_real;
+    const expr_t *seed_imaginary;
+    int seed_imaginary_sign;
+
+    if (!explicit_reciprocal_power(expr, &base, &order)) {
+        num_destroy(&seed);
+        return;
+    }
+
+    exact_seed = expr_exact_complex_root_seed(expr, &seed, &order);
+    if (exact_seed) {
+        seed_expr = expr_new_const(seed);
+    } else if (base) {
+        seed_expr = expr_principal_root_display(base, order);
+    } else {
+        seed_expr = expr_clone(expr);
+    }
+    seed_TeX = seed_expr ? expr_TeX_body_dup(seed_expr) : NULL;
+    if (!seed_TeX)
+        goto cleanup;
+    seed_value = expr_display_probe_value(seed_expr);
+    seed_has_cartesian_parts = expr_scaled_cartesian_parts(seed_expr, &seed_scale, &seed_real, &seed_imaginary,
+                                                           &seed_imaginary_sign);
+
+    if (order == 2L) {
+        negative_seed = expr_distribute_negative_for_display(seed_expr);
+        negative_expression = negative_seed ? expr_text_dup(negative_seed, style_UNBOUND) : NULL;
+        negative_TeX = negative_seed ? expr_TeX_body_dup(negative_seed) : NULL;
+        if (!negative_expression || !negative_TeX)
+            goto cleanup;
+    }
+
+    TeX_stream = open_memstream(&root_TeX, &root_TeX_size);
+    if (!TeX_stream)
+        goto cleanup;
+
+    fputs("\\begin{aligned}[t]", TeX_stream);
+    for (long root_index = 0L; root_index < order; ++root_index) {
+        char *quarter_turn_TeX = NULL;
+        char *cartesian_TeX = NULL;
+        char *polar_cartesian_TeX = NULL;
+
+        if (root_index > 0L)
+            fputs("\\\\[0.65em]", TeX_stream);
+        fputs("&", TeX_stream);
+        if (!exact_seed && !seed_has_cartesian_parts)
+            polar_cartesian_TeX = expr_polar_cartesian_root_TeX_dup(base, root_index, order);
+        if (!polar_cartesian_TeX && (order == 2L || order == 4L))
+            quarter_turn_TeX = expr_quarter_turn_root_TeX_dup(seed_expr, root_index * (4L / order));
+        else if (!polar_cartesian_TeX && root_index > 0L && order > 2L)
+            cartesian_TeX = expr_rotated_cartesian_root_TeX_dup(seed_expr, root_index, order);
+        if (polar_cartesian_TeX) {
+            fputs(polar_cartesian_TeX, TeX_stream);
+        } else if (quarter_turn_TeX) {
+            fputs(quarter_turn_TeX, TeX_stream);
+        } else if (cartesian_TeX) {
+            fputs(cartesian_TeX, TeX_stream);
+        } else if (root_index == 0L) {
+            fputs(seed_TeX, TeX_stream);
+        } else if (order == 2L) {
+            if (negative_TeX[0] == '-') {
+                fputs("\\mathord{-}\\mkern-2mu ", TeX_stream);
+                fputs(negative_TeX + 1, TeX_stream);
+            } else {
+                fputs(negative_TeX, TeX_stream);
+            }
+        } else {
+            fprintf(TeX_stream, "\\left(%s\\right)e^{\\frac{%ld\\pi i}{%ld}}", seed_TeX, 2L * root_index,
+                    order);
+        }
+        free(polar_cartesian_TeX);
+        free(cartesian_TeX);
+        free(quarter_turn_TeX);
+    }
+    fputs("\\end{aligned}", TeX_stream);
+
+    fclose(TeX_stream);
+    if (!root_family_texts_dup(seed_expr, order, &root_expression, &root_function))
+        goto cleanup;
+    root_value = numeric_root_family_dup(seed_value, order, precision);
+    printf("root_expression  %s\n", root_expression);
+    printf("root_tex    %s\n", root_TeX);
+    printf("root_function  %s\n", root_function);
+    if (root_value)
+        printf("root_value  %s\n", root_value);
+
+cleanup:
+    free(root_value);
+    free(root_function);
+    free(root_TeX);
+    free(root_expression);
+    free(seed_TeX);
+    free(negative_TeX);
+    free(negative_expression);
+    expr_free(negative_seed);
+    expr_free(seed_expr);
+    expr_free(base);
+    num_destroy(&seed_value);
+    num_destroy(&seed);
+}
+
+static void print_bindings(const char *label, expr_bindings_t *bindings, int precision)
+{
+    size_t count = expr_bindings_count(bindings);
+
+    for (size_t i = 0u; i < count; ++i) {
+        const char *name = expr_bindings_name_at(bindings, i);
+        expr_t *binding = expr_bindings_expr_at(bindings, i);
+        char *value_text;
+
+        if (!name || !binding)
+            continue;
+
+        value_text = owned_number_text(expr_get_val(binding), precision);
+        expr_t *named = expr_new_named_var(NUM_NAN, name);
+        char *expression_name = named ? expr_text_dup(named, style_UNBOUND) : NULL;
+        char *function_name = named ? expr_to_function_body(named) : NULL;
+        const char *binding_name = expression_name ? expression_name : name;
+
+        /* Editor bindings round-trip through Expression syntax, not Function syntax. */
+        printf("%-20s %s\t%s\t%s\n", label, expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable",
+               binding_name, value_text ? value_text : "(num_to_string failed)");
+        if (function_name && strcmp(function_name, binding_name) != 0)
+            printf("binding_function_name  %s\t%s\n", binding_name, function_name);
+        free(function_name);
+        free(expression_name);
+        expr_free(named);
+        free(value_text);
+    }
+}
+
+static bool expression_evaluation_ready(const expr_t *expr)
+{
+    return expr != NULL;
+}
+
+static void print_expression_tree_bindings(const char *label, const expr_t *expr, int precision)
+{
+    expr_bindings_t *bindings = expr_bindings_from_expr_internal(expr);
+
+    print_bindings(label, bindings, precision);
+    expr_bindings_free(bindings);
+}
+
+static void preserve_matching_binding_values(expr_bindings_t *bindings, const char *source_expression)
+{
+    expr_bindings_t *source_bindings = NULL;
+    expr_t *source_expr;
+    size_t count;
+
+    if (!bindings || !source_expression || source_expression[0] == '\0')
+        return;
+
+    source_expr = expr_from_string(source_expression, &source_bindings);
+    if (!source_expr)
+        return;
+
+    count = expr_bindings_count(bindings);
+    for (size_t i = 0u; i < count; ++i) {
+        const char *name = expr_bindings_name_at(bindings, i);
+        expr_t *binding = expr_bindings_expr_at(bindings, i);
+        expr_t *source_binding;
+
+        if (!name || !binding)
+            continue;
+        source_binding = expr_bindings_get(source_bindings, name);
+        if (source_binding) {
+            number_t value = expr_get_val(source_binding);
+
+            expr_set_val(binding, value);
+            num_destroy(&value);
+        }
+    }
+
+    expr_free(source_expr);
+    expr_bindings_free(source_bindings);
+}
+
+static int parse_number_expression(const char *text, int precision, number_t *out)
+{
+    expr_t *expr = NULL;
+    int rc = 1;
+
+    if (!text || !out)
+        return 1;
+
+    if (precision > 0)
+        num_set_default_prec_digits((size_t)precision + 8u);
+
+    expr = expr_from_string(text, NULL);
+    if (!expr) {
+        goto cleanup;
+    }
+
+    *out = expr_eval(expr);
+    rc = 0;
+
+cleanup:
+    expr_free(expr);
+    return rc;
+}
+
+static int apply_goal_start(expr_bindings_t *bindings, const char *assignment, int precision)
+{
+    char *copy;
+    char *name;
+    char *value_text;
+    size_t eq_pos;
+    expr_t *binding;
+    number_t value;
+    int rc = 1;
+
+    if (!bindings || !assignment)
+        return 1;
+
+    copy = xstrdup_local(assignment);
+    if (!copy)
+        return 1;
+
+    eq_pos = strcspn(copy, "=");
+    if (copy[eq_pos] != '=') {
+        fprintf(stderr, "Goal start must be name=value: %s\n", assignment);
+        goto cleanup;
+    }
+
+    copy[eq_pos] = '\0';
+    name = trim_ascii_in_place(copy);
+    value_text = trim_ascii_in_place(&copy[eq_pos + 1u]);
+
+    binding = expr_bindings_get(bindings, name);
+    if (!binding) {
+        fprintf(stderr, "No binding named '%s'\n", name);
+        goto cleanup;
+    }
+
+    if (parse_number_expression(value_text, precision, &value) != 0)
+        goto cleanup;
+
+    expr_set_val(binding, value);
+    num_destroy(&value);
+    rc = 0;
+
+cleanup:
+    free(copy);
+    return rc;
+}
+
+static int run_goal_seek(int argc, char **argv)
+{
+    const char *raw_input;
+    const char *target_text;
+    int precision;
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = NULL;
+    number_t target = (number_t){0};
+    expr_goal_seek_options_t options = {0};
+    expr_goal_seek_result_t result;
+    char *expr_text = NULL;
+    char *unbound_text = NULL;
+    char *func_text = NULL;
+    char *TeX_text = NULL;
+    int rc = 1;
+
+    if (argc < 5) {
+        fprintf(stderr, "Usage: %s --goal-seek <expression> <target> <precision> [name=start ...]\n", argv[0]);
+        return 1;
+    }
+
+    raw_input = argv[2];
+    target_text = argv[3];
+    precision = atoi(argv[4]);
+
+    if (precision > 0)
+        num_set_default_prec_digits((size_t)precision + 8u);
+
+    expr = expr_from_string(raw_input, &bindings);
+    if (!expr) {
+        goto cleanup;
+    }
+    if (!bindings) {
+        fprintf(stderr, "Goal seek needs variable bindings\n");
+        goto cleanup;
+    }
+
+    for (int i = 5; i < argc; ++i) {
+        if (apply_goal_start(bindings, argv[i], precision) != 0)
+            goto cleanup;
+    }
+
+    if (parse_number_expression(target_text, precision, &target) != 0)
+        goto cleanup;
+
+    options.precision_digits = precision > 0 ? (size_t)precision : 64u;
+    options.max_iterations = 0u;
+    options.allow_complex = true;
+    options.simplify_result = false;
+
+    if (expr_goal_seek(expr, bindings, target, &options, &result) != 0) {
+        fprintf(stderr, "Goal seek failed\n");
+        goto cleanup;
+    }
+
+    expr_text = expr_text_dup(result.expr, style_EXPRESSION);
+    unbound_text = expr_text_dup(result.expr, style_UNBOUND);
+    func_text = expr_text_dup(result.expr, style_FUNCTION);
+    TeX_text = expr_result_TeX_dup(result.expr);
+
+    printf("input       %s\n", raw_input);
+    printf("expression  %s\n", expr_text ? expr_text : "(null)");
+    printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
+    printf("function    %s\n", func_text ? func_text : "(null)");
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
+    print_bindings("binding", bindings, precision);
+    print_owned_number("value", num_clone(result.value), precision);
+    print_owned_number("residual", num_clone(result.residual), precision);
+    printf("iterations  %zu\n", result.iterations);
+    printf("complex     %s\n", result.used_complex ? "yes" : "no");
+
+    expr_goal_seek_result_clear(&result);
+    rc = 0;
+
+cleanup:
+    free(TeX_text);
+    free(func_text);
+    free(unbound_text);
+    free(expr_text);
+    num_destroy(&target);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+    return rc;
+}
+
+int main(int argc, char **argv)
+{
+    const char *raw_input = argc > 1 ? argv[1] : "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }";
+    const char *wrt_name = argc > 2 ? argv[2] : "x";
+    int precision = argc > 3 ? atoi(argv[3]) : -1;
+    const char *action = argc > 4 ? argv[4] : "";
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = NULL;
+    expr_t *display_expr = NULL;
+    expr_t *weighted_lerch_form = NULL;
+    expr_t *progression_closed_form = NULL;
+    expr_t *qdigamma_progression_source = NULL;
+    expr_t *deriv = NULL;
+    expr_t *display_deriv = NULL;
+    expr_t *derivative_progression_closed_form = NULL;
+    expr_t *derivative_progression_source = NULL;
+    expr_t *integral = NULL;
+    expr_t *display_integral = NULL;
+    expr_t *wrt = NULL;
+    char *expr_text = NULL;
+    char *unbound_text = NULL;
+    char *func_text = NULL;
+    char *TeX_text = NULL;
+    char *deriv_text = NULL;
+    char *deriv_func_text = NULL;
+    char *deriv_TeX_text = NULL;
+    char *deriv_values_text = NULL;
+    char *integral_text = NULL;
+    char *integral_func_text = NULL;
+    char *integral_TeX_text = NULL;
+    string_t *derivation_TeX = NULL;
+    char value_note[512];
+    bool integral_request = strcmp(action, "integral") == 0;
+    bool bindings_request = strcmp(action, "bindings") == 0;
+    bool binding_edit_request = strcmp(action, "binding-edit") == 0;
+    bool evaluate_request = strcmp(action, "evaluate") == 0 || bindings_request || binding_edit_request;
+    bool derivative_request = !integral_request && !evaluate_request;
+    bool wrt_is_variable = false;
+    bool complex_cartesian = false;
+    bool display_expr_owned = false;
+    bool display_deriv_owned = false;
+    bool domain_specialised = false;
+    bool recognised_weighted_lerch_form = false;
+    int rc = 0;
+
+    if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
+        return run_goal_seek(argc, argv);
+
+    if (precision > 0)
+        num_set_default_prec_digits((size_t)precision + 8u);
+
+    expr = expr_from_string_with_derivation_TeX_internal(raw_input, &bindings, &derivation_TeX,
+                                                        &domain_specialised);
+
+    if (!expr) {
+        rc = 1;
+        goto cleanup;
+    }
+
+    if (binding_edit_request) {
+        expr_bindings_t *edited_bindings = NULL;
+        expr_t *edited = expr_edit_binding(expr, bindings, wrt_name, argc > 5 ? argv[5] : "", &edited_bindings);
+
+        if (!edited) {
+            fprintf(stderr, "Could not edit binding '%s'\n", wrt_name);
+            rc = 1;
+            goto cleanup;
+        }
+        expr_free(expr);
+        expr_bindings_free(bindings);
+        expr = edited;
+        bindings = edited_bindings;
+    }
+
+    if (bindings_request && argc > 5)
+        preserve_matching_binding_values(bindings, argv[5]);
+
+    complex_cartesian = expr_is_complex_cartesian_elementary_request(expr);
+    if (bindings)
+        wrt = expr_bindings_get(bindings, wrt_name);
+    wrt_is_variable = wrt && expr_is_variable(wrt);
+    progression_closed_form = expr_finite_progression_closed_form(expr);
+    if (progression_closed_form && expr_finite_progression_requires_bound_step(expr))
+        domain_specialised = true;
+    if (!progression_closed_form) {
+        qdigamma_progression_source = expr_finite_progression_from_qdigamma_form(expr);
+        progression_closed_form = expr_finite_progression_closed_form(qdigamma_progression_source);
+    }
+    weighted_lerch_form = evaluate_request ? expr_finite_weighted_sinh_lerch_form(expr) : NULL;
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_cosh_lerch_form(expr);
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_sin_lerch_form(expr);
+    if (evaluate_request && !weighted_lerch_form)
+        weighted_lerch_form = expr_finite_weighted_cos_lerch_form(expr);
+    display_expr = weighted_lerch_form
+                       ? weighted_lerch_form
+                       : progression_closed_form
+                       ? progression_closed_form
+                       : derivation_TeX && string_length(derivation_TeX) > 0u
+                             ? expr_clone(expr)
+                             : display_polynomial_simplified(expr, wrt_is_variable ? wrt : NULL, complex_cartesian);
+    display_expr_owned = display_expr != NULL;
+    if (!display_expr)
+        display_expr = expr;
+
+    expr_t *specialised_transform = expr_transform_specialise_constants(display_expr);
+    if (specialised_transform) {
+        if (display_expr_owned)
+            expr_free(display_expr);
+        display_expr = specialised_transform;
+        display_expr_owned = true;
+    }
+
+    /* The complete native identity supersedes the parser's bare ellipsis preview. */
+    expr_t *infinite_closed = expr_infinite_power_sum_closed_form(display_expr, NULL);
+    if (infinite_closed) {
+        string_free(derivation_TeX);
+        derivation_TeX = NULL;
+        expr_free(infinite_closed);
+    }
+
+    expr_text = expr_text_dup(display_expr, style_EXPRESSION);
+    unbound_text = expr_text_dup(display_expr, style_UNBOUND);
+    func_text = expr_text_dup(display_expr, style_FUNCTION);
+    recognised_weighted_lerch_form = weighted_lerch_form != NULL || expr_is_finite_weighted_sinh_lerch_form(expr) ||
+                                     expr_is_finite_weighted_cosh_lerch_form(expr);
+    TeX_text = progression_closed_form
+                   ? expr_finite_progression_identity_TeX(qdigamma_progression_source ? qdigamma_progression_source
+                                                                                     : expr)
+                   : recognised_weighted_lerch_form ? expr_to_TeX_body(display_expr) : expr_result_TeX_dup(display_expr);
+
+    expr_t *request = expr_from_string_preserving_calculus_internal(raw_input);
+    char *transform_identity = expr_transform_identity_TeX(request ? request : expr, display_expr);
+    char *formal_transform = transform_identity ? NULL : expr_formal_transform_TeX(request, display_expr);
+    if (formal_transform) {
+        free(TeX_text);
+        TeX_text = formal_transform;
+    }
+
+    printf("input       %s\n", raw_input);
+    printf("expression  %s\n", expr_text ? expr_text : "(null)");
+    printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
+    printf("function    %s\n", func_text ? func_text : "(null)");
+    printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
+    printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
+    string_t *operation_function = expr_to_calculus_function_text(request, display_expr);
+    if (!operation_function)
+        operation_function = expr_to_transform_function_text(expr);
+    expr_free(request);
+    if (operation_function)
+        printf("operation_function  %s\n", string_c_str(operation_function));
+    string_free(operation_function);
+    printf("transform_identity_TeX  %s\n", transform_identity ? transform_identity : "");
+    free(transform_identity);
+    char *conditioned_expression = expr_conditioned_cases_to_string(display_expr);
+    printf("conditioned_expression  %s\n", conditioned_expression ? conditioned_expression : "");
+    free(conditioned_expression);
+    printf("algebraic_specialisation  %s\n",
+           specialised_transform ? "native-result" : domain_specialised ? "domain-required" : "none");
+    print_bindings("binding", bindings, precision);
+    printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
+    printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
+    if (evaluate_request)
+        print_explicit_root_family(expr, precision);
+    value_note[0] = '\0';
+    {
+        number_t value_number = NUM_NAN;
+
+        if (!expr_finite_weighted_sinh_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_cosh_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_sin_lerch_value(expr, &value_number) &&
+            !expr_finite_weighted_cos_lerch_value(expr, &value_number) &&
+            !expr_finite_qdigamma_progression_value(expr, &value_number)) {
+            value_number = expr_eval(expr);
+        }
+        /* Native simplification can prove a finite result despite unset input bindings. */
+        if (display_expr != expr && (num_is_nan(value_number) || num_is_zero(value_number))) {
+            number_t display_value = expr_eval(display_expr);
+
+            if (num_is_finite(display_value) && (num_is_nan(value_number) || !num_is_zero(display_value))) {
+                num_destroy(&value_number);
+                value_number = display_value;
+            } else {
+                num_destroy(&display_value);
+            }
+        }
+
+        print_owned_number("value", num_clone(value_number), precision);
+        const char *transform_note = !num_is_finite(value_number) ? expr_transform_value_note(expr) : NULL;
+        if (transform_note)
+            printf("value_note  %s\n", transform_note);
+        else if (!num_is_finite(value_number) && expr_integral_value_note(expr, value_note, sizeof(value_note)))
+            printf("value_note  %s\n", value_note);
+        else if (num_is_nan(value_number) && expr_finite_summation_exceeds_direct_limit(expr))
+            printf("value_note  Value not computed: the finite sum exceeds the safe direct-evaluation limit and has "
+                   "no supported numerical shortcut.\n");
+        num_destroy(&value_number);
+    }
+
+    if (wrt_is_variable && derivative_request) {
+        expr_t *derivative_root_base = NULL;
+        expr_t *weighted_derivative_source = NULL;
+        const expr_t *derivative_source = progression_closed_form ? expr : display_expr;
+        bool used_atan_derivative_form = false;
+        long derivative_root_order = 0L;
+
+        if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
+            expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOTH))
+            derivative_source = expr;
+        weighted_derivative_source = expr_finite_weighted_sinh_from_lerch_form(derivative_source);
+        if (!weighted_derivative_source)
+            weighted_derivative_source = expr_finite_weighted_cosh_from_lerch_form(derivative_source);
+        if (weighted_derivative_source) {
+            derivative_progression_source = expr_create_deriv(weighted_derivative_source, wrt);
+            expr_free(weighted_derivative_source);
+        }
+        deriv = expr_domain_specialised_inverse_power_derivative(expr, bindings, wrt);
+        if (!deriv)
+            deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
+        used_atan_derivative_form = deriv != NULL;
+        if (!deriv && strstr(raw_input, "..."))
+            deriv = expr_derivative_from_unbound_source(raw_input, bindings, wrt_name);
+        if (!deriv)
+            deriv = expr_create_deriv(derivative_source, wrt);
+        if (!deriv) {
+            fprintf(stderr, "Failed to build derivative with respect to %s\n", wrt_name);
+            rc = 1;
+            goto cleanup;
+        }
+        derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
+        if (!derivative_progression_closed_form && derivative_progression_source)
+            derivative_progression_closed_form = expr_clone(deriv);
+        display_deriv = derivative_progression_closed_form
+                            ? derivative_progression_closed_form
+                            : used_atan_derivative_form ? expr_beautify(deriv)
+                            : display_polynomial_simplified(deriv, wrt, complex_cartesian);
+        if (display_deriv) {
+            display_deriv_owned = true;
+        } else {
+            display_deriv = deriv;
+        }
+        if (explicit_reciprocal_power(expr, &derivative_root_base, &derivative_root_order)) {
+            number_t derivative_seed_value;
+
+            if (!root_family_texts_dup(display_deriv, derivative_root_order, &deriv_text, &deriv_func_text)) {
+                fprintf(stderr, "Failed to build derivative branch family\n");
+                expr_free(derivative_root_base);
+                rc = 1;
+                goto cleanup;
+            }
+            deriv_TeX_text = expr_branch_family_TeX_dup(display_deriv, derivative_root_order);
+            derivative_seed_value = expr_eval(deriv);
+            deriv_values_text = numeric_root_family_dup(derivative_seed_value, derivative_root_order, precision);
+            num_destroy(&derivative_seed_value);
+        } else {
+            bool explicit_Ei_cartesian = complex_cartesian &&
+                                         expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_EI);
+            string_t *cartesian_function = explicit_Ei_cartesian
+                                               ? expr_to_text_function_cartesian(display_deriv)
+                                               : NULL;
+
+            deriv_text = expr_text_dup(display_deriv, style_EXPRESSION);
+            deriv_func_text = cartesian_function ? xstrdup_local(string_c_str(cartesian_function))
+                                                  : expr_text_dup(display_deriv, style_FUNCTION);
+            deriv_TeX_text = derivative_progression_closed_form
+                                 ? expr_finite_progression_identity_TeX(derivative_progression_source
+                                                                           ? derivative_progression_source
+                                                                           : deriv)
+                             : explicit_Ei_cartesian
+                                 ? expr_Ei_derivative_cartesian_TeX_dup(expr, wrt_name, display_deriv)
+                                 : NULL;
+            if (!deriv_TeX_text)
+                deriv_TeX_text = expr_result_TeX_dup(display_deriv);
+            string_free(cartesian_function);
+        }
+        expr_t *derivative_variables[1] = {wrt};
+        expr_t *derivative_operation = expr_new_formal_derivative(expr, 1u, derivative_variables);
+        string_t *derivative_programme = expr_to_calculus_function_text(derivative_operation, display_deriv);
+        if (derivative_root_order >= 2L) {
+            char *family_expression = NULL;
+            char *family_function = NULL;
+
+            if (root_family_texts_dup(derivative_operation, derivative_root_order,
+                                      &family_expression, &family_function)) {
+                free(deriv_func_text);
+                deriv_func_text = family_function;
+            }
+            free(family_expression);
+        } else if (derivative_programme) {
+            free(deriv_func_text);
+            deriv_func_text = xstrdup_local(string_c_str(derivative_programme));
+        }
+        string_free(derivative_programme);
+        expr_free(derivative_operation);
+        normalise_double_minus_owned(&deriv_text);
+        normalise_double_minus_owned(&deriv_func_text);
+        normalise_double_minus_owned(&deriv_TeX_text);
+        expr_free(derivative_root_base);
+        printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
+        printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
+        printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
+        print_expression_tree_bindings("derivative_binding", deriv, precision);
+        if (deriv_values_text)
+            printf("d values     %s\n", deriv_values_text);
+        else {
+            print_owned_number("d value", expr_eval(deriv), precision);
+        }
+    } else if (derivative_request) {
+        printf("derivative  no variable binding named '%s'\n", wrt_name);
+    }
+
+    if (integral_request) {
+        if (wrt_is_variable) {
+            const expr_t *integral_source =
+                (complex_cartesian ||
+                 (progression_closed_form && expr_is_finite_inverse_progression(expr)))
+                    ? expr
+                    : display_expr;
+
+            integral = expr_integrate_family(integral_source, wrt);
+            if (!integral) {
+                printf("integral  no symbolic integral with respect to %s\n", wrt_name);
+            } else {
+                const expr_t *family_left = NULL;
+                const expr_t *family_right = NULL;
+                const char *integration_constant_name = NULL;
+                expr_t *weighted_integral_left = NULL;
+                bool family_subtract = false;
+
+                if (expr_match_add_sub_expr(integral, &family_left, &family_right, &family_subtract) &&
+                    !family_subtract && expr_is_named_const(family_right))
+                    integration_constant_name = expr_symbol_name(family_right);
+                weighted_integral_left = integration_constant_name
+                                             ? expr_finite_weighted_sinh_lerch_form(family_left)
+                                             : NULL;
+                display_integral = weighted_integral_left ? expr_add(weighted_integral_left, family_right) : NULL;
+                expr_free(weighted_integral_left);
+                if (!display_integral)
+                    display_integral = expr_contains_summation_for_display(integral)
+                                           ? expr_clone(integral)
+                                           : display_polynomial_simplified(integral, wrt, complex_cartesian);
+                if (!display_integral)
+                    display_integral = integral;
+                if (integration_constant_name) {
+                    expr_t *ordered_integral =
+                        expr_move_named_addend_last_for_display(display_integral, integration_constant_name);
+
+                    if (ordered_integral) {
+                        if (display_integral != integral)
+                            expr_free(display_integral);
+                        display_integral = ordered_integral;
+                    }
+                }
+                integral_text = expr_text_dup(display_integral, style_EXPRESSION);
+                integral_func_text = expr_text_dup(display_integral, style_FUNCTION);
+                expr_t *integral_operation = expr_integral_with_dummy_internal(integral_source, wrt, wrt);
+                string_t *integral_programme = expr_to_calculus_function_text(integral_operation, display_integral);
+                if (integral_programme) {
+                    free(integral_func_text);
+                    integral_func_text = xstrdup_local(string_c_str(integral_programme));
+                }
+                string_free(integral_programme);
+                expr_free(integral_operation);
+                integral_TeX_text = expr_result_TeX_dup(display_integral);
+                normalise_double_minus_owned(&integral_text);
+                normalise_double_minus_owned(&integral_func_text);
+                normalise_double_minus_owned(&integral_TeX_text);
+                printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
+                printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
+                printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");
+                print_expression_tree_bindings("integral_binding", integral, precision);
+                print_owned_number("i value", expr_eval(integral), precision);
+            }
+        } else {
+            printf("integral  no variable binding named '%s'\n", wrt_name);
+        }
+    }
+
+cleanup:
+    if (display_expr_owned)
+        expr_free(display_expr);
+    free(integral_TeX_text);
+    free(integral_func_text);
+    free(integral_text);
+    free(deriv_TeX_text);
+    free(deriv_func_text);
+    free(deriv_text);
+    free(deriv_values_text);
+    free(TeX_text);
+    string_free(derivation_TeX);
+    free(func_text);
+    free(unbound_text);
+    free(expr_text);
+    if (display_deriv_owned)
+        expr_free(display_deriv);
+    expr_free(derivative_progression_source);
+    expr_free(qdigamma_progression_source);
+    if (display_integral && display_integral != integral)
+        expr_free(display_integral);
+    expr_free(integral);
+    expr_free(deriv);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+    return rc;
+}

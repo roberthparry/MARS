@@ -1,11 +1,12 @@
 /**
  * @file lab_page.c
- * @brief Render the extracted Lab client using native strings and JSON.
+ * @brief Render the Lab page and build its separately transported configuration.
  *
  * Substitution is a single pass over the template, so user text cannot introduce
- * another substitution. JSON embedded in scripts also escapes HTML delimiters and
- * JavaScript line separators. The separate JSON settings supply defaults and
- * presentation constants. Geographic choices are served from the jurisdiction API.
+ * another substitution. The page contains no embedded configuration script;
+ * bootstrap values are served through the versioned transport adapter. Native
+ * catalogue tables supply defaults and presentation constants internally.
+ * Geographic choices are served from the jurisdiction API.
  */
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
@@ -41,7 +42,7 @@ static const char *lab_page_text_value(const json_t *value)
     return s ? string_c_str(s) : "";
 }
 
-static string_t *lab_page_read_asset(const char *name)
+static string_t *lab_page_read_template(void)
 {
     const char *configured = getenv("MARS_LAB_ASSET_FILE"), *root = getenv("MARS_ROOT");
     string_t *path = string_new();
@@ -54,40 +55,11 @@ static string_t *lab_page_read_asset(const char *name)
         error = string_append_format(path, "%s/tools/mars_lab/assets/index.html", root) < 0;
     else
         error = string_append_cstr(path, MARS_LAB_ASSET_PATH);
-    if (!error && strcmp(name, "index.html")) {
-        string_cursor_t *cursor = string_cursor_new(path);
-        string_pos_t start = cursor ? string_cursor_position(cursor) : 0, slash = start;
-        while (cursor && !string_cursor_done(cursor)) {
-            if (string_cursor_consume(cursor, "/"))
-                slash = string_cursor_position(cursor);
-            else
-                string_cursor_next(cursor);
-        }
-        string_t *sibling = cursor ? string_cursor_slice_between(start, slash, cursor) : NULL;
-        string_cursor_free(cursor);
-        string_free(path);
-        path = sibling;
-        error = !path || string_append_cstr(path, name);
-    }
     file_t *file = error ? NULL : file_new(path);
     string_t *asset = file ? file_read_all_text(file) : NULL;
     file_free(file);
     string_free(path);
     return asset;
-}
-
-/* Read packaged worksheet defaults and presentation constants, never geographic rows. */
-json_t *lab_page_catalogue(void)
-{
-    string_t *text = lab_page_read_asset("catalogue.json");
-    json_t *data = text ? json_from_text(text) : NULL;
-    string_free(text);
-    if (json_type(data) != JSON_OBJECT || json_type(lab_page_member(data, "defaults")) != JSON_OBJECT ||
-        json_type(lab_page_member(data, "constants")) != JSON_OBJECT) {
-        json_free(data);
-        return NULL;
-    }
-    return data;
 }
 
 static json_t *lab_page_defaults_from(const json_t *data)
@@ -269,10 +241,73 @@ fail:
     return NULL;
 }
 
+/* Reuse the native substitution values; no configuration is embedded as executable text. */
+json_t *lab_page_bootstrap(const json_t *state)
+{
+    static const char *const keys[] = {
+        "ALMANAC_ACCURACY_NOTE_JS",
+        "ALMANAC_COVERAGE_TEXT_JS",
+        "ALMANAC_LAND_TOTALITY_SEARCH_TIMEOUT_MS",
+        "ALMANAC_WORKSHEET_TITLE",
+        "CONTROL_QUERY_PREFIX",
+        "CONTROL_TOKEN",
+        "DEFAULT_ALMANAC_DATE",
+        "DEFAULT_ALMANAC_ELEVATION",
+        "DEFAULT_ALMANAC_LATITUDE",
+        "DEFAULT_ALMANAC_LONGITUDE",
+        "DEFAULT_ALMANAC_TEXT",
+        "DEFAULT_ALMANAC_TIME",
+        "DEFAULT_ALMANAC_VISIBILITY",
+        "DEFAULT_ALMANAC_ZONE",
+        "DEFAULT_DATETIME_DATE",
+        "DEFAULT_DATETIME_ELEVATION",
+        "DEFAULT_DATETIME_GMT_OFFSET",
+        "DEFAULT_DATETIME_JURISDICTION",
+        "DEFAULT_DATETIME_LATITUDE",
+        "DEFAULT_DATETIME_LONGITUDE",
+        "DEFAULT_DATETIME_TEXT",
+        "DEFAULT_DIFFEQUATION",
+        "DEFAULT_EQUATION",
+        "DEFAULT_EQUATION_VARIABLE",
+        "DEFAULT_EXPRESSION",
+        "DEFAULT_INTEGRATOR",
+        "DEFAULT_INTEGRATOR_BOUNDS",
+        "DEFAULT_INTEGRATOR_INTERVAL_CAP",
+        "DEFAULT_MATRIX",
+    };
+    json_t *data = lab_page_catalogue();
+    json_t *defaults = data ? lab_page_defaults_from(data) : NULL;
+    json_t *values = defaults ? lab_page_substitutions(data, defaults, state) : NULL;
+    json_t *result = values ? json_new_object() : NULL;
+    /* This is compiled into the server, unlike assets read from disk after a rebuild.
+     * Keep it in step with the WASM ABI; the browser integration test checks both. */
+    if (result && !lab_page_set_text(result, "BROWSER_ABI_VERSION", "30")) {
+        json_free(result);
+        result = NULL;
+    }
+    /* Enumerate the bounded bootstrap schema once; member access remains indexed. */
+    for (size_t i = 0; result && i < sizeof keys / sizeof *keys; ++i) {
+        const string_t *text = json_string_value(lab_page_member(values, keys[i]));
+        json_t *value = text ? json_from_text(text) : NULL;
+        string_t *key = string_new_with(keys[i]);
+        bool ok = value && key && json_object_set(result, key, value);
+        json_free(value);
+        string_free(key);
+        if (!ok) {
+            json_free(result);
+            result = NULL;
+        }
+    }
+    json_free(values);
+    json_free(defaults);
+    json_free(data);
+    return result;
+}
+
 /* Render only original template tokens; never reinterpret substituted user text. */
 string_t *lab_page_render(const json_t *state)
 {
-    string_t *asset = lab_page_read_asset("index.html"), *out = NULL;
+    string_t *asset = lab_page_read_template(), *out = NULL;
     string_cursor_t *cursor = NULL;
     json_t *data = lab_page_catalogue();
     json_t *defaults = data ? lab_page_defaults_from(data) : NULL;

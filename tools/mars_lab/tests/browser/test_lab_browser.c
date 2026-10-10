@@ -21,6 +21,7 @@
 #include "lab_server.h"
 #include "lab_state.h"
 #include "test_harness.h"
+#include "test_lab_browser_fixtures.h"
 #include "test_lab_support.h"
 
 extern char **environ;
@@ -39,30 +40,57 @@ static bool lab_browser_prepare(const char *directory)
 {
     file_t *source = file_new_cstr("tools/mars_lab/assets/index.html");
     file_t *checks = file_new_cstr("tools/mars_lab/tests/browser/checks.js");
-    file_t *catalogue = file_new_cstr("tools/mars_lab/assets/catalogue.json");
     file_t *page = lab_browser_file(directory, "index.html");
-    file_t *copy = lab_browser_file(directory, "catalogue.json");
     string_t *html = source ? file_read_all_text(source) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
-    string_t *injection = script ? string_sprintf("<script>\n%s\n</script>\n</head>", string_c_str(script)) : NULL;
+    static const char *const modules[] = {"profile_checks.js",        "workspace_checks.js",
+                                          "request_checks.js",        "forms_checks.js",
+                                          "layout_checks.js",         "syntax_checks.js",
+                                          "calendar_checks.js",       "persist_checks.js",
+                                          "widgets_checks.js",        "evaluation_checks.js",
+                                          "select_checks.js",         "projection_checks.js",
+                                          "workspace_dom_checks.js",  "location_dom_checks.js",
+                                          "result_dom_checks.js",     "binding_dom_checks.js",
+                                          "payload_checks.js",        "picker_dom_checks.js",
+                                          "storage_checks.js",        "evaluation_cards_checks.js",
+                                          "event_checks.js",          "widget_event_checks.js",
+                                          "select_event_checks.js",   "almanac_event_checks.js",
+                                          "binding_sync_checks.js",   "evaluation_install_checks.js",
+                                          "goal_checks.js",           "evaluation_setup_checks.js",
+                                          "weather_checks.js",        "binding_commit_checks.js",
+                                          "function_checks.js",       "result_flow_checks.js",
+                                          "binding_flow_checks.js",   "location_flow_checks.js",
+                                          "request_flow_checks.js",   "state_flow_checks.js",
+                                          "transport_flow_checks.js", "editor_checks.js"};
+    for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
+        file_t *module = lab_browser_file("tools/mars_lab/tests/browser", modules[i]);
+        string_t *text = module ? file_read_all_text(module) : NULL;
+        bool ok = text && !string_append_char(script, '\n') && !string_append_cstr(script, string_c_str(text));
+        string_free(text);
+        file_free(module);
+        if (!ok) {
+            string_free(script);
+            script = NULL;
+        }
+    }
+    string_t *injection = script && lab_browser_almanac_fixture(script)
+                              ? string_sprintf("<script>\n%s\n</script>\n</head>", string_c_str(script))
+                              : NULL;
     bool replaced = html && injection && string_find(html, "</head>") >= 0 &&
                     string_replace(html, "</head>", string_c_str(injection)) == 0;
     bool written = replaced && page && file_write_all_text(page, html);
-    bool copied = catalogue && copy && file_copy(catalogue, copy, false);
-    bool configured = written && copied && !setenv("MARS_LAB_ASSET_FILE", file_path(page), 1);
+    bool configured = written && !setenv("MARS_LAB_ASSET_FILE", file_path(page), 1);
     json_t *initial = test_lab_json("{\"expression\":\"2+3\",\"expression_updated_at\":1,\"lab_mode\":\"expression\"}");
     bool saved = configured && initial && lab_state_save(initial);
     bool ok = configured && saved;
     if (!ok)
-        string_fprintf(stderr, "Browser fixture: replaced=%d written=%d copied=%d configured=%d saved=%d errno=%d\n",
-                       replaced, written, copied, configured, saved, errno);
+        string_fprintf(stderr, "Browser fixture: replaced=%d written=%d configured=%d saved=%d errno=%d\n", replaced,
+                       written, configured, saved, errno);
     json_free(initial);
     string_free(injection);
     string_free(script);
     string_free(html);
-    file_free(copy);
     file_free(page);
-    file_free(catalogue);
     file_free(checks);
     file_free(source);
     return ok;
@@ -86,7 +114,9 @@ static bool lab_browser_run(const char *directory)
     string_free(settings);
     file_free(preferences);
     lab_server_t *server = profile_ready ? lab_svr_new(NULL, 0, 30000) : NULL;
-    string_t *url = server ? string_sprintf("http://127.0.0.1:%u/", lab_svr_port(server)) : NULL;
+    bool profiling = getenv("MARS_LAB_PROFILE") && !strcmp(getenv("MARS_LAB_PROFILE"), "1");
+    string_t *url =
+        server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server), profiling ? "?profile=1" : "") : NULL;
     pid_t workers[4] = {-1, -1, -1, -1};
     bool workers_ready = server != NULL;
     for (size_t i = 0; workers_ready && i < sizeof workers / sizeof *workers; ++i) {

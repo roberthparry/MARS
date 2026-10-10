@@ -1,9 +1,9 @@
 /**
  * @file lab_calendar.c
- * @brief Request validation and native scratch execution for MARS Lab calendars.
+ * @brief Request validation and native worker execution for MARS Lab calendars.
  *
  * Implements the five calendar routes without a shell or Python interpreter.
- * Only allowlisted arguments reach the scratch programs. Process failures are
+ * Only allowlisted arguments reach the worker programmes. Process failures are
  * distinguished from optional holiday database unavailability. Native almanac
  * and jurisdiction modules load their own database paths and keys, including
  * MARS_HOME/config files; no process-global environment changes are made here.
@@ -30,7 +30,7 @@ const json_t *lab_cal_get(const json_t *object, const char *key)
     return value;
 }
 
-/* Borrow scalar text used by both the browser and scratch interfaces. */
+/* Borrow scalar text used by both the browser and worker interfaces. */
 const char *lab_cal_text(const json_t *object, const char *key)
 {
     const json_t *value = lab_cal_get(object, key);
@@ -464,11 +464,10 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
         json_t *fields = lab_cal_run(is_datetime ? "datetime_lab" : "almanac_lab", args, 10000, &diagnostic);
         json_free(args);
         if (!fields)
-            response =
-                lab_cal_error(status, 422,
-                              diagnostic && string_byte_length(diagnostic)
-                                  ? string_c_str(diagnostic)
-                                  : "Native calendar backend unavailable or timed out; build the scratch helpers.");
+            response = lab_cal_error(status, 422,
+                                     diagnostic && string_byte_length(diagnostic)
+                                         ? string_c_str(diagnostic)
+                                         : "Native calendar backend unavailable or timed out; run make lab-workers.");
         else if (is_datetime) {
             if (!lab_cal_valid_date(lab_cal_text(fields, "date")) || !*lab_cal_text(fields, "julian_day_number")) {
                 json_free(fields);

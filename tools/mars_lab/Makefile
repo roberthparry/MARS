@@ -48,7 +48,23 @@ LAB_TEST_HEADERS := $(wildcard tools/mars_lab/tests/*.h)
 LAB_TEST_OBJS := $(patsubst tools/mars_lab/tests/%.c,$(LAB_BUILD_DIR)/tests/%.o,$(LAB_TEST_SRCS))
 LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
 LAB_WORKERS := mars_lab equation_lab diffequation_lab matrix_lab integrator_lab datetime_lab almanac_lab almanac_event_lab holiday_lab ophelia
-LAB_WORKER_BINS := $(addprefix $(BUILD_DIR)/scratch/,$(LAB_WORKERS))
+LAB_WORKER_DIR := $(LAB_BUILD_DIR)/workers
+LAB_WORKER_BINS := $(addprefix $(LAB_WORKER_DIR)/,$(LAB_WORKERS))
+LAB_WORKER_OBJS := $(addsuffix .o,$(LAB_WORKER_BINS))
+LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
+LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
+LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
+
+$(LAB_BUILD_DIR)/wasm/src/%.o: tools/mars_lab/wasm/src/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
+	    -nostdlib -Wmissing-prototypes -MMD -MP -MF $(@:.o=.d) -Itools/mars_lab/wasm/include -c $< -o $@
+
+-include $(LAB_WASM_OBJS:.o=.d)
+
+$(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/Makefile
+	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined --initial-memory=67108864 --max-memory=67108864 \
+	    $(LAB_WASM_OBJS) -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.
 # Keep this Lab-specific: native library builds do not need a WebAssembly toolchain.
@@ -89,14 +105,40 @@ $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) $(LAB_TEST_BIN) $(LAB_BUILD_DIR)/test
 
 # Native Lab build rules. Included by the root Makefile after library variables.
 # The local Makefile delegates to this same graph, reusing MARS dependency checks.
+$(LAB_WORKER_OBJS) $(LAB_WORKER_BINS): | native-tools check-deps
+
+$(LAB_WORKER_DIR)/%.o: tools/mars_lab/workers/%.c tools/mars_lab/Makefile Makefile
+	@mkdir -p $(dir $@) $(dir $@).deps
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+
+$(LAB_WORKER_DIR)/%: $(LAB_WORKER_DIR)/%.o $(STATIC_LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
+# Preserve the worker command names, with build-only targets beside their sources.
+define LAB_WORKER_ALIAS_RULES
+.PHONY: $(1) tools/mars_lab/workers/$(1)
+$(1): $(2)
+	@$(2) $$(ARGS)
+
+tools/mars_lab/workers/$(1): $(2)
+	@:
+endef
+$(foreach worker,$(LAB_WORKERS),$(eval $(call LAB_WORKER_ALIAS_RULES,$(worker),$(LAB_WORKER_DIR)/$(worker))))
+
+.PHONY: lab-workers
+lab-workers: $(LAB_WORKER_BINS)
+
 $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src \
 	    -DMARS_LAB_ROOT_DIR='"$(CURDIR)"' \
 	    -DMARS_LAB_ASSET_PATH='"$(CURDIR)/tools/mars_lab/assets/index.html"' \
-	    -DMARS_LAB_WORKER_DIR='"$(abspath $(BUILD_DIR)/scratch)"' -c $< -o $@
+	    -DMARS_LAB_WORKER_DIR='"$(abspath $(LAB_WORKER_DIR))"' -c $< -o $@
 
-$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB)
+$(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_WASM_PATH='"$(abspath $(LAB_WASM))"'
+
+$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM)
 	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) -o $@ $(LAB_OBJS) $(STATIC_LIB) $(LDLIBS)
 
@@ -112,8 +154,9 @@ $(LAB_TEST_BIN): $(LAB_TEST_OBJS) $(LAB_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS)
 .PHONY: native-lab lab-build clean-lab
 native-lab: $(LAB_SERVER) $(LAB_WORKER_BINS)
 
-$(LAB_BUILD_DIR)/tests/test_lab_browser: tools/mars_lab/tests/browser/test_lab_browser.c $(LAB_TEST_HEADERS) $(LAB_BUILD_DIR)/tests/test_lab_support.o $(TEST_COMMON_HELPER_OBJS) $(LAB_SUPPORT_OBJS) $(STATIC_LIB) $(LAB_WORKER_BINS)
-	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/tests -o $@ $< \
+LAB_BROWSER_SRCS := tools/mars_lab/tests/browser/test_lab_browser.c tools/mars_lab/tests/browser/test_lab_browser_fixtures.c
+$(LAB_BUILD_DIR)/tests/test_lab_browser: $(LAB_BROWSER_SRCS) tools/mars_lab/tests/browser/test_lab_browser_fixtures.h $(LAB_TEST_HEADERS) $(LAB_BUILD_DIR)/tests/test_lab_support.o $(TEST_COMMON_HELPER_OBJS) $(LAB_SUPPORT_OBJS) $(STATIC_LIB) $(LAB_WORKER_BINS) $(LAB_WASM)
+	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src -Itools/mars_lab/tests -o $@ $(LAB_BROWSER_SRCS) \
 	    $(LAB_BUILD_DIR)/tests/test_lab_support.o $(TEST_COMMON_HELPER_OBJS) $(LAB_SUPPORT_OBJS) $(STATIC_LIB) $(LDFLAGS) $(LDLIBS)
 
 .PHONY: lab-browser-test

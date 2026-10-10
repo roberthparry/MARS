@@ -1,6 +1,6 @@
 /**
  * @file lab_evaluate_fields.c
- * @brief Decode scratch worker records and supply native Lab result cards.
+ * @brief Decode Lab worker records and supply native Lab result cards.
  *
  * Labelled protocol records are selected by binary lookup. Repeated records and
  * multiline native renderings retain their order and contents. Binding arrays

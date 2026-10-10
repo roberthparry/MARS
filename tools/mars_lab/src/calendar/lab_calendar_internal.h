@@ -3,7 +3,7 @@
  * @brief Shared private facilities for the native Lab calendar adapters.
  *
  * Calendar-owned translation units share JSON ownership helpers, validated
- * request options, bounded scratch execution and UI presentation here.
+ * request options, bounded worker execution and UI presentation here.
  * The server should include lab_calendar.h instead.
  */
 #ifndef MARS_LAB_CALENDAR_INTERNAL_H
@@ -53,7 +53,7 @@ void lab_cal_append(json_t *array, json_t *value);
 /** @brief Build an error response and set its HTTP status. */
 json_t *lab_cal_error(unsigned *status, unsigned code, const char *message);
 
-/** @brief Run one native scratch helper with bounded output; return parsed fields on success. */
+/** @brief Run one native Lab worker with bounded output; return parsed fields on success. */
 json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, string_t **diagnostic);
 
 /** @brief Read an environment variable or a named MARS configuration file value. */
@@ -79,6 +79,42 @@ json_t *lab_cal_weather(const json_t *options);
 
 /** @brief Prepare navigation body rows and upcoming events. */
 json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status);
+
+/**
+ * @brief Attach native all/visible worksheet and event presentation variants.
+ * @param response Borrowed mutable almanac response; original fields remain intact.
+ * @return True on success, false on allocation failure or excessive row/event counts.
+ * @details Builds metadata privately before publishing it. Limited to 256 bodies
+ * and 64 events; exact action payloads are copied without mathematical rewriting.
+ */
+bool lab_cal_almanac_presentation(json_t *response);
+
+/**
+ * @brief Render a prepared visibility variant as escaped accessible HTML.
+ * @param response Borrowed worksheet headings.
+ * @param rows Borrowed prepared body rows, at most 256.
+ * @param events Borrowed prepared events, at most 64.
+ * @param visible True for the visible-only variant without the visibility column.
+ * @return Caller-owned markup, or NULL on allocation or bound failure; release with string_free.
+ */
+string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, const json_t *events, bool visible);
+
+/**
+ * @brief Render escaped nearest-totality text and an optional location action.
+ * @param text Borrowed display text.
+ * @param action Borrowed action fields; NULL or a blank town suppresses the button.
+ * @return Caller-owned markup, or NULL on allocation failure; release with string_free.
+ */
+string_t *lab_cal_totality_markup(const char *text, const json_t *action);
+
+/**
+ * @brief Render one calendar or weather section with escaped labels and values.
+ * @param title Borrowed section title; empty selects Calendar.
+ * @param open Whether the details element starts expanded.
+ * @param rows Borrowed label/value rows; empty arrays produce empty markup.
+ * @return Caller-owned markup, or NULL on allocation failure; release with string_free.
+ */
+string_t *lab_cal_section_markup(const char *title, bool open, const json_t *rows);
 
 /** @brief Search named land totality locations for requested events. */
 json_t *lab_cal_totality(const json_t *payload, const json_t *options, unsigned *status);

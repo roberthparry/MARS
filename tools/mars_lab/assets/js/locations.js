@@ -1,419 +1,422 @@
 /**
- * Town selectors, observer coordinates and local-time controls.
+ * Browser timing and Intl adapters for C/WASM calendar location and control projection.
  * Definition-only client script; app.js loads it before shared worksheet state.
  */
 
-function formatTownCoordinate(value, width) {
-  const number = Number(value);
-  if (!Number.isFinite(number))
-    return String(value || '').trim();
-  const sign = number >= 0 ? '+' : '-';
-  const magnitude = Math.abs(number).toFixed(4).padStart(width - 1, '0');
-  return `${sign}${magnitude}`;
-}
-
-function townOptionDisplay(option) {
-  const lat = String(option && option.dataset.latitude || '').trim();
-  const lon = String(option && option.dataset.longitude || '').trim();
-  return {
-    label: option ? option.textContent : '',
-    detail: lat && lon ? `${formatTownCoordinate(lat, 8)}  ${formatTownCoordinate(lon, 9)}` : ''
-  };
-}
-
 function validDateText(value, fallback = DEFAULT_DATETIME_DATE) {
-  const text = String(value || '').trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+    return labDOM.call('lab_location_validate', 1, {value}, fallback, HOLIDAY_JURISDICTION_SET);
 }
 
 function formatAlmanacTimeInput(value) {
-  const text = String(value || '').replace(',', '.');
-  const decimalAt = text.indexOf('.');
-  const clockText = decimalAt >= 0 ? text.slice(0, decimalAt) : text;
-  const fraction = decimalAt >= 0
-    ? text.slice(decimalAt + 1).replace(/\D/g, '')
-    : '';
-  const digits = clockText.replace(/\D/g, '').slice(0, 6);
-  let formatted = digits.slice(0, 2);
-
-  if (digits.length > 2)
-    formatted += ':';
-  if (digits.length > 2)
-    formatted += digits.slice(2, 4);
-  if (digits.length > 4)
-    formatted += ':';
-  if (digits.length > 4)
-    formatted += digits.slice(4, 6);
-  if (decimalAt >= 0 && digits.length === 6)
-    formatted += `.${fraction}`;
-  return formatted;
+    return labFlowContinue(26, {action: 0, value});
 }
 
 function validDatetimeJurisdiction(value, fallback = DEFAULT_DATETIME_JURISDICTION) {
-  const jurisdiction = String(value || '').trim();
-  return HOLIDAY_JURISDICTION_SET.has(jurisdiction) ? jurisdiction : fallback;
+    return labDOM.call('lab_location_validate', 2, {value}, fallback, HOLIDAY_JURISDICTION_SET);
 }
 
 function townsForJurisdiction(jurisdiction) {
-  const code = validDatetimeJurisdiction(jurisdiction, DEFAULT_DATETIME_JURISDICTION);
-  if (Array.isArray(JURISDICTION_TOWN_OPTIONS[code]))
-    return JURISDICTION_TOWN_OPTIONS[code];
-  const country = code.split('-', 1)[0];
-  return Array.isArray(JURISDICTION_TOWN_OPTIONS[country]) ? JURISDICTION_TOWN_OPTIONS[country] : [];
-}
-
-function townOptionValue(town) {
-  return [
-    String(town && town.name || '').trim(),
-    String(town && town.latitude || '').trim(),
-    String(town && town.longitude || '').trim(),
-    String(town && town.elevation || '').trim()
-  ].join('|');
+    return labDOM.call('lab_location_towns', calendarLocationContext(), {value: jurisdiction});
 }
 
 function townValueParts(value) {
-  const parts = String(value || '').split('|');
-  return {
-    name: String(parts[0] || '').trim(),
-    latitude: String(parts[1] || '').trim(),
-    longitude: String(parts[2] || '').trim(),
-    elevation: String(parts[3] || '').trim()
-  };
+    return labFlowContinue(26, {action: 1, value});
 }
 
 function townOptionMatchesValue(option, value) {
-  if (!option || !value)
-    return false;
-  const wanted = townValueParts(value);
-  const candidate = townValueParts(option.value);
-  if (!wanted.name || candidate.name !== wanted.name)
-    return false;
-  if (!numbersNearlyEqual(candidate.latitude, wanted.latitude))
-    return false;
-  if (!numbersNearlyEqual(candidate.longitude, wanted.longitude))
-    return false;
-  return !wanted.elevation || !candidate.elevation || candidate.elevation === wanted.elevation;
+    return labFlowContinue(26, {action: 2, option, value});
 }
 
 function numbersNearlyEqual(left, right, tolerance = 0.000001) {
-  const a = Number(left);
-  const b = Number(right);
-  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tolerance;
+    return Boolean(labWire.exports().lab_forms_nearly_equal(marsFormNumber(left), marsFormNumber(right), tolerance));
 }
 
 function syncRoundedSelect(select) {
-  if (select && typeof select.__marsRebuildRoundedSelect === 'function')
-    select.__marsRebuildRoundedSelect();
-  else if (select && typeof select.__marsSyncRoundedSelect === 'function')
-    select.__marsSyncRoundedSelect();
+    const capabilities = {
+        get rebuild() { return typeof select.__marsRebuildRoundedSelect === 'function'; },
+        get sync() { return typeof select.__marsSyncRoundedSelect === 'function'; }
+    };
+    labDOM.services(labDOM.call('lab_flow_location_select', select, capabilities), labLocationFlowServices());
 }
 
 function selectTownByCoordinates(select, latitude, longitude) {
-  if (!select)
-    return false;
-  const option = Array.from(select.options).find((candidate) =>
-    numbersNearlyEqual(candidate.dataset.latitude, latitude) &&
-    numbersNearlyEqual(candidate.dataset.longitude, longitude)
-  );
-  if (!option)
-    return false;
-  select.value = option.value;
-  syncRoundedSelect(select);
-  return true;
+    return Boolean(labDOM.call('lab_location_coordinates', select, {latitude, longitude}));
 }
 
-function restoreTownSelection(select, jurisdiction, townValue, latitude, longitude) {
-  populateTownSelect(select, jurisdiction, {selectDefault: false});
-  const wanted = String(townValue || '').trim();
-  if (wanted && Array.from(select.options).some((option) => option.value === wanted)) {
-    select.value = wanted;
-    syncRoundedSelect(select);
-    applyRestoredTownSelection(select);
-    return true;
-  }
-  const compatible = Array.from(select.options).find((option) => townOptionMatchesValue(option, wanted));
-  if (compatible) {
-    select.value = compatible.value;
-    syncRoundedSelect(select);
-    applyRestoredTownSelection(select);
-    return true;
-  }
-  if (selectTownByCoordinates(select, latitude, longitude))
-    return true;
-  select.value = '';
-  syncRoundedSelect(select);
-  return false;
+function restoreTownSelection(select, jurisdiction, townValue, latitude, longitude, isCurrent = () => true) {
+    return labFlowContinue(27, {select, jurisdiction, selection: {value: townValue, latitude, longitude}, isCurrent});
 }
 
-function applyRestoredTownSelection(select) {
-  if (select === datetimeTown) {
-    applySelectedTown({
-      townSelect: datetimeTown,
-      latitudeInput: datetimeLatitude,
-      longitudeInput: datetimeLongitude,
-      elevationInput: datetimeElevation,
-      zoneInput: datetimeGmtOffset,
-      dateInput: datetimeDate,
-      resetOffsetTouched: true
-    });
-  } else if (select === almanacTown) {
-    applySelectedTown({
-      townSelect: almanacTown,
-      latitudeInput: almanacLatitude,
-      longitudeInput: almanacLongitude,
-      elevationInput: almanacElevation,
-      zoneInput: almanacZone,
-      dateInput: almanacDate
-    });
-  }
-}
-
-function populateTownSelect(select, jurisdiction, {selectDefault = true} = {}) {
-  if (!select)
-    return [];
-  const previous = String(select.value || '');
-  const towns = townsForJurisdiction(jurisdiction);
-  select.textContent = '';
-
-  towns.forEach((town, index) => {
-    const option = document.createElement('option');
-    option.value = townOptionValue(town) || String(index);
-    option.textContent = String(town.name || 'Location');
-    option.dataset.latitude = String(town.latitude || '');
-    option.dataset.longitude = String(town.longitude || '');
-    option.dataset.elevation = String(town.elevation || '');
-    option.dataset.timezone = String(town.timezone || '');
-    if (town.default)
-      option.dataset.default = '1';
-    select.appendChild(option);
-  });
-
-  if (selectDefault && towns.length) {
-    const defaultIndex = towns.findIndex((town) => !!town.default);
-    select.value = townOptionValue(towns[defaultIndex >= 0 ? defaultIndex : 0]);
-  } else if (previous && Array.from(select.options).some((option) => option.value === previous)) {
-    select.value = previous;
-  } else if (towns.length) {
-    select.value = townOptionValue(towns[0]);
-  } else {
-    select.value = '';
-  }
-  syncRoundedSelect(select);
-  return towns;
+function populateTownSelect(select, jurisdiction, {selectDefault = true, isCurrent = () => true} = {}) {
+    return labFlowContinue(28, {select, jurisdiction, selectDefault, isCurrent});
 }
 
 function selectedTownOption(select) {
-  if (!select || !select.value)
-    return null;
-  const byValue = Array.from(select.options).find((option) => option.value === select.value);
-  return byValue || select.selectedOptions[0] || null;
+    return labDOM.call('lab_location_selected', select);
 }
 
 function clearTownForCustomCoordinates(townSelect, latitudeInput, longitudeInput, elevationInput) {
-  const option = selectedTownOption(townSelect);
-  if (!option)
-    return;
-  const latitudeMatches = numbersNearlyEqual(option.dataset.latitude, latitudeInput && latitudeInput.value);
-  const longitudeMatches = numbersNearlyEqual(option.dataset.longitude, longitudeInput && longitudeInput.value);
-  const selectedElevation = String(option.dataset.elevation || '').trim();
-  const currentElevation = String(elevationInput && elevationInput.value || '').trim();
-  const elevationMatches = !selectedElevation || !currentElevation ||
-    numbersNearlyEqual(selectedElevation, currentElevation, 0.01);
-  if (latitudeMatches && longitudeMatches && elevationMatches)
-    return;
-  townSelect.value = '';
-  syncRoundedSelect(townSelect);
+    labDOM.call('lab_location_clear_custom', townSelect, latitudeInput, longitudeInput, elevationInput);
 }
 
 function timeZoneOffsetHours(timeZone, dateText) {
-  if (!timeZone)
-    return null;
-  const parsed = validDateText(dateText, '');
-  if (!parsed)
-    return null;
-  const probe = new Date(`${parsed}T12:00:00Z`);
-  if (Number.isNaN(probe.getTime()))
-    return null;
-  try {
-    const formatter = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    const parts = Object.fromEntries(formatter.formatToParts(probe).map((part) => [part.type, part.value]));
-    const localAsUtc = Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-      Number(parts.hour),
-      Number(parts.minute),
-      Number(parts.second)
-    );
-    return (localAsUtc - probe.getTime()) / 3600000;
-  } catch (_) {
-    return null;
-  }
+    if (!timeZone)
+        return null;
+    const parsed = parseMarsIsoDate(dateText);
+    if (!parsed)
+        return null;
+    const forms = labWire.exports();
+    const probe = new Date(forms.lab_forms_utc_milliseconds(parsed.year, parsed.month, parsed.day, 12, 0, 0));
+    if (Number.isNaN(probe.getTime()))
+        return null;
+    try {
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+            timeZone,
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const parts = Object.fromEntries(formatter.formatToParts(probe).map((part) => [part.type, part.value]));
+        const localAsUtc = forms.lab_forms_utc_milliseconds(
+            marsFormNumber(parts.year), marsFormNumber(parts.month), marsFormNumber(parts.day),
+            marsFormNumber(parts.hour), marsFormNumber(parts.minute), marsFormNumber(parts.second));
+        const offset = forms.lab_forms_offset_hours(localAsUtc, probe.getTime());
+        return Number.isFinite(offset) ? offset : null;
+    } catch (_) {
+        return null;
+    }
 }
 
 function formatOffsetHours(offset) {
-  if (offset === null || !Number.isFinite(offset))
-    return '';
-  if (Math.abs(offset - Math.round(offset)) < 1e-9)
-    return String(Math.round(offset));
-  return String(Math.round(offset * 100) / 100);
+    if (offset === null || !Number.isFinite(offset))
+        return '';
+    const rounded = labWire.exports().lab_forms_round_offset(offset);
+    return Number.isFinite(rounded) ? String(rounded) : '';
 }
 
-function applySelectedTown({townSelect, latitudeInput, longitudeInput, elevationInput, zoneInput, dateInput, resetOffsetTouched = false} = {}) {
-  const option = selectedTownOption(townSelect);
-  if (!option)
-    return false;
-  if (latitudeInput && option.dataset.latitude)
-    latitudeInput.value = option.dataset.latitude;
-  if (longitudeInput && option.dataset.longitude)
-    longitudeInput.value = option.dataset.longitude;
-  if (elevationInput && option.dataset.elevation)
-    elevationInput.value = option.dataset.elevation;
-  if (zoneInput) {
-    const offset = timeZoneOffsetHours(option.dataset.timezone || '', dateInput && dateInput.value);
-    const offsetText = formatOffsetHours(offset);
-    if (offsetText)
-      zoneInput.value = offsetText;
-  }
-  if (resetOffsetTouched) {
-    datetimeAutoGmtOffset = String(zoneInput && zoneInput.value || '').trim();
-    datetimeGmtOffsetTouched = false;
-  }
-  syncRoundedSelect(townSelect);
-  return true;
+function applySelectedTown(controls = {}) {
+    const option = selectedTownOption(controls.townSelect);
+    const offset = formatOffsetHours(timeZoneOffsetHours(option?.dataset.timezone, controls.dateInput?.value));
+    const context = calendarLocationContext();
+    const applied = labDOM.call('lab_location_apply_town', controls, offset, context);
+    acceptCalendarLocationContext(context);
+    return Boolean(applied);
 }
 
 function syncTownSelectors({selectDefault = false} = {}) {
-  populateTownSelect(
-    datetimeTown,
-    datetimeJurisdiction && datetimeJurisdiction.value,
-    {selectDefault}
-  );
-  populateTownSelect(
-    almanacTown,
-    almanacJurisdiction && almanacJurisdiction.value,
-    {selectDefault}
-  );
+    return labFlowContinue(29, {selectDefault});
+}
+
+const calendarSchemas = new Map();
+
+function calendarLocationContext() {
+    return {
+        config: labConfig,
+        jurisdictions: HOLIDAY_JURISDICTION_SET,
+        towns: JURISDICTION_TOWN_OPTIONS,
+        visibility: almanacVisibilityMode,
+        automaticOffset: datetimeAutoGmtOffset,
+        offsetTouched: datetimeGmtOffsetTouched
+    };
+}
+
+function acceptCalendarLocationContext(context) {
+    almanacVisibilityMode = context.visibility;
+    datetimeAutoGmtOffset = context.automaticOffset;
+    datetimeGmtOffsetTouched = context.offsetTouched;
+}
+
+function calendarSchema(mode) {
+    if (!calendarSchemas.has(mode))
+        calendarSchemas.set(mode, labDOM.call('lab_location_schema', workspaceModeId(mode)));
+    return calendarSchemas.get(mode);
+}
+
+function readCalendarControls(mode) {
+    return labDOM.call('lab_location_read', workspaceModeId(mode), calendarLocationContext());
+}
+
+function calendarState(mode, source, operation, prefix = '') {
+    const state = labDOM.call(
+        'lab_location_state', workspaceModeId(mode), operation, source, prefix, calendarLocationContext(), 0);
+    if (!state)
+        throw new Error('Invalid calendar state operation');
+    return state;
+}
+
+function applyCalendarState(mode, source, operation = 0, prefix = '') {
+    const context = calendarLocationContext();
+    const state = labDOM.call('lab_location_state', workspaceModeId(mode), operation, source, prefix, context, 1);
+    if (!state)
+        throw new Error('Invalid calendar state operation');
+    acceptCalendarLocationContext(context);
+    return state;
+}
+
+function restoreCalendarHistory(mode, source, isCurrent = () => true) {
+    return labFlowContinue(30, {mode, source, isCurrent});
+}
+
+function calendarElements(mode) {
+    return labDOM.call('lab_location_elements', workspaceModeId(mode));
+}
+
+function calendarTownControls(mode, coordinates = true) {
+    return labDOM.call('lab_location_controls', workspaceModeId(mode), Number(coordinates));
 }
 
 function restoreDatetimeDefaultsIfBlank() {
-  if (datetimeDate && !datetimeDate.value)
-    datetimeDate.value = DEFAULT_DATETIME_DATE;
-  if (datetimeStart && !datetimeStart.value)
-    datetimeStart.value = datetimeDate?.value || DEFAULT_DATETIME_DATE;
-  if (datetimeEnd && !datetimeEnd.value)
-    datetimeEnd.value = datetimeDate?.value || DEFAULT_DATETIME_DATE;
-  if (datetimeYear && !datetimeYear.value)
-    datetimeYear.value = String((datetimeDate?.value || DEFAULT_DATETIME_DATE).slice(0, 4));
-  if (datetimeJurisdiction && !datetimeJurisdiction.value)
-    setSelectValue(datetimeJurisdiction, DEFAULT_DATETIME_JURISDICTION);
-  if (datetimeLatitude && !datetimeLatitude.value)
-    datetimeLatitude.value = DEFAULT_DATETIME_LATITUDE;
-  if (datetimeLongitude && !datetimeLongitude.value)
-    datetimeLongitude.value = DEFAULT_DATETIME_LONGITUDE;
-  if (datetimeElevation && !datetimeElevation.value)
-    datetimeElevation.value = DEFAULT_DATETIME_ELEVATION;
-}
-
-function currentDatetimeState() {
-  restoreDatetimeDefaultsIfBlank();
-  const currentOffsetText = String(datetimeGmtOffset && datetimeGmtOffset.value || '').trim();
-  const effectiveOffsetText = (!datetimeGmtOffsetTouched || currentOffsetText === datetimeAutoGmtOffset)
-    ? ''
-    : currentOffsetText;
-  return {
-    date: validDateText(datetimeDate && datetimeDate.value),
-    jdn: String(datetimeJdn && datetimeJdn.value || '').trim(),
-    start: validDateText(datetimeStart && datetimeStart.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
-    end: validDateText(datetimeEnd && datetimeEnd.value, datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE),
-    year: String(datetimeYear && datetimeYear.value || (datetimeDate && datetimeDate.value || DEFAULT_DATETIME_DATE).slice(0, 4)).trim(),
-    jurisdiction: validDatetimeJurisdiction(datetimeJurisdiction && datetimeJurisdiction.value),
-    town: String(datetimeTown && datetimeTown.value || '').trim(),
-    latitude: String(datetimeLatitude && datetimeLatitude.value || DEFAULT_DATETIME_LATITUDE).trim(),
-    longitude: String(datetimeLongitude && datetimeLongitude.value || DEFAULT_DATETIME_LONGITUDE).trim(),
-    elevation: String(datetimeElevation && datetimeElevation.value || DEFAULT_DATETIME_ELEVATION).trim(),
-    gmt_offset: effectiveOffsetText
-  };
+    applyCalendarState('datetime', readCalendarControls('datetime'), 2);
 }
 
 function restoreAlmanacDefaultsIfBlank() {
-  if (almanacDate && !almanacDate.value)
-    almanacDate.value = DEFAULT_ALMANAC_DATE;
-  if (almanacTime && !almanacTime.value)
-    almanacTime.value = DEFAULT_ALMANAC_TIME;
-  if (almanacZone && !almanacZone.value)
-    almanacZone.value = DEFAULT_ALMANAC_ZONE;
-  if (almanacJurisdiction && !almanacJurisdiction.value)
-    setSelectValue(almanacJurisdiction, DEFAULT_DATETIME_JURISDICTION);
-  if (almanacLatitude && !almanacLatitude.value)
-    almanacLatitude.value = DEFAULT_ALMANAC_LATITUDE;
-  if (almanacLongitude && !almanacLongitude.value)
-    almanacLongitude.value = DEFAULT_ALMANAC_LONGITUDE;
-  if (almanacElevation && !almanacElevation.value)
-    almanacElevation.value = DEFAULT_ALMANAC_ELEVATION;
-  almanacVisibilityMode = validAlmanacVisibility(almanacVisibilityMode, DEFAULT_ALMANAC_VISIBILITY);
+    applyCalendarState('almanac', readCalendarControls('almanac'), 2);
 }
 
-function validAlmanacVisibility(value, fallback = DEFAULT_ALMANAC_VISIBILITY) {
-  const raw = String(value || '').trim().toLowerCase();
-  return raw === 'visible' || raw === 'all' ? raw : fallback;
+function currentDatetimeState() {
+    return currentCalendarState('datetime');
 }
 
 function currentAlmanacState() {
-  restoreAlmanacDefaultsIfBlank();
-  return {
-    date: validDateText(almanacDate && almanacDate.value, DEFAULT_ALMANAC_DATE),
-    time: String(almanacTime && almanacTime.value || DEFAULT_ALMANAC_TIME).trim(),
-    zone: String(almanacZone && almanacZone.value || DEFAULT_ALMANAC_ZONE).trim(),
-    jurisdiction: validDatetimeJurisdiction(almanacJurisdiction && almanacJurisdiction.value),
-    town: String(almanacTown && almanacTown.value || '').trim(),
-    latitude: String(almanacLatitude && almanacLatitude.value || DEFAULT_ALMANAC_LATITUDE).trim(),
-    longitude: String(almanacLongitude && almanacLongitude.value || DEFAULT_ALMANAC_LONGITUDE).trim(),
-    elevation: String(almanacElevation && almanacElevation.value || DEFAULT_ALMANAC_ELEVATION).trim(),
-    visibility: validAlmanacVisibility(almanacVisibilityMode, DEFAULT_ALMANAC_VISIBILITY)
-  };
+    return currentCalendarState('almanac');
+}
+
+function currentCalendarState(mode) {
+    const context = calendarLocationContext();
+    const state = labDOM.call('lab_location_current', workspaceModeId(mode), context);
+    acceptCalendarLocationContext(context);
+    return state;
+}
+
+function validAlmanacVisibility(value, fallback = DEFAULT_ALMANAC_VISIBILITY) {
+    return labDOM.call('lab_location_validate', 3, {value}, fallback, HOLIDAY_JURISDICTION_SET);
 }
 
 function almanacSummaryText(state = currentAlmanacState()) {
-  return [
-    ALMANAC_WORKSHEET_TITLE,
-    `Date: ${state.date}`,
-    `GMT time: ${state.time}`,
-    `Jurisdiction: ${state.jurisdiction}`,
-    `Zone: ${state.zone}`,
-    `Latitude: ${state.latitude}`,
-    `Longitude: ${state.longitude}`,
-    `Altitude: ${state.elevation} m`,
-    `Show bodies: ${state.visibility === 'visible' ? 'visible only' : 'all bodies'}`
-  ].join('\n');
+    return labDOM.call('lab_location_summary', 6, state, ALMANAC_WORKSHEET_TITLE);
 }
 
 function datetimeSummaryText(state = currentDatetimeState()) {
-  return [
-    'MARS datetime observation',
-    `Date: ${state.date}`,
-    state.jdn ? `Julian Day Number: ${state.jdn}` : '',
-    `Range: ${state.start} to ${state.end}`,
-    `Year: ${state.year}`,
-    `Holiday jurisdiction: ${state.jurisdiction}`,
-    `Location: ${state.latitude}, ${state.longitude}`,
-    `GMT offset: ${state.gmt_offset || 'local machine offset'}`
-  ].filter(Boolean).join('\n');
+    return labDOM.call('lab_location_summary', 5, state, '');
+}
+
+function applyCalendarEvaluationFields(mode, data) {
+    const context = calendarLocationContext();
+    labDOM.call('lab_location_evaluation', workspaceModeId(mode), data, context);
+    acceptCalendarLocationContext(context);
 }
 
 function setDatetimeLocalText(text, sections = null) {
-  const body = String(text || '').trim();
-  if (datetimeLocalBody)
-    renderDatetimeSections(datetimeLocalBody, null, sections, body);
-  if (datetimeLocal)
-    datetimeLocal.classList.toggle('hidden', !body || currentMode() !== 'datetime');
+    labDOM.services(
+        labDOM.call('lab_flow_location_local', {value: text}, sections, datetimeLocalBody, datetimeLocal),
+        labLocationFlowServices());
+}
+
+function applyAlmanacTotalityAction(button) {
+    return labFlowContinue(31, {button});
+}
+
+function refreshCalendarJurisdictionLocation(mode, {updateCoordinates = true} = {}) {
+    return labFlowContinue(32, {mode, updateCoordinates});
+}
+
+function refreshDatetimeJurisdictionLocation(options) {
+    return refreshCalendarJurisdictionLocation('datetime', options);
+}
+
+function refreshAlmanacJurisdictionLocation(options) {
+    return refreshCalendarJurisdictionLocation('almanac', options);
+}
+
+function triggerDatetimeAutoEvaluation({refreshJurisdiction = false, refreshCoordinates = false} = {}) {
+    return labFlowContinue(33, {mode: 'datetime', options: {refreshJurisdiction, refreshCoordinates}});
+}
+
+function triggerAlmanacAutoEvaluation({refreshJurisdiction = false, refreshCoordinates = false} = {}) {
+    return labFlowContinue(33, {mode: 'almanac', options: {refreshJurisdiction, refreshCoordinates}});
+}
+
+/** Format time through native services, retaining request and authored-input ownership. */
+function formatAlmanacTimeFromEvent() {
+    return labFlowContinue(34, {});
+}
+
+/** Deliver native calendar actions to asynchronous location and evaluation services. */
+function applyCalendarControlEvent(mode, actions) {
+    void labFlowContinue(35, {mode, actions});
+}
+
+// Resolve browser-owned controls and application callbacks only when a native continuation executes them.
+let labLocationRegistry;
+function labLocationFlowServices() {
+    return labLocationRegistry ||= Object.freeze({
+        locForms: request => requestLabForms(request),
+        locCurrent: callback => callback(),
+        locAwait: promise => promise,
+        locTowns: jurisdiction => townsForJurisdiction(jurisdiction),
+        locPopulate: (...args) => populateTownSelect(...args),
+        locRestore: (...args) => restoreTownSelection(...args),
+        locApplyTown: controls => applySelectedTown(controls),
+        locElements: mode => calendarElements(mode),
+        locControls: (...args) => calendarTownControls(...args),
+        locApplyState: (...args) => applyCalendarState(...args),
+        locState: (...args) => calendarState(...args),
+        locRead: mode => readCalendarControls(mode),
+        locContext: () => calendarLocationContext(),
+        locAcceptContext: context => acceptCalendarLocationContext(context),
+        locBegin: (...args) => labRequests.begin(...args),
+        locFinish: request => labRequests.finish(request),
+        locRestoreTotality: (state, request) => restoreTownSelection(
+            almanacTown, state.jurisdiction, state.town, state.latitude, state.longitude,
+            () => labRequests.current(request)),
+        locSaveAlmanac: () => saveLastAlmanacState(),
+        locSaveDatetime: () => saveLastDatetimeState(),
+        locEvaluateCurrent: () => evaluateCurrentMode(),
+        locStatus: status => setStatus(status),
+        locError: message => setRenderedError(message),
+        locCoordinates: (...args) => selectTownByCoordinates(...args),
+        locResponse: (mode, data, context, update, applied) => labDOM.call(
+            'lab_location_response', workspaceModeId(mode), data, context, Number(update), Number(!!applied)),
+        locClearAlmanac: () => almanacLastWorksheetData = null,
+        locRefreshAlmanac: options => refreshAlmanacJurisdictionLocation(options),
+        locRefreshDatetime: options => refreshDatetimeJurisdictionLocation(options),
+        locEvaluateAlmanac: options => evaluateAlmanac(options),
+        locEvaluateDatetime: options => evaluateDatetime(options),
+        locTriggerAlmanac: options => triggerAlmanacAutoEvaluation(options),
+        locTriggerDatetime: options => triggerDatetimeAutoEvaluation(options),
+        locTimeSnapshot: () => ({authored: almanacTime.value, context: labRequests.context(),
+                                main: labRequests.latestMain(), element: almanacTime}),
+        locLatestMain: () => labRequests.latestMain(),
+        locFormatTime: text => formatAlmanacTimeInput(text),
+        locTimeApply: (input, text) => {
+            input.value = text;
+            input.setSelectionRange(text.length, text.length);
+        },
+        locClearCustom: (...args) => clearTownForCustomCoordinates(...args),
+        locRenderLocal: (node, sections, text) => renderDatetimeSections(node, null, sections, text),
+        locLocalVisible: card => labDOM.call('lab_flow_location_visibility', card, currentMode()),
+        locLocalHidden: card => card.classList.add('hidden'),
+        locSelectRebuild: select => select.__marsRebuildRoundedSelect(),
+        locSelectSync: select => select.__marsSyncRoundedSelect(),
+        locRenderPicker: () => renderMarsDatePicker()
+    });
+}
+
+
+/** DOM event delivery for menus whose projection and keyboard policy live in C/WASM. */
+function enhanceRoundedSelect(select, options = {}) {
+    if (!labDOM.call('lab_select_enhance', select, options, document))
+        return null;
+    const sync = () => labDOM.call('lab_select_sync', select);
+    const close = () => labDOM.call('lab_select_event', select, 3, 0, null);
+    select.__marsSyncRoundedSelect = sync;
+    select.__marsRebuildRoundedSelect = () => labDOM.call('lab_select_refresh', select, options);
+    return {sync, close};
+}
+
+// Browser date conversion and clock access; C owns picker policy and DOM projection.
+// Browser form controls perform text conversion; C receives structured numbers only.
+function marsFormNumber(value) {
+    if (typeof value === 'number')
+        return value;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.value = String(value ?? '').trim();
+    return input.valueAsNumber;
+}
+
+function parseMarsIsoDate(text) {
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.value = String(text || '').trim();
+    const date = input.valueAsDate;
+    if (!date)
+        return null;
+    const year = date.getUTCFullYear(), month = date.getUTCMonth() + 1, day = date.getUTCDate();
+    return labWire.exports().lab_forms_date_valid(year, month, day) ? {year, month, day} : null;
+}
+
+function marsIsoDate(year, month, day) {
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function marsClockTime(hours, minutes, seconds) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function marsTodayIsoDate() {
+    const now = new Date();
+    return marsIsoDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+function marsCurrentGmtMoment(now = new Date()) {
+    return {
+        date: marsIsoDate(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate()),
+        time: marsClockTime(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds())
+    };
+}
+
+function marsTodayIsoDateForInput(input) {
+    return labDOM.call('lab_widgets_picker_today_date', input, marsTodayIsoDate(), marsCurrentGmtMoment().date);
+}
+
+
+function closeMarsDatePicker({restoreFocus = false} = {}) {
+    labDOM.call('lab_widgets_picker_close', marsDatePickerState, Number(restoreFocus));
+}
+
+function marsDatePickerAnchorRect(shell) {
+    return labDOM.call('lab_widgets_picker_anchor', shell);
+}
+
+function placeMarsDatePicker(shell) {
+    labDOM.call('lab_widgets_picker_place', marsDatePickerState, shell, window.innerWidth, window.innerHeight);
+}
+
+function commitMarsDateValue(input, value) {
+    return !!labDOM.call('lab_widgets_date_commit', input, String(value));
+}
+
+function commitMarsTodayValue(input) {
+    labDOM.call('lab_widgets_picker_today', input, marsTodayIsoDate(), marsCurrentGmtMoment());
+}
+
+function renderMarsDatePicker() {
+    const input = marsDatePickerState.input;
+    labDOM.call(
+        'lab_widgets_picker_render', marsDatePickerState, parseMarsIsoDate(input?.value),
+        parseMarsIsoDate(marsTodayIsoDateForInput(input)), window.innerWidth, window.innerHeight);
+}
+
+function openMarsDatePicker(input, button) {
+    labDOM.call(
+        'lab_widgets_picker_open', marsDatePickerState, input, button, parseMarsIsoDate(input?.value),
+        parseMarsIsoDate(marsTodayIsoDateForInput(input)), new Date().getFullYear(), window.innerWidth,
+        window.innerHeight);
+}
+
+function setMarsDatePickerMonthYear(year, month, {commit = false} = {}) {
+    const moved = labDOM.call(
+        'lab_widgets_picker_move', marsDatePickerState, 0, marsFormNumber(year), marsFormNumber(month),
+        parseMarsIsoDate(marsDatePickerState.input?.value), new Date().getFullYear(), Number(!!commit));
+    labDOM.services(labDOM.call('lab_flow_location_picker', Number(!!moved)), labLocationFlowServices());
+}
+
+function shiftMarsDatePicker(delta, years) {
+    const moved = labDOM.call(
+        'lab_widgets_picker_move', marsDatePickerState, 1 + Number(!!years), delta, 0,
+        parseMarsIsoDate(marsDatePickerState.input?.value), new Date().getFullYear(), 1);
+    labDOM.services(labDOM.call('lab_flow_location_picker', Number(!!moved)), labLocationFlowServices());
+}
+
+function shiftMarsDatePickerYear(delta) {
+    shiftMarsDatePicker(delta, true);
+}
+
+function shiftMarsDatePickerMonth(delta) {
+    shiftMarsDatePicker(delta, false);
 }

@@ -13,11 +13,18 @@
 #include "file.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
+#include "lab_forms.h"
 #include "lab_mobile.h"
 #include "lab_page.h"
+#include "lab_presentation.h"
+#include "lab_state.h"
+#include "lab_wire.h"
 #include "lab_server.h"
 #include "lab_server_internal.h"
-#include "lab_state.h"
+
+#ifndef MARS_LAB_WASM_PATH
+#define MARS_LAB_WASM_PATH "tools/mars_lab/build/release/wasm/lab_browser.wasm"
+#endif
 
 struct lab_server {
     websrv_t *listener;
@@ -48,14 +55,25 @@ static const string_t *lab_svr_request_header(const websrv_request_t *request, c
     return value;
 }
 
-static bool lab_svr_message(websrv_response_t *response, unsigned status, const char *text)
+static bool lab_svr_value(const websrv_request_t *request, websrv_response_t *response, const json_t *value)
+{
+    (void)request;
+    array_t *bytes = lab_wire_encode(value);
+    bool ok = bytes && lab_svr_header(response, "Content-Type", "application/x-protobuf") &&
+              websrv_response_body(response, array_get(bytes, 0), array_size(bytes));
+    array_destroy(bytes);
+    return ok;
+}
+
+static bool lab_svr_message(const websrv_request_t *request, websrv_response_t *response, unsigned status,
+                            const char *text)
 {
     json_t *json = json_new_object(), *ok = json_new_bool(false);
     string_t *key = string_new_with("ok"), *error_key = string_new_with("error"), *error = string_new_with(text);
     json_t *value = error ? json_new_string(error) : NULL;
     bool result = json && ok && key && error_key && value && json_object_set(json, key, ok) &&
                   json_object_set(json, error_key, value) && websrv_response_status(response, status) &&
-                  websrv_response_json(response, json);
+                  lab_svr_value(request, response, json);
     json_free(json);
     json_free(ok);
     json_free(value);
@@ -65,7 +83,8 @@ static bool lab_svr_message(websrv_response_t *response, unsigned status, const 
     return result;
 }
 
-static bool lab_svr_static_asset(websrv_response_t *response, const char *path, const char *type)
+static bool lab_svr_static_asset(const websrv_request_t *request, websrv_response_t *response,
+                                 const char *path, const char *type)
 {
     file_t *file = file_new_cstr(path);
     file_info_t *info = file ? file_get_info(file) : NULL;
@@ -74,7 +93,7 @@ static bool lab_svr_static_asset(websrv_response_t *response, const char *path, 
     bool ok =
         bytes ? lab_svr_header(response, "Content-Type", type) &&
                     websrv_response_body(response, array_size(bytes) ? array_get(bytes, 0) : NULL, array_size(bytes))
-              : lab_svr_message(response, 404, "Asset not found");
+              : lab_svr_message(request, response, 404, "Asset not found");
     array_destroy(bytes);
     file_info_free(info);
     file_free(file);
@@ -89,6 +108,8 @@ struct lab_svr_asset {
 
 /* Enumerated once at registration, then resolved by the webserver's route index. */
 static const struct lab_svr_asset lab_svr_assets[] = {
+    {"/wasm/lab_browser.wasm", MARS_LAB_WASM_PATH, "application/wasm"},
+    {"/js/transport.js", "tools/mars_lab/assets/js/transport.js", "text/javascript; charset=utf-8"},
     {"/index.css", "tools/mars_lab/assets/index.css", "text/css; charset=utf-8"},
     {"/css/theme.css", "tools/mars_lab/assets/css/theme.css", "text/css; charset=utf-8"},
     {"/css/layout.css", "tools/mars_lab/assets/css/layout.css", "text/css; charset=utf-8"},
@@ -101,25 +122,12 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/css/results.css", "tools/mars_lab/assets/css/results.css", "text/css; charset=utf-8"},
     {"/css/help.css", "tools/mars_lab/assets/css/help.css", "text/css; charset=utf-8"},
     {"/css/responsive.css", "tools/mars_lab/assets/css/responsive.css", "text/css; charset=utf-8"},
-    {"/catalogue.json", "tools/mars_lab/assets/catalogue.json", "application/json"},
-    {"/js/almanac.js", "tools/mars_lab/assets/js/almanac.js", "text/javascript; charset=utf-8"},
     {"/js/api.js", "tools/mars_lab/assets/js/api.js", "text/javascript; charset=utf-8"},
     {"/js/app.js", "tools/mars_lab/assets/js/app.js", "text/javascript; charset=utf-8"},
     {"/js/bindings.js", "tools/mars_lab/assets/js/bindings.js", "text/javascript; charset=utf-8"},
-    {"/js/calculus.js", "tools/mars_lab/assets/js/calculus.js", "text/javascript; charset=utf-8"},
-    {"/js/controls.js", "tools/mars_lab/assets/js/controls.js", "text/javascript; charset=utf-8"},
-    {"/js/date_picker.js", "tools/mars_lab/assets/js/date_picker.js", "text/javascript; charset=utf-8"},
-    {"/js/editor.js", "tools/mars_lab/assets/js/editor.js", "text/javascript; charset=utf-8"},
-    {"/js/evaluation.js", "tools/mars_lab/assets/js/evaluation.js", "text/javascript; charset=utf-8"},
-    {"/js/events.js", "tools/mars_lab/assets/js/events.js", "text/javascript; charset=utf-8"},
-    {"/js/integrator.js", "tools/mars_lab/assets/js/integrator.js", "text/javascript; charset=utf-8"},
     {"/js/locations.js", "tools/mars_lab/assets/js/locations.js", "text/javascript; charset=utf-8"},
-    {"/js/mobile.js", "tools/mars_lab/assets/js/mobile.js", "text/javascript; charset=utf-8"},
-    {"/js/result_layout.js", "tools/mars_lab/assets/js/result_layout.js", "text/javascript; charset=utf-8"},
-    {"/js/result_text.js", "tools/mars_lab/assets/js/result_text.js", "text/javascript; charset=utf-8"},
     {"/js/results.js", "tools/mars_lab/assets/js/results.js", "text/javascript; charset=utf-8"},
     {"/js/state.js", "tools/mars_lab/assets/js/state.js", "text/javascript; charset=utf-8"},
-    {"/js/worksheet.js", "tools/mars_lab/assets/js/worksheet.js", "text/javascript; charset=utf-8"},
     {"/js/workspace.js", "tools/mars_lab/assets/js/workspace.js", "text/javascript; charset=utf-8"},
 };
 
@@ -130,8 +138,8 @@ static bool lab_svr_asset_request(const websrv_request_t *request, websrv_respon
         !lab_svr_header(response, "X-Content-Type-Options", "nosniff"))
         return false;
     if (!lab_svr_request_permitted(request))
-        return lab_svr_message(response, 403, "MARS Lab is private; use this machine or a private network.");
-    return lab_svr_static_asset(response, asset->path, asset->type);
+        return lab_svr_message(request, response, 403, "MARS Lab is private; use this machine or a private network.");
+    return lab_svr_static_asset(request, response, asset->path, asset->type);
 }
 
 static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t *response, void *context)
@@ -141,7 +149,7 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         !lab_svr_header(response, "X-Content-Type-Options", "nosniff"))
         return false;
     if (!lab_svr_request_permitted(request))
-        return lab_svr_message(response, 403, "MARS Lab is private; use this machine or a private network.");
+        return lab_svr_message(request, response, 403, "MARS Lab is private; use this machine or a private network.");
     const string_t *path = websrv_request_path(request);
     if (websrv_request_method(request) == HTTP_GET) {
         if (lab_svr_equal(path, "/") || lab_svr_equal(path, "/index.html")) {
@@ -159,76 +167,97 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             json_free(state);
             return ok;
         }
+        if (lab_svr_equal(path, "/bootstrap")) {
+            json_t *state = lab_state_load();
+            json_t *config = state ? lab_page_bootstrap(state) : NULL;
+            bool ok = config ? lab_svr_value(request, response, config)
+                             : lab_svr_message(request, response, 500, "Could not load Lab configuration");
+            json_free(config);
+            json_free(state);
+            return ok;
+        }
         if (lab_svr_equal(path, "/state")) {
             json_t *state = lab_state_load();
-            bool ok = state && websrv_response_json(response, state);
+            bool ok = state && lab_svr_value(request, response, state);
             json_free(state);
             return ok;
         }
         if (lab_svr_equal(path, "/jurisdictions")) {
             json_t *catalogue = lab_page_jurisdictions();
-            bool ok = catalogue && websrv_response_json(response, catalogue);
+            bool ok = catalogue && lab_svr_value(request, response, catalogue);
+            json_free(catalogue);
+            return ok;
+        }
+        if (lab_svr_equal(path, "/catalogue")) {
+            json_t *catalogue = lab_page_catalogue();
+            bool ok = catalogue && lab_svr_value(request, response, catalogue);
             json_free(catalogue);
             return ok;
         }
         if (lab_svr_equal(path, "/mobile-access")) {
             json_t *mobile = lab_mobile_details(lab_svr_request_header(request, "Host"), lab_svr_port(server));
-            bool ok = mobile && websrv_response_json(response, mobile);
+            bool ok = mobile && lab_svr_value(request, response, mobile);
             json_free(mobile);
             return ok;
         }
         if (lab_svr_equal(path, "/favicon.svg"))
-            return lab_svr_static_asset(response, "packaging/linux/mars-lab.svg", "image/svg+xml");
+            return lab_svr_static_asset(request, response, "packaging/linux/mars-lab.svg", "image/svg+xml");
         if (lab_svr_equal(path, "/apple-touch-icon.png"))
-            return lab_svr_static_asset(response, "packaging/linux/icon-concepts/wizard-prism-180.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-180.png", "image/png");
         if (lab_svr_equal(path, "/icon-192.png"))
-            return lab_svr_static_asset(response, "packaging/linux/icon-concepts/wizard-prism-192.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-192.png", "image/png");
         if (lab_svr_equal(path, "/icon-512.png"))
-            return lab_svr_static_asset(response, "packaging/linux/icon-concepts/wizard-prism-512.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-512.png", "image/png");
+        /* Browser installation manifests have a standard JSON format, unlike our API messages. */
         const char *body =
-            lab_svr_equal(path, "/manifest.webmanifest")
-                ? "{\"name\":\"MARS Lab\",\"short_name\":\"MARS\",\"start_url\":\"/\",\"display\":\"standalone\","
-                  "\"icons\":[{\"src\":\"/icon-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}]}"
-                : "{\"ok\":true,\"title\":\"Native MARS Lab\",\"hint\":\"Private-network access only\","
-                  "\"url\":\"\",\"qr\":\"\",\"control\":false,\"tailscale\":false}";
+            "{\"name\":\"MARS Lab\",\"short_name\":\"MARS\",\"start_url\":\"/\",\"display\":\"standalone\","
+            "\"icons\":[{\"src\":\"/icon-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}]}";
         string_t *text = string_new_with(body);
-        bool ok = text && lab_svr_header(response, "Content-Type", "application/json") &&
+        bool ok = text && lab_svr_header(response, "Content-Type", "application/manifest+json") &&
                   websrv_response_text(response, text);
         string_free(text);
         return ok;
     }
     if (lab_svr_equal(path, "/funnel-toggle"))
-        return lab_svr_message(response, 410, "Public access switching is disabled in MARS Lab.");
+        return lab_svr_message(request, response, 410, "Public access switching is disabled in MARS Lab.");
     const string_t *type = lab_svr_request_header(request, "Content-Type");
     string_offset_t separator = type ? string_find(type, ";") : -1;
     string_t *media = type ? string_substring(type, 0, separator < 0 ? string_length(type) : (size_t)separator) : NULL;
     if (media)
         string_trim(media);
-    bool is_json = lab_svr_equal(media, "application/json");
+    bool is_wire = lab_svr_equal(media, "application/x-protobuf");
     string_free(media);
-    if (!is_json)
-        return lab_svr_message(response, 415, "Expected application/json");
-    json_t *payload = websrv_request_json(request);
+    if (!is_wire)
+        return lab_svr_message(request, response, 415, "Expected application/x-protobuf");
+    json_t *payload = lab_wire_decode(websrv_request_body(request), websrv_request_body_size(request));
     if (!payload || json_type(payload) != JSON_OBJECT) {
         json_free(payload);
-        return lab_svr_message(response, 400, "Expected a JSON request object");
+        return lab_svr_message(request, response, 400, "Expected a valid versioned Protobuf request object");
     }
     if (lab_svr_equal(path, "/state")) {
         bool saved = lab_state_save(payload);
         json_free(payload);
         if (!saved)
-            return lab_svr_message(response, 500, "Could not save Lab state");
+            return lab_svr_message(request, response, 500, "Could not save Lab state");
         json_t *state = lab_state_load();
-        bool ok = state && websrv_response_json(response, state);
+        bool ok = state && lab_svr_value(request, response, state);
         json_free(state);
         return ok;
     }
     unsigned status = 200;
-    json_t *result = lab_eval_request(path, payload, &status);
+    bool presentation = lab_svr_equal(path, "/presentation"), forms = lab_svr_equal(path, "/forms");
+    json_t *result = presentation ? lab_presentation_request(payload, &status)
+                                 : forms ? lab_forms_request(payload, &status) : lab_eval_request(path, payload, &status);
     if (!result)
         result = lab_cal_request(path, payload, &status);
-    bool ok = result ? websrv_response_status(response, status) && websrv_response_json(response, result)
-                     : lab_svr_message(response, 404, "Unknown Lab operation");
+    if (result && !presentation && !forms && !lab_presentation_adapt(result)) {
+        json_free(result);
+        result = NULL;
+        json_free(payload);
+        return lab_svr_message(request, response, 500, "Could not prepare native presentation metadata");
+    }
+    bool ok = result ? websrv_response_status(response, status) && lab_svr_value(request, response, result)
+                     : lab_svr_message(request, response, 404, "Unknown Lab operation");
     json_free(result);
     json_free(payload);
     return ok;
@@ -239,6 +268,8 @@ static bool lab_svr_register_routes(lab_server_t *server)
 {
     static const char *const get_routes[] = {"/",
                                              "/index.html",
+                                             "/bootstrap",
+                                             "/catalogue",
                                              "/state",
                                              "/jurisdictions",
                                              "/mobile-access",
@@ -248,6 +279,8 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                              "/icon-512.png",
                                              "/manifest.webmanifest"};
     static const char *const post_routes[] = {"/state",
+                                              "/presentation",
+                                              "/forms",
                                               "/eval",
                                               "/goal_seek",
                                               "/function-run",

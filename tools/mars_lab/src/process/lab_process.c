@@ -33,13 +33,13 @@
 #include <unistd.h>
 
 #include "file.h"
-#include "lab_process.h"
 #include "ustring.h"
+#include "lab_process.h"
 
 extern char **environ;
 
 #ifndef MARS_LAB_WORKER_DIR
-#define MARS_LAB_WORKER_DIR "build/release/scratch"
+#define MARS_LAB_WORKER_DIR "tools/mars_lab/build/release/workers"
 #endif
 
 typedef struct {

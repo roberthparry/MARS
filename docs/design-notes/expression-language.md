@@ -7,7 +7,7 @@ language frontend and any future standalone project carry the Ophelia name.
 
 This note records an agreed direction, not a final grammar or a claim that the
 whole language is implemented. A first scalar, equation and matrix frontend now lives in the separate
-native target `scratch/ophelia`, reached through **RUN** on MARS Lab Function
+native target `tools/mars_lab/workers/ophelia`, reached through **RUN** on MARS Lab Function
 cards. Its supported subset and limits are documented in
 [Running Function cards](../mars-lab.md#running-function-cards). Most of the
 language design below remains prospective. Prototype alongside MARS first, then consider
