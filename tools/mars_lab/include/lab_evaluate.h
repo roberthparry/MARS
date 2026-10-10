@@ -2,7 +2,7 @@
  * @file lab_evaluate.h
  * @brief Native mathematical request adapter for MARS Lab.
  *
- * Dispatches mathematical JSON requests to prebuilt scratch workers and maps their
+ * Dispatches mathematical JSON requests to prebuilt Lab workers and maps their
  * labelled output to the Lab UI. Algebra and binding values remain native worker
  * results. The caller owns responses and HTTP/state persistence. Call from the
  * repository root so relative worker paths can be located. The process module

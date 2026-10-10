@@ -1,743 +1,609 @@
 /**
- * Mode selection, workspace visibility, precision and action controls.
- * Definition-only client script; app.js loads it before shared worksheet state.
+ * Workspace state adapters and asynchronous form/request coordination.
+ * C owns workspace DOM projection, control policy and presentation snapshots.
+ * Loaded last, after the definition scripts, to initialise shared browser references
+ * and views of native state before subscriptions and the first evaluation.
  */
 
-function createEmptyModeHistory() {
-  return {
-    expression: [],
-    equation: [],
-    diffequation: [],
-    matrix: [],
-    integrator: [],
-    datetime: [],
-    almanac: []
-  };
+function nextIntegratorFormsRevision() {
+    const revision = labWire.exports().lab_rows_revision_next();
+    if (!revision)
+        throw new Error('Integrator form revision limit reached; reload the Lab');
+    return revision;
+}
+let integratorReferenceMetadata = null;
+
+// This copies structured DOM fields only. Native /forms owns all text interpretation.
+function sanitizeIntegratorRow(row, fallbackName = 'x') {
+    return labDOM.call('lab_binding_row_normalise', row, String(fallbackName));
+}
+
+function integratorFormsExpression() {
+    return currentExpressionText() || expr.value || '';
+}
+
+function installIntegratorReferenceMetadata(expression, result) {
+    integratorReferenceMetadata = labDOM.call('lab_binding_rows_metadata', expression, result);
+}
+
+async function refreshIntegratorForms(rows = currentIntegratorRows(), expression = integratorFormsExpression()) {
+    return labFlowContinue(73, {rows, expression});
+}
+
+const integratorCandidateNames = Object.freeze(labDOM.call('lab_binding_row_names'));
+
+function integratorDefaultVariableName(rows = []) {
+    return labDOM.call('lab_binding_rows_name', rows);
+}
+
+function integratorRowText(row) {
+    return integratorBoundsTextFromRows([row]);
+}
+
+function integratorBoundsTextFromRows(rows) {
+    const text = labDOM.call('lab_binding_rows_text', rows);
+    if (text === null)
+        throw new Error('Integrator rows exceed the native limits or contain invalid Unicode');
+    return text;
+}
+
+async function parseIntegratorBoundsText(text) {
+    return labFlowContinue(74, {text});
+}
+
+function integratorFallbackRows() {
+    return labDOM.call('lab_binding_rows_default', 0);
+}
+
+function integratorBlankRows() {
+    return labDOM.call('lab_binding_rows_default', 1);
+}
+
+function currentIntegratorRows() {
+    return labDOM.call('lab_binding_rows_read', integratorBoundStack);
+}
+
+function activeIntegratorRowPlan(rows = currentIntegratorRows(), expressionText = '') {
+    const plan = labDOM.call(
+        'lab_binding_rows_plan', rows, integratorReferenceMetadata, expressionText || integratorFormsExpression());
+    if (!plan)
+        throw new Error('Invalid integrator row plan');
+    return plan;
+}
+
+function activeIntegratorBoundRows(rows = currentIntegratorRows(), expressionText = '') {
+    return activeIntegratorRowPlan(rows, expressionText).bounds;
+}
+
+function activeIntegratorRows(rows = currentIntegratorRows(), expressionText = '') {
+    return activeIntegratorRowPlan(rows, expressionText).rows;
+}
+
+function currentIntegratorBoundRows() {
+    return activeIntegratorBoundRows();
+}
+
+function currentIntegratorBoundNames() {
+    return new Set(currentIntegratorBoundRows().map((row) => row.name));
+}
+
+function planIntegratorRowEdit(rows, index, operation) {
+    const plan = labDOM.call('lab_binding_rows_edit', rows, index, operation);
+    if (!plan)
+        throw new Error('This edit would remove the last bound or exceed the 256-row form limit');
+    return plan;
+}
+
+function applyIntegratorResultBound(data) {
+    labStateSync(14, {data});
+}
+
+async function restoreIntegratorBoundsText(text, isCurrent = () => true) {
+    return labFlowContinue(75, {text, isCurrent, defaultBounds: DEFAULT_INTEGRATOR_BOUNDS_TEXT});
+}
+
+function currentIntegratorBoundsText() {
+    return integratorBoundsTextFromRows(activeIntegratorRows());
+}
+
+function resetIntegratorBoundsToDefault() {
+    return restoreIntegratorBoundsText(DEFAULT_INTEGRATOR_BOUNDS_TEXT);
+}
+
+function resetIntegratorBoundsToBlank() {
+    renderIntegratorRows(integratorBlankRows());
+}
+
+function requestedIntegratorIntervalCap() {
+    return labWire.intervals(marsFormNumber(integratorIntervalCap?.value), DEFAULT_INTEGRATOR_INTERVAL_CAP);
+}
+
+const WORKSPACE_MODE_NAMES =
+    Object.freeze(['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac']);
+const workspaceEncoder = new TextEncoder();
+const workspaceDecoder = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true});
+
+function workspaceStage(bytes, index = 0) {
+    const native = labWire.exports();
+    if (bytes.length > native.lab_workspace_capacity())
+        throw new Error('Worksheet snapshot exceeds the native 4 MiB limit');
+    new Uint8Array(native.memory.buffer, native.lab_workspace_input(index), bytes.length).set(bytes);
+    return bytes.length;
+}
+
+function workspaceStageText(text, index = 0) {
+    const bytes = workspaceEncoder.encode(String(text));
+    if (workspaceDecoder.decode(bytes) !== String(text))
+        throw new Error('Worksheet text contains an unpaired Unicode surrogate');
+    return workspaceStage(bytes, index);
+}
+
+function workspaceModeId(mode) {
+    const length = workspaceStageText(String(mode || '').trim());
+    return labWire.exports().lab_workspace_mode_id(length);
+}
+
+function workspaceStageSnapshot(state, index = 0) {
+    return workspaceStage(labWire.encode({state: state || null}), index);
+}
+
+function workspaceReadBytes(length) {
+    if (length < 0)
+        throw new Error('Invalid native worksheet operation');
+    const native = labWire.exports();
+    return new Uint8Array(native.memory.buffer, native.lab_workspace_output(), length).slice();
+}
+
+function workspaceReadSnapshot(length) {
+    const bytes = workspaceReadBytes(length);
+    return length ? labWire.decode(bytes.buffer).state : null;
+}
+
+// Property access is a host view, never a second owner of worksheet state.
+function createWorkspaceModeView(kind) {
+    const view = Object.create(null);
+    WORKSPACE_MODE_NAMES.forEach((mode, index) => {
+        Object.defineProperty(view, mode, {
+            enumerable: true,
+            get() {
+                const native = labWire.exports();
+                if (kind === 'precision')
+                    return native.lab_workspace_precision(index);
+                return workspaceDecoder.decode(workspaceReadBytes(native.lab_workspace_editor_get(index)));
+            },
+            set(value) {
+                const native = labWire.exports();
+                if (kind === 'precision')
+                    native.lab_workspace_precision_set(index, Number(value));
+                else if (!native.lab_workspace_editor_set(index, workspaceStageText(String(value))))
+                    throw new Error('Could not retain worksheet editor text');
+            }
+        });
+    });
+    return Object.preventExtensions(view);
+}
+
+function createWorkspaceSourceView() {
+    const view = Object.create(null);
+    ['fullText', 'displayText', 'lastInput', 'goalSource', 'goalTarget'].forEach((name, field) => {
+        Object.defineProperty(view, name, {
+            enumerable: true,
+            get() {
+                return workspaceDecoder.decode(workspaceReadBytes(labWire.exports().lab_workspace_source_get(field)));
+            },
+            set(value) {
+                if (!labWire.exports().lab_workspace_source_set(field, workspaceStageText(String(value))))
+                    throw new Error('Could not retain editor source text');
+            }
+        });
+    });
+    return Object.preventExtensions(view);
 }
 
 function precisionDigitsForBits(bits) {
-  if (bits <= DOUBLE_PRECISION_BITS)
-    return DOUBLE_PRECISION_DIGITS;
-  return Math.ceil(bits * Math.LOG10E * Math.LN2);
+    return labWire.exports().lab_workspace_digits(Number(bits));
 }
 
 function requestedPrecisionBits() {
-  const mode = currentMode();
-  const bits = modePrecisionBits[mode] ?? workingPrecisionBits;
-  return Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
+    const native = labWire.exports();
+    return native.lab_workspace_requested_precision(native.lab_workspace_mode());
 }
 
 function precisionStatusText() {
-  const bits = requestedPrecisionBits();
-  const digits = requestedValuePrecision();
-  return `${digits} digits / ${bits} bits`;
+    return labDOM.call('lab_workspace_dom_precision');
 }
 
 function setStatus(text) {
-  statusEl.textContent = `${text} · ${precisionStatusText()}`;
+    labDOM.call('lab_workspace_dom_status', String(text));
 }
 
 function currentMode() {
-  return currentLabMode;
+    return WORKSPACE_MODE_NAMES[labWire.exports().lab_workspace_mode()];
 }
 
 function syncModeTabs() {
-  modeTabs.forEach((tab) => {
-    const active = tab.dataset.mode === currentLabMode;
-    tab.classList.toggle('active', active);
-    tab.setAttribute('aria-selected', active ? 'true' : 'false');
-    tab.tabIndex = active ? 0 : -1;
-  });
+    labDOM.call('lab_workspace_dom_tabs', modeTabs, currentMode());
 }
 
 function setMode(mode, options = {}) {
-  const nextMode = mode === 'equation' || mode === 'diffequation' || mode === 'matrix' || mode === 'integrator' || mode === 'datetime' || mode === 'almanac'
-    ? mode
-    : 'expression';
-  const changed = nextMode !== currentLabMode;
-  if (changed && datetimeWeatherAbortController) {
-    datetimeWeatherAbortController.abort();
-    datetimeWeatherAbortController = null;
-  }
-  if (changed)
-    resetEditorManualSize();
-  currentLabMode = nextMode;
-  workingPrecisionBits = modePrecisionBits[currentLabMode] || workingPrecisionBits;
-  syncModeTabs();
-  if (!changed && !options.force)
-    return false;
-  return true;
+    return labStateSync(6, {index: workspaceModeId(mode), options});
 }
 
-function captureCurrentModeEditor() {
-  commitVisibleBindingInputs();
-  const mode = currentMode();
-  if (mode === 'expression') {
-    modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
-    saveLastExpression(modeEditorText.expression);
-  } else if (mode === 'equation') {
-    modeEditorText.equation = currentExpressionText() || expr.value.trim() || modeEditorText.equation;
-    saveLastEquationState();
-  }
-  else if (mode === 'diffequation') {
-    modeEditorText.diffequation = currentExpressionText() || expr.value.trim() || modeEditorText.diffequation;
-    saveLastDiffequationState();
-  }
-  else if (mode === 'matrix') {
-    modeEditorText.matrix = currentExpressionText() || expr.value.trim() || modeEditorText.matrix;
-    saveLastMatrixState();
-  } else if (mode === 'integrator') {
-    modeEditorText.integrator = currentExpressionText() || expr.value.trim() || modeEditorText.integrator;
-    saveLastIntegratorState();
-  } else if (mode === 'datetime') {
-    modeEditorText.datetime = DEFAULT_DATETIME_TEXT;
-    saveLastDatetimeState();
-  } else {
-    modeEditorText.almanac = DEFAULT_ALMANAC_TEXT;
-    saveLastAlmanacState();
-  }
+// Defaults arrive from the native catalogue; the C controller decides when to use them.
+function workspaceDefaultText(index) {
+    return [
+        DEFAULT_EXPRESSION_TEXT, DEFAULT_EQUATION_TEXT, DEFAULT_DIFFEQUATION_TEXT, DEFAULT_MATRIX_TEXT,
+        DEFAULT_INTEGRATOR_TEXT, DEFAULT_DATETIME_TEXT, DEFAULT_ALMANAC_TEXT
+    ][index];
+}
+
+async function captureCurrentModeEditor(isCurrent = () => true) {
+    return labFlowContinue(23, {isCurrent});
 }
 
 function restoreModeEditor(mode) {
-  if (mode === 'expression') {
-    setExpressionEditor(modeEditorText.expression || DEFAULT_EXPRESSION_TEXT);
-  } else if (mode === 'equation') {
-    setExpressionEditor(modeEditorText.equation || DEFAULT_EQUATION_TEXT);
-  } else if (mode === 'diffequation') {
-    setExpressionEditor(modeEditorText.diffequation || DEFAULT_DIFFEQUATION_TEXT);
-  } else if (mode === 'matrix') {
-    const text = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
-    if (bindingParts(text))
-      setExpressionEditor(text);
-    else {
-      expr.value = text;
-      clearExpressionSource();
-      clearVariableValues();
-    }
-  } else {
-    if (mode === 'datetime') {
-      expr.value = DEFAULT_DATETIME_TEXT;
-      clearExpressionSource();
-      clearVariableValues();
-      return;
-    }
-    if (mode === 'almanac') {
-      expr.value = DEFAULT_ALMANAC_TEXT;
-      clearExpressionSource();
-      clearVariableValues();
-      return;
-    }
-    const text = modeEditorText.integrator || DEFAULT_INTEGRATOR_TEXT;
-    if (bindingParts(text))
-      setExpressionEditor(text);
-    else {
-      expr.value = text;
-      clearExpressionSource();
-      clearVariableValues();
-    }
-  }
-}
-
-function setResultTitles(renderedText, parsedText, functionText, valueText) {
-  renderedTitle.textContent = renderedText;
-  parsedTitle.textContent = parsedText;
-  functionTitle.textContent = functionText;
-  functionRun.classList.toggle('hidden', functionText !== 'Function');
-  clearFunctionRun();
-  valueTitle.textContent = valueText;
-}
-
-function setAuxResultCardsVisible(visible) {
-  [parsed, functionStyle, value].filter(Boolean).forEach((element) => {
-    const card = element.closest('.result-card');
-    if (!card)
-      return;
-    if (!visible && card.classList.contains('expanded-card'))
-      collapseResultCards();
-    card.classList.toggle('hidden', !visible);
-  });
+    labStateSync(4, {index: workspaceModeId(mode)});
 }
 
 function setValueCardVisible(visible) {
-  if (!valueCard)
-    return;
-  if (!visible && valueCard.classList.contains('expanded-card'))
-    collapseResultCards();
-  valueCard.classList.toggle('hidden', !visible);
-  valueCard.toggleAttribute('hidden', !visible);
-  // Visibility must not override the selected card's expansion state.
-  valueCard.style.removeProperty('display');
-}
-
-function snapshotElementState(element) {
-  return {
-    className: element.className,
-    style: element.style.cssText,
-    innerHTML: element.innerHTML,
-    dataset: {...element.dataset}
-  };
-}
-
-function restoreElementState(element, state) {
-  element.className = state.className || '';
-  element.style.cssText = state.style || '';
-  element.innerHTML = state.innerHTML || '';
-  Object.keys(element.dataset).forEach((key) => {
-    delete element.dataset[key];
-  });
-  Object.entries(state.dataset || {}).forEach(([key, value]) => {
-    element.dataset[key] = value;
-  });
-}
-
-function snapshotButtonState(button) {
-  return {
-    className: button.className,
-    textContent: button.textContent,
-    disabled: !!button.disabled,
-    dataset: {...button.dataset}
-  };
-}
-
-function restoreButtonState(button, state) {
-  button.className = state.className || '';
-  button.textContent = state.textContent || '';
-  button.disabled = !!state.disabled;
-  Object.keys(button.dataset).forEach((key) => {
-    delete button.dataset[key];
-  });
-  Object.entries(state.dataset || {}).forEach(([key, value]) => {
-    button.dataset[key] = value;
-  });
-}
-
-function hasResultContent() {
-  return Boolean(
-    rendered.innerHTML.trim() ||
-    parsed.textContent.trim() ||
-    functionStyle.textContent.trim() ||
-    value.textContent.trim()
-  );
+    labDOM.call('lab_workspace_dom_value', Number(!!visible));
 }
 
 function saveCurrentModeResultState(mode = currentMode()) {
-  if (!hasResultContent()) {
-    modeResultState[mode] = null;
-    return;
-  }
-
-  modeResultState[mode] = {
-    rendered: snapshotElementState(rendered),
-    parsed: snapshotElementState(parsed),
-    functionStyle: snapshotElementState(functionStyle),
-    value: snapshotElementState(value),
-    renderedMore: snapshotButtonState(renderedMore),
-    parsedMore: snapshotButtonState(parsedMore),
-    functionMore: snapshotButtonState(functionMore),
-    valueMore: snapshotButtonState(valueMore),
-    resultInputText: resultUseInput.dataset.inputText || '',
-    lastTex,
-    lastDerivativeExpression,
-    currentVariables: [...currentVariables],
-    currentDifferentiable
-  };
+    modeResultState[mode] = labDOM.call(
+        'lab_workspace_dom_result_save', {lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable});
 }
 
 function restoreModeResultState(mode = currentMode()) {
-  clearFunctionRun();
-  const state = modeResultState[mode];
-  if (!state) {
-    clearResultPane();
-    return;
-  }
-
-  collapseResultCards();
-  restoreElementState(rendered, state.rendered);
-  restoreElementState(parsed, state.parsed);
-  restoreElementState(functionStyle, state.functionStyle);
-  restoreElementState(value, state.value);
-  restoreButtonState(renderedMore, state.renderedMore);
-  restoreButtonState(parsedMore, state.parsedMore);
-  restoreButtonState(functionMore, state.functionMore);
-  restoreButtonState(valueMore, state.valueMore);
-  setResultInputText(state.resultInputText || '');
-  lastTex = state.lastTex || '';
-  lastDerivativeExpression = state.lastDerivativeExpression || '';
-  currentVariables = Array.isArray(state.currentVariables) ? [...state.currentVariables] : [];
-  currentDifferentiable = state.currentDifferentiable !== false;
-  renderDerivativeButtons(currentVariables);
-  scheduleRenderedTeXFit();
+    labStateSync(5, {mode});
 }
 
 function syncMatrixControls() {
-  syncRoundedSelect(matrixOperation);
-  const needsOperand = currentMode() === 'matrix' && (matrixOperation.value === 'solve' || matrixOperation.value === 'multiply');
-  matrixOperand.classList.toggle('hidden', !needsOperand);
-  matrixOperandLabel.classList.toggle('hidden', !needsOperand);
-  scheduleEditorResizeGrip();
+    syncRoundedSelect(matrixOperation);
+    labDOM.call('lab_workspace_dom_matrix', workspaceModeId(currentMode()));
+    scheduleEditorResizeGrip();
 }
 
 function syncModeUI() {
-  const mode = currentMode();
-  const expressionMode = mode === 'expression';
-  const equationMode = mode === 'equation';
-  const diffequationMode = mode === 'diffequation';
-  const matrixMode = mode === 'matrix';
-  const integratorMode = mode === 'integrator';
-  const datetimeMode = mode === 'datetime';
-  const almanacMode = mode === 'almanac';
-
-  document.body.classList.toggle('datetime-mode', datetimeMode);
-  document.body.classList.toggle('almanac-mode', almanacMode);
-  document.body.classList.toggle('diffequation-mode', diffequationMode);
-  document.body.classList.toggle('matrix-mode', matrixMode);
-  matrixControls.classList.toggle('hidden', !matrixMode);
-  equationControls.classList.toggle('hidden', !equationMode);
-  diffequationControls.classList.toggle('hidden', !diffequationMode);
-  integratorControls.classList.toggle('hidden', !integratorMode);
-  datetimeControls.classList.toggle('hidden', !datetimeMode);
-  almanacControls.classList.toggle('hidden', !almanacMode);
-  if (datetimeLocal)
-    datetimeLocal.classList.toggle('hidden', !datetimeMode || !String(datetimeLocalBody?.textContent || '').trim());
-  targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
-  derivativeButtons.classList.toggle('hidden', !expressionMode && !matrixMode);
-  goalSeek.classList.toggle('hidden', !expressionMode);
-
-  if (expressionMode) {
-    leftPaneTitle.textContent = 'Expression';
-    subtitle.textContent = 'Switch between expression, equation, differential-equation, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
-    setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(Boolean(String(value.textContent || '').trim()));
-  } else if (equationMode) {
-    leftPaneTitle.textContent = 'Equation';
-    subtitle.textContent = 'Enter an equation on the left. The lab tries symbolic isolation first, then numeric solving for all variable bindings.';
-    setResultTitles('Rendered TeX', 'Equation', 'Function', 'Solutions');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(true);
-  } else if (diffequationMode) {
-    leftPaneTitle.textContent = 'Differential Equation';
-    subtitle.textContent = 'Enter an ordinary differential equation and optional initial or boundary conditions. MARS selects a symbolic solver family and preserves arbitrary constants when conditions are absent.';
-    setResultTitles('Solution', 'Differential Equation', 'Solver', 'Solutions');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(true);
-  } else if (matrixMode) {
-    leftPaneTitle.textContent = 'Matrix';
-    subtitle.textContent = 'Enter a complete matrix expression on the left, press Evaluate, and inspect its TeX, expression, function, and numerical value.';
-    setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(false);
-  } else if (integratorMode) {
-    leftPaneTitle.textContent = 'Integrator';
-    subtitle.textContent = 'Enter an integrand expression on the left, stack one or more integral rows, and use Free when a symbol should stay as a parameter. Leave both bounds blank for an antiderivative, or leave lower blank and fill upper to evaluate it there.';
-    setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(true);
-  } else if (almanacMode) {
-    leftPaneTitle.textContent = 'Almanac';
-    subtitle.textContent = `Enter date and time in GMT, then zone, latitude, and longitude. The live almanac engine covers ${ALMANAC_COVERAGE_TEXT}.`;
-    setResultTitles('Worksheet', '', '', '');
-    setAuxResultCardsVisible(false);
-  } else {
-    leftPaneTitle.textContent = 'Datetime';
-    subtitle.textContent = 'Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, solar times, and optional local weather, with jurisdiction holidays added when available.';
-    setResultTitles('Overview', 'Date Range', 'Calendar', 'Solar And Moon');
-    setAuxResultCardsVisible(true);
-    setValueCardVisible(true);
-  }
-
-  syncMatrixControls();
-  syncHelpCards();
-  updateHistoryButtons();
-  scheduleWorkspacePanelFit();
-}
-
-function textareaCanUseConditionalResize(textarea) {
-  return textarea.isConnected &&
-    textarea.clientHeight > 0 &&
-    textarea.getClientRects().length > 0;
+    labDOM.call('lab_workspace_dom_mode', workspaceModeId(currentMode()), ALMANAC_COVERAGE_TEXT);
+    clearFunctionRun();
+    syncMatrixControls();
+    syncHelpCards();
+    updateHistoryButtons();
+    scheduleWorkspacePanelFit();
 }
 
 function resetEditorManualSize() {
-  labTextareas.forEach((textarea) => {
-    textarea.classList.remove('editor-manual-size', 'editor-space-limited');
-    textarea.style.removeProperty('height');
-    textarea.style.removeProperty('max-height');
-    delete textarea.dataset.automaticHeight;
-  });
+    labDOM.call('lab_workspace_dom_editor_reset', labTextareas);
 }
 
 function syncEditorResizeGrip() {
-  editorResizeFrame = 0;
-  const visibleTextareas = labTextareas.filter(textareaCanUseConditionalResize);
-  const maximumTotalExtraHeight = Math.max(96, Math.min(320, window.innerHeight * 0.35));
-  const maximumExtraHeight = maximumTotalExtraHeight / Math.max(1, visibleTextareas.length);
-
-  labTextareas.forEach((textarea) => {
-    if (!textareaCanUseConditionalResize(textarea)) {
-      textarea.classList.remove('editor-manual-size', 'editor-space-limited');
-      textarea.style.removeProperty('height');
-      textarea.style.removeProperty('max-height');
-      delete textarea.dataset.automaticHeight;
-      return;
-    }
-
-    const spaceLimited = textarea.scrollHeight > textarea.clientHeight + 1;
-    if (spaceLimited && !textarea.classList.contains('editor-manual-size')) {
-      const automaticHeight = textarea.getBoundingClientRect().height;
-      textarea.dataset.automaticHeight = String(automaticHeight);
-      textarea.style.height = `${automaticHeight}px`;
-      textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;
-      textarea.classList.add('editor-manual-size');
-    }
-
-    if (textarea.classList.contains('editor-manual-size')) {
-      const automaticHeight = Number(textarea.dataset.automaticHeight || 0);
-      const currentHeight = textarea.getBoundingClientRect().height;
-      const manuallyResized = Math.abs(currentHeight - automaticHeight) > 2;
-      textarea.style.maxHeight = `${automaticHeight + maximumExtraHeight}px`;
-      if (!spaceLimited && !manuallyResized) {
-        textarea.classList.remove('editor-manual-size', 'editor-space-limited');
-        textarea.style.removeProperty('height');
-        textarea.style.removeProperty('max-height');
-        delete textarea.dataset.automaticHeight;
-      } else {
-        textarea.classList.add('editor-space-limited');
-      }
-    } else {
-      textarea.classList.toggle('editor-space-limited', spaceLimited);
-    }
-  });
-
+    editorResizeFrame = 0;
+    labDOM.call('lab_workspace_dom_editor_resize', labTextareas, window.innerHeight);
 }
 
 function scheduleEditorResizeGrip() {
-  if (editorResizeFrame)
-    cancelAnimationFrame(editorResizeFrame);
-  editorResizeFrame = requestAnimationFrame(syncEditorResizeGrip);
+    if (editorResizeFrame)
+        cancelAnimationFrame(editorResizeFrame);
+    editorResizeFrame = requestAnimationFrame(syncEditorResizeGrip);
 }
 
 function scheduleWorkspacePanelFit() {
-  scheduleEditorResizeGrip();
+    scheduleEditorResizeGrip();
 }
 
 function syncHelpCards() {
-  const mode = currentMode();
-
-  helpCards.forEach((card) => {
-    const modes = String(card.dataset.helpModes || '')
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const visible = !modes.length || modes.includes(mode);
-    card.classList.toggle('hidden', !visible);
-  });
+    labDOM.call('lab_workspace_dom_help_cards', helpCards, currentMode());
 }
 
 function applyLabMode(mode) {
-  setMode(validLabMode(mode), {force: true});
-  restoreModeEditor(currentMode());
-  if (currentMode() === 'integrator')
-    renderIntegratorRows(activeIntegratorRows());
-  if (currentMode() === 'datetime') {
-    restoreDatetimeDefaultsIfBlank();
-    refreshDatetimeJurisdictionLocation().then(() => {
-      if (currentMode() === 'datetime')
-        saveLastDatetimeState();
-    });
-  }
-  if (currentMode() === 'almanac') {
-    restoreAlmanacDefaultsIfBlank();
-    saveLastAlmanacState();
-  }
-  syncModeUI();
-  if (currentMode() === 'integrator' && currentIntegratorBoundRows().length === 0)
-    resetIntegratorBoundsToDefault();
-  if (currentMode() === 'integrator' && integratorIntervalCap)
-    integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
+    labStateSync(7, {mode});
 }
 
 function showResults() {
-  resultPane.classList.remove('hidden');
-  helpPane.classList.add('hidden');
-  rightPaneTitle.textContent = 'Result';
-  resultUseInput.classList.toggle('hidden', !resultUseInput.dataset.inputText);
-  help.textContent = 'Help';
+    labDOM.call('lab_workspace_dom_help', 0);
 }
 
 function showHelp() {
-  resultPane.classList.add('hidden');
-  helpPane.classList.remove('hidden');
-  rightPaneTitle.textContent = 'Help';
-  resultUseInput.classList.add('hidden');
-  help.textContent = 'Result';
-  setStatus('Help');
+    labDOM.call('lab_workspace_dom_help', 1);
 }
 
 function toggleHelp() {
-  if (helpPane.classList.contains('hidden'))
-    showHelp();
-  else {
-    showResults();
-    setStatus('Ready');
-  }
+    labDOM.call('lab_workspace_dom_help', 2);
 }
 
 function variableNamesFromBindings(bindings) {
-  return (Array.isArray(bindings) ? bindings : [])
-    .filter((binding) => String(binding.kind || 'variable') !== 'constant')
-    .map((binding) => String(binding.name || '').trim())
-    .filter(Boolean);
+    return labDOM.call('lab_binding_variables', bindings);
 }
 
 function visibleBindingsForCurrentMode(bindings) {
-  if (currentMode() !== 'integrator')
-    return Array.isArray(bindings) ? bindings : [];
-  return integratorEditableBindings(bindings);
+    const mode = workspaceModeId(currentMode());
+    return labDOM.call('lab_binding_select', mode, bindings, mode === 4 ? currentIntegratorBoundNames() : null);
 }
 
 function showTargetEntry() {
-  targetRow.classList.remove('hidden');
-  goalSeek.textContent = 'Run goal seek';
-  goalTarget.focus();
-  goalTarget.select();
-  setStatus('Enter target');
+    labDOM.call('lab_workspace_dom_target', 1);
 }
 
 function hideTargetEntry() {
-  targetRow.classList.add('hidden');
-  goalSeek.textContent = 'Goal seek';
+    labDOM.call('lab_workspace_dom_target', 0);
 }
 
 async function evaluateCurrentMode(options = {}) {
-  if (currentMode() === 'equation') {
-    await evaluateEquation(options);
-    return;
-  }
-  if (currentMode() === 'diffequation') {
-    await evaluateDiffequation(options);
-    return;
-  }
-  if (currentMode() === 'matrix') {
-    await evaluateMatrix(options);
-    return;
-  }
-  if (currentMode() === 'integrator') {
-    await evaluateIntegrator(options);
-    return;
-  }
-  if (currentMode() === 'datetime') {
-    await evaluateDatetime(options);
-    return;
-  }
-  if (currentMode() === 'almanac') {
-    await evaluateAlmanac(options);
-    return;
-  }
-  await evaluateExpression(options);
+    await evaluateLabMode(currentMode(), options);
+}
+
+function syncWorksheetButtons(isBusy = false) {
+    labDOM.call(
+        'lab_workspace_dom_controls', workspaceModeId(currentMode()), Number(!!isBusy),
+        Number(!!expressionReadyToEvaluate()), currentHistoryLength(), currentForwardHistoryLength(),
+        Number(!!canGoalSeek()), Number(atMinimumPrecision()), Number(atMaximumPrecision()));
 }
 
 function setBusy(isBusy) {
-  const expressionMode = currentMode() === 'expression';
-  run.disabled = isBusy || !expressionReadyToEvaluate();
-  back.disabled = isBusy || currentHistoryLength() === 0;
-  forward.disabled = isBusy || currentForwardHistoryLength() === 0;
-  goalSeek.disabled = isBusy || !expressionMode || !canGoalSeek();
-  goalSeek.title = goalSeek.disabled && !isBusy && expressionMode
-    ? 'Goal seek needs at least one variable binding'
-    : '';
-  goalTarget.disabled = isBusy;
-  lessPrecision.disabled = isBusy || atMinimumPrecision();
-  morePrecision.disabled = isBusy || atMaximumPrecision();
-  morePrecision.title = !isBusy && atMaximumPrecision()
-    ? 'Already at the current maximum precision setting'
-    : '';
-  Array.from((integratorBoundStack || document.createElement('div')).querySelectorAll('input, button')).forEach((control) => {
-    if (isBusy) {
-      if (!control.disabled)
-        control.dataset.busyDisabled = '1';
-      control.disabled = true;
-    } else if (control.dataset.busyDisabled === '1') {
-      control.disabled = false;
-      delete control.dataset.busyDisabled;
-    }
-  });
-  Array.from((datetimeControls || document.createElement('div')).querySelectorAll('input, button, select')).forEach((control) => {
-    if (isBusy) {
-      if (!control.disabled)
-        control.dataset.busyDisabled = '1';
-      control.disabled = true;
-    } else if (control.dataset.busyDisabled === '1') {
-      control.disabled = false;
-      delete control.dataset.busyDisabled;
-    }
-  });
-  Array.from((almanacControls || document.createElement('div')).querySelectorAll('input, button, select')).forEach((control) => {
-    if (isBusy) {
-      if (!control.disabled)
-        control.dataset.busyDisabled = '1';
-      control.disabled = true;
-    } else if (control.dataset.busyDisabled === '1') {
-      control.disabled = false;
-      delete control.dataset.busyDisabled;
-    }
-  });
-  if (equationVariable)
-    equationVariable.disabled = isBusy;
-  if (integratorIntervalCap)
-    integratorIntervalCap.disabled = isBusy;
-  copyButtons.forEach((button) => {
-    button.disabled = isBusy;
-  });
-  moreDigitButtons.forEach((button) => {
-    button.disabled = isBusy;
-  });
-  Array.from(variableValues.querySelectorAll('button')).forEach((button) => {
-    button.disabled = isBusy;
-  });
-  Array.from(variableValues.querySelectorAll('input')).forEach((input) => {
-    input.disabled = isBusy;
-  });
-  Array.from(derivativeButtons.querySelectorAll('button')).forEach((button) => {
-    button.disabled = isBusy;
-  });
+    syncWorksheetButtons(isBusy);
+    labDOM.call('lab_workspace_dom_busy', Number(!!isBusy), equationVariable, copyButtons, moreDigitButtons);
 }
 
 function updateHistoryButtons() {
-  const expressionMode = currentMode() === 'expression';
-  run.disabled = !expressionReadyToEvaluate();
-  back.disabled = currentHistoryLength() === 0;
-  forward.disabled = currentForwardHistoryLength() === 0;
-  lessPrecision.disabled = atMinimumPrecision();
-  morePrecision.disabled = atMaximumPrecision();
-  goalSeek.disabled = !expressionMode || !canGoalSeek();
-  goalSeek.title = goalSeek.disabled && expressionMode
-    ? 'Goal seek needs at least one variable binding'
-    : '';
-  morePrecision.title = atMaximumPrecision()
-    ? 'Already at the current maximum precision setting'
-    : '';
+    syncWorksheetButtons();
 }
 
 function pushExpressionHistory(entry) {
-  const snapshot = typeof entry === 'string'
-    ? historyStateForMode(currentMode(), entry)
-    : (entry || historyStateForMode());
-  const stack = modeHistoryStack(expressionHistory, snapshot.mode);
-  const previous = stack[stack.length - 1];
-
-  if (snapshot && snapshot.text && !historyStatesEqual(snapshot, previous))
-    stack.push(snapshot);
-  clearForwardHistory(snapshot.mode);
-  updateHistoryButtons();
+    labStateSync(10, {entry});
 }
 
 function renderDerivativeButtons(variables) {
-  derivativeButtons.replaceChildren();
-  if (!currentDifferentiable) return;
-  variables.forEach((name) => {
-    const derivativeButton = document.createElement('button');
-    derivativeButton.className = 'secondary';
-    derivativeButton.type = 'button';
-    const variableName = document.createElement('i');
-    variableName.textContent = bindingDisplayName(name);
-    derivativeButton.append(variableName, ' derivative');
-    derivativeButton.addEventListener('click', () => takeDerivative(name, derivativeButton));
-    derivativeButtons.appendChild(derivativeButton);
-  });
-  variables.forEach((name) => {
-    const integralButton = document.createElement('button');
-    integralButton.className = 'secondary';
-    integralButton.type = 'button';
-    const variableName = document.createElement('i');
-    variableName.textContent = bindingDisplayName(name);
-    integralButton.append(variableName, ' integral');
-    integralButton.addEventListener('click', () => takeIntegral(name, integralButton));
-    derivativeButtons.appendChild(integralButton);
-  });
+    labDOM.call(
+        'lab_workspace_dom_derivatives', variables, variables.map(bindingDisplayName), Number(!!currentDifferentiable));
+    for (const button of derivativeButtons.querySelectorAll('button'))
+        button.addEventListener('click', () => {
+            [takeDerivative, takeIntegral][Number(button.dataset.calculusAction)](button.dataset.variable, button);
+        });
 }
 
 function setActionRunning(button, running) {
-  if (!button)
-    return;
-  button.classList.toggle('action-running', running);
-  if (running)
-    button.setAttribute('aria-busy', 'true');
-  else
-    button.removeAttribute('aria-busy');
-}
-
-function estimateValuePrecision() {
-  const style = getComputedStyle(value);
-  const canvas = estimateValuePrecision.canvas || document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  const padLeft = parseFloat(style.paddingLeft) || 0;
-  const padRight = parseFloat(style.paddingRight) || 0;
-  let charWidth = 9;
-
-  estimateValuePrecision.canvas = canvas;
-  if (context) {
-    context.font = style.font;
-    charWidth = context.measureText('0123456789'.repeat(8)).width / 80 || charWidth;
-  }
-
-  const usableWidth = Math.max(0, value.clientWidth - padLeft - padRight);
-  const chars = Math.floor(usableWidth / charWidth);
-
-  return Math.max(96, Math.min(220, chars - 3));
+    labDOM.call('lab_workspace_dom_running', button, Number(!!running));
 }
 
 function requestedValuePrecision() {
-  return precisionDigitsForBits(requestedPrecisionBits());
+    return precisionDigitsForBits(requestedPrecisionBits());
 }
 
 function atMinimumPrecision() {
-  return requestedPrecisionBits() <= DOUBLE_PRECISION_BITS;
+    const native = labWire.exports();
+    return !native.lab_workspace_precision_can_step(native.lab_workspace_mode(), -1);
 }
 
 function atMaximumPrecision() {
-  return requestedPrecisionBits() >= MAX_PRECISION_BITS;
+    const native = labWire.exports();
+    return !native.lab_workspace_precision_can_step(native.lab_workspace_mode(), 1);
 }
 
 function setRequestedPrecisionBits(bits) {
-  const mode = currentMode();
-  const clamped = Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
-  modePrecisionBits[mode] = clamped;
-  workingPrecisionBits = clamped;
-}
-
-function nextPrecisionStepBits(current) {
-  if (current < QFLOAT_PRECISION_BITS)
-    return QFLOAT_PRECISION_BITS;
-  if (current < 256)
-    return 256;
-  return Math.min(MAX_PRECISION_BITS, Math.ceil((current + 1) / 128) * 128);
-}
-
-function previousPrecisionStepBits(current) {
-  if (current <= QFLOAT_PRECISION_BITS)
-    return DOUBLE_PRECISION_BITS;
-  if (current <= 256)
-    return QFLOAT_PRECISION_BITS;
-  return Math.max(256, Math.floor((current - 1) / 128) * 128);
+    const native = labWire.exports();
+    native.lab_workspace_request_precision(native.lab_workspace_mode(), Number(bits));
 }
 
 function evaluateFromKeyboard() {
-  if (!expressionReadyToEvaluate()) {
-    updateHistoryButtons();
-    return;
-  }
-  clearForwardHistory();
-  if (currentMode() === 'equation')
-    evaluateEquation();
-  else if (currentMode() === 'diffequation')
-    evaluateDiffequation();
-  else if (currentMode() === 'matrix')
-    evaluateMatrix();
-  else if (currentMode() === 'integrator')
-    evaluateIntegrator();
-  else if (currentMode() === 'datetime')
-    evaluateDatetime();
-  else
-    evaluateExpression();
+    labStateSync(8, {});
 }
+
+/** Await a guarded clear operation without disturbing a newer request. */
+async function clearWorksheetFromEvent() {
+    await labFlowContinue(72, {});
+}
+
+/** Restore a selected worksheet across asynchronous editor and result preparation. */
+async function selectWorksheetMode(mode) {
+    return labRequests.runUI('evaluate', currentMode(), request => labFlowContinue(24, {mode, request}));
+}
+
+async function changeWorksheetPrecision(direction) {
+    return labFlowContinue(25, {direction});
+}
+
+function flushWorksheetState() {
+    labStateSync(12, {});
+}
+
+/** Convert browser control values using their existing native validators. */
+function normaliseWorksheetControl(kind) {
+    labStateSync(
+        11, {index: kind, controls: [matrixOperation, equationVariable, integratorIntervalCap], config: labConfig});
+}
+
+
+// Browser references and views of C-owned worksheet state, initialised after the definition scripts.
+const {
+    expr,
+    subtitle,
+    leftPaneTitle,
+    matrixControls,
+    matrixOperation,
+    matrixOperand,
+    matrixOperandLabel,
+    equationControls,
+    diffequationControls,
+    integratorControls,
+    integratorBoundStack,
+    integratorIntervalCap,
+    datetimeControls,
+    datetimeDate,
+    datetimeJdn,
+    datetimeStart,
+    datetimeYear,
+    datetimeJurisdiction,
+    datetimeTown,
+    datetimeLatitude,
+    datetimeLongitude,
+    datetimeGmtOffset,
+    datetimeLocal,
+    datetimeLocalBody,
+    almanacControls,
+    almanacDate,
+    almanacTime,
+    almanacZone,
+    almanacJurisdiction,
+    almanacTown,
+    almanacLatitude,
+    almanacLongitude,
+    almanacElevation,
+    marsDatePicker,
+    marsDatePickerMonth,
+    marsDatePickerYear,
+    marsDatePickerWeekdays,
+    marsDatePickerGrid,
+    marsDatePickerToday,
+    marsDatePickerClose,
+    run,
+    back,
+    forward,
+    help,
+    goalSeek,
+    clear,
+    targetRow,
+    goalTarget,
+    lessPrecision,
+    morePrecision,
+    derivativeButtons,
+    variableValues,
+    mobileAccess,
+    mobileTitle,
+    mobileHint,
+    mobileUrl,
+    mobileQr,
+    statusEl,
+    inputCopy,
+    labWorkspace,
+    rightPaneTitle,
+    resultUseInput,
+    resultPane,
+    helpPane,
+    rendered,
+    renderedTitle,
+    renderedMore,
+    parsed,
+    parsedMore,
+    functionStyle,
+    functionTitle,
+    functionMore,
+    functionRun,
+    functionRunResult,
+    functionRunOutput,
+    valueCard,
+    valueNoteCard,
+    valueNote,
+    value,
+    valueTitle,
+    valueMore,
+    labTextareas,
+    modeTabs,
+    helpCards,
+    copyButtons,
+    moreDigitButtons,
+    resultCards,
+} = labDOM.call('lab_workspace_dom_references');
+const equationVariable = null;
+const controlToken = labConfig.CONTROL_TOKEN;
+let activeTooltipButton = null;
+
+const resultCardIds = new WeakMap(resultCards.map((card, index) => [card, index]));
+if (!labWire.exports().lab_view_cards_reset(resultCards.length))
+    throw new Error('Too many result cards for the native view controller');
+let lastTex = '';
+let resultInputBindings = [];
+let renderedTeXFitFrame = 0;
+let solverFitFrame = 0;
+let lastDerivativeExpression = '';
+let currentVariables = [];
+let currentBindingKinds = new Map();
+let currentDifferentiable = true;
+
+labWire.exports().lab_workspace_reset();
+const expressionHistory = 0;
+const forwardHistory = 1;
+const labEditorState = createWorkspaceSourceView();
+let expressionBindingRefreshTimer = 0;
+let pendingExpressionBindingCommit = Promise.resolve();
+
+labDOM.services(
+    labDOM.call('lab_bootstrap_workspace', 0, {
+        token: controlToken,
+        get search() {
+            return window.location.search;
+        },
+        get prefix() {
+            return String(labConfig.CONTROL_QUERY_PREFIX);
+        },
+        get pathname() {
+            return window.location.pathname;
+        },
+        get hash() {
+            return window.location.hash;
+        }
+    }),
+    {replaceLocation: url => window.history.replaceState(null, '', url)});
+let lastMatrixScalarExpression = '';
+let bindingValueCache = new Map();
+const modePrecisionBits = createWorkspaceModeView('precision');
+const DEFAULT_EXPRESSION_TEXT = labConfig.DEFAULT_EXPRESSION;
+const DEFAULT_EQUATION_TEXT = labConfig.DEFAULT_EQUATION;
+const DEFAULT_DIFFEQUATION_TEXT = labConfig.DEFAULT_DIFFEQUATION;
+const DEFAULT_EQUATION_VARIABLE_TEXT = labConfig.DEFAULT_EQUATION_VARIABLE;
+const DEFAULT_MATRIX_TEXT = labConfig.DEFAULT_MATRIX;
+const DEFAULT_INTEGRATOR_TEXT = labConfig.DEFAULT_INTEGRATOR;
+const DEFAULT_INTEGRATOR_BOUNDS_TEXT = labConfig.DEFAULT_INTEGRATOR_BOUNDS;
+const DEFAULT_INTEGRATOR_INTERVAL_CAP = labConfig.DEFAULT_INTEGRATOR_INTERVAL_CAP;
+const DEFAULT_DATETIME_TEXT = labConfig.DEFAULT_DATETIME_TEXT;
+const DEFAULT_DATETIME_DATE = labConfig.DEFAULT_DATETIME_DATE;
+const DEFAULT_DATETIME_JURISDICTION = labConfig.DEFAULT_DATETIME_JURISDICTION;
+const DEFAULT_DATETIME_GMT_OFFSET = labConfig.DEFAULT_DATETIME_GMT_OFFSET;
+const DEFAULT_ALMANAC_TEXT = labConfig.DEFAULT_ALMANAC_TEXT;
+const DEFAULT_ALMANAC_TIME = labConfig.DEFAULT_ALMANAC_TIME;
+const DEFAULT_ALMANAC_ZONE = labConfig.DEFAULT_ALMANAC_ZONE;
+const DEFAULT_ALMANAC_LATITUDE = labConfig.DEFAULT_ALMANAC_LATITUDE;
+const DEFAULT_ALMANAC_LONGITUDE = labConfig.DEFAULT_ALMANAC_LONGITUDE;
+const DEFAULT_ALMANAC_VISIBILITY = labConfig.DEFAULT_ALMANAC_VISIBILITY;
+const ALMANAC_WORKSHEET_TITLE = labConfig.ALMANAC_WORKSHEET_TITLE;
+const ALMANAC_COVERAGE_TEXT = labConfig.ALMANAC_COVERAGE_TEXT_JS;
+labDOM.services(
+    labDOM.call('lab_bootstrap_workspace', 1, {control: datetimeJurisdiction, fallback: DEFAULT_DATETIME_JURISDICTION}),
+    {writeValue: (control, value) => control.value = value});
+let datetimeAutoGmtOffset =
+    labDOM.call('lab_bootstrap_workspace', 2, {control: datetimeGmtOffset, fallback: DEFAULT_DATETIME_GMT_OFFSET});
+let datetimeGmtOffsetTouched = false;
+let almanacVisibilityMode = DEFAULT_ALMANAC_VISIBILITY;
+let almanacLastWorksheetData = null;
+const HOLIDAY_JURISDICTION_SET = new Set(labCatalogue.options.map(row => row[0]));
+const JURISDICTION_TOWN_OPTIONS = labCatalogue.towns;
+const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
+const EXPRESSION_TIMESTAMP_STORAGE_KEY = 'mars.exprLab.lastExpressionUpdatedAt';
+let lastExpressionUpdatedAt = 0;
+const modeEditorText = createWorkspaceModeView('editor');
+Object.assign(modeEditorText, {
+    expression: DEFAULT_EXPRESSION_TEXT,
+    equation: DEFAULT_EQUATION_TEXT,
+    diffequation: DEFAULT_DIFFEQUATION_TEXT,
+    matrix: DEFAULT_MATRIX_TEXT,
+    integrator: DEFAULT_INTEGRATOR_TEXT,
+    datetime: DEFAULT_DATETIME_TEXT,
+    almanac: DEFAULT_ALMANAC_TEXT
+});
+const modeResultState = labDOM.call('lab_workspace_dom_result_states');
+
+let editorResizeFrame = 0;
+
+const marsDatePickerState = {
+    input: null,
+    button: null,
+    shell: null,
+    get year() {
+        const native = labWire.exports();
+        return native.lab_forms_date_year(native.lab_forms_picker_date());
+    },
+    get month() {
+        const native = labWire.exports();
+        return native.lab_forms_date_month(native.lab_forms_picker_date());
+    }
+};

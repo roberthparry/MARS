@@ -118,11 +118,12 @@ Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
 MARS Lab runs as a native C server with native calculation workers and renders
-TeX through `latex` and `dvisvgm`. Its browser interface remains HTML, CSS and
-JavaScript. Native `mars_config` handles installation and links SQLCipher
+TeX through `latex` and `dvisvgm`. Its browser interface uses HTML, CSS,
+JavaScript DOM adapters and a freestanding C/WebAssembly module for binary
+transport and worksheet limit validation. Native `mars_config` handles installation and links SQLCipher
 directly; neither Python nor the `sqlcipher` CLI is required for installing or
 running the Lab. Lab builds also check Clang's WebAssembly target and LLVM's
-`wasm-ld` linker in preparation for the C browser migration. Install and check
+`wasm-ld` linker for the C browser module. Install and check
 its rendering and WebAssembly tools with:
 
 ```sh
@@ -137,7 +138,25 @@ alone with `make check-lab-wasm-deps`, or `make check-wasm-deps` from
 or paths when using a versioned toolchain. Lab artefacts have order-only
 dependencies on this check, so it also runs for direct build targets without
 forcing otherwise current artefacts to rebuild. Native library-only builds do
-not require these tools. This check does not yet change the browser interface.
+not require these tools.
+
+The Lab build produces `tools/mars_lab/build/release/wasm/lab_browser.wasm`
+(or the corresponding debug path), served locally as `application/wasm`.
+No Emscripten, Python, external JavaScript codec or Protobuf compiler is needed.
+Browser API calls now send typed Protobuf envelopes and request Protobuf replies;
+the native adapter uses MARS's existing Protobuf module. See the
+[Lab wire contract](docs/protobuf.md#mars-lab-browser-wire-contract).
+
+The C browser modules own Protobuf traversal, schema validation, worksheet state,
+undo/redo history, precision and integration-budget limits, request routing and
+stale-response rejection, and calendar arithmetic. JavaScript provides browser
+DOM, network, storage and rendering adapters. Mathematical evaluation and
+expression-presentation metadata remain native, not browser-side mathematics.
+Startup configuration and API error replies also use Protobuf. Local storage
+and saved state files retain JSON; old JSON HTTP clients still work. Browser
+startup reports an error if WebAssembly is unavailable rather than silently
+using another codec. Restart the Lab after rebuilding to serve the matching
+browser module and routes.
 
 ## Benchmark Highlights
 

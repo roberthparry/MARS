@@ -2,7 +2,7 @@
  * @file lab_calendar_almanac.c
  * @brief Native navigation worksheet and named land-totality JSON adapters.
  *
- * Uses the existing almanac and event scratch backends, retaining their native
+ * Uses the existing almanac and event workers, retaining their native
  * body formatting. Event times prefer each named town's validated IANA zone;
  * unavailable zones fall back to jurisdiction rules, then the supplied zone.
  * All child failures are returned as errors, never empty successful tables.
@@ -168,7 +168,8 @@ static json_t *lab_cal_body_rows(const json_t *fields, string_t **error)
     string_split_free(lines, count);
     string_free(text);
     if (!valid || !json_array_size(rows)) {
-        *error = string_new_with("Almanac backend returned no valid body snapshot; rebuild scratch/almanac_lab.");
+        *error = string_new_with(
+            "Almanac backend returned no valid body snapshot; run make tools/mars_lab/workers/almanac_lab.");
         json_free(rows);
         return NULL;
     }
@@ -422,6 +423,10 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     string_free(normal_clock);
     string_free(worksheet);
     string_free(listing);
+    if (!lab_cal_almanac_presentation(response)) {
+        json_free(response);
+        return lab_cal_error(status, 500, "Could not prepare bounded almanac presentation");
+    }
     return response;
 }
 
@@ -471,6 +476,14 @@ static json_t *lab_cal_totality_item(const char *requested_jd, const char *paylo
         lab_cal_set(item, "jd", requested_jd);
         lab_cal_set(item, "nearest_totality", string_c_str(label));
         lab_cal_take(item, "nearest_totality_action", action);
+        string_t *html = lab_cal_totality_markup(string_c_str(label), lab_cal_get(item, "nearest_totality_action"));
+        if (html)
+            lab_cal_set(item, "html", string_c_str(html));
+        else {
+            json_free(item);
+            item = NULL;
+        }
+        string_free(html);
         string_free(local);
         string_free(display_time);
         string_free(date);

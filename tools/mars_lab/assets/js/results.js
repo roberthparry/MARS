@@ -1,428 +1,411 @@
 /**
- * Installing, copying and reusing native result representations.
+ * Browser scheduling, request and clipboard adapters for C-owned result presentation.
  * Definition-only client script; app.js loads it before shared worksheet state.
  */
 
+function showButtonTooltip(button) {
+    if (labDOM.call('lab_tooltip_show', button, activeTooltipButton, window.innerWidth, window.innerHeight))
+        activeTooltipButton = button;
+}
+
+function hideButtonTooltip() {
+    labDOM.call('lab_tooltip_hide', activeTooltipButton);
+    activeTooltipButton = null;
+}
+
+
+// DOM capability adapters only; C owns layout and native card state.
+const resetMoreDigitsButton = (button, enabled) => labDOM.call('lab_layout_more', button, Number(!!enabled));
+const hasAbbreviatedValue = value => value === true;
+const resultZoomIndex = card => labWire.exports().lab_view_card_zoom(resultCardIds.get(card) ?? -1);
+const applyResultZoom = card => labDOM.call('lab_layout_zoom', card);
+const setResultZoom = (card, index) => labDOM.call('lab_layout_set_zoom', card, index, 0);
+const stepResultZoom = (card, direction) => labDOM.call('lab_layout_set_zoom', card, direction, 1);
+const renderResultCardExpansion = () => labDOM.call('lab_layout_expand', null, 0);
+const resultCardExpanded = card => labWire.exports().lab_view_card_expanded() === resultCardIds.get(card);
+const collapseResultCards = () => labDOM.call('lab_layout_expand', null, 2);
+const toggleResultCardExpansion = button => labDOM.call('lab_layout_expand', button.closest('.result-card'), 1);
+const setRenderedContent = (svg, fallback = '') => labDOM.call('lab_layout_content', svg, fallback);
+const svgMarkupIntrinsicWidth = markup => labDOM.call('lab_layout_markup_width', markup);
+const installSolverTexSvg = (markup, variant) => labDOM.call('lab_layout_solver_install', markup, variant);
+const clearRenderedError = () => labDOM.call('lab_layout_error', '', 0);
+const setRenderedError = message => labDOM.call('lab_layout_error', String(message || ''), 1);
+
+function fitRenderedTeXToCard() {
+    renderedTeXFitFrame = 0;
+    labDOM.call('lab_layout_fit');
+}
+
+function scheduleRenderedTeXFit() {
+    cancelAnimationFrame(renderedTeXFitFrame);
+    renderedTeXFitFrame = requestAnimationFrame(fitRenderedTeXToCard);
+}
+
+function scheduleSolverTexFit() {
+    cancelAnimationFrame(solverFitFrame);
+    solverFitFrame = requestAnimationFrame(() => {
+        void fitSolverTexToCard();
+    });
+}
+
+const labPresentationNumericLines = new Map();
+const labPresentationSolverTeX = new Map();
+const labPresentationCompact = new Map();
+const labPresentationEditors = new Map();
+const labPresentationExpansions = new Map();
+const labFunctionSyntax = new Map();
+const labMatrixHeadings = new Map();
+const labResultCaches = {
+    numeric: labPresentationNumericLines,
+    solver: labPresentationSolverTeX,
+    compact: labPresentationCompact,
+    editors: labPresentationEditors,
+    expansions: labPresentationExpansions,
+    functions: labFunctionSyntax,
+    headings: labMatrixHeadings
+};
+
+// Called by the transport bridge before exposing decoded native responses.
+function installLabPresentationData(data) {
+    labDOM.call('lab_result_presentation_install', labResultCaches, data);
+}
+
+// These maps retain native presentations only; the browser does not classify or format their text.
+function installLabFunctionSyntaxData(data) {
+    labDOM.call('lab_result_syntax_install', labResultCaches, data);
+}
+
+function setExpandableText(element, button, displayText, fullText) {
+    if (labDOM.call(
+            'lab_result_expandable', labResultCaches, element, button, String(displayText || ''),
+            String(fullText || '')))
+        clearFunctionRun();
+}
+
+function setValueText(fullText) {
+    labDOM.call('lab_result_value', labResultCaches, String(fullText || ''));
+}
+
+function renderDatetimeSections(element, button, sections, fallbackText = '') {
+    if (!labDOM.call('lab_result_datetime', element, button, sections, String(fallbackText || '')))
+        throw new Error(
+            'DateTime presentation is missing from the server response. ' +
+            'Run make mars-lab-restart, reload the page and evaluate again.');
+}
+
+function displayMatrixResult(data) {
+    clearFunctionRun();
+    const state = labDOM.call('lab_result_display', labResultCaches, data, 1);
+    lastTex = state.TeX;
+    resultInputBindings = state.bindings;
+}
+
+function displayCalculusResult(result) {
+    clearFunctionRun();
+    const state = labDOM.call('lab_result_display', labResultCaches, result, 2);
+    lastTex = state.TeX;
+    resultInputBindings = state.bindings;
+}
+
 function copyTextForTarget(target) {
-  if (target === 'rendered') return rendered.classList.contains('error') ? rendered.textContent : lastTex;
-  if (target === 'expression') return parsedExpressionText();
-  if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
-  if (target === 'value') return value.dataset.fullText || value.textContent;
-  if (target === 'mobile') {
-    const url = mobileUrl ? mobileUrl.textContent.trim() : '';
-    return /^https?:\/\//.test(url) ? url : '';
-  }
-  return '';
+    return labDOM.call('lab_result_copy', target, lastTex);
 }
 
 function parsedExpressionText() {
-  return expressionForEditor(
-    parsed.dataset.fullText ||
-    parsed.dataset.displayText ||
-    parsed.textContent ||
-    ''
-  ).trim();
+    return labDOM.call('lab_result_copy', 'expression', lastTex);
 }
 
 function setResultInputText(text, bindings = null) {
-  const inputText = expressionForEditor(String(text || '')).trim();
-  resultUseInput.dataset.inputText = inputText;
-  resultInputBindings = Array.isArray(bindings)
-    ? bindings.map((binding) => ({...binding}))
-    : [];
-  resultUseInput.disabled = !inputText;
-  resultUseInput.classList.toggle('hidden', !inputText);
-  resultUseInput.title = inputText
-    ? 'Send this result to the input pane'
-    : 'No reusable result is available';
+    labDOM.call('lab_result_input_set', String(text || ''));
+    resultInputBindings = labDOM.call('lab_result_binding_snapshot', bindings);
 }
 
 function resultExpressionTextForInput() {
-  if (currentMode() === 'equation')
-    return parsedExpressionText();
-  return (resultUseInput.dataset.inputText || parsedExpressionText()).trim();
+    return labDOM.call('lab_result_input_get', currentMode());
 }
 
-async function sendResultExpressionToInput() {
-  const resultText = resultExpressionTextForInput();
-  if (!resultText)
-    return;
-
-  const current = historyStateForMode();
-  const next = historyStateForMode(currentMode(), resultText);
-  if (current.text && !historyStatesEqual(current, next))
-    pushExpressionHistory(current);
-
-  clearGoalSeekRequest();
-  hideTargetEntry();
-  if (currentMode() === 'matrix') {
-    const sourceBindings = compactExpressionForEditor(currentExpressionText()).bindings || [];
-    const bindings = resultInputBindings.length
-      ? bindingsWithAuthoredValues(resultInputBindings, expressionWithBindings(resultText, sourceBindings))
-      : sourceBindings;
-    setExpressionEditor(expressionWithBindings(resultText, bindings), bindings, resultText);
-    matrixOperation.value = 'eval';
-    matrixOperand.value = '';
-    syncRoundedSelect(matrixOperation);
-    syncMatrixControls();
-  } else if (currentMode() === 'equation' || currentMode() === 'diffequation')
-    setExpressionEditor(resultText);
-  else if (!await applyMarsBindingExpression(resultText, resultText))
-    return;
-  saveCurrentModeEditorState();
-  updateHistoryButtons();
-  expr.focus();
-  setStatus('Result sent to input');
-}
-
-function parseMatrixResultText(text) {
-  const source = String(text || '').trim();
-  if (!source.startsWith('(') || !source.endsWith(')'))
-    return null;
-
-  const body = source.slice(1, -1).trim();
-  if (!body)
-    return [[]];
-
-  const rows = splitTopLevel(body, ';')
-    .map((row) => splitTopLevel(row, ',').map((cell) => cell.trim()));
-  if (!rows.length)
-    return null;
-
-  const cols = rows[0].length;
-  if (!cols || rows.some((row) => row.length !== cols))
-    return null;
-  return rows;
-}
-
-function parseMatrixDisplayTerm(text) {
-  const source = String(text || '').trim();
-  const directRows = parseMatrixResultText(source);
-  if (directRows)
-    return {factor: '', rows: directRows};
-
-  let depth = 0;
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    if ('([{'.includes(char)) {
-      depth += 1;
-      continue;
-    }
-    if (')]}'.includes(char)) {
-      depth = Math.max(0, depth - 1);
-      continue;
-    }
-    if (depth || (char !== '.' && char !== '·'))
-      continue;
-
-    const factor = source.slice(0, index).trim();
-    const rows = parseMatrixResultText(source.slice(index + 1).trim());
-    if (factor && rows)
-      return {factor, rows};
-  }
-  return null;
+function sendResultExpressionToInput() {
+    return labFlowContinue(56, {});
 }
 
 function setMatrixPrettyResult(resultText, prettyText, element = functionStyle, moreButton = functionMore) {
-  const terms = splitTopLevel(String(resultText || ''), '+')
-    .map((term) => parseMatrixDisplayTerm(term));
-  const matrixTerms = terms.length && terms.every((term) => term) ? terms : null;
-  element.classList.add('matrix-pretty');
-  element.dataset.displayText = prettyText || resultText || '';
-  element.dataset.fullText = prettyText || resultText || '';
-  if (moreButton)
-    resetMoreDigitsButton(moreButton, false);
-
-  if (!matrixTerms) {
-    renderMatrixSectionHeadings(element, prettyText || resultText || '');
-    return;
-  }
-
-  element.replaceChildren();
-  const sum = document.createElement('span');
-  sum.className = 'matrix-sum-display';
-  matrixTerms.forEach((term, matrixIndex) => {
-    if (matrixIndex) {
-      const operator = document.createElement('span');
-      operator.className = 'matrix-sum-operator';
-      operator.textContent = '+';
-      sum.appendChild(operator);
-    }
-
-    const termDisplay = document.createElement('span');
-    termDisplay.className = 'matrix-term-display';
-    if (term.factor) {
-      const factor = document.createElement('span');
-      factor.className = 'matrix-factor';
-      factor.textContent = term.factor;
-      termDisplay.appendChild(factor);
-
-      const product = document.createElement('span');
-      product.className = 'matrix-product-operator';
-      product.textContent = '·';
-      termDisplay.appendChild(product);
-    }
-
-    const display = document.createElement('span');
-    display.className = 'matrix-display';
-
-    const left = document.createElement('span');
-    left.className = 'matrix-bracket';
-    left.textContent = '(';
-    display.appendChild(left);
-
-    const grid = document.createElement('span');
-    grid.className = 'matrix-grid';
-    grid.style.gridTemplateColumns = element === value || element === parsed
-      ? `repeat(${term.rows[0].length}, minmax(0, 1fr))`
-      : `repeat(${term.rows[0].length}, max-content)`;
-    term.rows.forEach((row) => {
-      row.forEach((cellText) => {
-        const cell = document.createElement('span');
-        cell.className = 'matrix-cell';
-        cell.textContent = cellText;
-        grid.appendChild(cell);
-      });
-    });
-    display.appendChild(grid);
-
-    const right = document.createElement('span');
-    right.className = 'matrix-bracket';
-    right.textContent = ')';
-    display.appendChild(right);
-    termDisplay.appendChild(display);
-    sum.appendChild(termDisplay);
-  });
-  element.appendChild(sum);
-}
-
-function setMatrixExpressionResult(data) {
-  const fullExpression = data.expression_pretty || data.expression || data.result || '';
-  const displayExpression = data.display_expression_pretty || fullExpression;
-
-  parsed.classList.remove('matrix-pretty', 'matrix-expression-pretty');
-  parsed.classList.add('matrix-expression-text');
-  setExpandableText(parsed, parsedMore, displayExpression, fullExpression);
-}
-
-function setMatrixValueResult(data) {
-  const fullText = String(data.value || '');
-  const svg = String(data.value_svg || '');
-
-  value.classList.remove('matrix-pretty');
-  value.classList.toggle('matrix-tex-value', !!svg);
-  value.dataset.displayText = fullText;
-  value.dataset.fullText = fullText;
-  resetMoreDigitsButton(valueMore, false);
-  if (!svg) {
-    setValueText(fullText);
-    return;
-  }
-
-  value.replaceChildren();
-  const frame = document.createElement('span');
-  frame.className = 'rendered-zoom-frame';
-  frame.innerHTML = svg;
-  value.appendChild(frame);
-  const card = value.closest('.result-card');
-  if (card)
-    requestAnimationFrame(() => applyResultZoom(card));
+    return labFlowContinue(
+        57, {text: String(resultText || ''), pretty: String(prettyText || ''), element, button: moreButton});
 }
 
 function setRenderedResult(data) {
-  const displayTex = data.display_TeX || data.tex || '';
-  const fullDisplayTex = data.full_display_TeX || data.tex || '';
-
-  clearRenderedError();
-  lastTex = data.tex || '';
-  rendered.dataset.displayTex = displayTex;
-  rendered.dataset.fullTex = fullDisplayTex;
-  rendered.dataset.displaySvg = data.svg || '';
-  rendered.dataset.fullSvg = '';
-  rendered.dataset.renderError = data.render_error || '';
-  rendered.dataset.compactTex = displayTex;
-  rendered.dataset.wrappedTex = data.display_wrapped_TeX || displayTex;
-  rendered.dataset.compactSvg = data.svg || '';
-  rendered.dataset.wrappedSvg = data.display_wrapped_svg || '';
-  rendered.dataset.responsiveFallback =
-    data.render_error || data.display_expression || data.expression || 'Could not render result';
-  rendered.dataset.responsiveFit = data.display_wrapped_svg ? 'true' : 'false';
-  delete rendered.dataset.responsiveVariant;
-  setRenderedContent(
-    data.svg || '',
-    data.display_expression || data.expression || 'Could not render result'
-  );
-  scheduleRenderedTeXFit();
-  resetMoreDigitsButton(
-    renderedMore,
-    !!fullDisplayTex &&
-      !!displayTex &&
-      fullDisplayTex !== displayTex &&
-      hasAbbreviatedValue(displayTex)
-  );
+    lastTex = labDOM.call('lab_result_rendered', labResultCaches, data, 0);
 }
 
-async function renderTexSvg(tex) {
-  const response = await fetch('/render_TeX', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({tex})
-  });
-  const data = await response.json();
-  if (!response.ok || !data.ok)
-    throw new Error(data.error || 'Could not render TeX');
-  return data;
-}
-
-function solverTextToTex(text) {
-  const escapeTex = value => String(value || '')
-    .replaceAll('\\', String.raw`\textbackslash{}`)
-    .replaceAll('&', String.raw`\&`)
-    .replaceAll('%', String.raw`\%`)
-    .replaceAll('$', String.raw`\$`)
-    .replaceAll('#', String.raw`\#`)
-    .replaceAll('_', String.raw`\_`)
-    .replaceAll('{', String.raw`\{`)
-    .replaceAll('}', String.raw`\}`)
-    .replaceAll('^', String.raw`\textasciicircum{}`)
-    .replaceAll('~', String.raw`\textasciitilde{}`);
-  const rows = String(text || '').split('\n').map(line =>
-    line.trim()
-      ? String.raw`&\text{${escapeTex(line)}}`
-      : String.raw`&\text{\phantom{X}}`
-  );
-  return String.raw`\begin{aligned}[t]${rows.join(String.raw`\\`)}\end{aligned}`;
+function renderTexSvg(TeX) {
+    return labFlowContinue(61, {TeX});
 }
 
 function toggleTextDigits(element, button) {
-  const expanded = button.dataset.expanded === 'true';
-  if (expanded) {
-    renderResultText(element, element.dataset.displayText || element.textContent);
-    button.textContent = 'Show more digits';
-    button.dataset.expanded = 'false';
-  } else {
-    renderResultText(element, element.dataset.fullText || element.textContent);
-    button.textContent = 'Show fewer digits';
-    button.dataset.expanded = 'true';
-  }
+    labDOM.call('lab_result_text_digits', labResultCaches, element, button);
 }
 
-async function toggleRenderedDigits() {
-  const expanded = renderedMore.dataset.expanded === 'true';
-
-  if (expanded) {
-    setRenderedContent(rendered.dataset.displaySvg || '', rendered.dataset.renderError || '');
-    renderedMore.textContent = 'Show more digits';
-    renderedMore.dataset.expanded = 'false';
-    return;
-  }
-
-  if (!rendered.dataset.fullSvg) {
-    renderedMore.disabled = true;
-    setStatus('Rendering full TeX...');
-    try {
-      const data = await renderTexSvg(rendered.dataset.fullTex || lastTex);
-      rendered.dataset.fullSvg = data.svg || '';
-      rendered.dataset.fullRenderError = data.render_error || '';
-    } catch (err) {
-      rendered.dataset.fullRenderError = String(err);
-    } finally {
-      renderedMore.disabled = false;
-      setStatus('Ready');
-    }
-  }
-
-  setRenderedContent(
-    rendered.dataset.fullSvg || '',
-    rendered.dataset.fullRenderError || 'No rendered TeX available'
-  );
-  renderedMore.textContent = 'Show fewer digits';
-  renderedMore.dataset.expanded = 'true';
+function toggleRenderedDigits() {
+    return labFlowContinue(58, {});
 }
 
 async function writeClipboardText(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
 
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  area.style.top = '0';
-  document.body.appendChild(area);
-  area.select();
-  const ok = document.execCommand('copy');
-  document.body.removeChild(area);
-  if (!ok)
-    throw new Error('Copy was blocked by the browser');
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    area.style.top = '0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(area);
+    if (!ok)
+        throw new Error('Copy was blocked by the browser');
 }
 
 function flashCopyButton(button, ok) {
-  const original = button.dataset.originalLabel || button.textContent;
-  button.dataset.originalLabel = original;
-  button.classList.remove('copied', 'copy-failed');
-  button.classList.add(ok ? 'copied' : 'copy-failed');
-  button.textContent = ok ? 'Copied' : 'Failed';
-
-  clearTimeout(button.copyResetTimer);
-  button.copyResetTimer = setTimeout(() => {
-    button.textContent = original;
-    button.classList.remove('copied', 'copy-failed');
-  }, 1200);
+    labDOM.call('lab_result_copy_flash', button, ok ? 1 : 2);
+    clearTimeout(button.copyResetTimer);
+    button.copyResetTimer = setTimeout(() => labDOM.call('lab_result_copy_flash', button, 0), 1200);
 }
 
 function clearResultPane() {
-  collapseResultCards();
-  rendered.replaceChildren();
-  rendered.textContent = '';
-  clearRenderedError();
-  setDatetimeLocalText('');
-  resetMoreDigitsButton(renderedMore, false);
-  clearResultDetails();
+    labDOM.call('lab_result_pane_clear');
+    setDatetimeLocalText('');
+    clearResultDetails();
 }
 
 function clearResultDetails(options = {}) {
-  clearFunctionRun();
-  parsed.classList.remove('matrix-pretty');
-  parsed.classList.remove('matrix-expression-pretty');
-  parsed.classList.remove('matrix-expression-text');
-  functionStyle.classList.remove('matrix-pretty');
-  functionStyle.classList.remove('equation-function');
-  value.classList.remove('matrix-pretty');
-  value.classList.remove('matrix-tex-value');
-  parsed.textContent = '';
-  functionStyle.textContent = '';
-  resetMoreDigitsButton(parsedMore, false);
-  resetMoreDigitsButton(functionMore, false);
-  resetMoreDigitsButton(valueMore, false);
-  delete parsed.dataset.fullText;
-  delete parsed.dataset.displayText;
-  delete parsed.dataset.matrixExpression;
-  delete parsed.dataset.matrixDisplayResult;
-  delete parsed.dataset.matrixFullResult;
-  delete parsed.dataset.matrixPretty;
-  delete parsed.dataset.matrixBindings;
-  delete functionStyle.dataset.fullText;
-  delete functionStyle.dataset.displayText;
-  delete rendered.dataset.compactTex;
-  delete rendered.dataset.wrappedTex;
-  delete rendered.dataset.compactSvg;
-  delete rendered.dataset.wrappedSvg;
-  delete rendered.dataset.responsiveFallback;
-  delete rendered.dataset.responsiveFit;
-  delete rendered.dataset.responsiveVariant;
-  setResultInputText('');
-  setValueText('');
-  if (currentMode() === 'expression')
-    setValueCardVisible(false);
-  lastTex = '';
-  lastDerivativeExpression = '';
-  currentVariables = [];
-  currentDifferentiable = true;
-  renderDerivativeButtons(currentVariables);
-  if (!options.keepBindings)
-    clearVariableValues();
+    clearFunctionRun();
+    const state = labDOM.call('lab_result_reset', labResultCaches, currentMode(), options);
+    ({resultInputBindings, lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable} = state);
+    renderDerivativeButtons(currentVariables);
+    labDOM.services(state, {clearVariableValues: () => clearVariableValues()});
+}
+
+function almanacPresentationVariant(data, visibility) {
+    const variant = labDOM.call('lab_result_almanac_variant', data, visibility);
+    if (!variant)
+        throw new Error(
+            'Almanac presentation is missing from the server response. ' +
+            'Run make mars-lab-restart, reload the page and evaluate again.');
+    return variant;
+}
+
+// Browser-owned live state; C owns visibility selection and event service ordering.
+const labAlmanacEventState = Object.freeze({
+    get visibility() {
+        return almanacVisibilityMode;
+    },
+    get worksheet() {
+        return almanacLastWorksheetData;
+    }
+});
+
+function setAlmanacVisibility(value) {
+    almanacVisibilityMode = value;
+}
+
+function bindAlmanacTotalityActions(root) {
+    labDOM.call('lab_almanac_events_install', root, null);
+}
+
+function almanacWorksheetCopyText(data, visibility) {
+    return almanacPresentationVariant(data, visibility).copy_text;
+}
+
+function renderAlmanacWorksheet(target, data) {
+    const visibility = labDOM.call('lab_almanac_events_render', target, data, labAlmanacEventState);
+    if (visibility === null)
+        throw new Error(
+            'Almanac presentation is missing from the server response. ' +
+            'Run make mars-lab-restart, reload the page and evaluate again.');
+    setAlmanacVisibility(visibility);
+}
+
+/** Copy after outstanding binding commits, using the browser clipboard. */
+function copyInputFromEvent() {
+    return labFlowContinue(59, {button: inputCopy});
+}
+
+// Browser projection capabilities consumed by native continuation plans.
+function evaluationLabel(mode, field) {
+    return labDOM.call('lab_evaluation_label', mode, field);
+}
+
+// Only browser-side effects live here; C selects their arguments and execution order.
+const labEvaluationRecovery = Object.freeze({
+    clearMatrixScalar: () => {
+        lastMatrixScalarExpression = '';
+    },
+    setRenderedError: text => setRenderedError(text),
+    resetRenderedDigits: () => resetMoreDigitsButton(renderedMore, false),
+    setDatetimeLocalText: text => setDatetimeLocalText(text),
+    clearResultDetails: options => clearResultDetails(options),
+    clearRenderedError: () => clearRenderedError(),
+    applyIntegratorBindingState: (data, text) => applyIntegratorBindingState(data, text),
+    applyIntegratorResultBound: data => applyIntegratorResultBound(data),
+    saveWorksheetState: mode => saveWorksheetState(mode)
+});
+
+function installEvaluationTextCards(cards) {
+    setExpandableText(parsed, parsedMore, cards.expression, cards.full_expression);
+    setResultInputText(cards.input);
+    setExpandableText(functionStyle, functionMore, cards.function, cards.full_function);
+    setValueText(cards.value);
+}
+
+// Host mutations are deliberately deferred: native plans never redefine live workspace getters.
+const labEvaluationInstall = Object.freeze({
+    setRenderedResult: data => setRenderedResult(data),
+    setExpressionEditor: (...args) => setExpressionEditor(...args),
+    renderVariableValues: bindings => renderVariableValues(bindings),
+    clearVariableValues: () => clearVariableValues(),
+    installEvaluationTextCards: cards => installEvaluationTextCards(cards),
+    present: (mode, data) => labDOM.call('lab_evaluation_cards_present', mode, data),
+    render: (mode, data, expandable) => lastTex = labDOM.call('lab_evaluation_render', mode, data, Number(expandable)),
+    source: (key, text) => labEditorState[key] = text,
+    modeSource: (mode, text) => modeEditorText[mode] = text,
+    derivative: text => lastDerivativeExpression = text,
+    scalar: text => lastMatrixScalarExpression = text,
+    variables: (variables, differentiable) => {
+        currentVariables = variables;
+        currentDifferentiable = differentiable;
+        renderDerivativeButtons(currentVariables);
+    },
+    saveWorksheetState: (...args) => saveWorksheetState(...args),
+    displayMatrixResult: data => displayMatrixResult(data),
+    scheduleRenderedTeXFit: () => scheduleRenderedTeXFit(),
+    solverTextCards: cards => {
+        setExpandableText(parsed, parsedMore, cards.expression, cards.full_expression);
+        setResultInputText(cards.input);
+        setExpandableText(functionStyle, functionMore, cards.function, cards.full_function);
+    },
+    setValueText: value => setValueText(value),
+    setValueCardVisible: visible => setValueCardVisible(visible),
+    applyIntegratorBindingState: (data, text) => applyIntegratorBindingState(data, text),
+    applyIntegratorResultBound: data => applyIntegratorResultBound(data),
+    calendarCard: card => renderDatetimeSections(card.element, card.button, card.sections, card.text),
+    setDatetimeLocalText: (...args) => setDatetimeLocalText(...args),
+    applyCalendarEvaluationFields: (mode, data) => applyCalendarEvaluationFields(mode, data),
+    setResultInputText: text => setResultInputText(text),
+    saveLastDatetimeState: () => saveLastDatetimeState(),
+    saveLastAlmanacState: () => saveLastAlmanacState(),
+    almanacRender: data => renderAlmanacWorksheet(rendered, data),
+    almanacAccept: data => almanacLastWorksheetData = data,
+    refreshAlmanacLandTotality: data => refreshAlmanacLandTotality(data)
+});
+
+// Getters use direct native exports only; they must not open another DOM scope.
+const labEvaluationView = Object.freeze({
+    get caches() {
+        return labResultCaches;
+    },
+    get editors() {
+        return labPresentationEditors;
+    },
+    get fullText() {
+        return labEditorState.fullText;
+    },
+    get rawEditor() {
+        return labEditorSnapshot();
+    },
+    get bodyText() {
+        return expr.value;
+    },
+    get lastInput() {
+        return labEditorState.lastInput;
+    }
+});
+
+const labWeatherServices = Object.freeze({
+    setStatus: status => setStatus(status),
+    installWeather: (overview, data) => {
+        const cards = labDOM.call('lab_evaluation_weather_cards', overview, data);
+        renderDatetimeSections(rendered, null, cards.sections, cards.text);
+    }
+});
+
+const labGoalServices = Object.freeze({
+    setRenderedError: message => setRenderedError(message),
+    resetRenderedDigits: () => resetMoreDigitsButton(renderedMore, false),
+    clearResultDetails: options => clearResultDetails(options),
+    setStatus: status => setStatus(status),
+    captureHistory: () => pushExpressionHistory(currentExpressionText()),
+    setRenderedResult: data => setRenderedResult(data),
+    setEditor: (data, context) => setExpressionEditor(
+        context.editorExpression, data.binding_values || null, context.editorBody, data.evaluation_ready),
+    installCards: context => installEvaluationTextCards(context.cards),
+    setLastInput: context => {
+        labEditorState.lastInput = context.editorExpression;
+    },
+    clearDerivative: () => {
+        lastDerivativeExpression = '';
+    },
+    setVariables: data => {
+        currentVariables = variableNamesFromBindings(data.binding_values || []);
+    },
+    setDifferentiable: context => {
+        currentDifferentiable = context.cards.differentiable;
+    },
+    renderDerivatives: () => renderDerivativeButtons(currentVariables),
+    setSource: context => {
+        labEditorState.goalSource = expressionForEditor(context.seek.expression).trim();
+    },
+    setTarget: context => {
+        labEditorState.goalTarget = context.target;
+    },
+    hideTargetEntry: () => hideTargetEntry(),
+    setSuccessStatus: context => setStatus(labDOM.call('lab_goal_status', context.cards))
+});
+
+
+/** Copy an exact native card source through the browser clipboard. */
+function copyResultFromEvent(button) {
+    return labFlowContinue(60, {button});
+}
+
+/** Browser capabilities for native result-action continuations. */
+function labResultFlowServices() {
+    return {
+        resultInput: () => resultExpressionTextForInput(),
+        resultSnapshot: () => ({mode: currentMode(), editor: expr.value, context: labRequests.context()}),
+        resultPrepare: text => prepareLabEditor(text),
+        resultHistoryEqual: (left, right) => historyStatesEqual(left, right),
+        resultClearGoal: () => {
+            clearGoalSeekRequest();
+            hideTargetEntry();
+        },
+        resultSourceBindings: () => compactExpressionForEditor(currentExpressionText()),
+        resultBindings: () => resultInputBindings,
+        resultAuthoredBindings: (...args) => bindingsWithAuthoredValues(...args),
+        resultApplyBinding: (...args) => applyMarsBindingExpression(...args),
+        resultMatrixControls: () => {
+            matrixOperation.value = 'eval';
+            matrixOperand.value = '';
+            syncRoundedSelect(matrixOperation);
+            syncMatrixControls();
+        },
+        resultSaveEditor: () => saveCurrentModeEditorState(),
+        resultPresentation: payload => requestLabPresentation(payload),
+        resultLastTeX: () => lastTex,
+        resultRenderTeX: TeX => renderTexSvg(TeX),
+        resultCopyText: button => copyTextForTarget(button.dataset.copyTarget),
+        resultDatetimeSummary: () => datetimeSummaryText(),
+        resultClipboard: text => writeClipboardText(text),
+        resultFlash: (...args) => flashCopyButton(...args),
+        resultStatusLater: (text, delay) => setTimeout(() => setStatus(text), delay),
+        resultFetch: (url, payload) => labFetch(url, {method: 'POST', body: labWire.encode(payload)}),
+        resultDecode: response => response.labData(),
+        resultStartupSnapshot: () => ({context: labRequests.context(), main: labRequests.latestMain()}),
+        resultRestoreBounds: () => restoreIntegratorBoundsText(DEFAULT_INTEGRATOR_BOUNDS_TEXT),
+        resultLoadState: () => loadLastState(),
+        resultInitialEvaluation: () => evaluateActiveModeOnLoad()
+    };
 }

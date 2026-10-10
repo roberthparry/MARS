@@ -5,12 +5,15 @@
  * Converts jurisdiction visitors to the browser's JSON representation without
  * inspecting database tables or SQL seed files. Grouped town enumeration appends
  * to one array at a time, avoiding repeated copying of an ever-growing catalogue.
+ * The forms API supplies selection keys and coordinate display text with each
+ * town, avoiding a browser round trip to prepare that same catalogue again.
  * Missing or unreadable databases yield explicit unavailable metadata and empty
  * choices; mathematical worksheets do not depend on the jurisdiction database.
  */
 #include <string.h>
 
 #include "jurisdiction.h"
+#include "lab_forms.h"
 #include "lab_page.h"
 
 struct lab_page_places {
@@ -94,7 +97,8 @@ static bool lab_page_town(const jurisdict_place_t *place, void *context)
                  lab_page_catalogue_text(row, "longitude", place->longitude) &&
                  lab_page_catalogue_text(row, "elevation", place->elevation) &&
                  lab_page_catalogue_text(row, "timezone", place->timezone) &&
-                 lab_page_catalogue_set(row, "default", is_default) && json_array_append(places->group, row);
+                 lab_page_catalogue_set(row, "default", is_default) && lab_forms_town_presentation(row) &&
+                 json_array_append(places->group, row);
     json_free(is_default);
     json_free(row);
     return places->ok;

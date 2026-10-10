@@ -2,7 +2,7 @@
  * @file lab_evaluate.c
  * @brief Validate and dispatch native MARS Lab mathematical requests.
  *
- * This server adapter supplies bounded argv vectors to prebuilt scratch workers.
+ * This server adapter supplies bounded argv vectors to prebuilt Lab workers.
  * It does not interpret mathematical syntax, rewrite results, build executables,
  * or persist editor state. The process module resolves build-directory defaults
  * and CLI/environment worker overrides. Relative paths require the repository
@@ -368,7 +368,7 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
         string_free(cap_text);
         timeout_ms = lab_eval_integrator_timeout(precision, cap);
     }
-    /* Prevent scratch option parsers from interpreting an expression as a mode. */
+    /* Prevent worker option parsers from interpreting an expression as a mode. */
     valid = valid && !string_starts_with(input, "--") && lab_eval_argument(&args, string_c_str(input));
     if (valid && !strcmp(entry->mode, "expression"))
         valid = lab_eval_expression_arguments(&args, payload, string_c_str(digits));

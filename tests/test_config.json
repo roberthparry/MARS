@@ -2644,6 +2644,16 @@
       "test_lab_browser": true
     }
   },
+  "tools/mars_lab/tests/test_lab_almanac_presentation.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_almanac_land_policy": true,
+      "test_lab_almanac_presentation_bound": true,
+      "test_lab_almanac_times": true,
+      "test_lab_almanac_variants": true,
+      "test_lab_calendar_markup_escaping": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_calendar_extra.c": {
     "tests": {
       "enabled": true,
@@ -2697,6 +2707,19 @@
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
       "test_lab_extra_unsafe_TeX_input": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_forms.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_forms_integrator_references": true,
+      "test_lab_forms_integrator_structured": true,
+      "test_lab_forms_integrator_text": true,
+      "test_lab_forms_limits": true,
+      "test_lab_forms_rejections": true,
+      "test_lab_forms_time": true,
+      "test_lab_forms_town": true,
+      "test_lab_forms_town_presentation": true
     }
   },
   "tools/mars_lab/tests/test_lab_function.c": {
@@ -3264,6 +3287,25 @@
       "test_process_worker_paths": true
     }
   },
+  "tools/mars_lab/tests/test_lab_presentation.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_presentation_calculus_cards": true,
+      "test_lab_presentation_compaction": true,
+      "test_lab_presentation_condition_boundary": true,
+      "test_lab_presentation_editor_analysis": true,
+      "test_lab_presentation_editor_calculus": true,
+      "test_lab_presentation_editor_edits": true,
+      "test_lab_presentation_embedded_nul": true,
+      "test_lab_presentation_empty_constants_roundtrip": true,
+      "test_lab_presentation_equation_solution_text": true,
+      "test_lab_presentation_integrator_text": true,
+      "test_lab_presentation_matrix": true,
+      "test_lab_presentation_metadata": true,
+      "test_lab_presentation_rejections": true,
+      "test_lab_presentation_unset": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_routes.c": {
     "tests": {
       "enabled": true,
@@ -3287,6 +3329,30 @@
       "test_lab_page_escaping": true,
       "test_lab_state_corruption": true,
       "test_lab_state_round_trip": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_syntax.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_syntax_combined": true,
+      "test_lab_syntax_literals": true,
+      "test_lab_syntax_matrix_heading_bound": true,
+      "test_lab_syntax_matrix_headings": true,
+      "test_lab_syntax_span_bound": true,
+      "test_lab_syntax_variants": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_wire.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_wire_byte_boundary": true,
+      "test_lab_wire_depth_boundary": true,
+      "test_lab_wire_node_boundary": true,
+      "test_lab_wire_number_policy": true,
+      "test_lab_wire_number_vectors": true,
+      "test_lab_wire_rejections": true,
+      "test_lab_wire_roundtrip": true,
+      "test_lab_wire_schema": true
     }
   },
   "tools/to_be_announced_lab/tests/test_tba_native.c": {

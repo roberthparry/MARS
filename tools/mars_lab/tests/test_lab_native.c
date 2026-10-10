@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "file.h"
 #include "lab_process.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -40,6 +41,11 @@ static bool output_equals(const string_t *output, const char *expected)
 static bool worker_path_checks(const char *directory)
 {
     (void)directory;
+#ifdef DEBUG
+    const char *configuration = "debug";
+#else
+    const char *configuration = "release";
+#endif
     static const struct {
         const char *name;
         const char *environment;
@@ -57,8 +63,14 @@ static bool worker_path_checks(const char *directory)
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         bool cleared = unsetenv(cases[i].environment) == 0;
         string_t *fallback = cleared ? lab_proc_worker_path(cases[i].name) : NULL;
-        string_t *suffix = string_sprintf("/%s", cases[i].name);
+        string_t *suffix = string_sprintf("/tools/mars_lab/build/%s/workers/%s", configuration, cases[i].name);
         ok = fallback && suffix && string_ends_with(fallback, string_c_str(suffix)) && ok;
+        file_t *executable = fallback ? file_new(fallback) : NULL;
+        file_info_t *info = executable ? file_get_info(executable) : NULL;
+        ok = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) > 0 &&
+             (file_info_permissions(info) & 0111u) && ok;
+        file_info_free(info);
+        file_free(executable);
         bool changed = setenv(cases[i].environment, "/custom path/worker;$literal", 1) == 0;
         string_t *override = changed ? lab_proc_worker_path(cases[i].name) : NULL;
         ok = output_equals(override, "/custom path/worker;$literal") && ok;
@@ -84,7 +96,7 @@ static bool worker_path_checks(const char *directory)
 static void test_process_worker_paths(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(worker_path_checks),
-                     "all worker overrides, empty defaults, owned paths and invalid basenames are handled");
+                     "all ten Lab-local workers exist in the active build; overrides and invalid names are handled");
 }
 
 static void test_process_success(void)
@@ -385,6 +397,11 @@ int tests_main(void)
     test_lab_mobile_cases();
     test_lab_runtime_cases();
     test_lab_route_cases();
+    test_lab_wire_cases();
+    test_lab_presentation_cases();
+    test_lab_forms_cases();
+    test_lab_syntax_cases();
+    test_lab_almanac_presentation_cases();
     TEST_SECTION("Native mathematical worker regressions");
     test_lab_math_cases();
     TEST_SECTION("README examples (last)");

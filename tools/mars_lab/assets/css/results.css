@@ -373,9 +373,15 @@ pre {
 
 .matrix-grid {
   display: grid;
+  grid-template-columns: repeat(var(--matrix-columns), max-content);
   align-items: center;
   gap: 0.3rem 1.25rem;
   padding: 0.35rem 0.1rem;
+}
+
+#value .matrix-grid,
+#parsed .matrix-grid {
+  grid-template-columns: repeat(var(--matrix-columns), minmax(0, 1fr));
 }
 
 .matrix-cell {

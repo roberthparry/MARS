@@ -52,6 +52,9 @@ void lab_cal_section(json_t *sections, const char *title, bool open, const json_
     lab_cal_set(section, "title", title);
     lab_cal_take(section, "open", json_new_bool(open));
     lab_cal_take(section, "rows", json_clone(rows));
+    string_t *html = lab_cal_section_markup(title, open, rows);
+    if (html) lab_cal_set(section, "html", string_c_str(html));
+    string_free(html);
     lab_cal_append(sections, section);
 }
 

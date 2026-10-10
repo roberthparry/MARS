@@ -88,18 +88,25 @@ static bool page_escaping(const char *directory)
     ok = page && string_find(page, "&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;&amp;&quot;") >= 0 &&
          string_find(page, "&lt;Lab &amp; &quot;test&quot;&gt;") >= 0 &&
          string_find(page, "</textarea><script>alert(1)</script>") < 0 &&
-         string_find(page, "\\u003c/script\\u003e\\u0026\\u2028\\u2029__LAB_NAME__") >= 0 &&
+         string_find(page, "id=\"lab-config\"") < 0 &&
          string_find(page, "__LAB_NAME__") >= 0 && string_find(page, "MARS_LAB_DATA") < 0;
+    json_t *config = lab_page_bootstrap(state);
+    ok = ok && !strcmp(test_lab_text(config, "BROWSER_ABI_VERSION"), "30");
+    const json_t *token = test_lab_member(config, "CONTROL_TOKEN");
+    const string_t *token_text = json_string_value(token);
+    ok = ok && token_text && string_view_equals_literal(string_view_all(token_text),
+                                                        "</script>&\u2028\u2029__LAB_NAME__");
+    json_free(config);
     string_free(page);
     json_free(state);
     string_t *path = string_sprintf("%s/bad.html", directory);
     file_t *file = path ? file_new(path) : NULL;
-    static const char invalid[] = "<html>missing asset catalogue</html>";
+    static const char invalid[] = "<html>__UNKNOWN_CATALOGUE_TOKEN__</html>";
     bool prepared = file && file_write_all_bytes(file, invalid, sizeof(invalid) - 1) &&
                     !setenv("MARS_LAB_ASSET_FILE", string_c_str(path), 1);
     page = prepared ? lab_page_render(NULL) : NULL;
     json_t *defaults = prepared ? lab_page_defaults() : NULL;
-    ok = prepared && !page && !defaults && ok;
+    ok = prepared && !page && defaults && ok;
     string_free(page);
     json_free(defaults);
     file_free(file);
@@ -124,12 +131,24 @@ static void test_lab_page_escaping(void)
 
 static bool packaged_defaults(const char *directory)
 {
-    (void)directory;
+    string_t *missing_template = string_sprintf("%s/no-template.html", directory);
+    bool configured = missing_template && !setenv("MARS_LAB_ASSET_FILE", string_c_str(missing_template), 1);
+    string_free(missing_template);
     json_t *catalogue = lab_page_catalogue();
     json_t *defaults = lab_page_defaults();
     string_t *expected = json_to_string(test_lab_member(catalogue, "defaults"));
     string_t *actual = defaults ? json_to_string(defaults) : NULL;
-    bool ok = expected && actual && !string_compare(expected, actual);
+    const json_t *constants = test_lab_member(catalogue, "constants");
+    const json_t *precision = test_lab_member(defaults, "precision_bits");
+    const string_t *bits = json_number_text(test_lab_member(precision, "integrator"));
+    bool ok = configured && expected && actual && !string_compare(expected, actual) &&
+              json_object_size(constants) == 40 && !test_lab_member(constants, "DEFAULT_SCRATCH_TARGET") &&
+              json_object_size(defaults) == 34 &&
+              json_object_size(precision) == 7 && bits && string_view_equals_literal(string_view_all(bits), "1280") &&
+              !strcmp(test_lab_text(defaults, "datetime_date"), "2026-10-05") &&
+              !strcmp(test_lab_text(defaults, "almanac_town"), "Shrewsbury|52.7077|-2.7541|75") &&
+              !strcmp(test_lab_text(defaults, "equation"), "(x+1)^4 = 1") &&
+              !strcmp(test_lab_text(defaults, "expression"), test_lab_text(constants, "DEFAULT_EXPRESSION"));
     string_free(actual);
     string_free(expected);
     json_free(defaults);

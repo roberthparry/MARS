@@ -3,901 +3,395 @@
  * Definition-only client script; app.js loads it before shared worksheet state.
  */
 
-function expressionWithBindings(bodyText, bindings) {
-  const source = String(bodyText || '').trim();
-  if (!source)
-    return '';
-  if (!Array.isArray(bindings) || !bindings.length)
-    return source;
-  const body = expressionBodyForEditor(source);
+async function editIntegratorRow(item, index, operation) {
+    return labFlowContinue(47, {item, index, operation});
+}
 
-  const variableAssignments = [];
-  const constantAssignments = [];
-  bindings.forEach((binding) => {
-    const name = String(binding && binding.name || '').trim();
-    if (!name)
-      return;
+const labBindingEventRoots = new WeakSet();
 
-    let valueText = String(binding && (binding.value ?? binding.display) || '').trim();
-    if (!valueText || /^NAN$/i.test(valueText))
-      valueText = '?';
+function installLabBindingEvents(root, nativeEvent, actions) {
+    if (labBindingEventRoots.has(root))
+        return;
+    labBindingEventRoots.add(root);
+    for (const type of ['keydown', 'change', 'input', 'pointerdown', 'click']) {
+        root.addEventListener(type, event => {
+            const action = labDOM.call(nativeEvent, root, event);
+            if (action?.prevent)
+                event.preventDefault();
+            if (action)
+                void actions[action.action]?.(action);
+        }, true);
+    }
+}
 
-    const assignment = `${name} = ${valueText}`;
-    if (String(binding && binding.kind || 'variable').trim() === 'constant')
-      constantAssignments.push(assignment);
-    else
-      variableAssignments.push(assignment);
-  });
+async function prepareIntegratorBindingInput(input) {
+    return labFlowContinue(48, {input});
+}
 
-  constantAssignments.sort(compareBindingNames);
-  let bindingText = variableAssignments.join(', ');
-  if (constantAssignments.length) {
-    const constants = constantAssignments.join(', ');
-    bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
-  }
-  return bindingText ? `{ ${body} | ${bindingText} }` : body;
+const labIntegratorBindingActions = {
+    invalidate: ({card}) => {
+        nextIntegratorFormsRevision();
+        integratorReferenceMetadata = null;
+        card.input.setCustomValidity('');
+    },
+    prepare: ({card}) => prepareIntegratorBindingInput(card.input),
+    edit: ({item, index, operation}) => editIntegratorRow(item, index, operation)
+};
+
+function renderIntegratorRows(rows) {
+    nextIntegratorFormsRevision();
+    const safeRows = labDOM.call('lab_binding_rows_prepare', rows);
+    installLabBindingEvents(integratorBoundStack, 'lab_binding_integrator_event', labIntegratorBindingActions);
+    labDOM.call('lab_binding_integrator_render', integratorBoundStack, safeRows);
+}
+
+function labEditorData(text) {
+    return labDOM.call('lab_editor_metadata', 0, [text], labPresentationEditors);
+}
+
+function expressionWithSortedConstants(text) {
+    return labDOM.call('lab_editor_metadata', 1, [text], labPresentationEditors);
+}
+
+function canGoalSeek() {
+    return currentVariables.length > 0;
+}
+function expressionForEvaluation(text) {
+    return String(text || '');
+}
+function expressionForEditor(text) {
+    return String(text || '');
+}
+
+function restoreCompactBindingValues(text) {
+    return labDOM.call('lab_editor_metadata', 2, [text], labPresentationEditors);
+}
+
+// UTF-8 validation and buffer transfer only; safe to call from a scoped native view getter.
+function labEditorSnapshot() {
+    const text = expr.value.trim();
+    return {text, length: workspaceStageText(text)};
+}
+
+function currentExpressionText() {
+    return labDOM.call('lab_editor_current', labEvaluationView);
+}
+
+function expressionBodyForEditor(text) {
+    return labDOM.call('lab_editor_metadata', 3, [text], labPresentationEditors);
+}
+
+function clearExpressionSource() {
+    labDOM.services(labDOM.call('lab_binding_projection_clear', 0), labBindingFlowServices());
+}
+
+function clearGoalSeekRequest() {
+    labDOM.services(labDOM.call('lab_binding_projection_clear', 1), labBindingFlowServices());
+}
+
+function currentGoalSeekSource() {
+    const length = labWire.exports().lab_workspace_source_resolve(workspaceStageText(expr.value.trim()), true);
+    return workspaceDecoder.decode(workspaceReadBytes(length));
+}
+
+function expressionReadyToEvaluate() {
+    return labDOM.call('lab_editor_ready', [currentMode()], labEvaluationView);
+}
+
+function bindingParts(text) {
+    return labDOM.call('lab_editor_metadata', 4, [text], labPresentationEditors);
+}
+
+function compactExpressionForEditor(fullText) {
+    return labDOM.call('lab_editor_metadata', 5, [fullText], labPresentationEditors);
+}
+
+async function expressionWithBindings(bodyText, bindings) {
+    return labFlowContinue(40, {body: bodyText, bindings});
 }
 
 function visibleBindingValues() {
-  return Array.from(variableValues.querySelectorAll('.binding-value-input'))
-    .map((input) => ({
-      name: String(input.dataset.bindingName || '').trim(),
-      kind: String(input.dataset.bindingKind || 'variable').trim(),
-      value: normalisedBindingInputValue(input),
-      display: normalisedBindingInputValue(input)
-    }))
-    .filter((binding) => binding.name);
+    return labDOM.call('lab_binding_visible', variableValues);
 }
 
-function expressionWithVisibleBindings(sourceExpression, visibleBindings) {
-  return expressionWithBindings(
-    expressionBodyForEditor(sourceExpression),
-    visibleBindings
-  ) || sourceExpression;
+async function expressionWithVisibleBindings(sourceExpression, visibleBindings) {
+    return await expressionWithBindings(sourceExpression, visibleBindings) || sourceExpression;
 }
 
 function bindingsWithAuthoredValues(bindings, sourceExpression, visibleBindings = []) {
-  const discovered = Array.isArray(bindings) ? bindings : [];
-  const authored = compactExpressionForEditor(sourceExpression).bindings || [];
-  const authoredByName = new Map(
-    authored.map((binding) => [String(binding.name || '').trim(), binding])
-  );
-  const visibleByName = new Map(
-    (Array.isArray(visibleBindings) ? visibleBindings : [])
-      .map((binding) => [String(binding.name || '').trim(), binding])
-  );
-
-  return discovered.map((binding) => {
-    const name = String(binding && binding.name || '').trim();
-    const sourceBinding = visibleByName.get(name) || authoredByName.get(name);
-    if (!sourceBinding)
-      return binding;
-    return {
-      ...binding,
-      value: sourceBinding.value,
-      display: sourceBinding.display
-    };
-  });
+    return labDOM.call(
+        'lab_binding_authored', bindings, compactExpressionForEditor(sourceExpression).bindings, visibleBindings);
 }
 
-function replaceBindingValueInExpression(sourceExpression, kind, targetName, valueText) {
-  const parts = bindingParts(sourceExpression);
-  if (!parts || !targetName)
-    return sourceExpression;
-
-  let changed = false;
-  function replaceAssignments(assignmentsText, shouldReplace) {
-    return splitTopLevel(assignmentsText, ',')
-      .map((part) => {
-        const eq = indexOfTopLevel(part, '=');
-        if (eq < 0)
-          return part.trim();
-
-        const name = part.slice(0, eq).trim();
-        if (!shouldReplace || name !== targetName)
-          return part.trim();
-
-        changed = true;
-        return `${name} = ${valueText}`;
-      })
-      .filter(Boolean)
-      .join(', ');
-  }
-
-  const variables = replaceAssignments(parts.variables, kind !== 'constant');
-  const constants = replaceAssignments(parts.constants, kind === 'constant');
-  if (!changed)
-    return sourceExpression;
-
-  let bindingText = variables;
-  if (constants)
-    bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
-  return `{ ${parts.body} | ${bindingText} }`;
-}
-
-function replaceBindingKindInExpression(sourceExpression, targetName, nextKind) {
-  const parts = bindingParts(sourceExpression);
-  if (!parts || !targetName)
-    return sourceExpression;
-
-  let movedAssignment = '';
-  function removeAssignment(assignmentsText, shouldRemove) {
-    return splitTopLevel(assignmentsText, ',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .filter((part) => {
-        const eq = indexOfTopLevel(part, '=');
-        const name = eq >= 0 ? part.slice(0, eq).trim() : part.trim();
-        if (!shouldRemove || name !== targetName)
-          return true;
-        movedAssignment = part;
-        return false;
-      })
-      .join(', ');
-  }
-
-  const variables = removeAssignment(parts.variables, nextKind === 'constant');
-  const constants = removeAssignment(parts.constants, nextKind !== 'constant');
-  if (!movedAssignment)
-    return sourceExpression;
-
-  const nextVariables = nextKind === 'constant'
-    ? variables
-    : [variables, movedAssignment].filter(Boolean).join(', ');
-  const nextConstants = nextKind === 'constant'
-    ? sortedAssignmentParts(
-      [...splitTopLevel(constants, ','), movedAssignment]
-        .map((part) => part.trim())
-        .filter(Boolean)
-    ).join(', ')
-    : constants;
-  let bindingText = nextVariables;
-  if (nextConstants)
-    bindingText = bindingText ? `${bindingText}; ${nextConstants}` : `; ${nextConstants}`;
-  return `{ ${parts.body} | ${bindingText} }`;
-}
-
-function isIntegrationConstantName(name) {
-  return /^C(?:_\d+|[₀₁₂₃₄₅₆₇₈₉]+)?$/.test(String(name || '').trim());
-}
-
-function splitTopLevelAddSubTerms(text) {
-  const terms = [];
-  let depth = 0;
-  let start = 0;
-  let sign = '+';
-  const source = String(text || '');
-
-  for (let i = 0; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
-    else if ((ch === '+' || ch === '-') && depth === 0 && i > 0) {
-      const term = source.slice(start, i).trim();
-      if (term)
-        terms.push({sign, text: term});
-      sign = ch;
-      start = i + 1;
-    }
-  }
-
-  const tail = source.slice(start).trim();
-  if (tail)
-    terms.push({sign, text: tail});
-  return terms;
-}
-
-function joinTopLevelAddSubTerms(terms) {
-  return (terms || []).map((term, index) => {
-    const sign = term.sign === '-' ? '-' : '+';
-    const text = String(term.text || '').trim();
-    if (!text)
-      return '';
-    if (index === 0)
-      return sign === '-' ? `-${text}` : text;
-    return sign === '-' ? ` - ${text}` : ` + ${text}`;
-  }).filter(Boolean).join('');
-}
-
-function removeBindingFromExpression(sourceExpression, kind, targetName) {
-  const parts = bindingParts(sourceExpression);
-  if (!parts || !targetName)
-    return sourceExpression;
-
-  let changed = false;
-  function keepAssignments(assignmentsText, shouldRemove) {
-    return splitTopLevel(assignmentsText, ',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .filter((part) => {
-        const eq = indexOfTopLevel(part, '=');
-        const name = eq >= 0 ? part.slice(0, eq).trim() : part.trim();
-        if (!shouldRemove || name !== targetName)
-          return true;
-        changed = true;
-        return false;
-      })
-      .join(', ');
-  }
-
-  const variables = keepAssignments(parts.variables, kind !== 'constant');
-  const constants = keepAssignments(parts.constants, kind === 'constant');
-  let body = parts.body;
-  if (kind === 'constant' && isIntegrationConstantName(targetName)) {
-    const terms = splitTopLevelAddSubTerms(body);
-    const filteredTerms = terms.filter((term) => term.text !== targetName);
-    if (filteredTerms.length !== terms.length) {
-      body = joinTopLevelAddSubTerms(filteredTerms) || '0';
-      changed = true;
-    }
-  }
-
-  if (!changed)
-    return sourceExpression;
-
-  let bindingText = variables;
-  if (constants)
-    bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
-  return bindingText ? `{ ${body} | ${bindingText} }` : body;
+async function replaceBindingKindInExpression(sourceExpression, targetName, nextKind) {
+    return labFlowContinue(55, {source: sourceExpression, name: targetName, nextKind});
 }
 
 function applyUpdatedBindingExpression(updated) {
-  if (currentMode() === 'expression' || currentMode() === 'equation' || currentMode() === 'diffequation') {
-    setExpressionEditor(updated);
-    return;
-  }
-
-  if (bindingParts(updated))
-    setExpressionEditor(updated);
-  else {
-    expr.value = expressionForEditor(updated).trim();
-    clearExpressionSource();
-    clearVariableValues();
-  }
+    labDOM.services(
+        labDOM.call('lab_binding_projection_update', workspaceModeId(currentMode()), updated, labEditorData(updated)),
+        labBindingFlowServices());
 }
 
 async function applyMarsBindingExpression(updated, editorBodyText = null) {
-  setBusy(true);
-  setStatus('Updating bindings...');
-  try {
-    const {response, data} = await fetchEvaluation(updated, '', 'bindings');
-    if (!response.ok || !data.ok)
-      throw new Error(data.error || 'MARS could not update the bindings');
-
-    const bindings = bindingsWithAuthoredValues(
-      Array.isArray(data.binding_values) ? data.binding_values : [],
-      updated
-    );
-    if (editorBodyText !== null && editorBodyText !== undefined) {
-      const editorBody = expressionBodyForEditor(editorBodyText);
-      setExpressionEditor(
-        expressionWithBindings(editorBody, bindings) || editorBody,
-        bindings,
-        editorBody,
-        data.evaluation_ready
-      );
-    } else {
-      setExpressionEditor(
-        updated,
-        bindings,
-        null,
-        data.evaluation_ready
-      );
-    }
-    updateHistoryButtons();
-    saveCurrentModeEditorState();
-    setStatus('Ready');
-    return true;
-  } catch (err) {
-    setStatus(String(err));
-    return false;
-  } finally {
-    setBusy(false);
-  }
+    const mode = currentMode(), editorSnapshot = expr.value;
+    return labRequests.run(
+        'bindingCommit', mode, request => labFlowContinue(52, {updated, editorBodyText, editorSnapshot, request}));
 }
 
-function applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data) {
-  const inlineBindings = bindingParts(editedBody);
-  const editorBody = expressionBodyForEditor(editedBody);
-  const authoredBindingSource = inlineBindings ? editedBody : sourceExpression;
-  const bindings = bindingsWithAuthoredValues(
-    data && data.binding_values,
-    authoredBindingSource
-  );
-  fullExpressionText = expressionForEditor(
-    expressionWithBindings(editorBody, bindings) || editorBody
-  ).trim();
-  displayedExpressionText = editorBody;
-  expr.dataset.fullExpression = fullExpressionText;
-  expr.dataset.displayExpression = displayedExpressionText;
-  expr.dataset.bindingRefreshValid = 'true';
-  expr.dataset.evaluationReady =
-    String(data && data.evaluation_ready || 'no').trim().toLowerCase() === 'yes'
-      ? 'true'
-      : 'false';
-  expr.value = displayedExpressionText;
-  renderVariableValues(bindings);
-  currentVariables = variableNamesFromBindings(bindings);
-  currentDifferentiable =
-    String(data && data.differentiable || 'yes').trim().toLowerCase() !== 'no';
-  renderDerivativeButtons(currentVariables);
-  saveLastExpression(fullExpressionText, {debounce: true});
+async function applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data, request) {
+    return labFlowContinue(53, {editedBody, sourceExpression, data, request});
 }
 
-async function refreshEditedExpressionBindings(editedBody, sourceExpression, sequence) {
-  try {
-    const {response, data} = await fetchEvaluation(
-      editedBody,
-      '',
-      'bindings',
-      sourceExpression
-    );
-    if (sequence !== expressionBindingRefreshSequence ||
-        currentMode() !== 'expression' ||
-        expr.value.trim() !== editedBody)
-      return;
-
-    if (!response.ok || !data.ok) {
-      expr.dataset.bindingRefreshValid = 'false';
-      updateHistoryButtons();
-      return;
+async function refreshEditedExpressionBindings(editedBody, sourceExpression, request) {
+    try {
+        return await labFlowContinue(54, {editedBody, sourceExpression, request});
+    } finally {
+        labRequests.finish(request);
     }
-
-    applyMarsBindingsToEditedExpression(editedBody, sourceExpression, data);
-    updateHistoryButtons();
-  } catch (err) {
-    if (sequence !== expressionBindingRefreshSequence ||
-        currentMode() !== 'expression' ||
-        expr.value.trim() !== editedBody)
-      return;
-    expr.dataset.bindingRefreshValid = 'false';
-    updateHistoryButtons();
-  }
 }
 
 function scheduleEditedExpressionBindingRefresh() {
-  const editedBody = expr.value.trim();
-  const sourceExpression = expr.dataset.fullExpression || fullExpressionText;
-  const sequence = ++expressionBindingRefreshSequence;
-
-  clearTimeout(expressionBindingRefreshTimer);
-  expr.dataset.bindingRefreshValid = 'pending';
-  updateHistoryButtons();
-  expressionBindingRefreshTimer = setTimeout(() => {
-    void refreshEditedExpressionBindings(
-      editedBody,
-      sourceExpression,
-      sequence
-    );
-  }, 300);
+    const context = {editedBody: expr.value, sourceExpression: labEditorState.fullText};
+    for (let phase = 0; phase < 2; ++phase)
+        labDOM.services(labDOM.call('lab_binding_projection_refresh', phase, context), labBindingFlowServices());
 }
 
 function saveCurrentModeEditorState() {
-  if (currentMode() === 'expression')
-    saveLastExpression(currentExpressionText() || expr.value.trim());
-  else if (currentMode() === 'equation')
-    saveLastEquationState();
-  else if (currentMode() === 'diffequation')
-    saveLastDiffequationState();
-  else if (currentMode() === 'matrix')
-    saveLastMatrixState();
-  else
-    saveLastIntegratorState();
+    saveWorksheetState(currentMode());
 }
 
-function normalisedBindingInputValue(input) {
-  let text = String(input.value || '').trim();
-  // Recover values contaminated by an older result-envelope parser.
-  const conditionStart = indexOfTopLevel(text, ';');
-  if (conditionStart >= 0)
-    text = text.slice(0, conditionStart).trim();
-  return text || '?';
+const labBindingCommit = Object.freeze({
+    source: text => labEditorState.fullText = text,
+    cache: (snapshot, editor) => labDOM.call('lab_binding_committed_cache', snapshot, editor, bindingValueCache),
+    applyUpdatedBindingExpression: text => applyUpdatedBindingExpression(text),
+    applyMarsBindingExpression: (...args) => applyMarsBindingExpression(...args),
+    refreshVariableValuesFromEditor: (...args) => refreshVariableValuesFromEditor(...args),
+    updateHistoryButtons: () => updateHistoryButtons(),
+    saveCurrentModeEditorState: () => saveCurrentModeEditorState()
+});
+
+async function commitLabBindingValues(inputs, isCurrent = () => true) {
+    return labFlowContinue(51, {inputs, isCurrent});
 }
 
 async function commitBindingInput(input) {
-  const name = input.dataset.bindingName || '';
-  const kind = input.dataset.bindingKind || 'variable';
-  const valueText = normalisedBindingInputValue(input);
-  const current = currentExpressionText();
-
-  if (currentMode() === 'expression') {
-    let updatedSource = replaceBindingValueInExpression(
-      current,
-      kind,
-      name,
-      valueText
-    );
-    if (updatedSource === current)
-      updatedSource = replaceBindingValueInExpression(
-        current,
-        kind === 'constant' ? 'variable' : 'constant',
-        name,
-        valueText
-      );
-    if (!updatedSource || updatedSource === current)
-      return;
-
-    fullExpressionText = expressionForEditor(updatedSource).trim();
-    expr.dataset.fullExpression = fullExpressionText;
-    expr.dataset.bindingRefreshValid = 'true';
-    input.value = isUnsetBindingValue(valueText) ? '' : valueText;
-    input.title = valueText;
-    if (isUnsetBindingValue(valueText))
-      bindingValueCache.delete(name);
-    else
-      bindingValueCache.set(name, valueText);
-    updateHistoryButtons();
-    saveCurrentModeEditorState();
-    return;
-  }
-
-  const removesIntegrationConstant =
-    kind === 'constant' && valueText === '?' && isIntegrationConstantName(name);
-  const updated = removesIntegrationConstant
-    ? removeBindingFromExpression(current, kind, name)
-    : replaceBindingValueInExpression(current, kind, name, valueText);
-
-  input.value = (valueText === '?' || /^NAN$/i.test(valueText)) ? '' : valueText;
-  input.title = valueText;
-
-  if (updated === current)
-    return;
-
-  if (removesIntegrationConstant) {
-    await applyMarsBindingExpression(updated);
-    return;
-  }
-
-  applyUpdatedBindingExpression(updated);
-  refreshVariableValuesFromEditor();
-  updateHistoryButtons();
-  saveCurrentModeEditorState();
+    return commitLabBindingValues([input]);
 }
 
-function commitVisibleBindingInputs() {
-  const inputs = Array.from(variableValues.querySelectorAll('.binding-value-input'));
-  if (!inputs.length)
-    return false;
-
-  let current = currentExpressionText();
-  let updated = current;
-
-  if (currentMode() === 'expression') {
-    if (!bindingParts(current)) {
-      const enteredBindings = inputs.map((input) => ({
-        name: input.dataset.bindingName || '',
-        kind: input.dataset.bindingKind || 'variable',
-        value: normalisedBindingInputValue(input)
-      })).filter((binding) => binding.name);
-      updated = expressionWithBindings(current, enteredBindings);
-    } else {
-      inputs.forEach((input) => {
-        const name = input.dataset.bindingName || '';
-        const kind = input.dataset.bindingKind || 'variable';
-        const valueText = normalisedBindingInputValue(input);
-        const previous = updated;
-        updated = replaceBindingValueInExpression(previous, kind, name, valueText);
-        if (updated === previous)
-          updated = replaceBindingValueInExpression(
-            previous,
-            kind === 'constant' ? 'variable' : 'constant',
-            name,
-            valueText
-          );
-      });
-    }
-
-    if (!updated || updated === current)
-      return false;
-
-    fullExpressionText = expressionForEditor(updated).trim();
-    expr.dataset.fullExpression = fullExpressionText;
-    expr.dataset.bindingRefreshValid = 'true';
-    inputs.forEach((input) => {
-      const name = input.dataset.bindingName || '';
-      const valueText = normalisedBindingInputValue(input);
-      input.value = isUnsetBindingValue(valueText) ? '' : valueText;
-      input.title = valueText;
-      if (isUnsetBindingValue(valueText))
-        bindingValueCache.delete(name);
-      else
-        bindingValueCache.set(name, valueText);
-    });
-    updateHistoryButtons();
-    saveCurrentModeEditorState();
-    return true;
-  }
-
-  if (currentMode() === 'matrix' && !bindingParts(current)) {
-    const enteredBindings = inputs
-      .map((input) => ({
-        name: input.dataset.bindingName || '',
-        kind: input.dataset.bindingKind || 'variable',
-        value: String(input.value || '').trim()
-      }))
-      .filter((binding) => binding.name && binding.value);
-
-    if (!enteredBindings.length)
-      return false;
-    updated = expressionWithBindings(current, enteredBindings);
-  } else {
-    inputs.forEach((input) => {
-      const name = input.dataset.bindingName || '';
-      const kind = input.dataset.bindingKind || 'variable';
-      const valueText = normalisedBindingInputValue(input);
-      updated = kind === 'constant' && valueText === '?' && isIntegrationConstantName(name)
-        ? removeBindingFromExpression(updated, kind, name)
-        : replaceBindingValueInExpression(updated, kind, name, valueText);
-    });
-  }
-
-  if (!updated || updated === current)
-    return false;
-
-  applyUpdatedBindingExpression(updated);
-  refreshVariableValuesFromEditor();
-  updateHistoryButtons();
-  saveCurrentModeEditorState();
-  return true;
+async function commitVisibleBindingInputs(isCurrent = () => true) {
+    return labFlowContinue(41, {isCurrent});
 }
 
 async function toggleBindingKind(binding) {
-  const current = currentExpressionText();
-  const name = String(binding && binding.name || '').trim();
-  const currentKind = String(binding && binding.kind || 'variable').trim() || 'variable';
-  if (!current || !name)
-    return;
-
-  const nextKind = currentKind === 'constant' ? 'variable' : 'constant';
-  const updated = replaceBindingKindInExpression(current, name, nextKind);
-  if (updated === current)
-    return;
-
-  if (currentMode() === 'expression') {
-    await applyMarsBindingExpression(updated, expr.value.trim());
-    return;
-  }
-
-  applyUpdatedBindingExpression(updated);
-  refreshVariableValuesFromEditor();
-  updateHistoryButtons();
-  saveCurrentModeEditorState();
-}
-
-function displayValueForBinding(binding) {
-  const value = String(binding.value || binding.display || '').trim();
-  return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
-}
-
-function solutionLineIsNumericLiteral(line) {
-  const match = String(line || '').match(/^[^=≈]+(?:=|≈)\s*(.+)$/);
-  if (!match)
-    return false;
-
-  const rhs = match[1].replace(/\s+/g, '');
-  const number = '(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[Ee][+-]?\\d+)?';
-  const fraction = '(?:\\d+/\\d+|[⁰¹²³⁴⁵⁶⁷⁸⁹]+⁄[₀₁₂₃₄₅₆₇₈₉]+|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])';
-  const scalar = `(?:${number}|${fraction})`;
-  const numeric = new RegExp(
-    `^(?:[+-]?${scalar}|[+-]?(?:${scalar})?i|[+-]?${scalar}[+-](?:${scalar})?i)$`
-  );
-  return numeric.test(rhs);
-}
-
-function fullValueForBinding(binding) {
-  const value = String(binding.value || binding.display || '').trim();
-  return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
+    return labFlowContinue(43, {binding});
 }
 
 function clearVariableValues() {
-  variableValues.replaceChildren();
-  variableValues.classList.add('hidden');
-  currentBindingKinds = new Map();
+    labDOM.call('lab_binding_clear', variableValues);
+    currentBindingKinds = new Map();
 }
 
-function refreshVariableValuesFromEditor() {
-  if (currentMode() === 'expression') {
-    scheduleEditedExpressionBindingRefresh();
-    return;
-  }
-  const compact = compactExpressionForEditor(currentExpressionText());
-  const bindings = visibleBindingsForCurrentMode(compact.bindings || []);
-  renderVariableValues(bindings);
-  currentVariables = variableNamesFromBindings(bindings);
-  renderDerivativeButtons(currentVariables);
+async function refreshVariableValuesFromEditor(isCurrent = () => true) {
+    return labFlowContinue(44, {isCurrent});
 }
 
 function queueBindingInputCommit(input) {
-  const isExpression = currentMode() === 'expression';
-  const pending = isExpression
-    ? pendingExpressionBindingCommit.then(() => commitBindingInput(input))
-    : commitBindingInput(input);
-  const handled = pending.catch((err) => setStatus(String(err)));
-  if (isExpression)
-    pendingExpressionBindingCommit = handled;
-  return handled;
+    const mode = currentMode();
+    const pending = pendingExpressionBindingCommit.then(() => labFlowContinue(45, {mode, input}));
+    pendingExpressionBindingCommit = pending.catch(err => setStatus(String(err)));
+    return pendingExpressionBindingCommit;
 }
 
 function bindingDisplayName(name) {
-  const text = String(name || '');
-  // Brackets remain part of the native identifier, but are not needed on UI labels.
-  return text.startsWith('[') && text.endsWith(']') ? text.slice(1, -1) : text;
+    return labDOM.call('lab_binding_label', [name]);
 }
+
+const labBindingActions = {
+    evaluate: ({card}) => labFlowContinue(49, {card, operation: 0}),
+    commit: ({card}) => queueBindingInputCommit(card.input),
+    history: () => updateHistoryButtons(),
+    clear: ({card}) => labFlowContinue(49, {card, operation: 1}),
+    copy: ({card}) => labFlowContinue(49, {card, operation: 2}),
+    toggle: ({card}) => toggleBindingKind(card.binding)
+};
 
 function renderVariableValues(bindings) {
-  variableValues.replaceChildren();
-  bindingValueCache = new Map();
-  currentBindingKinds = new Map();
-  if (!bindings.length) {
-    variableValues.classList.add('hidden');
-    return;
-  }
-
-  const variableBindings = [];
-  const constantBindings = [];
-  bindings.forEach((binding) => {
-    const kind = binding.kind || 'variable';
-    if (kind === 'constant')
-      constantBindings.push(binding);
-    else
-      variableBindings.push(binding);
-  });
-  constantBindings.sort(compareBindingNames);
-
-  [...variableBindings, ...constantBindings].forEach((binding) => {
-    const kind = binding.kind || 'variable';
-    const displayName = bindingDisplayName(binding.name);
-    currentBindingKinds.set(binding.name, kind);
-    const displayValue = displayValueForBinding(binding);
-    const fullValue = fullValueForBinding(binding);
-    if (fullValue)
-      bindingValueCache.set(binding.name, fullValue);
-
-    const box = document.createElement('div');
-    box.className = kind === 'constant'
-      ? 'variable-value-box constant-value-box'
-      : 'variable-value-box';
-
-    const name = document.createElement('span');
-    name.className = kind === 'constant'
-      ? 'variable-value-name constant-value-name'
-      : 'variable-value-name';
-    name.textContent = displayName;
-
-    const field = document.createElement('div');
-    field.className = 'binding-value-field';
-
-    const text = document.createElement('input');
-    text.className = 'variable-value-text binding-value-input';
-    text.type = 'text';
-    text.value = displayValue;
-    text.title = fullValue || binding.value || '?';
-    text.dataset.bindingName = binding.name;
-    text.dataset.bindingKind = kind;
-    text.autocomplete = 'off';
-    text.spellcheck = false;
-    // A blank placeholder lets CSS hide the clear button whenever the value is empty.
-    text.placeholder = ' ';
-    text.setAttribute('aria-label', `Value of ${displayName}`);
-    text.addEventListener('keydown', (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        event.preventDefault();
-        commitBindingInput(text).then(() => evaluateFromKeyboard());
-      } else if (event.key === 'Enter') {
-        event.preventDefault();
-        text.blur();
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        text.value = displayValue;
-        text.blur();
-      }
-    });
-    text.addEventListener('change', () => {
-      void queueBindingInputCommit(text);
-    });
-    text.addEventListener('input', () => updateHistoryButtons());
-
-    const clear = document.createElement('button');
-    clear.className = 'binding-value-clear';
-    clear.type = 'button';
-    clear.textContent = '×';
-    clear.title = `Clear ${displayName}`;
-    clear.setAttribute('aria-label', clear.title);
-    // Do not blur and re-render the field before the click can clear it.
-    clear.addEventListener('pointerdown', (event) => event.preventDefault());
-    clear.addEventListener('click', async () => {
-      text.value = '';
-      text.focus();
-      updateHistoryButtons();
-      await queueBindingInputCommit(text);
-      // Other modes may replace the binding controls while committing.
-      const replacement = Array.from(variableValues.querySelectorAll('.binding-value-input'))
-        .find((input) => input.dataset.bindingName === binding.name && input.dataset.bindingKind === kind);
-      (replacement || expr).focus();
-    });
-    field.append(text, clear);
-
-    const actions = document.createElement('div');
-    actions.className = 'variable-value-actions';
-
-    const copy = document.createElement('button');
-    copy.className = 'card-action variable-copy';
-    copy.type = 'button';
-    copy.textContent = 'Copy';
-    copy.addEventListener('click', async () => {
-      try {
-        await writeClipboardText(text.value);
-        flashCopyButton(copy, true);
-        setStatus(`Copied ${displayName}`);
-        setTimeout(() => setStatus('Ready'), 1000);
-      } catch (err) {
-        flashCopyButton(copy, false);
-        setStatus(String(err));
-      }
-    });
-
-    const toggle = document.createElement('button');
-    toggle.className = 'card-action variable-toggle';
-    toggle.type = 'button';
-    toggle.textContent = kind === 'constant' ? 'Variable' : 'Constant';
-    toggle.title = kind === 'constant'
-      ? `Treat ${displayName} as a variable`
-      : `Treat ${displayName} as a constant`;
-    toggle.addEventListener('click', () => {
-      void toggleBindingKind(binding);
-    });
-
-    actions.append(toggle, copy);
-    box.append(name, field, actions);
-    variableValues.appendChild(box);
-  });
-
-  variableValues.classList.remove('hidden');
-}
-
-function assignmentValuesByName(assignmentsText) {
-  const values = new Map();
-  splitTopLevel(assignmentsText || '', ',').forEach((part) => {
-    const eq = indexOfTopLevel(part, '=');
-    if (eq < 0)
-      return;
-
-    const name = part.slice(0, eq).trim();
-    const valueText = part.slice(eq + 1).trim();
-    if (name && valueText)
-      values.set(name, valueText);
-  });
-  return values;
+    installLabBindingEvents(variableValues, 'lab_binding_event', labBindingActions);
+    const rendered = labDOM.call('lab_binding_render', variableValues, bindings);
+    bindingValueCache = new Map(rendered.values);
+    currentBindingKinds = new Map(rendered.kinds);
 }
 
 function solvedStartValuesForGoalSeek(sourceExpression, solvedExpression, providedStart = {}) {
-  const start = {...providedStart};
-  const sourceParts = bindingParts(sourceExpression);
-  const solvedParts = bindingParts(solvedExpression);
-  if (!sourceParts || !solvedParts)
-    return start;
-
-  const sourceVariables = new Set(assignmentValuesByName(sourceParts.variables).keys());
-  const solvedVariables = assignmentValuesByName(solvedParts.variables);
-  sourceVariables.forEach((name) => {
-    const cachedValue = bindingValueCache.get(name);
-    const solvedValue = cachedValue || solvedVariables.get(name) || '';
-    if (!solvedValue || solvedValue === '?' || /^NAN$/i.test(solvedValue))
-      return;
-    start[name] = solvedValue;
-  });
-
-  return start;
+    return labDOM.call(
+        'lab_binding_goal_starts', labEditorData(sourceExpression), labEditorData(solvedExpression), providedStart,
+        bindingValueCache);
 }
 
-function goalSeekExpressionAndStarts(sourceExpression, providedStart = {}) {
-  const parts = bindingParts(sourceExpression);
-  const start = {...providedStart};
-
-  if (!parts)
-    return {expression: sourceExpression, start};
-
-  let changed = false;
-  const variables = splitTopLevel(parts.variables, ',')
-    .map((part) => {
-      const eq = indexOfTopLevel(part, '=');
-      if (eq < 0)
-        return part.trim();
-
-      const name = part.slice(0, eq).trim();
-      const valueText = part.slice(eq + 1).trim();
-      if (!name)
-        return part.trim();
-
-      if (valueText && valueText !== '?' && !/^NAN$/i.test(valueText) && !start[name])
-        start[name] = valueText;
-
-      changed = changed || valueText !== '?';
-      return `${name} = ?`;
-    })
-    .filter(Boolean)
-    .join(', ');
-
-  let bindingText = variables;
-  if (parts.constants)
-    bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
-
-  return {
-    expression: changed ? `{ ${parts.body} | ${bindingText} }` : sourceExpression,
-    start
-  };
+async function goalSeekExpressionAndStarts(sourceExpression, providedStart = {}) {
+    return labFlowContinue(46, {source: sourceExpression, providedStart});
 }
 
-function setExpressionEditor(
-  fullText,
-  evaluatedBindings = null,
-  editorBodyText = null,
-  evaluationReady = null
-) {
-  const compact = currentMode() === 'expression'
-    ? null
-    : compactExpressionForEditor(fullText);
-  const hasEvaluatedBindings = Array.isArray(evaluatedBindings);
-  const editorBindings = hasEvaluatedBindings ? evaluatedBindings : [];
-  const defaultEditorBody = expressionBodyForEditor(fullText);
-  let editorBody = editorBodyText === null || editorBodyText === undefined
-    ? defaultEditorBody
-    : expressionBodyForEditor(editorBodyText);
-  const fullEditorText = expressionForEditor(fullText).trim();
-  fullExpressionText = fullEditorText;
-  displayedExpressionText = editorBody;
-  expr.dataset.fullExpression = fullExpressionText;
-  expr.dataset.displayExpression = displayedExpressionText;
-  expr.dataset.bindingRefreshValid = 'true';
-  if (evaluationReady !== null && evaluationReady !== undefined) {
-    expr.dataset.evaluationReady =
-      String(evaluationReady).trim().toLowerCase() === 'yes'
-        ? 'true'
-        : 'false';
-  } else {
-    delete expr.dataset.evaluationReady;
-  }
-  expr.value = displayedExpressionText;
-  scheduleEditorResizeGrip();
-  const bindings = visibleBindingsForCurrentMode(
-    hasEvaluatedBindings
-      ? editorBindings
-      : (compact ? compact.bindings : [])
-  );
-  renderVariableValues(bindings || []);
-  currentVariables = variableNamesFromBindings(bindings || []);
-  renderDerivativeButtons(currentVariables);
-  if (currentMode() === 'expression' &&
-      (evaluationReady === null || evaluationReady === undefined)) {
-    scheduleEditedExpressionBindingRefresh();
-  }
-}
-
-function integratorEditableBindings(bindings) {
-  const boundNames = currentIntegratorBoundNames();
-  return (Array.isArray(bindings) ? bindings : [])
-    .filter((binding) => !boundNames.has(String(binding && binding.name || '').trim()));
+function setExpressionEditor(fullText, evaluatedBindings = null, editorBodyText = null, evaluationReady = null) {
+    labDOM.services(
+        labDOM.call(
+            'lab_binding_projection_prepare',
+            {mode: currentMode(), fullText, evaluatedBindings, editorBodyText, evaluationReady},
+            labEditorData(fullText)),
+        labBindingFlowServices());
+    const mode = workspaceModeId(currentMode());
+    const selected = labDOM.call(
+        'lab_binding_editor', mode, {
+            text: fullText,
+            metadata: labEditorData(fullText),
+            body: editorBodyText,
+            bodyMetadata: labEditorData(editorBodyText),
+            bindings: evaluatedBindings,
+            ready: evaluationReady
+        },
+        mode === 4 ? currentIntegratorBoundNames() : null);
+    labDOM.services(labDOM.call('lab_binding_projection_finish', selected), labBindingFlowServices());
 }
 
 function applyIntegratorBindingState(data, fallbackExpression) {
-  const bindingExpression = expressionWithSortedConstants(
-    String(data && data.binding_expression || fallbackExpression || '').trim()
-  );
-  const editorBody = String(data && data.expression || expr.value || '').trim();
-  const editableBindings = integratorEditableBindings(data && data.binding_values);
+    labDOM.services(
+        labDOM.call(
+            'lab_binding_integrator_state', data, fallbackExpression, labPresentationEditors,
+            currentIntegratorBoundNames()),
+        {
+            setExpressionEditor,
+            clearVariableValues,
+            renderVariableValues,
+            setIntegratorBindingExpression: expression => modeEditorText.integrator = expression
+        });
+}
 
-  if (bindingExpression && bindingParts(bindingExpression)) {
-    setExpressionEditor(
-      bindingExpression,
-      editableBindings,
-      editorBody || null
-    );
-    if (!editableBindings.length)
-      clearVariableValues();
-    modeEditorText.integrator = bindingExpression;
-  } else if (editableBindings.length) {
-    renderVariableValues(editableBindings);
-  } else {
-    clearVariableValues();
-  }
+/** Apply native input decisions while retaining editor storage and refresh timers in the host. */
+function refreshWorksheetFromInput() {
+    labRequests.cancel('evaluate');
+    labRequests.cancel('bindings');
+    const mode = currentMode(), native = labWire.exports();
+    const plan = labDOM.call(
+        'lab_events_refresh', workspaceModeId(mode), Number(!!bindingParts(expr.value)),
+        native.lab_workspace_source_matches(workspaceStageText(expr.value.trim())),
+        {editor: expr, defaultDatetimeText: DEFAULT_DATETIME_TEXT});
+    labDOM.services(plan, {
+        setModeEditor: (mode, text) => {
+            modeEditorText[mode] = text;
+        },
+        setSource: (field, text) => {
+            labEditorState[field] = text;
+        },
+        refreshVariableValuesFromEditor,
+        saveState: (mode, state) => saveWorksheetState(mode, state.text, state.options),
+        cancelBindingRefresh: () => clearTimeout(expressionBindingRefreshTimer),
+        markBindingRefresh: editor => labDOM.call('lab_events_refresh_mark', editor),
+        clearGoalSeekRequest,
+        scheduleEditedExpressionBindingRefresh,
+        updateHistoryButtons
+    });
+}
+
+/** Browser capabilities for native binding continuations; no request acceptance decisions live here. */
+let labBindingRegistry;
+function labBindingFlowServices() {
+    return labBindingRegistry ||= Object.freeze({
+        bindingCancelRefresh: () => clearTimeout(expressionBindingRefreshTimer),
+        bindingBeginRefresh: (context, operation, mode, options) => context.request =
+            labRequests.begin(operation, mode, options),
+        bindingRefreshPending: () => expr.dataset.bindingRefreshValid = 'pending',
+        bindingRefreshHistory: () => updateHistoryButtons(),
+        bindingRefreshTimer: (editedBody, sourceExpression, request, delay) => {
+            expressionBindingRefreshTimer = setTimeout(() => {
+                void refreshEditedExpressionBindings(editedBody, sourceExpression, request);
+            }, delay);
+        },
+        bindingSource: (field, value) => labEditorState[field] = value,
+        bindingResetCache: () => bindingValueCache = new Map(),
+        bindingClearFlags: () => {
+            delete expr.dataset.bindingRefreshValid;
+            delete expr.dataset.evaluationReady;
+        },
+        bindingClearGoal: () => clearGoalSeekRequest(),
+        bindingClearSource: () => clearExpressionSource(),
+        bindingClearValues: () => clearVariableValues(),
+        bindingSetText: text => expr.value = text,
+        bindingDeferEditor: context => {
+            void labFlowContinue(50, context);
+        },
+        bindingResize: () => scheduleEditorResizeGrip(),
+        bindingRenderValues: bindings => renderVariableValues(bindings),
+        bindingSetVariables: bindings => currentVariables = variableNamesFromBindings(bindings),
+        bindingRenderDerivatives: () => renderDerivativeButtons(currentVariables),
+        bindingCapture: () => ({
+            mode: currentMode(),
+            modeId: workspaceModeId(currentMode()),
+            source: currentExpressionText(),
+            text: expr.value,
+            editor: expr
+        }),
+        bindingCurrent: callback => callback(),
+        bindingPending: () => pendingExpressionBindingCommit,
+        bindingCommitVisible: isCurrent =>
+            commitLabBindingValues(Array.from(variableValues.querySelectorAll('.binding-value-input')), isCurrent),
+        bindingRunCommit: frame => labRequests.run('bindingCommit', frame.before.mode, request => labFlowContinue(42, {
+                                                                                           request,
+                                                                                           source: frame.before.source,
+                                                                                           modeId: frame.before.modeId,
+                                                                                           inputs: frame.inputs,
+                                                                                           isCurrent: frame.isCurrent
+                                                                                       })),
+        bindingCommitInput: input => commitBindingInput(input),
+        bindingPrepare: text => prepareLabEditor(text),
+        bindingPresentation: (...args) => requestLabPresentation(...args),
+        bindingExpression: data => data.editor.expression,
+        bindingInvalid: () => {
+            throw new TypeError('Cannot read properties of null or undefined binding');
+        },
+        bindingEffects: plan => labDOM.services(plan, labBindingCommit),
+        bindingReplaceKind: (...args) => replaceBindingKindInExpression(...args),
+        bindingScheduleRefresh: () => scheduleEditedExpressionBindingRefresh(),
+        bindingProjectVisible: source => {
+            const bindings = visibleBindingsForCurrentMode(compactExpressionForEditor(source).bindings);
+            renderVariableValues(bindings);
+            currentVariables = variableNamesFromBindings(bindings);
+            renderDerivativeButtons(currentVariables);
+        },
+        bindingPrepareRows: (index, operation) =>
+            refreshIntegratorForms(planIntegratorRowEdit(currentIntegratorRows(), index, operation)),
+        bindingRenderRows: rows => renderIntegratorRows(rows),
+        bindingRowError: (item, error) => item.title = error.message,
+        bindingRefresh: () => refreshVariableValuesFromEditor(),
+        bindingRefreshForms: () => refreshIntegratorForms(),
+        bindingUpdateForms: prepared => labDOM.call('lab_binding_integrator_update', integratorBoundStack, prepared),
+        bindingValidity: (input, error) => {
+            input.setCustomValidity(error.message);
+            input.reportValidity();
+        },
+        bindingQueue: input => queueBindingInputCommit(input),
+        bindingRefocus: card => labDOM.call('lab_binding_refocus', variableValues, card, expr),
+        bindingEvaluate: () => evaluateFromKeyboard(),
+        bindingClipboard: text => writeClipboardText(text),
+        bindingFlash: (button, success) => flashCopyButton(button, success),
+        bindingReadyTimer: () => setTimeout(() => setStatus('Ready'), 1000),
+        bindingSetEditor: (...args) => setExpressionEditor(...args),
+        bindingFetch: (text, source, request) => fetchEvaluation(text, '', 'bindings', source, '', request),
+        bindingAuthored: (bindings, source) => bindingsWithAuthoredValues(bindings, source),
+        bindingBody: text => expressionBodyForEditor(text),
+        bindingSaveMode: () => saveCurrentModeEditorState(),
+        bindingInspectText: text => ({parts: bindingParts(text), body: expressionBodyForEditor(text)}),
+        bindingProjectEdited: (assembled, body, bindings, data) => {
+            labEditorState.fullText = assembled;
+            labEditorState.displayText = body;
+            const projected = labDOM.call('lab_binding_sync_apply', expr, {displayText: body, bindings, data});
+            renderVariableValues(bindings);
+            currentVariables = projected.variables;
+            currentDifferentiable = projected.differentiable;
+            renderDerivativeButtons(currentVariables);
+            saveWorksheetState('expression', labEditorState.fullText, {debounce: true});
+        },
+        bindingApplyEdited: (...args) => applyMarsBindingsToEditedExpression(...args),
+        bindingMarkInvalid: () => expr.dataset.bindingRefreshValid = 'false'
+    });
 }

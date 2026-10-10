@@ -9,19 +9,19 @@ is sent to the local MARS helper programs, which use MARSlib.
 ## Installing and starting the Lab
 
 MARS Lab runs as a native C server with isolated native calculation workers.
-The browser still runs the existing HTML/CSS/JavaScript interface, served from
+The browser runs C/WebAssembly with JavaScript browser adapters and HTML/CSS, served from
 `tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
 (served as `/index.css`), an ordered import list for the component styles in `assets/css/`.
 Browser code lives in `assets/js/`, and the formatted
-`assets/catalogue.json` contains only packaged worksheet defaults and presentation constants.
+`src/page/lab_page_catalogue.c` contains packaged worksheet defaults and presentation constants as native C tables.
 Mathematical processing remains in the native C server and workers. The stylesheet is served
 with `text/css; charset=utf-8` and the same private-access and no-cache rules as
 the page. No Python interpreter is launched by the Lab.
 Database and weather installation use the native `mars_config` application.
-Install the external TeX rendering tools as follows:
+Install the external TeX rendering tools and freestanding WebAssembly toolchain as follows:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm
+sudo apt install texlive-latex-base dvisvgm clang lld
 make mars-lab
 ```
 
@@ -102,13 +102,35 @@ and a private browser profile, injects browser assertions into a temporary copy
 of the page, and reports through that fixture's state endpoint. It checks native
 evaluation and TeX output, authored input, mode controls, history, result cards,
 the date picker, persistence, mobile metadata and startup failure reporting.
+The lifecycle checks exercise all seven modes, partial native results, exceptions,
+history suppression and supersession during binding preparation, fetch and solver
+rendering. DOM checks use the actual WASM imports and browser geometry to verify
+card projection, accessible expansion, calendar boundary cells, delegated clicks
+and recovery after failed or oversized capability calls. Retired script routes
+must return 404, and no loader may request them.
 It never uses the running Lab or the user's browser profile. Like the C suite,
 it uses `tests/test_config.json`; the browser test has its own source-path entry.
 
+For an opt-in performance report, run `MARS_LAB_PROFILE=1 make -j1 DEBUG=0 lab-browser-test`
+from the repository root. Output includes `BROWSER PASS: PROFILE` followed by a
+JSON report: startup request counts, encoded message sizes, median encode/decode
+times and host-callback counts for scalar, native-result, table and long-text
+workloads. It also counts requests for a repeated evaluation. This uses the same
+private fixture, not the running Lab. Timings are observations rather than test
+thresholds; run the ordinary browser suite separately to verify correctness.
+
+The bridge combines child lookup with type lookup, copies UTF-8 directly into
+WebAssembly memory and creates/attaches decoded values in one host call. Returned
+wire buffers remain owned copies so subsequent operations cannot overwrite an
+in-flight request. Town display metadata arrives with the native catalogue, so
+selector population needs no additional formatting request or browser cache.
+Stale-selection guards still protect asynchronous legacy saved-town matching.
+
 ### Browser implementation layout
 
-`index.html` holds the page structure and a small, escaped `lab-config` JSON
-block supplied by C. `index.css` imports the styles in their deliberate cascade order;
+`index.html` holds the page structure; startup configuration is fetched from
+`/bootstrap` over Protobuf rather than embedded in a JSON script block.
+`index.css` imports the styles in their deliberate cascade order;
 keep that order when maintaining the component files. No CSS bundler is required.
 The styles are divided into:
 
@@ -119,36 +141,529 @@ The styles are divided into:
 - `results.css` and `help.css`: result rendering, help cards and visibility utilities.
 - `responsive.css`: tablet and phone overrides, loaded last.
 
-`js/app.js` loads the database catalogue
-and definition scripts before `worksheet.js` initialises shared DOM references
-and state; `events.js` attaches the remaining controls and starts the initial
-evaluation. Startup errors are shown in the result pane rather than leaving an
+`js/app.js` loads the C browser module, bootstrap configuration, database catalogue
+and definition scripts, then loads `workspace.js` to initialise browser references
+and views of native state. Native modules register controls through the generic
+event bridge before startup begins the initial evaluation. Startup errors are
+shown in the result pane rather than leaving an
 apparently ready but unusable worksheet.
 
 The scripts use the existing shared lexical state and explicitly controlled
 classic-script loading, not ES module imports. This preserves the worksheet's
 behaviour without adding a bundler or framework. Responsibility boundaries are:
 
-- `api.js`: native evaluation requests; `evaluation.js`: mode-specific result handling.
-- `state.js` and `workspace.js`: persistence, history, modes and workspace controls.
-- `editor.js`, `bindings.js` and `calculus.js`: authored input, binding controls and native calculus requests.
-- `results.js`, `result_text.js` and `result_layout.js`: result cards, syntax highlighting, zoom and layout.
-- `controls.js`, `date_picker.js`, `locations.js`, `almanac.js` and `integrator.js`: specialised controls.
-- `mobile.js`: private-network access metadata.
+- `transport.js`: browser value/network bridge to the bounded C Protobuf codec and scoped DOM capabilities for C.
+- `api.js`: network resources and callback capabilities for C-owned request workflows.
+- `state.js` and `workspace.js`: storage and DOM adapters for C-owned history, modes and precision.
+- `bindings.js`: authored input, native editor-state views and binding controls.
+- `results.js`: native result installation, tooltips and entry-point adapters to C-owned card layout.
+- `locations.js`: browser location, clock and date-control conversion adapters.
+- `api.js` also applies native private-network access metadata; the separate `mobile.js` adapter is removed.
+
+`evaluation.js` and its route are removed. Its evaluation, goal-seek and auxiliary
+workflows are C continuations, not JavaScript workflows relocated into another
+script. `wasm/src/lab_flow.c` supplies the shared native continuation dispatcher;
+`lab_flow_evaluation.c`, `lab_flow_goal.c` and `lab_flow_aux.c` own their respective
+workflow decisions. The generic host runner executes allowlisted callbacks and
+awaits browser operations outside the synchronous WASM scope. Browser-only
+request, result and binding callbacks remain in the existing `api.js`, `results.js`
+and `bindings.js` modules. Retired `/js/evaluation.js` requests return 404, and
+startup no longer loads that script.
+
+The same native continuation mechanism also owns saved-state restoration, history
+navigation, worksheet changes, binding commits and edits, location refreshes,
+calculus and Function requests, optional render requests, clipboard completion,
+and transferring results back into the editor. These responsibilities are split
+between `lab_flow_state.c`, `lab_flow_binding.c`, `lab_flow_binding_edit.c`,
+`lab_flow_location.c`, `lab_flow_request.c` and `lab_flow_result.c` under
+`tools/mars_lab/wasm/src/`, with private declarations in `wasm/include/`.
+Synchronous save and restoration plans live in `lab_flow_state_sync.c`; binding
+projection policy lives in `lab_binding_projection.c`. Exact editor metadata
+selection and retained-source recovery live in `lab_editor.c`: compact display
+text is never treated as a new mathematical expression or reparsed in the browser.
+`lab_flow_transport.c` owns POST publication, stale-error suppression and ordered
+UI recovery, while browser callbacks retain the actual fetches and request resources.
+`lab_flow_state_forms.c` owns worksheet clearing and integrator bounds/form
+restoration, including revision checks before applying asynchronous responses.
+`lab_bootstrap.c` selects definition scripts and validates the native bootstrap
+and jurisdiction catalogue before creating the workspace.
+
+`transport.js` supplies the shared synchronous and promise interpreters for these continuations. Each
+request has its own browser-owned frame; C chooses the next operation, await
+boundary, stale-result guard and recovery destination. Scoped DOM handles never
+survive a yield. Exceptions remain browser objects, and their display text is
+converted lazily, so discarded requests need not inspect exception properties.
+The native and browser sides still communicate exclusively through the existing
+Protobuf messages; mathematical expressions are not interpreted in the client.
+
+The remaining JavaScript adapters provide browser capabilities: WebAssembly
+instantiation and byte staging, fetch streams and abort controllers, promises,
+DOM references and events, timers and animation frames, storage and clipboard
+access, and browser `Date`/`Intl` services. Keeping these adapters in separate
+responsibility-based files does not imply separate JavaScript implementations
+of the native workflows. Moving these capabilities themselves would still require
+JavaScript imports and would not remove the browser bridge.
+
+The separate `result_text.js` script and route are removed. Native C supplies
+escaped Function highlighting and matrix-heading markup alongside the exact
+source and lexical spans. User text is escaped, including carriage returns so
+HTML parsing cannot normalise them; class names come only from native token
+kinds. Oversized presentations omit markup and display literal source instead.
+`results.js` installs these presentations and the native calendar markup;
+the Function Run browser handler lives with the other requests in `api.js`.
+
+`editor.js` and its route are also removed following migration of source state
+and matching into WASM. Presentation metadata caches now sit with result
+installation, editor preparation with requests, and field synchronisation with
+binding controls. Pending editor preparation is shared only within the same
+native request context; switching away and back cannot reuse stale work, and an
+old finaliser cannot remove a newer request for the same text.
+
+`integrator.js` and its route are removed too. C/WASM owns row selection,
+reconciliation, editing, structured row-text formatting and monotonically
+numbered form revisions. Formatting copies names and bounds verbatim rather
+than parsing their mathematics; transfer buffers remain bounded to 4 MiB.
+The whole row batch now crosses into C once: C normalises each structured row,
+copies its UTF-8 fields, inserts notation and newline separators, and publishes
+one completed string. Batches are limited to 256 rows and 4 MiB of output;
+invalid Unicode or an oversized row rejects the batch without publishing partial
+text. Authored whitespace, embedded NUL bytes and supplementary Unicode remain
+unchanged. The host bridge only performs bounded UTF-8 conversion.
+Stale preparations and changed expressions cannot claim the current revision.
+Remaining integrator DOM fields live with binding controls, request transport
+with the other API helpers, and row-plan adapters with worksheet state.
+
+`events.js` and its route are removed. `wasm/src/lab_event_dom.c` registers worksheet
+controls and owns keyboard, calendar, zoom and lifecycle event decisions. The
+generic browser bridge installs listeners and invokes a fixed set of asynchronous
+services after the scoped WASM call returns. Repeated registration does not add
+duplicate listeners. Clipboard, timers, fetch and browser observers remain in the
+JavaScript adapters that use them.
+
+Binding refresh policy now runs in C too. `wasm/src/lab_events.c` turns input
+changes into ordered save, source-update and refresh actions; host services run
+only after the scoped WASM call has returned. Live workspace views remain owned
+by their existing setters, and unchanged input cancels a pending refresh before
+marking its binding metadata reusable.
+`wasm/src/lab_binding_sync.c` constructs binding request records and projects
+accepted editor metadata. It preserves authored values, nullish defaults and
+sparse-array positions without interpreting mathematical text. Browser promises
+still check request ownership and unchanged input before applying a reply.
+`wasm/src/lab_binding_commit.c` builds binding-merge requests and orders accepted
+value edits and variable/constant toggles. Exact source and binding records remain
+opaque. Expression commits normalise all captured controls before updating the
+authored-value Map; duplicate names retain their original update order, and unset
+values delete their cache entries. Other worksheets apply the native replacement,
+start their existing background refresh, then update history and persistence.
+Expression kind changes still await their native evaluation. Request, editor,
+source and per-input freshness checks remain at the browser's asynchronous boundary.
+
+`wasm/src/lab_function.c` owns Function-card availability, running/empty states,
+output selection and diagnostics. It reads only the stored full programme, never
+the abbreviated display. Output keeps its leading whitespace and is installed as
+text, not HTML. Failed requests retain useful output alongside their diagnostic;
+stale replies do not touch the card. Cancellation, network I/O and request ownership
+remain in the browser adapter. The generic text bridge supplies trailing-whitespace
+trimming so C uses the browser's Unicode whitespace conventions.
+
+`wasm/src/lab_binding_integrator_state.c` selects editable parameters using exact
+bound-name membership, then orders editor, binding-card and saved-source updates.
+It uses server-authored editor metadata to recognise wrapped expressions; it
+does not infer their structure from display text. Temporary handles are released
+per binding so response size does not grow the synchronous handle table.
+
+`wasm/src/lab_evaluation_cards.c` selects the native result representations for each
+mode and composes diagnostic and weather sections without interpreting mathematics.
+`wasm/src/lab_storage.c` owns saved-control normalisation, recovery precedence and
+history restoration plans; browser storage access and awaited editor preparation
+retain their cancellation checks in the host.
+
+`almanac.js` and its route are removed. Native calendar markup is installed by
+`results.js`, request transport lives in `api.js`, and shared observer controls
+live in `locations.js`. `wasm/src/lab_profile.c` owns the directly indexed DateTime
+and almanac field schemas: field order, DOM IDs, bootstrap default keys, dependent
+date/year fallbacks, restore/capture/fill/reset choices and change-event actions.
+Server state, local Protobuf fallback and history restoration use the same
+schema. Browser code supplies strings and validation flags and applies the
+returned choices; it does not maintain a second field-policy table.
+
+Restoration retains authored DateTime whitespace while capture trims values.
+Clear preserves town selection and the almanac jurisdiction. Named-town offsets
+and manually edited DateTime offsets retain priority over jurisdiction replies.
+The browser ABI is version 30; mismatched assets require a rebuild/restart
+rather than falling back to old JavaScript policy.
+The native `/bootstrap` response also carries its compiled browser ABI. Startup
+checks that it matches WASM before loading worksheet code. This catches an old
+server process serving new assets from disk: restart with `make mars-lab-restart`
+and reload the page. Without this check, newly required native presentation
+metadata could be absent and structured calendar cards could degrade to text.
+Calendar result installation also rejects missing native markup. An incomplete
+Almanac response reports an error rather than publishing an empty worksheet with
+`Ready` status; structured DateTime sections cannot silently fall back to text
+when their markup is missing. Failed Almanac installation retains the previous
+accepted worksheet data for subsequent visibility controls.
+
+`result_layout.js` and its route are removed. `wasm/src/lab_layout.c` now drives
+zoom projection, SVG frame sizing, exclusive card expansion, accessible button
+labels, compact/wrapped selection and error-state projection. Native SVG and TeX
+are used unchanged. Browser services measure CSS/SVG geometry; the browser's SVG
+parser still handles units and view boxes. The asynchronous wrapped-solver fetch
+remains in `api.js`, guarded by native request ownership and unchanged source
+identity, and completion rechecks current geometry before choosing a variant.
+`wasm/src/lab_solver_view.c` now owns request preparation, deduplication,
+snapshot comparison and publication. Its snapshot retains browser values for the
+card, source, parent and restored-result owner, never temporary integer handles.
+The JavaScript adapter only begins, awaits and finishes the requested operation;
+stale responses cannot update either cached SVG or the visible card.
+Restored solver cards receive a fresh browser identity tied to the current mode
+generation instead of reusing an expired evaluation token. Their wrapping requests
+use the same cancellable solver channel and 45-second deadline. Replacement,
+mode changes and a new evaluation invalidate obsolete replies, even when their
+TeX is identical. Differential-equation and calculus cards enable fitting of
+their supplied wrapped representations directly.
+Error colours remain in the stylesheet rather than being duplicated as inline CSS.
+
+The scoped DOM bridge in `transport.js` lends node, string and structured-value handles only for
+one synchronous C call. C never retains them. A call is limited to 4,095 handles,
+rejects re-entry, and releases its handle table even after exceptions. Browser
+animation callbacks capture their required DOM node separately, never a scoped
+handle. Selector/property strings crossing from C are bounded to 4,095 bytes.
+Only native presentation is installed as HTML; error messages remain text.
+
+The browser projection is split into native modules by responsibility:
+
+- `lab_workspace_dom.c` applies mode panels, help, busy controls, result snapshots,
+  calculus buttons and measured editor sizing.
+- `lab_binding.c` constructs binding/integrator controls and chooses interaction
+  actions. Constant labels use stable merge sorting with browser locale collation;
+  post-commit focus uses an indexed name/kind lookup.
+- `lab_binding_rows.c` supplies integrator defaults, candidate names, reference
+  retention and bound reconciliation. `lab_binding_editor.c` selects visible
+  bindings and goal-start precedence from native editor metadata.
+- `lab_location.c` projects jurisdiction/town catalogues, calendar defaults and
+  returned fields. Named-town restoration checks option identities across awaits.
+  C issues a fresh identity token when options are populated or selection changes;
+  asynchronous restoration must still own both that token and its option snapshot.
+  C selects exact-key, native compatibility-match, coordinate and empty fallbacks
+  in that order. JavaScript retains only the awaited request and timezone services.
+- `lab_result.c` owns presentation-cache limits, copy sources, digit toggles and
+  calendar/result installation. Pending rendering uses request identities and is
+  invalidated when another result or restored worksheet replaces the card.
+- `lab_evaluation_dom.c` installs supplied solver representations without parsing
+  or rewriting TeX, SVG or mathematical source.
+- `lab_persist_dom.c` assembles history and local/server save records from the
+  native schemas; browser storage failures cannot suppress server saves.
+- `lab_payload.c` builds Protobuf request records and applies background mobile
+  and eclipse replies after the asynchronous owner has accepted them.
+- `lab_events.c` selects editor-refresh, clear, page-inactivity and precision
+  actions; calendar precision cannot accidentally trigger integration.
+- `lab_widgets.c` owns date-picker opening, navigation, date commits, Today
+  selection and measured popup placement, as well as constructing the grid.
+
+The host exposes generic DOM, object, Map, Unicode and geometry capabilities.
+Returned values retain their actual browser objects, never transient integer
+handles. Native loops release temporary handles per rendered item. JavaScript
+continues to deliver DOM events, manage promises, fetch/abort, timers, clipboard,
+storage and browser date/time services. Asynchronous adapters retain explicit
+freshness checks after awaits; moving display decisions into C does not weaken
+request ownership. Mathematical evaluation remains in the native server.
+
+`controls.js` and its route are removed. `wasm/src/lab_select.c` constructs rounded
+selection menus and owns filtering, selected/disabled state, opening/closing,
+keyboard navigation and change decisions. Town detail columns, accents and
+non-Latin labels remain searchable; the browser supplies Unicode normalisation
+and string comparison primitives. Native select options remain the source of
+truth. Keyboard navigation skips disabled choices, wraps at the ends, and does
+not process a search-field arrow key twice through bubbling.
+
+The same C module registers menu, label, keyboard and outside-click subscriptions.
+The host bridge attaches listeners idempotently for each DOM node and context;
+rebuilding a menu does not duplicate change notifications.
+
+`wasm/src/lab_almanac_events.c` also registers worksheet visibility and totality
+actions. It validates server presentation before replacing a card, ignores an
+unchanged visibility choice, and orders visibility updates, persistence, rerendering
+and totality refresh. Without a retained worksheet it requests a fresh evaluation
+without adding history. Browser services run after native dispatch returns;
+repeated binding does not duplicate listeners or retain expired WASM handles.
+The server's HTML and copy text pass through unchanged.
+
+Menu rendering visits each option but releases temporary handles after each row,
+so a large town catalogue does not exhaust the scoped bridge table. Focus,
+scroll and change effects retain DOM nodes separately and run only after the C
+call releases its handles; resulting event handlers can safely call WASM again.
+Failed calls discard their queued effects. Date adapters sit in
+`locations.js`, and tooltip adapters in `results.js`, both loaded before event
+wiring. Browser regressions exercise 1,500-option rebuilds, keyboard/focus
+behaviour, native disabled states, Unicode searches and single change delivery.
+
+`wasm/src/lab_tooltip.c` owns control-hint labels, authored-title precedence, result-card
+names, accessibility descriptions and DOM placement. Its fixed ID catalogue uses
+binary search. JavaScript only forwards events and retains the active DOM node;
+WASM never retains borrowed handles. Repeated hover/focus refreshes do not replace
+the original `aria-describedby`, and hiding restores absent, empty or populated
+attributes exactly, even for detached controls. Explicitly clearing an authored
+title clears its cached hint. Labels are inserted as text, never HTML. Browser
+tests cover label precedence, Unicode, focus/hover transitions and restoration.
+
+`wasm/src/lab_widgets.c` builds date-picker month options, weekday headings and all
+42 date buttons directly from the existing C calendar model. It handles selected,
+today and outside-month classes, zero-padded dates and disabled year-boundary
+cells. Invalid displayed months leave the DOM unchanged. Browser code supplies
+clock readings and structured dates, positions the popup and delegates button
+clicks through one listener instead of allocating 42 listeners per render.
+
+`wasm/src/lab_evaluation.c` owns per-mode preparation, failure-recovery and response
+action plans plus status labels. `wasm/src/lab_flow_evaluation.c` coordinates all
+seven evaluation modes through the shared continuation runner: C chooses history,
+recovery and completion steps, while the host performs requests and awaits their
+results. There is no separate JavaScript evaluation workflow or mode-policy loop.
+`wasm/src/lab_evaluation_install.c` owns their directly indexed completion plans;
+six dedicated JavaScript installers have been replaced by a shared service adapter.
+Partial Expression results,
+Integrator diagnostics/bindings, DateTime weather follow-ups and awaited
+differential-equation solver rendering retain their individual policies.
+Preparation flags, diagnostic selection and recovery ordering are decoded only
+in C. Named preparation records and response plans replace the duplicate JavaScript
+flag catalogue. A plan names allowlisted synchronous browser services; these run
+after the WASM handle scope has closed, in native-defined order. Explicit exception
+text, partial results and integration raw-error precedence remain distinct.
+Native continuations select request-ownership checks at asynchronous boundaries;
+the host executes those checks against the native request controller.
+
+`wasm/src/lab_evaluation_setup.c` also owns request preparation stages. Visible
+bindings are captured before their commit; editor text is captured afterwards.
+Only after binding assembly completes does C choose between the authored source
+and the last exact input used for a precision change. Equation and
+differential-equation inputs are trimmed, whereas Matrix and Integrator sources
+keep their supplied whitespace. Calendar snapshots use the existing location
+services. The service bridge returns its last
+callback's result without awaiting it; a preparation plan explicitly marks that
+final callback as asynchronous, and the host checks ownership before proceeding.
+Getter-backed views are read lazily and are never overwritten.
+
+`wasm/src/lab_evaluation_weather.c` selects weather completion services. Stale
+replies do nothing; failed requests and presentation exceptions retain the current
+overview and report weather unavailability. Accepted weather uses the native
+section merger before reporting readiness. Native continuations select the
+parent-request guards; network I/O remains a browser capability.
+
+Obsolete JavaScript entry points for result-text formatting, binding-value policy
+and workspace snapshots have been removed. Their browser regression assertions
+call the owning C exports directly; production no longer carries wrappers solely
+for test access.
+
+Completion has two phases: initial card/editor projection, then persistence and
+derivative controls. The second phase reads the live editor after the first has
+finished, rather than saving a pre-projection snapshot. Differential equations
+await their optional SVG request between phases; current rendering failures keep
+the plain derivation, while stale success and failure replies skip completion.
+Services stop on the first exception. In particular, Almanac markup must be
+accepted before replacing its retained worksheet data, and DateTime saves observe
+the evaluated fields. Getter-backed workspace views are never replaced with plain
+data properties.
+`wasm/src/lab_goal.c` similarly orders successful goal-seek completion and failure
+recovery. `wasm/src/lab_flow_goal.c` coordinates the preparation and request
+continuations around these plans. History is captured before editor replacement;
+browser callbacks retain execution-time getters, request resources and asynchronous
+binding preparation. `wasm/src/lab_flow_aux.c` supplies the auxiliary workflow
+continuations through the same runner. Native source, target, binding values and
+mathematical renderings are used unchanged.
+
+`wasm/src/lab_persist.c` owns the mathematical worksheets' save schemas, local
+storage keys, empty-value rules and independent deferred-save tokens. A single
+browser adapter captures values and performs local storage and Protobuf I/O.
+Expression and Equation autosaves defer by 250 milliseconds when requested;
+other saves remain immediate. Superseded callbacks cannot publish old snapshots
+or cancel another mode's save. Blank Expression input preserves a pending useful
+save, whereas blank Equation input is sent to the server. Empty editors and
+integrator bounds retain the last useful local copy; empty Matrix operands clear
+it. Local storage failures do not prevent server saves. Token exhaustion fails
+closed until the page reloads, rather than reusing a stale token.
+Server and local editor restoration also share this schema and a C action plan:
+empty or abbreviated saved matrix, differential-equation and integrator editors
+cannot overwrite useful text. Server text is trimmed; local editor whitespace
+is preserved. Binding-aware restoration obtains canonical text from native MARS,
+not from a browser-side mathematical parser.
+
+The freestanding C implementations live in `wasm/src/`, with separate
+module interfaces in `wasm/include/`. Each implementation includes its own
+header and only the interfaces it uses; there is no umbrella header.
+`lab_browser.h` covers the Protobuf codec and scalar limits, while
+`lab_host.h` and `lab_dom.h` declare the JavaScript host imports for codec values
+and scoped DOM access respectively. Worksheet state, requests, bindings,
+presentation and the other browser modules have their own matching headers.
+These interfaces are tool-private, not installed MARS library headers.
+All implementations compile into one `lab_browser.wasm` asset.
+The WASM compiler checks that exported functions have prior declarations, and
+generated dependency files rebuild the implementations affected by a header change.
+Objects and dependency files mirror the source layout under
+`build/<configuration>/wasm/src/`; the browser asset remains
+`build/<configuration>/wasm/lab_browser.wasm`.
+Native result-markup generation in `src/calendar/lab_calendar_markup.c` and
+`src/evaluate/lab_evaluate_markup.c` runs on the server, not in WebAssembly.
+
+The freestanding sources in `wasm/src/` separate binary transport, worksheet state,
+request policy, view policy and form arithmetic. `lab_workspace` owns editor bytes, committed
+snapshots, mode selection, precision and back/forward history. It also owns editor
+full/display text, last evaluation input and goal-seek source/target bytes in the
+same bounded arena. These active fields are pinned, not evictable history.
+Exact display matching and source recovery happen in C without interpreting
+mathematics; browser properties are read/write views, not duplicate storage in
+globals or DOM attributes. The workspace controller also owns editor
+capture and restoration policy: blank mathematical input retains the previous
+editor, empty saved editors display catalogue defaults, and calendar summaries
+always use their form defaults. Restoration does not overwrite saved text.
+Binding-aware versus plain-text restoration is selected in C from the mode and
+native editor metadata; the browser only applies the resulting DOM update.
+Saved result-card metadata is also normalised in C. Each restored variable list
+is an independent array, missing labels default to empty text, and only explicit
+`false` disables differentiability. Restoring reusable input clears bindings from
+the previous mode. Browser code assigns the returned state before refreshing
+derivative controls and scheduling layout; absent snapshots use the existing clear
+path instead.
+The view controller owns each registered result card's zoom and the single
+expanded-card selection. DOM attributes and CSS classes are outputs, not state
+stores. Changing expansion preserves zoom, and hiding an expanded card collapses
+it through the same controller. Registration is bounded to 64 cards; invalid
+card operations leave existing state unchanged. Browser adapters retain only
+DOM references and apply native decisions, including accessibility attributes.
+`lab_requests`
+owns request identity, endpoint selection, busy state and stale-response rejection,
+including mode changes away and back. Operation names, endpoint paths and expression action names come from
+its own policy tables. The browser builds a direct name index once at startup
+instead of maintaining a duplicate routing catalogue. Unknown operations fail
+closed; inactive requests expose no endpoint.
+`lab_forms` owns Gregorian calendar
+arithmetic, numeric limits and the date-picker controller. Its open/closed state
+and visible month/year live only in WASM. Month/year selection preserves the
+input day where possible, clamps leap days and saturates at the supported year
+limits. Invalid navigation leaves state unchanged; closed pickers reject edits.
+The former `date_picker.js` and `worksheet.js` scripts and their HTTP routes are
+removed. `locations.js` retains browser input conversion and clock access;
+`workspace.js` retains browser references and read-only views of the native
+year/month. `lab_workspace_dom_references` supplies the control catalogue as
+browser-owned references and array snapshots without changing worksheet state.
+`wasm/src/lab_widget_events.c` owns opener toggles, navigation, commits,
+outside-click handling, tooltip event boundaries and subscription registration.
+The generic event bridge deduplicates subscriptions by target, event, dispatcher,
+action and browser context, retaining actual objects rather than scoped handles.
+Native dispatch returns ordered browser services; commits and focus changes run
+after the WASM call returns, so nested browser events can safely enter WASM.
+The date picker builds its complete 42-cell grid in one WASM call, including
+valid-date, outside-month, today and selected flags. C projects that grid through
+the DOM bridge. Invalid months leave the previous buffer unchanged,
+and cells beyond years 1–9999 are disabled. `lab_rows` plans active integrator
+bounds and reconciles result bounds with retained free parameters in batched
+calls. The C binding-row adapter supplies presence/reference flags and applies
+returned indices; JavaScript passes structured rows and native reference metadata.
+Plans retain authored row values unchanged and enforce the native 256-row limit. The same
+module now plans add/remove/toggle edits as index/flag pairs, protects the last
+bound, clears bounds when changing a row to Free and appends a replacement bound
+when needed. One browser edit handler awaits binding commits and applies the
+plan without interpreting mathematical text. Failed plans
+leave the previous output intact. Reference detection remains in native MARS,
+with stale or incomplete reference metadata conservatively retaining rows. `lab_view` owns
+mode/card titles and visibility, control availability, zoom levels, matrix fitting
+and compact-versus-wrapped result selection, along with date-picker popup sizing
+and placement. It also decides tooltip placement and conditional editor resizing:
+overflow enables resizing, deliberate manual sizes survive content changes, and
+unused manual sizing resets. The extra-height budget is shared between visible
+editors and bounded between 96 and 320 pixels in total. The host supplies measured geometry;
+the browser's SVG API resolves intrinsic units and view boxes. Invalid geometry
+cannot initiate a wrapped-render request, and non-finite zoom indices select 100%.
+JavaScript keeps
+DOM events, browser storage, fetch/abort resources, timezone API access, syntax
+highlight spans and the application of layout decisions; no mathematical engine is shipped
+to the browser.
+
+The native jurisdiction catalogue supplies each town's selection key and formatted
+coordinate detail directly. `lab_forms_town_presentation` shares the legacy town
+formatter when building that catalogue. Town selectors apply those fields without
+posting the catalogue back for formatting; the former browser detail cache and
+preparation requests are removed. Legacy saved-town matching still uses `/forms`.
+
+Text preparation uses native `string_t` helpers through `/forms` and
+`/presentation`. These handle integrator bounds and symbol references, time and
+town input, authored binding edits, integration-constant removal, exact goal-seek
+starts, matrix layout, Function-card lexical spans and numerical display metadata. Async edits and restoration
+are checked for staleness before applying results. Domain conditions and exact
+binding values are retained; metadata is installed only after an accepted response.
+Function highlighting is limited to 1,024 lexical spans per variant and 64 KiB
+of source. Larger programmes retain their full text without colouring; execution
+and copying still use the unchanged complete source.
+
+Native presentation metadata also supplies equation solution text, integrator
+detail/value text, matrix section-heading spans and normalised calculus cards.
+`lab_evaluate_calculus.c` selects derivative/integral expressions, exact and
+abbreviated Function variants, numerical values and compact/wrapped TeX. One
+browser request handler in `api.js` applies both kinds of card through `results.js`;
+scalar matrix calculus uses the same native projection. Native editor preparation
+constructs matrix calculus input with validated variable names and retains the
+authored bindings and conditions. The former `calculus.js` and its route are
+removed, and ordinary matrix evaluation shares the matrix result renderer.
+Function text falls back to the native expression
+when no programme was returned, and absent numerical values keep Value hidden.
+The browser does not infer
+these from English status messages or parse the returned mathematics. Almanac
+responses contain both all-body and visible-body variants, including exact
+clipboard text, compact event times, visibility labels and land-search eligibility.
+`lab_calendar_markup.c` supplies escaped HTML for both worksheet variants,
+event tables, deferred totality actions and DateTime/weather sections. The browser
+installs this native markup and binds DOM events; it no longer reconstructs these
+tables or sections in JavaScript. Variable text and action attributes are escaped
+before publication, retaining exact Unicode and carriage returns. Browser layout
+tests consume native fixtures through Protobuf, including compact clocks,
+accessible scrolling and mobile event cards.
+Matrix layout requests likewise supply escaped native HTML with exact factors and
+cells. CSS uses native column counts to choose intrinsic-width or fitted grids;
+JavaScript no longer builds matrix terms, brackets or cells. Ragged input retains
+the native plain-text fallback.
+Changing the body filter selects a supplied variant without another astronomy
+evaluation. Metadata construction is bounded to 256 bodies and 64 events and is
+published only after successful preparation.
+
+The remaining JavaScript supplies browser capabilities and asynchronous adapters:
+event delivery, measured geometry, clipboard and storage access, Unicode/locale
+operations, network cancellation and bridge value marshalling. C owns control
+and result projection, while JavaScript still coordinates promises and checks
+request freshness at asynchronous boundaries. Local display updates stay
+synchronous. WebAssembly cannot directly call browser APIs; moving these
+capability wrappers into more WASM-to-host calls would not remove that dependency.
+
+All browser API requests, bootstrap data and application errors use typed
+Protobuf envelopes exclusively. JSON POST requests receive HTTP 415 and the
+browser rejects non-Protobuf API responses. `response.labData()` decodes the
+binary response; it is not a JSON parser. Calendar fallback snapshots in browser
+local storage use the same C/WASM Protobuf codec, with base64 solely because
+local storage accepts strings. Versioned `.protobuf` keys replace the former
+JSON snapshots; old keys are neither read nor deleted. The server's saved state
+remains authoritative. Missing, corrupt or oversized browser snapshots are
+ignored independently. Scalar browser settings remain ordinary strings, and
+the native saved-state file still uses JSON. The schema, binary64 policy
+and resource limits are documented in the [Protobuf guide](protobuf.md#mars-lab-browser-wire-contract).
+The Makefile probes Clang and `wasm-ld` by compiling and linking a small module.
+No Emscripten, Python, npm or generated JavaScript codec is required. Rebuild and
+restart the Lab together: an incompatible browser-module ABI reports a startup
+error, not a silent JavaScript fallback.
 
 The server registers individual asset routes; it does not expose arbitrary files
-under `assets/`. JavaScript uses `text/javascript; charset=utf-8`, JSON uses
-`application/json`, and all assets retain private-access checks, `no-store` and
-`nosniff`. `lab_page_catalogue()` reads the owned, validated settings JSON.
+under `assets/`. JavaScript uses `text/javascript; charset=utf-8`; the browser
+installation manifest uses its standard `application/manifest+json` format.
+All assets retain private-access checks, `no-store` and
+`nosniff`. `lab_page_catalogue()` builds an owned settings object from native C tables;
+`/catalogue` returns it as Protobuf. The former JSON asset and `/catalogue.json`
+route are removed. Edit the native tables and rebuild to change packaged defaults;
+the existing saved worksheet state still takes precedence.
 `lab_page_jurisdictions()` reads configured database storage through the public
 jurisdiction visitors and returns owned `options`, `locations` and `towns`
 collections, with an explicit availability flag. The browser endpoint and native
 timezone index consume that same database-backed representation.
 `lab_page_defaults()` returns the owned worksheet-default snapshot and
 `lab_page_render()` renders the escaped template with request-specific state.
-`MARS_LAB_ASSET_FILE` selects a custom template and its sibling settings
-`catalogue.json`; scripts and the static settings route use the packaged asset
-directory. Jurisdiction data always comes from the configured database, not from
+`lab_page_bootstrap()` returns owned startup configuration for the Protobuf wire format.
+`MARS_LAB_ASSET_FILE` selects only a custom HTML template; defaults are compiled in
+and scripts use the packaged asset directory. Jurisdiction data always comes from the configured database, not from
 that custom template directory.
 
 ### Native implementation layout
@@ -164,15 +679,20 @@ tools/mars_lab/
   src/
     app/            Command-line options and worker-process supervision
     server/         Opaque server ownership, routes and access checks
-    evaluate/       Mathematical worker records and TeX rendering
+    evaluate/       Mathematical worker records, native editor metadata and TeX rendering
+    forms/          Native string_t form parsing and symbolic reference metadata
     calendar/       DateTime, almanac, weather and town time zones
     page/           Client template, defaults and escaped substitutions
     mobile/         Private-network discovery and separate QR encoder
     process/        Bounded child execution, input and cancellation
     runtime/        Startup cache configuration and key preservation
     state/          Locked, atomic worksheet persistence
+    wire/           Native typed Protobuf adaptation
     internal/       Controlled white-box test façades
-  assets/           HTML template, CSS import list, css/ styles, catalogue.json and js/ scripts
+  assets/           HTML template, CSS import list, css/ styles and js/ scripts
+  proto/            Versioned Lab wire schema
+  workers/          Isolated native calculation and Ophelia worker sources
+  wasm/             Freestanding C browser modules
   build/release/    Generated mars_lab, module objects and dependencies
 ```
 
@@ -181,8 +701,15 @@ Debug output uses `build/debug/`; generated output is ignored by the root
 rules when included by the root build. Invoked directly, it delegates commands
 to that same root graph, keeping compiler flags and dependencies consistent.
 `make -C tools/mars_lab clean` removes only Lab build output, leaving the
-library, calculation workers and saved worksheets intact. Calculation workers
-remain under the repository's `build/<configuration>/scratch/` directory.
+library and saved worksheets intact. Calculation workers are built from
+`tools/mars_lab/workers/` into `tools/mars_lab/build/<configuration>/workers/`
+and are removed by the Lab clean target too. They remain separate processes for
+timeout enforcement and failure isolation. `make lab-workers` builds all ten;
+`make tools/mars_lab/workers/ophelia` builds just the Ophelia worker. Existing
+worker command targets such as `make mars_lab` still build and run that worker;
+`make mars-lab` starts the web application. Per-worker executable environment
+overrides are unchanged. The repository's `scratch/` directory retains standalone
+examples and experiments, not these production Lab workers.
 
 Both module APIs and static implementation functions use module-specific
 prefixes: `lab_cal_` for calendar, `lab_eval_` for evaluation, `lab_proc_` for
@@ -957,8 +1484,8 @@ current expression semantics; an unresolved transform or formal derivative can
 remain symbolic. Unsupported statement forms report an error rather than being
 sent to a shell or silently ignored.
 
-The separate native target is `scratch/ophelia`; the resulting
-`build/release/scratch/ophelia` reads programme source from standard input and
+The separate native target is `tools/mars_lab/workers/ophelia`; the resulting
+`tools/mars_lab/build/release/workers/ophelia` reads programme source from standard input and
 accepts an optional decimal-precision argument. Lab requests have a 30-second
 execution timeout. The prototype limits source to 64 KiB, scope size to 256
 symbols, parameters to 64, nesting to 32, executed statements to 2048 and output
@@ -1189,7 +1716,7 @@ Result cards have distinct purposes:
   algebra in the other cards.
 
 MARSlib creates all four representations from the same simplified matrix. The
-browser transports, displays and compacts the native fields; it does not parse,
+browser transports and displays the native full or abbreviated fields; it does not parse,
 simplify or reinterpret the matrix mathematics.
 
 Symbolic matrix calculus constructs expression DAGs. It does not depend on the
