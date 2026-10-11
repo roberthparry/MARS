@@ -18,6 +18,7 @@ This directory contains the longer module documentation for MARS.
 
 ## Modules
 
+- [`csv_t`](./csv.md) — bounded UTF-8 CSV streams, quoting and indexed headers
 - [`file_t`, `file_info_t`, `file_key_t`](./file.md) — Linux file I/O,
   metadata, compression, authenticated encryption and SQLCipher transfers
 - [`number_t`](./number.md) — generic numeric value cluster over exact,

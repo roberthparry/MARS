@@ -44,6 +44,8 @@ pointer is NULL. Database-specific size limits still apply.
 - step through result rows without exposing raw `sqlite3_stmt *`
 - read text, integer, double, and `NULL` column values
 - report statement-level errors
+- import CSV files with full-file type inference, or explicitly typed streams
+- export read-only query results through the CSV writer
 
 ## Example: Encrypted String Storage
 
@@ -535,3 +537,390 @@ Returns the public result described by stmt column bytes.
 ```c
 size_t sqlite_stmt_column_bytes(sqlite_stmt_t *stmt, int column);
 ```
+
+## CSV ingestion and export
+
+CSV syntax belongs to [csv_t](csv.md); SQLite owns column policies, schema
+creation, binding and transactions. These helpers add no external dependency.
+File data is read through `file_t`, parsed as `string_t` fields and inserted
+with one reusable prepared statement. Importer buffering follows the configured
+CSV record limits and column plan, not the number of imported rows; SQLite's
+database, cache and transaction-journal storage are separate.
+
+### Public API
+
+| API | Behaviour |
+| --- | --- |
+| `sqlite_csv_options_default()` | Return headers-on, strict-width, create-new-table, empty-as-NULL defaults. Decimal inference is off. |
+| `sqlite_import_csv(db, input, table, options, report)` | Borrow an open seekable file, infer across the entire remaining input, rewind and insert. NULL options use defaults. |
+| `sqlite_import_csv_reader(db, reader, table, options, refill, context, report)` | Borrow a fresh CSV reader and import once using explicit column types. Call the optional refill callback on `CSV_NEED_INPUT`. |
+| `sqlite_export_csv(db, query, writer, header, report)` | Stream one read-only result to a borrowed fresh writer; optionally emit names, then finish the writer. |
+
+Import and export functions return `bool`. Optional `sqlite_csv_report_t` output is reset
+first. `rows` counts imported rows on success; failed imports report zero,
+whereas failed exports retain the number of completely written records.
+`record` and `column` identify the one-based CSV location when available;
+records include a consumed header. `code` is an errno-style diagnostic,
+`sqlite_code` captures a native database failure, and `csv_error` preserves
+CSV parser/writer details. Zero record/column denotes no applicable position.
+`sqlite_last_error` supplies a readable diagnostic without echoing field values.
+
+### Column policies and names
+
+`sqlite_csv_options_t` contains:
+
+- `csv`: file-reader options and bounds; ignored when supplying your own reader.
+- `columns` and `column_count`: optional positional overrides, exactly one
+  `sqlite_csv_column_t` per input column. Each has a borrowed replacement
+  `name` (NULL uses the header) and `type`.
+- `create_table`: true creates a new table and fails if it exists; false appends
+  without deleting or replacing existing rows.
+- `empty_is_null`: true treats every empty field as SQL NULL, including quoted
+  empties. False preserves empty text, which is incompatible with a numeric override.
+- `infer_real`: explicitly permit approximate decimal inference.
+
+Types are `SQLITE_CSV_AUTO`, `SQLITE_CSV_INTEGER`, `SQLITE_CSV_REAL` and
+`SQLITE_CSV_TEXT`. AUTO is available only for the two-pass file importer.
+Names are matched to existing columns independently of table column order.
+Columns omitted from the CSV receive database defaults or NULL, subject to
+constraints. Headerless input requires replacement names. Duplicate/empty
+input names are acceptable only when replacements produce unique, non-empty
+names. Matching uses SQLite's ASCII case folding, not Unicode case folding.
+Names and values retain their Unicode spelling; the importer does not trim them.
+
+Table names designate one unqualified name in the `main` schema. A dot is
+part of the identifier, not a schema separator. Identifiers are quoted and
+values bound: neither headers nor CSV values are interpolated as SQL code.
+Existing views are rejected. INTEGER, REAL and TEXT affinities are supported
+for destination columns, including declarations such as INT and VARCHAR.
+NUMERIC, BLOB and untyped destination columns are rejected. Inferred/overridden
+types must match the destination affinity; choose TEXT overrides when importing
+numeric-looking text into TEXT columns. The importer deliberately adds stricter
+validation than SQLite's normal [type-affinity rules](https://www.sqlite.org/datatype3.html).
+
+### Conservative inference
+
+The whole first pass participates; there is no sampling cutoff.
+
+| Data in a column | Inferred type |
+| --- | --- |
+| Signed whole numbers within the 64-bit range | INTEGER |
+| Leading-zero identifiers, negative integer zero, dates or other text | TEXT |
+| Decimal/exponent notation with default options | TEXT |
+| Decimal/exponent notation with `infer_real = true`, at most 15 significant digits and finite, non-underflowing conversion | REAL |
+| Oversized integers, high-precision decimals, mixed text/numbers | TEXT |
+| Mixed REAL and integers outside the exact binary64 integer range | TEXT |
+| Only empty fields | TEXT, with NULL or empty values according to policy |
+
+Explicit INTEGER accepts signed 64-bit decimal integers only. Explicit REAL
+authorises rounding and accepts finite decimal numbers, including large integer
+spellings; overflow, underflow, NaN, infinity and trailing junk fail.
+Numeric conversion uses a private C numeric locale, never a process-wide locale
+change. Leading/trailing whitespace is not stripped. TEXT overrides preserve
+values without numeric conversion. Boolean/date interpretation is left to callers.
+
+### Streaming and atomicity
+
+A file import starts at the current byte position, leaves the borrowed handle
+open at EOF on success and attempts to restore its starting position on failure.
+Keep the input unchanged during both passes: this is not a snapshot of a file
+being modified concurrently. Types, widths and row counts are rechecked, but
+compatible content changes are not guaranteed to be detected.
+
+For non-replayable input, supply explicit types through
+`sqlite_import_csv_reader`. Configure the reader's headers yourself. Already-fed
+final input and file-backed readers need no callback. A `sqlite_csv_refill_fn`
+must feed a non-empty chunk or final EOF, returning true; false cancels the
+import. The callback context remains caller-owned. It must not re-enter the
+importer or use the database connection. The function is synchronous and holds
+its transaction while requesting subsequent chunks.
+
+Imports use a [savepoint](https://www.sqlite.org/lang_savepoint.html) around schema
+creation and insertion, preserving an enclosing transaction. Parsing, conversion,
+constraint, cancellation or write failures roll back the import; successful
+imports do not commit a caller's transaction. Triggers retain normal SQL effects:
+a trigger explicitly rolling back the outer transaction cannot be contained.
+Rollback-cleanup failures are reported; inspect the connection before reusing it.
+Calls require exclusive use of their database connection until they return.
+
+### Export limitations
+
+Pass one read-only SELECT or WITH query with result columns and no parameters.
+Its first keyword, after whitespace, must be SELECT or WITH; leading comments
+and PRAGMAs are rejected before preparation because some PRAGMAs have preparation-time
+effects. Multiple statements and mutating SQL are rejected. Query text is trusted SQL supplied by
+the application, not CSV data. Use SQL expressions to select or transform data
+explicitly before export.
+
+The writer controls delimiter, quoting, BOM and line endings. INTEGER output is
+exact, REAL output uses 17 significant digits, and TEXT preserves its UTF-8
+bytes. BLOBs require an explicit SQL encoding such as `hex(column)`; non-finite
+reals, malformed UTF-8 and embedded NUL fail. NULL and empty text both produce
+empty fields, so this is tabular interchange, not a lossless database backup.
+A header-only file is emitted for an empty result when headers are enabled.
+
+Export calls `csv_finish` but does not free the writer or close its file.
+Failures can leave partial output. Choose file-module staging when atomic
+publication is required. Reading/writing source CSV is not itself encrypted;
+only storage in the SQLCipher database is encrypted at rest.
+
+### Example: infer a CSV file
+
+This complete programme creates a temporary input, imports it, reports its
+storage types and removes the input.
+
+```c
+#include <stdlib.h>
+
+#include "sqlite.h"
+
+int main(void)
+{
+    char directory[] = "/tmp/mars-csv-import-XXXXXX";
+    if (!mkdtemp(directory))
+        return 1;
+    string_t *source_path = string_sprintf("%s/input.csv", directory);
+    file_t *input = file_new(source_path), *dir = file_new_cstr(directory);
+    string_t *text = string_new_with("code,count\n00123,7\n00456,12\n");
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    string_t *table = string_new_with("measurements");
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    sqlite_csv_report_t report;
+    bool ok = db && input && file_write_all_text(input, text) &&
+              file_open(input, FILE_MODE_OPEN, FILE_ACCESS_READ) && sqlite_import_csv(db, input, table, NULL, &report);
+    sqlite_stmt_t *stmt = ok ? sqlite_stmt_prepare(db, "SELECT typeof(code), typeof(count) FROM measurements LIMIT 1") : NULL;
+    ok = ok && stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW;
+    if (ok)
+        string_printf("Imported %zu rows (code: %s, count: %s)\n", report.rows,
+                  sqlite_stmt_column_text(stmt, 0), sqlite_stmt_column_text(stmt, 1));
+    sqlite_stmt_finalize(stmt);
+    file_close(input);
+    file_delete(input);
+    file_remove_directory(dir);
+    file_free(input);
+    file_free(dir);
+    sqlite_close(db);
+    string_free(table);
+    string_free(key);
+    string_free(path);
+    string_free(text);
+    string_free(source_path);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Imported 2 rows (code: text, count: integer)
+```
+
+### Example: an explicitly typed reader
+
+This example uses a single final chunk. The file-to-file streaming example below
+shows the refill callback and a file-backed output writer together.
+
+```c
+#include "sqlite.h"
+
+int main(void)
+{
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    string_t *table = string_new_with("measurements");
+    string_t *text = string_new_with("name,count\nZoë,7\nAda,12\n");
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    sqlite_csv_options_t options = sqlite_csv_options_default();
+    sqlite_csv_column_t columns[] = {{NULL, SQLITE_CSV_TEXT}, {NULL, SQLITE_CSV_INTEGER}};
+    options.columns = columns;
+    options.column_count = 2;
+    csv_t *reader = csv_reader_new(NULL, &options.csv);
+    sqlite_csv_report_t report;
+    bool ok = db && reader && csv_feed(reader, text, true) &&
+              sqlite_import_csv_reader(db, reader, table, &options, NULL, NULL, &report);
+    if (ok)
+        string_printf("Imported %zu rows\n", report.rows);
+    csv_free(reader);
+    sqlite_close(db);
+    string_free(text);
+    string_free(table);
+    string_free(key);
+    string_free(path);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Imported 2 rows
+```
+
+### Example: export query results
+
+```c
+#include "sqlite.h"
+
+int main(void)
+{
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    string_t *query = string_new_with("SELECT 'Zoë' AS name, 'hello, world' AS note");
+    csv_options_t options = csv_options_default();
+    options.crlf = false;
+    csv_t *writer = csv_writer_new(NULL, &options);
+    bool ok = db && writer && sqlite_export_csv(db, query, writer, true, NULL);
+    if (ok)
+        string_printf("%S", csv_output(writer));
+    csv_free(writer);
+    string_free(query);
+    sqlite_close(db);
+    string_free(key);
+    string_free(path);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+name,note
+Zoë,"hello, world"
+```
+
+### Example: stream a CSV file in and query results out
+
+This complete programme creates a small fixture, imports it through a refill
+callback, then exports rows directly to another file. Neither transfer collects
+the entire CSV in memory. The in-memory database is just for this demonstration;
+use a database file instead of `:memory:` for large datasets.
+
+The seven-byte input buffer deliberately splits the UTF-8 spelling of `Zoë`
+and the quoted field `"Ada, A."` across callbacks. Normally use a larger buffer,
+such as 4096 bytes. `string_append_bytes` preserves unfinished UTF-8 sequences;
+do not normalise individual chunks. `csv_feed` copies the bytes, so the callback
+can immediately release its temporary string. At EOF the callback supplies a
+final empty chunk. Returning false cancels the import and rolls it back.
+
+The reader must be created with a NULL file for the callback to run.
+`example_csv_refill` is the callback implementation; `refill` holds its function
+pointer, and `&source` is the caller-owned context passed to every invocation.
+The context carries the borrowed input file and a call counter. The call to
+`sqlite_import_csv_reader(..., refill, &source, ...)` registers both: the importer,
+not `main`, invokes the callback whenever its reader needs input. The context
+must remain valid until this synchronous import returns.
+
+Export needs no callback: `csv_writer_new(output, ...)`
+writes each encoded record to the open file, unlike a NULL-file writer, which
+collects bounded output in memory. `sqlite_export_csv` finishes the writer;
+the caller checks file-close errors and releases both handles. Failed exports
+may leave a partial file; use staging before publishing production output.
+
+```c
+#include <stdlib.h>
+
+#include "sqlite.h"
+
+/* Caller-owned state passed unchanged to every refill invocation. */
+typedef struct {
+    file_t *input;
+    size_t calls;
+} example_csv_source_t;
+
+/* Feed raw bytes: a chunk may end halfway through a UTF-8 character. */
+static bool example_csv_refill(csv_t *reader, void *context)
+{
+    example_csv_source_t *source = context;
+    char bytes[7];
+    size_t count = 0;
+    ++source->calls;
+    if (!file_read(source->input, bytes, sizeof(bytes), &count))
+        return false;
+    if (count == 0)
+        return csv_feed(reader, NULL, true);
+    string_t *chunk = string_new();
+    bool ok = chunk && string_append_bytes(chunk, bytes, count) == 0 && csv_feed(reader, chunk, false);
+    string_free(chunk);
+    return ok;
+}
+
+int main(void)
+{
+    char directory[] = "/tmp/mars-csv-stream-XXXXXX";
+    if (!mkdtemp(directory))
+        return 1;
+    string_t *source_path = string_sprintf("%s/input.csv", directory);
+    string_t *output_path = string_sprintf("%s/output.csv", directory);
+    file_t *input = file_new(source_path), *output = file_new(output_path), *dir = file_new_cstr(directory);
+    string_t *text = string_new_with("name,count\nZoë,7\n\"Ada, A.\",12\n");
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    string_t *table = string_new_with("measurements");
+    string_t *query = string_new_with("SELECT name,count FROM measurements ORDER BY count");
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+
+    sqlite_csv_options_t options = sqlite_csv_options_default();
+    sqlite_csv_column_t columns[] = {{NULL, SQLITE_CSV_TEXT}, {NULL, SQLITE_CSV_INTEGER}};
+    options.columns = columns;
+    options.column_count = 2;
+    csv_t *reader = csv_reader_new(NULL, &options.csv);
+    csv_options_t output_options = csv_options_default();
+    output_options.crlf = false;
+    csv_t *writer = NULL;
+    sqlite_csv_report_t imported = {0}, exported = {0};
+
+    example_csv_source_t source = {.input = input, .calls = 0};
+    sqlite_csv_refill_fn refill = example_csv_refill;
+    bool ok = db && input && output && dir && text && table && query && reader &&
+              file_write_all_text(input, text) && file_open(input, FILE_MODE_OPEN, FILE_ACCESS_READ);
+    if (ok) {
+        /* Register our callback and its context; the importer calls it until EOF. */
+        ok = sqlite_import_csv_reader(db, reader, table, &options, refill, &source, &imported);
+    }
+    if (ok)
+        ok = file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
+    if (ok) {
+        writer = csv_writer_new(output, &output_options);
+        ok = writer && sqlite_export_csv(db, query, writer, true, &exported);
+    }
+    /* Export finishes the CSV writer, but borrowed files remain ours to close. */
+    csv_free(writer);
+    csv_free(reader);
+    if (!file_close(input))
+        ok = false;
+    if (!file_close(output))
+        ok = false;
+    if (ok) {
+        string_printf("Refill callback: %zu calls (including EOF)\n", source.calls);
+        string_printf("Imported %zu rows; exported %zu rows\n", imported.rows, exported.rows);
+    }
+
+    /* The demonstration removes its temporary files; keep output.csv in a real application. */
+    file_delete(input);
+    file_delete(output);
+    file_remove_directory(dir);
+    file_free(input);
+    file_free(output);
+    file_free(dir);
+    sqlite_close(db);
+    string_free(query);
+    string_free(table);
+    string_free(key);
+    string_free(path);
+    string_free(text);
+    string_free(output_path);
+    string_free(source_path);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Refill callback: 6 calls (including EOF)
+Imported 2 rows; exported 2 rows
+```
+
+The exported CSV preserves both rows, the UTF-8 name and the quoting around the
+name containing a comma. The example removes its temporary directory afterwards.
+
+These four examples run last in `tests/sqlite/test_sqlite_csv.c`, after the
+ordinary tests in the existing `make -j1 test_sqlite` suite.

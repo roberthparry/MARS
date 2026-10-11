@@ -6,6 +6,9 @@
  * Opaque database and statement handles support SQL execution, parameter binding,
  * typed result access and transactions. Object-storage helpers persist supported
  * MARS values without exposing database implementation details.
+ * CSV ingestion adds conservative whole-file type inference, explicit streaming
+ * schemas and savepoint-protected insertion. Query export delegates escaping
+ * to csv_t; CSV syntax remains the responsibility of the CSV module.
  *
  * File-content import/export is available through file.h; live handles and open
  * descriptors are not persistent objects. Applications are responsible for key
@@ -26,6 +29,7 @@
 #include <stdint.h>
 
 #include "ustring.h"
+#include "csv.h"
 
 /**
  * @brief Opaque encrypted SQLite database handle.
@@ -367,5 +371,101 @@ bool sqlite_stmt_column_is_null(sqlite_stmt_t *stmt, int column);
  * @return Last error text, or `NULL` if unavailable.
  */
 const string_t *sqlite_stmt_last_error(const sqlite_stmt_t *stmt);
+
+/** @brief Import column policy; AUTO is available only for replayable file imports. */
+typedef enum {
+    SQLITE_CSV_AUTO,
+    SQLITE_CSV_INTEGER,
+    SQLITE_CSV_REAL,
+    SQLITE_CSV_TEXT
+} sqlite_csv_type_t;
+
+/** @brief Positional column override; names and values are borrowed during import. */
+typedef struct {
+    const string_t *name; /**< Replacement destination name, or NULL to use the CSV header. */
+    sqlite_csv_type_t type; /**< Required storage policy, or AUTO for file inference. */
+} sqlite_csv_column_t;
+
+/** @brief Import policy; initialise with sqlite_csv_options_default(). */
+typedef struct {
+    csv_options_t csv; /**< File-reader policy; default consumes headers and requires uniform row widths. */
+    const sqlite_csv_column_t *columns; /**< Optional positional names/types; exactly one per input column. */
+    size_t column_count; /**< Number of overrides, or zero when columns is NULL. */
+    bool create_table; /**< Create a new main-schema table; true by default. False appends to an existing table. */
+    bool empty_is_null; /**< Interpret empty fields as NULL; true by default. Otherwise retain empty text. */
+    bool infer_real; /**< Permit approximate REAL inference for at most 15 significant digits; false by default. */
+} sqlite_csv_options_t;
+
+/** @brief Import/export result; no caller-owned allocations. */
+typedef struct {
+    size_t rows; /**< Successful data rows; zero on failed import, completed rows on failed export. */
+    size_t record; /**< One-based CSV record at failure, including a consumed header; zero before reading. */
+    size_t column; /**< One-based column at failure, or zero for a row/database-level failure. */
+    int code; /**< errno-style failure code, or zero on success. */
+    int sqlite_code; /**< Underlying SQLite failure code, or zero for non-SQL failures. */
+    csv_error_t csv_error; /**< Underlying CSV failure details, otherwise zero. */
+} sqlite_csv_report_t;
+
+/**
+ * @brief Supply another chunk when a streamed import needs input.
+ * @param reader Borrowed CSV reader; callback must call csv_feed(), marking its final chunk.
+ * @param context Borrowed caller context.
+ * @return True after feeding a non-empty chunk or final EOF; false cancels and rolls back the import.
+ */
+typedef bool (*sqlite_csv_refill_fn)(csv_t *reader, void *context);
+
+/** @brief Return conservative CSV import defaults. @return Policy with headers, NULL empties and new-table creation. */
+sqlite_csv_options_t sqlite_csv_options_default(void);
+
+/**
+ * @brief Infer a replayable CSV file's columns, then atomically import its rows.
+ *
+ * Reads from the current position of an open seekable file twice. The caller must keep its contents unchanged.
+ * Headerless input requires explicit names. All columns must have the same width. Names must be non-empty and unique
+ * under SQLite's ASCII case-insensitive matching; replacement names permit otherwise ambiguous input headers.
+ * Integers outside signed 64-bit range, leading-zero identifiers and mixed columns infer TEXT. Decimal text stays
+ * TEXT unless infer_real is enabled; explicit REAL overrides authorise rounding. Empty-only columns infer TEXT.
+ * Existing tables are appended to by column name, without replacing rows; INTEGER, REAL and TEXT affinities are
+ * supported. Incompatible inferred/declared types fail rather than relying on SQLite's permissive coercions.
+ * A savepoint protects table creation and all inserts, including inside a caller transaction. Schema triggers still
+ * have their normal effects; in particular a trigger that rolls back the outer transaction cannot be contained.
+ *
+ * @param db Borrowed open database, exclusively used for the duration of the call.
+ * @param input Borrowed open readable seekable file; never closed. At EOF on success; restored on failure if possible.
+ * @param table Borrowed unqualified main-schema table name, treated as one quoted identifier, never SQL.
+ * @param options Borrowed policy, or NULL for defaults; copied for the duration of the call.
+ * @param report Optional output report, reset before work. Failure details also appear in sqlite_last_error(db).
+ * @return True on success; false on malformed input, incompatible schema, I/O or database failure.
+ */
+bool sqlite_import_csv(sqlite_t *db, file_t *input, const string_t *table,
+                       const sqlite_csv_options_t *options, sqlite_csv_report_t *report);
+
+/**
+ * @brief Import a CSV reader once using explicit column types and a savepoint.
+ * @param db Borrowed database; exclusive use is required during the call and refill callbacks.
+ * @param reader Borrowed fresh reader; not freed. Configure headers before calling; options.csv is ignored.
+ * @param table Borrowed unqualified destination table name.
+ * @param options Required policy with columns and non-AUTO types; names may come from the reader's header.
+ * @param refill Optional callback after CSV_NEED_INPUT; NULL rejects incomplete input. Must make progress.
+ * @param context Borrowed callback context, passed unchanged; must not use the database or re-enter the importer.
+ * @param report Optional reset output report; import failures report zero successful rows.
+ * @return True on success; false rolls back the import. Reader position is not restored.
+ */
+bool sqlite_import_csv_reader(sqlite_t *db, csv_t *reader, const string_t *table,
+                              const sqlite_csv_options_t *options, sqlite_csv_refill_fn refill, void *context,
+                              sqlite_csv_report_t *report);
+
+/**
+ * @brief Stream one read-only SQL result through a CSV writer and finish it.
+ * @param db Borrowed database; exclusive use is required during export.
+ * @param query Borrowed single read-only SELECT or WITH query with no parameters; never user data. The first keyword
+ * must be SELECT or WITH, ignoring leading whitespace; leading SQL comments and PRAGMAs are rejected before prepare.
+ * @param writer Borrowed fresh CSV writer; never freed. File ownership remains with its caller.
+ * @param header True writes result column names first, even for an empty result.
+ * @param report Optional reset output report; rows counts completed records even on failure.
+ * @return True after csv_finish(); false for invalid SQL, BLOB/NUL/non-UTF-8 data or output failure. Output may be
+ * partial. NULL exports as an empty field and is indistinguishable from empty text; REAL uses 17 significant digits.
+ */
+bool sqlite_export_csv(sqlite_t *db, const string_t *query, csv_t *writer, bool header, sqlite_csv_report_t *report);
 
 #endif /* MARS_SQLITE_H */

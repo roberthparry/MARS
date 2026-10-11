@@ -221,11 +221,11 @@ int string_append_cstr(string_t *s, const char *suffix);
 int string_append_string(string_t *s, const string_t *suffix);
 
 /**
- * @brief Append exactly @p size raw bytes from @p buffer.
+ * @brief Append a byte span using ordinary text normalisation.
  *
- * The bytes are copied verbatim without UTF-8 validation. A null terminator
- * is written after the appended bytes automatically. Capacity is expanded
- * as needed.
+ * As with ordinary text mutators, Unicode spelling may be normalised and invalid
+ * sequences replaced. Use string_append_bytes() for raw protocol fragments or
+ * string_append_utf8_exact() for complete, validated UTF-8 without normalisation.
  *
  * @param s       Destination string. Must not be @c NULL.
  * @param buffer  Pointer to the bytes to append. Need not be null-terminated.
@@ -233,6 +233,21 @@ int string_append_string(string_t *s, const string_t *suffix);
  * @return        0 on success, non-zero on allocation failure.
  */
 int string_append_chars(string_t *s, const char *buffer, size_t size);
+
+/**
+ * @brief Append arbitrary protocol bytes without validation or normalisation.
+ *
+ * Accepts partial UTF-8 scalars and embedded NUL bytes. Callers must validate
+ * completed text before using Unicode operations. A trailing NUL is maintained
+ * outside the byte length; ordinary text mutators may subsequently normalise it.
+ * The source may refer to bytes already stored in the destination.
+ *
+ * @param s Non-NULL destination string.
+ * @param buffer Borrowed bytes; NULL is permitted only for zero size.
+ * @param size Number of bytes; zero succeeds without changing the destination.
+ * @return Zero on success; -1 on invalid arguments, overflow or allocation failure.
+ */
+int string_append_bytes(string_t *s, const char *buffer, size_t size);
 
 /**
  * @brief Append complete UTF-8 scalars verbatim, without Unicode normalisation.

@@ -424,7 +424,9 @@ void ts_builder_destroy(ts_builder_t *builder);
  * The CSV file must contain a date column and a value column identified by header name. Dates are parsed using the
  * datetime layer; for the current Sample forecasting inputs this is expected to support forms such as `31/05/2020`.
  *
- * Fields are split on commas without CSV quoting support. Rows retain file order; absent or unparseable dates are
+ * The csv_t reader supports UTF-8, quoted commas, doubled quotes and embedded newlines. Header lookup trims whitespace
+ * and is case-sensitive; missing or ambiguous selected headers fail. CSV defaults bound field, record and column sizes.
+ * Rows retain file order; absent or unparseable dates are
  * skipped. Empty or invalid numeric fields become missing. TS_MISSING_ERROR retains missing values, DROP removes them,
  * and other fill policies have the limitations of ts_fill_missing(). Regularity follows the frequency label without
  * checking dates.
@@ -461,8 +463,9 @@ timeseries_t *ts_from_csv(const char *path, const char *date_column, const char 
  *
  * The returned matrix is numeric and is intended for exogenous regressors in regression and ARIMAX/SARIMAX workflows.
  *
- * Rows retain file order; dates are only checked for non-empty text, never parsed or sorted. Comma splitting does not
- * support quoted CSV fields. DROP and ERROR both discard rows with empty selected fields; other policies keep NaNs
+ * Rows retain file order; dates are only checked for non-empty text, never parsed or sorted. The csv_t reader handles
+ * quoted UTF-8 fields and multiline records; missing or ambiguous selected headers fail. CSV default size limits apply.
+ * DROP and ERROR both discard rows with empty selected fields; other policies keep NaNs
  * without filling. Numeric conversion uses double precision.
  *
  * @param path Non-NULL borrowed file path text.
@@ -480,8 +483,9 @@ matrix_t *ts_matrix_from_csv_text(const string_t *path, const string_t *date_col
 /**
  * @brief Convenience wrapper for ts_matrix_from_csv_text().
  *
- * Rows retain file order; dates are only checked for non-empty text, never parsed or sorted. Comma splitting does not
- * support quoted CSV fields. DROP and ERROR both discard rows with empty selected fields; other policies keep NaNs
+ * Rows retain file order; dates are only checked for non-empty text, never parsed or sorted. The csv_t reader handles
+ * quoted UTF-8 fields and multiline records; missing or ambiguous selected headers fail. CSV default size limits apply.
+ * DROP and ERROR both discard rows with empty selected fields; other policies keep NaNs
  * without filling. Numeric conversion uses double precision.
  *
  * @param path Non-NULL borrowed file path as a NUL-terminated string.
@@ -593,7 +597,7 @@ void ts_print(const timeseries_t *series);
  *
  * CSV includes date, mean, stderr, lower and upper columns. Both text styles show mean and bounds identically. Finite
  * numbers use two decimal places and dates omit time of day; absent optional series render as NaN. Empty means produce
- * NULL outside CSV. The current renderer leaks temporary matrices and may not report append failures.
+ * NULL outside CSV. Non-CSV rendering may not report append failures. CSV rendering checks every append.
  *
  * @param forecast Non-NULL borrowed forecast with a non-NULL mean; any supplied interval series must be at least as
  * long.
@@ -607,7 +611,7 @@ string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t s
  *
  * CSV includes date, mean, stderr, lower and upper columns. Both text styles show mean and bounds identically. Finite
  * numbers use two decimal places and dates omit time of day; absent optional series render as NaN. Empty means produce
- * NULL outside CSV. The current renderer leaks temporary matrices and may not report append failures.
+ * NULL outside CSV. Non-CSV rendering may not report append failures. CSV rendering checks every append.
  *
  * @param forecast Non-NULL borrowed forecast with a non-NULL mean; any supplied interval series must be at least as
  * long.
@@ -732,7 +736,7 @@ int ts_arima_summary_write_file(const char *path, const ts_arima_result_t *resul
  *
  * All output pointers must be non-NULL and distinct; outputs are written only on success and existing storage is not
  * freed. Initialise slots to NULL and length to zero before use. Payload bytes are not NUL-terminated. CSV omits time
- * of day; undated or missing-valued rows cannot currently be read back by ts_deserialise().
+ * of day; undated rows cannot currently be read back by ts_deserialise(). Empty fields preserve missing values.
  *
  * @param series Non-NULL borrowed series to serialise.
  * @param out_type Receives an owned type label; release with string_free().
@@ -747,8 +751,8 @@ bool ts_serialize(const timeseries_t *series, string_t **out_type, string_t **ou
 /**
  * @brief Reconstruct a timeseries from a serialised payload.
  *
- * Requires dated rows with non-empty values accepted in full by strtod(); missing fields and undated rows fail. Numeric
- * values are reconstructed through double precision. Unknown or absent metadata defaults to unknown frequency and
+ * Requires dated rows and exactly the date,value schema width, parsed by csv_t. Empty values remain missing; non-empty
+ * numeric values use the number module without an intermediate double conversion. Unknown or absent metadata defaults to unknown frequency and
  * calendar years. Input bytes are copied; they need not end with NUL.
  *
  * @param data Non-NULL borrowed payload buffer of at least len bytes.

@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "csv.h"
 #include "timeseries.h"
 
 struct timeseries_t {
@@ -56,6 +57,25 @@ typedef struct ts_arima_meta_t {
 typedef struct {
     string_t *text;
 } ts_string_builder_t;
+
+/** @brief Read typed rows from a CSV reader. @param csv Reader. @param date_name Date header.
+ * @param value_name Value header. @param frequency Frequency. @param year_type Year convention.
+ * @param policy Missing policy. @param strict_values Reject invalid date/value rows. @return Owned series or NULL. */
+timeseries_t *ts_csv_read_series(csv_t *csv, const string_t *date_name, const string_t *value_name,
+                                 ts_frequency_t frequency, ts_year_type_t year_type,
+                                 ts_missing_policy_t policy, bool strict_values);
+
+/** @brief Format a series using csv_t. @param series Borrowed series. @return Owned text or NULL. */
+string_t *ts_csv_series_text(const timeseries_t *series);
+
+/** @brief Format a forecast using csv_t. @param forecast Borrowed forecast. @return Owned text or NULL. */
+string_t *ts_csv_forecast_text(const ts_forecast_t *forecast);
+
+/** @brief Format coefficient rows using csv_t. @param result Borrowed result. @return Owned text or NULL. */
+string_t *ts_csv_regression_text(const ts_regression_result_t *result);
+
+/** @brief Format AR rows using csv_t. @param result Borrowed result. @return Owned text or NULL. */
+string_t *ts_csv_arima_text(const ts_arima_result_t *result);
 
 int ts_appendf(ts_string_builder_t *sb, const char *fmt, ...);
 int ts_append_text(ts_string_builder_t *sb, const string_t *text);

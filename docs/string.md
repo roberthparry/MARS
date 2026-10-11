@@ -362,7 +362,8 @@ All declarations are in `include/ustring.h`.
 - `void string_clear(string_t *s)` — reset to empty without reallocating
 - `int string_append_string(string_t *s, const string_t *suffix)` — append another `string_t`
 - `int string_append_cstr(string_t *s, const char *suffix)` — boundary helper for appending a C string
-- `int string_append_chars(string_t *s, const char *buffer, size_t size)` — low-level helper for appending `size` raw bytes verbatim
+- `int string_append_chars(string_t *s, const char *buffer, size_t size)` — append a non-empty byte span with ordinary text normalisation; not suitable for partial protocol characters
+- `int string_append_bytes(string_t *s, const char *buffer, size_t size)` — append arbitrary bytes verbatim, including partial UTF-8 and embedded NUL. Zero size succeeds; self-append is supported. Returns zero on success or -1 on invalid arguments, overflow or allocation failure. Validate completed text before Unicode operations; use `string_append_utf8_exact` for complete validated text. CSV uses this operation to preserve streamed fragments.
 - `int string_append_char(string_t *s, char c)` — append one ASCII character
 - `int string_insert_string(string_t *s, size_t pos, const string_t *text)` — insert another `string_t` at character index `pos`
 - `int string_insert(string_t *s, size_t pos, const char *text)` — boundary helper for inserting C-string text at character index `pos`

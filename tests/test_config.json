@@ -85,6 +85,19 @@
       "test_unset_range": true
     }
   },
+  "tests/csv/test_csv.c": {
+    "example_csv_read": true,
+    "example_csv_write": true,
+    "test_csv_chunk_boundaries": true,
+    "test_csv_files": true,
+    "test_csv_headers": true,
+    "test_csv_invalid_input": true,
+    "test_csv_limits_and_width": true,
+    "test_csv_records": true,
+    "test_csv_varied_roundtrips": true,
+    "test_csv_writer_limits": true,
+    "test_csv_writer_roundtrip": true
+  },
   "tests/datetime/test_datetime.c": {
     "readme_examples": {
       "enabled": true,
@@ -2218,6 +2231,24 @@
       "test_sqlite_string_round_trip_is_encrypted": true
     }
   },
+  "tests/sqlite/test_sqlite_csv.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_sqlite_csv_export": true,
+      "example_sqlite_csv_file": true,
+      "example_sqlite_csv_file_stream": true,
+      "example_sqlite_csv_stream": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_sqlite_csv_bad_input": true,
+      "test_sqlite_csv_boundaries": true,
+      "test_sqlite_csv_export": true,
+      "test_sqlite_csv_inference": true,
+      "test_sqlite_csv_mapping_and_identifiers": true,
+      "test_sqlite_csv_stream_rollback": true
+    }
+  },
   "tests/string/test_string.c": {
     "readme_examples": {
       "enabled": true,
@@ -2237,6 +2268,7 @@
       "test_split_basic": true,
       "test_split_edge_cases": true,
       "test_starts_with_ends_with": true,
+      "test_string_append_bytes": true,
       "test_string_append_utf8_exact": true,
       "test_string_builder": true,
       "test_string_byte_length_counts_utf8_bytes": true,
@@ -2271,6 +2303,7 @@
     "test_auto_arima_preserves_selected_model_and_scale": true,
     "test_csv_file_module_io": true,
     "test_csv_load_and_slice": true,
+    "test_csv_quoted_headers_and_restore": true,
     "test_exogenous_alignment_for_future_forecasts": true,
     "test_in_memory_constructors_and_builder": true,
     "test_output_and_write_file": true,

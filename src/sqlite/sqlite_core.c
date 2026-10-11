@@ -41,7 +41,7 @@ static bool sqlite_text_is_empty(const string_t *text)
     return !text || string_byte_length(text) == 0u;
 }
 
-static void sqlite_set_error(sqlite_t *db, const char *message)
+void sqlite_set_error(sqlite_t *db, const char *message)
 {
     if (!db)
         return;

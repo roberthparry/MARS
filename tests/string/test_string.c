@@ -916,6 +916,24 @@ static void example_readme_examples(void)
 }
 
 
+static void test_string_append_bytes(void)
+{
+    string_t *text = string_new();
+    TEST_ASSERT_NOT_NULL(text);
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, "e\xcc", 2), 0);
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, "\x81\0\xff", 3), 0);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 5);
+    TEST_ASSERT_TRUE(memcmp(string_c_str(text), "e\xcc\x81\0\xff", 5) == 0, "verbatim bytes");
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, string_c_str(text), 5), 0);
+    TEST_ASSERT_INT_EQ(string_byte_length(text), 10);
+    TEST_ASSERT_TRUE(memcmp(string_c_str(text), string_c_str(text) + 5, 5) == 0, "self append");
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, NULL, 0), 0);
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, NULL, 1), -1);
+    TEST_ASSERT_INT_EQ(string_append_bytes(text, "x", SIZE_MAX), -1);
+    TEST_ASSERT_INT_EQ(string_append_bytes(NULL, "x", 1), -1);
+    string_free(text);
+}
+
 static void test_string_append_utf8_exact(void)
 {
     string_t *text = string_new();
@@ -1072,6 +1090,7 @@ int tests_main(void)
 {
     TEST_SECTION("Core");
     TEST_RUN_IN_GROUP(test_string_append_utf8_exact, tests, NULL);
+    TEST_RUN_IN_GROUP(test_string_append_bytes, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_unquote_shell_words, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_unquote_shell_invalid, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_unquote_shell_exact_unicode, tests, NULL);

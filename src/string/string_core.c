@@ -183,8 +183,8 @@ static int string_append_fragment_raw(string_t *s, const char *data, size_t len)
     return 0;
 }
 
-/* Validate and append protocol text without changing Unicode spelling. */
-int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
+/* Append raw protocol fragments, including incomplete Unicode and embedded NUL. */
+int string_append_bytes(string_t *s, const char *buffer, size_t size)
 {
     size_t offset = 0;
     bool alias;
@@ -198,12 +198,6 @@ int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
         if (size > s->len - offset)
             return -1;
     }
-    for (size_t pos = 0; pos < size;) {
-        size_t width = string_utf8_scalar_width((unsigned char)buffer[pos]);
-        if (!width || width > size - pos || !string_utf8_decode_one_strict(buffer + pos, width, NULL))
-            return -1;
-        pos += width;
-    }
     if (string_reserve(s, s->len + size + 1u) != 0)
         return -1;
     if (alias)
@@ -212,6 +206,23 @@ int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
     s->len += size;
     s->data[s->len] = '\0';
     return 0;
+}
+
+/* Validate and append protocol text without changing Unicode spelling. */
+int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
+{
+    if (!s || (!buffer && size) || size > SIZE_MAX - s->len - 1u)
+        return -1;
+    if ((uintptr_t)buffer >= (uintptr_t)s->data && (uintptr_t)buffer - (uintptr_t)s->data <= s->len &&
+        size > s->len - (size_t)((uintptr_t)buffer - (uintptr_t)s->data))
+        return -1;
+    for (size_t pos = 0; pos < size;) {
+        size_t width = string_utf8_scalar_width((unsigned char)buffer[pos]);
+        if (!width || width > size - pos || !string_utf8_decode_one_strict(buffer + pos, width, NULL))
+            return -1;
+        pos += width;
+    }
+    return string_append_bytes(s, buffer, size);
 }
 
 static int string_append_utf8_scalar(string_t *s, uint32_t value)

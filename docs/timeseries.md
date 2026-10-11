@@ -68,20 +68,30 @@ The header therefore includes helpers to:
   wrappers when a caller already has ordinary C strings at the boundary
 
 This matches workflows where the target series and exogenous population series
-are read through the public `file_t` API. Parsing remains entirely in
-`string_t`: line reads, column names, field splitting, dates and numeric text
-use MARS string operations. Both CSV readers accept a leading UTF-8 BOM and
-LF, CRLF or CR line endings, including a final line without a terminator.
-Malformed UTF-8 or a read failure rejects the load instead of returning a
-partially loaded series or matrix. Line-buffer memory grows with the longest
-line; the resulting series or matrix still resides in memory.
+are read through the public `file_t` API and the shared [CSV module](csv.md).
+The opaque `csv_t` handles syntax, UTF-8 validation, quoted commas, doubled
+quotes, multiline fields, an initial BOM and LF, CRLF or CR record endings.
+The last record need not have a terminator. Timeseries handles date and number
+conversion using `string_t`, rather than maintaining its own CSV parser.
+Header names are whitespace-trimmed and case-sensitive; missing or ambiguous
+selected headers reject the load. Empty header arguments still select column zero.
+Ragged rows retain the existing missing-field policies. Malformed CSV, invalid
+UTF-8, limit violations or read failures never return a partial series or matrix.
+Default CSV limits apply: 1 MiB per decoded field, 8 MiB per encoded record and
+4,096 columns. File input is streamed, but the resulting series or matrix still
+resides in memory.
 
 File readers and writers follow symbolic links explicitly, including creation
 through a dangling output link, but reject directories and other non-regular
 files. Writers preserve the serialiser's text without adding a newline, check
 close failures, and truncate existing output; they do not provide atomic
-replacement. The CSV field parser is unchanged and is not a general quoted,
-multiline CSV parser.
+replacement. Series, forecast and model-summary CSV exports delegate escaping
+and record construction to `csv_t`, retaining their existing schemas and LF
+endings. Text-returning exports and the file wrappers still materialise the
+complete output. Stored series are also restored through `csv_t`: missing
+values round-trip as empty fields, and numeric restoration no longer passes
+through double precision. Dates still omit time of day; undated series cannot
+be restored through this CSV representation.
 
 Typical target series and exogenous population series
 already exist as monthly CSV files, such as:

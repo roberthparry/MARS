@@ -10,8 +10,8 @@
  */
 
 #define MARS_TIMESERIES_INTERNAL_ACCESS
-#include "timeseries_internal.h"
 #include "ustring.h"
+#include "timeseries_internal.h"
 
 static char *ts_cstring_from_text(string_t *text)
 {
@@ -54,23 +54,13 @@ string_t *ts_to_text(const timeseries_t *series, ts_string_style_t style)
     if (!series)
         return NULL;
     if (style == TS_STRING_CSV)
-        ts_appendf(&sb, "date,value\n");
+        return ts_csv_series_text(series);
     for (i = 0u; i < series->length; ++i) {
         string_t *date_text = NULL;
 
         if (series->has_index && series->index[i])
             date_text = ts_format_date_text(series->index[i]);
-        if (style == TS_STRING_CSV) {
-            if (date_text)
-                ts_append_text(&sb, date_text);
-            ts_appendf(&sb, ",");
-            if (series->missing[i])
-                ts_appendf(&sb, "\n");
-            else {
-                ts_append_number_text(&sb, series->values[i]);
-                ts_appendf(&sb, "\n");
-            }
-        } else if (style == TS_STRING_PRETTY) {
+        if (style == TS_STRING_PRETTY) {
             if (date_text) {
                 ts_append_text(&sb, date_text);
                 ts_appendf(&sb, " : ");
@@ -241,48 +231,28 @@ string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t s
     if (!forecast || !forecast->mean)
         return NULL;
     if (style == TS_STRING_CSV)
-        ts_appendf(&sb, "date,mean,stderr,lower,upper\n");
+        return ts_csv_forecast_text(forecast);
     for (i = 0u; i < ts_length(forecast->mean); ++i) {
-        datetime_t *dt = ts_start_datetime(forecast->mean);
         string_t *date_text;
-        number_t value, stderr_v, lower_v, upper_v;
+        number_t value, lower_v, upper_v;
 
-        if (dt)
-            datetime_dealloc(dt);
         date_text = (forecast->mean->has_index && forecast->mean->index[i])
                         ? ts_format_date_text(forecast->mean->index[i])
                         : NULL;
-        value = mat_get_num(ts_to_column_matrix(forecast->mean), i, 0);
-        stderr_v = forecast->stderr ? forecast->stderr->values[i] : num_clone(NUM_NAN);
+        value = num_clone(forecast->mean->values[i]);
         lower_v = forecast->lower ? forecast->lower->values[i] : num_clone(NUM_NAN);
         upper_v = forecast->upper ? forecast->upper->values[i] : num_clone(NUM_NAN);
-        if (style == TS_STRING_CSV) {
-            if (date_text)
-                ts_append_text(&sb, date_text);
-            ts_appendf(&sb, ",");
-            ts_append_number_fixed(&sb, value, 2);
-            ts_appendf(&sb, ",");
-            ts_append_number_fixed(&sb, stderr_v, 2);
-            ts_appendf(&sb, ",");
-            ts_append_number_fixed(&sb, lower_v, 2);
-            ts_appendf(&sb, ",");
-            ts_append_number_fixed(&sb, upper_v, 2);
-            ts_appendf(&sb, "\n");
-        } else {
-            if (date_text)
-                ts_append_text(&sb, date_text);
-            ts_appendf(&sb, ": best estimate ");
-            ts_append_number_fixed(&sb, value, 2);
-            ts_appendf(&sb, ", plausible lower end: ");
-            ts_append_number_fixed(&sb, lower_v, 2);
-            ts_appendf(&sb, ", plausible upper end: ");
-            ts_append_number_fixed(&sb, upper_v, 2);
-            ts_appendf(&sb, "\n");
-        }
+        if (date_text)
+            ts_append_text(&sb, date_text);
+        ts_appendf(&sb, ": best estimate ");
+        ts_append_number_fixed(&sb, value, 2);
+        ts_appendf(&sb, ", plausible lower end: ");
+        ts_append_number_fixed(&sb, lower_v, 2);
+        ts_appendf(&sb, ", plausible upper end: ");
+        ts_append_number_fixed(&sb, upper_v, 2);
+        ts_appendf(&sb, "\n");
         string_free(date_text);
         num_destroy(&value);
-        if (!forecast->stderr)
-            num_destroy(&stderr_v);
         if (!forecast->lower)
             num_destroy(&lower_v);
         if (!forecast->upper)
@@ -756,63 +726,19 @@ int ts_forecast_write_file(const char *path, const ts_forecast_t *forecast, ts_s
     return ts_write_owned_text_to_path(path, ts_forecast_to_text(forecast, style));
 }
 
+/* Use the shared CSV writer for coefficient tables; ordinary summaries remain text. */
 int ts_regression_summary_write_file(const char *path, const ts_regression_result_t *result, ts_string_style_t style)
 {
-    string_t *text;
-
-    if (style == TS_STRING_CSV && result && result->coefficients) {
-        ts_string_builder_t sb = {0};
-        size_t i;
-
-        ts_appendf(&sb, "term,estimate,stderr,t_stat,p_value\n");
-        for (i = 0u; i < mat_get_row_count(result->coefficients); ++i) {
-            number_t est = mat_get_num(result->coefficients, i, 0);
-            number_t se = result->stderr ? mat_get_num(result->stderr, i, 0) : num_clone(NUM_NAN);
-            number_t t = result->t_stat ? mat_get_num(result->t_stat, i, 0) : num_clone(NUM_NAN);
-            number_t p = result->p_value ? mat_get_num(result->p_value, i, 0) : num_clone(NUM_NAN);
-
-            ts_appendf(&sb, "beta%zu,", i);
-            ts_append_number_sig(&sb, est, 6);
-            ts_appendf(&sb, ",");
-            ts_append_number_sig(&sb, se, 6);
-            ts_appendf(&sb, ",");
-            ts_append_number_sig(&sb, t, 6);
-            ts_appendf(&sb, ",");
-            ts_append_number_sig(&sb, p, 6);
-            ts_appendf(&sb, "\n");
-            num_destroy(&est);
-            num_destroy(&se);
-            num_destroy(&t);
-            num_destroy(&p);
-        }
-        text = ts_builder_detach_text(&sb);
-    } else {
-        text = ts_regression_summary_to_text(result);
-    }
+    string_t *text = style == TS_STRING_CSV && result && result->coefficients
+                         ? ts_csv_regression_text(result) : ts_regression_summary_to_text(result);
     return ts_write_owned_text_to_path(path, text);
 }
 
+/* Preserve the AR-only CSV schema while delegating record syntax. */
 int ts_arima_summary_write_file(const char *path, const ts_arima_result_t *result, ts_string_style_t style)
 {
-    string_t *text;
-
-    if (style == TS_STRING_CSV && result && result->ar_params) {
-        ts_string_builder_t sb = {0};
-        size_t i;
-
-        ts_appendf(&sb, "term,estimate\n");
-        for (i = 0u; i < mat_get_row_count(result->ar_params); ++i) {
-            number_t est = mat_get_num(result->ar_params, i, 0);
-
-            ts_appendf(&sb, "phi%zu,", i + 1u);
-            ts_append_number_sig(&sb, est, 6);
-            ts_appendf(&sb, "\n");
-            num_destroy(&est);
-        }
-        text = ts_builder_detach_text(&sb);
-    } else {
-        text = ts_arima_summary_to_text(result);
-    }
+    string_t *text = style == TS_STRING_CSV && result && result->ar_params
+                         ? ts_csv_arima_text(result) : ts_arima_summary_to_text(result);
     return ts_write_owned_text_to_path(path, text);
 }
 
@@ -911,90 +837,47 @@ bool ts_serialize(const timeseries_t *series, string_t **out_type, string_t **ou
     return true;
 }
 
+static string_t *ts_csv_encoding_token(const string_t *encoding, const char *key, size_t key_length)
+{
+    string_offset_t start = string_find(encoding, key);
+    if (start < 0)
+        return string_new();
+    size_t offset = (size_t)start + key_length;
+    string_t *tail = string_substr(encoding, offset, string_byte_length(encoding) - offset);
+    string_offset_t end = tail ? string_find(tail, ";") : -1;
+    if (end < 0)
+        return tail;
+    string_t *token = string_substr(tail, 0, (size_t)end);
+    string_free(tail);
+    return token;
+}
+
+/* Restore stored rows through the same UTF-8, quoting and numeric path as file input. */
 timeseries_t *ts_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding)
 {
-    char *buffer;
-    char *saveptr = NULL;
-    char *line;
-    ts_frequency_t frequency;
-    ts_year_type_t year_type;
-    ts_builder_t *builder;
+    if ((!data && len) || !type || !encoding || !string_view_equals_literal(string_view_all(type), "timeseries_t"))
+        return NULL;
+    string_t *frequency_text = ts_csv_encoding_token(encoding, "frequency=", 10);
+    string_t *year_text = ts_csv_encoding_token(encoding, "year_type=", 10);
+    string_t *text = string_new(), *date = string_new_with("date"), *value = string_new_with("value");
+    csv_options_t options = csv_options_default();
+    options.first_row_header = true;
+    options.strict_columns = true;
+    if (len > options.max_buffer_bytes)
+        options.max_buffer_bytes = len;
+    csv_t *csv = csv_reader_new(NULL, &options);
     timeseries_t *series = NULL;
-    const char *enc;
-    const char *freq_text;
-    const char *year_text;
-
-    if (!data || !type || !encoding)
-        return NULL;
-    if (strcmp(string_c_str(type), "timeseries_t") != 0)
-        return NULL;
-
-    enc = string_c_str(encoding);
-    freq_text = strstr(enc, "frequency=");
-    year_text = strstr(enc, "year_type=");
-    frequency = ts_frequency_from_name(freq_text ? freq_text + strlen("frequency=") : "unknown");
-    year_type = ts_year_type_from_name(year_text ? year_text + strlen("year_type=") : "calendar");
-
-    if (freq_text) {
-        char token[32];
-        size_t i = 0u;
-        const char *p = freq_text + strlen("frequency=");
-        while (p[i] && p[i] != ';' && i + 1u < sizeof(token)) {
-            token[i] = p[i];
-            i++;
-        }
-        token[i] = '\0';
-        frequency = ts_frequency_from_name(token);
+    if (csv && text && date && value && frequency_text && year_text &&
+        string_append_bytes(text, data, len) == 0 && csv_feed(csv, text, true)) {
+        ts_frequency_t frequency = ts_frequency_from_name(string_c_str(frequency_text));
+        ts_year_type_t year_type = ts_year_type_from_name(string_c_str(year_text));
+        series = ts_csv_read_series(csv, date, value, frequency, year_type, TS_MISSING_KEEP, true);
     }
-    if (year_text) {
-        char token[32];
-        size_t i = 0u;
-        const char *p = year_text + strlen("year_type=");
-        while (p[i] && p[i] != ';' && i + 1u < sizeof(token)) {
-            token[i] = p[i];
-            i++;
-        }
-        token[i] = '\0';
-        year_type = ts_year_type_from_name(token);
-    }
-
-    buffer = malloc(len + 1u);
-    if (!buffer)
-        return NULL;
-    memcpy(buffer, data, len);
-    buffer[len] = '\0';
-
-    builder = ts_builder_new(frequency, year_type);
-    if (!builder) {
-        free(buffer);
-        return NULL;
-    }
-
-    for (line = strtok_r(buffer, "\n", &saveptr); line != NULL; line = strtok_r(NULL, "\n", &saveptr)) {
-        char *comma;
-        double value;
-        char *end = NULL;
-
-        if (*line == '\0' || strcmp(line, "date,value") == 0)
-            continue;
-        comma = strrchr(line, ',');
-        if (!comma) {
-            ts_builder_destroy(builder);
-            free(buffer);
-            return NULL;
-        }
-        *comma = '\0';
-        value = strtod(comma + 1, &end);
-        if (end == comma + 1 || (end && *end != '\0') ||
-            ts_builder_append_date_string_double(builder, line, value) != 0) {
-            ts_builder_destroy(builder);
-            free(buffer);
-            return NULL;
-        }
-    }
-
-    series = ts_builder_build(builder);
-    ts_builder_destroy(builder);
-    free(buffer);
+    csv_free(csv);
+    string_free(text);
+    string_free(date);
+    string_free(value);
+    string_free(frequency_text);
+    string_free(year_text);
     return series;
 }

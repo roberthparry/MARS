@@ -18,9 +18,10 @@
 #include "datetime.h"
 #include "expression.h"
 #include "sqlite.h"
-#include "test_harness.h"
 #include "timeseries.h"
 #include "ustring.h"
+#include "test_harness.h"
+#include "test_sqlite_csv.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -426,6 +427,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_sqlite_rejects_wrong_key, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_object_blob_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_requires_key, tests, NULL);
+    test_sqlite_csv_cases();
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
@@ -438,6 +440,7 @@ int tests_main(void)
                                   "sqlite,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_prepared_statement_query, readme_examples,
                                   "sqlite,readme,output");
+    test_sqlite_csv_examples();
 
     return TEST_EXIT_CODE();
 }

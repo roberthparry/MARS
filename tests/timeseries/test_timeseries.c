@@ -9,8 +9,8 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_timeseries.h"
 #include "file.h"
+#include "test_timeseries.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -236,9 +236,7 @@ static void test_output_and_write_file(void)
     string_t *text = NULL;
     string_t *file_text = NULL;
     const char *csv_path = test_case_temp_path("timeseries.csv");
-    FILE *f = NULL;
-    char buf[128] = {0};
-    size_t used = 0u;
+    file_t *file = file_new_cstr(csv_path);
     const char *cols[] = {"test3"};
     matrix_t *x = NULL;
     ts_regression_result_t fit = {0};
@@ -254,12 +252,7 @@ static void test_output_and_write_file(void)
     text = NULL;
 
     TEST_ASSERT_TRUE(ts_write_file(csv_path, head, TS_STRING_CSV) == 0, "write csv file");
-    f = fopen(csv_path, "r");
-    TEST_ASSERT_NOT_NULL(f);
-    used = fread(buf, 1u, sizeof(buf) - 1u, f);
-    buf[used] = '\0';
-    fclose(f);
-    file_text = string_new_with(buf);
+    file_text = file_read_all_text(file);
     TEST_ASSERT_NOT_NULL(file_text);
     TEST_ASSERT_TRUE(string_find(file_text, "date,value") >= 0, "written csv header");
     string_free(file_text);
@@ -279,6 +272,32 @@ static void test_output_and_write_file(void)
                      "summary includes a friendly overall assessment");
     TEST_ASSERT_TRUE(string_find(summary, "improve") >= 0 || string_find(summary, "better result") >= 0,
                      "summary assessment includes improvement guidance");
+
+    TEST_ASSERT_INT_EQ(ts_regression_summary_write_file(csv_path, &fit, TS_STRING_CSV), 0);
+    file_text = file_read_all_text(file);
+    TEST_ASSERT_NOT_NULL(file_text);
+    TEST_ASSERT_TRUE(string_starts_with(file_text, "term,estimate,stderr,t_stat,p_value\nbeta0,"),
+                     "coefficient CSV uses the shared writer");
+    string_free(file_text);
+
+    ts_forecast_t forecast = {.mean = head};
+    text = ts_forecast_to_text(&forecast, TS_STRING_CSV);
+    TEST_ASSERT_NOT_NULL(text);
+    TEST_ASSERT_TRUE(string_starts_with(text, "date,mean,stderr,lower,upper\n"), "forecast CSV schema");
+    TEST_ASSERT_INT_EQ(ts_forecast_write_file(csv_path, &forecast, TS_STRING_CSV), 0);
+    file_text = file_read_all_text(file);
+    TEST_ASSERT_STR_EQ(string_c_str(file_text), string_c_str(text));
+    string_free(file_text);
+    string_free(text);
+
+    ts_arima_result_t ar = {.ar_params = fit.coefficients};
+    TEST_ASSERT_INT_EQ(ts_arima_summary_write_file(csv_path, &ar, TS_STRING_CSV), 0);
+    file_text = file_read_all_text(file);
+    TEST_ASSERT_NOT_NULL(file_text);
+    TEST_ASSERT_TRUE(string_starts_with(file_text, "term,estimate\nphi1,"), "AR CSV schema");
+    string_free(file_text);
+    TEST_ASSERT_TRUE(file_delete(file), "remove CSV output");
+    file_free(file);
 
     string_free(summary);
     ts_regression_result_clear(&fit);
@@ -672,10 +691,65 @@ static void test_csv_file_module_io(void)
     file_free(source);
 }
 
+static void test_csv_quoted_headers_and_restore(void)
+{
+    char directory[] = "/tmp/mars-timeseries-csv-XXXXXX";
+    TEST_ASSERT_NOT_NULL(mkdtemp(directory));
+    string_t *path = string_sprintf("%s/data.csv", directory);
+    file_t *file = file_new(path), *dir = file_new_cstr(directory);
+    string_t *text = string_new_with("\"date\",\"π, value\",\"note\"\n"
+                                      "\"2026-01-01\",\"1234567890123456789\",\"two\nlines\"\n"
+                                      "\"2026-02-01\",,\"say \"\"yes\"\"\"\n");
+    TEST_ASSERT_TRUE(file_write_all_text(file, text), "quoted CSV fixture");
+    timeseries_t *series = ts_from_csv(string_c_str(path), "date", "π, value", TS_FREQ_MONTHLY,
+                                      TS_YEAR_CALENDAR, TS_MISSING_KEEP);
+    TEST_ASSERT_NOT_NULL(series);
+    TEST_ASSERT_INT_EQ(ts_length(series), 2);
+    string_t *type = NULL, *encoding = NULL;
+    void *data = NULL;
+    size_t length = 0;
+    TEST_ASSERT_TRUE(ts_serialize(series, &type, &encoding, &data, &length), "serialise with missing value");
+    timeseries_t *restored = ts_deserialise(data, length, type, encoding);
+    TEST_ASSERT_NOT_NULL(restored);
+    string_t *before = ts_to_text(series, TS_STRING_CSV), *after = ts_to_text(restored, TS_STRING_CSV);
+    TEST_ASSERT_STR_EQ(string_c_str(after), string_c_str(before));
+    TEST_ASSERT_TRUE(string_find(after, "1234567890123456789") >= 0, "no double conversion on restore");
+    const char *columns[] = {"π, value"};
+    matrix_t *matrix = ts_matrix_from_csv(string_c_str(path), "date", columns, 1, TS_FREQ_MONTHLY, TS_MISSING_KEEP);
+    TEST_ASSERT_NOT_NULL(matrix);
+    TEST_ASSERT_INT_EQ(mat_get_row_count(matrix), 2);
+    mat_free(matrix);
+    const char *bad[] = {"date,value\n2026-01-01,\"unfinished", "date,value,value\n2026-01-01,1,2",
+                        "date,other\n2026-01-01,1"};
+    const char *selected[] = {"value"};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(*bad); ++i) {
+        string_t *fixture = string_new_with(bad[i]);
+        TEST_ASSERT_TRUE(file_write_all_text(file, fixture), "invalid CSV fixture");
+        string_free(fixture);
+        TEST_ASSERT_TRUE(ts_from_csv(string_c_str(path), "date", "value", TS_FREQ_MONTHLY,
+                                      TS_YEAR_CALENDAR, TS_MISSING_KEEP) == NULL, "reject invalid or ambiguous data");
+        TEST_ASSERT_TRUE(ts_matrix_from_csv(string_c_str(path), "date", selected, 1, TS_FREQ_MONTHLY,
+                                             TS_MISSING_KEEP) == NULL, "matrix also rejects it");
+    }
+    string_free(after);
+    string_free(before);
+    ts_free(restored);
+    free(data);
+    string_free(encoding);
+    string_free(type);
+    ts_free(series);
+    string_free(text);
+    TEST_ASSERT_TRUE(file_delete(file) && file_remove_directory(dir), "remove fixtures");
+    file_free(file);
+    file_free(dir);
+    string_free(path);
+}
+
 void run_timeseries_core_tests(void)
 {
     TEST_RUN_CASE(test_csv_load_and_slice, NULL);
     TEST_RUN_CASE(test_csv_file_module_io, NULL);
+    TEST_RUN_CASE(test_csv_quoted_headers_and_restore, NULL);
     TEST_RUN_CASE(test_in_memory_constructors_and_builder, NULL);
     TEST_RUN_CASE(test_transforms_and_aggregation, NULL);
 }
