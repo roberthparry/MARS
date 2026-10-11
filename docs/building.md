@@ -169,16 +169,30 @@ See the [file guide](file.md#compression-encryption-and-object-storage)
 for API behaviour and examples, and the
 [third-party notices](../THIRD_PARTY_NOTICES.md) for redistribution information.
 
-MARS Lab's server and workers are native C programmes; starting and using the
-Lab does not require Python. TeX rendering still uses `latex` and `dvisvgm`.
+MARS Lab's native C calculation modes are linked into its server executable;
+isolated child instances run them with `--worker MODE`, without scratch binaries.
+Starting and using the Lab does not require Python. TeX rendering uses `latex`
+and `dvisvgm`; building its C/WebAssembly browser module requires Clang and LLD's
+`wasm-ld` linker, even when GCC builds the native library and server.
 Database and weather configuration use the native `mars_config` application,
 linked directly to SQLCipher; installation needs neither Python nor the SQLCipher
-command-line programme. To install the additional rendering prerequisites:
+command-line programme. To install the rendering and WebAssembly prerequisites:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm
+sudo apt install texlive-latex-base dvisvgm clang lld
 make check-lab-deps
 ```
+
+With these dependencies installed, the check includes this successful probe:
+
+```text
+MARS Lab WebAssembly compile/link probe passed.
+```
+
+Run `make check-lab-wasm-deps` to check only the WebAssembly toolchain. Set
+`LAB_WASM_CC` and `LAB_WASM_LD` to select versioned compiler and linker executables.
+The toolchain is needed at build time, not to run an already-built browser module.
+See the [Lab guide](mars-lab.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).
 
 ## Common Targets
 

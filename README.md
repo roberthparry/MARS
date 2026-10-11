@@ -62,9 +62,9 @@ MARS Lab provides an approachable graphical front end to MARSlib. Its seven
 workspaces cover expressions, equations, ordinary and partial differential
 equations, matrices, symbolic and numerical integration, civil date
 calculations and the astronomical almanac. The browser handles presentation;
-the mathematical work remains in MARSlib and the MARS helper programs running
-locally. Expression mode presents supported functions of `x + iy`, their
-derivatives and their antiderivatives in Cartesian `p + qi` form. Explicit
+the mathematical work remains in MARSlib, called by the server's built-in
+calculation modes running locally. Expression mode presents supported functions
+of `x + iy`, their derivatives and their antiderivatives in Cartesian `p + qi` form. Explicit
 fractional powers retain every root branch, while named root functions remain
 single-valued. Native algebraic-series recognition supplies the sigma step and
 domain-appropriate closed form, and a Value card appears whenever all required
@@ -117,11 +117,13 @@ sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev li
 Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
-MARS Lab runs as a native C server with native calculation workers and renders
-TeX through `latex` and `dvisvgm`. Its browser interface uses HTML, CSS,
-JavaScript DOM adapters and a freestanding C/WebAssembly module for binary
-transport and worksheet limit validation. Native `mars_config` handles installation and links SQLCipher
-directly; neither Python nor the `sqlcipher` CLI is required for installing or
+MARS Lab runs as a native C server with calculation modes linked into the same
+`mars_lab` executable. It launches isolated child instances with `--worker MODE`,
+not separate scratch binaries, and renders TeX through `latex` and `dvisvgm`.
+Its browser interface uses HTML, CSS, JavaScript DOM adapters and a freestanding
+C/WebAssembly module for binary transport and worksheet limit validation.
+Native `mars_config` handles installation and links SQLCipher directly;
+neither Python nor the `sqlcipher` CLI is required for installing or
 running the Lab. Lab builds also check Clang's WebAssembly target and LLVM's
 `wasm-ld` linker for the C browser module. Install and check
 its rendering and WebAssembly tools with:
@@ -152,10 +154,12 @@ undo/redo history, precision and integration-budget limits, request routing and
 stale-response rejection, and calendar arithmetic. JavaScript provides browser
 DOM, network, storage and rendering adapters. Mathematical evaluation and
 expression-presentation metadata remain native, not browser-side mathematics.
-Startup configuration and API error replies also use Protobuf. Local storage
-and saved state files retain JSON; old JSON HTTP clients still work. Browser
-startup reports an error if WebAssembly is unavailable rather than silently
-using another codec. Restart the Lab after rebuilding to serve the matching
+Startup configuration and API error replies also use Protobuf. JSON HTTP request
+bodies are rejected with HTTP 415; there is no legacy JSON transport fallback.
+Calendar snapshots in browser local storage use base64-encoded Protobuf, while
+scalar browser settings remain strings. The native saved-state file still uses
+JSON. Browser startup reports an error if WebAssembly is unavailable rather
+than silently using another codec. Restart the Lab after rebuilding to serve the matching
 browser module and routes.
 
 ## Benchmark Highlights
@@ -537,6 +541,11 @@ ecosystem:
 These projects do the heavy mathematical lifting for `number_t`'s exact and
 multiprecision backends. MARS depends on their development headers and runtime
 libraries.
+
+The [third-party notices](THIRD_PARTY_NOTICES.md) also acknowledge the storage,
+compression, encryption, networking and Unicode libraries, generated-data sources
+and separately installed tools. These include the LLVM, Clang and LLD contributors
+whose toolchain builds the Lab's C/WebAssembly browser module.
 
 ## Licence
 
