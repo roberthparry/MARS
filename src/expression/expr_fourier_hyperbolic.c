@@ -10,6 +10,7 @@
  */
 
 /* Hyperbolic Fourier rules: power families, analytic spectra, odd pairs and beta inverses. */
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
 
 /* ------------------------------------------------------------------ */

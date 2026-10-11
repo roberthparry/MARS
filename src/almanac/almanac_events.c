@@ -14,6 +14,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 bool almanac_event_window_is_valid(almanac_t *almanac, const datetime_t *start, const datetime_t *end,

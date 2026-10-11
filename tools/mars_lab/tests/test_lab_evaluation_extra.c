@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "lab_presentation.h"
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"

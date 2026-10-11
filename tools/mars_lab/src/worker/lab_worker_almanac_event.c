@@ -18,8 +18,9 @@
 #include "almanac-t.h"
 #include "sqlite-t.h"
 
-#define MARS_ALMANAC_INTERNAL_ACCESS
+#define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
 #include "internal/almanac_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 typedef enum almanac_event_lab_kind_t {

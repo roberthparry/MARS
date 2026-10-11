@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_TBA_INTERNAL_ACCESS
 #include "tba_series_internal.h"
 
 /* Describe shared-data quality and the strongest absolute driver correlation. */

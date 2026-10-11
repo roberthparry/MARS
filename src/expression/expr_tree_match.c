@@ -17,6 +17,7 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

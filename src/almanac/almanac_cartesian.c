@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdbool.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_cartesian.h"
 
 cartesian3_t cartesian_add(const cartesian3_t *a, const cartesian3_t *b)

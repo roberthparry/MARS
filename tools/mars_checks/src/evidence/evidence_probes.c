@@ -8,6 +8,7 @@
  */
 #include <stdlib.h>
 
+#define MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS
 #include "evidence_private.h"
 
 void evidence_put(json_t *object, const char *key, json_t *value)

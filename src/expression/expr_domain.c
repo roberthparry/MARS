@@ -9,11 +9,11 @@
  * domain restrictions when extending these operations.
  */
 
-#define MARS_EXPR_INTERNAL_ACCESS
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 static bool domain_numeric(const expr_t *expr);

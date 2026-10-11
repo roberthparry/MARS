@@ -14,7 +14,9 @@
 #include <string.h>
 
 #include "expression-t.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringin_scan.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 
 char *expr_tostring_texify(const char *text);

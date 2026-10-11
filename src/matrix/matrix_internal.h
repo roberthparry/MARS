@@ -13,9 +13,9 @@
 #ifndef MATRIX_INTERNAL_H
 #define MATRIX_INTERNAL_H
 
-#if !defined(MARS_MATRIX_INTERNAL_ACCESS) &&                                                                           \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "matrix_internal.h is private to the matrix module; include matrix-t.h instead."
+#if !defined(MARS_MATRIX_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_MATRIX_INTERNAL_ACCESS."
 #endif
 
 #include <stdbool.h>

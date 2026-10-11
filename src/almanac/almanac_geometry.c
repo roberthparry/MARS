@@ -15,6 +15,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 double almanac_normalize_degrees(double degrees)

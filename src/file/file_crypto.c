@@ -9,11 +9,11 @@
  * public error, ownership and output-publication contracts.
  */
 
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <string.h>
 #include <sodium.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 #define FILE_CIPHER_EXTRA crypto_secretstream_xchacha20poly1305_ABYTES

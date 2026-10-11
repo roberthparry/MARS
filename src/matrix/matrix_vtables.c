@@ -9,6 +9,7 @@
  * must not rely on private matrix representation.
  */
 
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_vtable_defs.h"
 
 const struct store_vtable dense_store = {.create = store_create_dense,

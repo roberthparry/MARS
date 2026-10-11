@@ -28,6 +28,7 @@
 
 #include "checks_process.h"
 #include "checks_fixtures.h"
+#define MARS_CHECKS_FIXTURES_INTERNAL_ACCESS
 #include "checks_fixtures_internal.h"
 
 extern char **environ;

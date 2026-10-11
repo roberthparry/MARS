@@ -6,10 +6,11 @@
  * The first file pass determines every column from all records. The second
  * validates against that plan and inserts bound values using one statement.
  */
-#define MARS_SQLITE_INTERNAL_ACCESS
+
 #include <errno.h>
 #include <stdint.h>
 
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
 /* Prefer exact spelling unless approximate decimal inference is explicitly enabled. */

@@ -13,6 +13,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 bool almanac_solar_eclipse_geometry(almanac_t *almanac, double jd, const almanac_observer_t *observer,

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 static const double ALMANAC_NUTATION_START_JD = 2287185.5;

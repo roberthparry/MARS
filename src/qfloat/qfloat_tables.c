@@ -7,9 +7,9 @@
  * implementations consume these definitions through their existing public or private declarations.
  */
 
-#define MARS_QFLOAT_INTERNAL_ACCESS
 #include <math.h>
 
+#define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
 /* Exact and sentinel values. */

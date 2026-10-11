@@ -16,8 +16,8 @@
 #include <string.h>
 #include <sys/types.h>
 
-#define MARS_MATRIX_INTERNAL_ACCESS
 #include "dictionary-t.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "lab_worker.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 typedef struct {

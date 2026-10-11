@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include "cfg_calendar.h"
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 static bool cfg_locales_row(json_t *table, size_t count, const string_t *const fields[])

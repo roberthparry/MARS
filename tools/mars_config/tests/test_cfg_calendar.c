@@ -14,6 +14,7 @@
 
 #include "file-t.h"
 #include "cfg_calendar.h"
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

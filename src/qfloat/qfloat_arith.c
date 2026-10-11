@@ -9,9 +9,9 @@
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
-#define MARS_QFLOAT_INTERNAL_ACCESS
 #include <math.h>
 
+#define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
 /* Add double-double values with an error-free sum and renormalisation. */

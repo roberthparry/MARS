@@ -13,7 +13,13 @@
 #ifndef MARS_ALMANAC_ENGINE_INTERNAL_H
 #define MARS_ALMANAC_ENGINE_INTERNAL_H
 
+#if !defined(MARS_ALMANAC_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_ALMANAC_INTERNAL_ACCESS."
+#endif
+
 #include "almanac-t.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_cartesian.h"
 #include "sqlite-t.h"
 #include "string-t.h"

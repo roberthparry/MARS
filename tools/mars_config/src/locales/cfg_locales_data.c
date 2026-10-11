@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 /* Look up an ASCII field without exposing internal dictionary storage. */

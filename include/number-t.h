@@ -96,7 +96,6 @@ typedef struct number_factors_t {
     number_factor_t *items;
 } number_factors_t;
 
-#ifndef MARS_NUMBER_IMPLEMENTATION
 typedef union number_inline_qfloat_bits_t {
     qfloat_t value;
     uint64_t words[2];
@@ -132,7 +131,6 @@ number_t number_inline_make_qcomplex_parts(qfloat_t real, qfloat_t imag);
 static inline number_t number_inline_make_qcomplex(qcomplex_t value) {
     return number_inline_make_qcomplex_parts(value.re, value.im);
 }
-#endif
 
 /**
  * @brief Opaque temporary lifetime scope for heap-backed `number_t` results.

@@ -10,11 +10,11 @@
  * public error, ownership and output-publication contracts.
  */
 
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 /* Validate complete UTF-8 sequences without normalising or discarding bytes. */

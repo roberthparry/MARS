@@ -9,9 +9,9 @@
  * domain restrictions when extending these operations.
  */
 
-#define MARS_EXPR_INTERNAL_ACCESS
 #include <stdio.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 typedef number_t (*signal_numeric_fn)(number_t);

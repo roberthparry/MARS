@@ -13,6 +13,7 @@
 #include <float.h>
 #include <limits.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
 
 /* Divide by a positive denominator using floor division for a negative numerator. */

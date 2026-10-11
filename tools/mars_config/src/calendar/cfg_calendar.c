@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "cfg_progress.h"
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 
 /* Populate a staging calendar without taking ownership of its connection or inputs. */

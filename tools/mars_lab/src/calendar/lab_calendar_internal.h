@@ -9,6 +9,11 @@
 #ifndef MARS_LAB_CALENDAR_INTERNAL_H
 #define MARS_LAB_CALENDAR_INTERNAL_H
 
+#if !defined(MARS_LAB_CALENDAR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_LAB_CALENDAR_INTERNAL_ACCESS."
+#endif
+
 #include <stdbool.h>
 #include <time.h>
 

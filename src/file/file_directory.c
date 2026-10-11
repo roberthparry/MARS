@@ -10,13 +10,13 @@
  * public error, ownership and output-publication contracts.
  */
 
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 /* Create a private directory exclusively; handle destruction never removes its contents. */

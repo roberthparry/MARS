@@ -14,6 +14,7 @@
 #include <limits.h>
 #include <math.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
 #include "string-t.h"
 

@@ -17,6 +17,7 @@
 #include "file-t.h"
 #include "regex-t.h"
 #include "lab_process.h"
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "../src/internal/lab_evaluate_internal.h"
 #include "test_lab_math_support.h"
 

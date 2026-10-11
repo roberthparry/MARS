@@ -16,6 +16,7 @@
 #include "xml_internal.h"
 #include "file-t.h"
 
+#define MARS_XML_INTERNAL_ACCESS
 #include "xml_parse_private.h"
 
 bool xml_parse_fail(xml_reader_t *reader, const char *message)

@@ -12,6 +12,11 @@
 #ifndef MARS_JURISDICTION_INTERNAL_H
 #define MARS_JURISDICTION_INTERNAL_H
 
+#if !defined(MARS_JURISDICTION_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_JURISDICTION_INTERNAL_ACCESS."
+#endif
+
 #include "jurisdiction-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"

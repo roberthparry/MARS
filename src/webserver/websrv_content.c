@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_WEBSERVER_INTERNAL_ACCESS
 #include "websrv_internal.h"
 
 static size_t key_hash(const void *key) { return string_hash(*(string_t *const *)key); }

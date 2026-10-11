@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 void almanac_set_error(almanac_t *almanac, const char *message)

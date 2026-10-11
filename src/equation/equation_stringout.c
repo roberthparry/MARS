@@ -17,14 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_STRINGOUT_INTERNAL_ACCESS
+#include "internal/expr_stringout_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
-#include "expression/expr_stringout.h"
-#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
-#include "expression/expr_stringout_internal.h"
-
-bool expr_set_number_scientific_local(bool scientific);
-int expr_set_number_precision_local(int precision);
 
 static void equ_emit_function_name(sbuf_t *buffer, const char *name)
 {

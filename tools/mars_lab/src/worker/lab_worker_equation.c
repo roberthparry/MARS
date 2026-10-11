@@ -22,6 +22,7 @@
 #include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 static char *dup_string(const char *text)

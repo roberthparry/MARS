@@ -14,6 +14,7 @@
 
 #include "datetime-t.h"
 #include "http-t.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
 static bool lab_cal_provider_number(const json_t *day, const char *key, double *value)

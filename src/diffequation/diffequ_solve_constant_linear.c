@@ -14,8 +14,8 @@
 
 #include "matrix-t.h"
 
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation/equation_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 

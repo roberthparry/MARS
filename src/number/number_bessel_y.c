@@ -9,9 +9,9 @@
  * borrowed aliases and independently owned numeric values.
  */
 
-#define MARS_NUMBER_INTERNAL_ACCESS
 #include <math.h>
 
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
 enum { BESSEL_Y_MAX_WORK_BITS = 65536, BESSEL_Y_MAX_TERMS = 20000 };

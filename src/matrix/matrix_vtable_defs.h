@@ -13,6 +13,11 @@
 #ifndef MATRIX_VTABLE_DEFS_H
 #define MATRIX_VTABLE_DEFS_H
 
+#if !defined(MARS_MATRIX_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_MATRIX_INTERNAL_ACCESS."
+#endif
+
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 

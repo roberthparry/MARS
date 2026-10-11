@@ -12,6 +12,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <time.h>
 
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 
 typedef struct cfg_database_scan {

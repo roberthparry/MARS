@@ -6,9 +6,9 @@
  * handles only dates, numeric conversion, missing policies and series shape.
  * File handles are opened and closed here; no CSV syntax is interpreted here.
  */
-#define MARS_TIMESERIES_INTERNAL_ACCESS
 
 #include "csv-t.h"
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static bool ts_csv_column(csv_t *csv, const string_t *name, size_t *column)

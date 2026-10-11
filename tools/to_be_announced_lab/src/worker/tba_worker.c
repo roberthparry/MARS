@@ -16,6 +16,7 @@
 
 #include "string-t.h"
 #include "tba_worker.h"
+#define MARS_TBA_INTERNAL_ACCESS
 #include "tba_worker_internal.h"
 
 static json_t *tba_worker_fail(const char *message)

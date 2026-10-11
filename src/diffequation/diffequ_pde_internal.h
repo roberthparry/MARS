@@ -12,9 +12,9 @@
 #ifndef DIFFEQU_PDE_INTERNAL_H
 #define DIFFEQU_PDE_INTERNAL_H
 
-#if !defined(MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS) &&                                                                 \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "diffequ_pde_internal.h is private to the PDE solver."
+#if !defined(MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS."
 #endif
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS

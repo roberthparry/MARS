@@ -12,9 +12,9 @@
 #ifndef EQUATION_INTERNAL_H
 #define EQUATION_INTERNAL_H
 
-#if !defined(MARS_EQUATION_INTERNAL_ACCESS) &&                                                                         \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "equation_internal.h is private to the equation module; include equation-t.h instead."
+#if !defined(MARS_EQUATION_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EQUATION_INTERNAL_ACCESS."
 #endif
 
 #include <stdbool.h>
@@ -80,15 +80,9 @@ int equ_append_solution_expr(const expr_t *wrt, const expr_t *rhs, equation_solu
 /* Propose a rational approximation without claiming that it is an exact root or coefficient. */
 number_t equ_polynomial_rational_candidate(number_t value);
 
-int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
-
 int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 
-int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
-
 int equ_try_solve_quartic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
-
-int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
 
 int equ_try_quartic_radicals(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
 

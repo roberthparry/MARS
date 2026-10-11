@@ -10,6 +10,7 @@
  */
 
 /* Symmetric-shift presentation: retain a common centre in a+b and a-b. */
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"

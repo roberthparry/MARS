@@ -14,6 +14,7 @@
 
 #include "datetime-t.h"
 #include "file-t.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 #include "lab_page.h"
 

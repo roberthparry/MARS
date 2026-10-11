@@ -19,6 +19,7 @@
 #include "test_harness.h"
 #include "checks_process.h"
 #include "checks_readme.h"
+#define MARS_CHECKS_FIXTURES_INTERNAL_ACCESS
 #include "../src/fixtures/checks_fixtures_internal.h"
 #include "test_checks.h"
 

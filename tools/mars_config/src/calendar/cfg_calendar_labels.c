@@ -6,6 +6,7 @@
  * expanded once. Exact event translations override those entries. Unrecognised
  * event names remain untouched when the snapshot collector performs its lookup.
  */
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 
 static bool cfg_calendar_label_query(sqlite_t *db, const char *sql, const string_t *jurisdiction,

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <time.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
 #include "string-t.h"
 

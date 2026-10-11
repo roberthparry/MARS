@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
 #include "string-t.h"
 

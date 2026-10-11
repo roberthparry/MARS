@@ -15,7 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_binding_simplify.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"

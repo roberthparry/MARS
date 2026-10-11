@@ -17,6 +17,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define MARS_WEBSERVER_INTERNAL_ACCESS
 #include "websrv_internal.h"
 
 /* Bind a bounded IP listener; exposure beyond loopback is explicit. */

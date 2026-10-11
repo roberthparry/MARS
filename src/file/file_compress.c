@@ -9,7 +9,6 @@
  * public error, ownership and output-publication contracts.
  */
 
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +16,7 @@
 #include <zstd.h>
 #include <zstd_errors.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 struct _file_decoder_t {

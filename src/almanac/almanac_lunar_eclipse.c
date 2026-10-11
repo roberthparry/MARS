@@ -13,6 +13,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 typedef struct almanac_lunar_eclipse_geometry_t {

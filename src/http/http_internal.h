@@ -12,8 +12,9 @@
 
 #ifndef MARS_HTTP_INTERNAL_H
 #define MARS_HTTP_INTERNAL_H
-#ifndef MARS_HTTP_INTERNAL_ACCESS
-#error "http_internal.h is private to the HTTP module."
+#if !defined(MARS_HTTP_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_HTTP_INTERNAL_ACCESS."
 #endif
 #include <curl/curl.h>
 #include "http-t.h"

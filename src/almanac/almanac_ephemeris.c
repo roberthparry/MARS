@@ -15,6 +15,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 static const almanac_body_ref_id_t ALMANAC_BODY_REF_IDS[ALMANAC_BODY_ID_COUNT] = {

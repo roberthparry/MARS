@@ -12,9 +12,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix-t.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_vtable_defs.h"
 #include "number-t.h"
 #include "qcomplex-t.h"

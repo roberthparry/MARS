@@ -20,6 +20,7 @@
 #include "string-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 static char *wrap_expression(const char *raw_input)

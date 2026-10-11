@@ -12,6 +12,11 @@
 #ifndef EXPR_STRINGIN_SCAN_H
 #define EXPR_STRINGIN_SCAN_H
 
+#if !defined(MARS_EXPR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EXPR_INTERNAL_ACCESS."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -12,6 +12,12 @@
 #ifndef EXPR_BINDING_SIMPLIFY_H
 #define EXPR_BINDING_SIMPLIFY_H
 
+#if !defined(MARS_EXPR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EXPR_INTERNAL_ACCESS."
+#endif
+
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 
 /* Top-level simplification stages. */

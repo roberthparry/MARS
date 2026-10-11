@@ -8,9 +8,15 @@
 #ifndef MARS_SQLITE_CSV_INTERNAL_H
 #define MARS_SQLITE_CSV_INTERNAL_H
 
+#if !defined(MARS_SQLITE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_SQLITE_INTERNAL_ACCESS."
+#endif
+
 #include <locale.h>
 
 #include "dictionary-t.h"
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_internal.h"
 
 /** @brief Owned column plan built before insertion. */

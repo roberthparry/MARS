@@ -13,6 +13,7 @@
 #include <float.h>
 #include <math.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 static const double ALMANAC_GMST_BASE_DEG = 280.46061837;

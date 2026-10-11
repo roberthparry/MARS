@@ -15,7 +15,9 @@
 #include <limits.h>
 #include <math.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_astronomy_internal.h"
 
 static int datetime_day_of_year(const datetime_t *dttm);

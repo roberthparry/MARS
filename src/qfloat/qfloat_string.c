@@ -9,12 +9,12 @@
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
-#define MARS_QFLOAT_INTERNAL_ACCESS
 #include <math.h>
 #include <stdio.h>
 
-#include "qfloat_internal.h"
 #include "string-t.h"
+#define MARS_QFLOAT_INTERNAL_ACCESS
+#include "qfloat_internal.h"
 
 static qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 {

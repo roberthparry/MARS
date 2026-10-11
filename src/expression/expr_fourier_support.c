@@ -10,6 +10,7 @@
  */
 
 /* Shared Fourier construction, structural matching and domain-condition helpers. */
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
 
 /* Own a temporary expression in the Fourier context. */

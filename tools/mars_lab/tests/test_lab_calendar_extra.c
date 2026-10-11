@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "datetime-t.h"
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #include "lab_process.h"
 #include "sqlite-t.h"

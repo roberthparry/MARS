@@ -9,9 +9,9 @@
  * domain restrictions when extending these operations.
  */
 
-#define MARS_EXPR_INTERNAL_ACCESS
 #include <stdlib.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
 /* Infer a candidate from a spectral feature, then check its complete forward formula. Nothing in

@@ -6,12 +6,13 @@
  * preserves identifiers and precision-sensitive values as text; explicit
  * numeric policies reject invalid or out-of-range values before insertion.
  */
-#define MARS_SQLITE_INTERNAL_ACCESS
+
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
 bool sqlite_csv_fail(sqlite_csv_context_t *c, int code, const char *message)

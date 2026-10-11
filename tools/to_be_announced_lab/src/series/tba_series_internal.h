@@ -7,6 +7,11 @@
  */
 #ifndef TBA_SERIES_INTERNAL_H
 #define TBA_SERIES_INTERNAL_H
+
+#if !defined(MARS_TBA_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_TBA_INTERNAL_ACCESS."
+#endif
 #include "tba_series.h"
 struct tba_series {
     tba_csv_t *csv;

@@ -11,6 +11,7 @@
 
 #include "number-t.h"
 #include "string-t.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 static string_t *lab_worker_number_real(number_t value, int precision)

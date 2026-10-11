@@ -9,6 +9,7 @@
  * borrowed aliases and independently owned numeric values.
  */
 
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_vtable_defs.h"
 
 const number_vtable_t number_double_vt = {.kind = NUMBER_DOUBLE,

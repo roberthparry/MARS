@@ -9,7 +9,6 @@
  * public error, ownership and output-publication contracts.
  */
 
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -18,6 +17,7 @@
 #include <sys/file.h>
 #include <unistd.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 bool file_fail(file_t *file, int error)

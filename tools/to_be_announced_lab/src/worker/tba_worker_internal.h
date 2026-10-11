@@ -8,6 +8,11 @@
  */
 #ifndef TBA_WORKER_INTERNAL_H
 #define TBA_WORKER_INTERNAL_H
+
+#if !defined(MARS_TBA_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_TBA_INTERNAL_ACCESS."
+#endif
 #include "timeseries-t.h"
 #include "tba_support.h"
 

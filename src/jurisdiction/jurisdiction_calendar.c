@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
 bool jurisdiction_parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)

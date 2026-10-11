@@ -7,6 +7,7 @@
  * test text cannot become script source. Kept separate from process/signal code
  * because the library and POSIX stack types occupy the same C namespace.
  */
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #include "lab_wire.h"
 #include "test_lab_browser_fixtures.h"

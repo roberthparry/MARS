@@ -12,6 +12,11 @@
 #ifndef LAB_SYNTAX_INTERNAL_H
 #define LAB_SYNTAX_INTERNAL_H
 
+#if !defined(MARS_LAB_SYNTAX_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_LAB_SYNTAX_INTERNAL_ACCESS."
+#endif
+
 #include "json-t.h"
 
 /**

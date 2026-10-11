@@ -18,6 +18,7 @@
 
 #include "almanac-t.h"
 #include "sqlite-t.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 typedef struct almanac_lab_options_t {

@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define MARS_CSV_INTERNAL_ACCESS
 #include "csv_internal.h"
 
 /* Return finite, explicit defaults for both reading and writing. */

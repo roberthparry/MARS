@@ -7,5 +7,11 @@
  */
 #ifndef MARS_LAB_EVALUATE_TEST_INTERNAL_H
 #define MARS_LAB_EVALUATE_TEST_INTERNAL_H
+
+#if !defined(MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS."
+#endif
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "../evaluate/lab_evaluate_internal.h"
 #endif

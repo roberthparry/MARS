@@ -6,6 +6,7 @@
  * file-t.h, and hashes regular files. Package metadata is optional; failure to
  * hash a present copyright record or any required library aborts collection.
  */
+#define MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS
 #include "evidence_private.h"
 
 static json_t *evidence_package(const string_t *root, const string_t *path)

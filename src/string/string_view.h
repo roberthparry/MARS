@@ -12,6 +12,11 @@
 #ifndef STRING_VIEW_H
 #define STRING_VIEW_H
 
+#if !defined(MARS_STRING_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_STRING_INTERNAL_ACCESS."
+#endif
+
 #include <stddef.h>
 
 #include "string-t.h"

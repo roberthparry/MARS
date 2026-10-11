@@ -11,8 +11,9 @@
 
 #ifndef MARS_XML_INTERNAL_H
 #define MARS_XML_INTERNAL_H
-#if !defined(MARS_XML_INTERNAL_ACCESS)
-#error "xml_internal.h is private to the XML module."
+#if !defined(MARS_XML_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_XML_INTERNAL_ACCESS."
 #endif
 #include "xml-t.h"
 #include "array-t.h"

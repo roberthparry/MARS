@@ -10,6 +10,7 @@
  */
 
 /* Fourier pairs sharing kernel matching, including periodic principal-value spectra. */
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
 
 /* ------------------------------------------------------------------ */

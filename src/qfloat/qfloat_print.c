@@ -9,15 +9,15 @@
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
-#define MARS_QFLOAT_INTERNAL_ACCESS
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "qfloat_internal.h"
 #include "string-t.h"
+#define MARS_QFLOAT_INTERNAL_ACCESS
+#include "qfloat_internal.h"
 
 static int qf_append_repeated_char(string_t *out, char ch, int count)
 {

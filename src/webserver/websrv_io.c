@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <time.h>
 
+#define MARS_WEBSERVER_INTERNAL_ACCESS
 #include "websrv_internal.h"
 
 int64_t websrv_now(void)

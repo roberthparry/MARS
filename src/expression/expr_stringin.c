@@ -70,8 +70,11 @@
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringin_scan.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"

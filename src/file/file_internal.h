@@ -16,8 +16,9 @@
 #error "The MARS file module requires Linux."
 #endif
 
-#if !defined(MARS_FILE_INTERNAL_ACCESS) && !defined(__INTELLISENSE__)
-#error "file_internal.h is private to the file module; include file-t.h instead."
+#if !defined(MARS_FILE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_FILE_INTERNAL_ACCESS."
 #endif
 
 #include <dirent.h>

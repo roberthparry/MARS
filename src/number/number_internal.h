@@ -12,9 +12,9 @@
 #ifndef MARS_NUMBER_INTERNAL_H
 #define MARS_NUMBER_INTERNAL_H
 
-#if !defined(MARS_NUMBER_INTERNAL_ACCESS) &&                                                                           \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "number_internal.h is private to the number module; include number-t.h instead."
+#if !defined(MARS_NUMBER_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_NUMBER_INTERNAL_ACCESS."
 #endif
 
 #include <string.h>

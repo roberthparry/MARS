@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 #include "cfg_storage.h"
 

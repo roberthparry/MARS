@@ -13,9 +13,9 @@
 #ifndef MARS_SQLITE_INTERNAL_H
 #define MARS_SQLITE_INTERNAL_H
 
-#if !defined(MARS_SQLITE_INTERNAL_ACCESS) &&                                                                           \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "sqlite_internal.h is private to the sqlite module; include sqlite-t.h instead."
+#if !defined(MARS_SQLITE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_SQLITE_INTERNAL_ACCESS."
 #endif
 
 #ifndef SQLITE_HAS_CODEC

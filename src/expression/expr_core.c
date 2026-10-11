@@ -36,6 +36,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #include "number-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS

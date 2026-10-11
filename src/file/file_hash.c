@@ -6,11 +6,11 @@
  * Open and close semantics match the file module's whole-file operations. Metadata
  * checks detect ordinary concurrent edits without promising a hostile-writer snapshot.
  */
-#define MARS_FILE_INTERNAL_ACCESS
 #include <errno.h>
 #include <sodium.h>
 #include <unistd.h>
 
+#define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
 /* Hash a closed regular file without changing its contents or retaining a stream. */

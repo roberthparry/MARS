@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 static const char *const ALMANAC_BODY_CODES[ALMANAC_BODY_ID_COUNT] = {

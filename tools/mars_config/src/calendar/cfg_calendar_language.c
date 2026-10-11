@@ -8,6 +8,7 @@
  */
 #include <stdio.h>
 
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 #include "cfg_prompt.h"
 

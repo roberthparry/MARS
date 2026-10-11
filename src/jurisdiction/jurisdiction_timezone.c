@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
 void jurisdiction_free_timezone_era_rows(jurisdiction_vec_t *rows)

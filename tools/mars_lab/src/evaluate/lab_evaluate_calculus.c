@@ -7,8 +7,10 @@
  * no expression is evaluated or rewritten here. Missing worker results remain
  * empty so the request controller can distinguish failure from a valid result.
  */
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
 #include "lab_presentation.h"
+#define MARS_LAB_PRESENTATION_INTERNAL_ACCESS
 #include "lab_presentation_internal.h"
 
 static const char *lab_pres_calculus_field(const json_t *fields, const char *format, const char *action)

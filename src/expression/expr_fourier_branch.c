@@ -9,6 +9,7 @@
  * domain restrictions when extending these operations.
  */
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
 
 /* MARS's real-axis asin and atanh values have positive imaginary parts on both tails;

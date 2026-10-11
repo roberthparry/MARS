@@ -9,6 +9,7 @@
  */
 #include <stdlib.h>
 
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 
 /* Release one location, including partially constructed records. */

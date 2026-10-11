@@ -14,9 +14,9 @@
 
 #include <stdbool.h>
 
-#if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) &&                                                                     \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "diffequ_internal.h is private to the diffequation module; include diffequation-t.h instead."
+#if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_DIFFEQUATION_INTERNAL_ACCESS."
 #endif
 
 #include "diffequation-t.h"

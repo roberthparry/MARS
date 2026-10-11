@@ -8,6 +8,7 @@
  */
 #include <math.h>
 
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
 /* Preserve empty fields by using the view-based split API. */

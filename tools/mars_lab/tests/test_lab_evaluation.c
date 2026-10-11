@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <string.h>
 
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"

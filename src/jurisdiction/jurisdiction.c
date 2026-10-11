@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 #include "file-t.h"
 

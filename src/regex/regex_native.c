@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define MARS_REGEX_INTERNAL_ACCESS
 #include "regex_native.h"
 
 struct _regex_native_t {

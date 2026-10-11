@@ -9,6 +9,7 @@
  */
 #include <string.h>
 
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 #include "string-t.h"
 

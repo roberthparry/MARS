@@ -6,12 +6,13 @@
  * non-finite reals, embedded NUL and malformed UTF-8 are rejected. The caller
  * chooses output file ownership and any atomic-publication policy.
  */
-#define MARS_SQLITE_INTERNAL_ACCESS
+
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
 static bool sqlite_csv_query(sqlite_csv_context_t *c, const string_t *query, sqlite3_stmt **stmt)

@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "datetime-t.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
 /* Keep named-town offsets and the location route's JSON contract in one adapter. */

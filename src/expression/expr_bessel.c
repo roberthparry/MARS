@@ -9,6 +9,7 @@
  * domain restrictions when extending these operations.
  */
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
 
 static bool uses(const expr_t *e, const expr_t *x)

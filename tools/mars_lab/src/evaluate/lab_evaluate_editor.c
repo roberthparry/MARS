@@ -12,7 +12,9 @@
 #include <string.h>
 
 #include "expression-t.h"
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
+#define MARS_LAB_PRESENTATION_INTERNAL_ACCESS
 #include "lab_presentation_internal.h"
 #include "string-t.h"
 

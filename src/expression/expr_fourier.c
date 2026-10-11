@@ -9,6 +9,7 @@
  * domain restrictions when extending these operations.
  */
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
 
 static bool quadratic(fourier_context_t *c, const expr_t *f, const expr_t *x,

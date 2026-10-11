@@ -66,6 +66,9 @@ void test_checks_evidence_cases(void);
 /** @brief Register native C source-policy regressions. @return No value. */
 void test_checks_policy_cases(void);
 
+/** @brief Register private-header compiler boundary regressions. @return No value. */
+void test_checks_header_cases(void);
+
 /** @brief Run the documented parser benchmark after ordinary tests. @return No value. */
 void test_checks_policy_readme_cases(void);
 

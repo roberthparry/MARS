@@ -10,6 +10,11 @@
 #ifndef LAB_EVALUATE_INTERNAL_H
 #define LAB_EVALUATE_INTERNAL_H
 
+#if !defined(MARS_LAB_EVALUATE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_LAB_EVALUATE_INTERNAL_ACCESS."
+#endif
+
 #include "lab_evaluate.h"
 
 /** @brief Look up a borrowed JSON member using a UTF-8 key. */

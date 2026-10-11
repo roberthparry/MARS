@@ -12,9 +12,9 @@
 #ifndef EXPR_STRINGOUT_INTERNAL_H
 #define EXPR_STRINGOUT_INTERNAL_H
 
-#if !defined(MARS_EXPR_STRINGOUT_INTERNAL_ACCESS) &&                                                                   \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "expr_stringout_internal.h is private to expression formatting; include expression-t.h instead."
+#if !defined(MARS_EXPR_STRINGOUT_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EXPR_STRINGOUT_INTERNAL_ACCESS."
 #endif
 
 #include <stdbool.h>

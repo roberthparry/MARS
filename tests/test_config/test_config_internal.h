@@ -1,9 +1,16 @@
+/**
+ * @file test_config_internal.h
+ * @brief Private configuration-tree and persistence helpers for the test harness.
+ *
+ * Shared by configuration implementation units and authorised white-box tests.
+ * Ordinary test suites use test_config.h instead of these internal operations.
+ */
 #ifndef TEST_CONFIG_INTERNAL_H
 #define TEST_CONFIG_INTERNAL_H
 
-#if !defined(MARS_TEST_CONFIG_INTERNAL_ACCESS) &&                                                                      \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "test_config_internal.h is private to the test-config implementation; include test_config.h instead."
+#if !defined(MARS_TEST_CONFIG_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_TEST_CONFIG_INTERNAL_ACCESS."
 #endif
 
 #include <stdbool.h>

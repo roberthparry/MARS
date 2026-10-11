@@ -6,9 +6,9 @@
  * escaping and record construction. Text-returning APIs necessarily retain the
  * complete output, while temporary storage is bounded to one typed row.
  */
-#define MARS_TIMESERIES_INTERNAL_ACCESS
 
 #include "csv-t.h"
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static csv_t *ts_csv_writer(const char *const *names, size_t count)

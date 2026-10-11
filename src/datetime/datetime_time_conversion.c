@@ -15,7 +15,9 @@
 #include <math.h>
 #include <time.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_astronomy_internal.h"
 
 /* Estimate TT minus UT in seconds using the existing piecewise year polynomials. */

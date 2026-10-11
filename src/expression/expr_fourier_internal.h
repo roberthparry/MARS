@@ -13,11 +13,17 @@
 #ifndef MARS_EXPR_FOURIER_INTERNAL_H
 #define MARS_EXPR_FOURIER_INTERNAL_H
 
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
+#if !defined(MARS_EXPR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EXPR_INTERNAL_ACCESS."
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 
 typedef struct {
     expr_t **nodes;

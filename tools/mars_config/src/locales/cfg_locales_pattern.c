@@ -8,6 +8,7 @@
  */
 #include <stdio.h>
 
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 static bool cfg_locales_part(json_t *parts, const char *field, const string_t *literal)

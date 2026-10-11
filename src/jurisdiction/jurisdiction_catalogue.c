@@ -6,6 +6,7 @@
  * the normalised catalogue keys; no packaged C or JSON copy supplies these rows.
  * Visitors may stop early. Statements are always finalised, including on errors.
  */
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
 static sqlite_stmt_t *jurisdiction_catalogue_prepare(jurisdiction_t *jurisdiction, const char *sql, bool visitor)

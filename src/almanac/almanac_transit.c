@@ -14,6 +14,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 typedef struct almanac_solar_transit_geometry_t {

@@ -11,10 +11,12 @@
 
 #ifndef MARS_XML_PARSE_PRIVATE_H
 #define MARS_XML_PARSE_PRIVATE_H
-#if !defined(MARS_XML_INTERNAL_ACCESS)
-#error "xml_parse_private.h is private to the XML parser."
+#if !defined(MARS_XML_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_XML_INTERNAL_ACCESS."
 #endif
 #include <stdint.h>
+#define MARS_XML_INTERNAL_ACCESS
 #include "xml_internal.h"
 
 typedef enum { PARSE_TEXT, PARSE_OPEN, PARSE_TAG, PARSE_PI, PARSE_COMMENT, PARSE_CDATA } parse_mode_t;

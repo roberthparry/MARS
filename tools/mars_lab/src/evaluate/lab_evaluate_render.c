@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
 #include "lab_process.h"
 

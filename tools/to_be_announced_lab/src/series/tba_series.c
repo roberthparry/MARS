@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_TBA_INTERNAL_ACCESS
 #include "tba_series_internal.h"
 
 typedef struct {

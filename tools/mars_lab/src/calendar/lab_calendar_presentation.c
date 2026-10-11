@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "string-t.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
 static bool lab_cal_pres_put(json_t *object, const char *name, json_t *value)

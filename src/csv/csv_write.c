@@ -8,6 +8,7 @@
  */
 #include <errno.h>
 
+#define MARS_CSV_INTERNAL_ACCESS
 #include "csv_internal.h"
 
 static bool csv_publish(csv_t *csv, const string_t *text)

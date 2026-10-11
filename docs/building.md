@@ -272,6 +272,18 @@ names from the installed `mars` directory (or add that directory to your
 compiler's include search path). This is a source-level rename: earlier header
 names are no longer supplied as compatibility wrappers. Public type and function
 names are unchanged. Private implementation headers are not installed.
+Public headers are included normally, without implementation-mode or private-access
+macros; their declarations are the same for library implementations and consumers.
+
+Private implementation headers require an explicit `MARS_<MODULE>_INTERNAL_ACCESS`
+definition immediately before each include, including nested includes and authorised
+white-box tests. Their checks reject accidental access; ordinary include guards only
+prevent duplicate declarations. Controlled cross-module façades have their own access
+macros and grant access to the owning header after checking them. An editor may open
+a private header directly, but IntelliSense mode does not waive checks for includes
+from a translation unit. These macros document dependencies, not security boundaries.
+The native checker suite discovers private headers and runs positive, negative and
+editor-mode compiler probes for each one before its README examples.
 
 Override paths as needed:
 

@@ -14,6 +14,7 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 /* Derive illuminated fraction and phase classification for a body entry. */

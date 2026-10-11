@@ -9,6 +9,11 @@
 #ifndef MARS_REGEX_NATIVE_H
 #define MARS_REGEX_NATIVE_H
 
+#if !defined(MARS_REGEX_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_REGEX_INTERNAL_ACCESS."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 

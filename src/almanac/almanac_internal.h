@@ -12,9 +12,9 @@
 #ifndef MARS_ALMANAC_INTERNAL_H
 #define MARS_ALMANAC_INTERNAL_H
 
-#if !defined(MARS_ALMANAC_INTERNAL_ACCESS) &&                                                                          \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "almanac_internal.h is private to the almanac module; include almanac-t.h instead."
+#if !defined(MARS_ALMANAC_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_ALMANAC_INTERNAL_ACCESS."
 #endif
 
 #include "almanac-t.h"

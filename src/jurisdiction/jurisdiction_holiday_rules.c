@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
 static bool text_equals(const char *left, const char *right)

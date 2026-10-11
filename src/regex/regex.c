@@ -12,6 +12,7 @@
 #include <stdlib.h>
 
 #include "regex-t.h"
+#define MARS_REGEX_INTERNAL_ACCESS
 #include "regex_native.h"
 
 struct _regex_t {

@@ -16,6 +16,7 @@
 #include <float.h>
 #include <math.h>
 
+#define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
 typedef struct timezone_transition_occurrence_t {

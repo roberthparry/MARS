@@ -18,11 +18,10 @@
 #include <string.h>
 #include <complex.h>
 
-#define MARS_NUMBER_IMPLEMENTATION
 #include "number-t.h"
+#include "string-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string-t.h"
 #undef complex
 
 /* Resolve a valid storage kind through the backend registry. */

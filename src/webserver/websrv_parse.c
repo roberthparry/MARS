@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
+#define MARS_WEBSERVER_INTERNAL_ACCESS
 #include "websrv_internal.h"
 
 static unsigned char at(string_view_t v, size_t pos)

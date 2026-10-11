@@ -14,6 +14,7 @@
 #include "matrix-t.h"
 #include "number-t.h"
 #include "tba_csv.h"
+#define MARS_TBA_INTERNAL_ACCESS
 #include "tba_worker_internal.h"
 
 static timeseries_t *tba_worker_observations(const tba_worker_config_t *cfg, bool driver, const char *column)

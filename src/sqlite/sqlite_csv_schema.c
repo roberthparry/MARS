@@ -6,11 +6,12 @@
  * with SQLite-compatible ASCII case folding. Existing tables must have matching
  * supported affinities; unsupported coercions are never silently accepted.
  */
-#define MARS_SQLITE_INTERNAL_ACCESS
+
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 
+#define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
 string_t *sqlite_csv_identifier(const string_t *text)

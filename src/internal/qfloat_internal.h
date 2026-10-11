@@ -12,9 +12,9 @@
 #ifndef QFLOAT_SHARED_INTERNAL_H
 #define QFLOAT_SHARED_INTERNAL_H
 
-#if !defined(MARS_SHARED_QFLOAT_INTERNAL_ACCESS) &&                                                                    \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/qfloat_internal.h is private to the MARS implementation; include qfloat-t.h instead."
+#if !defined(MARS_SHARED_QFLOAT_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_SHARED_QFLOAT_INTERNAL_ACCESS."
 #endif
 
 #include <stddef.h>

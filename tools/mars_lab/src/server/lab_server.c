@@ -20,6 +20,7 @@
 #include "lab_state.h"
 #include "lab_wire.h"
 #include "lab_server.h"
+#define MARS_LAB_SERVER_INTERNAL_ACCESS
 #include "lab_server_internal.h"
 
 #ifndef MARS_LAB_WASM_PATH

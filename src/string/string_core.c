@@ -36,8 +36,8 @@
 #include <stdio.h>
 #include <wchar.h>
 
-#define MARS_STRING_INTERNAL_ACCESS
 #include "string-t.h"
+#define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
 
 static bool string_utf8_decode_one_strict(const char *data, size_t len, uint32_t *out)

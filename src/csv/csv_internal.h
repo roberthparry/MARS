@@ -8,6 +8,11 @@
 #ifndef MARS_CSV_INTERNAL_H
 #define MARS_CSV_INTERNAL_H
 
+#if !defined(MARS_CSV_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_CSV_INTERNAL_ACCESS."
+#endif
+
 #include "dictionary-t.h"
 #include "csv-t.h"
 

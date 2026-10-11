@@ -9,6 +9,11 @@
 #ifndef MARS_EVIDENCE_PRIVATE_H
 #define MARS_EVIDENCE_PRIVATE_H
 
+#if !defined(MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS."
+#endif
+
 #include "file-t.h"
 #include "checks_process.h"
 

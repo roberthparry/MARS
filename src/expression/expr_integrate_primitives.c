@@ -13,6 +13,7 @@
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
 
 /* Match a numeric monomial a*x^p.  Keeping this matcher structural makes the

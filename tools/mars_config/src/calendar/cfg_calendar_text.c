@@ -15,6 +15,7 @@
 #include <uninorm.h>
 #endif
 
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 #include "file-t.h"
 

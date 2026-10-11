@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "cfg_locales.h"
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 /* Generate complete caller-owned SQL without changing repository or installed data. */

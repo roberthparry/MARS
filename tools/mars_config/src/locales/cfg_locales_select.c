@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 static const string_t *cfg_locales_resolve(cfg_locales_state *state, const string_t *request, bool *ok)

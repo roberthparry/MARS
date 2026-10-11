@@ -19,6 +19,7 @@
 #include <time.h>
 
 #include "cfg_progress.h"
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 
 static const size_t cfg_database_line_limit = 1024 * 1024;

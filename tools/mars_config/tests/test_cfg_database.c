@@ -16,6 +16,7 @@
 #include "sqlite-t.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

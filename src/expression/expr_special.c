@@ -16,6 +16,7 @@
 
 #define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
 #include "expr_integrate_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
 
 /* Shared special-function dependency checks. */

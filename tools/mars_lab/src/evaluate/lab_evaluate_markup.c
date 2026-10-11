@@ -8,8 +8,11 @@
  * the resulting markup while CSS selects the available-width layout.
  */
 #include "string-t.h"
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
+#define MARS_LAB_PRESENTATION_INTERNAL_ACCESS
 #include "lab_presentation_internal.h"
+#define MARS_LAB_SYNTAX_INTERNAL_ACCESS
 #include "lab_syntax_internal.h"
 
 /* Escape text nodes without changing Unicode or carriage returns. */

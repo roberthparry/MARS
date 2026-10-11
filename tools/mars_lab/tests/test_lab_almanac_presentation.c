@@ -8,6 +8,7 @@
  */
 #include <string.h>
 
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"

@@ -13,6 +13,11 @@
 #ifndef MARS_DATETIME_INTERNAL_H
 #define MARS_DATETIME_INTERNAL_H
 
+#if !defined(MARS_DATETIME_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_DATETIME_INTERNAL_ACCESS."
+#endif
+
 #include <stddef.h>
 
 #include "datetime-t.h"

@@ -9,8 +9,8 @@
  * constructing or transforming results.
  */
 
-#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "string-t.h"
+#define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 static char *ts_cstring_from_text(string_t *text)

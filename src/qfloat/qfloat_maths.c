@@ -9,11 +9,11 @@
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
-#define MARS_QFLOAT_INTERNAL_ACCESS
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
 static int qf_is_integer(qfloat_t x);

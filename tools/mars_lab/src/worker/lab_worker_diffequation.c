@@ -15,6 +15,7 @@
 #include "equation-t.h"
 #include "expression-t.h"
 #include "string-t.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 static const char *solve_status_name(de_solve_status_t status)

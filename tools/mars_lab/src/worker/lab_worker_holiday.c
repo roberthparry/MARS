@@ -15,6 +15,7 @@
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
 #include "string-t.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 typedef struct holiday_lab_options_t {

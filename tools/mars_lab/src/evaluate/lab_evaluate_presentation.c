@@ -15,8 +15,11 @@
 #include "number-t.h"
 #include "string-t.h"
 #include "lab_presentation.h"
+#define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
+#define MARS_LAB_PRESENTATION_INTERNAL_ACCESS
 #include "lab_presentation_internal.h"
+#define MARS_LAB_SYNTAX_INTERNAL_ACCESS
 #include "lab_syntax_internal.h"
 
 static string_t *lab_pres_solver_TeX(const string_t *source)

@@ -9,6 +9,7 @@
  * domain restrictions when extending these operations.
  */
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_binding_simplify.h"
 
 /* Binding rules consume and return the owned node. A rule that does not match

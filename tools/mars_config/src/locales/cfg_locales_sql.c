@@ -8,6 +8,7 @@
  */
 #include <string.h>
 
+#define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
 static const char cfg_locales_schema[] =

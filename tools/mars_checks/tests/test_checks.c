@@ -67,6 +67,7 @@ int tests_main(void)
     test_checks_coverage_cases();
     test_checks_evidence_cases();
     test_checks_policy_cases();
+    test_checks_header_cases();
     TEST_SECTION("Migrated Markdown API coverage and mathematical presentation");
     test_checks_documentation_cases();
     TEST_SECTION("README examples (last)");

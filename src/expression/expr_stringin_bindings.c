@@ -16,6 +16,7 @@
 #include "qfloat-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"

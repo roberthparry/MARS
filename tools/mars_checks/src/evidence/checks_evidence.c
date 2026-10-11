@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "checks_evidence.h"
+#define MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS
 #include "evidence_private.h"
 
 static json_t *evidence_host(void)

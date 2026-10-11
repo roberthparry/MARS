@@ -10,9 +10,9 @@
  * and logarithmic-gamma details remain private to this translation unit.
  */
 
-#define MARS_NUMBER_INTERNAL_ACCESS
 #include <math.h>
 
+#define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
 typedef enum number_modified_family_t {

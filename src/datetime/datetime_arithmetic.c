@@ -14,6 +14,7 @@
 #include <limits.h>
 #include <math.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
 
 /* Invalidate Julian caches and recalculate from the current civil fields. */

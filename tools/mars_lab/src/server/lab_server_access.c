@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "lab_mobile.h"
+#define MARS_LAB_SERVER_INTERNAL_ACCESS
 #include "lab_server_internal.h"
 
 static bool lab_svr_equal(const string_t *text, const char *literal)

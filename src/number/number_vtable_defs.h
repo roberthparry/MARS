@@ -12,6 +12,11 @@
 #ifndef NUMBER_VTABLE_DEFS_H
 #define NUMBER_VTABLE_DEFS_H
 
+#if !defined(MARS_NUMBER_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_NUMBER_INTERNAL_ACCESS."
+#endif
+
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 

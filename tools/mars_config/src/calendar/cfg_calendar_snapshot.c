@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"

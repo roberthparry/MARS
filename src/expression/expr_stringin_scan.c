@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <string.h>
 
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringin_scan.h"
 
 #define MARS_EXPR_INTERNAL_ACCESS

@@ -17,6 +17,7 @@
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 
 typedef struct cfg_database_options {

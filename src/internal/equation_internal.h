@@ -13,9 +13,9 @@
 #ifndef EQUATION_SHARED_INTERNAL_H
 #define EQUATION_SHARED_INTERNAL_H
 
-#if !defined(MARS_SHARED_EQUATION_INTERNAL_ACCESS) &&                                                                  \
-    (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/equation_internal.h is private to the MARS implementation; include equation-t.h instead."
+#if !defined(MARS_SHARED_EQUATION_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_SHARED_EQUATION_INTERNAL_ACCESS."
 #endif
 
 #include <stdbool.h>
@@ -66,6 +66,33 @@ bool equ_match_symbolic_quadratic_expr(const expr_t *expr, const expr_t *wrt, ex
                                        expr_t **linear_out, expr_t **quadratic_out);
 
 int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+
+/**
+ * @brief Solve a quadratic coefficient array for native equation and ODE analysis.
+ * @param coeffs Borrowed three coefficients in ascending power order.
+ * @param wrt Borrowed variable whose solutions are constructed.
+ * @param solutions Borrowed destination receiving owned solution equations.
+ * @return Solver status; negative indicates failure.
+ */
+int equ_solve_quadratic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
+
+/**
+ * @brief Solve a cubic coefficient array for native equation and ODE analysis.
+ * @param coeffs Borrowed four coefficients in ascending power order.
+ * @param wrt Borrowed variable whose solutions are constructed.
+ * @param solutions Borrowed destination receiving owned solution equations.
+ * @return Solver status; negative indicates failure.
+ */
+int equ_solve_cubic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
+
+/**
+ * @brief Solve a quartic coefficient array for native equation and ODE analysis.
+ * @param coeffs Borrowed five coefficients in ascending power order.
+ * @param wrt Borrowed variable whose solutions are constructed.
+ * @param solutions Borrowed destination receiving owned solution equations.
+ * @return Solver status; negative indicates failure.
+ */
+int equ_solve_quartic_coefficients(const number_t *coeffs, const expr_t *wrt, equation_solutions_t *solutions);
 
 void equ_solutions_clear(equation_solutions_t *solutions);
 

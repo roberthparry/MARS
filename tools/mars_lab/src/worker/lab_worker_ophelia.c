@@ -23,6 +23,7 @@
 #include "string-t.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 #define SOURCE_LIMIT 65536u

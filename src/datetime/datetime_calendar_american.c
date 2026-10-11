@@ -12,7 +12,9 @@
 /* Cherokee, Mayan and Aztec calendar views and observances. */
 #include <limits.h>
 
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
+#define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_astronomy_internal.h"
 #include "string-t.h"
 

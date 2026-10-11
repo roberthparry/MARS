@@ -2538,6 +2538,12 @@
       "test_checks_evidence_output_aliases": true
     }
   },
+  "tools/mars_checks/tests/test_checks_headers.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_private_header_access": true
+    }
+  },
   "tools/mars_checks/tests/test_checks_parsers.c": {
     "tests": {
       "enabled": true,
