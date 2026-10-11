@@ -139,6 +139,11 @@ by glibc under the GNU LGPL version 2.1 or later, with separately licensed
 components. Consult the copyright files from the exact operating-system
 packages being redistributed.
 
+The native `thread_t` and `lock_t` modules use that existing POSIX threading
+implementation, including monotonic condition-variable waits. They introduce
+no additional third-party library. Browser codec workers instead use the
+browser's Worker API and independently instantiated WebAssembly memory.
+
 Upstream licence information:
 
 - GMP: <https://gmplib.org/manual/Copying.html>
@@ -319,8 +324,8 @@ services and relevant authorities where accuracy is critical.
 
 MARS acknowledges the LLVM project contributors for the LLVM compiler
 infrastructure, Clang C compiler and LLD linker. The Lab build uses Clang's
-WebAssembly backend and LLD's `wasm-ld` to produce its freestanding browser
-module. These are separately installed build tools, not linked MARS runtime
+WebAssembly backend and LLD's `wasm-ld` to produce its freestanding page and
+codec-worker modules. These are separately installed build tools, not linked MARS runtime
 libraries; MARS does not bundle their source or executables.
 
 The project's principal licence is Apache License 2.0 with LLVM exceptions

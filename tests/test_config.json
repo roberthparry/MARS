@@ -1507,6 +1507,18 @@
       "test_ukraine_future_rule_windows_cover_2030": true
     }
   },
+  "tests/lock/test_lock.c": {
+    "example_lock_event": true,
+    "example_lock_scope": true,
+    "test_lock_cleanup": true,
+    "test_lock_events": true,
+    "test_lock_invalid": true,
+    "test_lock_mutex_lifetime": true,
+    "test_lock_readers": true,
+    "test_lock_recursive_release": true,
+    "test_lock_semaphore": true,
+    "test_lock_wrong_owner": true
+  },
   "tests/matrix/test_matrix.c": {
     "readme_examples": {
       "enabled": true,
@@ -2305,6 +2317,16 @@
       "test_to_upper_and_to_lower": true,
       "test_utf8_stuff": true
     }
+  },
+  "tests/thread/test_thread.c": {
+    "example_thread_counter": true,
+    "example_thread_event": true,
+    "example_thread_join": true,
+    "test_thread_free_while_detached": true,
+    "test_thread_invalid": true,
+    "test_thread_lifecycle": true,
+    "test_thread_self_join": true,
+    "test_thread_wait_and_detach": true
   },
   "tests/timeseries/test_timeseries.c": {
     "test_arima_smoke": true,

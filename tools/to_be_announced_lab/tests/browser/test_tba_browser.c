@@ -47,6 +47,17 @@ static bool tba_browser_prepare(const char *directory, uint16_t report_port)
         file_free(source);
         file_free(target);
     }
+    file_t *shared = tba_browser_file(directory, "tools/mars_lab/assets/js");
+    ok = ok && shared && file_create_directory(shared, 0700, true);
+    static const char *const shared_names[] = {"codec.js", "jobs.js", "codec_worker.js"};
+    for (size_t i = 0; ok && i < sizeof shared_names / sizeof *shared_names; ++i) {
+        file_t *source = tba_browser_file("tools/mars_lab/assets/js", shared_names[i]);
+        file_t *target = tba_browser_file(file_path(shared), shared_names[i]);
+        ok = source && target && file_copy(source, target, false);
+        file_free(source);
+        file_free(target);
+    }
+    file_free(shared);
     file_t *page = assets ? tba_browser_file(file_path(assets), "index.html") : NULL;
     file_t *checks = file_new_cstr("tools/to_be_announced_lab/tests/browser/checks.js");
     string_t *html = ok && page ? file_read_all_text(page) : NULL;

@@ -49,6 +49,7 @@ LAB_TEST_OBJS := $(patsubst tools/mars_lab/tests/%.c,$(LAB_BUILD_DIR)/tests/%.o,
 LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
 
 LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
+LAB_CODEC_WASM := $(LAB_BUILD_DIR)/wasm/lab_codec.wasm
 LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
 LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
 
@@ -69,6 +70,11 @@ $(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/wasm/lab_browser.imports tools/mars
 # Keep this Lab-specific: native library builds do not need a WebAssembly toolchain.
 LAB_WASM_CC ?= clang
 LAB_WASM_LD ?= wasm-ld
+
+# Workers need only the codec and queue policy, never DOM imports or UI state.
+$(LAB_CODEC_WASM): $(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_browser.o lab_memory.o lab_jobs.o) tools/mars_lab/wasm/lab_codec.imports tools/mars_lab/Makefile
+	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
+	    --initial-memory=16777216 --max-memory=16777216 $(filter %.o,$^) -o $@
 .PHONY: check-lab-wasm-deps
 check-lab-wasm-deps:
 	@set -eu; \
@@ -114,8 +120,9 @@ $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 	    -DMARS_LAB_SERVER_PATH='"$(abspath $(LAB_SERVER))"' -c $< -o $@
 
 $(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_WASM_PATH='"$(abspath $(LAB_WASM))"'
+$(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_CODEC_PATH='"$(abspath $(LAB_CODEC_WASM))"'
 
-$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM)
+$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM) $(LAB_CODEC_WASM)
 	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) -o $@ $(LAB_OBJS) $(STATIC_LIB) $(LDLIBS)
 

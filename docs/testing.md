@@ -27,6 +27,20 @@ directory delegates to the corresponding root target. Test binaries remain in
 the application's own `build/<mode>/tests/` directory. Run these suites
 sequentially, just like library and Lab suites.
 
+Run `make -j1 test_lock` and then `make -j1 test_thread` for the native
+synchronisation modules. These cover backend dispatch, acquisition ownership,
+cloned lifetimes, timeouts, scope cleanup, completion, joining and detachment.
+Each suite runs its README examples last. The configuration suite also exercises
+the installer progress reporter's thread-backed heartbeat and shutdown.
+
+The separate `make -j1 lab-browser-test` target uses real Firefox to test the
+WebAssembly codec worker, bounded job queue, cancellation, deadlines, malformed
+messages, startup failures and recovery. This is message-based browser work,
+not the native pthread backend. Run it sequentially after native tests; see
+[background codec jobs](mars-lab.md#background-codec-jobs) for its resource limits.
+Finally, `make -j1 test-readme-examples` compiles and runs the complete Markdown
+C programmes, including the thread and lock examples and their expected output.
+
 Installer tests use disposable private directories beneath `/tmp`, not the
 user's configured databases. The checker suite exercises passing and failing
 fixtures; failures deliberately produced inside a test are not suite failures.

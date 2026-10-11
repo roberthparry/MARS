@@ -105,6 +105,17 @@ try {
     assert(wasm.tba_period_end(20240110, 3, 1) === 20240331, 'fiscal quarter in WASM');
     assert(wasm.tba_period_add(20240228, 1, 2, 0) === 20240301, 'leap day in WASM');
     const sample = {text: '£ – <tag> Ελληνικά', values: [null, true, false, 1.25], nested: {empty: ''}};
+    const workerBytes = tbaWire.encode({text: 'μ'.repeat(100000)});
+    const workerCopy = await tbaWire.decodeAsync(workerBytes);
+    assert(workerCopy.text.length === 100000 && workerBytes.byteLength > 0, 'isolated codec preserves owned input');
+    assert(tbaWire.background().status().completed > 0, 'large response uses an isolated worker');
+    const workerAbort = new AbortController();
+    const workerPending = tbaWire.decodeAsync(workerBytes, workerAbort.signal).then(() => false,
+        error => error.name === 'AbortError');
+    workerAbort.abort();
+    assert(await workerPending, 'worker cancellation rejects pending completion');
+    assert((await tbaWire.decodeAsync(workerBytes)).text.length === 100000, 'worker recovers after cancellation');
+    assert(!tbaWire.background().status().count && !tbaWire.background().status().bytes, 'worker budget released');
     const copy = tbaWire.decode(tbaWire.encode(sample));
     assert(copy.text === sample.text && copy.values[3] === 1.25 && copy.nested.empty === '', 'typed wire round trip');
     rejects(() => tbaWire.decode(new Uint8Array([8, 2])), 'wrong protocol version rejected');

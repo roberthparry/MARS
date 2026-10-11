@@ -54,6 +54,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
+- **`lock_t`** — opaque mutex, recursive lock, reader/writer lock, semaphore and completion-event handles, with optional scope cleanup
+- **`thread_t`** — native callback threads with completion checks, timed waits, joining and detachment
 - **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `expr_t` integrands
 
 ## MARS Lab
@@ -106,7 +108,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
-- Clang and LLD for the Lab's WebAssembly asset, included in the default build
+- Clang and LLD for the Lab's WebAssembly assets, included in the default build
 - OpenSSL development files for the native HTTPS protocol test fixtures
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
@@ -146,7 +148,8 @@ dependencies on this check, so it also runs for direct build targets without
 forcing otherwise current artefacts to rebuild. Native library-only builds do
 not require these tools.
 
-The Lab build produces `tools/mars_lab/build/release/wasm/lab_browser.wasm`
+The Lab build produces `lab_browser.wasm` and the isolated worker's
+`lab_codec.wasm` under `tools/mars_lab/build/release/wasm/`
 (or the corresponding debug path), served locally as `application/wasm`.
 No Emscripten, Python, external JavaScript codec or Protobuf compiler is needed.
 Browser API calls now send typed Protobuf envelopes and request Protobuf replies;
@@ -164,6 +167,13 @@ undo/redo history, precision and integration-budget limits, request routing and
 stale-response rejection, and calendar arithmetic. JavaScript provides browser
 DOM, network, storage and rendering adapters. Mathematical evaluation and
 expression-presentation metadata remain native, not browser-side mathematics.
+Large Protobuf responses are decoded in a dedicated browser Worker with its own
+WASM memory. A bounded C-owned queue handles admission and completion tokens;
+DOM updates remain on the browser thread. See
+[background codec jobs](docs/mars-lab.md#background-codec-jobs) for limits,
+cancellation and failure behaviour. Native applications instead use
+[`thread_t`](docs/thread.md) and [`lock_t`](docs/lock.md); those pthread-backed
+APIs do not make arbitrary mathematical state safe for concurrent access.
 Startup configuration and API error replies also use Protobuf. JSON HTTP request
 bodies are rejected with HTTP 415; there is no legacy JSON transport fallback.
 Calendar snapshots in browser local storage use base64-encoded Protobuf, while
@@ -416,6 +426,8 @@ int main(void) {
 | `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](./docs/set.md) |
 | `array_t` | Generic array storage with copy/cleanup callbacks | [`docs/array.md`](./docs/array.md) |
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](./docs/bitset.md) |
+| `lock_t` | Opaque mutex, reader/writer, semaphore and completion-event class cluster | [`docs/lock.md`](./docs/lock.md) |
+| `thread_t` | Owned native callback threads with lock-backed completion waits | [`docs/thread.md`](./docs/thread.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](./docs/number.md) |
 | `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](./docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](./docs/qcomplex.md) |

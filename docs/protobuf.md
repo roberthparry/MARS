@@ -63,15 +63,30 @@ Both implementations enforce a 4 MiB envelope limit, 65,536 value nodes and
 maximum value depth 32 (root depth zero). They reject duplicate known singular
 fields, duplicate object keys, mismatched payload kinds, non-finite numbers,
 invalid UTF-8, truncation and unknown envelope versions. Supported unknown wire
-fields are ignored; removed field numbers must not be reused. The browser C
+fields are ignored; removed field numbers must not be reused. The page's browser C
 module has a fixed 64 MiB linear memory and copies each encoded request before
-asynchronous network work begins. Its JavaScript adapter uses own properties
+asynchronous network work begins. The codec-only Worker has separate, fixed
+16 MiB linear memory and uses the same C parser and validation limits.
+Its JavaScript adapter uses own properties
 for decoded keys, including `__proto__`, without modifying prototypes. Encoding
 rejects accessors, sparse arrays and recursive codec invocation. Decoding honours
 typed-view offsets, including `DataView`, and rejects shared or fake byte buffers.
 Native fractional numbers use binary64 rounding; lossy integer conversion,
 overflow and nonzero-to-zero underflow are rejected. Signed zero and nonzero
 subnormal values are preserved. Exact mathematical values must remain text.
+
+`response.labData()` uses asynchronous decoding: bodies of at least 128 KiB go
+to one reusable module Worker, while smaller messages and synchronous local-state
+operations use the page's codec. Each instance has independent host handles and
+buffers; there is no shared linear memory or JavaScript Protobuf parser.
+Caller-owned input is not detached. The C job queue admits at most eight jobs
+and 8 MiB of input, with a 30-second deadline including queueing and startup.
+These limits bound retained input, not the total browser heap or decoded objects.
+Cancellation, overload, malformed input and worker failure reject the operation;
+existing request-generation checks still reject stale results before display.
+See [background codec jobs](mars-lab.md#background-codec-jobs) for worker lifetime,
+failure recovery and browser regressions. The native Protobuf API remains
+synchronous and does not create threads itself.
 
 `lab_wire_encode` and `lab_wire_decode` in the Lab's private `lab_wire.h` adapt
 existing `json_t` in-memory trees through the public Protobuf API. Returned

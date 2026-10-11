@@ -49,7 +49,22 @@ const labProfile = (() => {
         } finally {
             countCalls = false;
         }
-        return {name, bytes: bytes.length, median_roundtrip_ms: +times[3].toFixed(3), host_calls: {...calls}};
+        const hostCalls = {...calls};
+        const decodeTimes = [], backgroundTimes = [], submissionTimes = [];
+        for (let i = 0; i < 7; ++i) {
+            let begin = performance.now();
+            labWire.decode(bytes);
+            decodeTimes.push(performance.now() - begin);
+            begin = performance.now();
+            const pending = labWire.decodeAsync(bytes);
+            submissionTimes.push(performance.now() - begin);
+            await pending;
+            backgroundTimes.push(performance.now() - begin);
+        }
+        const median = values => +values.sort((a, b) => a - b)[3].toFixed(3);
+        return {name, bytes: bytes.length, median_roundtrip_ms: +times[3].toFixed(3), host_calls: hostCalls,
+            ui_decode_ms: median(decodeTimes), async_submit_ms: median(submissionTimes),
+            async_complete_ms: median(backgroundTimes)};
     }
     return {
         enabled,
@@ -77,7 +92,11 @@ const labProfile = (() => {
                                                         }))
                     }
                 ],
-                ['long_text', {expression: '1234567890'.repeat(6553)}]
+                ['long_text', {expression: '1234567890'.repeat(6553)}],
+                ['large_table', {rows: Array.from({length: 4096}, (_, i) => ({
+                    name: `Item ${i}`, value: i / 10, description: 'μσ — exact text'.repeat(4)
+                }))}],
+                ['large_text', {text: '1234567890'.repeat(209715)}]
             ];
             const results = [];
             for (const [name, value] of workloads) results.push(await measure(name, value));

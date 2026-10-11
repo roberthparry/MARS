@@ -281,7 +281,7 @@ json_t *lab_page_bootstrap(const json_t *state)
     json_t *result = values ? json_new_object() : NULL;
     /* This is compiled into the server, unlike assets read from disk after a rebuild.
      * Keep it in step with the WASM ABI; the browser integration test checks both. */
-    if (result && !lab_page_set_text(result, "BROWSER_ABI_VERSION", "30")) {
+    if (result && !lab_page_set_text(result, "BROWSER_ABI_VERSION", "31")) {
         json_free(result);
         result = NULL;
     }

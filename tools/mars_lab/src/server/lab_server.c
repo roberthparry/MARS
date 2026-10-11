@@ -27,6 +27,10 @@
 #define MARS_LAB_WASM_PATH "tools/mars_lab/build/release/wasm/lab_browser.wasm"
 #endif
 
+#ifndef MARS_LAB_CODEC_PATH
+#define MARS_LAB_CODEC_PATH "tools/mars_lab/build/release/wasm/lab_codec.wasm"
+#endif
+
 struct lab_server {
     websrv_t *listener;
 };
@@ -110,6 +114,10 @@ struct lab_svr_asset {
 /* Enumerated once at registration, then resolved by the webserver's route index. */
 static const struct lab_svr_asset lab_svr_assets[] = {
     {"/wasm/lab_browser.wasm", MARS_LAB_WASM_PATH, "application/wasm"},
+    {"/wasm/lab_codec.wasm", MARS_LAB_CODEC_PATH, "application/wasm"},
+    {"/js/codec.js", "tools/mars_lab/assets/js/codec.js", "text/javascript; charset=utf-8"},
+    {"/js/jobs.js", "tools/mars_lab/assets/js/jobs.js", "text/javascript; charset=utf-8"},
+    {"/js/codec_worker.js", "tools/mars_lab/assets/js/codec_worker.js", "text/javascript; charset=utf-8"},
     {"/js/transport.js", "tools/mars_lab/assets/js/transport.js", "text/javascript; charset=utf-8"},
     {"/index.css", "tools/mars_lab/assets/index.css", "text/css; charset=utf-8"},
     {"/css/theme.css", "tools/mars_lab/assets/css/theme.css", "text/css; charset=utf-8"},

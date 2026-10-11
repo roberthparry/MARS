@@ -74,7 +74,7 @@ Build tools:
 Required libraries:
 
 - `libm`
-- pthreads
+- pthreads (`-pthread` during both compilation and linking; checked by `make check-deps`)
 - GMP
 - MPFR
 - MPC
@@ -205,6 +205,13 @@ MARS Lab WebAssembly compile/link probe passed.
 Run `make check-lab-wasm-deps` to check only the WebAssembly toolchain. Set
 `LAB_WASM_CC` and `LAB_WASM_LD` to select versioned compiler and linker executables.
 The toolchain is needed at build time, not to run an already-built browser module.
+The Lab builds both `lab_browser.wasm` for the page and `lab_codec.wasm` for
+background response decoding in `tools/mars_lab/build/<mode>/wasm/`. The normal
+Lab build includes both; neither needs Emscripten, shared-memory WASM threads or
+an additional library. Keep the executable, browser adapters and WASM assets
+together when deploying a build, then restart the Lab and reload the page.
+Module Worker support is required for responses of at least 128 KiB; failure to
+start the worker is reported rather than silently blocking the browser thread.
 See the [Lab guide](mars-lab.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).
 
 ## Common Targets

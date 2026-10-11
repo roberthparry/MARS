@@ -486,6 +486,7 @@
                 return;
             }
             await checkWire();
+            await labCheckWorkers(check);
             check(
                 (await nativeFetch('/js/worksheet.js')).status === 404 && !labDefinitionScripts.includes('worksheet') &&
                     !document.querySelector('script[src="/js/worksheet.js"]'),

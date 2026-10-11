@@ -123,7 +123,9 @@ For an opt-in performance report, run `MARS_LAB_PROFILE=1 make -j1 DEBUG=0 lab-b
 from the repository root. Output includes `BROWSER PASS: PROFILE` followed by a
 JSON report: startup request counts, encoded message sizes, median encode/decode
 times and host-callback counts for scalar, native-result, table and long-text
-workloads. It also counts requests for a repeated evaluation. This uses the same
+workloads, including larger table and text messages. It also reports synchronous
+decode time, asynchronous submission time and total asynchronous completion time,
+and counts requests for a repeated evaluation. This uses the same
 private fixture, not the running Lab. Timings are observations rather than test
 thresholds; run the ordinary browser suite separately to verify correctness.
 
@@ -133,6 +135,40 @@ wire buffers remain owned copies so subsequent operations cannot overwrite an
 in-flight request. Town display metadata arrives with the native catalogue, so
 selector population needs no additional formatting request or browser cache.
 Stale-selection guards still protect asynchronous legacy saved-town matching.
+
+### Background codec jobs
+
+Response bodies of at least 128 KiB are decoded by a dedicated module Worker;
+smaller responses and synchronous local-state operations retain the direct codec
+path. The initial profile measured roughly 34 ms per encode/decode round trip for
+a 601,026-byte structured message, compared with less than 1 ms for a typical small
+result on the development machine. Timings vary by hardware and workload: worker
+dispatch improves UI responsiveness, not necessarily total completion time.
+
+`wasm/src/lab_jobs.c` owns admission, FIFO selection and non-reused completion
+tokens. At most eight queued/running jobs and 8 MiB of retained input are admitted,
+with the existing 4 MiB per-message limit. Queue overload rejects explicitly.
+Each job has a 30-second deadline including queueing and worker startup. Abort
+signals cancel queued work; cancelling running work terminates its worker. Late
+messages from a replaced worker cannot complete a newer request. Startup errors,
+decode errors and deadlines reject promises and release their admission budgets.
+
+The thin `js/jobs.js` adapter owns browser Workers, promises, timers and transfers.
+`js/codec.js` supplies the shared host-value bridge; all Protobuf validation remains
+in C. `js/codec_worker.js` loads the codec-only `wasm/lab_codec.wasm`, with fixed
+16 MiB private linear memory and no DOM imports. There is one lazily started worker
+per page, reused between jobs; no `SharedArrayBuffer`, atomics, pthreads or blocking
+UI waits are introduced. Input buffers remain caller-owned and are not detached.
+Transferred decoded objects are still subject to the existing request-token checks
+before publication. The admission limit bounds input retention, not total browser
+heap usage. All native codec node and depth limits remain in force.
+
+No payloads are persisted or sent to a service by the worker. It fetches only its
+same-origin code/module assets. A browser that cannot start module Workers reports
+an error for large responses rather than silently decoding them on the UI thread.
+Page teardown closes the queue; back/forward-cache suspension preserves it.
+The browser tests exercise queue/byte limits, stale tokens, FIFO order, malformed
+messages, cancellation, worker startup failure, deadlines, shutdown and recovery.
 
 ### Browser implementation layout
 
@@ -302,7 +338,7 @@ returned choices; it does not maintain a second field-policy table.
 Restoration retains authored DateTime whitespace while capture trims values.
 Clear preserves town selection and the almanac jurisdiction. Named-town offsets
 and manually edited DateTime offsets retain priority over jurisdiction replies.
-The browser ABI is version 30; mismatched assets require a rebuild/restart
+The browser ABI is version 31; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -506,19 +542,22 @@ header and only the interfaces it uses; there is no umbrella header.
 and scoped DOM access respectively. Worksheet state, requests, bindings,
 presentation and the other browser modules have their own matching headers.
 These interfaces are tool-private, not installed MARS library headers.
-All implementations compile into one `lab_browser.wasm` asset.
+All page implementations compile into `lab_browser.wasm`. The codec, memory
+helpers and job policy also link into the separate `lab_codec.wasm` worker asset;
+that smaller module has no DOM imports or worksheet state.
 `lab_memory.c` supplies freestanding `memset`, `memcpy`, `memmove` and `memcmp`
 for compiler-generated memory operations, without requiring JavaScript libc
 shims. Only browser bridge functions listed in `wasm/lab_browser.imports`
 (declared in `lab_host.h` and `lab_dom.h`) may remain unresolved. Keep this
-allowlist synchronised when changing the bridge; other missing functions fail the link
+allowlist synchronised when changing the bridge. The worker has its own smaller
+`wasm/lab_codec.imports` allowlist; other missing functions fail the link
 rather than producing a module that fails during browser startup. This also
 catches compiler/toolchain differences when building on another machine.
 The WASM compiler checks that exported functions have prior declarations, and
 generated dependency files rebuild the implementations affected by a header change.
 Objects and dependency files mirror the source layout under
-`build/<configuration>/wasm/src/`; the browser asset remains
-`build/<configuration>/wasm/lab_browser.wasm`.
+`build/<configuration>/wasm/src/`; both browser assets live in
+`build/<configuration>/wasm/`.
 Native result-markup generation in `src/calendar/lab_calendar_markup.c` and
 `src/evaluate/lab_evaluate_markup.c` runs on the server, not in WebAssembly.
 

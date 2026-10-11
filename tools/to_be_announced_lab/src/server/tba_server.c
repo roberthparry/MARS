@@ -23,6 +23,10 @@
 #define TBA_WASM_PATH "tools/to_be_announced_lab/build/release/wasm/tba_browser.wasm"
 #endif
 
+#ifndef MARS_LAB_CODEC_PATH
+#define MARS_LAB_CODEC_PATH "tools/mars_lab/build/release/wasm/lab_codec.wasm"
+#endif
+
 typedef bool (*tba_svr_handler_t)(const websrv_request_t *, websrv_response_t *, tba_server_t *);
 struct tba_server {
     websrv_t *listener;
@@ -58,9 +62,10 @@ static json_t *tba_svr_payload(const websrv_request_t *request)
 
 static bool tba_svr_wasm(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    (void)request;
     (void)server;
-    file_t *file = file_new_cstr(TBA_WASM_PATH);
+    const string_t *path = websrv_request_path(request);
+    bool codec = string_ends_with(path, "/wasm/lab_codec.wasm");
+    file_t *file = file_new_cstr(codec ? MARS_LAB_CODEC_PATH : TBA_WASM_PATH);
     file_info_t *info = file ? file_get_info(file) : NULL;
     bool safe = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= 4u * 1024u * 1024u;
     array_t *bytes = safe ? file_read_all_bytes(file) : NULL;
@@ -238,6 +243,10 @@ static const tba_svr_route_t tba_svr_routes[] = {
     {"/download-summary", HTTP_GET, tba_svr_retired, NULL, NULL}, {"/download-forecast", HTTP_GET, tba_svr_retired, NULL, NULL},
     {"/manifest.webmanifest", HTTP_GET, tba_svr_manifest, NULL, NULL},
     {"/wasm/tba_browser.wasm", HTTP_GET, tba_svr_wasm, NULL, NULL},
+    {"/wasm/lab_codec.wasm", HTTP_GET, tba_svr_wasm, NULL, NULL},
+    {"/js/codec.js", HTTP_GET, NULL, "/tools/mars_lab/assets/js/codec.js", "text/javascript; charset=utf-8"},
+    {"/js/jobs.js", HTTP_GET, NULL, "/tools/mars_lab/assets/js/jobs.js", "text/javascript; charset=utf-8"},
+    {"/js/codec_worker.js", HTTP_GET, NULL, "/tools/mars_lab/assets/js/codec_worker.js", "text/javascript; charset=utf-8"},
     {"/index.css", HTTP_GET, NULL, "index.css", "text/css; charset=utf-8"},
     {"/js/transport.js", HTTP_GET, NULL, "js/transport.js", "text/javascript; charset=utf-8"},
     {"/favicon.svg", HTTP_GET, NULL, NULL, "image/svg+xml"}
@@ -263,7 +272,9 @@ static bool tba_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         return tba_svr_protobuf(response, 413, tba_json_error("Stream envelope exceeds 64 KiB."));
     if (route->handler)
         return route->handler(request, response, server);
-    string_t *asset = route->asset ? tba_asset_path(route->asset) : tba_path("packaging/linux/to-be-announced-lab.svg");
+    /* Leading slash marks a fixed repository-relative shared asset, never a user-supplied path. */
+    string_t *asset = route->asset ? (route->asset[0] == '/' ? tba_path(route->asset + 1) : tba_asset_path(route->asset))
+                                 : tba_path("packaging/linux/to-be-announced-lab.svg");
     string_t *text = asset ? tba_file_read(string_c_str(asset), 4u * 1024u * 1024u) : NULL;
     string_free(asset);
     return text ? tba_svr_text(response, 200, route->type, text) :

@@ -16,7 +16,7 @@ else
     RELEASE_BUILD  := 1
 endif
 
-CFLAGS += -D_GNU_SOURCE
+CFLAGS += -D_GNU_SOURCE -pthread
 
 CC := gcc
 AR := ar rcs
@@ -81,7 +81,7 @@ ifeq ($(ENABLE_UNISTRING),1)
 endif
 
 LDLIBS += -lm
-LDLIBS += -lpthread
+LDLIBS += -pthread
 LDLIBS += -lmpfr -lmpc -lgmp
 
 # ------------------------------------------------------------
@@ -243,6 +243,7 @@ check-deps:
 	    fi; \
 	    rm -f "$$probe_dir/probe"; \
 	}; \
+	check_dep "POSIX threads" "pthread.h" "-pthread" "libc6-dev" "pthread_mutex_t m; pthread_mutex_init(&m, 0); pthread_mutex_destroy(&m)"; \
 	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
 	check_dep "libcurl >= 7.86.0" "curl/curl.h" "$(CURL_CFLAGS) $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)" "libcurl4-openssl-dev" "_Static_assert(LIBCURL_VERSION_NUM >= 0x075600, \"libcurl too old\"); CURL *c = curl_easy_init(); curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, \"https\"); size_t n = 0; char b = 0; curl_ws_send(c, &b, 0, &n, 0, CURLWS_TEXT); curl_easy_cleanup(c)"; \
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \

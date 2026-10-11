@@ -149,6 +149,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"integrator-t.h", "integrator.md"},
                                                  {"json-t.h", "json.md"},
                                                  {"jurisdiction-t.h", "jurisdiction.md"},
+                                                 {"lock-t.h", "lock.md"},
                                                  {"matrix-t.h", "matrix.md"},
                                                  {"number-t.h", "number.md"},
                                                  {"protobuf-t.h", "protobuf.md"},
@@ -158,6 +159,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"set-t.h", "set.md"},
                                                  {"sqlite-t.h", "sqlite.md"},
                                                  {"string-t.h", "string.md"},
+                                                 {"thread-t.h", "thread.md"},
                                                  {"timeseries-t.h", "timeseries.md"},
                                                  {"webserver-t.h", "webserver.md"},
                                                  {"xml-t.h", "xml.md"}};
