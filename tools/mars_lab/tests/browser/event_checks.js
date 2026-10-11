@@ -305,6 +305,7 @@ window.checkLabEvents = function checkLabEvents() {
             ['back', 'click', 1, 'navigateHistoryFromEvent', [0]],
             ['forward', 'click', 2, 'navigateHistoryFromEvent', [1]],
             ['clear', 'click', 5, 'clearWorksheetFromEvent', []], ['help', 'click', 6, 'toggleHelp', []],
+            ['helpClose', 'click', 6, 'toggleHelp', []],
             ['goalSeek', 'click', 7, 'startGoalSeekFromEvent', []],
             ['matrixOperation', 'change', 9, 'normaliseWorksheetControl', [0]],
             ['integratorIntervalCap', 'change', 11, 'normaliseWorksheetControl', [2]],

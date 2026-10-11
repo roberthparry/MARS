@@ -297,18 +297,26 @@ void lab_workspace_dom_help_cards(int cards, int mode)
     }
 }
 
-/* Show results, show help, or toggle; only explicit help/toggle actions replace status. */
+/* Full-width help preserves the worksheet; its visible return action owns keyboard focus. */
 void lab_workspace_dom_help(unsigned action)
 {
     if (action > 2)
         return;
-    int showing = action == 1 || (action == 2 && lab_dom_has_class(lab_dom_query(0, "#helpPane"), "hidden"));
+    int was_showing = !lab_dom_has_class(lab_dom_query(0, "#helpPane"), "hidden");
+    int showing = action == 1 || (action == 2 && !was_showing);
+    if (showing && lab_view_card_expanded() >= 0)
+        lab_layout_expand(0, 2);
+    lab_dom_class(lab_dom_query(0, "#labWorkspace"), "help-open", showing);
     lab_workspace_dom_hidden("#resultPane", showing);
     lab_workspace_dom_hidden("#helpPane", !showing);
+    lab_workspace_dom_hidden("#helpClose", !showing);
     lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing ? "Help" : "Result");
     int input = lab_dom_query(0, "#resultUseInput");
     lab_dom_class(input, "hidden", showing || !lab_dom_length(lab_dom_read(input, 3, "inputText")));
     lab_workspace_dom_text(lab_dom_query(0, "#help"), 0, "", showing ? "Result" : "Help");
+    lab_workspace_dom_text(lab_dom_query(0, "#help"), 2, "aria-expanded", showing ? "true" : "false");
+    if (showing != was_showing)
+        lab_dom_effect(lab_dom_query(0, showing ? "#helpClose" : "#help"), 0);
     if (action)
         lab_workspace_dom_status(lab_dom_string(showing ? "Help" : "Ready"));
 }

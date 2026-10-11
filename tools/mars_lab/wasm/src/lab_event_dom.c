@@ -273,6 +273,7 @@ void lab_events_install(int document, int window)
                     {"#expr", "input", 4},
                     {"#clear", "click", 5},
                     {"#help", "click", 6},
+                    {"#helpClose", "click", 6},
                     {"#goalSeek", "click", 7},
                     {".mode-tab", "click", 8},
                     {"#matrixOperation", "change", 9},

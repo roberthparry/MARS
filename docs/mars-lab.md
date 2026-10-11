@@ -764,6 +764,13 @@ with an error instead of launching a competing instance.
 
 ### Result-card conventions
 
+**Help** opens mode-specific guidance across the full workspace width, temporarily
+hiding the editor and result cards. **Return to worksheet** restores them without
+changing the input and returns keyboard focus to the Help button. The mode tabs
+remain available while Help is open. Cards cover current binding roles, symbolic
+evaluation, Function RUN, numerical notation, equation branches, transforms,
+matrix operations, integration limits, calendars and almanac tables.
+
 Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
 calculation, so moving between modes or restarting the Lab does not restore an

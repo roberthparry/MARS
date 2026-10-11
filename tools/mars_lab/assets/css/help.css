@@ -1,9 +1,19 @@
 /* Help cards and shared visibility utilities. */
+#labWorkspace.help-open > #workspacePanel {
+  display: none;
+}
+
+#labWorkspace.help-open > #resultWorkspacePanel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .help-pane {
   padding: 1rem;
 }
 
 .help-card {
+  overflow-wrap: anywhere;
   padding: 1rem;
   border: 2px solid rgba(233, 244, 239, 0.24);
   border-radius: 18px;

@@ -103,6 +103,24 @@ static void test_lab_extra_expression(void)
     expect_response("/eval", "{\"expression\":\"{ x^(1/3) | x=8 }\",\"precision\":40}", 200u, "value", "[2,");
 }
 
+static void test_lab_extra_help_examples(void)
+{
+    /* Help-card examples in assets/index.html: execute the public adapter paths, not browser arithmetic. */
+    expect_response("/eval", "{\"expression\":\"sin(x)\"}", 200u, "evaluation_ready", "yes");
+    expect_response("/eval", "{\"expression\":\"{ x+a | x=2; a=3 }\"}", 200u, "value", "5");
+    expect_response("/eval", "{\"expression\":\"sum(k,1,4,k)\"}", 200u, "value", "10");
+    expect_response("/eval", "{\"expression\":\"Laplace(exp(-t),t,s)\"}", 200u, "expression", "Re(s)");
+    expect_response("/matrix-eval", "{\"matrix\":\"trace(1 2; 3 4)\",\"operation\":\"eval\"}",
+                    200u, "value", "5");
+    expect_response("/matrix-eval", "{\"matrix\":\"det(1 2; 3 4)\",\"operation\":\"eval\"}",
+                    200u, "value", "-2");
+    expect_response("/equation-eval", "{\"equation\":\"abs(x-3) = 0\"}", 200u, "solutions", "x = 3");
+    expect_response("/equation-eval", "{\"equation\":\"abs(x-3) = 2\"}", 200u, "solutions", "x = 1");
+    expect_response("/equation-eval", "{\"equation\":\"{ abs(x-3) = 2 | x=6 }\"}", 200u, "solutions", "x = 5");
+    expect_response("/equation-eval", "{\"equation\":\"x^2 = 4\"}", 200u, "solutions", "x = -2");
+    expect_response("/equation-eval", "{\"equation\":\"(x+1)^4 = 1\"}", 200u, "display_solutions", "± i");
+}
+
 static void test_lab_extra_constant_identity(void)
 {
     expect_response("/eval", "{\"expression\":\"{ sin(x)^2+cos(x)^2 | x=? }\"}", 200u, "value", "1");
@@ -496,6 +514,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_editor_and_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_expression, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_help_examples, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_constant_identity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_bindings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_binding_edit, tests, NULL);

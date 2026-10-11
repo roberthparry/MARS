@@ -107,9 +107,14 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         showHelp();
         check(hidden(resultPane) && !hidden(helpPane) && hidden(resultUseInput), 'help pane and reuse visibility');
         check(help.textContent === 'Result' && rightPaneTitle.textContent === 'Help', 'help navigation labels');
+        const helpClose = document.getElementById('helpClose');
+        check(document.getElementById('labWorkspace').classList.contains('help-open'), 'full-width help state');
+        check(!hidden(helpClose) && document.activeElement === helpClose, 'visible return action receives focus');
         toggleHelp();
         check(!hidden(resultPane) && hidden(helpPane) && !hidden(resultUseInput), 'toggle returns to reusable result');
         check(statusEl.textContent.startsWith('Ready · '), 'returning from help reports Ready');
+        check(hidden(helpClose) && document.activeElement === help, 'return restores focus to the Help button');
+        check(!document.getElementById('labWorkspace').classList.contains('help-open'), 'two-panel state restored');
         resultUseInput.dataset.inputText = '';
         setStatus('Preserved');
         showResults();

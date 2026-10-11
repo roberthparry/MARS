@@ -272,6 +272,40 @@
             body: labWire.encode({expression: `BROWSER ${message}`, expression_updated_at: Date.now() + 1000000})
         });
     }
+    async function checkHelpLayout() {
+        const frame = document.createElement('iframe');
+        frame.style.cssText = 'position:fixed;left:-10000px;top:0;height:1000px;border:0';
+        try {
+            const loaded = new Promise(resolve => frame.onload = resolve);
+            frame.srcdoc = '<!doctype html><html><head><link rel="stylesheet" href="/index.css"></head>' +
+                '<body></body></html>';
+            document.body.appendChild(frame);
+            await loaded;
+            const workspace = document.getElementById('labWorkspace').cloneNode(true);
+            workspace.classList.add('help-open');
+            workspace.querySelector('#helpPane').classList.remove('hidden');
+            workspace.querySelector('#helpClose').classList.remove('hidden');
+            workspace.querySelector('#resultPane').classList.add('hidden');
+            for (const card of workspace.querySelectorAll('.help-card'))
+                card.classList.remove('hidden');
+            frame.contentDocument.body.appendChild(workspace);
+            for (const width of [1920, 900, 390]) {
+                frame.style.width = `${width}px`;
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                const panel = workspace.querySelector('#resultWorkspacePanel').getBoundingClientRect();
+                const bar = workspace.querySelector('.lab-topbar').getBoundingClientRect();
+                check(Math.abs(panel.left - bar.left) < 2 && Math.abs(panel.right - bar.right) < 2,
+                      `Help spans the full workspace at ${width}px`);
+                for (const card of workspace.querySelectorAll('.help-card'))
+                    check(card.scrollWidth <= card.clientWidth + 1, `Help text overflows at ${width}px`);
+                check(frame.contentDocument.documentElement.scrollWidth <= width,
+                      `Help must not introduce page-wide horizontal scrolling at ${width}px`);
+            }
+        } finally {
+            frame.remove();
+        }
+    }
+
     async function checkAlmanacLayout() {
         // Timestamp parsing belongs to test_lab_almanac_presentation.c; this fixture checks DOM consumption only.
         const visibility = almanacVisibilityMode;
@@ -504,6 +538,7 @@
             check(!failures.length, failures.join('; '));
             check(currentMode() === 'expression', 'Initial expression mode not restored');
             await checkAlmanacLayout();
+            await checkHelpLayout();
             check(document.styleSheets.length > 0, 'External stylesheet not loaded');
             const stylesheet = Array.from(document.styleSheets).find(sheet => sheet.href?.endsWith('/index.css'));
             const styleNames = [
@@ -563,9 +598,9 @@
             const expand = card.querySelector('[data-expand-card]');
             expand.click();
             check(expand.getAttribute('aria-expanded') === 'true', 'Result expansion failed');
-            expand.click();
             help.click();
             check(!helpPane.classList.contains('hidden'), 'Help did not open');
+            check(expand.getAttribute('aria-expanded') === 'false', 'Help must leave result expansion cleanly');
             help.click();
 
             for (const mode
@@ -577,6 +612,25 @@
                 check(
                     document.querySelector(`[data-mode="${mode}"]`).classList.contains('active'),
                     `Mode ${mode} tab inactive`);
+                const sourceBeforeHelp = expr.value;
+                help.click();
+                const helpClose = document.getElementById('helpClose');
+                const workspace = document.getElementById('workspacePanel');
+                const panel = document.getElementById('resultWorkspacePanel').getBoundingClientRect();
+                const bar = document.querySelector('.lab-topbar').getBoundingClientRect();
+                check(getComputedStyle(workspace).display === 'none', `${mode} editor hidden for Help`);
+                check(Math.abs(panel.left - bar.left) < 2 && Math.abs(panel.right - bar.right) < 2,
+                      `${mode} Help must span both workspace columns`);
+                check(document.activeElement === helpClose, `${mode} Help return button is keyboard accessible`);
+                for (const card of helpPane.querySelectorAll('.help-card')) {
+                    const selected = card.dataset.helpModes.split(',').includes(mode);
+                    check(card.classList.contains('hidden') !== selected, `${mode} Help topic filtering`);
+                }
+                helpClose.click();
+                check(!document.getElementById('labWorkspace').classList.contains('help-open'),
+                      `${mode} Help return restores the workspace`);
+                check(document.activeElement === help && expr.value === sourceBeforeHelp,
+                      `${mode} Help return preserves the input and restores focus`);
             }
             setMode('matrix');
             syncModeUI();

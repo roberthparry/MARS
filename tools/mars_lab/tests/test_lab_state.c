@@ -129,6 +129,32 @@ static void test_lab_page_escaping(void)
     TEST_ASSERT_TRUE(test_lab_isolated(page_escaping), "HTML and script substitutions are escaped exactly once");
 }
 
+static bool test_lab_help_content(const char *directory)
+{
+    (void)directory;
+    string_t *page = lab_page_render(NULL);
+    /* A bounded catalogue of required topics guards the shipped help, not just a test-only fixture. */
+    const char *topics[] = {"Your Worksheet And Cards", "Precision And Numerical Notation",
+                            "What The Result Cards Mean", "Running A Function Card", "Solving Equations",
+                            "Reading Equation Solutions", "Partial Differential Equations And Results",
+                            "Matrix Operation Selector", "Transforms And Sums", "Roots And Complex Numbers",
+                            "Datetime Workflow", "Almanac Workflow", "Work budget ceiling",
+                            "id=\"helpClose\"", "Return to worksheet", "2.5×10⁻⁵"};
+    bool ok = page != NULL;
+    for (size_t i = 0; page && i < sizeof(topics) / sizeof(*topics); ++i)
+        ok = string_find(page, topics[i]) >= 0 && ok;
+    ok = ok && string_find(page, "before <code>Evaluate</code> becomes available") < 0 &&
+         string_find(page, "is only used when you want the optional local holiday panel") < 0 &&
+         string_find(page, "changes the displayed value precision without changing the expression") < 0;
+    string_free(page);
+    return ok;
+}
+
+static void test_lab_page_help(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(test_lab_help_content), "shipped Help covers current controls and all modes");
+}
+
 static bool packaged_defaults(const char *directory)
 {
     string_t *missing_template = string_sprintf("%s/no-template.html", directory);
@@ -167,5 +193,6 @@ void test_lab_state_cases(void)
     TEST_RUN_IN_GROUP(test_lab_state_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_state_corruption, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_page_escaping, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_page_help, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_packaged_defaults, tests, NULL);
 }

@@ -415,6 +415,12 @@ ensure that abbreviating a long mantissa retains its exponent. The browser
 suite verifies that Value cards install the native power-of-ten markup and
 Function execution displays the native text without client-side number parsing.
 
+Help coverage includes `test_lab_page_help` for the shipped topic catalogue and
+`test_lab_extra_help_examples` for live symbolic, binding, sum, transform,
+matrix and equation examples. Browser checks verify mode filtering, full-width
+Help and keyboard return in all seven modes, plus wrapping without horizontal
+overflow at desktop, tablet and phone widths.
+
 Lab test fixtures honour `TMPDIR` and otherwise use `/tmp`. The `lab-browser-test`
 target sets `TMPDIR` to its absolute build directory so Snap-packaged Firefox can
 access the disposable profile: Snap's private `/tmp` cannot see the host's `/tmp`.
