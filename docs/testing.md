@@ -171,7 +171,18 @@ origin tracking and a non-zero error exit code. Treat definite, indirect and
 possible leaks as errors. Retain Valgrind's default 12-frame trace depth for
 routine bounded checks; deeper allocation traces can substantially increase
 the checker's own memory use. Increasing trace depth is not required for full
-leak detection. AddressSanitizer, LeakSanitizer and
+leak detection.
+
+For MARS Lab evaluation checks, trace exec'd calculation children with
+`--trace-children=yes`: checking the test harness alone does not check the
+integrated workers. Use a per-process `--log-file` containing `%p` so Valgrind
+diagnostics do not enter the worker's result protocol. System utility children
+may be excluded with `--trace-children-skip=/bin/*,/usr/*`; do not exclude the
+Lab executable. Inspect both the harness result and each worker's final error
+summary. Forked test fixtures must release their inherited resource handles
+before `_exit`, while leaving directory removal to their parent.
+
+AddressSanitizer, LeakSanitizer and
 UndefinedBehaviorSanitizer provide complementary checks in a separate build;
 stop on the first diagnostic. If sandbox restrictions prevent LeakSanitizer's
 final scan, report that check as incomplete rather than disabling leak detection
@@ -605,6 +616,47 @@ per worker call, including generated-function calls, to retain that allowance
 under the 50% CPU cap. Their mathematical inputs, precision and assertions are
 unchanged. Worker failures report the deadline, errno and source expression;
 this test-only allowance does not change the Lab's request deadlines.
+
+### Recorded Check: 11 October 2026
+
+The native MARS Lab audit, based on commit `e463829`, found and fixed ownership
+leaks in matrix result formatting, integrator bounds/results and numerical root
+families. Output slots now use non-allocating initial values when the receiving
+API replaces them; matrix TeX construction no longer creates a redundant
+temporary clone. Forked test fixtures now release their inherited temporary-directory
+handle before exiting. The missing-executable assertion also accepts the POSIX
+child-exit-127 outcome as well as a synchronous spawn error.
+
+Sequential Valgrind batches completed 113 ordinary Lab cases with no reported
+memory errors. These cover process/state/runtime handling, presentation,
+Protobuf boundaries, evaluation, HTTP contracts/rejections, calendar/timezone
+presentation and Function programmes. Calculation workers were traced as well
+as the harness. Expanded regressions cover scalar and eigenvalue matrix
+operations, non-square rejection, finite and infinite integration bounds,
+numerical integration and cube-root-family output. The 11 documented Function
+programmes subsequently passed as the final README batch, also with no reported
+memory errors. No suppressions were added.
+
+The checks retained the 512 MiB, zero-swap, 50% CPU and 90-second limits above.
+Memory coverage remains incomplete:
+
+- The encrypted catalogue case reached the service deadline during SQLCipher
+  key derivation.
+- The TeX-route matrix-power case exceeded its production worker deadline
+  under Valgrind. A direct worker check also reached the 90-second service
+  limit during symbolic simplification. Termination-time allocation reports
+  are not a completed final leak scan; this case is not recorded as clean.
+- The 386-digit integrator deadline case and encrypted datetime-cache case
+  were checked functionally, not under Valgrind in this audit.
+- The separate 263 mathematical regressions, their 33 output-example groups,
+  browser/WebAssembly instrumentation and the wider library memory suites were
+  not rerun.
+
+All 117 ordinary cases in the selected Lab infrastructure/evaluation suites
+passed without instrumentation, including the four cases without completed
+memory coverage. Source-policy checks passed. The original test configuration
+was restored after the README batch. These results establish scoped regression
+coverage, not a whole-project memory-safety guarantee.
 
 ## Notes
 

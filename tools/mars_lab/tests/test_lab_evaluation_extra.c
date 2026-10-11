@@ -99,6 +99,7 @@ static void expect_response(const char *route, const char *payload, unsigned exp
 static void test_lab_extra_expression(void)
 {
     expect_response("/eval", "{\"expression\":\"{ x^2 | x=3 }\",\"precision\":40}", 200u, "value", "9");
+    expect_response("/eval", "{\"expression\":\"{ x^(1/3) | x=8 }\",\"precision\":40}", 200u, "value", "[2,");
 }
 
 static void test_lab_extra_constant_identity(void)
@@ -151,6 +152,17 @@ static void test_lab_extra_diffequation(void)
 static void test_lab_extra_matrix(void)
 {
     expect_response("/matrix-eval", "{\"matrix\":\"(1,2;3,4)\",\"operation\":\"det\"}", 200u, "result", "-2");
+    expect_response("/matrix-eval", "{\"matrix\":\"(1,2;3,4)\",\"operation\":\"trace\"}", 200u, "result", "5");
+    expect_response("/matrix-eval", "{\"matrix\":\"(2,0;0,3)\",\"operation\":\"eigenvalues\"}", 200u, "result", "3");
+    expect_response("/matrix-eval", "{\"matrix\":\"(2,0;0,3)\",\"operation\":\"eigendecompose\"}", 200u,
+                    "result", "eigenvectors");
+    /* Output slots must be safe to release when a numeric operation rejects a non-square matrix. */
+    expect_response("/matrix-eval", "{\"matrix\":\"(1,2,3;4,5,6)\",\"operation\":\"det\"}", 422u, "error", "det");
+    expect_response("/matrix-eval", "{\"matrix\":\"(1,2,3;4,5,6)\",\"operation\":\"trace\"}", 422u, "error", "trace");
+    expect_response("/matrix-eval", "{\"matrix\":\"(1,2,3;4,5,6)\",\"operation\":\"eigenvalues\"}", 422u,
+                    "error", "eigenvalues");
+    expect_response("/matrix-eval", "{\"matrix\":\"(1,2,3;4,5,6)\",\"operation\":\"eigendecompose\"}", 422u,
+                    "error", "eigendecompose");
 }
 
 static void test_lab_extra_integrator(void)
@@ -169,6 +181,16 @@ static void test_lab_extra_integrator(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "exact half integral retains its root integrand and native editor binding");
+    /* Exercise both infinity parsers and the numerical output slots under worker memory checks. */
+    expect_response("/integrator-eval",
+                    "{\"expression\":\"exp(x)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"0\"}],"
+                    "\"precision\":40}", 200u, "value", "1");
+    expect_response("/integrator-eval",
+                    "{\"expression\":\"exp(-x)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"inf\"}],"
+                    "\"precision\":40}", 200u, "value", "1");
+    expect_response("/integrator-eval",
+                    "{\"expression\":\"exp(Li(x))\",\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"1\"}],"
+                    "\"precision\":17}", 200u, "value", "0.6243299885");
 }
 
 static void test_lab_extra_function(void)

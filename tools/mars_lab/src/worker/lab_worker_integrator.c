@@ -181,7 +181,7 @@ static int parse_number_bound(const char *text, int precision, number_t *out)
 
     if (!out)
         return 1;
-    *out = num_new();
+    *out = NUM_NAN;
     if (parse_infinity_bound(text, out) == 0)
         return 0;
     rc = parse_number_expression(text, precision, out);
@@ -198,7 +198,7 @@ static expr_t *parse_bound_expression(const char *text, int precision)
     char *wrapped_input = NULL;
     expr_t *expr = NULL;
     expr_t *simplified = NULL;
-    number_t value = num_new();
+    number_t value = NUM_NAN;
 
     if (!text) {
         num_destroy(&value);
@@ -669,9 +669,10 @@ int lab_worker_integrator(int argc, char **argv)
     char **hi_display_inputs = NULL;
     char **lo_TeX_inputs = NULL;
     char **hi_TeX_inputs = NULL;
-    number_t value_num = num_new();
-    number_t error_num = num_new();
-    number_t symbolic_num = num_new();
+    /* Output-producing calls replace these slots; do not allocate values they would discard. */
+    number_t value_num = NUM_NAN;
+    number_t error_num = NUM_NAN;
+    number_t symbolic_num = NUM_NAN;
     char *expr_text = NULL;
     char *binding_expr_text = NULL;
     char *TeX_text = NULL;
@@ -954,8 +955,8 @@ int lab_worker_integrator(int argc, char **argv)
         if (used_partial_symbolic_numeric && all_bounds_numeric && ndim > 1u) {
             num_destroy(&value_num);
             num_destroy(&error_num);
-            value_num = num_new();
-            error_num = num_new();
+            value_num = NUM_NAN;
+            error_num = NUM_NAN;
             intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num, &value_num, &error_num);
             if (intg_rc >= 0)
                 used_partial_symbolic_numeric = 0;

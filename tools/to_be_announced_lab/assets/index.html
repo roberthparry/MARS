@@ -302,7 +302,7 @@
               <li><code>Exogenous columns</code>: tick one or more supporting columns from the scrollable list.</li>
               <li><code>Exogenous date column</code>: the date column in the exogenous file, usually <code>DATE</code>.</li>
               <li><code>Models</code>: tick one or more model families. The output table shows a mean and standard error for each selected model.</li>
-              <li><code>Detected frequency</code>: how often the target data appears to be recorded. Most council reporting here will usually be <code>Monthly</code>.</li>
+              <li><code>Detected frequency</code>: how often the target data appears to be recorded. For example, data recorded once a month has a <code>Monthly</code> frequency.</li>
               <li><code>Year type</code>: choose <code>Fiscal Apr-Mar</code> if you want the forecast to align with the UK financial year.</li>
               <li><code>Confidence level</code>: the confidence level for the forecast bands. <code>0.95</code> is the usual choice.</li>
             </ul>
@@ -315,7 +315,7 @@
               <li><code>ARIMA</code>: best when you want the model to use the history of the target series by itself.</li>
               <li><code>ARIMAX</code>: use this when you want both the target history and outside drivers such as population.</li>
               <li><code>SARIMA</code>: use this when the pattern repeats over the year, for example monthly seasonal swings.</li>
-              <li><code>SARIMAX</code>: usually the strongest practical choice for monthly council data when you have both seasonality and outside drivers.</li>
+              <li><code>SARIMAX</code>: use this for monthly data when you have both seasonality and outside drivers.</li>
               <li><code>Auto-ARIMA</code>: helpful if you do not want to choose all the order settings by hand, but still check the results rather than assuming the search is always best.</li>
             </ul>
           </div>
@@ -332,7 +332,7 @@
               <li><code>Season length</code>: the repeating pattern to use for <code>SARIMA</code>, <code>SARIMAX</code>, and potentially <code>Auto-ARIMA</code>. Choose labels such as <code>None</code>, <code>Quarterly</code>, <code>Every 4 months</code>, <code>Half-yearly</code>, or <code>Yearly</code>; the lab converts the choice to the model's numeric setting.</li>
             </ul>
             <p>The lab can suggest a sensible first set of these settings for you from the detected frequency and chosen model. Use <code>Use suggested settings</code> if you want a good practical starting point.</p>
-            <p>Good practical starting points for monthly council data are often:</p>
+            <p>Good practical starting points for monthly data are often:</p>
             <ul>
               <li><code>ARIMA</code>: <code>p=1, d=1, q=0</code></li>
               <li><code>SARIMA</code>: <code>p=1, d=1, q=0</code>, with <code>P=1</code> only when a strong repeating pattern is detected.</li>
@@ -418,7 +418,7 @@
                 Very narrow bands on a volatile series may be overconfident.
               </li>
             </ul>
-            <p>For council use, a practical summary is:
+            <p>For planning, a practical summary is:
             Exceptional means the forecast is accurate, stable, and easy to explain.
             Excellent and very good are usually strong enough for planning.
             Good may still be useful if the service is volatile.

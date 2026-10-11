@@ -145,7 +145,7 @@ static char *number_text_dup(number_t value)
 
 static char *number_TeX_dup(number_t value)
 {
-    expr_t *expr = expr_new_const(num_clone(value));
+    expr_t *expr = expr_new_const(value);
     char *tex = expr ? expr_text_dup(expr, style_LATEX) : NULL;
 
     expr_free(expr);
@@ -861,10 +861,12 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
             print_expr_scalar_field(matrix, operation, trace);
             return 0;
         } else {
-            number_t trace = num_new();
+            number_t trace = NUM_ZERO;
 
-            if (mat_trace(matrix, &trace) != 0)
+            if (mat_trace(matrix, &trace) != 0) {
+                num_destroy(&trace);
                 return 1;
+            }
             print_number_scalar_field(matrix, operation, trace);
             return 0;
         }
@@ -879,10 +881,12 @@ static int run_scalar_operation(const matrix_t *matrix, const char *operation)
             print_expr_scalar_field(matrix, operation, det);
             return 0;
         } else {
-            number_t det = num_new();
+            number_t det = NUM_ZERO;
 
-            if (mat_det(matrix, &det) != 0)
+            if (mat_det(matrix, &det) != 0) {
+                num_destroy(&det);
                 return 1;
+            }
             print_number_scalar_field(matrix, operation, det);
             return 0;
         }
@@ -952,7 +956,7 @@ static int run_eigenvalue_operation(const matrix_t *matrix)
         if (!eigenvalues)
             return 1;
         for (size_t i = 0; i < n; ++i)
-            eigenvalues[i] = num_new();
+            eigenvalues[i] = NUM_ZERO;
         rc = mat_eigenvalues(matrix, eigenvalues);
         if (rc != 0) {
             for (size_t i = 0; i < n; ++i)
@@ -1010,7 +1014,7 @@ static int run_eigendecompose_operation(const matrix_t *matrix)
         if (!eigenvalues)
             return 1;
         for (size_t i = 0; i < n; ++i)
-            eigenvalues[i] = num_new();
+            eigenvalues[i] = NUM_ZERO;
         rc = mat_eigendecompose(matrix, eigenvalues, &eigenvectors);
         if (rc != 0 || !eigenvectors) {
             mat_free(eigenvectors);

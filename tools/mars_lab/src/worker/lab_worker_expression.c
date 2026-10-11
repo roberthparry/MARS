@@ -919,8 +919,8 @@ static char *numeric_root_family_dup(const number_t seed, long order, int precis
         } else {
             number_t turn = num_new();
             number_t angle;
-            number_t sine = num_new();
-            number_t cosine = num_new();
+            number_t sine = NUM_NAN;
+            number_t cosine = NUM_NAN;
             number_t imaginary;
             number_t rotation;
 

@@ -182,9 +182,12 @@ static bool lab_test_worker_execution(const char *directory)
     output = NULL;
     configured = setenv("MARS_LAB_OPHELIA_BINARY", "/missing-lab-worker", 1) == 0;
     ran = configured && lab_proc_run_worker(cat, directory, NULL, 5000, 4096, &output, &status);
-    ok = !ran && errno == ENOENT && status == -1 && ok;
+    /* As with generic execution, POSIX permits a spawn error or a failed child exit. */
+    bool missing = (!ran && errno == ENOENT && status == -1) || (ran && status == 127);
+    ok = configured && missing && ok;
     if (!ok)
-        string_fprintf(stderr, "Missing worker override: ran=%d status=%d errno=%d\n", ran, status, errno);
+        string_fprintf(stderr, "Missing worker override: ran=%d status=%d errno=%d output=[%S]\n", ran, status, errno,
+                       output);
     string_free(output);
     string_free(input);
     return ok;

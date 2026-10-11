@@ -120,9 +120,9 @@ bool test_lab_isolated(bool (*callback)(const char *directory))
     const char *directory = file_path(root);
     pid_t child = fork();
     if (!child) {
-        char *root = getcwd(NULL, 0);
+        char *working_directory = getcwd(NULL, 0);
         string_t *state = string_sprintf("%s/state.json", directory);
-        string_t *asset = root ? string_sprintf("%s/tools/mars_lab/assets/index.html", root) : NULL;
+        string_t *asset = working_directory ? string_sprintf("%s/tools/mars_lab/assets/index.html", working_directory) : NULL;
         bool ready = state && asset && !setenv("MARS_HOME", directory, 1) &&
                      !setenv("MARS_LAB_STATE_FILE", string_c_str(state), 1) &&
                      !setenv("MARS_LAB_ASSET_FILE", string_c_str(asset), 1) &&
@@ -130,8 +130,11 @@ bool test_lab_isolated(bool (*callback)(const char *directory))
                      !unsetenv("MARS_LAB_CONTROL_QUERY_PARAM");
         string_free(state);
         string_free(asset);
-        free(root);
-        _exit(ready && callback(directory) ? 0 : 1);
+        free(working_directory);
+        bool passed = ready && callback(directory);
+        /* Release this process's inherited handle; only the parent removes the directory. */
+        file_free(root);
+        _exit(passed ? 0 : 1);
     }
     int status = 0;
     pid_t waited = -1;
