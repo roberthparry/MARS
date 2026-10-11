@@ -215,15 +215,15 @@ examples are in the [expression guide](../expression.md#fourier-transforms).
 
 | Source $f(t)$ | Forward transform | Status |
 | --- | --- | --- |
-| $e^{-at^2+bt+d}$ | $\sqrt{\pi/a}\exp(d-(\omega+ib)^2/(4a))$ | Both directions, $\Re(a)>0$. |
+| $e^{-at^2+bt+d}$ | $\sqrt{\pi/a}\exp(d-(\omega+ib)^2/(4a))$ | Both directions, $\mathfrak{Re}(a)>0$. |
 | $\operatorname{rect}(t)$ | $\operatorname{sinc}(\omega/(2\pi))$ | Both directions; real affine arguments. |
 | $\operatorname{tri}(t)$ | $\operatorname{sinc}^2(\omega/(2\pi))$ | Both directions, including real affine scaling of sinc-squared. |
 | $\operatorname{sinc}(t)$ | $\operatorname{rect}(\omega/(2\pi))$ | Both directions; normalised sinc. |
-| $e^{-a\lvert t\rvert}$ | $2a/(a^2+\omega^2)$ | Both directions, $\Re(a)>0$. Quadratic reciprocals also support real translations. |
-| $e^{-at}\operatorname{step}(t)$ | $1/(a+i\omega)$ | Both directions, $\Re(a)>0$; reversed gates and imaginary-rate linear reciprocals are also supported. |
+| $e^{-a\lvert t\rvert}$ | $2a/(a^2+\omega^2)$ | Both directions, $\mathfrak{Re}(a)>0$. Quadratic reciprocals also support real translations. |
+| $e^{-at}\operatorname{step}(t)$ | $1/(a+i\omega)$ | Both directions, $\mathfrak{Re}(a)>0$; reversed gates and imaginary-rate linear reciprocals are also supported. |
 | $\operatorname{sech}(t)$ | $\pi\operatorname{sech}(\pi\omega/2)$ | Both directions; real affine arguments. |
-| $\sinh^n(t)$ | $2^{-(n+1)}[\mathrm B((-n+i\omega)/2,n+1)+e^{i\pi n}\mathrm B((-n-i\omega)/2,n+1)]$ | Both directions for $-1<\Re(n)<0$; principal powers and real affine arguments. Absolute sinh powers omit the phase factor. |
-| $\cosh^n(t)$ | $2^{-(n+1)}\mathrm B((-n+i\omega)/2,(-n-i\omega)/2)$ | Both directions for $\Re(n)<0$; real affine arguments. Reciprocal/sech powers are included. |
+| $\sinh^n(t)$ | $2^{-(n+1)}[\mathrm B((-n+i\omega)/2,n+1)+e^{i\pi n}\mathrm B((-n-i\omega)/2,n+1)]$ | Both directions for $-1<\mathfrak{Re}(n)<0$; principal powers and real affine arguments. Absolute sinh powers omit the phase factor. |
+| $\cosh^n(t)$ | $2^{-(n+1)}\mathrm B((-n+i\omega)/2,(-n-i\omega)/2)$ | Both directions for $\mathfrak{Re}(n)<0$; real affine arguments. Reciprocal/sech powers are included. |
 | $J_n(t)$ | $2(-i)^n T_{\lvert n\rvert}(\omega)/\sqrt{1-\omega^2}$ for $\lvert\omega\rvert<1$, zero for $\lvert\omega\rvert>1$ | Integer $n$, including negative orders; real affine arguments in both directions. The inverse transform of $J_n$ uses coefficient $i^n/\pi$. Singular support edges have no finite pointwise value. |
 | $T_n(t)\operatorname{rect}(t/2)/\sqrt{1-t^2}$ | $\pi(-i)^nJ_n(\omega)$ | Non-negative integral $n$. The inverse coefficient is $i^n/2$. Recognised directly, including real affine arguments. |
 | $e^{-a^2t^2/2}\mathcal H_n(at)$ | $\sqrt{2\pi}(-i)^n e^{-\omega^2/(2a^2)}\mathcal H_n(\omega/a)/\lvert a\rvert$ | Non-negative integral $n$, real non-zero $a$; translations also supported. Inverse coefficient $i^n/(\sqrt{2\pi}\lvert a\rvert)$. $\mathcal H_n$ is physicists' Hermite, distinct from harmonic $H_n$. |
@@ -240,8 +240,8 @@ examples are in the [expression guide](../expression.md#fourier-transforms).
 | $\coth t$ | $-i\pi\coth(\pi\omega/2)$ | Both directions, with symmetric cancellation at both poles. Numerical spectrum for real $\omega\ne0$; inverse for real $t\ne0$. Real affine arguments and reciprocal `tanh` notation. |
 | $\operatorname{atanh}t$ | $i\pi^2\delta(\omega)-2\pi i\operatorname{step}(\omega)\operatorname{sinc}(\omega/\pi)$ | Both directions, with MARS's complex real-axis boundary values; real affine arguments and copied spectra. |
 | $\arcsin t$, $\arccos t$, $\operatorname{acosh}t$ | Bessel-weighted $\operatorname{step}(\omega)/\omega$, plus the exact delta correction | Both directions, with real affine arguments. Half-line quotients retain a unit-cutoff finite part internally; copied spectra use the same convention. The real-axis identity $\operatorname{acosh}t=i\arccos t$ fixes the complex branch. See the expression guide. |
-| $\Gamma(a+ibt)$ | $2\pi\exp(a\omega/b-e^{\omega/b})/|b|$ | Both directions for $\operatorname{Re}(a)>0$, real $b\ne0$. Explicit real-axis gamma requests receive a non-existence diagnostic. |
-| $\Gamma(x)$ along $\operatorname{Re}(x)>0$ | $2\pi\exp(k\operatorname{Re}(x)-e^k)$ | Shorthand selects $\operatorname{Im}(x)\to k$, with the real coordinate fixed. A copied inverse reconstructs $\Gamma(x)$ on that half-plane. |
+| $\Gamma(a+ibt)$ | $2\pi\exp(a\omega/b-e^{\omega/b})/|b|$ | Both directions for $\mathfrak{Re}(a)>0$, real $b\ne0$. Explicit real-axis gamma requests receive a non-existence diagnostic. |
+| $\Gamma(x)$ along $\mathfrak{Re}(x)>0$ | $2\pi\exp(k\mathfrak{Re}(x)-e^k)$ | Shorthand selects $\mathfrak{Im}(x)\to k$, with the real coordinate fixed. A copied inverse reconstructs $\Gamma(x)$ on that half-plane. |
 | $\arctan t$ | $-i\pi e^{-|\omega|}/\omega$ | Both directions, with symmetric cancellation at zero in the spectrum. Numerical spectrum for real $\omega\ne0$; inverse for all real $t$. Real affine arguments and independently copied spectra. |
 | $\operatorname{asinh}t$ | $-2iK_0(|\omega|)/\omega$ | Both directions, real affine arguments and copied spectra. Symmetric cancellation at zero; numerical spectrum for real $\omega\ne0$, inverse for all real $t$. |
 | $\cos(at+b)$, $\sin(at+b)$, $e^{iat+b}$ | Shifted impulses with their phase factors | Both directions for real harmonic rates. |
@@ -325,9 +325,9 @@ The formulas below may be rendered in an algebraically equivalent form.
 
 ### Elementary functions
 
-Write $\sigma=\operatorname{Re}(s)$,
-$C(a):\sigma>\operatorname{Re}(ia),\ \sigma>\operatorname{Re}(-ia)$, and
-$H(a):\sigma>\operatorname{Re}(a),\ \sigma>\operatorname{Re}(-a)$.
+Write $\sigma=\mathfrak{Re}(s)$,
+$C(a):\sigma>\mathfrak{Re}(ia),\ \sigma>\mathfrak{Re}(-ia)$, and
+$H(a):\sigma>\mathfrak{Re}(a),\ \sigma>\mathfrak{Re}(-a)$.
 For real $a$, these reduce to $\sigma>0$ and
 $\sigma>\lvert a\rvert$, respectively.
 
@@ -335,11 +335,11 @@ $\sigma>\lvert a\rvert$, respectively.
 | --- | --- | --- |
 | Zero | $0$ | Every finite $s$ |
 | Constant $c$ | $c/s$ | $\sigma>0$; source-independent functions count as constants |
-| `pow`, `pow_xp`: $t^\nu$ | $\Gamma(\nu+1)/s^{\nu+1}$ | $\operatorname{Re}(\nu)>-1,\ \sigma>0$ |
+| `pow`, `pow_xp`: $t^\nu$ | $\Gamma(\nu+1)/s^{\nu+1}$ | $\mathfrak{Re}(\nu)>-1,\ \sigma>0$ |
 | `sqrt`: $\sqrt t$ | $\sqrt\pi/(2s^{3/2})$ | $\sigma>0$ |
 | `cubrt`: $t^{1/3}$ | $\Gamma(4/3)/s^{4/3}$ | $\sigma>0$ |
-| `root`: $t^{1/n}$ | $\Gamma(1+1/n)/s^{1+1/n}$ | Where reduced to the power rule; $\operatorname{Re}(1/n)>-1,\ \sigma>0$ |
-| `exp`, powers of `e`: $e^{at+b}$ | $e^b/(s-a)$ | $\sigma>\operatorname{Re}(a)$ |
+| `root`: $t^{1/n}$ | $\Gamma(1+1/n)/s^{1+1/n}$ | Where reduced to the power rule; $\mathfrak{Re}(1/n)>-1,\ \sigma>0$ |
+| `exp`, powers of `e`: $e^{at+b}$ | $e^b/(s-a)$ | $\sigma>\mathfrak{Re}(a)$ |
 | `sin`: $\sin(at+b)$ | $(a\cos b+s\sin b)/(s^2+a^2)$ | $C(a)$ |
 | `cos`: $\cos(at+b)$ | $(s\cos b-a\sin b)/(s^2+a^2)$ | $C(a)$ |
 | `sinh`: $\sinh(at+b)$ | $(a\cosh b+s\sinh b)/(s^2-a^2)$ | $H(a)$ |
@@ -357,7 +357,7 @@ $\sigma>\lvert a\rvert$, respectively.
 | `abs`: $\lvert at+b\rvert$, no positive zero | $\epsilon(a/s^2+b/s)$ | Known real $a,b$, $\epsilon=\operatorname{sgn}(b)$ if $b\ne0$, otherwise $\operatorname{sgn}(a)$; $\sigma>0$ |
 | `abs`: $\lvert at+b\rvert$, $ab<0$ | $\operatorname{sgn}(b)(a/s^2+b/s)+2\lvert a\rvert e^{sb/a}/s^2$ | Known real $a,b$, positive zero $-b/a$; $\sigma>0$ |
 | `conj`: $\overline{at+b}$ | $\overline a/s^2+\overline b/s$ | $\sigma>0$; $s$ is not conjugated |
-| `realpart`: $\operatorname{Re}(at+b)$ | $\operatorname{Re}(a)/s^2+\operatorname{Re}(b)/s$ | $\sigma>0$; the source coordinate is real |
+| `realpart`: $\mathfrak{Re}(at+b)$ | $\mathfrak{Re}(a)/s^2+\mathfrak{Re}(b)/s$ | $\sigma>0$; the source coordinate is real |
 | `floor`: $\lfloor at\rfloor$ | $1/[s(e^{s/a}-1)]$ | Known real $a>0,\ \sigma>0$ |
 | `ceil`: $\lceil at\rceil$ | $1/[s(1-e^{-s/a})]$ | Known real $a>0,\ \sigma>0$ |
 
@@ -376,8 +376,8 @@ $\quad\begin{array}{l}\displaystyle A(a,s)=\frac{e^{-is/a}E_1(-is/a)-e^{is/a}E_1
 
 | Expression function / source $f(t)$ | Transform $F(s)$ | Conditions / supported form |
 | --- | --- | --- |
-| `tanh`: $\tanh(at)$ | $[2\psi(z+\tfrac12)-\psi(z)-\psi(z+1)]/(4a)$ | $\sigma>0,\ \operatorname{Re}(q)>0$; $a=0$ gives zero |
-| `sech`: $\operatorname{sech}(at)$ | $[\psi(z+\tfrac34)-\psi(z+\tfrac14)]/(2q)$ | $\sigma>-\operatorname{Re}(q),\ \operatorname{Re}(q)>0$; known non-real rates are not matched; $a=0$ gives $1/s$ |
+| `tanh`: $\tanh(at)$ | $[2\psi(z+\tfrac12)-\psi(z)-\psi(z+1)]/(4a)$ | $\sigma>0,\ \mathfrak{Re}(q)>0$; $a=0$ gives zero |
+| `sech`: $\operatorname{sech}(at)$ | $[\psi(z+\tfrac34)-\psi(z+\tfrac14)]/(2q)$ | $\sigma>-\mathfrak{Re}(q),\ \mathfrak{Re}(q)>0$; known non-real rates are not matched; $a=0$ gives $1/s$ |
 | `atan`: $\arctan(at)$ | $\operatorname{sgn}(a)A(\lvert a\rvert,s)$ | Known real $a\ne0,\ \sigma>0$; $a=0$ gives zero |
 | `acot`: $\operatorname{arccot}(at)$ | $\pi/(2s)-\operatorname{sgn}(a)A(\lvert a\rvert,s)$ | Known real $a\ne0,\ \sigma>0$; branch $\operatorname{arccot}x=\pi/2-\arctan x$; $a=0$ gives $\pi/(2s)$ |
 | `asinh`: $\operatorname{arsinh}(at)$ | $\operatorname{sgn}(a)\pi[\mathbf H_0(s/\lvert a\rvert)-Y_0(s/\lvert a\rvert)]/(2s)$ | Known real $a\ne0,\ \sigma>0$; $a=0$ gives zero |
@@ -441,11 +441,11 @@ Do not replace $\sqrt{a^2}$ by $a$ without the required branch assumption.
 
 | Expression function / source $f(t)$ | Transform $F(s)$ | Conditions / supported form |
 | --- | --- | --- |
-| `exp`, powers of `e`: $e^{-At^2+Bt+D}$ | $G(A,B,D;s)$ | $\operatorname{Re}(A)>0$; every finite $s$ |
-| `erf`: $\operatorname{erf}(at+b)$ | $[\operatorname{erf}(b)+R(a,b;s)]/s$ | $\operatorname{Re}(a^2)>0,\ \sigma>0$ |
-| `erfc`: $\operatorname{erfc}(at+b)$ | $[\operatorname{erfc}(b)-R(a,b;s)]/s$ | $\operatorname{Re}(a^2)>0,\ \sigma>0$ |
-| `normal_pdf`, `pdf`: $\phi(at+b)$ | $G(a^2/2,-ab,-b^2/2;s)/\sqrt{2\pi}$ | $\operatorname{Re}(a^2)>0$; every finite $s$ |
-| `normal_cdf`, `cdf`: $\Phi(at+b)$ | $[\operatorname{erfc}(-b/\sqrt2)-R(-a/\sqrt2,-b/\sqrt2;s)]/(2s)$ | $\operatorname{Re}(a^2)>0,\ \sigma>0$ |
+| `exp`, powers of `e`: $e^{-At^2+Bt+D}$ | $G(A,B,D;s)$ | $\mathfrak{Re}(A)>0$; every finite $s$ |
+| `erf`: $\operatorname{erf}(at+b)$ | $[\operatorname{erf}(b)+R(a,b;s)]/s$ | $\mathfrak{Re}(a^2)>0,\ \sigma>0$ |
+| `erfc`: $\operatorname{erfc}(at+b)$ | $[\operatorname{erfc}(b)-R(a,b;s)]/s$ | $\mathfrak{Re}(a^2)>0,\ \sigma>0$ |
+| `normal_pdf`, `pdf`: $\phi(at+b)$ | $G(a^2/2,-ab,-b^2/2;s)/\sqrt{2\pi}$ | $\mathfrak{Re}(a^2)>0$; every finite $s$ |
+| `normal_cdf`, `cdf`: $\Phi(at+b)$ | $[\operatorname{erfc}(-b/\sqrt2)-R(-a/\sqrt2,-b/\sqrt2;s)]/(2s)$ | $\mathfrak{Re}(a^2)>0,\ \sigma>0$ |
 | `normal_logpdf`, `logpdf`: $\ln\phi(at+b)$ | $-a^2/s^3-ab/s^2-[b^2+\ln(2\pi)]/(2s)$ | $\sigma>0$; native quadratic log-density definition |
 
 Zero rates use the constant rule instead of the expressions containing $1/a$.
@@ -457,14 +457,14 @@ In the Bessel rows, write $r=\sqrt{s^2+a^2}$ and $u=a/(s+r)$.
 
 | Expression function / source $f(t)$ | Transform $F(s)$ | Conditions / supported form |
 | --- | --- | --- |
-| `E1`: $E_1(at)$ | $\ln(1+s/a)/s$ | Known positive real $a$, or symbolic $a$ guarded by $\operatorname{Re}(a)>0$; $\sigma>0$ |
+| `E1`: $E_1(at)$ | $\ln(1+s/a)/s$ | Known positive real $a$, or symbolic $a$ guarded by $\mathfrak{Re}(a)>0$; $\sigma>0$ |
 | `Ei`: $\operatorname{Ei}(at)$, $a>0$ | $-\ln(s/a-1)/s$ | Known real $a>0,\ \sigma>a$ |
 | `Ei`: $\operatorname{Ei}(at)$, $a<0$ | $-\ln(1+s/\lvert a\rvert)/s$ | Known real $a<0,\ \sigma>0$ |
-| `gammainc_lower`: $\gamma(\nu,at)$ | $\Gamma(\nu)P_\nu/s$ | $\operatorname{Re}(\nu)>0,\ \sigma>0$; scale as for `E1` |
+| `gammainc_lower`: $\gamma(\nu,at)$ | $\Gamma(\nu)P_\nu/s$ | $\mathfrak{Re}(\nu)>0,\ \sigma>0$; scale as for `E1` |
 | `gammainc_upper`: $\Gamma(\nu,at)$ | $\Gamma(\nu)(1-P_\nu)/s$ | Same restrictions |
 | `gammainc_P`: $P(\nu,at)$ | $P_\nu/s$ | Same restrictions |
 | `gammainc_Q`: $Q(\nu,at)$ | $(1-P_\nu)/s$ | Same restrictions |
-| `bessel_j`: $J_\nu(at)$ | $u^\nu/r$ | Known real $a>0,\ \operatorname{Re}(\nu)>-1,\ \sigma>0$ |
+| `bessel_j`: $J_\nu(at)$ | $u^\nu/r$ | Known real $a>0,\ \mathfrak{Re}(\nu)>-1,\ \sigma>0$ |
 | `bessel_j`: $J_{-n}(at)$ | $(-1)^n u^n/r$ | Known positive integer $n$, known real $a>0,\ \sigma>0$ |
 | `bessel_j(0,...)`, `J_0`: $J_0(at)$ | $1/\sqrt{s^2+a^2}$ | $C(a)$; this zero-order rule also supports symbolic and complex scales |
 | `bessel_y`: $Y_0(at)$ | $-2\ln((s+r)/a)/(\pi r)$ | Known real $a>0,\ \sigma>0$ |
@@ -502,7 +502,7 @@ $G(s)=\mathcal L\{g(t)\}(s)$.
 | $t^n f(t)$ | $(-1)^n F^{(n)}(s)$ | Recognised finite non-negative integer time powers and an available symbolic derivative |
 | $\cos^n(at)$ | $2^{-n}\sum_{j=0}^{n}\binom nj\,s/[s^2+(n-2j)^2a^2]$ | Known real rate $a$, non-negative integer $n$, $\sigma>0$; symbolic $n$ retains an integer guard |
 | $\sin^n(at)$ | $(2i)^{-n}\sum_{j=0}^{n}(-1)^j\binom nj/[s-i(n-2j)a]$ | Same restrictions |
-| $\cosh^n(at+b)$ | $2^{-n}\sum_{j=0}^{n}\binom nj\,e^{(n-2j)b}/[s-(n-2j)a]$ | Known integer $0\le n\le16$; $\sigma>\operatorname{Re}(na),\ \sigma>\operatorname{Re}(-na)$ |
+| $\cosh^n(at+b)$ | $2^{-n}\sum_{j=0}^{n}\binom nj\,e^{(n-2j)b}/[s-(n-2j)a]$ | Known integer $0\le n\le16$; $\sigma>\mathfrak{Re}(na),\ \sigma>\mathfrak{Re}(-na)$ |
 | $\sinh^n(at+b)$ | $2^{-n}\sum_{j=0}^{n}(-1)^j\binom nj\,e^{(n-2j)b}/[s-(n-2j)a]$ | Same restrictions |
 
 Small integer circular powers may instead be returned as rational functions.

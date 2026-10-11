@@ -129,7 +129,7 @@ static void test_from_string_laplace(void)
     check_parse_num("Laplace explicit target", "{Laplace(t,t,p) | p=2}", "1/4", __LINE__);
     check_parse_expr("Laplace canonical call", "@L(f(t),t,p)", "{ ℒ(f(t), t, p) | p = NAN }", __LINE__);
     check_parse_TeX("Laplace convergence", "@L(t)",
-                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\operatorname{Re}(s)>0) \\;\\middle|\\; s = NAN \\right\\}",
+                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\mathfrak{Re}(s)>0) \\;\\middle|\\; s = NAN \\right\\}",
                     __LINE__);
 }
 
@@ -3259,7 +3259,7 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ exp(pi*sqrt(x)) | x = 163 }", &bindings);
     char *got = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *want = "{ exp(π·√(x)) | x = 163 }";
+    const char *want = "{ exp(π·√x) | x = 163 }";
 
     if (expr && got && str_eq(got, want) && expr_bindings_count(bindings) == 1u &&
         expr_bindings_get(bindings, "x") != NULL && expr_bindings_get(bindings, "@pi") == NULL)
@@ -3337,22 +3337,22 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     check_parse_expr("constant bindings accept semicolon separators",
                      "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
                      "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }", __LINE__);
-    check_parse_expr("const-only binding preserves leading semicolon", "{ exp(π·√(H)) | ;H = 163 }",
-                     "{ exp(π·√(H)) | ; H = 163 }", __LINE__);
+    check_parse_expr("const-only binding preserves leading semicolon", "{ exp(π·√H) | ;H = 163 }",
+                     "{ exp(π·√H) | ; H = 163 }", __LINE__);
     check_parse_expr("const-only binding accepts trailing digit subscript", "{ exp(π·√(H8)) | ; H8 = 163 }",
                      "{ exp(π·√(H₈)) | ; H₈ = 163 }", __LINE__);
     check_parse_expr("minus after factor remains subtraction", "{ exp(π·√(H8))-(5x)^3 | H8 = 163, x = NAN }",
                      "{ exp(π·√(H₈)) - (5x)³ | H₈ = 163, x = NAN }", __LINE__);
     check_parse_expr("absolute-value bars omit inner spaces", "{ exp(pi*sqrt(x)) - | exp(pi*sqrt(x)) | | x = NAN }",
-                     "{ exp(π·√(x)) - |exp(π·√(x))| | x = NAN }", __LINE__);
+                     "{ exp(π·√x) - |exp(π·√x)| | x = NAN }", __LINE__);
     check_parse_expr("symbolic pi quotient cancels powers", "{ pi/pi^2 }", "π/π²", __LINE__);
     check_parse_simplified_expr(
         "generated derivative with NaN bindings simplifies explicitly",
         "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
         "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = NAN, z = NAN, x = NAN }", __LINE__);
     check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
-                                "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
-                                "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }", __LINE__);
+                                "{ (-2π·exp(π·√x) + 2·π²·√x·exp(π·√x))/(2·√x)/(2·√x)² | x = 163 }",
+                                "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }", __LINE__);
     check_parse_simplified_expr(
         "nested rational derivative numerator canonicalizes",
         "{ (2*(x^2 + 3*x + 5)*(2*(x + 1)*(2*x + 3) - 9*x - (-x - 1)*(2*x + 3) - 3*x^2 - 15) - 6*(2*x + 3)*((-x - "
@@ -3523,12 +3523,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }") == 0) {
         to_string_pass("symbolic pi derivative keeps exact coefficient", deriv_text,
-                       "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }");
+                       "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic pi derivative keeps exact coefficient",
-                       deriv_text ? deriv_text : "(null)", "{ ¼π·exp(π·√(x))/x^³⁄₂·(π·√(x) - 1) | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }");
     }
 
     free(deriv_text);
@@ -3544,12 +3544,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }") == 0) {
         to_string_pass("symbolic coefficient folding happens in derivative DAG", deriv_text,
-                       "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }");
+                       "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic coefficient folding happens in derivative DAG",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = ⅙π }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }");
     }
 
     free(deriv_text);
@@ -3560,17 +3560,17 @@ static void test_from_string_bindings_with_constant_expression_value(void)
         expr_free(expr);
 
     bindings = NULL;
-    expr = expr_from_string("{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }", &bindings);
+    expr = expr_from_string("{ π·exp(π·√x)·(π·√x - 1)/(4x^³⁄₂) | x = 163 }", &bindings);
     x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }") == 0) {
         to_string_pass("nested symbolic pi derivative factors common terms", deriv_text,
-                       "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }");
+                       "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "nested symbolic pi derivative factors common terms",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√(x))/x^⁵⁄₂·(3 - 3π·√(x) + π²·x) | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }");
     }
 
     free(deriv_text);
@@ -4291,7 +4291,7 @@ static void test_from_string_unevaluated_integral(void)
     expr = expr_from_string("{ @S^z exp(-x^2)dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    if (text && strstr(text, "√(π)·erf(z)") && strstr(text, "z = NAN")) {
+    if (text && strstr(text, "√π·erf(z)") && strstr(text, "z = NAN")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S substitutes its explicit upper variable in the antiderivative\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4318,7 +4318,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S_0^1 exp(-x^2)dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "√(π)") && strstr(text, "erf(1) - erf(0)") && strstr(text, "∫") == NULL) {
+    if (text && strstr(text, "√π") && strstr(text, "erf(1) - erf(0)") && strstr(text, "∫") == NULL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " bounded @S returns a completed expression\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {

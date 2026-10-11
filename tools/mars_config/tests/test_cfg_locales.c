@@ -13,11 +13,11 @@
 #include <string.h>
 
 #include "file.h"
+#include "sqlite.h"
 #include "json.h"
 #include "lab_process.h"
-#include "sqlite.h"
-#include "test_cfg_support.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
 
 static const char *const test_cfg_locales_check_message =
     "Calendar locale seed matches Babel 2.17.0 / CLDR 46 and explicit supplements.\n";

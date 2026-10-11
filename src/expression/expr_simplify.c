@@ -2939,6 +2939,9 @@ expr_t *expr_simplify_unary_operator(const expr_t *expr, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(expr, &ops_sqrt)) {
+        expr_t *quotient = expr_simplify_try_sqrt_square_denominator(a);
+        if (quotient)
+            return quotient;
         expr_t *sqrt_scaled = expr_simplify_try_sqrt_scaled_square_const(a);
 
         if (sqrt_scaled)

@@ -150,6 +150,7 @@ static const char *const commands[] = {
     "mathit",
     "mathnormal",
     "mathop",
+    "mathopen",
     "mathrm",
     "mathsf",
     "mathtt",

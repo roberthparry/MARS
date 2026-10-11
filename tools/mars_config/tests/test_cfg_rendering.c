@@ -26,11 +26,11 @@
 #include <string.h>
 #include <time.h>
 
-#include "datetime.h"
 #include "file.h"
+#include "datetime.h"
 #include "sqlite.h"
-#include "test_cfg_support.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
 
 typedef struct {
     int year, month, day;

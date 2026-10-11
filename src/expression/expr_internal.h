@@ -815,6 +815,14 @@ expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg);
+
+/**
+ * @brief Extract a certified positive square denominator from a rational radicand.
+ * @param arg Owned radicand, consumed only on success; its principal square-root branch is preserved.
+ * @return Owned simplified root quotient, or NULL without consuming arg.
+ */
+expr_t *expr_simplify_try_sqrt_square_denominator(expr_t *arg);
+
 expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den);
 expr_t *expr_simplify_direct_inverse_pair(const expr_t *outer, expr_t *inner);
 expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer, const expr_t *raw_inner,

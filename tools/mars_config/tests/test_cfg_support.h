@@ -19,6 +19,9 @@ void test_cfg_storage_cases(void);
 /** Register weather configuration tests. */
 void test_cfg_weather_cases(void);
 
+/** Register live progress and redirected-output tests. */
+void test_cfg_progress_cases(void);
+
 /** Register database installation tests. */
 void test_cfg_database_cases(void);
 

@@ -9,6 +9,8 @@
  * domain restrictions when extending these operations.
  */
 
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
@@ -270,6 +272,27 @@ expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
 
     num_destroy(&folded);
     num_destroy(&value);
+    return out;
+}
+
+/* Dividing by a positive integer preserves the principal branch, including negative radicands. */
+expr_t *expr_simplify_try_sqrt_square_denominator(expr_t *arg)
+{
+    number_t numerator = NUM_NAN, denominator_root = NUM_NAN;
+    if (!expr_simplify_is_plain_real_const(arg) ||
+        !num_extract_square_denominator(arg->c, &numerator, &denominator_root))
+        return NULL;
+    expr_t *integer = expr_new_const(numerator);
+    expr_t *root = integer ? expr_sqrt(integer) : NULL;
+    expr_t *divisor = expr_new_const(denominator_root);
+    expr_t *out = root && divisor ? expr_div_simplify_owned(expr_clone(root), expr_clone(divisor)) : NULL;
+    expr_free(divisor);
+    expr_free(root);
+    expr_free(integer);
+    num_destroy(&denominator_root);
+    num_destroy(&numerator);
+    if (out)
+        expr_free(arg);
     return out;
 }
 

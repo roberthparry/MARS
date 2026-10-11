@@ -1772,7 +1772,7 @@ static void test_to_string_unary_sqrt_expr(void)
     expr_t *x = test_expr_new_named_var_d(4.0, "x");
     expr_t *f = expr_sqrt(x);
     char *got = expr_to_string(f, style_EXPRESSION);
-    const char *want = "{ √(x) | x = 4 }";
+    const char *want = "{ √x | x = 4 }";
 
     if (str_eq(got, want))
         to_string_pass("unary sqrt (EXPR)", got, want);
@@ -2430,6 +2430,298 @@ static void test_to_string_function_uses_lowercase_builtin_names(void)
  * TEST SUITE RUNNER
  * ============================================================ */
 
+static void test_to_string_conjugate_overbar_TeX(void)
+{
+    static const struct { const char *source; const char *expected; } cases[] = {
+        {"conj(A)", "\\overline{A}"},
+        {"conj(x+y)", "\\overline{x + y}"},
+        {"conj(A)^2", "\\overline{A}"},
+        {"sqrt(conj(z)+2*z)", "\\overline{z}"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        char *plain = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        bool ok = TeX && strstr(TeX, cases[i].expected) && !strstr(TeX, "conj") &&
+                  plain && strstr(plain, "conj");
+        if (i == 2u)
+            ok = ok && strstr(TeX, "^{2}");
+        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
+        free(plain);
+        free(TeX);
+        expr_free(expr);
+        ASSERT_TRUE(ok);
+    }
+}
+
+static void test_to_string_square_denominator(void)
+{
+    const size_t saved = num_get_default_prec_bits();
+    static const size_t precisions[] = {53u, 256u};
+    static const char *const sources[] = {
+        "7/625", "-7/625", "-1957044392389164807/62500000000",
+        "7/6250000000000000000000000000000000000000000"
+    };
+    bool ok = true;
+    for (size_t p = 0; p < sizeof(precisions) / sizeof(*precisions); ++p) {
+        num_set_default_prec_bits(precisions[p]);
+        for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
+            /* The very large exact fraction needs the wider rational working budget. */
+            if (p == 0 && i == 3)
+                continue;
+            number_t value = num_create_from_string(sources[i]);
+            expr_t *atom = expr_new_const(value);
+            expr_t *root = expr_sqrt(atom);
+            expr_t *raw = i == 2 ? expr_mul_long(root, 10000) : expr_clone(root);
+            expr_t *simplified = raw ? expr_simplify(raw) : NULL;
+            char *TeX = simplified ? expr_to_TeX_body(simplified) : NULL;
+            char *plain = simplified ? expr_to_string(simplified, style_EXPRESSION) : NULL;
+            char *function = simplified ? expr_to_string(simplified, style_FUNCTION) : NULL;
+            printf("  %zu bits: %s -> %s\n", precisions[p], sources[i], TeX ? TeX : "NULL");
+            ok = ok && TeX && plain && function && !strstr(TeX, "625") && !strstr(plain, "625") &&
+                 !strstr(function, "625") && strstr(TeX, "25");
+            expr_t *again = simplified ? expr_simplify(simplified) : NULL;
+            char *repeat = again ? expr_to_TeX_body(again) : NULL;
+            ok = ok && repeat && TeX && !strcmp(repeat, TeX);
+            number_t before = expr_eval(raw), after = expr_eval(simplified);
+            number_t delta = num_sub(before, after), error = num_abs(delta), scale = num_abs(before);
+            number_t epsilon = num_create_from_string(p ? "1/1000000000000000000000000000000000000000000000000000000000000"
+                                                       : "1/1000000000000");
+            number_t tolerance = num_mul(scale, epsilon);
+            ok = ok && num_is_finite(after) && num_le(error, tolerance);
+            num_destroy(&tolerance);
+            num_destroy(&epsilon);
+            num_destroy(&scale);
+            num_destroy(&error);
+            num_destroy(&delta);
+            num_destroy(&after);
+            num_destroy(&before);
+            free(repeat);
+            expr_free(again);
+            free(function);
+            free(plain);
+            free(TeX);
+            expr_free(simplified);
+            expr_free(raw);
+            expr_free(root);
+            expr_free(atom);
+            num_destroy(&value);
+        }
+        static const struct { const char *input; const char *expected; } parsed[] = {
+            {"sqrt(7/625)", "\\frac{\\sqrt{7}}{25}"},
+            {"sqrt(-7/625)", "\\frac{\\sqrt{-7}}{25}"},
+            {"sqrt(7/626)", "626"},
+            {"sqrt(0.0112)", "\\frac{\\sqrt{7}}{25}"}
+        };
+        for (size_t i = 0; i < sizeof(parsed) / sizeof(*parsed); ++i) {
+            expr_t *raw = expr_from_string(parsed[i].input, NULL);
+            expr_t *simplified = raw ? expr_simplify(raw) : NULL;
+            char *TeX = simplified ? expr_to_TeX_body(simplified) : NULL;
+            printf("  %zu bits: %s -> %s\n", precisions[p], parsed[i].input, TeX ? TeX : "NULL");
+            ok = ok && TeX && strstr(TeX, parsed[i].expected);
+            free(TeX);
+            expr_free(simplified);
+            expr_free(raw);
+        }
+        number_t inexact = num_create_from_double(0.0112);
+        expr_t *atom = expr_new_const(inexact);
+        expr_t *raw = expr_sqrt(atom);
+        expr_t *simplified = expr_simplify(raw);
+        char *before = expr_to_TeX_body(raw), *after = expr_to_TeX_body(simplified);
+        ok = ok && !num_is_exact(inexact) && before && after && !strcmp(before, after);
+        free(after);
+        free(before);
+        expr_free(simplified);
+        expr_free(raw);
+        expr_free(atom);
+        num_destroy(&inexact);
+    }
+    num_set_default_prec_bits(saved);
+    ASSERT_TRUE(ok);
+}
+
+static void test_to_string_exact_rational_TeX(void)
+{
+    static const struct { const char *source; const char *expected; bool radical; } cases[] = {
+        {"30864197253/250000000000", "\\frac{30864197253}{250000000000}", false},
+        {"-30864197253/250000000000", "-\\frac{30864197253}{250000000000}", false},
+        {"1957044392389164807/62500000000", "\\frac{1957044392389164807}{62500000000}", false},
+        {"-1957044392389164807/62500000000", "\\frac{1957044392389164807}{62500000000}", true}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        number_t value = num_create_from_string(cases[i].source);
+        expr_t *atom = expr_new_const(value);
+        expr_t *expr = cases[i].radical ? expr_sqrt(atom) : expr_clone(atom);
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        bool ok = num_is_exact(value) && TeX && strstr(TeX, cases[i].expected) && !strstr(TeX, ".");
+        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
+        free(TeX);
+        expr_free(expr);
+        expr_free(atom);
+        num_destroy(&value);
+        ASSERT_TRUE(ok);
+    }
+}
+
+static void test_to_string_indexed_principal_roots(void)
+{
+    static const struct { const char *source, *expected; } cases[] = {
+        {"{cubrt(x) | x=2}", "³√x"},
+        {"{root(x,4) | x=2}", "⁴√x"},
+        {"{root(x,12) | x=2}", "¹²√x"},
+        {"{²√(x) | x=2}", "√x"},
+        {"{root(x,2147483647) | x=2}", "²¹⁴⁷⁴⁸³⁶⁴⁷√x"},
+        {"{³√(⁴√(x)) | x=2}", "³√(⁴√x)"},
+        {"{root(x,n) | x=2; n=4}", "root(x, n)"},
+        {"{2*cubrt(x) | x=2}", "2·³√x"},
+        {"{2*root(x,4) | x=2}", "2·⁴√x"},
+        {"{cubrt(x+1) | x=2}", "³√(x + 1)"},
+        {"{cubrt(x^2) | x=-2}", "³√(x²)"},
+        {"{³√x+1 | x=2}", "³√x + 1"},
+        {"{³√x*y | x=2; y=3}", "y·³√x"},
+        {"{cubrt([long name]) | [long name]=2}", "³√([long name])"},
+        {"{cubrt(@alpha) | @alpha=2}", "³√α"},
+        {"{cubrt(x_1) | x_1=2}", "³√(x₁)"},
+        {"{x*cubrt(2) | x=3}", "³√(2)·x"},
+        {"{x*root(2,4) | x=3}", "⁴√(2)·x"},
+        {"{cubrt(x)^2 | x=2}", "³√(x)"},
+        {"{1/root(x,12) | x=2}", "¹²√(x)"},
+        {"{³√(x) | x=-8}", "³√x"},
+        {"{⁴√(x) | x=-16}", "⁴√x"},
+        {"{¹²√(x) | x=3+4i}", "¹²√x"},
+        {"{x | x=³√π}", "³√π"},
+        {"{x | x=⁴√π}", "⁴√π"},
+        {"{x | x=√π}", "√π"},
+        {"{x | x=³√π*2}", "³√π"},
+        {"{x | x=(⁴√π)^2}", "⁴√"},
+        {"{x | x=(³√π)^2}", "³√(π)²"},
+        {"{x | x=³√(2)}", "³√(2)"},
+        {"{x | x=⁴√(2)}", "⁴√(2)"},
+        {"{x | x=2*³√(2)}", "·³√(2)"},
+        {"{x | x=2*¹²√(2)}", "·¹²√(2)"},
+        {"{x^(1/3) | x=-8}", "^⅓"},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        expr_t *parsed = text ? expr_from_string(text, NULL) : NULL;
+        number_t before = expr_eval(expr), after = expr_eval(parsed);
+        number_t difference = num_sub(before, after), error = num_abs(difference);
+        number_t tolerance = num_create_from_string("1/1000000000000");
+        long before_order = 0, after_order = 0;
+        bool before_family = expr_explicit_root_order(expr, &before_order);
+        bool after_family = expr_explicit_root_order(parsed, &after_order);
+        bool ok = expr && parsed && text && strstr(text, cases[i].expected) && num_is_finite(after) &&
+                  num_le(error, tolerance) && before_family == after_family && before_order == after_order;
+        printf("  %s -> %s\n", cases[i].source, text ? text : "NULL");
+        num_destroy(&tolerance);
+        num_destroy(&error);
+        num_destroy(&difference);
+        num_destroy(&after);
+        num_destroy(&before);
+        expr_free(parsed);
+        free(text);
+        expr_free(expr);
+        ASSERT_TRUE(ok);
+    }
+    /* Unsupported numeric orders remain readable function calls, not overflowing radical indices. */
+    expr_t *large = expr_from_string("root(x,2147483648)", NULL);
+    char *large_text = large ? expr_to_string(large, style_UNBOUND) : NULL;
+    bool large_ok = large_text && !strcmp(large_text, "root(x, 2147483648)");
+    free(large_text);
+    expr_free(large);
+    ASSERT_TRUE(large_ok);
+    static const char *const invalid[] = {
+        "⁰√(2)", "¹√(2)", "⁻³√(2)", "³√", "³√()", "³√(2", "²¹⁴⁷⁴⁸³⁶⁴⁸√(2)"
+    };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(*invalid); ++i) {
+        expr_t *expr = expr_from_string(invalid[i], NULL);
+        bool rejected = expr == NULL;
+        expr_free(expr);
+        ASSERT_TRUE(rejected);
+    }
+}
+
+static void test_to_string_complex_projection_TeX(void)
+{
+    static const struct { const char *source; const char *glyph; } cases[] = {
+        {"Re(z)", "Re"}, {"realpart(z)", "Re"}, {"real_part(z)", "Re"}, {"ℜ(z)", "Re"},
+        {"Im(z)", "Im"}, {"imagpart(z)", "Im"}, {"imag_part(z)", "Im"}, {"ℑ(z)", "Im"},
+        {"Re(x+y)", "Re"}, {"Im(x+y)", "Im"}, {"Re(z)^2", "Re"}, {"Im(z)^2", "Im"},
+        {"8*Re(z)", "Re"}, {"8*Im(z)", "Im"}, {"8*Re(z)^2", "Re"}, {"8*Im(z)^2", "Im"},
+        {"Re(z)*x", "Re"}, {"Im(z)*x", "Im"}, {"(1/2)*Re(z)", "Re"}, {"(1/2)*Im(z)", "Im"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        string_t *expected = string_sprintf("\\mathfrak{%s}", cases[i].glyph);
+        bool ok = TeX && expected && strstr(TeX, string_c_str(expected)) && !strstr(TeX, "\\operatorname") &&
+                  strstr(TeX, "\\mathopen{}\\left\\{");
+        if (ok && i >= 12u)
+            ok = strstr(TeX, "\\,") && !strstr(TeX, "\\mkern-2mu");
+        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
+        string_free(expected);
+        free(TeX);
+        expr_free(expr);
+        ASSERT_TRUE(ok);
+    }
+}
+
+static void test_to_string_equal_conjugate_sums(void)
+{
+    static const struct { const char *source; bool paired; } cases[] = {
+        {"A+conj(A)", true}, {"conj(A)+A", true}, {"4*conj(A)+4*A+211", true},
+        {"A+A+2*conj(A)", true}, {"-3*A-3*conj(A)", true}, {"A/3+conj(A)/3", true},
+        {"i*A+i*conj(A)", true}, {"c*A+c*conj(A)", true}, {"exp(z)+conj(exp(z))", true},
+        {"exp(2*x*3*y)+conj(exp(6*y*x))", true}, {"4*A+4*conj(A)-47", true},
+        {"conj(A)+3*A", false}, {"3*A+conj(A)", false}, {"conj(A)+c*A", false},
+        {"A+conj(A)+A", false}, {"A-conj(A)", false}, {"A+conj(B)", false}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *expr = expr_from_string(cases[i].source, NULL);
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        char *plain = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        char *function = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
+        bool ok = TeX && plain && function;
+        if (ok)
+            ok = !strstr(TeX, " + -") && !strstr(plain, " + -") && !strstr(function, " + -");
+        if (ok && cases[i].paired)
+            ok = strstr(TeX, "\\mathfrak{Re}") && !strstr(TeX, "\\overline") &&
+                 strstr(plain, "Re(") && !strstr(plain, "conj") &&
+                 strstr(function, "realpart(") && !strstr(function, "conj");
+        else if (ok)
+            ok = !strstr(TeX, "\\mathfrak{Re}") && strstr(TeX, "\\overline") &&
+                 !strstr(plain, "Re(") && strstr(plain, "conj") &&
+                 !strstr(function, "realpart(") && strstr(function, "conj");
+        printf("  %s -> %s\n  %s\n  %s\n", cases[i].source, TeX ? TeX : "NULL",
+               plain ? plain : "NULL", function ? function : "NULL");
+        string_t *input = string_sprintf("{ %s | A = 2+3*i; B = -1+i; c = 2+i; x = 0.2; y = 0.3; z = 0.4+i }",
+                                          cases[i].source);
+        expr_t *bound = input ? expr_from_text(input, NULL) : NULL;
+        char *bound_text = bound ? expr_to_string(bound, style_EXPRESSION) : NULL;
+        expr_t *roundtrip = bound_text ? expr_from_string(bound_text, NULL) : NULL;
+        number_t expected = bound ? expr_eval(bound) : num_clone(NUM_NAN);
+        number_t actual = roundtrip ? expr_eval(roundtrip) : num_clone(NUM_NAN);
+        number_t difference = num_sub(actual, expected), error = num_abs(difference);
+        number_t tolerance = num_create_from_double(1e-12);
+        ok = ok && num_is_finite(error) && num_lt(error, tolerance);
+        num_destroy(&tolerance);
+        num_destroy(&error);
+        num_destroy(&difference);
+        num_destroy(&actual);
+        num_destroy(&expected);
+        expr_free(roundtrip);
+        free(bound_text);
+        expr_free(bound);
+        string_free(input);
+        free(function);
+        free(plain);
+        free(TeX);
+        expr_free(expr);
+        ASSERT_TRUE(ok);
+    }
+}
+
 static void test_to_string_symmetric_shifts_TeX(void)
 {
     static const struct { const char *source; const char *plus; const char *minus; } cases[] = {
@@ -2493,6 +2785,12 @@ static void test_to_string_integrals_outside_fractions_TeX(void)
 
 void test_to_string_all(void)
 {
+    TEST_RUN_SUBTEST(test_to_string_indexed_principal_roots, NULL);
+    TEST_RUN_SUBTEST(test_to_string_conjugate_overbar_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_complex_projection_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_exact_rational_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_square_denominator, NULL);
+    TEST_RUN_SUBTEST(test_to_string_equal_conjugate_sums, NULL);
     TEST_RUN_SUBTEST(test_to_string_symmetric_shifts_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_integrals_outside_fractions_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_clausen, NULL);

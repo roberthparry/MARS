@@ -1019,6 +1019,23 @@ expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *
     return plan;
 }
 
+static void function_prune_conjugate_temporaries(function_temporary_table_t *table)
+{
+    /* An overbar on an existing short binding needs no separate mathematical definition. */
+    for (size_t index = table->count; index-- > 0u;) {
+        const expr_t *candidate = table->nodes[index];
+        if (!expr_is_op(candidate, &ops_conj) || !function_temporary_table_contains(table, candidate->a))
+            continue;
+        free(table->names[index]);
+        for (size_t move = index + 1u; move < table->count; ++move) {
+            table->nodes[move - 1u] = table->nodes[move];
+            table->names[move - 1u] = table->names[move];
+            table->constants[move - 1u] = table->constants[move];
+        }
+        --table->count;
+    }
+}
+
 /* Prefer short, parseable names for a bounded mathematical definition block. */
 expr_function_temporaries_t *expr_mathematical_temporaries_new(const expr_t *const *roots, size_t count)
 {
@@ -1027,6 +1044,7 @@ expr_function_temporaries_t *expr_mathematical_temporaries_new(const expr_t *con
 
     if (!plan)
         return NULL;
+    function_prune_conjugate_temporaries(&plan->temporaries);
     for (size_t i = 0u; i < plan->temporaries.count; ++i) {
         while (name[0] <= 'Z' && !function_temporary_name_is_available(name, &plan->variables, &plan->constants))
             ++name[0];

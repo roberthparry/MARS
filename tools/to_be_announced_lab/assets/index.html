@@ -69,7 +69,7 @@
                   </div>
                 </div>
                 <div id="target-meta" class="detected-meta">__TARGET_META_HTML__</div>
-                <span class="field-hint">Upload the file from your machine. The lab will save it locally for this lab and read the header row for you.</span>
+                <span class="field-hint">Files stay in this browser. Selected columns are encrypted before transmission; the server processes them in memory without saving them.</span>
               </div>
               <div class="target-right-stack">
                 <label class="compact-field">Target value column
@@ -77,7 +77,7 @@
                     __TARGET_VALUE_OPTIONS__
                   </select>
                   <span class="helper-row">
-                    <span class="field-hint">Choose the series to forecast from the uploaded CSV header.</span>
+                    <span class="field-hint">Choose a value column from the locally read CSV header.</span>
                     <span id="target-picker-status" class="picker-status">__TARGET_PICKER_STATUS__</span>
                   </span>
                 </label>
@@ -110,7 +110,7 @@
                 <select name="target_date_column">
                   __TARGET_DATE_OPTIONS__
                 </select>
-                <span class="field-hint">Choose the target date column from the likely candidates the lab found in the uploaded file.</span>
+                <span class="field-hint">Choose a date column from the local file.</span>
               </label>
               <label>Forecast until
                 <select name="forecast_end_date">
@@ -354,7 +354,7 @@
             <ul>
               <li>Use as much clean historic data as you can, especially if it covers several years.</li>
               <li>Make sure the dates line up properly between the target file and any exogenous file.</li>
-              <li>For monthly local authority data, try a seasonal model before assuming the pattern is non-seasonal.</li>
+              <li>For monthly data, try a seasonal model before assuming the pattern is non-seasonal.</li>
               <li>Keep the model as simple as possible at first. A very complicated model is not automatically a better one.</li>
               <li>If you have a sensible outside driver, such as population, test a model with and without it and compare the outputs.</li>
               <li>Be cautious with very long horizons. A 6- to 12-month forecast is usually easier to trust than a much longer one.</li>

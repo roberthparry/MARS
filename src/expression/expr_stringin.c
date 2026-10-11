@@ -64,17 +64,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
+#include "ustring.h"
+#include "qfloat.h"
+#include "expression.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
 #include "expr_bindings.h"
 #include "expr_maths.h"
-#include "qfloat.h"
 #include "expr_stringin_scan.h"
-#include "expression.h"
-#include "ustring.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 
 /* Restore detached bound-Expression qualifications before parsing the body. */
 bool expr_distribution_restore(string_t **body, string_t **conditions);
@@ -3400,6 +3400,20 @@ static expr_t *parse_atom_body(expr_parse_state_t *p, bool allow_ascii_rational_
 
     if (b == '{' && p->syntax == EXPR_PARSE_EXPRESSION_SYNTAX)
         return parse_bound_expression(p);
+
+    int root_index = expr_parse_read_root_index(p->cursor);
+    if (root_index >= 2) {
+        expr_t *argument = expr_parse_consume_char(p, '(')
+            ? parse_enclosed_addexpr(p, ')', "expected ')' after indexed radical")
+            : parse_atom(p, false);
+        if (!argument)
+            return NULL;
+        if (root_index == 2)
+            return apply_unary_preserving_constexpr(&ops_sqrt, argument, expr_sqrt);
+        if (root_index == 3)
+            return apply_unary_preserving_constexpr(&ops_cubrt, argument, expr_cubrt);
+        return apply_binary_preserving_constexpr(&ops_root, argument, expr_const_long(root_index), expr_root);
+    }
 
     indexed_bessel_call_t bessel;
     if (scan_indexed_bessel_call(text, pos, p->syntax, &bessel)) {

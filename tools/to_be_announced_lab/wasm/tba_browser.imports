@@ -21,6 +21,9 @@ tba_dom_push
 tba_dom_keys
 tba_dom_string
 tba_dom_text
+tba_dom_length
+tba_dom_char
+tba_dom_slice
 tba_dom_clean
 tba_dom_split
 tba_dom_join

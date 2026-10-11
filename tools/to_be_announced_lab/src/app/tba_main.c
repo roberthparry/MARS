@@ -1,10 +1,10 @@
 /**
  * @file tba_main.c
- * @brief Linux native forecasting Lab command line and prefork supervision.
+ * @brief Linux private Lab command line and prefork supervision.
  *
  * Starts four single-threaded HTTP workers, preserving existing desktop options
- * and port 8766. Signal-driven shutdown cancels active native forecast processes
- * and reaps children. It never starts Python or changes Tailscale configuration.
+ * and port 8766. Workers retire after confidential requests; signal-driven
+ * shutdown reaps children. No proxy configuration is changed.
  */
 #include <errno.h>
 #include <signal.h>
@@ -12,13 +12,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "lab_process.h"
 #include "tba_server.h"
-#include "tba_worker.h"
 
 extern char **environ;
 static volatile sig_atomic_t tba_main_stopping;
@@ -33,10 +34,15 @@ static pid_t tba_main_spawn_worker(tba_server_t *server, tba_app_t *app)
 {
     pid_t child = fork();
     if (!child) {
+        struct rlimit core = {0, 0};
+        if (setrlimit(RLIMIT_CORE, &core) || prctl(PR_SET_DUMPABLE, 0))
+            _exit(1);
         lab_proc_set_cancel_flag(&tba_main_stopping);
         int result = 0;
         while (!tba_main_stopping) {
             int served = tba_svr_once(server);
+            if (served == 2)
+                break;
             if (served < 0 && errno == EBADF) {
                 result = 1;
                 break;
@@ -61,8 +67,6 @@ static void tba_main_browser(const char *browser, const char *url)
 /* Launch the native workbench without an interpreter or shell command construction. */
 int main(int argc, char **argv)
 {
-    if (argc >= 3 && !strcmp(argv[1], "--forecast-worker"))
-        return tba_worker_main(argc - 2, argv + 2, argv[2]);
     const char *host = "::", *browser = "", *base = NULL;
     bool open_browser = true;
     uint16_t port = 8766;
@@ -104,7 +108,7 @@ int main(int argc, char **argv)
     tba_app_t *app = tba_app_new(base);
     tba_server_t *server = app ? tba_svr_new(app, host, port) : NULL;
     if (!server) {
-        string_fprintf(stderr, "Could not start the native forecasting Lab: %s\n", strerror(errno));
+        string_fprintf(stderr, "Could not start the private Lab: %s\n", strerror(errno));
         tba_app_free(app);
         return 1;
     }

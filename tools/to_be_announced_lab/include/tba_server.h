@@ -1,8 +1,8 @@
 /**
  * @file tba_server.h
- * @brief Opaque native HTTP listener for the forecasting workbench.
+ * @brief Opaque native HTTP listener for the private Lab.
  *
- * Registers exact private routes and bounded asset/upload handlers. Construct
+ * Registers exact private routes and bounded asset/encrypted-stream handlers. Construct
  * before forking; each single-threaded worker may serve its inherited listener.
  * The borrowed app must outlive the server. No threads or Python are required.
  */
@@ -17,6 +17,8 @@ tba_server_t *tba_svr_new(tba_app_t *app, const char *host, uint16_t port);
 void tba_svr_free(tba_server_t *server);
 /** @brief Borrow the actual port. @param server Server. @return Port or zero. */
 uint16_t tba_svr_port(const tba_server_t *server);
-/** @brief Serve one request. @param server Server. @return websrv_serve_once result. */
+/** @brief Serve one request. @param server Server.
+ * @return 2 when the caller must retire this process after a final envelope, including rejection;
+ * otherwise the websrv_serve_once result. */
 int tba_svr_once(tba_server_t *server);
 #endif

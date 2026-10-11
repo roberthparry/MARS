@@ -13,12 +13,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "cfg_database.h"
-#include "cfg_storage.h"
 #include "file.h"
-#include "test_cfg_calendar_fixture.h"
-#include "test_cfg_support.h"
+#include "cfg_storage.h"
+#include "cfg_database.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
+#include "test_cfg_calendar_fixture.h"
 
 static file_t *test_calendar_seed_directory;
 static file_t *test_calendar_seed;

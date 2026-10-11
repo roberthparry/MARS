@@ -129,7 +129,7 @@ required; do not disable assertions in examples that use `assert`.
 Programs run in separate temporary working directories, so relative database
 and file names cannot overwrite project files. File examples receive fresh
 paths as command-line arguments. HTTP examples use the local fixture, while
-`make -j1 test-http-live` tests the client against the native MARS web server
+`make -j1 test_http_live` tests the client against the native MARS web server
 on loopback, with no external-service calls or opt-in flag. Almanac and
 jurisdiction examples require the configured databases described in their
 module guides; missing data is a failure, not a skipped success.

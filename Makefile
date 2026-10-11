@@ -181,10 +181,10 @@ $(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-too
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 # Documented scratch examples are opt-in; tests compile their sources directly.
-all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) lab-build native-tba-lab
+all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) native-lab native-tba-lab
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -261,10 +261,7 @@ check-deps:
 	    exit 1; \
 	fi
 
-# Installers link the SQLCipher library directly; no interpreter or SQL CLI is needed.
-check-jurisdiction-db-deps: check-deps
-
-check-lab-deps: check-jurisdiction-db-deps check-lab-wasm-deps
+check-lab-deps: check-deps check-lab-wasm-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -487,10 +484,6 @@ mem$(1): $(2)
 endef
 
 TEST_ALIAS_EXCLUDES := test_almanac memtest_almanac
-.PHONY: test-http-live
-test-http-live: $(TEST_BUILD_DIR)/http_live/test_http_live
-	@$<
-
 $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS_EXCLUDES)),$(TEST_BINS)),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 .PHONY: test_almanac memtest_almanac
@@ -580,7 +573,7 @@ mars-lab-restart: mars-lab-stop
 to-be-announced-lab: native-tba-lab
 	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
 
-install-almanac-db: check-jurisdiction-db-deps native-config $(ALMANAC_RULES_SOURCES)
+install-almanac-db: check-deps native-config $(ALMANAC_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" almanac
 
 uninstall-almanac-db:
@@ -607,14 +600,19 @@ endif
 install-jurisdiction-db: export MARS_CALENDAR_LOCATION_ARGUMENT = $(if $(LOCATION),$(LOCATION),$(CALENDAR_LOCATION_GOAL))
 install-jurisdiction-db: export MARS_CALENDAR_LANGUAGE_ARGUMENT = $(CALENDAR_LANGUAGE)
 install-jurisdiction-db: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
-install-jurisdiction-db: check-jurisdiction-db-deps native-config $(JURISDICTION_RULES_SOURCES)
+install-jurisdiction-db: check-deps native-config $(JURISDICTION_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" jurisdiction
 
 uninstall-jurisdiction-db:
-	rm -rf "$(HOME)/.mars"
+	rm -f "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db" \
+	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-journal" \
+	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-wal" \
+	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-shm" \
+	    "$(HOME)/.mars/config/jurisdiction-db.env"
 
 install-mars-lab: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
 install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+	@echo "MARS Lab install [1/4]: installing desktop launcher and icons"
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -644,10 +642,13 @@ install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISD
 	done
 	@sed -e 's|@MARS_LAUNCHER@|$(MARS_LAB_LAUNCHER)|g' packaging/linux/mars-lab.desktop.in > "$(MARS_LAB_DESKTOP)"
 	chmod 755 "$(MARS_LAB_DESKTOP)"
+	@echo "MARS Lab install [2/4]: refreshing desktop caches"
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
+	@echo "MARS Lab install [3/4]: building jurisdiction database (live progress below)"
 	@$(MAKE) install-jurisdiction-db
+	@echo "MARS Lab install [4/4]: configuring weather (may request input)"
 	@"$(CONFIG_PROGRAM)" weather
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
@@ -701,50 +702,47 @@ uninstall-to-be-announced-lab:
 # ------------------------------------------------------------
 help:
 	@echo "Targets:"
-	@echo "  make debug                  Build debug binaries and tests"
-	@echo "  make release                Build release binaries and tests"
-	@echo "  make release-evidence       Build a release and record its binary dependency evidence"
-	@echo "  make test                   Run all tests (release)"
-	@echo "  make memtest                Run all tests under valgrind (release)"
-	@echo "  make test_<name>            Build and run a single test (e.g. make test_expression) (release)"
-	@echo "  make memtest_<name>         Build and run a single test under valgrind (release)"
-	@echo "  make DEBUG=1 test           Run all tests (debug)"
-	@echo "  make DEBUG=1 memtest        Run all tests under valgrind (debug)"
-	@echo "  make DEBUG=1 test_<name>    Build and run a single test (e.g. make test_expression) (debug)"
-	@echo "  make DEBUG=1 memtest_<name> Build and run a single test under valgrind (debug)"
-	@echo "  make bench_<name>           Build and run a benchmark (e.g. make bench_integrator)"
-	@echo "  make scratch                Build optional standalone examples (not built by all)"
-	@echo "  make mars_lab               Build and run the Lab expression worker"
-	@echo "  make lab-workers            Build the server with all built-in calculation modes"
-	@echo "  make mars_lab ARGS='...'     Run the server's built-in expression mode"
-	@echo "  make mars-lab               Launch the local MARS Lab"
-	@echo "  make mars-lab-stop          Stop the local MARS Lab"
-	@echo "  make mars-lab-restart       Stop and relaunch the local MARS Lab"
-	@echo "  make to-be-announced-lab              Launch the local To-Be-Announced Lab"
-	@echo "  make install-mars-lab       Install a user desktop launcher for MARS Lab"
-	@echo "  make uninstall-mars-lab     Remove the user desktop launcher for MARS Lab"
-	@echo "  make install-almanac-db     Build and configure the Almanac database only"
-	@echo "  make uninstall-almanac-db   Remove the configured Almanac database"
-	@echo "  make install-jurisdiction-db [town] Build the private database and calendar_local for a town"
-	@echo "  make install-jurisdiction-db LOCATION='town, jurisdiction' Select a qualified or multiword town"
-	@echo "  Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
-	@echo "  make uninstall-jurisdiction-db Remove ~/.mars, including the private jurisdiction database"
-	@echo "  make install-to-be-announced-lab      Install a user desktop launcher for To-Be-Announced Lab"
-	@echo "  make uninstall-to-be-announced-lab    Remove the user desktop launcher for To-Be-Announced Lab"
-	@echo "  make check-deps             Check required external development libraries"
-	@echo "  make test-http-live         Test the HTTP client against the native loopback web server"
-	@echo "  make test_webserver        Run offline Linux web server tests and its README example"
-	@echo "  make test-readme-examples   Compile/run complete Markdown C examples"
-	@echo "  make check-compliance       Verify public-path, notice, SPDX and provenance safeguards"
-	@echo "  make check-source-policy    Audit inline sizes, expression registries and absence of Python"
-	@echo "  make native-checks         Build tools/mars_checks/build/<mode>/mars_checks"
-	@echo "  make native-config         Build tools/mars_config/build/<mode>/mars_config"
-	@echo "  make check-jurisdiction-db-deps Check runtime tools needed for jurisdiction database installation"
-	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX/WebAssembly tools"
-	@echo "  make check-lab-wasm-deps    Probe Clang's WebAssembly target and the LLVM linker"
-	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
-	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"
-	@echo "  make clean                  Remove all build artifacts"
+	@printf '  %-40s %s\n' "make debug" "Build debug binaries and tests"
+	@printf '  %-40s %s\n' "make release" "Build release binaries and tests"
+	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
+	@printf '  %-40s %s\n' "make test" "Run all tests"
+	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
+	@printf '  %-40s %s\n' "make test_<name>" "Build and run a single test (e.g. make test_expression)"
+	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
+	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
+	@printf '  %-40s %s\n' "make scratch" "Build optional standalone examples (not built by all)"
+	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
+	@printf '  %-40s %s\n' "make test_lab_native" "Run native Lab tests"
+	@printf '  %-40s %s\n' "make lab-browser-test" "Run Lab browser tests"
+	@printf '  %-40s %s\n' "make mars-lab" "Launch the local MARS Lab"
+	@printf '  %-40s %s\n' "make mars-lab-stop" "Stop the local MARS Lab"
+	@printf '  %-40s %s\n' "make mars-lab-restart" "Stop and relaunch the local MARS Lab"
+	@printf '  %-40s %s\n' "make to-be-announced-lab" "Launch the local To-Be-Announced Lab"
+	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
+	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
+	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
+	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the configured Almanac database"
+	@printf '  %-40s %s\n' "make install-jurisdiction-db [town]" "Build the private database and calendar_local for a town"
+	@echo "    Use LOCATION='town, jurisdiction' for a qualified or multiword town."
+	@echo "    Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
+	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove only the default jurisdiction database and its configuration"
+	@printf '  %-40s %s\n' "make install-to-be-announced-lab" "Install a user desktop launcher for To-Be-Announced Lab"
+	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
+	@printf '  %-40s %s\n' "make check-deps" "Check required external development libraries"
+	@printf '  %-40s %s\n' "make test_http_live" "Test the HTTP client against the native loopback web server"
+	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
+	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"
+	@printf '  %-40s %s\n' "make check-compliance" "Verify public-path, notice, SPDX and provenance safeguards"
+	@printf '  %-40s %s\n' "make check-source-policy" "Audit inline sizes, expression registries and absence of Python"
+	@printf '  %-40s %s\n' "make native-checks" "Build tools/mars_checks/build/<mode>/mars_checks"
+	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
+	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TeX/WebAssembly tools"
+	@printf '  %-40s %s\n' "make check-lab-wasm-deps" "Probe Clang's WebAssembly target and the LLVM linker"
+	@printf '  %-40s %s\n' "make install" "Install libraries and headers under PREFIX (default /usr/local)"
+	@printf '  %-40s %s\n' "make uninstall" "Remove installed libraries and headers from PREFIX"
+	@printf '  %-40s %s\n' "make clean" "Remove all build artefacts"
+	@echo ""
+	@echo "Builds and tests default to release; add DEBUG=1 for debug (e.g. make DEBUG=1 test_expression)."
 
 # ------------------------------------------------------------
 # Clean

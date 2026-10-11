@@ -157,7 +157,7 @@ static char *equation_display_TeX_dup(const equation_t *equation)
             }
             if (annotated) {
                 complete = string_append_format(annotated,
-                    " \\\\\n%s &= %s,\\qquad \\operatorname{Re}\\{%s\\}>1",
+                    " \\\\\n%s &= %s,\\qquad \\mathfrak{Re}\\{%s\\}>1",
                     series_TeX, closed_TeX, order_TeX) >= 0;
                 appended = appended || complete;
             }

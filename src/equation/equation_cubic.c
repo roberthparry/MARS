@@ -12,11 +12,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation_internal.h"
+#include "number.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "number.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 static void equ_init_numbers(number_t *values, size_t count)
 {
@@ -319,11 +319,9 @@ static int equ_append_cubic_cardano_roots(const expr_t *wrt, number_t p, number_
 
 static expr_t *equ_cubic_expr_cuberoot(const expr_t *expr)
 {
-    number_t exponent = num_create_from_frac(1L, 3L);
-    expr_t *root = expr ? expr_pow(expr, &exponent) : NULL;
+    expr_t *root = expr ? expr_cubrt(expr) : NULL;
     expr_t *out = expr_simplify_owned(root);
 
-    num_destroy(&exponent);
     return out;
 }
 

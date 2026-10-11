@@ -31,7 +31,7 @@ static void test_default_coordinate_and_conditions(void)
 {
     const json_t *r = math_fourier_fields("@F{gamma(x)}", "k");
     lab_math_equal(lab_math_algebra(r), "2π·exp(k·Re(x) - exp(k))");
-    lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "\\operatorname{Im}(x)\\to k", true);
+    lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "\\mathfrak{Im}\\left\\{x\\right\\}\\to k", true);
     lab_math_contains(math_fourier_text(r, "expression"), "Re(x) > 0", true);
     lab_math_contains(math_fourier_text(r, "expression"), "k ∈ ℝ", true);
     lab_math_contains(math_fourier_text(r, "function"), "realpart(x) > 0", true);

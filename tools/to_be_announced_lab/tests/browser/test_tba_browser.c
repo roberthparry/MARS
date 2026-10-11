@@ -1,6 +1,6 @@
 /**
  * @file test_tba_browser.c
- * @brief Real Firefox regressions for forecasting WASM, Protobuf and page interaction.
+ * @brief Real Firefox regressions for private Lab WASM and encrypted Protobuf.
  *
  * Copies assets into a private temporary root, injects browser assertions and
  * starts two loopback workers. No installed Lab, user settings or public service
@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "file.h"
+#include "webserver.h"
 #include "tba_server.h"
 #include "test_harness.h"
 #include "test_tba_support.h"
@@ -33,7 +34,7 @@ static file_t *tba_browser_file(const char *directory, const char *name)
     return file;
 }
 
-static bool tba_browser_prepare(const char *directory)
+static bool tba_browser_prepare(const char *directory, uint16_t report_port)
 {
     file_t *assets = tba_browser_file(directory, "tools/to_be_announced_lab/assets");
     file_t *scripts = assets ? tba_browser_file(file_path(assets), "js") : NULL;
@@ -50,7 +51,8 @@ static bool tba_browser_prepare(const char *directory)
     file_t *checks = file_new_cstr("tools/to_be_announced_lab/tests/browser/checks.js");
     string_t *html = ok && page ? file_read_all_text(page) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
-    string_t *injection = script ? string_sprintf("<script type=\"module\">\n%S\n</script></body>", script) : NULL;
+    string_t *injection = script ? string_sprintf("<script type=\"module\">\nconst reportPort = %u;\n%S\n</script></body>",
+                                                 report_port, script) : NULL;
     ok = html && injection && string_replace(html, "</body>", string_c_str(injection)) == 0 &&
          file_write_all_text(page, html) && !setenv("MARS_ROOT", directory, 1);
     string_free(injection);
@@ -63,12 +65,41 @@ static bool tba_browser_prepare(const char *directory)
     return ok;
 }
 
+static bool tba_browser_report(const websrv_request_t *request, websrv_response_t *response, void *context)
+{
+    string_t *report = context;
+    return string_append_utf8_exact(report, websrv_request_body(request), websrv_request_body_size(request)) == 0 &&
+           websrv_response_status(response, 204);
+}
+
+static pid_t tba_browser_worker(tba_server_t *server)
+{
+    pid_t child = fork();
+    if (!child) {
+        for (;;) {
+            int status = tba_svr_once(server);
+            if (status == 2)
+                _exit(0);
+            if (status < 0 && errno == EBADF)
+                _exit(1);
+        }
+    }
+    return child;
+}
+
 static bool tba_browser_run(const char *directory)
 {
-    if (!tba_browser_prepare(directory))
-        return false;
+    string_t *address = string_new_with("127.0.0.1"), *route = string_new_with("/result");
+    string_t *report = string_new();
+    websrv_limits_t limits = {.max_body_bytes = 8192, .timeout_ms = 1000};
+    websrv_t *collector = address ? websrv_new(address, 0, &limits) : NULL;
+    bool prepared = collector && route && report &&
+                    websrv_route(collector, HTTP_POST, route, tba_browser_report, report) &&
+                    tba_browser_prepare(directory, websrv_port(collector));
+    string_free(address);
+    string_free(route);
     file_t *profile = tba_browser_file(directory, "profile");
-    bool profile_ready = profile && file_create_directory(profile, 0700, false);
+    bool profile_ready = prepared && profile && file_create_directory(profile, 0700, false);
     file_t *preferences = profile_ready ? tba_browser_file(file_path(profile), "user.js") : NULL;
     string_t *settings = string_new_with("user_pref(\"dom.ipc.processCount\", 1);\n"
                                          "user_pref(\"fission.autostart\", false);\n"
@@ -86,13 +117,7 @@ static bool tba_browser_run(const char *directory)
     pid_t workers[2] = {-1, -1};
     bool workers_ready = server != NULL;
     for (size_t i = 0; workers_ready && i < sizeof workers / sizeof *workers; ++i) {
-        workers[i] = fork();
-        if (!workers[i]) {
-            for (;;) {
-                if (tba_svr_once(server) < 0 && errno == EBADF)
-                    _exit(1);
-            }
-        }
+        workers[i] = tba_browser_worker(server);
         workers_ready = workers[i] > 0;
     }
     pid_t child = -1;
@@ -112,16 +137,18 @@ static bool tba_browser_run(const char *directory)
     struct timespec start, now;
     clock_gettime(CLOCK_MONOTONIC, &start);
     while (ready) {
-        json_t *state = tba_app_state(app);
-        const char *result = tba_json_text(state, "target_display_name");
+        websrv_serve_once(collector, 50);
+        const char *result = string_c_str(report);
         bool finished = !strncmp(result, "BROWSER ", 8);
         if (finished) {
             passed = !strncmp(result, "BROWSER PASS:", 13);
             string_fprintf(stderr, "%s\n", result);
         }
-        json_free(state);
         if (finished)
             break;
+        for (size_t i = 0; i < sizeof workers / sizeof *workers; ++i)
+            if (workers[i] > 0 && waitpid(workers[i], NULL, WNOHANG) == workers[i])
+                workers[i] = tba_browser_worker(server);
         int status;
         if (waitpid(child, &status, WNOHANG) == child) {
             string_fprintf(stderr, "Browser exited before reporting: wait status=%d\n", status);
@@ -158,6 +185,8 @@ static bool tba_browser_run(const char *directory)
     string_free(url);
     tba_svr_free(server);
     tba_app_free(app);
+    websrv_free(collector);
+    string_free(report);
     file_free(profile);
     if (!passed)
         string_fprintf(stderr, "Browser suite failed or timed out; check the browser output above.\n");
@@ -179,6 +208,11 @@ static void test_tba_browser(void)
     if (!tba_browser_executable || !*tba_browser_executable)
         tba_browser_executable = "firefox";
     bool ok = ready && tba_browser_run(directory);
+    file_t *state_file = state ? file_new(state) : NULL;
+    file_t *upload_dir = uploads ? file_new(uploads) : NULL;
+    ok = state_file && upload_dir && !file_exists(state_file) && !file_exists(upload_dir) && ok;
+    file_free(state_file);
+    file_free(upload_dir);
     string_free(state);
     string_free(uploads);
     file_t *root = file_new_cstr(directory);

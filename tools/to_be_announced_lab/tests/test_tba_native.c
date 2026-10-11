@@ -38,13 +38,18 @@ static void test_tba_defaults(void)
 {
     json_t *defaults = tba_app_defaults(), *copy = tba_app_defaults();
     bool ok = defaults && copy && json_object_size(defaults) == 23 &&
-              !strcmp(tba_json_text(defaults, "target_path"), "sample_data/Monthly Target Numbers.csv") &&
-              !strcmp(tba_json_text(defaults, "target_value_column"), "18-24 LD No Health contrib Tot.") &&
               !strcmp(tba_json_text(defaults, "models"), "sarimax") &&
               !strcmp(tba_json_text(defaults, "frequency"), "monthly") &&
               !strcmp(tba_json_text(defaults, "year_type"), "fiscal") &&
               !strcmp(tba_json_text(defaults, "level"), "0.95") &&
               json_type(tba_json_get(defaults, "level")) == JSON_STRING;
+    static const char *const empty_fields[] = {
+        "target_path", "target_display_name", "target_date_column", "target_value_column",
+        "xreg_path", "xreg_display_name", "xreg_date_column", "xreg_columns"
+    };
+    for (size_t i = 0; i < sizeof empty_fields / sizeof *empty_fields; ++i)
+        ok = json_type(tba_json_get(defaults, empty_fields[i])) == JSON_STRING &&
+             !*tba_json_text(defaults, empty_fields[i]) && ok;
     static const char *const numeric[] = {"p", "d", "q", "P", "D", "Q", "season_period"};
     static const char *const expected[] = {"1", "1", "0", "1", "0", "0", "12"};
     for (size_t i = 0; i < sizeof numeric / sizeof *numeric; ++i)
@@ -53,49 +58,46 @@ static void test_tba_defaults(void)
     ok = tba_json_string(copy, "models", "arima") && !strcmp(tba_json_text(defaults, "models"), "sarimax") && ok;
     json_free(copy);
     json_free(defaults);
-    TEST_ASSERT_TRUE(ok, "compiled defaults preserve values, scalar types and independent ownership");
+    TEST_ASSERT_TRUE(ok, "compiled defaults start without datasets or columns and preserve independent ownership");
 }
 
-static void test_tba_protobuf_storage(void)
+static void test_tba_rows(void)
 {
-    char directory[] = "/tmp/mars-tba-storage-XXXXXX";
-    TEST_ASSERT_TRUE(mkdtemp(directory) != NULL, "private storage fixture created");
-    string_t *path = string_sprintf("%s/message.pb", directory);
-    file_t *file = path ? file_new(path) : NULL;
-    json_t *value = tba_app_defaults();
-    bool ok = path && file && value && tba_file_publish_message(string_c_str(path), value);
-    json_t *saved = path ? tba_file_read_message(string_c_str(path)) : NULL;
-    ok = saved && json_object_size(saved) == 23 && !strcmp(tba_json_text(saved, "models"), "sarimax") && ok;
-    json_free(saved);
-    json_t *invalid = json_new_array();
-    ok = invalid && !tba_file_publish_message(string_c_str(path), invalid) && ok;
-    saved = tba_file_read_message(string_c_str(path));
-    ok = saved && !strcmp(tba_json_text(saved, "models"), "sarimax") && ok;
-    json_free(saved);
-    json_free(invalid);
-    file_info_t *info = file ? file_get_info(file) : NULL;
-    ok = info && file_info_permissions(info) == 0600 && ok;
-    file_info_free(info);
-    static const char rejected[] = "{\"models\":\"regression\"}";
-    ok = file && file_write_all_bytes(file, rejected, sizeof rejected - 1) && ok;
-    saved = tba_file_read_message(string_c_str(path));
-    ok = !saved && ok;
-    json_free(saved);
-    ok = tba_file_publish_message(string_c_str(path), value) && file_truncate(file, 3) && ok;
-    saved = tba_file_read_message(string_c_str(path));
-    ok = !saved && ok;
-    json_free(saved);
-    ok = file_truncate(file, 4u * 1024u * 1024u + 1) && ok;
-    saved = tba_file_read_message(string_c_str(path));
-    ok = !saved && ok;
-    json_free(saved);
-    json_free(value);
-    string_free(path);
-    file_free(file);
-    file_t *root = file_new_cstr(directory);
-    ok = root && test_tba_cleanup(root) && ok;
-    file_free(root);
-    TEST_ASSERT_TRUE(ok, "private Protobuf storage rejects JSON, truncation and oversize; failed encoding preserves data");
+    json_t *data = json_new_object(), *headers = json_new_array(), *rows = json_new_array(), *row = json_new_array();
+    bool ok = data && headers && rows && row && tba_json_append(headers, "DATE") &&
+              tba_json_append(headers, "value") && tba_json_append(row, "2026-01-01") &&
+              tba_json_append(row, "42") && json_array_append(rows, row) &&
+              tba_json_set(data, "headers", headers) && tba_json_set(data, "rows", rows);
+    tba_csv_t *csv = ok ? tba_csv_from_rows(data) : NULL;
+    ok = csv && tba_csv_rows(csv) == 1 && tba_csv_column(csv, "value") == 1 &&
+         !strcmp(string_c_str(tba_csv_cell(csv, 0, 1)), "42") && ok;
+    tba_csv_free(csv);
+    /* Duplicate headings and ragged rows must fail before indexing. */
+    json_t *duplicate = json_new_array();
+    ok = duplicate && tba_json_append(duplicate, "DATE") && tba_json_append(duplicate, "DATE") &&
+         tba_json_set(data, "headers", duplicate) && ok;
+    csv = tba_csv_from_rows(data);
+    ok = !csv && ok;
+    tba_csv_free(csv);
+    ok = tba_json_set(data, "headers", headers) && tba_json_append(row, "extra") && ok;
+    json_t *ragged = json_new_array();
+    ok = ragged && json_array_append(ragged, row) && tba_json_set(data, "rows", ragged) && ok;
+    csv = tba_csv_from_rows(data);
+    ok = !csv && ok;
+    tba_csv_free(csv);
+    json_t *empty = json_new_array();
+    ok = empty && tba_json_set(data, "rows", empty) && ok;
+    csv = tba_csv_from_rows(data);
+    ok = !csv && ok;
+    tba_csv_free(csv);
+    json_free(empty);
+    json_free(ragged);
+    json_free(duplicate);
+    json_free(row);
+    json_free(rows);
+    json_free(headers);
+    json_free(data);
+    TEST_ASSERT_TRUE(ok, "in-memory rows preserve cells and reject duplicates, ragged rows and empty input");
 }
 
 static bool test_tba_csv(void)
@@ -131,8 +133,8 @@ static bool test_tba_template(void)
     return ok;
 }
 
-static http_response_t *test_tba_request(tba_app_t *app, const char *path, const void *body, size_t length,
-                                        const char *type)
+static http_response_t *test_tba_request_outcome(tba_app_t *app, const char *path, const void *body, size_t length,
+                                                const char *type, int expected_worker)
 {
     tba_server_t *server = tba_svr_new(app, "127.0.0.1", 0);
     string_t *url = server ? string_sprintf("http://127.0.0.1:%u%s", tba_svr_port(server), path) : NULL;
@@ -154,7 +156,7 @@ static http_response_t *test_tba_request(tba_app_t *app, const char *path, const
             result = tba_svr_once(server);
         tba_svr_free(server);
         tba_app_free(app);
-        _exit(result == 1 ? 0 : 1);
+        _exit(result == expected_worker ? 0 : 1);
     }
     tba_svr_free(server);
     http_response_t *response = child > 0 ? http_client_send(client, request) : NULL;
@@ -175,6 +177,12 @@ static http_response_t *test_tba_request(tba_app_t *app, const char *path, const
     return response;
 }
 
+static http_response_t *test_tba_request(tba_app_t *app, const char *path, const void *body, size_t length,
+                                        const char *type)
+{
+    return test_tba_request_outcome(app, path, body, length, type, 1);
+}
+
 static bool test_tba_route(tba_app_t *app, const char *path, unsigned expected)
 {
     http_response_t *response = test_tba_request(app, path, NULL, 0, NULL);
@@ -190,12 +198,12 @@ static bool test_tba_route(tba_app_t *app, const char *path, unsigned expected)
 static bool test_tba_wire(tba_app_t *app)
 {
     json_t *update = json_new_object();
-    bool ok = update && tba_json_string(update, "target_display_name", "Unicode £ – forecast");
+    bool ok = update && tba_json_string(update, "target_display_name", "Unicode £ – local");
     array_t *bytes = ok ? lab_wire_encode(update) : NULL;
     http_response_t *response = bytes ? test_tba_request(app, "/to-be-announced/state", array_get(bytes, 0),
                                                         array_size(bytes), "application/x-protobuf") : NULL;
     json_t *reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
-    ok = response && http_response_status(response) == 200 && tba_json_bool(reply, "ok") && ok;
+    ok = response && http_response_status(response) == 410 && !tba_json_bool(reply, "ok") && ok;
     string_t *header = string_new_with("Content-Type");
     const string_t *type = response && header ? http_response_header_at(response, header, 0) : NULL;
     ok = type && string_view_equals_literal(string_view_all(type), "application/x-protobuf") && ok;
@@ -207,13 +215,13 @@ static bool test_tba_wire(tba_app_t *app)
     http_response_free(response);
     file_t *saved = file_new_cstr(getenv("MARS_LAB_STATE_FILE"));
     file_info_t *info = saved ? file_get_info(saved) : NULL;
-    ok = info && file_info_permissions(info) == 0600 && ok;
+    ok = !info && ok;
     file_info_free(info);
     file_free(saved);
     response = test_tba_request(app, "/to-be-announced/state", NULL, 0, NULL);
     reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
-    ok = !strcmp(tba_json_text(reply, "target_display_name"), "Unicode £ – forecast") && ok;
-    if (strcmp(tba_json_text(reply, "target_display_name"), "Unicode £ – forecast"))
+    ok = !*tba_json_text(reply, "target_display_name") && ok;
+    if (*tba_json_text(reply, "target_display_name"))
         string_fprintf(stderr, "Protobuf state GET: HTTP %u, name %s\n", http_response_status(response),
                        tba_json_text(reply, "target_display_name"));
     json_free(reply);
@@ -223,7 +231,7 @@ static bool test_tba_wire(tba_app_t *app)
         {"application/x-protobuf", "", 400}
     };
     for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
-        response = test_tba_request(app, "/state", rejected[i].body, strlen(rejected[i].body), rejected[i].type);
+        response = test_tba_request(app, "/stream/begin", rejected[i].body, strlen(rejected[i].body), rejected[i].type);
         reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
         if (!response || http_response_status(response) != rejected[i].status || !*tba_json_text(reply, "error"))
             string_fprintf(stderr, "Protobuf rejection %zu: HTTP %u, expected %u, error %s\n", i,
@@ -231,6 +239,17 @@ static bool test_tba_wire(tba_app_t *app)
         ok = response && http_response_status(response) == rejected[i].status && *tba_json_text(reply, "error") && ok;
         json_free(reply);
         http_response_free(response);
+    }
+    for (unsigned final = 0; final <= 1; ++final) {
+        json_t *frame = json_new_object();
+        bool ready = frame && tba_json_flag(frame, "final", final != 0);
+        array_t *encoded = ready ? lab_wire_encode(frame) : NULL;
+        response = encoded ? test_tba_request_outcome(app, "/stream/chunk", array_get(encoded, 0), array_size(encoded),
+                                                     "application/x-protobuf", final ? 2 : 1) : NULL;
+        ok = response && http_response_status(response) == 400 && ok;
+        http_response_free(response);
+        array_destroy(encoded);
+        json_free(frame);
     }
     response = test_tba_request(app, "/wasm/tba_browser.wasm", NULL, 0, NULL);
     if (!response || http_response_status(response) != 200)
@@ -249,7 +268,7 @@ static bool test_tba_wire(tba_app_t *app)
 
 static void test_tba_browser_policy(void)
 {
-    TEST_ASSERT_TRUE(tba_browser_abi_version() == 2, "application WASM ABI is versioned");
+    TEST_ASSERT_TRUE(tba_browser_abi_version() == 3, "application WASM ABI is versioned");
     TEST_ASSERT_TRUE(tba_model_season(2, 0, 0) == 12 && tba_model_season(3, 0, 0) == 4 &&
                      tba_model_season(2, 1, 0) == 0 && tba_model_season(2, 2, 0) == 1 &&
                      tba_model_season(2, 4, 6) == 6, "seasonality overrides and frequency defaults");
@@ -326,13 +345,8 @@ static void test_tba_forecast_view(void)
 
 static void test_tba_worker(void)
 {
-    char directory[] = "/tmp/mars-tba-worker-XXXXXX";
-    TEST_ASSERT_TRUE(mkdtemp(directory) != NULL, "private fitting fixture created");
-    string_t *target = string_sprintf("%s/target.csv", directory);
-    string_t *driver = string_sprintf("%s/driver.csv", directory);
-    string_t *output = string_sprintf("%s/result.pb", directory);
     string_t *y = string_new_with("DATE,value\n"), *x = string_new_with("DATE,driver\n");
-    bool ok = target && driver && output && y && x;
+    bool ok = y && x;
     for (unsigned i = 0; ok && i < 42; ++i) {
         double value = 20 + i + sin(i * 0.7);
         ok = string_append_format(x, "%u-%02u-01,%.8f\n", 2023 + i / 12, i % 12 + 1, value) >= 0;
@@ -340,42 +354,33 @@ static void test_tba_worker(void)
             ok = string_append_format(y, "%u-%02u-01,%.8f\n", 2023 + i / 12, i % 12 + 1,
                                       2 + 3 * value + cos(i * 0.4)) >= 0 && ok;
     }
-    file_t *yf = target ? file_new(target) : NULL, *xf = driver ? file_new(driver) : NULL;
-    ok = yf && xf && file_write_all_text(yf, y) && file_write_all_text(xf, x) && ok;
-    file_free(yf);
-    file_free(xf);
     static const char *const models[] = {"regression", "arima", "arimax", "sarima", "sarimax", "auto-arima"};
-    char *args[] = {"worker", "--target", (char *)string_c_str(target),
+    const char *args[] = {"worker",
                     "--target-date-column", "DATE", "--target-value-column", "value",
-                    "--xreg", (char *)string_c_str(driver), "--xreg-date-column", "DATE",
+                    "--xreg-date-column", "DATE",
                     "--xreg-cols", "driver", "--frequency", "monthly", "--year-type", "calendar",
                     "--horizon", "3", "--p", "0", "--d", "0", "--q", "0",
                     "--P", "0", "--D", "0", "--Q", "0", "--season-period", "0", "--model", NULL};
     size_t model_index = sizeof args / sizeof *args - 1;
     for (size_t i = 0; ok && i < sizeof models / sizeof *models; ++i) {
-        args[model_index] = (char *)models[i];
-        ok = !tba_worker_main((int)(sizeof args / sizeof *args), args, string_c_str(output));
-        json_t *result = tba_file_read_message(string_c_str(output));
+        args[model_index] = models[i];
+        json_t *result = tba_worker_memory((int)(sizeof args / sizeof *args), args, y, x);
         bool fitted = tba_json_bool(result, "ok");
         if (!fitted)
             string_fprintf(stderr, "%s: %s\n", models[i], tba_json_text(result, "error"));
         ok = fitted && *tba_json_text(result, "forecast_csv") && ok;
+        json_t *memory = tba_worker_memory((int)(sizeof args / sizeof *args), args, NULL, x);
+        ok = memory && !tba_json_bool(memory, "ok") && ok;
+        json_free(memory);
         json_free(result);
     }
     args[model_index] = "invalid-model";
-    ok = !tba_worker_main((int)(sizeof args / sizeof *args), args, string_c_str(output)) && ok;
-    json_t *invalid = tba_file_read_message(string_c_str(output));
+    json_t *invalid = tba_worker_memory((int)(sizeof args / sizeof *args), args, y, x);
     ok = invalid && !tba_json_bool(invalid, "ok") && *tba_json_text(invalid, "error") && ok;
     json_free(invalid);
     string_free(y);
     string_free(x);
-    string_free(target);
-    string_free(driver);
-    string_free(output);
-    file_t *root = file_new_cstr(directory);
-    ok = root && test_tba_cleanup(root) && ok;
-    file_free(root);
-    TEST_ASSERT_TRUE(ok, "all six server-owned fitting modes publish Protobuf; invalid arguments return structured errors");
+    TEST_ASSERT_TRUE(ok, "all six native modes operate in memory and reject invalid or missing inputs");
 }
 
 /* Standalone smoke suite: all requests are sequential and no user state is written. */
@@ -397,13 +402,7 @@ static void test_tba_native_routes(void)
         ok = test_tba_route(app, "/to-be-announced/not-found", 404) && ok;
     if (app)
         ok = test_tba_wire(app) && ok;
-    json_t *result = json_new_object();
-    bool stored = result && tba_json_flag(result, "ok", true) && tba_json_string(result, "summary_text", "£42\n") &&
-                  tba_app_result_save(app, result);
-    json_t *loaded = stored ? tba_app_result(app) : NULL;
-    ok = loaded && tba_json_bool(loaded, "ok") && !strcmp(tba_json_text(loaded, "summary_text"), "£42\n") && ok;
-    json_free(loaded);
-    json_free(result);
+
     tba_app_free(app);
     string_free(state);
     file_t *root = file_new_cstr(directory);
@@ -413,15 +412,21 @@ static void test_tba_native_routes(void)
     TEST_ASSERT_TRUE(ok, "native CSV, dates and loopback routes work without Python");
 }
 
+static void test_tba_stream(void)
+{
+    TEST_ASSERT_TRUE(test_tba_stream_checks(), "encrypted envelopes, one-use replies, replay, quota, cancellation and expiry");
+}
+
 /* Register the fixture with the shared sequential test configuration. */
 int tests_main(void)
 {
     TEST_RUN_IN_GROUP(test_tba_defaults, tests, NULL);
-    TEST_RUN_IN_GROUP(test_tba_protobuf_storage, tests, NULL);
+    TEST_RUN_IN_GROUP(test_tba_rows, tests, NULL);
     TEST_RUN_IN_GROUP(test_tba_browser_policy, tests, NULL);
     TEST_RUN_IN_GROUP(test_tba_chart, tests, NULL);
     TEST_RUN_IN_GROUP(test_tba_forecast_view, tests, NULL);
     TEST_RUN_IN_GROUP(test_tba_worker, tests, NULL);
+    TEST_RUN_IN_GROUP(test_tba_stream, tests, NULL);
     TEST_RUN_IN_GROUP(test_tba_native_routes, tests, NULL);
     return TEST_EXIT_CODE();
 }

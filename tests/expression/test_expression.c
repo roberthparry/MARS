@@ -596,6 +596,23 @@ static void example_readme_examples(void)
     TEST_ASSERT_TRUE(run_README_md_example() == 0, "README examples run");
 }
 
+/* README example: principal indexed radicals in docs/expression.md. */
+static void example_indexed_roots(void)
+{
+    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)"};
+    const char *expected[] = {"³√x", "⁴√x", "¹²√x"};
+    for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
+        expr_t *expr = expr_from_string(sources[i], NULL);
+        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        bool ok = text && strcmp(text, expected[i]) == 0;
+        if (text)
+            puts(text);
+        free(text);
+        expr_free(expr);
+        TEST_ASSERT_TRUE(ok, "README indexed root output");
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic tests                                                          */
 /* ------------------------------------------------------------------------- */
@@ -654,6 +671,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "expression,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_signal_readme_examples, readme_examples, "signal,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_orthopoly_readme_examples, readme_examples, "orthopoly,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_indexed_roots, readme_examples, "expression,readme,output");
 
     return TESTS_EXIT_CODE();
 }

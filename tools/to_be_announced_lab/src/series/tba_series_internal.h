@@ -13,7 +13,6 @@ struct tba_series {
     int *dates;
     size_t date_column;
     json_t *date_candidates;
-    string_t *path;
     int first, last;
     const char *frequency;
 };

@@ -644,6 +644,26 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *
     return expr_binding_expr_simplify(inner);
 }
 
+/* Apply the same exact denominator rule to parser-preserved constant expressions. */
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_square_denominator(expr_binding_expr_t *expr)
+{
+    number_t value = NUM_NAN, numerator = NUM_NAN, denominator_root = NUM_NAN;
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP || expr->u.unary_op.ops != &ops_sqrt ||
+        !expr_binding_expr_number_value(expr->u.unary_op.child, &value))
+        return expr;
+    bool matched = num_extract_square_denominator(value, &numerator, &denominator_root);
+    num_destroy(&value);
+    if (!matched)
+        return expr;
+    expr_binding_expr_t *top = binding_expr_number_from_value(numerator);
+    expr_binding_expr_t *bottom = binding_expr_number_from_value(denominator_root);
+    expr_binding_expr_t *root = expr_binding_expr_new_unary_op(&ops_sqrt, top);
+    expr_binding_expr_t *out = expr_binding_expr_new_div(root, bottom);
+    num_destroy(&denominator_root);
+    num_destroy(&numerator);
+    return binding_expr_fold_to_expr_owned(expr, out);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_expr_t *expr)
 {
     const expr_binding_expr_t *power;

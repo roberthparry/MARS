@@ -18,6 +18,8 @@
 #include "internal/equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 static const equation_t *ordered_solution_at(const equation_solutions_t *solutions, const size_t *order, size_t i)
 {
@@ -104,11 +106,8 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
     lhs = expr_temporaries_math_expression(plan, variable, style);
     if (!definitions || !string_length(definitions) || !lhs)
         goto cleanup;
-    for (size_t i = 0u; i < count; ++i) {
-        rendered[i] = expr_temporaries_math_expression(plan, rows[i], style);
-        if (!rendered[i])
-            goto cleanup;
-    }
+    if (!equ_solution_pairs_text(plan, roots, count, style, rendered))
+        goto cleanup;
     output = string_new();
     if (!output)
         goto cleanup;
@@ -121,10 +120,6 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
         const char *separator = TeX ? " \\\\\n" : bound ? (i ? ";\n  " : "") : "\n";
         if (string_append_format(output, "%s%s%s%s", separator, string_c_str(lhs),
                                  TeX ? " &= " : " = ", string_c_str(rendered[i])) < 0)
-            goto cleanup;
-        if (paired && string_append_format(output, "%s%s%s",
-                                 TeX ? " \\pm \\left(" : " ± (", string_c_str(rendered[i + 1u]),
-                                 TeX ? "\\right)" : ")") < 0)
             goto cleanup;
         i += paired ? 2u : 1u;
     }

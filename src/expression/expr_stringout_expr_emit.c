@@ -20,16 +20,34 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ustring.h"
+#include "expression.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression.h"
-#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
-#include "internal/number_internal.h"
-#include "ustring.h"
+
+/* Keep complex radicands and powered roots delimited; a lone letter needs no brackets. */
+void emit_expr_root_argument(const expr_t *arg, sbuf_t *b, int parent_prec)
+{
+    const char *temporary = expr_math_temporary_name(arg);
+    bool single = temporary ? expr_tostring_is_single_symbol(temporary) : false;
+    if (!temporary && (expr_is_var(arg) || expr_is_const(arg))) {
+        single = expr_tostring_should_emit_binding_expr(arg)
+            ? arg->binding_expr->kind == EXPR_BINDING_EXPR_CONST
+            : expr_tostring_is_single_symbol(arg->name);
+    }
+    bool grouped = !single || parent_prec >= PREC_POW;
+    if (grouped)
+        sbuf_putc(b, '(');
+    emit_expr(arg, b, PREC_LOWEST);
+    if (grouped)
+        sbuf_putc(b, ')');
+}
 
 void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 {
@@ -306,11 +324,17 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_sqrt_expr(f))
             sbuf_puts(b, "√");
+        else if (expr_is_op(f, &ops_cubrt))
+            sbuf_puts(b, "³√");
         else
             sbuf_puts(b, expr_unary_name(f));
-        sbuf_putc(b, '(');
-        emit_expr(f->a, b, 0);
-        sbuf_putc(b, ')');
+        if (expr_is_sqrt_expr(f) || expr_is_op(f, &ops_cubrt)) {
+            emit_expr_root_argument(f->a, b, parent_prec);
+        } else {
+            sbuf_putc(b, '(');
+            emit_expr(f->a, b, 0);
+            sbuf_putc(b, ')');
+        }
 
         if (need)
             sbuf_putc(b, ')');
@@ -363,6 +387,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
          * rather than func(arg)² so the exponent binds to the function name.
          * Floor/ceiling keep their mathematical brackets: ⌊x⌋². */
         if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
+            !expr_is_op(f->a, &ops_cubrt) &&
             !expr_distribution_qualification(f->a)) {
             expr_t *inner = f->a;
             if (expr_is_op(inner, &ops_floor) || expr_is_op(inner, &ops_ceil)) {
@@ -481,6 +506,8 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
     /* Addition/subtraction with a + -b → a - b and a - -b → a + b */
     if (expr_is_addsub(f)) {
+        if (expr_emit_conjugate_sum(f, b, parent_prec, style_EXPRESSION))
+            return;
         int need = PREC_ADD < parent_prec;
         const expr_t *negative_complex_base = NULL;
         const expr_t *negative_complex_rhs = NULL;
@@ -670,6 +697,16 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
     /* Named binary functions (e.g. atan2) */
     if (f->ops->arity == EXPR_OP_BINARY) {
+        long root_index;
+        if (expr_is_op(f, &ops_root) && expr_is_unnamed_const(f->b) &&
+            (!f->b->binding_expr || expr_binding_expr_is_numeric_literal(f->b->binding_expr)) &&
+            expr_try_get_small_integer_exponent(f->b->c, &root_index) && root_index >= 2L && root_index <= INT_MAX) {
+            if (root_index > 2L)
+                emit_superscript_int(b, root_index);
+            sbuf_puts(b, "√");
+            emit_expr_root_argument(f->a, b, parent_prec);
+            return;
+        }
         if (expr_is_op(f, &ops_indexed_symbol)) {
             emit_expr(f->a, b, 0);
             sbuf_puts(b, "_(");

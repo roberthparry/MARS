@@ -57,6 +57,9 @@ export const tbaUI = (() => {
         tba_dom_keys: object => remember(Object.keys(values[object] || {})),
         tba_dom_string: pointer => remember(literal(pointer)),
         tba_dom_text: value => remember(string(values[value])),
+        tba_dom_length: value => string(values[value]).length,
+        tba_dom_char: (value, index) => string(values[value]).charCodeAt(index) || 0,
+        tba_dom_slice: (value, begin, end) => remember(string(values[value]).slice(begin, end)),
         tba_dom_clean: (value, lower) => remember(lower ? string(values[value]).trim().toLowerCase() : string(values[value]).trim()),
         tba_dom_split: (text, separator) => remember(string(values[text]).split(literal(separator))),
         tba_dom_join: (array, separator) => remember(values[array].join(literal(separator))),
@@ -97,15 +100,19 @@ export const tbaUI = (() => {
             const address = values[url], payload = values[body], requestHeaders = values[headers];
             effects.push(async () => {
                 try {
-                    let content = payload;
                     if (kind === 2) {
-                        content = new FormData();
-                        content.append('file', payload);
+                        if (!(payload instanceof File) || payload.size > 16777216)
+                            throw new Error('Local file exceeds 16 MiB');
+                        const data = {ok: true, text: await payload.text(), name: payload.name};
+                        call('tba_ui_response', action, serial, data, true);
+                    } else if (kind === 3) {
+                        const data = await tbaEncrypted(address, payload);
+                        call('tba_ui_response', action, serial, data, true);
+                    } else {
+                        const response = await tbaFetch(address, {method: kind ? 'POST' : 'GET',
+                            ...(kind ? {body: payload} : {}), headers: requestHeaders || {}, cache: 'no-store'});
+                        call('tba_ui_response', action, serial, await response.tbaData(), response.ok);
                     }
-                    const response = await tbaFetch(address, {method: kind ? 'POST' : 'GET',
-                        ...(kind ? {body: content} : {}), headers: requestHeaders || {}, cache: 'no-store'});
-                    const data = await response.tbaData();
-                    call('tba_ui_response', action, serial, data, response.ok);
                 } catch (error) {
                     call('tba_ui_response', action, serial, {error: error.message || String(error)}, false);
                 }
@@ -300,7 +307,7 @@ export const tbaWire = (() => {
             const result = await WebAssembly.instantiate(await response.arrayBuffer(), imports);
             wasm = result.instance.exports;
             if (typeof wasm.lab_browser_abi_version !== 'function' || wasm.lab_browser_abi_version() !== 30 ||
-                typeof wasm.tba_browser_abi_version !== 'function' || wasm.tba_browser_abi_version() !== 2)
+                typeof wasm.tba_browser_abi_version !== 'function' || wasm.tba_browser_abi_version() !== 3)
                 throw new Error('The Lab browser module is out of date; rebuild and restart the forecasting Lab');
         },
         encode(value) {
@@ -358,7 +365,7 @@ export const tbaWire = (() => {
 export async function tbaFetch(url, options = {}) {
     const headers = new Headers(options.headers);
     headers.set('Accept', 'application/x-protobuf');
-    if (options.body !== undefined && !(options.body instanceof FormData)) {
+    if (options.body !== undefined) {
         headers.set('Content-Type', 'application/x-protobuf');
         options = {...options, body: tbaWire.encode(options.body)};
     }
@@ -400,6 +407,100 @@ export async function tbaFetch(url, options = {}) {
     return response;
 }
 
+
+// Web Crypto and fetch are browser capabilities; C owns message values and application policy.
+export async function tbaEncrypted(address, payload, options = {}) {
+    if (!globalThis.isSecureContext || !crypto.subtle)
+        throw new Error('Use trusted HTTPS or local loopback; plaintext transfer is disabled');
+    const url = new URL(address, location.href);
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if (url.origin !== location.origin || (url.protocol !== 'https:' && !local))
+        throw new Error('Encrypted streams require a trusted same-origin connection');
+    const encode64 = bytes => {
+        let text = '';
+        for (let offset = 0; offset < bytes.length; offset += 8192)
+            text += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+        return btoa(text);
+    };
+    const decode64 = text => {
+        if (typeof text !== 'string' || text.length > 2796228)
+            throw new Error('Invalid encrypted response');
+        return Uint8Array.from(atob(text), ch => ch.charCodeAt(0));
+    };
+    const bytes = tbaWire.encode(payload);
+    if (!bytes.length || bytes.length > 2097152) {
+        bytes.fill(0);
+        throw new Error('Selected data exceeds the 2 MiB message limit');
+    }
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    options.signal?.addEventListener('abort', abort, {once: true});
+    if (options.signal?.aborted) abort();
+    const timeout = setTimeout(abort, 90000);
+    const rawKey = crypto.getRandomValues(new Uint8Array(32));
+    let session, finished = false;
+    const request = async (path, body, signal = controller.signal) => {
+        const response = await tbaFetch(url.href + path, {method: 'POST', body, signal, cache: 'no-store',
+            redirect: 'error', credentials: 'same-origin'});
+        const data = await response.tbaData();
+        if (!response.ok || !data.ok)
+            throw new Error(data.error || 'Encrypted request rejected');
+        return data;
+    };
+    try {
+        session = await request('/begin', {});
+        if (!Number.isInteger(session.slot) || session.slot < 0 || session.slot > 3 ||
+            !/^[0-9a-f]{64}$/.test(session.token) || session.chunk_limit !== 32768 ||
+            session.message_limit !== 2097152)
+            throw new Error('Incompatible encrypted stream');
+        const publicKey = await crypto.subtle.importKey('spki', decode64(session.public_key),
+            {name: 'RSA-OAEP', hash: 'SHA-256'}, false, ['encrypt']);
+        const wrappedKey = encode64(new Uint8Array(await crypto.subtle.encrypt({name: 'RSA-OAEP'}, publicKey, rawKey)));
+        const key = await crypto.subtle.importKey('raw', rawKey, {name: 'AES-GCM'}, false, ['encrypt', 'decrypt']);
+        rawKey.fill(0);
+        let result;
+        for (let offset = 0, sequence = 0; offset < bytes.length; offset += 32768, ++sequence) {
+            const final = offset + 32768 >= bytes.length;
+            const iv = new Uint8Array(12);
+            new DataView(iv.buffer).setUint32(8, sequence);
+            const additionalData = new TextEncoder().encode('MARS-TBA-1:' + session.token + ':0:' + sequence + ':' + Number(final));
+            const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+                {name: 'AES-GCM', iv, additionalData, tagLength: 128}, key, bytes.subarray(offset, offset + 32768)));
+            result = await request('/chunk', {slot: session.slot, token: session.token, wrapped_key: wrappedKey,
+                sequence, final, ciphertext: encode64(ciphertext)});
+            if (!final && result.ciphertext !== undefined)
+                throw new Error('Premature stream completion');
+        }
+        const cipher = decode64(result.ciphertext);
+        if (cipher.length < 16 || cipher.length > 2097168)
+            throw new Error('Invalid encrypted result size');
+        const iv = new Uint8Array(12);
+        iv[0] = 1;
+        const additionalData = new TextEncoder().encode('MARS-TBA-1:' + session.token + ':1:0:1');
+        const plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv, additionalData, tagLength: 128},
+            key, cipher));
+        try {
+            const result = tbaWire.decode(plain);
+            finished = true;
+            return result;
+        } finally {
+            plain.fill(0);
+        }
+    } finally {
+        bytes.fill(0);
+        rawKey.fill(0);
+        clearTimeout(timeout);
+        options.signal?.removeEventListener('abort', abort);
+        if (session && !finished) {
+            try {
+                await request('/chunk', {slot: session.slot, token: session.token, sequence: 0, cancel: true},
+                    AbortSignal.timeout(2000));
+            } catch (_) {
+                // The native service also expires abandoned ciphertext streams.
+            }
+        }
+    }
+}
 
 // Bootstrap only: the native application owns all controls and presentation.
 const bootstrap = document.getElementById('tba-config');

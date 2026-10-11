@@ -158,6 +158,11 @@ To remove that private jurisdiction database again, run:
 make uninstall-jurisdiction-db
 ```
 
+This removes only `~/.mars/jurisdiction/mars_jurisdiction_rules.db`, its SQLite
+journal/WAL sidecars and `~/.mars/config/jurisdiction-db.env`. Almanac data,
+weather configuration, Lab settings and other files are preserved. Databases
+installed at custom paths are not removed by this target.
+
 If you want the desktop app as well, use `make install-mars-lab`.
 
 MARS supplies no shared WeatherAPI account or key. When the installer chooses
@@ -718,7 +723,14 @@ with the machine does not change the installed calendar. Future policy changes
 require updated MARS rules or system time-zone data and reinstallation.
 
 Installation uses the native `mars_config` application (built by the Make target),
-linked to MARS, and system IANA time-zone data. Queries require only
+linked to MARS, and system IANA time-zone data. The installer displays a live
+progress bar for each packaged SQL source, with percentages based on processed
+bytes rather than estimated installation time. Database preparation, calendar
+generation and publication show an activity indicator and elapsed time, including
+while a database operation is blocking. Reporting stops before interactive prompts.
+Redirected output uses plain stage messages and five-second activity updates,
+without terminal control codes. A failed stage is never reported as complete.
+Queries require only
 SQLCipher with SQLite 3.35 or later and `SQLITE_ENABLE_MATH_FUNCTIONS`; no MARS
 library, custom SQL functions or `generate_series` extension is needed when
 querying. Loading the SQL script alone creates an empty calendar until the

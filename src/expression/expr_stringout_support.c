@@ -13,9 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expr_stringout.h"
-#include "expr_stringin_scan.h"
 #include "expression.h"
+#include "expr_stringin_scan.h"
+#include "expr_stringout.h"
 
 char *expr_tostring_texify(const char *text);
 
@@ -272,6 +272,20 @@ void emit_name(sbuf_t *b, const char *name)
         sbuf_puts(b, name);
         sbuf_putc(b, ']');
     }
+}
+
+/* A bare radical may contain one letter, never a compound identifier or subscript. */
+bool expr_tostring_is_single_symbol(const char *name)
+{
+    if (!name || !*name || strnlen(name, 5u) > 4u)
+        return false;
+    string_t *text = string_new_with(name);
+    uint32_t value = 0;
+    string_pos_t end = 0;
+    bool single = text && string_view_peek_rune_value(string_view_all(text), 0u, &value, &end) &&
+                  end == string_byte_length(text) && expr_tostring_is_unicode_letter(value);
+    string_free(text);
+    return single;
 }
 
 int expr_tostring_is_safe_func_name(const char *name)

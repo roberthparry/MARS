@@ -192,10 +192,7 @@ static string_t *tba_page_metadata(const json_t *meta)
 string_t *tba_page_render(const tba_app_t *app, const json_t *mobile)
 {
     json_t *state = tba_app_state(app), *values = json_new_object(), *config = json_new_object();
-    tba_series_t *target =
-        state ? tba_series_open(tba_json_text(state, "target_path"), tba_json_text(state, "target_date_column")) : NULL;
-    tba_series_t *drivers =
-        state ? tba_series_open(tba_json_text(state, "xreg_path"), tba_json_text(state, "xreg_date_column")) : NULL;
+    tba_series_t *target = NULL, *drivers = NULL;
     json_t *target_meta = tba_series_details(target, tba_json_text(state, "target_value_column"), "");
     json_t *driver_meta = tba_series_details(drivers, "", tba_json_text(state, "xreg_columns"));
     json_t *target_map = tba_series_targets(target);

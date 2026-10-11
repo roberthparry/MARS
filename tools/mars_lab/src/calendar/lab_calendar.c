@@ -457,7 +457,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
             response = lab_cal_error(status, 422,
                                      diagnostic && string_byte_length(diagnostic)
                                          ? string_c_str(diagnostic)
-                                         : "Native calendar backend unavailable or timed out; run make lab-workers.");
+                                         : "Native calendar backend unavailable or timed out; run make native-lab.");
         else if (is_datetime) {
             if (!lab_cal_valid_date(lab_cal_text(fields, "date")) || !*lab_cal_text(fields, "julian_day_number")) {
                 json_free(fields);

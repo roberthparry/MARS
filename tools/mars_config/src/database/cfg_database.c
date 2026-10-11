@@ -13,10 +13,11 @@
 #include <unistd.h>
 
 #include "cfg_calendar.h"
-#include "cfg_database.h"
-#include "cfg_database_internal.h"
+#include "cfg_progress.h"
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
+#include "cfg_database.h"
+#include "cfg_database_internal.h"
 
 typedef struct cfg_database_options {
     string_t *home;
@@ -213,8 +214,10 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
         string_free(root);
         root = string_new_with(MARS_CONFIG_ROOT_DIR);
     }
+    cfg_progress_t *progress = cfg_progress_start("Preparing encrypted database");
     sqlite_t *db = temporary && root ? sqlite_open_encrypted(temporary_path, options->key) : NULL;
     ok = ok && db && destination && sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON;");
+    cfg_progress_finish(progress, ok);
     if (ok) {
         fprintf(stderr, "Building encrypted %s database...\n", jurisdiction ? "jurisdiction" : "almanac");
         ok = cfg_database_source(db, root,
@@ -234,6 +237,7 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
                                    options->saved_location, interactive, options->requested_language,
                                    options->saved_language, &chosen_location, &chosen_language);
     /* An unfinished source transaction must fail instead of being rolled back silently on close. */
+    progress = ok ? cfg_progress_start("Finalising and publishing database") : NULL;
     if (ok)
         ok = sqlite_exec_cstr(db, "BEGIN; COMMIT; PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE;");
     sqlite_close(db);
@@ -241,6 +245,7 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
     ok = ok && body &&
          cfg_database_publish(temporary, destination, options->configuration, options->configuration_directory, staging,
                               body);
+    cfg_progress_finish(progress, ok);
     if (ok) {
         printf("Built %s database at %s\nWrote %s database configuration to %s\n",
                jurisdiction ? "jurisdiction" : "almanac", string_c_str(options->path),

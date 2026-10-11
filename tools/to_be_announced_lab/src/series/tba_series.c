@@ -109,14 +109,13 @@ static bool tba_series_index_dates(tba_series_t *series)
     return true;
 }
 
-/* Load one owned dated document. */
-tba_series_t *tba_series_open(const char *path, const char *date_column)
+/* Index already parsed observations without resolving a filesystem path. */
+tba_series_t *tba_series_from_rows(const json_t *data, const char *date_column)
 {
     tba_series_t *series = calloc(1, sizeof *series);
     if (!series)
         return NULL;
-    series->path = tba_path(path);
-    series->csv = series->path ? tba_csv_open(string_c_str(series->path)) : NULL;
+    series->csv = tba_csv_from_rows(data);
     series->date_candidates = json_new_array();
     if (!series->csv || !series->date_candidates || !tba_series_detect(series, date_column) ||
         !tba_series_index_dates(series)) {
@@ -132,7 +131,6 @@ void tba_series_free(tba_series_t *series)
     if (series) {
         tba_csv_free(series->csv);
         json_free(series->date_candidates);
-        string_free(series->path);
         free(series->dates);
         free(series);
     }
@@ -255,7 +253,7 @@ json_t *tba_series_details(const tba_series_t *series, const char *target, const
          tba_json_string(result, "detected_frequency_label", tba_date_frequency_label(series->frequency)) &&
          tba_series_date_fields(result, "start_date", series->first) && tba_series_date_fields(result, "end_date", series->last) &&
          tba_series_date_fields(result, "usable_start_date", first) && tba_series_date_fields(result, "usable_end_date", last) &&
-         tba_json_string(result, "path", string_c_str(series->path)) &&
+         tba_json_string(result, "path", "local") &&
          tba_json_string(result, "value_column", target ? target : "") &&
          tba_json_string(result, "selected_columns_text", drivers ? drivers : "") &&
          tba_series_statistics(series, target && *target ? tba_csv_column(series->csv, target) : SIZE_MAX, result);

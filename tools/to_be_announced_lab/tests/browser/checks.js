@@ -1,5 +1,5 @@
 // Injected only into the temporary browser fixture, after the actual application module.
-import {tbaWire, tbaFetch, tbaUI} from './js/transport.js';
+import {tbaWire, tbaFetch, tbaUI, tbaEncrypted} from './js/transport.js';
 
 const base = '/to-be-announced';
 let checks = 0;
@@ -19,12 +19,87 @@ async function waitFor(predicate, message) {
     }
     throw new Error(message);
 }
+
+async function rejectsAsync(callback, message) {
+    let rejected = false;
+    try { await callback(); } catch (_) { rejected = true; }
+    assert(rejected, message);
+}
+
+async function checkEncryption() {
+    const payload = {operation: 'metadata', date_column: 'DATE', value_column: 'value',
+        data: {headers: ['DATE', 'value'], rows: []}};
+    for (let i = 0; i < 1400; ++i)
+        payload.data.rows.push([`${2020 + Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, '0')}-01`, String(i)]);
+    const nativeFetch = globalThis.fetch;
+    let mode = '', packets = [], inFlight = 0, maximum = 0;
+    globalThis.fetch = async (url, options = {}) => {
+        if (!String(url).endsWith('/stream/chunk')) return nativeFetch(url, options);
+        let frame = tbaWire.decode(options.body);
+        if (frame.cancel) return nativeFetch(url, options);
+        packets.push(frame);
+        assert(!('data' in frame) && !('rows' in frame) && typeof frame.ciphertext === 'string',
+               'only encrypted envelopes cross the network');
+        if (mode === 'sequence') frame.sequence += 1;
+        if (mode === 'final') frame.final = !frame.final;
+        if (mode === 'tag') frame.ciphertext = (frame.ciphertext[0] === 'A' ? 'B' : 'A') + frame.ciphertext.slice(1);
+        if (mode === 'key') frame.wrapped_key = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(256))));
+        ++inFlight;
+        maximum = Math.max(maximum, inFlight);
+        try {
+            const response = await nativeFetch(url, {...options, body: tbaWire.encode(frame)});
+            if (mode === 'response' && frame.final && response.ok) {
+                const data = tbaWire.decode(await response.arrayBuffer());
+                data.ciphertext = (data.ciphertext[0] === 'A' ? 'B' : 'A') + data.ciphertext.slice(1);
+                return new Response(tbaWire.encode(data), {headers: {'Content-Type': 'application/x-protobuf'}});
+            }
+            if (mode === 'truncate' && frame.final && response.ok) {
+                const bytes = new Uint8Array(await response.arrayBuffer());
+                return new Response(bytes.slice(0, -1), {headers: {'Content-Type': 'application/x-protobuf'}});
+            }
+            return response;
+        } finally {
+            --inFlight;
+        }
+    };
+    try {
+        const result = await tbaEncrypted(`${base}/stream`, payload);
+        assert(result.ok && packets.length > 1 && maximum === 1,
+               'multiple chunks interoperate with native crypto and apply backpressure');
+        const replay = await tbaFetch(`${base}/stream/chunk`, {method: 'POST', body: packets.at(-1)});
+        assert(replay.status === 400, 'completed envelopes cannot be replayed');
+        for (mode of ['sequence', 'final', 'tag', 'key', 'response', 'truncate']) {
+            await rejectsAsync(() => tbaEncrypted(`${base}/stream`, payload), 'reject modified ' + mode);
+        }
+        mode = '';
+        const recovered = await tbaEncrypted(`${base}/stream`, payload);
+        assert(recovered.ok, 'rejected streams release capacity for a clean request');
+        const aborted = new AbortController();
+        aborted.abort();
+        await rejectsAsync(() => tbaEncrypted(`${base}/stream`, payload, {signal: aborted.signal}),
+                           'cancelled calls never begin transmission');
+        await rejectsAsync(() => tbaEncrypted(`${base}/stream`, {text: 'x'.repeat(2097153)}),
+                           'oversized plaintext is rejected before transmission');
+        await rejectsAsync(() => tbaEncrypted('http://example.invalid/stream', payload),
+                           'nonlocal plaintext and cross-origin destinations are prohibited');
+    } finally {
+        globalThis.fetch = nativeFetch;
+    }
+    for (const path of ['/upload-target', '/upload-xreg', '/forecast', '/state', '/target-columns']) {
+        const response = await tbaFetch(base + path, {method: 'POST', body: {data: 'must not be accepted'}});
+        assert(response.status === 410, 'retired data route rejects input: ' + path);
+    }
+    for (const path of ['/download-summary', '/download-forecast']) {
+        const response = await tbaFetch(base + path);
+        assert(response.status === 410, 'no server-side saved result: ' + path);
+    }
+}
 let report;
 try {
     await import('./js/transport.js');
     assert(!document.getElementById('status').textContent.includes('Startup failed'), 'native UI initialisation succeeds');
     const wasm = tbaWire.exports();
-    assert(wasm.tba_browser_abi_version() === 2, 'WASM instantiated with the supported imports');
+    assert(wasm.tba_browser_abi_version() === 3, 'WASM instantiated with the supported imports');
     assert(wasm.tba_model_season(2, 4, 6) === 6, 'season suggestions run in WASM');
     assert(wasm.tba_model_order(5, 4, 0) === 2, 'model orders run in WASM');
     assert(wasm.tba_period_end(20240110, 3, 1) === 20240331, 'fiscal quarter in WASM');
@@ -46,25 +121,23 @@ try {
     const rejected = await fetch(`${base}/state`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
     });
-    assert(rejected.status === 415, 'legacy JSON request rejected');
+    assert(rejected.status === 410, 'legacy JSON request rejected');
+    await checkEncryption();
     const csv = ['DATE,value'];
     for (let i = 0; i < 36; ++i) {
         csv.push(`${2023 + Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, '0')}-01,${100 + i * 2 + i % 3}`);
     }
     const upload = document.getElementById('target-upload');
     const transfer = new DataTransfer();
-    transfer.items.add(new File([csv.join('\n') + '\n'], 'forecast.csv', {type: 'text/csv'}));
+    transfer.items.add(new File([csv.join('\n') + '\n'], 'local.csv', {type: 'text/csv'}));
     upload.files = transfer.files;
     upload.dispatchEvent(new Event('change', {bubbles: true}));
     const form = document.getElementById('forecast-form');
-    await waitFor(() => form.elements.namedItem('target_path').value.includes('/upload-'), 'CSV upload did not complete');
-    await waitFor(() => document.getElementById('status').textContent.includes('Target CSV uploaded'), 'upload state save failed');
-    assert(form.elements.namedItem('target_date_column').value === 'DATE', 'uploaded date column rendered');
-    const columnsResponse = await tbaFetch(`${base}/target-columns`, {
-        method: 'POST', body: {path: form.elements.namedItem('target_path').value, date_column: 'DATE', value_column: 'value'},
-    });
-    const columns = await columnsResponse.tbaData();
-    assert(columns.ok && columns.value_columns.includes('value'), 'metadata uses a Protobuf POST');
+    await waitFor(() => form.elements.namedItem('target_path').value === 'local', 'Local selection did not complete');
+    await waitFor(() => document.getElementById('status').textContent.includes('Encrypted request verified'), 'Encrypted metadata did not complete');
+    assert(form.elements.namedItem('target_date_column').value === 'DATE', 'Local date column rendered');
+    assert(Array.from(form.elements.namedItem('target_value_column').options).some(option => option.value === 'value'),
+           'local columns remain available after encrypted metadata');
     const fields = {
         target_value_column: 'value', xreg_path: '', xreg_columns: '', models: 'arima',
         frequency: 'monthly', year_type: 'calendar', forecast_end_date: '2026-01-31',
@@ -155,17 +228,17 @@ try {
            'empty chart produces a readable native message');
     await new Promise(resolve => setTimeout(resolve, 600));
     const saved = await (await tbaFetch(`${base}/state`)).tbaData();
-    assert(saved.p === '1' && saved.target_value_column === 'value', 'C debounce saves current state as Protobuf');
+    assert(saved.p === 1 && saved.target_value_column === '', 'server defaults never retain browser settings');
     const driverUpload = document.getElementById('xreg-upload');
     const drivers = new DataTransfer();
     drivers.items.add(new File([csv.join('\n') + '\n'], 'drivers.csv', {type: 'text/csv'}));
     driverUpload.files = drivers.files;
     driverUpload.dispatchEvent(new Event('change', {bubbles: true}));
-    await waitFor(() => document.getElementById('status').textContent.includes('Exogenous CSV uploaded'),
-                  'driver upload and save did not complete');
+    await waitFor(() => document.getElementById('status').textContent.includes('Encrypted request verified'),
+                  'Second local selection did not complete');
     const driverChoice = document.querySelector('input[name="xreg-column-choice"]');
     assert(driverChoice && !driverChoice.disabled && form.elements.namedItem('xreg_date_column').value === 'DATE',
-           'C renders uploaded driver metadata and usable columns');
+           'C renders local metadata and selectable columns');
     driverChoice.checked = true;
     driverChoice.dispatchEvent(new Event('change', {bubbles: true}));
     assert(form.elements.namedItem('xreg_columns').value === 'value', 'C synchronises driver selections');
@@ -181,10 +254,9 @@ try {
 } catch (error) {
     report = 'BROWSER FAIL: ' + (error.message || String(error)) + '\n' + (error.stack || '');
 }
-// Report through the same native state endpoint; no test-only production route.
+// Report to a fixture-only loopback collector, never an application persistence route.
 try {
-    await tbaWire.start(base);
-    await tbaFetch(`${base}/state`, {method: 'POST', body: {target_display_name: report}});
+    await fetch(`http://127.0.0.1:${reportPort}/result`, {method: 'POST', mode: 'no-cors', body: report});
 } catch (error) {
     console.error(report, error);
 }

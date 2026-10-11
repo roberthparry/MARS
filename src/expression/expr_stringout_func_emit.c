@@ -261,6 +261,9 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (!preserve_function_operations && expr_emit_conjugate_sum(f, b, parent_prec, style_FUNCTION))
+        return;
+
     if (!preserve_function_operations && expr_is_addsub(f) &&
         (display_series_remainder(f) || display_sum_has_transform(f)) &&
         emit_func_display_polynomial_sum(f, b, parent_prec))

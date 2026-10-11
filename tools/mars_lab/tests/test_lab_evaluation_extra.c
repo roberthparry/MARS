@@ -151,7 +151,10 @@ static void test_lab_extra_equation_real_surd_numerics(void)
                                "{\"equation\":\"x^4-x^3-26x^2+4x+8=0\",\"precision\":78}", &status);
     const json_t *roots = test_lab_member(response, "numeric_solutions");
     bool ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 4u &&
-              contains(response, "solutions", "√");
+              contains(response, "display_solutions", "(1 - 2·B ± √(211 + C - 73/B))/4") &&
+              contains(response, "display_solutions", "(1 + 2·B ± √(211 + C + 73/B))/4") &&
+              contains(response, "display_TeX", "8\\,\\mathfrak{Re}\\mathopen{}\\left\\{A\\right\\}") &&
+              !contains(response, "display_TeX", "\\overline") && contains(response, "svg", "<svg");
     for (size_t i = 0u; i < json_array_size(roots); ++i) {
         const string_t *root = json_string_value(json_array_get(roots, i));
         ok = root && string_find(root, "i") < 0 && string_find(root, "≈") >= 0 &&
@@ -183,12 +186,12 @@ static void test_lab_extra_equation_decimal_notation(void)
     } cases[] = {
         {"x=sqrt(2)/10000", "0.00014142135623730950488"},
         {"x=-sqrt(2)/10000", "-0.00014142135623730950488"},
-        {"x=sqrt(2)/100000", "1.4142135623730950488 ×10⁻⁵"},
-        {"x=-sqrt(2)*1e-12", "-1.4142135623730950488 ×10⁻¹²"},
+        {"x=sqrt(2)/100000", "1.4142135623730950488×10⁻⁵"},
+        {"x=-sqrt(2)*1e-12", "-1.4142135623730950488×10⁻¹²"},
         {"x=sqrt(2)*1e20", "141421356237309504880"},
-        {"x=sqrt(2)*1e5000", "1.4142135623730950488 ×10⁵⁰⁰⁰"},
-        {"x=0.00001+0.0000002i", "1 ×10⁻⁵ + 2 ×10⁻⁷i"},
-        {"x=-0.0000002i", "-2 ×10⁻⁷i"},
+        {"x=sqrt(2)*1e5000", "1.4142135623730950488×10⁵⁰⁰⁰"},
+        {"x=0.00001+0.0000002i", "1×10⁻⁵ + 2×10⁻⁷i"},
+        {"x=-0.0000002i", "-2×10⁻⁷i"},
         {"x=1+i", "1 + i"},
         {"x=0", "0"},
     };
@@ -214,6 +217,29 @@ static void test_lab_extra_equation_decimal_notation(void)
         json_free(response);
         string_free(payload);
         TEST_ASSERT_TRUE(ok, "equation numerics use decimals or Unicode powers of ten, never E notation");
+    }
+    static const unsigned precisions[] = {17u, 78u};
+    for (size_t p = 0; p < sizeof(precisions) / sizeof(*precisions); ++p) {
+        unsigned status = 0u;
+        string_t *payload = string_sprintf("{\"equation\":\"x^4-x^3-26x^2+4x+1/10000=0\",\"precision\":%u}", precisions[p]);
+        json_t *response = payload ? request("/equation-eval", string_c_str(payload), &status) : NULL;
+        string_free(payload);
+        const json_t *roots = test_lab_member(response, "numeric_solutions");
+        bool ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 4u &&
+                  contains(response, "display_solutions", "A = ³√(") &&
+                  contains(response, "display_TeX", "1957044392389164807") &&
+                  contains(response, "display_TeX", "\\frac{\\sqrt{-1957044392389164807} - 8913952525}{500000}") &&
+                  !contains(response, "display_TeX", "62500000000") &&
+                  !contains(response, "display_TeX", "31312710.278226636912") && contains(response, "svg", "<svg");
+        string_printf("  Compact quartic: %S\n", json_string_value(test_lab_member(response, "display_TeX")));
+        bool small_root = false;
+        for (size_t i = 0u; i < json_array_size(roots); ++i) {
+            const string_t *root = json_string_value(json_array_get(roots, i));
+            ok = root && string_find(root, " ×10") < 0 && ok;
+            small_root = small_root || (root && string_find(root, "×10⁻⁵") >= 0);
+        }
+        json_free(response);
+        TEST_ASSERT_TRUE(ok && small_root, "quartic surds remain reduced at double and higher precision");
     }
 }
 
@@ -284,6 +310,28 @@ static void test_lab_extra_render_TeX(void)
     expect_response("/eval", "{\"expression\":\"2*x\"}", 200u, "svg", "<svg");
     expect_response("/matrix-eval", "{\"matrix\":\"{ (1,2;3,4)^x | x = @pi }\"}", 200u, "svg", "<svg");
     expect_response("/diffequation-eval", "{\"diffequation\":\"y'+2y=0\"}", 200u, "svg", "<svg");
+}
+
+static void test_lab_extra_projection_fonts(void)
+{
+    static const struct { const char *route; const char *payload; const char *field; } cases[] = {
+        {"/eval", "{\"expression\":\"Re(a)+Im(a)\"}", "display_TeX"},
+        {"/equation-eval", "{\"equation\":\"x=Re(a)+Im(a)\"}", "display_TeX"},
+        {"/diffequation-eval", "{\"diffequation\":\"y'=Re(a)+Im(a)\"}", "display_TeX"},
+        {"/matrix-eval", "{\"matrix\":\"(Re(a),Im(a);0,1)\"}", "tex"},
+        {"/integrator-eval", "{\"expression\":\"(Re(a)+Im(a))*x\",\"bounds\":[{\"name\":\"x\"}]}", "tex"}
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        unsigned status = 0u;
+        json_t *response = request(cases[i].route, cases[i].payload, &status);
+        bool ok = status == 200u && test_lab_ok(response, true) &&
+                  contains(response, cases[i].field, "\\mathfrak{Re}") &&
+                  contains(response, cases[i].field, "\\mathfrak{Im}") && contains(response, "svg", "<svg");
+        if (!ok)
+            show_failure(response);
+        json_free(response);
+        TEST_ASSERT_TRUE(ok, "every mathematical mode renders two-letter Fraktur projections");
+    }
 }
 
 static void test_lab_extra_unsafe_TeX_input(void)
@@ -415,6 +463,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_function, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_goal_seek, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_render_TeX, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_projection_fonts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_escape, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_environment, tests, NULL);

@@ -22,26 +22,26 @@ remain a single unevaluated operator.
 
 | Input | Algebraic result |
 |---|---|
-| `@L(t)` | $1/s^2,\quad \operatorname{Re}(s)>0$ |
-| `@L(J_0(t))` | $1/\sqrt{s^2+1},\quad \operatorname{Re}(s)>0$ |
-| `@L(sqrt(t))` | $\sqrt{\pi}/(2s^{3/2}),\quad \operatorname{Re}(s)>0$ |
-| `@L(cubrt(t))` | $\Gamma(4/3)/s^{4/3},\quad \operatorname{Re}(s)>0$ |
-| `@L(exp(-t))` | $1/(s+1),\quad \operatorname{Re}(s)>-1$ |
-| `@L(e^(a*t))` | $1/(s-a),\quad \operatorname{Re}(s)>\operatorname{Re}(a)$ |
-| `@L(exp(a*t+b),t)` | $e^b/(s-a),\quad \operatorname{Re}(s)>\operatorname{Re}(a)$ |
-| `@L(sin(t))` | $1/(s^2+1),\quad \operatorname{Re}(s)>0$ |
-| `@L(erf(t))` | $e^{s^2/4}\operatorname{erfc}(s/2)/s,\quad \operatorname{Re}(s)>0$ |
-| `@L(erf(t/(2a)))` | $a e^{a^2s^2}\operatorname{erfc}(s\sqrt{a^2})/(s\sqrt{a^2}),\quad \operatorname{Re}(s)>0,\quad \operatorname{Re}(a^2)>0$ |
-| `@L(erfc(t))` | $(1-e^{s^2/4}\operatorname{erfc}(s/2))/s,\quad \operatorname{Re}(s)>0$ |
-| `@L(tsin(at))` | $2as/(s^2+a^2)^2,\quad \operatorname{Re}(s)>\operatorname{Re}(ai),\quad \operatorname{Re}(s)>\operatorname{Re}(-ai)$ |
-| `@L(sinh(at))` | $a/(s^2-a^2),\quad \operatorname{Re}(s)>\operatorname{Re}(a),\quad \operatorname{Re}(s)>\operatorname{Re}(-a)$ |
-| `@L(sinh(@omega*t))` | $\omega/(s^2-\omega^2),\quad \operatorname{Re}(s)>\operatorname{Re}(\omega),\quad \operatorname{Re}(s)>\operatorname{Re}(-\omega)$ |
-| `@L(cosh(at))` | $s/(s^2-a^2),\quad \operatorname{Re}(s)>\operatorname{Re}(a),\quad \operatorname{Re}(s)>\operatorname{Re}(-a)$ |
-| `@L(t,t,p)` | $1/p^2,\quad \operatorname{Re}(p)>0$ |
+| `@L(t)` | $1/s^2,\quad \mathfrak{Re}(s)>0$ |
+| `@L(J_0(t))` | $1/\sqrt{s^2+1},\quad \mathfrak{Re}(s)>0$ |
+| `@L(sqrt(t))` | $\sqrt{\pi}/(2s^{3/2}),\quad \mathfrak{Re}(s)>0$ |
+| `@L(cubrt(t))` | $\Gamma(4/3)/s^{4/3},\quad \mathfrak{Re}(s)>0$ |
+| `@L(exp(-t))` | $1/(s+1),\quad \mathfrak{Re}(s)>-1$ |
+| `@L(e^(a*t))` | $1/(s-a),\quad \mathfrak{Re}(s)>\mathfrak{Re}(a)$ |
+| `@L(exp(a*t+b),t)` | $e^b/(s-a),\quad \mathfrak{Re}(s)>\mathfrak{Re}(a)$ |
+| `@L(sin(t))` | $1/(s^2+1),\quad \mathfrak{Re}(s)>0$ |
+| `@L(erf(t))` | $e^{s^2/4}\operatorname{erfc}(s/2)/s,\quad \mathfrak{Re}(s)>0$ |
+| `@L(erf(t/(2a)))` | $a e^{a^2s^2}\operatorname{erfc}(s\sqrt{a^2})/(s\sqrt{a^2}),\quad \mathfrak{Re}(s)>0,\quad \mathfrak{Re}(a^2)>0$ |
+| `@L(erfc(t))` | $(1-e^{s^2/4}\operatorname{erfc}(s/2))/s,\quad \mathfrak{Re}(s)>0$ |
+| `@L(tsin(at))` | $2as/(s^2+a^2)^2,\quad \mathfrak{Re}(s)>\mathfrak{Re}(ai),\quad \mathfrak{Re}(s)>\mathfrak{Re}(-ai)$ |
+| `@L(sinh(at))` | $a/(s^2-a^2),\quad \mathfrak{Re}(s)>\mathfrak{Re}(a),\quad \mathfrak{Re}(s)>\mathfrak{Re}(-a)$ |
+| `@L(sinh(@omega*t))` | $\omega/(s^2-\omega^2),\quad \mathfrak{Re}(s)>\mathfrak{Re}(\omega),\quad \mathfrak{Re}(s)>\mathfrak{Re}(-\omega)$ |
+| `@L(cosh(at))` | $s/(s^2-a^2),\quad \mathfrak{Re}(s)>\mathfrak{Re}(a),\quad \mathfrak{Re}(s)>\mathfrak{Re}(-a)$ |
+| `@L(t,t,p)` | $1/p^2,\quad \mathfrak{Re}(p)>0$ |
 | `@L(f(t))` | $\mathcal{L}_{t\to s}\{f(t)\}$ |
-| `@L(t^n,t)` | $\Gamma(n+1)/s^{n+1},\quad \operatorname{Re}(s)>0,\quad \operatorname{Re}(n)>-1$ |
-| `{@L(t^n) \| s=?; n=5}` | $120/s^6,\quad \operatorname{Re}(s)>0$ |
-| `{@L(sin^n(t)) \| s=1; n=5}` | $120/((s^2+25)(s^4+10s^2+9)),\quad \operatorname{Re}(s)>0$; value $3/13$ |
+| `@L(t^n,t)` | $\Gamma(n+1)/s^{n+1},\quad \mathfrak{Re}(s)>0,\quad \mathfrak{Re}(n)>-1$ |
+| `{@L(t^n) \| s=?; n=5}` | $120/s^6,\quad \mathfrak{Re}(s)>0$ |
+| `{@L(sin^n(t)) \| s=1; n=5}` | $120/((s^2+25)(s^4+10s^2+9)),\quad \mathfrak{Re}(s)>0$; value $3/13$ |
 
 The initial rule set covers constants, source powers with exponent real part greater than −1,
 including square roots, cube roots, integer-order roots and their reciprocals.
@@ -57,8 +57,8 @@ rates and offsets. Both `exp(...)` and powers of Euler's constant
 are recognised. Exponential convergence uses the real part of the rate; negative
 rates do not acquire an unnecessary restriction to positive target real parts.
 For sine and cosine, both exponential components must converge:
-$\operatorname{Re}(s)>|\operatorname{Im}(a)|$. This reduces to
-$\operatorname{Re}(s)>0$ for real frequencies.
+$\mathfrak{Re}(s)>|\mathfrak{Im}(a)|$. This reduces to
+$\mathfrak{Re}(s)>0$ for real frequencies.
 Multiplication by a known positive integer power of the source variable uses
 $\mathcal L\{t^m f(t)\}=(-1)^m F^{(m)}(s)$, retaining the original convergence
 conditions. Orders up to 64 are expanded by repeated differentiation; unsupported
@@ -68,8 +68,8 @@ $q=\sqrt{a^2}$ on the principal branch, the error-function transform is
 
 $\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{erf}(at+b)\} =\frac{\operatorname{erf}(b)+(a/q)e^{s^2/(4a^2)+sb/a} \operatorname{erfc}(s/(2q)+bq/a)}{s}.\end{array}$
 
-The sufficient conditions are $\operatorname{Re}(s)>0$ and
-$\operatorname{Re}(a^2)>0$; both signs of non-zero real rates are covered.
+The sufficient conditions are $\mathfrak{Re}(s)>0$ and
+$\mathfrak{Re}(a^2)>0$; both signs of non-zero real rates are covered.
 The complementary transform is one over the target variable minus this result.
 A supplied zero rate is handled separately. The unshifted positive-rate formula
 is [DLMF 7.14.2](https://dlmf.nist.gov/7.14.E2); the affine extension follows by
@@ -84,7 +84,7 @@ conditions, but numerical validation currently covers real rates, offsets and
 positive real target values only.
 Hyperbolic sine and cosine also accept symbolic affine arguments, including complex
 rates and offsets. Their two displayed half-plane conditions are equivalent to
-$\operatorname{Re}(s)>|\operatorname{Re}(a)|$, so both exponential components
+$\mathfrak{Re}(s)>|\mathfrak{Re}(a)|$, so both exponential components
 converge. These are sufficient conditions, retained even for degenerate zero rates.
 Non-negative integer powers of sine/cosine with real numerical frequency and zero phase use an exact recurrence
 through order 16 and a finite sum for larger or symbolic orders. There is no
@@ -94,11 +94,11 @@ non-negative integer; negative, fractional and non-real values fail that conditi
 
 For example, `@L(cos(t)^n,t)` gives the finite-sum result
 
-$\quad\begin{array}{l}\displaystyle \frac{1}{2^n}\sum_{k=0}^{n}\binom{n}{k} \frac{s}{s^2+(n-2k)^2},\qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
+$\quad\begin{array}{l}\displaystyle \frac{1}{2^n}\sum_{k=0}^{n}\binom{n}{k} \frac{s}{s^2+(n-2k)^2},\qquad \mathfrak{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
 
 Similarly, `@L(sin(t)^n,t)` gives
 
-$\quad\begin{array}{l}\displaystyle \frac{1}{(2i)^n}\sum_{k=0}^{n}\frac{(-1)^k\binom{n}{k}}{s-i(n-2k)}, \qquad \operatorname{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
+$\quad\begin{array}{l}\displaystyle \frac{1}{(2i)^n}\sum_{k=0}^{n}\frac{(-1)^k\binom{n}{k}}{s-i(n-2k)}, \qquad \mathfrak{Re}(s)>0,\quad n\in\mathbb{Z}_{\ge0}.\end{array}$
 
 The renderer currently expresses the binomial coefficients using gamma functions.
 Both sums are exact; their integer-order restrictions survive copying through the
@@ -112,7 +112,7 @@ Recognised transforms simplify to a native formula with convergence restrictions
 Both Laplace directions accept braces as well as parentheses. For example,
 `@L{ln(t)}` gives
 
-$\quad\begin{array}{l}\displaystyle \mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+\ln(s)}{s},\qquad \operatorname{Re}(s)>0,\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L_{t\to s}\{\ln(t)\}=-\frac{\gamma+\ln(s)}{s},\qquad \mathfrak{Re}(s)>0,\end{array}$
 
 where $\gamma$ is the Euler–Mascheroni constant. At `s=1`, the value is
 approximately `-0.5772156649015329`.
@@ -220,7 +220,7 @@ Unsupported transforms retain their original symbolic operation.
 The [function-by-function coverage inventory](#laplace-function-coverage) distinguishes
 implemented formulas, proven obstructions and well-defined cases still left symbolic.
 Hyperbolic tangent, unlike tangent, has a supported digamma transform. For real
-$c>0$ and $\operatorname{Re}(s)>0$,
+$c>0$ and $\mathfrak{Re}(s)>0$,
 
 $\quad\begin{array}{l}\displaystyle \mathcal L\{\tanh(ct)\} =\frac1s-\frac{\psi(1+s/(4c))-\psi(1/2+s/(4c))}{2c}.\end{array}$
 
@@ -233,7 +233,7 @@ $\quad\begin{array}{l}\displaystyle \frac{d}{ds}\mathcal L\{\tanh(ct)\} =\frac{2
 Negative real coefficients follow by oddness, and a zero coefficient gives
 zero without a condition on `s`. With an unspecified coefficient the formula
 uses $q=\sqrt{c^2}$ on the principal branch and retains
-$\operatorname{Re}(q)>0$; this also covers complex coefficients off the
+$\mathfrak{Re}(q)>0$; this also covers complex coefficients off the
 imaginary axis without assuming $\sqrt{c^2}=c$. For example,
 `{@L{tanh(c*t)} | s=2; c=1}` gives $\ln(2)-1/2$, approximately
 `0.1931471805599453`. Non-zero imaginary coefficients are excluded by the
@@ -335,7 +335,7 @@ integration. For `@L{@S^t 1/(1-x^2) dx}`, the chosen primitive is
 `½·(ln(t+1)-ln(t-1))`, not a real-logarithm absolute-value replacement.
 Its transform is
 
-$\quad\begin{array}{l}\displaystyle \frac{e^s E_1(s)+e^{-s}\operatorname{Ei}(s)-i\pi(1-e^{-s})}{2s},\qquad \operatorname{Re}(s)>0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \frac{e^s E_1(s)+e^{-s}\operatorname{Ei}(s)-i\pi(1-e^{-s})}{2s},\qquad \mathfrak{Re}(s)>0.\end{array}$
 
 The logarithmic singularity at `t=1` is locally integrable. The imaginary term
 retains the principal-logarithm value on `0<t<1`; this does not assert that a
@@ -452,7 +452,7 @@ mean that arbitrary compositions of supported functions are supported.
 
 The `asinh` formula uses the native ordinary Struve and Bessel functions:
 
-$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asinh}(t)\}(s) =\frac{\pi}{2s}\left[\mathbf H_0(s)-Y_0(s)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asinh}(t)\}(s) =\frac{\pi}{2s}\left[\mathbf H_0(s)-Y_0(s)\right], \qquad \mathfrak{Re}(s)>0.\end{array}$
 
 Both functions support complex numerical arguments, so targets in the right
 half-plane can be evaluated within their documented numerical limits.
@@ -463,7 +463,7 @@ expanded hypergeometric form, retain their inverse transform.
 For the principal branch, the unilateral Laplace transform includes
 `acosh(t)=i*acos(t)` on $0\le t<1$, not just the real tail above $t=1$:
 
-$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(t)\}(s) =\frac{K_0(s)}{s}+\frac{i\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(t)\}(s) =\frac{K_0(s)}{s}+\frac{i\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right], \qquad \mathfrak{Re}(s)>0.\end{array}$
 
 Here $\mathbf L_0$ is the native modified Struve function, written
 `struvel(0,z)` in Function output. The native modified Bessel function
@@ -480,7 +480,7 @@ by the numerical functions, subject to their existing precision and range limits
 
 For a known non-zero real rate $a$, put $q=|a|$ and $z=s/q$. The formula is
 
-$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(at)\}(s) =\frac{K_0(z)}{s} +\frac{i\pi}{2s}\left[1-\operatorname{sign}(a) \left(I_0(z)-\mathbf L_0(z)\right)\right], \qquad \operatorname{Re}(s)>0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acosh}(at)\}(s) =\frac{K_0(z)}{s} +\frac{i\pi}{2s}\left[1-\operatorname{sign}(a) \left(I_0(z)-\mathbf L_0(z)\right)\right], \qquad \mathfrak{Re}(s)>0.\end{array}$
 
 A zero rate gives $i\pi/(2s)$ on the same half-plane. Unspecified rates,
 non-real rates and shifted source arguments remain symbolic. Supplied constant
@@ -492,9 +492,9 @@ match; a Bessel term without its companion is not sufficient.
 
 The inverse-circular functions use the same native special functions:
 
-$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asin}(t)\}(s) =\frac{\pi}{2s}\left[I_0(s)-\mathbf L_0(s)\right]+\frac{iK_0(s)}{s}, \qquad \operatorname{Re}(s)>0,\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{asin}(t)\}(s) =\frac{\pi}{2s}\left[I_0(s)-\mathbf L_0(s)\right]+\frac{iK_0(s)}{s}, \qquad \mathfrak{Re}(s)>0,\end{array}$
 
-$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acos}(t)\}(s) =\frac{\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right]-\frac{iK_0(s)}{s}, \qquad \operatorname{Re}(s)>0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal L\{\operatorname{acos}(t)\}(s) =\frac{\pi}{2s}\left[1-I_0(s)+\mathbf L_0(s)\right]-\frac{iK_0(s)}{s}, \qquad \mathfrak{Re}(s)>0.\end{array}$
 
 These formulas retain MARS's real-cut values: for $t>1$,
 $\operatorname{asin}(t)=\pi/2+i\operatorname{acosh}(t)$ and
@@ -668,7 +668,7 @@ inline construction wrappers.
 The native forward and inverse rules recognise absolute powers, including reciprocal
 square roots written with `sqrt`, powers or modulus bars. The cosine Mellin integral gives
 
-$\quad\begin{array}{l}\displaystyle \mathcal F_{t\to\omega}\{|t|^p\}=2\Gamma(p+1)\cos\!\left(\frac{\pi(p+1)}2\right)|\omega|^{-p-1},\qquad -1<\Re(p)<0,\quad\omega\in\mathbb R\setminus\{0\}.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal F_{t\to\omega}\{|t|^p\}=2\Gamma(p+1)\cos\!\left(\frac{\pi(p+1)}2\right)|\omega|^{-p-1},\qquad -1<\mathfrak{Re}(p)<0,\quad\omega\in\mathbb R\setminus\{0\}.\end{array}$
 
 This is an oscillatory improper integral, not an absolutely convergent integral over
 the whole line. Both the input and spectrum are locally integrable at zero in this
@@ -766,12 +766,12 @@ An unqualified complex `ln(x)` is different and remains unsupported here.
 For real $a\ne0$ and $b$, let $q=\omega/a$ and $A_\pm=(-n\pm iq)/2$.
 The principal-power convention gives
 
-$\quad\begin{array}{l}\displaystyle \mathcal F\{\sinh^n(at+b)\}(\omega) =\frac{2^{-(n+1)}e^{ibq}}{|a|} \left[\mathrm B(A_+,n+1)+e^{i\pi n}\mathrm B(A_-,n+1)\right], \qquad -1<\Re(n)<0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\sinh^n(at+b)\}(\omega) =\frac{2^{-(n+1)}e^{ibq}}{|a|} \left[\mathrm B(A_+,n+1)+e^{i\pi n}\mathrm B(A_-,n+1)\right], \qquad -1<\mathfrak{Re}(n)<0.\end{array}$
 
 The factor $e^{i\pi n}$ is the negative-half-line branch value; it must not be
 discarded for fractional or complex powers. Replacing the input by
 $|\sinh(at+b)|^n$ replaces this factor by one. For $\cosh^n(at+b)$, the bracket
-becomes $\mathrm B(A_+,A_-)$ and the convergence condition is $\Re(n)<0$.
+becomes $\mathrm B(A_+,A_-)$ and the convergence condition is $\mathfrak{Re}(n)<0$.
 These formulas follow from [Euler's beta integral](https://dlmf.nist.gov/5.12.E1);
 the cosh pair also follows from [DLMF 5.12.7](https://dlmf.nist.gov/5.12.E7).
 Inverse transforms reverse the sign of $q$ and include $1/(2\pi)$, without
@@ -795,11 +795,11 @@ growth, so neither an ordinary nor a tempered-distribution Fourier transform
 exists for real non-zero scale. Finite exponential sums have the separate
 analytic-functional extension described below. Other proven growing cases return
 `NAN` with an explicit non-existence diagnostic, rather than an unevaluated transform.
-For sinh powers, $\Re(n)\le-1$ instead gives a
+For sinh powers, $\mathfrak{Re}(n)\le-1$ instead gives a
 non-integrable singularity. The exponent $-1$ has the separate symmetric
 `csch` rule below; other principal-value or finite-part prescriptions are not
 inferred by continuing the beta formula.
-Unimplemented boundary cases with $\Re(n)=0$ remain symbolic. Unknown parameters
+Unimplemented boundary cases with $\mathfrak{Re}(n)=0$ remain symbolic. Unknown parameters
 retain the convergence conditions rather than being declared divergent.
 
 | Input | Output |
@@ -1075,7 +1075,7 @@ Adding a delta to the spectrum correctly adds 1/(2π) to the inverse.
 
 The gamma function on a vertical line has an ordinary Fourier pair:
 
-$\quad\begin{array}{l}\displaystyle \mathcal F\{\Gamma(a+ibx)\}(k) =\frac{2\pi}{|b|}\exp\bigl(ak/b-e^{k/b}\bigr), \qquad \operatorname{Re}(a)>0,\quad b\in\mathbb R,\quad b\ne0.\end{array}$
+$\quad\begin{array}{l}\displaystyle \mathcal F\{\Gamma(a+ibx)\}(k) =\frac{2\pi}{|b|}\exp\bigl(ak/b-e^{k/b}\bigr), \qquad \mathfrak{Re}(a)>0,\quad b\in\mathbb R,\quad b\ne0.\end{array}$
 
 | Input | Output |
 | --- | --- |
@@ -1083,13 +1083,13 @@ $\quad\begin{array}{l}\displaystyle \mathcal F\{\Gamma(a+ibx)\}(k) =\frac{2\pi}{
 | `@Finv{2*@pi*exp(k-exp(k))}` | $\Gamma(1+ix)$, x ∈ ℝ |
 
 The shorthand `@F{gamma(x)}` selects the vertical-line interpretation explicitly
-in its displayed operator: $\mathcal F_{\operatorname{Im}(x)\to k}$.
+in its displayed operator: $\mathcal F_{\mathfrak{Im}(x)\to k}$.
 The real coordinate is held fixed, with Re(x) > 0. This is the same family as
 Γ(a + iy), with a = Re(x) and y = Im(x); it is not integration along the real axis.
 
 | Input | Output |
 | --- | --- |
-| `@F{gamma(x)}` | $2\pi\exp(k\operatorname{Re}(x)-e^k)$, k ∈ ℝ, Re(x) > 0 |
+| `@F{gamma(x)}` | $2\pi\exp(k\mathfrak{Re}(x)-e^k)$, k ∈ ℝ, Re(x) > 0 |
 | `@Finv{2*@pi*exp(k*Re(x)-exp(k))}` | $\Gamma(x)$, Re(x) > 0 |
 
 The explicit coordinate spelling `Fourier(gamma(x),Im(x),k)` gives the same
@@ -1317,7 +1317,7 @@ TeX uses the corresponding mathematical notation.
 
 | Input | Output |
 | --- | --- |
-| `@F{exp(-t^2)}` | `√(π)·exp(-¼ω²) where (ω ∈ ℝ)` |
+| `@F{exp(-t^2)}` | `√π·exp(-¼ω²) where (ω ∈ ℝ)` |
 | `@Finv{exp(-ω^2)}` | `½·exp(-¼t²)/√(π) where (t ∈ ℝ)` |
 | `@F{rect(t)}` | `sinc(ω/(2π)) where (ω ∈ ℝ)` |
 | `@F{delta(t)}` | `1` |
@@ -2067,6 +2067,14 @@ The beautifier cancels exact rational factors around square roots when this
 does not enlarge the rational scale inside the root. Reciprocal positive
 integer roots can be written as division by a root. These rules retain an
 exterior negative sign and do not assume that symbolic variables are positive.
+An exact rational square root with a perfect-square denominator is simplified
+by extracting its positive integer square root. Surrounding rational factors
+then cancel normally. The square test uses integer arithmetic, including at
+double precision and for integers larger than a machine word; approximate
+radicands are not promoted to exact fractions. Principal branches are preserved
+for both positive and negative numerators. Reciprocal coefficients multiplying
+sums are displayed as a single TeX fraction, except where that would put a
+derivative or integral inside an enclosing algebraic fraction.
 For example, this Gaussian primitive in MARS Lab:
 
 ```text
@@ -2298,8 +2306,76 @@ All functions return owning handles.
 - `expr_t *expr_new_finite_summation_range(const expr_t *term, const expr_t *index, const expr_t *lower, const expr_t *upper)` — construct an unevaluated finite sigma with inclusive bounds
 - `expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, const expr_t *lower, const expr_t *upper)` — construct an unevaluated finite product with inclusive bounds
 
+Principal roots use indexed radicals in Expression and Unbound output: `³√x`,
+`⁴√x` and `¹²√x` represent `cubrt(x)`, `root(x,4)` and `root(x,12)`.
+The square-root index is omitted. A single unadorned symbol needs no parentheses,
+including Greek letters: `√x` and `³√α`. Compound radicands, subscripted or
+multi-character names, and powered roots retain grouping where needed. The parser
+accepts both bare and parenthesised forms, including in bindings. A bare radical
+consumes the next atom only; use parentheses to include a sum, product or power
+inside the radical. A multiplication
+dot separates a preceding factor from an indexed radical so that its index cannot
+be mistaken for that factor's exponent. Literal indices from 2 to `INT_MAX` use
+this notation; symbolic or larger indices retain `root(value, order)`. Numeric
+root evaluation itself requires an integer index in the range 2 to `INT_MAX`.
+These are principal **complex** roots, not the real-only odd-root convention.
+Explicit fractional powers retain their complete-root-family meaning and are
+not rewritten as principal radicals. Function output retains `cubrt`/`root`,
+and TeX continues to use its existing indexed radicals.
+
+This complete example prints three principal roots without evaluating `x`:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "expression.h"
+
+int main(void)
+{
+    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)"};
+    for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
+        expr_t *expr = expr_from_string(sources[i], NULL);
+        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        if (!text) {
+            expr_free(expr);
+            return EXIT_FAILURE;
+        }
+        puts(text);
+        free(text);
+        expr_free(expr);
+    }
+    return EXIT_SUCCESS;
+}
+```
+
+Output:
+
+```text
+³√x
+⁴√x
+¹²√x
+```
+
 The string grammar accepts `conj(z)` and `conjugate(z)` for complex
-conjugation. Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
+conjugation. TeX places an overbar over the complete conjugated argument,
+including compound arguments and powered conjugates; Expression and Function
+output retain the parseable function notation. Real and imaginary projections
+use the two-letter Fraktur forms $\mathfrak{Re}$ and $\mathfrak{Im}$ in TeX across
+all Lab modes, including transform conditions. A thin space separates these
+projections from adjacent factors, including coefficients and powered projections.
+The argument's opening brace sits immediately after the projection name or its
+power, without TeX's automatic inner-delimiter gap.
+Parseable text retains `Re`/`Im`
+and Function output uses `realpart`/`imagpart`.
+Exact rational constants retain stacked fractions in TeX, including beneath
+radicals; long terminating decimals are not substituted into exact surd formulae.
+Equal total coefficients of an expression and its conjugate are presented using
+twice its real part, with any common numeric coefficient outside the projection.
+Unequal coefficients retain conjugation; the formatter does not split off a
+partial real-part term. This native structural rule preserves exact radicals
+and applies consistently to TeX, Expression and Function output.
+Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
 also equivalent for every scalar type; for complex values and expressions
 they denote the modulus `sqrt(z*z^*)`. An unmatched bar is a syntax error.
 In Expression syntax, an opening modulus may follow another factor without a

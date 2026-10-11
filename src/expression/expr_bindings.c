@@ -17,16 +17,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expr_binding_simplify.h"
-#include "expr_bindings.h"
+#include "ustring.h"
 #include "expression.h"
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
-#include "expr_stringin_scan.h"
-#include "expr_stringout.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "ustring.h"
+#include "expr_bindings.h"
+#include "expr_binding_simplify.h"
+#include "expr_stringin_scan.h"
+#include "expr_stringout.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 
 typedef struct {
     string_cursor_t *cursor;
@@ -1083,6 +1083,11 @@ bool expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *e
 
     if (!expr)
         return false;
+
+    /* Never let a preceding factor absorb a radical's superscript index as its own exponent. */
+    if ((expr->kind == EXPR_BINDING_EXPR_UNARY_OP && expr->u.unary_op.ops == &ops_cubrt) ||
+        (expr->kind == EXPR_BINDING_EXPR_BINARY_OP && expr->u.binary_op.ops == &ops_root))
+        return true;
 
     ops = binding_expr_ops_for_kind(expr->kind);
     return ops && ops->explicit_mul_separator ? ops->explicit_mul_separator(expr) : false;
@@ -2538,6 +2543,20 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p, bool al
     if (p->error || binding_at_end(p)) {
         binding_set_error(p, "expected binding expression");
         return NULL;
+    }
+
+    int root_index = expr_parse_read_root_index(p->cursor);
+    if (root_index >= 2) {
+        expr_binding_expr_t *argument = binding_consume_char(p, '(')
+            ? parse_binding_enclosed_expr(p, ')', "expected ')' after indexed radical")
+            : parse_binding_atom_mode(p, false);
+        if (!argument)
+            return NULL;
+        if (root_index == 2 || root_index == 3)
+            return expr_binding_expr_new_unary_op(root_index == 2 ? &ops_sqrt : &ops_cubrt, argument);
+        char order[32];
+        snprintf(order, sizeof(order), "%d", root_index);
+        return expr_binding_expr_new_binary_op(&ops_root, argument, expr_binding_expr_new_number_text(order));
     }
 
     if (binding_peek_ascii(p, &c) && c == '(') {
@@ -4005,12 +4024,21 @@ static void emit_binding_TeX_unary_call(const expr_ops_t *ops, const expr_bindin
     sbuf_putc(b, ')');
 }
 
+static void emit_binding_expr_root_argument(const expr_binding_expr_t *child, sbuf_t *b, bool allow_bare)
+{
+    bool grouped = !allow_bare || child->kind != EXPR_BINDING_EXPR_CONST;
+    if (grouped)
+        sbuf_putc(b, '(');
+    emit_binding_expr(child, b, BIND_PREC_LOWEST);
+    if (grouped)
+        sbuf_putc(b, ')');
+}
+
 static void emit_binding_expr_unary_sqrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
-    sbuf_puts(b, "√(");
-    emit_binding_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, ')');
+    sbuf_puts(b, "√");
+    emit_binding_expr_root_argument(child, b, true);
 }
 
 static void emit_binding_TeX_unary_sqrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
@@ -4024,9 +4052,8 @@ static void emit_binding_TeX_unary_sqrt(const expr_ops_t *ops, const expr_bindin
 static void emit_binding_expr_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
-    sbuf_puts(b, "cubrt(");
-    emit_binding_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, ')');
+    sbuf_puts(b, "³√");
+    emit_binding_expr_root_argument(child, b, true);
 }
 
 static void emit_binding_TeX_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
@@ -4166,12 +4193,16 @@ static const binding_unary_render_t *binding_unary_renderer_for_ops(const expr_o
 
 static void emit_binding_expr_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
-    const binding_unary_render_t *renderer = binding_unary_renderer_for_ops(expr->u.unary_op.ops);
+    const expr_ops_t *ops = expr->u.unary_op.ops;
+    const binding_unary_render_t *renderer = binding_unary_renderer_for_ops(ops);
     bool need = BIND_PREC_UNARY < parent_prec;
 
     if (need)
         sbuf_putc(b, '(');
-    if (renderer && renderer->emit_expr)
+    if (parent_prec >= BIND_PREC_POW && (ops == &ops_sqrt || ops == &ops_cubrt)) {
+        sbuf_puts(b, ops == &ops_sqrt ? "√" : "³√");
+        emit_binding_expr_root_argument(expr->u.unary_op.child, b, false);
+    } else if (renderer && renderer->emit_expr)
         renderer->emit_expr(expr->u.unary_op.ops, expr->u.unary_op.child, b);
     else
         emit_binding_expr_unary_call(expr->u.unary_op.ops, expr->u.unary_op.child, b);
@@ -4197,6 +4228,16 @@ static void emit_binding_TeX_unary_op(const expr_binding_expr_t *expr, sbuf_t *b
 static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     const expr_ops_t *ops = expr->u.binary_op.ops;
+
+    long index;
+    if (ops == &ops_root && binding_number_text_to_long(expr->u.binary_op.right, &index) &&
+        index >= 2L && index <= INT_MAX) {
+        if (index > 2L)
+            emit_binding_superscript_int(b, index);
+        sbuf_puts(b, "√");
+        emit_binding_expr_root_argument(expr->u.binary_op.left, b, parent_prec < BIND_PREC_POW);
+        return;
+    }
 
     if (ops == &ops_pow) {
         bool need = BIND_PREC_POW < parent_prec;

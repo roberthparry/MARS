@@ -3,8 +3,10 @@
  * @brief Validated configuration for server-owned isolated forecast workers.
  *
  * Runs regression and ARIMA-family fitting through the MARS timeseries API.
- * The server invokes its own private worker mode with validated arguments;
- * results are atomically published as Protobuf, never printed as JSON.
+ * The in-memory entry point returns results directly and never uses dataset
+ * paths. The private command-line entry point publishes Protobuf results while
+ * the server's transport is being migrated. Neither entry point selects a
+ * default dataset or data column.
  */
 
 #include <math.h>
@@ -147,11 +149,9 @@ static void tba_worker_config_init(tba_worker_config_t *cfg)
     if (!cfg)
         return;
     memset(cfg, 0, sizeof(*cfg));
-    cfg->target_path = "sample_data/Monthly Target Numbers.csv";
     cfg->target_date_column = "";
-    cfg->target_value_column = "18-24 LD No Health contrib Tot.";
-    cfg->xreg_path = "sample_data/Monthly Population.csv";
-    cfg->xreg_date_column = "DATE";
+    cfg->target_value_column = "";
+    cfg->xreg_date_column = "";
     cfg->frequency = TS_FREQ_MONTHLY;
     cfg->year_type = TS_YEAR_FISCAL_UK_APR;
     cfg->model = TBA_WORKER_MODEL_SARIMAX;
@@ -170,7 +170,7 @@ static void tba_worker_config_init(tba_worker_config_t *cfg)
     cfg->level = 0.95;
 }
 
-static int tba_worker_parse_args(tba_worker_config_t *cfg, int argc, char **argv)
+static int tba_worker_parse_args(tba_worker_config_t *cfg, int argc, const char *const *argv)
 {
     int i;
 
@@ -183,14 +183,10 @@ static int tba_worker_parse_args(tba_worker_config_t *cfg, int argc, char **argv
         if (i + 1 >= argc)
             return -1;
         value = argv[++i];
-        if (strcmp(arg, "--target") == 0)
-            cfg->target_path = value;
-        else if (strcmp(arg, "--target-date-column") == 0)
+        if (strcmp(arg, "--target-date-column") == 0)
             cfg->target_date_column = value;
         else if (strcmp(arg, "--target-value-column") == 0)
             cfg->target_value_column = value;
-        else if (strcmp(arg, "--xreg") == 0)
-            cfg->xreg_path = value;
         else if (strcmp(arg, "--xreg-date-column") == 0)
             cfg->xreg_date_column = value;
         else if (strcmp(arg, "--xreg-cols") == 0) {
@@ -243,15 +239,15 @@ static int tba_worker_parse_args(tba_worker_config_t *cfg, int argc, char **argv
     return 0;
 }
 
-/* Publish one bounded Protobuf result from the server's private worker entry point. */
-int tba_worker_main(int argc, char **argv, const char *output_path)
+/* Borrow observations for this calculation; never resolve paths or publish files. */
+json_t *tba_worker_memory(int argc, const char *const *argv, const string_t *target, const string_t *drivers)
 {
     tba_worker_config_t cfg;
     tba_worker_config_init(&cfg);
+    cfg.target_text = target;
+    cfg.driver_text = drivers;
     int parsed = tba_worker_parse_args(&cfg, argc, argv);
     json_t *result = parsed ? tba_worker_fail("Invalid forecast worker arguments.") : tba_worker_run(&cfg);
-    bool ok = result && tba_file_publish_message(output_path, result);
-    json_free(result);
     tba_worker_free_string_list(cfg.xreg_columns, cfg.xreg_column_count);
-    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+    return result;
 }

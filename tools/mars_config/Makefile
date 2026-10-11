@@ -28,9 +28,14 @@ $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Ma
 $(CONFIG_PROGRAM): $(CONFIG_OBJS) $(STATIC_LIB)
 	$(CC) $(LDFLAGS) -o $@ $(CONFIG_OBJS) $(STATIC_LIB) $(LDLIBS)
 
+# Private module headers are available only to their owning module's regression tests.
+$(CONFIG_BUILD_DIR)/tests/test_cfg_calendar.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/calendar
+$(CONFIG_BUILD_DIR)/tests/test_cfg_database.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
+
 $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tests/test_cfg_support.h tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include -Itools/mars_lab/include \
+	    $(CONFIG_TEST_INTERNAL_INCLUDES) \
 	    -DMARS_CONFIG_PROGRAM='"$(abspath $(CONFIG_PROGRAM))"' -DMARS_CONFIG_ROOT_DIR='"$(CURDIR)"' -c $< -o $@
 
 $(CONFIG_TEST_BIN): $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(CONFIG_PROGRAM)

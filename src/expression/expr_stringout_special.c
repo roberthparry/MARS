@@ -90,6 +90,8 @@ static const char *expr_known_constant_TeX_local(number_t value)
 
 void emit_TeX_number_value(sbuf_t *b, number_t value)
 {
+    if (expr_emit_exact_rational_TeX(b, value))
+        return;
     const char *constant_TeX = NULL;
     char *text = expr_number_to_string_local(num_clone(value));
     char *tex;
@@ -117,6 +119,8 @@ void emit_TeX_number_value(sbuf_t *b, number_t value)
 
 void emit_TeX_const_value(sbuf_t *b, const expr_t *expr)
 {
+    if (expr && expr_emit_exact_rational_TeX(b, expr->c))
+        return;
     const char *constant_TeX = NULL;
     char *text = expr_const_to_string_local(expr);
     char *tex;

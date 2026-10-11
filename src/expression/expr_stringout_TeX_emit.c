@@ -72,6 +72,13 @@ static bool TeX_factor_has_compound_name(const expr_t *factor)
            !expr_tostring_should_emit_binding_expr(factor) && !expr_tostring_is_simple_name(factor->name);
 }
 
+static bool TeX_factor_is_projection(const expr_t *factor)
+{
+    while (factor && (expr_is_neg(factor) || expr_is_op(factor, &ops_pow) || expr_is_pow_d_expr(factor)))
+        factor = factor->a;
+    return expr_is_op(factor, &ops_real_bound) || expr_is_op(factor, &ops_imag_coordinate);
+}
+
 /* Use the same factor separation in ordinary products, fractions and multiline output. */
 void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
@@ -103,6 +110,11 @@ void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
     }
     if (TeX_factor_has_compound_name(left) || TeX_factor_has_compound_name(right)) {
         sbuf_puts(b, " \\cdot ");
+        return;
+    }
+    /* Fraktur projections need a positive thin space, not the kerning used for adjacent algebraic symbols. */
+    if (TeX_factor_is_projection(left) || TeX_factor_is_projection(right)) {
+        sbuf_puts(b, "\\,");
         return;
     }
     sbuf_puts(b, "\\mkern-2mu ");
@@ -329,6 +341,34 @@ static bool emit_TeX_rational_quotient(const expr_t *numerator, const expr_t *de
     emit_TeX_expr(denominator, b, PREC_MUL);
     sbuf_putc(b, '}');
     if (PREC_MUL < parent_prec)
+        sbuf_puts(b, "\\right)");
+    return true;
+}
+
+/* A reciprocal coefficient on a sum is clearer as one fraction; calculus stays outside algebraic fractions. */
+static bool emit_TeX_reciprocal_sum(const expr_t *f, sbuf_t *b, int parent_prec)
+{
+    const expr_t *coefficient = f->a, *sum = f->b;
+    if (!expr_is_addsub(sum)) {
+        coefficient = f->b;
+        sum = f->a;
+    }
+    long numerator, denominator;
+    if (!expr_is_addsub(sum) || !expr_is_unnamed_const(coefficient) ||
+        (coefficient->binding_expr && !expr_binding_expr_is_numeric_literal(coefficient->binding_expr)) ||
+        !num_get_small_rational(coefficient->c, &numerator, &denominator) || denominator <= 1 ||
+        (numerator != 1 && numerator != -1) || TeX_contains_calculus(sum))
+        return false;
+    if (parent_prec > PREC_MUL)
+        sbuf_puts(b, "\\left(");
+    if (numerator < 0)
+        sbuf_putc(b, '-');
+    sbuf_puts(b, "\\frac{");
+    emit_TeX_expr(sum, b, PREC_LOWEST);
+    char divisor[32];
+    snprintf(divisor, sizeof(divisor), "}{%ld}", denominator);
+    sbuf_puts(b, divisor);
+    if (parent_prec > PREC_MUL)
         sbuf_puts(b, "\\right)");
     return true;
 }
@@ -578,7 +618,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "\\in\\mathbb{R}" : "\\in\\mathbb{Z}_{\\ge0}");
                 continue;
             }
-            sbuf_puts(b, "\\operatorname{Re}(");
+            sbuf_puts(b, ops_real_bound.TeX_name);
+            sbuf_putc(b, '(');
             emit_TeX_expr(pair->a, b, PREC_LOWEST);
             sbuf_puts(b, ")>");
             emit_TeX_expr(pair->b->a, b, PREC_LOWEST);
@@ -693,6 +734,15 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (group_argument)
                 sbuf_puts(b, "\\right)");
             sbuf_putc(b, '!');
+        } else if (expr_is_op(f, &ops_real_bound) || expr_is_op(f, &ops_imag_coordinate)) {
+            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, "\\mathopen{}\\left\\{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_puts(b, "\\right\\}");
+        } else if (expr_is_op(f, &ops_conj)) {
+            sbuf_puts(b, "\\overline{");
+            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            sbuf_putc(b, '}');
         } else if (expr_is_op(f, &ops_abs)) {
             sbuf_puts(b, "\\left|");
             emit_TeX_expr_abs(f->a, b, 0);
@@ -787,7 +837,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         const char *unary_name = f->a->ops->arity == EXPR_OP_UNARY ? TeX_unary_name(f->a) : NULL;
         if (f->a->ops->arity == EXPR_OP_UNARY && !expr_is_formal_derivative(f->a) && !expr_is_neg(f->a) &&
             !expr_distribution_qualification(f->a) &&
-            !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !expr_is_op(f->a, &ops_factorial) &&
+            !expr_is_sqrt_expr(f->a) && !expr_is_op(f->a, &ops_abs) && !expr_is_op(f->a, &ops_conj) &&
+            !expr_is_op(f->a, &ops_factorial) &&
             !TeX_postfix_factorial_argument(f->a) &&
             !strchr(unary_name ? unary_name : "", '^')) {
             const char *name = unary_name;
@@ -800,7 +851,11 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             } else {
                 emit_TeX_const_value(b, f);
             }
-            if (TeX_unary_has_bare_greek_argument(f->a)) {
+            if (expr_is_op(f->a, &ops_real_bound) || expr_is_op(f->a, &ops_imag_coordinate)) {
+                sbuf_puts(b, "}\\mathopen{}\\left\\{");
+                emit_TeX_expr(f->a->a, b, PREC_LOWEST);
+                sbuf_puts(b, "\\right\\}");
+            } else if (TeX_unary_has_bare_greek_argument(f->a)) {
                 sbuf_puts(b, "} ");
                 emit_TeX_expr(f->a->a, b, PREC_UNARY);
             } else {
@@ -833,6 +888,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_mul(f)) {
+        if (emit_TeX_reciprocal_sum(f, b, parent_prec))
+            return;
         int need = PREC_MUL < parent_prec;
         expr_t *fac[64];
         int n = 0;
@@ -889,6 +946,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_addsub(f)) {
+        if (expr_emit_conjugate_sum(f, b, parent_prec, style_LATEX))
+            return;
         int need = PREC_ADD < parent_prec;
         bool neg = expr_renders_negative(f->b);
         const expr_t *negative_complex_base = NULL;

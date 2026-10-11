@@ -331,7 +331,7 @@ These tests run during ordinary `make test`; there is no opt-in flag and no
 external-service dependency. Run them separately with:
 
 ```sh
-make -j1 test-http-live
+make -j1 test_http_live
 ```
 
 Successful README example output (the harness also prints test results):

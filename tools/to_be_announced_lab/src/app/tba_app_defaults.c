@@ -5,6 +5,7 @@
  * The native application owns these defaults; no configuration asset is parsed
  * at startup. Values retain their scalar types in the in-memory tree consumed by
  * the shared Protobuf codec. Each caller receives an independent owned copy.
+ * No dataset, filename or data column is preselected: files belong to the browser.
  */
 #include "tba_app.h"
 
@@ -16,16 +17,16 @@ json_t *tba_app_defaults(void)
         const char *value;
         bool number;
     } defaults[] = {
-        {"target_path",         "sample_data/Monthly Target Numbers.csv", false},
-        {"target_display_name", "Monthly Sample LD Numbers.csv",         false},
+        {"target_path",         "",                                      false},
+        {"target_display_name", "",                                      false},
         {"target_date_column",  "",                                      false},
-        {"target_value_column", "18-24 LD No Health contrib Tot.",        false},
+        {"target_value_column", "",                                      false},
         {"outlier_mode",        "flag",                                  false},
         {"outlier_dates",       "",                                      false},
-        {"xreg_path",           "sample_data/Monthly Population.csv",     false},
-        {"xreg_display_name",   "Monthly Sample Population.csv",          false},
-        {"xreg_date_column",    "DATE",                                  false},
-        {"xreg_columns",        "All",                                   false},
+        {"xreg_path",           "",                                      false},
+        {"xreg_display_name",   "",                                      false},
+        {"xreg_date_column",    "",                                      false},
+        {"xreg_columns",        "",                                      false},
         {"models",              "sarimax",                               false},
         {"frequency",           "monthly",                               false},
         {"year_type",           "fiscal",                                false},

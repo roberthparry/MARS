@@ -1,23 +1,17 @@
 /**
  * @file tba_forecast.c
- * @brief Validated, bounded native-worker orchestration for forecasting requests.
+ * @brief Validated, bounded native-worker orchestration for private requests.
  *
- * Uses independent private fit inputs and argument vectors, with a 60-second
- * limit per model. Fit copies are removed on every exit path; uploaded originals
- * remain untouched. The server's built-in worker owns mathematical fitting and
- * publishes a private Protobuf result; no scratch console application is used.
+ * Uses transient in-memory inputs and returns transient results. No request
+ * data, settings or results are published to the filesystem.
  */
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "lab_process.h"
-#include "tba_forecast.h"
 #include "tba_series.h"
-
-#ifndef TBA_SERVER_PATH
-#define TBA_SERVER_PATH "tools/to_be_announced_lab/build/release/to_be_announced_lab"
-#endif
+#include "tba_worker.h"
+#include "tba_forecast.h"
 
 static const char *const tba_forecast_tokens[] = {"regression", "arima", "arimax", "sarima", "sarimax", "auto-arima"};
 static const char *const tba_forecast_labels[] = {"Regression", "ARIMA", "ARIMAX", "SARIMA", "SARIMAX", "Auto-ARIMA"};
@@ -89,34 +83,22 @@ static bool tba_forecast_numbers(const json_t *state)
            (!strcmp(year, "fiscal") || !strcmp(year, "calendar"));
 }
 
-static void tba_forecast_remove(string_t *path)
-{
-    if (path) {
-        file_t *file = file_new(path);
-        if (file)
-            file_delete(file);
-        file_free(file);
-        string_free(path);
-    }
-}
-
-static json_t *tba_forecast_one(tba_app_t *app, const json_t *state, const char *model)
+static json_t *tba_forecast_one(const json_t *payload, const json_t *state, const char *model)
 {
     json_t *result = NULL, *meta = NULL, *ends = NULL, *overlap = NULL;
     tba_series_t *target = NULL, *drivers = NULL;
-    string_t *target_fit = NULL, *driver_fit = NULL, *note = NULL, *fit_csv = NULL;
-    string_t *driver_csv = NULL, *driver_note = NULL, *output = NULL, *horizon_text = NULL;
-    string_t *worker_result = NULL;
+    string_t *note = NULL, *fit_csv = NULL;
+    string_t *driver_csv = NULL, *driver_note = NULL, *horizon_text = NULL;
     const char *error = "The selected target CSV or date column could not be read.";
-    target = tba_series_open(tba_json_text(state, "target_path"), tba_json_text(state, "target_date_column"));
+    target = tba_series_from_rows(tba_json_get(payload, "target"), tba_json_text(state, "target_date_column"));
     if (!target)
         goto done;
     meta = tba_series_details(target, tba_json_text(state, "target_value_column"), "");
     if (!meta)
         goto done;
     const char *selection = tba_json_text(state, "xreg_columns");
-    if (*selection && *tba_json_text(state, "xreg_path")) {
-        drivers = tba_series_open(tba_json_text(state, "xreg_path"), tba_json_text(state, "xreg_date_column"));
+    if (*selection && tba_json_get(payload, "drivers")) {
+        drivers = tba_series_from_rows(tba_json_get(payload, "drivers"), tba_json_text(state, "xreg_date_column"));
         error = "The selected exogenous CSV or date column could not be read.";
         if (!drivers)
             goto done;
@@ -158,38 +140,25 @@ static json_t *tba_forecast_one(tba_app_t *app, const json_t *state, const char 
     horizon_text = string_sprintf("%zu", horizon);
     fit_csv = tba_series_adjust(target, tba_json_text(state, "target_value_column"),
                                 tba_json_text(state, "outlier_mode"), tba_json_text(state, "outlier_dates"), &note);
-    target_fit = fit_csv ? tba_app_upload(app, fit_csv) : NULL;
     if (drivers) {
         driver_csv = tba_series_adjust(drivers, "", "flag", "", &driver_note);
-        driver_fit = driver_csv ? tba_app_upload(app, driver_csv) : NULL;
     }
     error = "Could not prepare private forecast input copies.";
-    if (!target_fit || !horizon_text || (drivers && !driver_fit))
+    if (!fit_csv || !horizon_text || (drivers && !driver_csv))
         goto done;
-    worker_result = string_sprintf("%S.result.pb", target_fit);
-    if (!worker_result)
-        goto done;
-    const char *argv[] = {TBA_SERVER_PATH, "--forecast-worker", string_c_str(worker_result),
-        "--target", string_c_str(target_fit),
+    const char *argv[] = {"worker",
         "--target-date-column", tba_json_text(meta, "date_column"),
         "--target-value-column", tba_json_text(state, "target_value_column"),
-        "--xreg", driver_fit ? string_c_str(driver_fit) : "", "--xreg-date-column", tba_json_text(state, "xreg_date_column"),
+        "--xreg-date-column", tba_json_text(state, "xreg_date_column"),
         "--xreg-cols", selection, "--model", model, "--frequency", frequency,
         "--year-type", tba_json_text(state, "year_type"), "--horizon", string_c_str(horizon_text),
         "--p", tba_json_text(state, "p"), "--d", tba_json_text(state, "d"), "--q", tba_json_text(state, "q"),
         "--P", tba_json_text(state, "P"), "--D", tba_json_text(state, "D"), "--Q", tba_json_text(state, "Q"),
         "--season-period", tba_json_text(state, "season_period"), "--criterion", tba_json_text(state, "criterion"),
         "--level", tba_json_text(state, "level"), NULL};
-    int status = -1;
-    error = "The native forecast worker failed, timed out or exceeded its output limit.";
-    if (!lab_proc_run(argv, NULL, 60000, 16u * 1024u * 1024u, &output, &status))
+    result = tba_worker_memory((int)(sizeof argv / sizeof *argv - 1), argv, fit_csv, driver_csv);
+    if (!result)
         goto done;
-    result = tba_file_read_message(string_c_str(worker_result));
-    if (json_type(result) != JSON_OBJECT || (status && tba_json_bool(result, "ok"))) {
-        json_free(result);
-        result = NULL;
-        goto done;
-    }
     string_t *summary = string_new_with(tba_json_text(result, "summary_text"));
     if (summary && note && string_byte_length(note))
         string_append_format(summary, "\n%S", note);
@@ -230,11 +199,7 @@ done:
     string_free(driver_note);
     string_free(fit_csv);
     string_free(driver_csv);
-    string_free(output);
     string_free(horizon_text);
-    tba_forecast_remove(target_fit);
-    tba_forecast_remove(driver_fit);
-    tba_forecast_remove(worker_result);
     if (!result)
         result = tba_json_error(error);
     if (result)
@@ -250,7 +215,7 @@ json_t *tba_forecast_run(tba_app_t *app, const json_t *payload)
     json_t *state = tba_app_state(app);
     for (size_t i = 0; state && i < json_object_size(state); ++i) {
         const string_t *key = json_object_key_at(state, i);
-        const json_t *value = json_object_get(payload, key);
+        const json_t *value = json_object_get(tba_json_get(payload, "settings"), key);
         if (value && !json_object_set(state, key, value)) {
             json_free(state);
             state = NULL;
@@ -265,7 +230,7 @@ json_t *tba_forecast_run(tba_app_t *app, const json_t *payload)
     json_t *results = json_new_array();
     for (size_t i = 0; results && i < json_array_size(models); ++i) {
         const char *model = string_c_str(json_string_value(json_array_get(models, i)));
-        json_t *result = tba_forecast_one(app, state, model);
+        json_t *result = tba_forecast_one(payload, state, model);
         bool ok = result && json_array_append(results, result);
         json_free(result);
         if (!ok) {
@@ -275,9 +240,9 @@ json_t *tba_forecast_run(tba_app_t *app, const json_t *payload)
     }
     json_t *result = !results ? NULL : json_array_size(results) == 1 ? json_clone(json_array_get(results, 0)) :
                      tba_forecast_combine(results);
-    if (tba_json_bool(result, "ok") && (!tba_forecast_view(result) || !tba_app_result_save(app, result))) {
+    if (tba_json_bool(result, "ok") && !tba_forecast_view(result)) {
         json_free(result);
-        result = tba_json_error("Forecast completed, but its downloadable result could not be saved.");
+        result = tba_json_error("Could not construct the result.");
     }
     json_free(results);
     json_free(models);

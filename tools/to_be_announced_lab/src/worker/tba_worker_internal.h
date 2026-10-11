@@ -2,7 +2,8 @@
  * @file tba_worker_internal.h
  * @brief Private fitting configuration and output boundary within the worker module.
  *
- * Configuration borrows validated argument strings for one isolated request.
+ * Configuration borrows validated argument strings and, for in-memory fitting,
+ * observation buffers that remain alive for the complete calculation.
  * Only worker sources consume this header; the server uses tba_worker.h.
  */
 #ifndef TBA_WORKER_INTERNAL_H
@@ -20,10 +21,10 @@ typedef enum {
 } tba_worker_model_t;
 
 typedef struct {
-    const char *target_path;
+    const string_t *target_text;
+    const string_t *driver_text;
     const char *target_date_column;
     const char *target_value_column;
-    const char *xreg_path;
     const char *xreg_date_column;
     char **xreg_columns;
     size_t xreg_column_count;

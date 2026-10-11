@@ -283,6 +283,16 @@ qcomplex_t number_value_to_qcomplex(const number_t *number);
 number_t number_invalid(void);
 bool num_is_immortal(number_t number);
 bool num_get_small_rational(number_t number, long *numerator, long *denominator);
+
+/**
+ * @brief Extract an exact numerator and positive square root of a non-unit square denominator.
+ * @param number Borrowed rational value; approximate values are rejected.
+ * @param numerator Initialised owned output; unchanged on failure.
+ * @param denominator_root Distinct initialised owned output; unchanged on failure.
+ * @return True on success. Release both successful outputs with num_destroy.
+ */
+bool num_extract_square_denominator(number_t number, number_t *numerator, number_t *denominator_root);
+
 bool num_is_inexact_real_backend(number_t number);
 number_t num_as_inexact_real_prec(number_t number, size_t precision_bits);
 number_t number_take(number_t *boxed_number);

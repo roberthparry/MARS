@@ -53,7 +53,7 @@ static string_t *lab_worker_number_real(number_t value, int precision)
     } else {
         static const char *const superscripts[] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"};
         string_view_t mantissa = string_view_slice(view, 0u, marker);
-        ok = ok && string_append_format(out, "%W ×10%s", mantissa, negative ? "⁻" : "") >= 0;
+        ok = ok && string_append_format(out, "%W×10%s", mantissa, negative ? "⁻" : "") >= 0;
         while (exponent_start + 1u < length &&
                string_view_peek_ascii(view, exponent_start, &byte) && byte == '0')
             ++exponent_start;

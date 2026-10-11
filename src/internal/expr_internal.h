@@ -251,6 +251,14 @@ bool expr_match_same_reapplicable_unary_function(const expr_t *expr, const expr_
 expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const expr_t *argument);
 bool expr_match_exp_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out);
+/**
+ * @brief Inspect a principal square root without exposing its expression node.
+ * @param expr Borrowed expression to inspect.
+ * @param arg_out Receives the borrowed radicand on success.
+ * @return True for a square-root node; false otherwise.
+ */
+bool expr_match_sqrt_expr(const expr_t *expr, const expr_t **arg_out);
+
 bool expr_match_sin_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_cos_expr(const expr_t *expr, const expr_t **arg_out);
 bool expr_match_tan_expr(const expr_t *expr, const expr_t **arg_out);

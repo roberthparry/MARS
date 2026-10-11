@@ -1074,9 +1074,8 @@ void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool r
 
         if (need)
             sbuf_putc(b, '(');
-        sbuf_puts(b, "1/√(");
-        emit_expr(base, b, PREC_LOWEST);
-        sbuf_putc(b, ')');
+        sbuf_puts(b, "1/√");
+        emit_expr_root_argument(base, b, PREC_MUL);
         if (need)
             sbuf_putc(b, ')');
         return;
@@ -1087,9 +1086,8 @@ void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool r
 
         if (need)
             sbuf_putc(b, '(');
-        sbuf_puts(b, "√(");
-        emit_expr(base, b, PREC_LOWEST);
-        sbuf_putc(b, ')');
+        sbuf_puts(b, "√");
+        emit_expr_root_argument(base, b, parent_prec);
         if (need)
             sbuf_putc(b, ')');
     }

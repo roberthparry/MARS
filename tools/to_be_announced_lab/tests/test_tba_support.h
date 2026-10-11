@@ -17,4 +17,8 @@
  */
 bool test_tba_cleanup(file_t *directory);
 
+/** @brief Exercise encrypted transport and expiry without files or network I/O.
+ * @return True when all authenticated boundary checks pass. */
+bool test_tba_stream_checks(void);
+
 #endif

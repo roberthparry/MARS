@@ -46,4 +46,11 @@ bool expr_parse_view_starts_with_text(string_view_t view, const char *text, bool
 string_t *expr_parse_read_name(string_cursor_t *cursor, bool allow_plain_letters_after_first);
 int expr_parse_read_superscript_int(string_cursor_t *cursor);
 
+/**
+ * @brief Read an indexed radical prefix without consuming a mismatched token.
+ * @param[in,out] cursor Borrowed cursor; advanced past the superscript index and √ only on success.
+ * @return Integer index from 2 to INT_MAX, or -1 on mismatch, overflow or allocation failure.
+ */
+int expr_parse_read_root_index(string_cursor_t *cursor);
+
 #endif /* EXPR_STRINGIN_SCAN_H */

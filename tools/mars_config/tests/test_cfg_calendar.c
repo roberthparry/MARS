@@ -12,12 +12,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../src/calendar/cfg_calendar_internal.h"
-#include "cfg_calendar.h"
 #include "file.h"
-#include "test_cfg_calendar_fixture.h"
-#include "test_cfg_support.h"
+#include "cfg_calendar.h"
+#include "cfg_calendar_internal.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
+#include "test_cfg_calendar_fixture.h"
 
 /** Register documented calendar snapshots after all ordinary test groups. */
 void test_cfg_calendar_readme_cases(void);

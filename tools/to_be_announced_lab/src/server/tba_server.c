@@ -1,15 +1,14 @@
 /**
  * @file tba_server.c
- * @brief Native forecasting HTTP routes, response policy and listener lifecycle.
+ * @brief Private Lab routes and encrypted, transient request processing.
  *
- * Routes dispatch directly through the webserver index. Every request is checked
- * against the private-network policy before asset reads, uploads or calculations.
- * Persistent state/results coordinate prefork workers through atomic files.
- * Structured routes use version-one Protobuf exclusively; multipart CSV uploads,
- * text downloads and the standards-required JSON web manifest retain their formats.
+ * Only authenticated encrypted envelopes reach computation. Retired storage and
+ * file-upload routes are rejected. The actual socket peer must be loopback;
+ * remote browsers use an existing trusted HTTPS reverse proxy.
  */
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "lab_mobile.h"
 #include "lab_wire.h"
@@ -17,6 +16,7 @@
 #include "tba_http.h"
 #include "tba_page.h"
 #include "tba_series.h"
+#include "tba_stream.h"
 #include "tba_server.h"
 
 #ifndef TBA_WASM_PATH
@@ -27,6 +27,8 @@ typedef bool (*tba_svr_handler_t)(const websrv_request_t *, websrv_response_t *,
 struct tba_server {
     websrv_t *listener;
     tba_app_t *app;
+    tba_stream_t *stream;
+    bool retire;
     struct tba_svr_context *contexts;
 };
 
@@ -65,7 +67,7 @@ static bool tba_svr_wasm(const websrv_request_t *request, websrv_response_t *res
     bool ok = bytes ? websrv_response_status(response, 200) &&
                           tba_http_header_set(response, "Content-Type", "application/wasm") &&
                           websrv_response_body(response, array_get(bytes, 0), array_size(bytes)) :
-                      tba_svr_protobuf(response, 404, tba_json_error("Build the forecasting browser module first."));
+                      tba_svr_protobuf(response, 404, tba_json_error("Build the browser module first."));
     array_destroy(bytes);
     file_info_free(info);
     file_free(file);
@@ -120,80 +122,65 @@ static bool tba_svr_state_get(const websrv_request_t *request, websrv_response_t
     return tba_svr_protobuf(response, 200, tba_app_state(server->app));
 }
 
-static bool tba_svr_state_post(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
+static bool tba_svr_retired(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    json_t *update = tba_svr_payload(request);
-    if (json_type(update) != JSON_OBJECT) {
-        json_free(update);
-        return tba_svr_protobuf(response, 400, tba_json_error("State payload must be an object."));
-    }
-    bool ok = tba_app_save(server->app, update);
-    json_free(update);
-    json_t *result = ok ? json_new_object() : tba_json_error("Could not save the worksheet state.");
-    if (ok)
-        tba_json_flag(result, "ok", true);
-    return tba_svr_protobuf(response, ok ? 200 : 500, result);
-}
-
-static bool tba_svr_columns(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
-{
+    (void)request;
     (void)server;
-    json_t *params = tba_svr_payload(request);
-    tba_series_t *series = params ? tba_series_open(tba_json_text(params, "path"), tba_json_text(params, "date_column")) : NULL;
-    json_t *result = series ? tba_series_details(series, tba_json_text(params, "value_column"),
-                                                tba_json_text(params, "selected_columns")) : NULL;
-    bool ok = result && tba_json_flag(result, "ok", true);
-    if (!ok) {
-        json_free(result);
-        result = tba_json_error("CSV data, date column or selected values could not be read.");
-    }
+    return tba_svr_protobuf(response, 410, tba_json_error("Use client-local files and encrypted streams."));
+}
+
+static bool tba_svr_stream_begin(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
+{
+    json_t *body = tba_svr_payload(request);
+    bool valid = json_type(body) == JSON_OBJECT && json_object_size(body) == 0;
+    json_free(body);
+    json_t *result = valid ? tba_stream_begin(server->stream) : tba_json_error("Invalid stream request.");
+    return tba_svr_protobuf(response, valid ? tba_json_bool(result, "ok") ? 200 : 429 : 400, result);
+}
+
+static json_t *tba_svr_process(tba_server_t *server, const json_t *payload)
+{
+    const char *operation = tba_json_text(payload, "operation");
+    if (!strcmp(operation, "run"))
+        return tba_forecast_run(server->app, payload);
+    if (strcmp(operation, "metadata"))
+        return tba_json_error("Unsupported operation.");
+    tba_series_t *series = tba_series_from_rows(tba_json_get(payload, "data"), tba_json_text(payload, "date_column"));
+    json_t *result = series ? tba_series_details(series, tba_json_text(payload, "value_column"),
+                                                 tba_json_text(payload, "selected_columns")) : NULL;
     tba_series_free(series);
-    json_free(params);
-    return tba_svr_protobuf(response, ok ? 200 : 400, result);
-}
-
-static bool tba_svr_upload(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
-{
-    string_t *filename = NULL, *text = tba_http_upload(request, &filename);
-    tba_csv_t *csv = text ? tba_csv_parse(text) : NULL;
-    string_t *path = csv ? tba_app_upload(server->app, text) : NULL;
-    tba_series_t *series = path ? tba_series_open(string_c_str(path), "") : NULL;
-    json_t *result = series ? tba_series_details(series, "", "") : NULL;
-    bool ok = result && filename && tba_json_flag(result, "ok", true) &&
-              tba_json_string(result, "path", string_c_str(path)) &&
-              tba_json_string(result, "original_name", string_c_str(filename));
-    if (!ok) {
+    if (!result || !tba_json_flag(result, "ok", true)) {
         json_free(result);
-        result = tba_json_error("Choose one non-empty, valid UTF-8 CSV file, up to 16 MiB.");
-        file_t *file = path ? file_new(path) : NULL;
-        if (file)
-            file_delete(file);
-        file_free(file);
+        result = tba_json_error("Invalid local observations.");
     }
-    tba_series_free(series);
-    tba_csv_free(csv);
-    string_free(filename);
-    string_free(text);
-    string_free(path);
-    return tba_svr_protobuf(response, ok ? 200 : 400, result);
+    return result;
 }
 
-static json_t *tba_svr_run(tba_server_t *server, const json_t *payload)
+static bool tba_svr_stream_chunk(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    if (json_type(payload) != JSON_OBJECT)
-        return tba_json_error("Forecast settings must be an object.");
-    if (!tba_app_save(server->app, payload))
-        return tba_json_error("Could not save forecast settings.");
-    return tba_forecast_run(server->app, payload);
-}
-
-static bool tba_svr_forecast(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
-{
-    json_t *payload = tba_svr_payload(request);
-    bool valid = json_type(payload) == JSON_OBJECT;
-    json_t *result = tba_svr_run(server, payload);
-    json_free(payload);
-    return tba_svr_protobuf(response, !valid ? 400 : tba_json_bool(result, "ok") ? 200 : 422, result);
+    json_t *frame = tba_svr_payload(request), *message = NULL;
+    /* A failed final decode may still have allocated transient plaintext. */
+    server->retire = tba_json_bool(frame, "final");
+    tba_stream_reply_t *key = NULL;
+    json_t *result = tba_stream_receive(server->stream, frame, &message, &key);
+    json_free(frame);
+    unsigned status = tba_json_bool(result, "ok") ? 200 : 400;
+    if (message) {
+        json_free(result);
+        /* Request workers are isolated processes; the parent replaces a timed-out worker. */
+        alarm(60);
+        json_t *plain = tba_svr_process(server, message);
+        result = tba_stream_seal(key, plain);
+        json_free(plain);
+        alarm(0);
+        if (!result) {
+            status = 500;
+            result = tba_json_error("Encrypted response unavailable.");
+        }
+    }
+    json_free(message);
+    tba_stream_reply_free(key);
+    return tba_svr_protobuf(response, status, result);
 }
 
 static bool tba_svr_mobile_get(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
@@ -206,24 +193,6 @@ static bool tba_svr_funnel(const websrv_request_t *request, websrv_response_t *r
     (void)request;
     (void)server;
     return tba_svr_protobuf(response, 410, tba_json_error("Public access switching is disabled in To-Be-Announced Lab."));
-}
-
-static bool tba_svr_download(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
-{
-    bool summary = string_ends_with(websrv_request_path(request), "/download-summary");
-    json_t *result = tba_app_result(server->app);
-    const char *data = tba_json_text(result, summary ? "summary_text" : "forecast_csv");
-    bool ok;
-    if (!*data)
-        ok = tba_svr_protobuf(response, 404, tba_json_error("No completed forecast is available yet."));
-    else {
-        ok = tba_http_header_set(response, "Content-Disposition", summary ?
-            "attachment; filename=\"to-be-announced-summary.txt\"" :
-            "attachment; filename=\"to-be-announced-forecast.csv\"") &&
-            tba_svr_text(response, 200, summary ? "text/plain; charset=utf-8" : "text/csv; charset=utf-8", string_new_with(data));
-    }
-    json_free(result);
-    return ok;
 }
 
 static bool tba_svr_manifest(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
@@ -259,12 +228,14 @@ struct tba_svr_context {
 
 static const tba_svr_route_t tba_svr_routes[] = {
     {"/", HTTP_GET, tba_svr_page, NULL, NULL}, {"/index.html", HTTP_GET, tba_svr_page, NULL, NULL},
-    {"/state", HTTP_GET, tba_svr_state_get, NULL, NULL}, {"/state", HTTP_POST, tba_svr_state_post, NULL, NULL},
-    {"/target-columns", HTTP_POST, tba_svr_columns, NULL, NULL},
-    {"/upload-target", HTTP_POST, tba_svr_upload, NULL, NULL}, {"/upload-xreg", HTTP_POST, tba_svr_upload, NULL, NULL},
-    {"/forecast", HTTP_POST, tba_svr_forecast, NULL, NULL},
+    {"/state", HTTP_GET, tba_svr_state_get, NULL, NULL}, {"/state", HTTP_POST, tba_svr_retired, NULL, NULL},
+    {"/target-columns", HTTP_POST, tba_svr_retired, NULL, NULL},
+    {"/upload-target", HTTP_POST, tba_svr_retired, NULL, NULL}, {"/upload-xreg", HTTP_POST, tba_svr_retired, NULL, NULL},
+    {"/forecast", HTTP_POST, tba_svr_retired, NULL, NULL},
+    {"/stream/begin", HTTP_POST, tba_svr_stream_begin, NULL, NULL},
+    {"/stream/chunk", HTTP_POST, tba_svr_stream_chunk, NULL, NULL},
     {"/mobile-access", HTTP_GET, tba_svr_mobile_get, NULL, NULL}, {"/funnel-toggle", HTTP_POST, tba_svr_funnel, NULL, NULL},
-    {"/download-summary", HTTP_GET, tba_svr_download, NULL, NULL}, {"/download-forecast", HTTP_GET, tba_svr_download, NULL, NULL},
+    {"/download-summary", HTTP_GET, tba_svr_retired, NULL, NULL}, {"/download-forecast", HTTP_GET, tba_svr_retired, NULL, NULL},
     {"/manifest.webmanifest", HTTP_GET, tba_svr_manifest, NULL, NULL},
     {"/wasm/tba_browser.wasm", HTTP_GET, tba_svr_wasm, NULL, NULL},
     {"/index.css", HTTP_GET, NULL, "index.css", "text/css; charset=utf-8"},
@@ -281,13 +252,15 @@ static bool tba_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         !tba_http_header_set(response, "X-Content-Type-Options", "nosniff") ||
         !tba_http_header_set(response, "X-Frame-Options", "SAMEORIGIN"))
         return false;
-    if (!tba_http_permitted(request))
-        return tba_svr_protobuf(response, 403, tba_json_error("This forecasting Lab is private. Use this machine, WiFi or Tailscale."));
-    if (route->method == HTTP_POST && route->handler != tba_svr_upload) {
+    if (!tba_http_permitted(request) || !tba_http_loopback(request))
+        return tba_svr_protobuf(response, 403, tba_json_error("Access requires local loopback or a trusted HTTPS reverse proxy."));
+    if (route->method == HTTP_POST && route->handler != tba_svr_retired) {
         const string_t *type = tba_http_header(request, "Content-Type");
         if (!type || !string_view_equals_literal(string_view_all(type), "application/x-protobuf"))
             return tba_svr_protobuf(response, 415, tba_json_error("Use application/x-protobuf."));
     }
+    if (route->method == HTTP_POST && websrv_request_body_size(request) > 65536)
+        return tba_svr_protobuf(response, 413, tba_json_error("Stream envelope exceeds 64 KiB."));
     if (route->handler)
         return route->handler(request, response, server);
     string_t *asset = route->asset ? tba_asset_path(route->asset) : tba_path("packaging/linux/to-be-announced-lab.svg");
@@ -304,14 +277,15 @@ tba_server_t *tba_svr_new(tba_app_t *app, const char *host, uint16_t port)
         return NULL;
     tba_server_t *server = calloc(1, sizeof *server);
     string_t *address = string_new_with(host ? host : "127.0.0.1");
-    websrv_limits_t limits = {.max_body_bytes = 17u * 1024u * 1024u, .timeout_ms = 420000};
+    websrv_limits_t limits = {.max_body_bytes = 4u * 1024u * 1024u, .timeout_ms = 30000};
     if (server) {
         server->app = app;
+        server->stream = tba_stream_new();
         server->listener = address ? websrv_new(address, port, &limits) : NULL;
         server->contexts = calloc(sizeof tba_svr_routes / sizeof *tba_svr_routes, sizeof *server->contexts);
     }
     string_free(address);
-    bool ok = server && server->listener && server->contexts;
+    bool ok = server && server->listener && server->contexts && server->stream;
     for (size_t i = 0; ok && i < sizeof tba_svr_routes / sizeof *tba_svr_routes; ++i) {
         const tba_svr_route_t *route = &tba_svr_routes[i];
         string_t *path = string_new_with(route->path);
@@ -334,6 +308,7 @@ void tba_svr_free(tba_server_t *server)
 {
     if (server) {
         websrv_free(server->listener);
+        tba_stream_free(server->stream);
         free(server->contexts);
         free(server);
     }
@@ -348,5 +323,9 @@ uint16_t tba_svr_port(const tba_server_t *server)
 /* Serve one request in the current single-threaded worker. */
 int tba_svr_once(tba_server_t *server)
 {
-    return server ? websrv_serve_once(server->listener, 250) : -1;
+    if (!server)
+        return -1;
+    tba_stream_expire(server->stream);
+    int result = websrv_serve_once(server->listener, 250);
+    return server->retire ? 2 : result;
 }

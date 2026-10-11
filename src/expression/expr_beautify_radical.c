@@ -119,9 +119,13 @@ static expr_t *absorb_scale(const expr_t *expr, number_t coefficient)
     number_t original = num_create_from_frac(old_n, old_d);
     number_t square = num_mul(coefficient, coefficient);
     number_t combined = num_mul(original, square);
+    number_t integer = NUM_NAN, denominator_root = NUM_NAN;
+    bool introduces_square_denominator = !rest && num_extract_square_denominator(combined, &integer, &denominator_root);
+    num_destroy(&denominator_root);
+    num_destroy(&integer);
 
     /* Remove a factor only when it does not enlarge the rational numbers inside the root. */
-    if (num_get_small_rational(combined, &new_n, &new_d) && new_n > 0L && new_d > 0L &&
+    if (!introduces_square_denominator && num_get_small_rational(combined, &new_n, &new_d) && new_n > 0L && new_d > 0L &&
         (new_n > new_d ? new_n : new_d) <= (old_n > old_d ? old_n : old_d)) {
         expr_t *arg = scaled_radicand(rest, new_n, new_d);
         expr_t *root = arg ? expr_sqrt(arg) : NULL;

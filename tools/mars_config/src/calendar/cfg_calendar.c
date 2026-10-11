@@ -8,6 +8,7 @@
  */
 #include <stdio.h>
 
+#include "cfg_progress.h"
 #include "cfg_calendar_internal.h"
 
 /* Populate a staging calendar without taking ownership of its connection or inputs. */
@@ -24,11 +25,17 @@ bool cfg_calendar_populate(sqlite_t *db, const string_t *path, const string_t *k
     for (size_t i = 0; i < sizeof(inputs) / sizeof(*inputs) && ok; ++i)
         ok = cfg_calendar_text_valid(inputs[i]);
     cfg_calendar_place_t place = {0};
-    ok = ok && cfg_calendar_catalogue(db) && cfg_calendar_choose_place(db, requested, saved, interactive, &place);
+    cfg_progress_t *progress = ok ? cfg_progress_start("Preparing calendar catalogue") : NULL;
+    ok = ok && cfg_calendar_catalogue(db);
+    cfg_progress_finish(progress, ok);
+    ok = ok && cfg_calendar_choose_place(db, requested, saved, interactive, &place);
     string_t *locale = ok ? cfg_calendar_choose_language(db, &place, language, saved_language, interactive) : NULL;
     string_t *label =
         locale ? string_sprintf("%s, %s", string_c_str(place.name), string_c_str(place.jurisdiction)) : NULL;
-    ok = ok && locale && label && cfg_calendar_snapshot(db, path, key, &place, locale);
+    ok = ok && locale && label;
+    progress = ok ? cfg_progress_start("Generating local calendar") : NULL;
+    ok = ok && cfg_calendar_snapshot(db, path, key, &place, locale);
+    cfg_progress_finish(progress, ok);
     if (ok) {
         *chosen_location = label;
         *chosen_language = locale;

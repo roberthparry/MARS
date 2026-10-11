@@ -23,12 +23,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "cfg_storage.h"
 #include "file.h"
 #include "sqlite.h"
-#include "test_cfg_calendar_fixture.h"
-#include "test_cfg_support.h"
+#include "cfg_storage.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
+#include "test_cfg_calendar_fixture.h"
 
 /** Register real-terminal installer cases in the ordinary sequential test groups. */
 void test_cfg_terminal_cases(void);
@@ -131,6 +131,8 @@ static bool test_calendar_pty(const string_t *path, const test_calendar_dialogue
             _exit(122);
         if (close(master))
             _exit(123);
+        if (setenv("TERM", "xterm", 1))
+            _exit(125);
         execl(MARS_CONFIG_PROGRAM, MARS_CONFIG_PROGRAM, "jurisdiction", "--db-path", string_c_str(path), "--db-key",
               test_calendar_password, (char *)NULL);
         _exit(124);
@@ -286,6 +288,9 @@ static bool test_calendar_pty_fixture(const char *directory)
     ok = ok && test_calendar_pty(path, choose, sizeof(choose) / sizeof(*choose), 0, false, &output) &&
          string_find(output, "Towns — page 2/") >= 0 && string_find(output, "Choose one of the numbers shown.") >= 0 &&
          string_find(output, "1. Italian") >= 0 && string_find(output, "2. Latin") >= 0 &&
+         string_find(output, "Generating local calendar") >= 0 &&
+         string_find(output, "Finalising and publishing database — done") >= 0 &&
+         string_find(output, "\033[2K[") >= 0 &&
          string_find(output, test_calendar_password) < 0;
     string_free(output);
     db = ok ? sqlite_open_encrypted(path, key) : NULL;

@@ -12,8 +12,11 @@
 typedef struct tba_csv tba_csv_t;
 /** @brief Parse CSV text. @param text Borrowed UTF-8 input. @return Owned document or NULL; release with tba_csv_free. */
 tba_csv_t *tba_csv_parse(const string_t *text);
-/** @brief Read up to 16 MiB of CSV. @param path Borrowed path. @return Owned document or NULL. */
-tba_csv_t *tba_csv_open(const char *path);
+
+/** @brief Construct a document from locally parsed Protobuf rows, never from a path.
+ * @param data Borrowed object containing headers and rectangular rows of scalar cells.
+ * @return Owned validated document or NULL; release with tba_csv_free. */
+tba_csv_t *tba_csv_from_rows(const json_t *data);
 /** @brief Release a document. @param csv Owned document; NULL is safe. */
 void tba_csv_free(tba_csv_t *csv);
 /** @brief Count data rows. @param csv Borrowed document. @return Count excluding the header. */

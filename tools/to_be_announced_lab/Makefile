@@ -19,8 +19,26 @@ TBA_BUILD_DIR := tools/to_be_announced_lab/build/$(notdir $(BUILD_DIR))
 TBA_SRCS := $(sort $(wildcard tools/to_be_announced_lab/src/*/*.c))
 TBA_OBJS := $(patsubst tools/to_be_announced_lab/src/%.c,$(TBA_BUILD_DIR)/%.o,$(TBA_SRCS))
 TBA_SERVER := $(TBA_BUILD_DIR)/to_be_announced_lab
+TBA_CRYPTO_CFLAGS := $(shell pkg-config --cflags libcrypto 2>/dev/null)
+TBA_CRYPTO_LIBS := $(shell pkg-config --libs libcrypto 2>/dev/null)
+ifeq ($(strip $(TBA_CRYPTO_LIBS)),)
+TBA_CRYPTO_LIBS := -lcrypto
+endif
+.PHONY: check-tba-crypto-deps
+check-tba-crypto-deps:
+	@probe_dir=$$(mktemp -d /tmp/mars-tba-crypto.XXXXXX) || exit 1; \
+	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	if ! printf '%s\n' '#include <openssl/evp.h>' '#include <openssl/rsa.h>' \
+	    'int main(void) { EVP_PKEY *k = EVP_RSA_gen(2048); EVP_PKEY_free(k); return 0; }' \
+	    | $(CC) $(TBA_CRYPTO_CFLAGS) -x c - -o "$$probe_dir/probe" $(TBA_CRYPTO_LIBS); then \
+	    echo 'Private Lab encryption requires OpenSSL 3 development files (Debian/Ubuntu: libssl-dev).'; exit 1; \
+	fi
+$(TBA_BUILD_DIR)/stream/tba_stream.o: CFLAGS += $(TBA_CRYPTO_CFLAGS)
+$(TBA_BUILD_DIR)/stream/tba_stream.o: | check-tba-crypto-deps
 TBA_TEST_BIN := $(TBA_BUILD_DIR)/tests/test_tba_native
 TBA_TEST_SUPPORT := tools/to_be_announced_lab/tests/test_tba_support.c
+TBA_STREAM_TEST := tools/to_be_announced_lab/tests/test_tba_stream.c
 TBA_TEST_HEADERS := tools/to_be_announced_lab/tests/test_tba_support.h $(wildcard tools/to_be_announced_lab/wasm/include/*.h)
 TBA_SHARED_OBJS := $(LAB_BUILD_DIR)/process/lab_process.o $(LAB_BUILD_DIR)/mobile/lab_mobile.o $(LAB_BUILD_DIR)/mobile/lab_mobile_qr.o $(LAB_BUILD_DIR)/wire/lab_wire.o
 TBA_WASM := $(TBA_BUILD_DIR)/wasm/tba_browser.wasm
@@ -41,16 +59,16 @@ $(TBA_BUILD_DIR)/%.o: tools/to_be_announced_lab/src/%.c tools/to_be_announced_la
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include -Itools/mars_lab/include \
 	    -DTBA_ROOT='"$(CURDIR)"' -DTBA_SERVER_PATH='"$(abspath $(TBA_SERVER))"' -c $< -o $@
 $(TBA_SERVER): $(TBA_OBJS) $(TBA_SHARED_OBJS) $(STATIC_LIB) $(TBA_WASM)
-	$(CC) $(LDFLAGS) -o $@ $(TBA_OBJS) $(TBA_SHARED_OBJS) $(STATIC_LIB) $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $(TBA_OBJS) $(TBA_SHARED_OBJS) $(STATIC_LIB) $(LDLIBS) $(TBA_CRYPTO_LIBS)
 .PHONY: native-tba-lab clean-tba-lab
 native-tba-lab: $(TBA_SERVER)
 clean-tba-lab:
 	rm -rf tools/to_be_announced_lab/build
-$(TBA_BUILD_DIR)/tests/test_tba_native: tools/to_be_announced_lab/tests/test_tba_native.c $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_WASM_SRCS)
+$(TBA_BUILD_DIR)/tests/test_tba_native: tools/to_be_announced_lab/tests/test_tba_native.c $(TBA_STREAM_TEST) $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_WASM_SRCS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include -Itools/mars_lab/include \
-	    -Itools/to_be_announced_lab/wasm/include -Itools/to_be_announced_lab/tests -o $@ $< $(TBA_WASM_POLICY_SRCS) $(TBA_TEST_SUPPORT) \
-	    $(filter-out $(TBA_BUILD_DIR)/app/tba_main.o,$(TBA_OBJS)) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDFLAGS) $(LDLIBS)
+	    -Itools/to_be_announced_lab/wasm/include -Itools/to_be_announced_lab/tests -Wl,--wrap=clock_gettime -o $@ $< $(TBA_WASM_POLICY_SRCS) $(TBA_TEST_SUPPORT) $(TBA_STREAM_TEST) \
+	    $(filter-out $(TBA_BUILD_DIR)/app/tba_main.o,$(TBA_OBJS)) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDFLAGS) $(LDLIBS) $(TBA_CRYPTO_LIBS)
 .PHONY: test-tba-native
 test-tba-native: $(TBA_BUILD_DIR)/tests/test_tba_native $(TBA_SERVER)
 	$<
@@ -58,7 +76,7 @@ $(TBA_BUILD_DIR)/tests/test_tba_browser: tools/to_be_announced_lab/tests/browser
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include -Itools/mars_lab/include \
 	    -Itools/to_be_announced_lab/tests -o $@ $< $(TBA_TEST_SUPPORT) \
-	    $(filter-out $(TBA_BUILD_DIR)/app/tba_main.o,$(TBA_OBJS)) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDFLAGS) $(LDLIBS)
+	    $(filter-out $(TBA_BUILD_DIR)/app/tba_main.o,$(TBA_OBJS)) $(TBA_SHARED_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDFLAGS) $(LDLIBS) $(TBA_CRYPTO_LIBS)
 .PHONY: test-tba-browser
 test-tba-browser: $(TBA_BUILD_DIR)/tests/test_tba_browser $(TBA_SERVER)
 	TMPDIR="$(abspath $(TBA_BUILD_DIR))" MARS_LAB_BROWSER="$(FIREFOX)" $<

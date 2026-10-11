@@ -26,7 +26,7 @@ static unsigned tba_model_option_row(unsigned frequency)
 /* Keep the browser adapter and application-specific exports in step. */
 unsigned tba_browser_abi_version(void)
 {
-    return 2;
+    return 3;
 }
 
 /* Prefer a measured clear seasonal lag over frequency-based defaults. */

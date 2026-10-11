@@ -246,12 +246,12 @@ void tba_form_columns(int columns, int driver)
         tba_dom_release(mark);
     }
     if (!tba_dom_count(columns))
-        tba_ui_add(parts, "<div class=\"multi-select-placeholder\">Upload an exogenous CSV to choose driver columns.</div>");
+        tba_ui_add(parts, "<div class=\"multi-select-placeholder\">Choose a local CSV to select additional columns.</div>");
     tba_ui_write("xreg-columns-list", "innerHTML", tba_ui_join(parts));
     tba_form_sync(1);
 }
 
-/* Upload paths and display names are kept distinct from user-controlled filenames. */
+/* Local selection markers and display names never resolve server paths. */
 void tba_form_upload(int path, int name, int driver)
 {
     tba_ui_set(driver ? "xreg_display_name" : "target_display_name", name);
@@ -420,7 +420,7 @@ void tba_form_change(int event)
     if (tba_ui_is(tba_dom_get(event, "type"), "change")) {
         if (tba_ui_is(name, "target_value_column") || tba_ui_is(name, "target_date_column"))
             tba_request_metadata(0);
-        if (tba_ui_is(name, "xreg_date_column"))
+        if (tba_ui_is(name, "xreg_date_column") || tba_ui_is(name, "xreg-column-choice"))
             tba_request_metadata(1);
     }
     if (tba_ui_is(name, "year_type") || tba_ui_is(name, "frequency"))

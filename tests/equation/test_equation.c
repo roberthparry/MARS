@@ -16,6 +16,8 @@
 #include "equation.h"
 #include "expression.h"
 #include "test_harness.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -2237,8 +2239,52 @@ static void test_equation_zeta_level_search(void)
     num_set_default_prec_digits(previous_digits);
 }
 
+static void test_equation_compact_symmetric_surds(void)
+{
+    static const char *const inputs[] = {
+        "x^4-x^3-26x^2+4x+8=0", "z^4-z^3-26z^2+4z+8=0", "6x^4+x^3+3x^2+4x+6=0",
+        "16*w^4-8*w^3-104*w^2+8*w+8=0", "x^4-x^3-26x^2+4x+1/10000=0"
+    };
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+        equation_t *equation = equ_from_string(inputs[i]);
+        equation_solutions_t *solutions = equation ? equ_derive_solutions(equation) : NULL;
+        string_t *TeX = solutions ? equ_solutions_compact_text(solutions, NULL, style_LATEX) : NULL;
+        string_t *plain = solutions ? equ_solutions_compact_text(solutions, NULL, style_UNBOUND) : NULL;
+        string_t *bound = solutions ? equ_solutions_compact_text(solutions, NULL, style_EXPRESSION) : NULL;
+        printf("  %s\n%s\n%s\n", inputs[i], TeX ? string_c_str(TeX) : "NULL", plain ? string_c_str(plain) : "NULL");
+        bool ok = solutions && equ_solutions_count(solutions) == 4u && TeX && plain &&
+                  bound && string_find(TeX, "\\pm") >= 0 && string_find(plain, "±") >= 0 &&
+                  string_find(TeX, "\\mathfrak{Re}") >= 0 && string_find(TeX, "conj") < 0 &&
+                  string_find(bound, "Re(A)") >= 0;
+        if (i < 2u) {
+            ok = ok && string_find(TeX, "8\\,\\mathfrak{Re}\\mathopen{}\\left\\{A\\right\\}") >= 0 &&
+                 string_find(TeX, "\\overline") < 0 && string_find(plain, "conj") < 0 &&
+                 string_find(TeX, "\\frac{1 - 2\\mkern-2mu B \\pm \\sqrt{211 + C - \\frac{73}{B}}}{4}") >= 0 &&
+                 string_find(TeX, "\\frac{1 + 2\\mkern-2mu B \\pm \\sqrt{211 + C + \\frac{73}{B}}}{4}") >= 0 &&
+                 string_find(plain, "(1 - 2·B ± √(211 + C - 73/B))/4") >= 0 &&
+                 string_find(plain, "(1 + 2·B ± √(211 + C + 73/B))/4") >= 0 &&
+                 string_find(bound, "(1 - 2·B ± √(211 + C - 73/B))/4") >= 0 &&
+                 string_find(bound, "(1 + 2·B ± √(211 + C + 73/B))/4") >= 0;
+        }
+        if (i == 3u)
+            ok = ok && string_find(plain, "(1 - 4·B ± √(211 + D - 73/C))/8") >= 0 &&
+                 string_find(plain, "(1 + 4·B ± √(211 + D + 73/C))/8") >= 0;
+        if (i == 4u)
+            ok = ok && string_find(TeX, "\\frac{\\sqrt{-1957044392389164807} - 8913952525}{500000}") >= 0 &&
+                 string_find(plain, "A = ³√(") >= 0 && string_find(bound, "A = ³√(") >= 0 &&
+                 string_find(plain, "8913952525") >= 0 && string_find(plain, "62500000000") < 0;
+        string_free(bound);
+        string_free(plain);
+        string_free(TeX);
+        equ_solutions_free(solutions);
+        equ_free(equation);
+        ASSERT_TRUE(ok);
+    }
+}
+
 static void test_equation_basics(void)
 {
+    TEST_RUN_SUBTEST(test_equation_compact_symmetric_surds, NULL);
     TEST_RUN_SUBTEST(test_equation_infers_existing_binding_nodes, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_shares_symbols_across_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);

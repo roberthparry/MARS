@@ -188,7 +188,10 @@ including Ophelia RUN output. When no rational quadratic factor is certified,
 non-degenerate exact real-coefficient quartics use Ferrari's formula with paired
 cube-root branches. These solutions retain nested square and cube roots in the
 native solution set, Lab cards and Ophelia RUN output; complex intermediate
-radicals can occur even for real roots. Where the cubic or quartic construction
+radicals can occur even for real roots. Exact square denominators inside these
+radicals are extracted before surrounding rational coefficients are combined,
+so compact definitions do not retain cancellable factors inside their roots.
+Where the cubic or quartic construction
 proves that paired cube roots are complex conjugates, the native formula retains
 that relationship explicitly. Their imaginary components then cancel during
 numerical evaluation, rather than leaving round-off in real-root approximations.
@@ -228,7 +231,9 @@ x = (-1 - u ± √(-u² - 141 + 2162/u))/24
 x = (-1 + u ± √(-u² - 141 - 2162/u))/24
 ```
 
-The cube root is the principal complex branch. The native solution trees retain
+The cube root is the principal complex branch; native Expression output writes
+it as `³√(...)`, omitting the parentheses for a single unadorned symbol. It does not denote
+the full root family of an explicitly entered fractional power. The native solution trees retain
 the full radicals. For lengthy finite solution sets, MARS Lab displays shared
 exact definitions followed by paired root rows, instead of repeating the same
 radicals. Its single-letter definition names are chosen automatically without
@@ -237,6 +242,13 @@ above are explanatory abbreviations, not fixed names required by the solver.
 The Function card's algebraic Run Output uses the same compact native formatter,
 placing the shared definitions after a binding bar in a single curly-braced
 solution block. Ordinary numerical output and short exact solutions are unchanged.
+The native formatter collects a shared reciprocal integer factor into a single
+denominator for each root pair. When paired centres or square-root radicands
+have a common additive part and opposite displacements, it presents the common
+part first in both rows. Each row retains its own independent `±` choice.
+TeX renders complex conjugation with an overbar; parseable text retains `conj`.
+Equal-weight conjugate sums instead use a real-part projection, preserving
+exact definitions without combining unequal coefficients.
 
 Deflation is implemented as an iterative constant-stack loop, so increasing
 the polynomial degree does not increase solver call-stack depth. Coefficient

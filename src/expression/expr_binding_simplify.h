@@ -57,6 +57,13 @@ expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_expr_t *expr);
+
+/**
+ * @brief Extract a certified square denominator from a stored rational square root.
+ * @param expr Owned binding tree; consumed when rewritten, otherwise returned unchanged.
+ * @return Owned replacement or the unchanged input, preserving the principal root branch.
+ */
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_square_denominator(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_abs_numeric(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_integer_exp_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exp_product(expr_binding_expr_t *expr);

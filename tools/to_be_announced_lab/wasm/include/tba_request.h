@@ -2,8 +2,8 @@
  * @file tba_request.h
  * @brief Native request sequencing and completion handling.
  *
- * Owns request generations, upload/save transitions and forecast submission.
- * Fetch itself is a browser capability; no HTTP or application policy lives in JS.
+ * Owns request generations, local selection and encrypted submission.
+ * Browser capabilities supply file reads, Web Crypto and fetch.
  */
 #ifndef TBA_REQUEST_H
 #define TBA_REQUEST_H
@@ -14,18 +14,18 @@
 void tba_request_metadata(int driver);
 
 /**
- * @brief Upload the selected CSV.
+ * @brief Read the selected CSV into browser-local memory.
  * @param driver Non-zero selects driver data.
  */
 void tba_request_upload(int driver);
 
 /**
- * @brief Save current worksheet settings.
+ * @brief Retain current settings in browser memory only.
  */
 void tba_request_save(void);
 
 /**
- * @brief Submit a forecast unless one is already running.
+ * @brief Submit an encrypted request unless one is already running.
  */
 void tba_request_forecast(void);
 

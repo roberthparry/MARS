@@ -11,8 +11,12 @@
 #include "tba_csv.h"
 #include "tba_dates.h"
 typedef struct tba_series tba_series_t;
-/** @brief Load and index dates. @param path Borrowed CSV path. @param date_column Optional header. @return Owned series or NULL. */
-tba_series_t *tba_series_open(const char *path, const char *date_column);
+
+/** @brief Construct an in-memory series from decrypted, browser-parsed observations.
+ * @param data Borrowed object containing headers and rows.
+ * @param date_column Borrowed requested date heading, or empty for detection.
+ * @return Owned series or NULL; release with tba_series_free. */
+tba_series_t *tba_series_from_rows(const json_t *data, const char *date_column);
 /** @brief Release observations. @param series Owned series; NULL is safe. */
 void tba_series_free(tba_series_t *series);
 /** @brief Describe target/driver data. @param series Series. @param target Optional value column. @param drivers Comma-separated selection. @return Owned metadata or NULL. */

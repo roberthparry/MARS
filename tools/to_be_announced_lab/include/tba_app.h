@@ -1,11 +1,9 @@
 /**
  * @file tba_app.h
- * @brief Opaque application configuration and private persistent storage.
+ * @brief Opaque, process-local private Lab configuration.
  *
- * Owns compiled defaults and resolved paths for a forecasting server. State and
- * result files use Protobuf; updates are locked and atomic. No JSON configuration
- * or compatibility loader is used. Objects are process-local. The json_t type
- * represents in-memory values only, not a JSON persistence format.
+ * Owns compiled defaults and a public URL prefix. Client data and settings are
+ * never persisted or restored. The json_t type is an in-memory value tree only.
  */
 #ifndef TBA_APP_H
 #define TBA_APP_H
@@ -24,14 +22,6 @@ tba_app_t *tba_app_new(const char *base);
 void tba_app_free(tba_app_t *app);
 /** @brief Borrow the URL prefix. @param app App. @return Stable string. */
 const char *tba_app_base(const tba_app_t *app);
-/** @brief Load defaults overlaid by saved state. @param app App. @return Owned object or NULL. */
+/** @brief Copy compiled defaults. @param app App. @return Owned object or NULL. */
 json_t *tba_app_state(const tba_app_t *app);
-/** @brief Atomically merge recognised settings. @param app App. @param update Borrowed object. @return Success. */
-bool tba_app_save(const tba_app_t *app, const json_t *update);
-/** @brief Store a unique private CSV. @param app App. @param text Borrowed UTF-8 contents. @return Owned absolute path or NULL. */
-string_t *tba_app_upload(const tba_app_t *app, const string_t *text);
-/** @brief Store a successful result. @param app App. @param result Borrowed result. @return Success. */
-bool tba_app_result_save(const tba_app_t *app, const json_t *result);
-/** @brief Read the most recent result. @param app App. @return Owned object or NULL. */
-json_t *tba_app_result(const tba_app_t *app);
 #endif

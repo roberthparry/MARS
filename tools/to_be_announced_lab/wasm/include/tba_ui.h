@@ -162,9 +162,9 @@ int tba_ui_selection(int text);
 int tba_ui_checked(const char *selector);
 
 /**
- * @brief Queue a Protobuf or upload request.
+ * @brief Queue a browser capability request.
  * @param path Static route.
- * @param kind GET 0, POST 1, upload 2.
+ * @param kind GET 0, POST 1, local file read 2, encrypted stream 3.
  * @param body Scoped data.
  * @param action Completion action.
  * @param serial Request generation.

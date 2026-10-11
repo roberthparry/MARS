@@ -15,8 +15,10 @@
 #include <sqlcipher/sqlite3.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
+#include "cfg_progress.h"
 #include "cfg_database_internal.h"
 
 static const size_t cfg_database_line_limit = 1024 * 1024;
@@ -31,7 +33,7 @@ typedef struct cfg_database_lexer {
 } cfg_database_lexer;
 
 static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const string_t *path, unsigned depth,
-                                  cfg_database_values *parent);
+                                  cfg_database_values *parent, cfg_progress_t *progress);
 
 /* Select one candidate through a perfect hash, then verify exact allowlist membership. */
 const char *cfg_database_trace_label(const string_t *path)
@@ -145,7 +147,8 @@ static string_t *cfg_database_read_argument(const string_t *line)
 }
 
 static bool cfg_database_sql_line(sqlite_t *db, const string_t *root, string_t *pending, cfg_database_values *values,
-                                  cfg_database_lexer *lexer, const char *bytes, size_t length, unsigned depth)
+                                  cfg_database_lexer *lexer, const char *bytes, size_t length, unsigned depth,
+                                  cfg_progress_t *progress)
 {
     string_t *line = string_new();
     bool ok = line && !string_append_utf8_exact(line, bytes, length);
@@ -157,7 +160,7 @@ static bool cfg_database_sql_line(sqlite_t *db, const string_t *root, string_t *
     bool directive = string_view_peek_ascii(view, start, &first) && first == '.';
     if (ok && directive && !values->prefix && !lexer->has_sql && !lexer->block_comment && !lexer->line_comment) {
         string_t *argument = cfg_database_read_argument(line);
-        ok = argument && cfg_database_sql_file(db, root, argument, depth + 1, values);
+        ok = argument && cfg_database_sql_file(db, root, argument, depth + 1, values, progress);
         string_free(argument);
         string_clear(pending);
     } else if (ok) {
@@ -188,13 +191,15 @@ static bool cfg_database_sql_line(sqlite_t *db, const string_t *root, string_t *
 }
 
 static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const string_t *path, unsigned depth,
-                                  cfg_database_values *parent)
+                                  cfg_database_values *parent, cfg_progress_t *progress)
 {
     if (depth >= 32)
         return false;
     const char *trace_option = getenv("MARS_CONFIG_IMPORT_TRACE");
     bool trace = trace_option && trace_option[0] == '1' && trace_option[1] == '\0';
-    const char *label = trace ? cfg_database_trace_label(path) : NULL;
+    const char *label = cfg_database_trace_label(path);
+    const char *progress_label = strrchr(label, '/');
+    progress_label = progress_label ? progress_label + 1 : label;
     double wall_start = trace ? cfg_database_trace_seconds(CLOCK_MONOTONIC) : 0;
     double cpu_start = trace ? cfg_database_trace_seconds(CLOCK_PROCESS_CPUTIME_ID) : 0;
     if (trace) {
@@ -205,6 +210,10 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
                              ? string_clone(path)
                              : string_sprintf("%s/%s", string_c_str(root), string_c_str(path));
     file_t *file = resolved ? file_new(resolved) : NULL;
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    uint64_t total = file_info_size(info);
+    file_info_free(info);
+    cfg_progress_update(progress, progress_label, 0, total);
     string_t *pending = string_new();
     cfg_database_values values = {.trace = trace};
     cfg_database_lexer lexer = {0};
@@ -225,13 +234,14 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
             }
             line[used++] = chunk[i];
             if (chunk[i] == '\n') {
-                ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth);
+                ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth, progress);
                 used = 0;
             }
         }
+        cfg_progress_update(progress, progress_label, bytes_read - used, total);
     }
     if (ok && used)
-        ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth);
+        ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth, progress);
     if (values.prefix)
         ok = false;
     /* SQLite accepts a final statement without a terminating semicolon. */
@@ -267,5 +277,10 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
 /* Import without adding, splitting or committing the source's transactions. */
 bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *path)
 {
-    return db && root && path && cfg_database_sql_file(db, root, path, 0, NULL);
+    if (!db || !root || !path)
+        return false;
+    cfg_progress_t *progress = cfg_progress_start("Importing packaged SQL");
+    bool ok = cfg_database_sql_file(db, root, path, 0, NULL, progress);
+    cfg_progress_finish(progress, ok);
+    return ok;
 }

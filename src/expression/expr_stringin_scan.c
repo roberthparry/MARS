@@ -624,3 +624,23 @@ int expr_parse_read_superscript_int(string_cursor_t *cursor)
     string_cursor_free(scan);
     return result;
 }
+
+/* An indexed radical is an atom prefix, never a superscript attached to a preceding factor. */
+int expr_parse_read_root_index(string_cursor_t *cursor)
+{
+    uint32_t value = 0;
+    if (!expr_parse_cursor_peek_value(cursor, &value, NULL) || !expr_parse_is_superscript_digit(value))
+        return -1;
+    string_cursor_t *scan = string_cursor_clone(cursor);
+    if (!scan)
+        return -1;
+    int index = expr_parse_read_superscript_int(scan);
+    if (index >= 2 && expr_parse_cursor_peek_value(scan, &value, NULL) && value == 0x221A) {
+        string_cursor_next(scan);
+        string_cursor_seek(cursor, string_cursor_position(scan));
+    } else {
+        index = -1;
+    }
+    string_cursor_free(scan);
+    return index;
+}

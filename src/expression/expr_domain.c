@@ -68,7 +68,7 @@ static expr_t *real_bound_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 
 const expr_ops_t ops_real_bound = {
     .eval = real_bound_eval, .kind = EXPR_KIND_REAL_BOUND, .arity = EXPR_OP_UNARY,
-    .expression_name = "Re", .function_name = "realpart", .TeX_name = "\\operatorname{Re}",
+    .expression_name = "Re", .function_name = "realpart", .TeX_name = "\\mathfrak{Re}",
     .apply_unary = real_bound_new, .simplify = real_bound_simplify,
 };
 
@@ -113,7 +113,7 @@ static expr_t *imag_coordinate_simplify(const expr_t *expr, expr_t *a, expr_t *b
 
 const expr_ops_t ops_imag_coordinate = {
     .eval = imag_coordinate_eval, .kind = EXPR_KIND_IMAG_COORDINATE, .arity = EXPR_OP_UNARY,
-    .expression_name = "Im", .function_name = "imagpart", .TeX_name = "\\operatorname{Im}",
+    .expression_name = "Im", .function_name = "imagpart", .TeX_name = "\\mathfrak{Im}",
     .apply_unary = expr_imag_coordinate, .simplify = imag_coordinate_simplify,
 };
 

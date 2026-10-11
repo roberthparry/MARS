@@ -112,7 +112,7 @@ static char *expr_result_TeX_dup(const expr_t *expr)
 
         result = malloc(length);
         if (result)
-            snprintf(result, length, "%s = %s,\\qquad \\operatorname{Re}\\{%s\\}>1",
+            snprintf(result, length, "%s = %s,\\qquad \\mathfrak{Re}\\{%s\\}>1",
                      series_TeX, closed_TeX, order_TeX);
     }
     free(series_TeX);

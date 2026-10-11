@@ -13,7 +13,27 @@
 #include "datetime.h"
 #include "matrix.h"
 #include "number.h"
+#include "tba_csv.h"
 #include "tba_worker_internal.h"
+
+static timeseries_t *tba_worker_observations(const tba_worker_config_t *cfg, bool driver, const char *column)
+{
+    const char *date = driver ? cfg->xreg_date_column : cfg->target_date_column;
+    tba_csv_t *csv = tba_csv_parse(driver ? cfg->driver_text : cfg->target_text);
+    size_t date_index = date && *date ? tba_csv_column(csv, date) : 0;
+    size_t value_index = tba_csv_column(csv, column);
+    ts_builder_t *builder = csv ? ts_builder_new(cfg->frequency, cfg->year_type) : NULL;
+    bool ok = builder && date_index < tba_csv_columns(csv) && value_index < tba_csv_columns(csv);
+    for (size_t row = 0; ok && row < tba_csv_rows(csv); ++row) {
+        double value;
+        if (tba_text_number(tba_csv_cell(csv, row, value_index), &value))
+            ok = ts_builder_append_date_text_double(builder, tba_csv_cell(csv, row, date_index), value) == 0;
+    }
+    timeseries_t *result = ok ? ts_builder_build(builder) : NULL;
+    ts_builder_destroy(builder);
+    tba_csv_free(csv);
+    return result;
+}
 
 static const char *tba_worker_model_name(tba_worker_model_t model)
 {
@@ -73,7 +93,7 @@ static int tba_worker_load_x_columns(const tba_worker_config_t *cfg, const times
 
     if (!cfg || !y || !aligned_y_out || !fit_x_out || !future_x_out)
         return -1;
-    if (!cfg->xreg_path || cfg->xreg_column_count == 0u) {
+    if (cfg->xreg_column_count == 0u) {
         *aligned_y_out = ts_clone(y);
         return *aligned_y_out ? 0 : -1;
     }
@@ -86,8 +106,7 @@ static int tba_worker_load_x_columns(const tba_worker_config_t *cfg, const times
         goto fail;
 
     for (i = 0u; i < cfg->xreg_column_count; ++i) {
-        raw[i] = ts_from_csv(cfg->xreg_path, cfg->xreg_date_column ? cfg->xreg_date_column : "DATE",
-                             cfg->xreg_columns[i], cfg->frequency, cfg->year_type, TS_MISSING_DROP);
+        raw[i] = tba_worker_observations(cfg, true, cfg->xreg_columns[i]);
         if (!raw[i])
             goto fail;
     }
@@ -220,11 +239,10 @@ json_t *tba_worker_run(const tba_worker_config_t *cfg)
     number_t level;
     size_t effective_horizon = 0u;
 
-    if (!cfg || !cfg->target_path || !cfg->target_value_column)
+    if (!cfg || !cfg->target_text || !cfg->target_value_column)
         return tba_json_error("Target dataset and value column are required.");
 
-    y = ts_from_csv(cfg->target_path, cfg->target_date_column ? cfg->target_date_column : "", cfg->target_value_column,
-                    cfg->frequency, cfg->year_type, TS_MISSING_DROP);
+    y = tba_worker_observations(cfg, false, cfg->target_value_column);
     if (!y)
         return tba_json_error("Could not load the target time series.");
     if (tba_worker_load_x_columns(cfg, y, &fit_y, &fit_x, &future_x) != 0) {

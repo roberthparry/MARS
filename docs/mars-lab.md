@@ -20,6 +20,12 @@ Mathematical processing remains in the native C server and workers. The styleshe
 with `text/css; charset=utf-8` and the same private-access and no-cache rules as
 the page. No Python interpreter is launched by the Lab.
 Database and weather installation use the native `mars_config` application.
+`make install-mars-lab` labels its desktop installation, cache refresh, database
+and weather-configuration stages. Database installation displays live source-byte
+progress bars and elapsed-time activity indicators for unmeasured work, so long
+imports and calendar generation remain visibly active. When output is redirected,
+plain status lines replace animated bars. Password and selection prompts remain
+unobstructed; a failed stage does not display successful completion.
 Install the external TeX rendering tools and freestanding WebAssembly toolchain as follows:
 
 ```sh
@@ -49,9 +55,9 @@ launching. The Lab also has its own Makefile: `make -C tools/mars_lab` builds it
 `make -j1 -C tools/mars_lab test` runs its regression suite, and
 `make -C tools/mars_lab run` launches it. Both entry points use the same source list,
 build rules, library dependencies and compiler options. A normal `make` at the
-repository root also invokes the Lab Makefile after its shared prerequisites
-are ready; the local build uses the leaf `native-lab` target without recursing
-back into the root `all` target. Use `DEBUG=1` for a
+repository root includes the Lab Makefile and builds `native-lab` directly after
+its shared prerequisites are ready, without a redundant recursive build.
+Use `DEBUG=1` for a
 separate debug build. The superseded Python server and repository shell launcher
 have been removed. Reinstall an older desktop launcher once so it references the
 native executable directly.
@@ -719,9 +725,9 @@ receives only the calculation's arguments and optional standard input. This keep
 timeouts, cancellation, output limits and mathematical global state isolated from
 the request handler without depending on scratch console applications.
 
-`make lab-workers` now builds that same server executable. Existing convenience
-targets such as `make mars_lab` and `make ophelia` invoke its built-in modes;
-`make mars-lab` starts the web application. Explicit per-mode executable
+`make native-lab` builds that same server executable, and `make mars-lab` starts
+the web application. Calculation modes are an internal `--worker` interface,
+not separate Make targets. Explicit per-mode executable
 environment overrides remain available for diagnostics and failure-injection
 tests, but are not required in normal operation. The repository's `scratch/`
 directory retains standalone examples and experiments, not production Lab workers.
@@ -759,6 +765,9 @@ older expression or equation.
 The precision buttons change the working precision used by the mathematical
 helpers. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
+When numerical results use powers of ten, the mantissa is joined directly to
+`×10` and its superscript exponent, without an intervening space. Real and
+imaginary components use the same notation.
 
 On a desktop-sized screen, each mode now follows the natural page height rather
 than forcing the editor and result panels into the remaining viewport. This

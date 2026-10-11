@@ -421,6 +421,7 @@
         "enabled": true,
         "test_equation_avoids_existing_branch_parameter_name": true,
         "test_equation_collects_high_degree_composite_power": true,
+        "test_equation_compact_symmetric_surds": true,
         "test_equation_cubic_preserves_certified_surds": true,
         "test_equation_deduplicates_repeated_high_degree_root": true,
         "test_equation_deduplicates_repeated_irrational_quartic_roots": true,
@@ -1042,7 +1043,11 @@
           },
           "test_to_string_basic_var_TeX": true,
           "test_to_string_clausen": true,
+          "test_to_string_complex_projection_TeX": true,
+          "test_to_string_conjugate_overbar_TeX": true,
           "test_to_string_double_negative_expr": true,
+          "test_to_string_equal_conjugate_sums": true,
+          "test_to_string_exact_rational_TeX": true,
           "test_to_string_exp_unit_fraction_root_TeX": true,
           "test_to_string_floor_ceil": {
             "enabled": true,
@@ -1063,6 +1068,7 @@
           "test_to_string_function_uses_lowercase_builtin_names": true,
           "test_to_string_gamma_polygamma_standard_names": true,
           "test_to_string_gammainv_TeX": true,
+          "test_to_string_indexed_principal_roots": true,
           "test_to_string_integrals_outside_fractions_TeX": true,
           "test_to_string_lambert_w_TeX": true,
           "test_to_string_log10_TeX": true,
@@ -1099,6 +1105,7 @@
             "test_to_string_powered_exponent_TeX": true
           },
           "test_to_string_special_functions": true,
+          "test_to_string_square_denominator": true,
           "test_to_string_symbolic_constant_quotient_TeX": true,
           "test_to_string_symbolic_constants_TeX": true,
           "test_to_string_symmetric_shifts_TeX": true,
@@ -1206,6 +1213,7 @@
   "tests/expression/test_expression.c": {
     "readme_examples": {
       "enabled": true,
+      "example_indexed_roots": true,
       "example_orthopoly_readme_examples": true,
       "example_readme_examples": true,
       "example_signal_readme_examples": true
@@ -2594,7 +2602,15 @@
       "enabled": true,
       "test_cfg_make_dry": true,
       "test_cfg_make_forward": true,
-      "test_cfg_make_reject": true
+      "test_cfg_make_help": true,
+      "test_cfg_make_reject": true,
+      "test_cfg_make_uninstall": true
+    }
+  },
+  "tools/mars_config/tests/test_cfg_progress.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_progress_output": true
     }
   },
   "tools/mars_config/tests/test_cfg_rendering.c": {
@@ -2706,6 +2722,7 @@
       "test_lab_extra_invalid_type": true,
       "test_lab_extra_matrix": true,
       "test_lab_extra_native_records": true,
+      "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
@@ -3375,7 +3392,8 @@
       "test_tba_defaults": true,
       "test_tba_forecast_view": true,
       "test_tba_native_routes": true,
-      "test_tba_protobuf_storage": true,
+      "test_tba_rows": true,
+      "test_tba_stream": true,
       "test_tba_worker": true
     }
   }

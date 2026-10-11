@@ -60,6 +60,14 @@ int expr_tostring_is_negative_const(const expr_t *f);
 int expr_tostring_is_var_pow_d(const expr_t *f);
 int expr_tostring_is_unicode_letter(unsigned int c);
 int expr_tostring_is_simple_name(const char *name);
+
+/**
+ * @brief Check whether a displayed name is exactly one letter, including Greek symbols.
+ * @param[in] name Borrowed UTF-8 name; NULL and empty names are rejected.
+ * @return True for one unadorned letter, false for compound or bracketed names.
+ */
+bool expr_tostring_is_single_symbol(const char *name);
+
 int expr_tostring_is_safe_func_name(const char *name);
 
 /* Emission helpers. */

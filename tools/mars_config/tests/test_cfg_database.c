@@ -12,13 +12,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/database/cfg_database_internal.h"
-#include "cfg_database.h"
-#include "cfg_storage.h"
 #include "file.h"
 #include "sqlite.h"
-#include "test_cfg_support.h"
+#include "cfg_storage.h"
+#include "cfg_database.h"
+#include "cfg_database_internal.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
 
 static file_t *test_cfg_database_file(const char *directory, const char *name)
 {

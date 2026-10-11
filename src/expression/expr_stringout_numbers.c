@@ -333,6 +333,31 @@ static bool expr_split_rational_text_local(const string_t *text, string_t **nume
     return true;
 }
 
+/* Preserve exact rational atoms in mathematical output, independently of decimal text preferences. */
+bool expr_emit_exact_rational_TeX(sbuf_t *buffer, number_t value)
+{
+    if (!num_is_exact(value) || !num_is_real(value) || num_is_integer(value))
+        return false;
+    string_t *text = num_to_string(value), *numerator = NULL, *denominator = NULL;
+    bool matched = expr_split_rational_text_local(text, &numerator, &denominator);
+    if (matched) {
+        string_view_t view = string_view_all(numerator);
+        unsigned char first = 0u;
+        bool negative = string_view_peek_ascii(view, 0u, &first) && first == '-';
+        if (negative)
+            sbuf_putc(buffer, '-');
+        sbuf_puts(buffer, "\\frac{");
+        sbuf_puts(buffer, string_c_str(numerator) + (negative ? 1u : 0u));
+        sbuf_puts(buffer, "}{");
+        sbuf_puts(buffer, string_c_str(denominator));
+        sbuf_putc(buffer, '}');
+    }
+    string_free(denominator);
+    string_free(numerator);
+    string_free(text);
+    return matched;
+}
+
 static char *expr_decimal_string_from_rational_text_local(const string_t *text)
 {
     string_t *numer_text = NULL;

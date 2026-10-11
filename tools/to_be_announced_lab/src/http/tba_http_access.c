@@ -34,6 +34,21 @@ static bool tba_http_private_v4(const struct in_addr *address)
            (ip >> 16) == 0xa9fe || (ip >> 22) == 0x191;
 }
 
+/* Trust proxy transport only from this host, never from a forwarding header. */
+bool tba_http_loopback(const websrv_request_t *request)
+{
+    const string_t *peer = websrv_request_peer(request);
+    struct in_addr v4;
+    struct in6_addr v6;
+    if (!peer)
+        return false;
+    if (inet_pton(AF_INET, string_c_str(peer), &v4) == 1)
+        return (ntohl(v4.s_addr) >> 24) == 127;
+    if (inet_pton(AF_INET6, string_c_str(peer), &v6) != 1)
+        return false;
+    return IN6_IS_ADDR_LOOPBACK(&v6) || (IN6_IS_ADDR_V4MAPPED(&v6) && v6.s6_addr[12] == 127);
+}
+
 static bool tba_http_private_address(const string_t *text)
 {
     if (!text)

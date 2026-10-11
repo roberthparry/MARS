@@ -25,6 +25,16 @@ bool num_is_immortal(number_t number);
 bool num_is_inexact_real_backend(number_t number);
 bool num_is_complex_backend(number_t number);
 bool num_get_small_rational(number_t number, long *numerator, long *denominator);
+
+/**
+ * @brief Split an exact fraction n/d whose reduced denominator is a non-unit integer square.
+ * @param number Borrowed exact rational; inexact and non-rational values are rejected.
+ * @param numerator Initialised owned output, replaced with the exact numerator on success.
+ * @param denominator_root Distinct initialised owned output, replaced with the positive integer square root of d.
+ * @return True on an exact match; false leaves outputs unchanged. Release successful outputs with num_destroy.
+ */
+bool num_extract_square_denominator(number_t number, number_t *numerator, number_t *denominator_root);
+
 number_t num_as_inexact_real_prec(number_t number, size_t precision_bits);
 number_t num_as_complex_prec(number_t number, size_t precision_bits);
 num_scope_t *number_scope_suspend(void);

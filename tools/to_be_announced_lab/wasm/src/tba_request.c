@@ -1,33 +1,21 @@
 /**
  * @file tba_request.c
- * @brief Native request ordering, upload transitions and asynchronous completions.
+ * @brief Native request ordering, local ingestion and encrypted completions.
  *
- * Saves are serialised and coalesced. Metadata generations reject stale replies;
+ * Settings remain browser-local. Metadata generations reject stale replies;
  * browser capabilities perform only transport, never application decisions.
  */
 #include "tba_ui.h"
 #include "tba_form.h"
 #include "tba_view.h"
+#include "tba_local.h"
 #include "tba_request.h"
 
 static unsigned tba_request_generation[2], tba_request_upload_generation[2];
-static int tba_request_saving;
-static unsigned tba_request_notice;
-
-static void tba_request_send_save(int payload)
-{
-    tba_request_saving = 1;
-    tba_ui_request("/state", 1, payload, TBA_RESPONSE_SAVE, 0);
-}
-
-/* Save snapshots in order, coalescing edits made during an outstanding save. */
+/* Keep settings in this browser context only. */
 void tba_request_save(void)
 {
-    int payload = tba_form_collect();
-    if (tba_request_saving)
-        tba_ui_store("pending_save", payload);
-    else
-        tba_request_send_save(payload);
+    tba_ui_store("local_settings", tba_form_collect());
 }
 
 /* Reload metadata for the selected file and columns, rejecting earlier generations. */
@@ -42,14 +30,16 @@ void tba_request_metadata(int driver)
     }
     int body = tba_dom_object(0);
     tba_dom_set(body, "path", path);
+    tba_dom_set(body, "operation", tba_dom_string("metadata"));
+    tba_dom_set(body, "data", tba_local_project(driver));
     tba_dom_set(body, "date_column", tba_ui_value(driver ? "xreg_date_column" : "target_date_column"));
     tba_dom_set(body, driver ? "selected_columns" : "value_column",
                 tba_ui_value(driver ? "xreg_columns" : "target_value_column"));
     tba_ui_store(driver ? "driver_request" : "target_request", body);
-    tba_ui_request("/target-columns", 1, body, driver ? TBA_RESPONSE_DRIVER : TBA_RESPONSE_TARGET, serial);
+    tba_ui_request("/stream", 3, body, driver ? TBA_RESPONSE_DRIVER : TBA_RESPONSE_TARGET, serial);
 }
 
-/* Upload a selected browser File without exposing its contents to application JS. */
+/* Read a browser File locally; no upload request is made. */
 void tba_request_upload(int driver)
 {
     int input = tba_dom_id(driver ? "xreg-upload" : "target-upload");
@@ -57,8 +47,8 @@ void tba_request_upload(int driver)
     if (!file)
         return;
     ++tba_request_generation[driver];
-    tba_ui_status(tba_dom_string(driver ? "Uploading exogenous CSV..." : "Uploading target CSV..."), "");
-    tba_ui_request(driver ? "/upload-xreg" : "/upload-target", 2, file,
+    tba_ui_status(tba_dom_string("Reading local file..."), "");
+    tba_ui_request("", 2, file,
                    driver ? TBA_RESPONSE_UPLOAD_DRIVER : TBA_RESPONSE_UPLOAD_TARGET,
                    ++tba_request_upload_generation[driver]);
 }
@@ -70,37 +60,34 @@ void tba_request_forecast(void)
     if (tba_dom_truth(tba_dom_get(button, "disabled")))
         return;
     tba_dom_timer(TBA_SAVE, -1);
-    int payload = tba_form_collect();
+    int payload = tba_dom_object(0);
+    tba_dom_set(payload, "operation", tba_dom_string("run"));
+    int settings = tba_form_collect();
+    tba_dom_set(settings, "target_path", tba_dom_string(""));
+    tba_dom_set(settings, "target_display_name", tba_dom_string(""));
+    tba_dom_set(settings, "xreg_path", tba_dom_string(""));
+    tba_dom_set(settings, "xreg_display_name", tba_dom_string(""));
+    tba_dom_set(payload, "settings", settings);
+    int target = tba_local_project(0);
+    if (!target) {
+        tba_ui_status(tba_dom_string("Choose a local file and valid columns first."), "error");
+        return;
+    }
+    tba_dom_set(payload, "target", target);
+    if (tba_dom_truth(tba_ui_value("xreg_columns")))
+        tba_dom_set(payload, "drivers", tba_local_project(1));
     tba_dom_flag(button, "disabled", 1);
     tba_ui_status(tba_dom_string("Submitting forecast..."), "");
-    tba_ui_request("/forecast", 1, payload, TBA_RESPONSE_FORECAST, 0);
+    tba_ui_request("/stream", 3, payload, TBA_RESPONSE_FORECAST, 0);
 }
 
 static void tba_request_columns(int driver, int data)
 {
-    int columns = driver ? tba_dom_get(data, "value_column_details") : 0;
-    if (!columns)
-        columns = tba_dom_get(data, "value_columns");
+    int columns = tba_local_columns(driver);
+    int document = tba_ui_state(driver ? "local_driver" : "local_target");
+    tba_dom_set(data, "date_candidates", tba_dom_get(document, "headers"));
     tba_form_columns(columns, driver);
     tba_form_meta(data, driver);
-}
-
-static void tba_request_saved(int data, int success)
-{
-    tba_request_saving = 0;
-    int pending = tba_ui_state("pending_save");
-    tba_ui_store("pending_save", 0);
-    if (pending) {
-        tba_request_send_save(pending);
-        return;
-    }
-    if (!success) {
-        tba_ui_status(tba_ui_or(tba_dom_get(data, "error"), "Could not save worksheet state."), "error");
-    } else if (tba_request_notice) {
-        tba_ui_status(tba_dom_string(tba_request_notice == 1 ?
-            "Target CSV uploaded. Choose the series to forecast from the dropdown." : "Exogenous CSV uploaded."), "ok");
-    }
-    tba_request_notice = 0;
 }
 
 static void tba_request_mobile(int data, int success)
@@ -131,7 +118,6 @@ void tba_request_complete(unsigned action, unsigned serial, int data, int succes
     }
     success = success && tba_dom_truth(tba_dom_get(data, "ok"));
     if (action == TBA_RESPONSE_SAVE) {
-        tba_request_saved(data, success);
         return;
     }
     if (action == TBA_RESPONSE_FORECAST) {
@@ -163,12 +149,34 @@ void tba_request_complete(unsigned action, unsigned serial, int data, int succes
         return;
     }
     if (upload) {
-        tba_form_upload(tba_dom_get(data, "path"), tba_dom_get(data, "original_name"), driver);
-        tba_request_columns(driver, data);
-        tba_request_notice = driver ? 2 : 1;
-        tba_request_save();
+        int document = tba_local_parse(tba_dom_get(data, "text"));
+        if (!document) {
+            tba_ui_status(tba_dom_string("Invalid or oversized local CSV."), "error");
+            return;
+        }
+        tba_ui_store(driver ? "local_driver" : "local_target", document);
+        int headers = tba_dom_get(document, "headers"), date = tba_dom_item(headers, 0);
+        /* Heading discovery examines at most 256 locally supplied headings. */
+        for (unsigned i = 0; i < tba_dom_count(headers); ++i) {
+            int name = tba_dom_item(headers, i), lower = tba_dom_clean(name, 1);
+            if (tba_ui_is(lower, "date") || tba_ui_is(lower, "month") || tba_ui_is(lower, "period")) {
+                date = name;
+                break;
+            }
+        }
+        tba_form_upload(tba_dom_string("local"), tba_dom_get(data, "name"), driver);
+        tba_ui_set(driver ? "xreg_columns" : "target_value_column", tba_dom_string(""));
+        int initial = tba_dom_object(0);
+        tba_dom_set(initial, "date_candidates", headers);
+        tba_dom_set(initial, "date_column", date);
+        tba_form_meta(initial, driver);
+        tba_ui_set(driver ? "xreg_date_column" : "target_date_column", date);
+        tba_form_columns(tba_local_columns(driver), driver);
+        tba_ui_status(tba_dom_string("File kept locally. Preparing encrypted request..."), "");
+        tba_request_metadata(driver);
     } else {
         tba_request_columns(driver, data);
+        tba_ui_status(tba_dom_string("Local file ready. Encrypted request verified."), "");
         tba_dom_timer(TBA_SAVE, 250);
     }
 }

@@ -375,7 +375,7 @@ The complete README program runs last. `make -j1 test-readme-examples`
 also compiles and runs the exact documentation program and verifies its output.
 No memory tests are implied by these commands.
 
-`make -j1 test-http-live` additionally runs end-to-end client/server tests
+`make -j1 test_http_live` additionally runs end-to-end client/server tests
 against this module, including the HTTP guide's GET, JSON and XML programs.
 It starts bounded child servers on ephemeral loopback ports and needs no
 internet connection. These integration tests also run in ordinary `make test`.

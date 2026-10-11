@@ -28,6 +28,20 @@
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
+struct expr_function_temporaries;
+
+/**
+ * @brief Render solution centres and offsets with structural symmetry and shared denominators.
+ * @param plan Required borrowed temporary-binding plan.
+ * @param rows Borrowed centre/offset pairs, preceded by a lone root when count is odd.
+ * @param count Number of entries in rows, at most sixteen.
+ * @param style Unbound expression or LaTeX output style.
+ * @param rendered Zero-initialised output array; caller frees every populated string, even on failure.
+ * @return True on success; false on allocation failure or invalid count.
+ */
+bool equ_solution_pairs_text(const struct expr_function_temporaries *plan, const expr_t *const *rows,
+                             size_t count, style_t style, string_t **rendered);
+
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 const string_t *equ_lhs_display_TeX(const equation_t *equation);
 const string_t *equ_rhs_display_TeX(const equation_t *equation);

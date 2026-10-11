@@ -12,9 +12,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "ustring.h"
 #include "file.h"
 #include "test_cfg_support.h"
-#include "ustring.h"
 
 /* Used only beneath this fixture's successful mkdtemp directory, after its child has exited. */
 static bool test_cfg_remove_tree(file_t *directory, unsigned depth, size_t *remaining)

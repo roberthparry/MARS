@@ -12,10 +12,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 /* A fixed-size construction arena owns intermediate references, not the returned solutions. */
 typedef struct {
@@ -131,9 +131,7 @@ int equ_try_quartic_radicals(const number_t *coeffs, const expr_t *wrt, equation
     if (zero_argument)
         argument = divide(&work, sub(&work, delta1, radical), 2L);
     /* Pair Q with delta0/Q: independently chosen cube-root branches are not interchangeable. */
-    number_t third = num_create_from_frac(1L, 3L);
-    expr_t *big_q = keep(&work, expr_pow(argument, &third));
-    num_destroy(&third);
+    expr_t *big_q = keep(&work, expr_cubrt(argument));
     /* For a negative resolvent discriminant, |Q|^2 = delta0 exactly. Evaluating the
      * equivalent conjugate pair avoids imaginary round-off in their real sum. */
     expr_t *paired_q = keep(&work, conjugate_pair ? expr_conj(big_q) : expr_div(delta0, big_q));

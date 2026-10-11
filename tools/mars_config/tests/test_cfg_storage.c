@@ -8,10 +8,10 @@
  */
 #include <stdlib.h>
 
-#include "cfg_storage.h"
-#include "test_cfg_support.h"
-#include "test_harness.h"
 #include "ustring.h"
+#include "cfg_storage.h"
+#include "test_harness.h"
+#include "test_cfg_support.h"
 
 static bool test_cfg_storage_round_trip(const char *directory)
 {

@@ -161,6 +161,20 @@ bool expr_match_log_expr(const expr_t *expr, const expr_t **arg_out)
     return expr_match_unary_op(expr, EXPR_KIND_LOG, arg_out);
 }
 
+/* Share square-root inspection with native presentation consumers. */
+bool expr_match_sqrt_expr(const expr_t *expr, const expr_t **arg_out)
+{
+    if (expr_match_unary_op(expr, EXPR_KIND_SQRT, arg_out))
+        return true;
+    number_t exponent = num_new();
+    const expr_t *base = NULL;
+    bool matches = expr_match_pow_const(expr, &base, &exponent) && num_eq(exponent, NUM_HALF);
+    num_destroy(&exponent);
+    if (matches && arg_out)
+        *arg_out = base;
+    return matches;
+}
+
 bool expr_match_sin_expr(const expr_t *expr, const expr_t **arg_out)
 {
     return expr_match_unary_op(expr, EXPR_KIND_SIN, arg_out);

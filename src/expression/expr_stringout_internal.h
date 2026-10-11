@@ -52,6 +52,16 @@ bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
 
 /* Variable and constant discovery. */
+/**
+ * @brief Emit a complete additive group containing conjugates, combining only equal total coefficients.
+ * @param expr Borrowed sum to inspect; it is never modified.
+ * @param buffer Destination text buffer.
+ * @param parent_prec Enclosing precedence, used for grouping.
+ * @param style Expression, Function or LaTeX output style.
+ * @return True when emitted; false when the ordinary renderer should handle the expression.
+ */
+bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style);
+
 /* Recognise opposite shifts in paired function arguments or definite-integral bounds, without rewriting the DAG. */
 const expr_t *expr_display_symmetric_shift_centre(const expr_t *expr);
 bool expr_display_centred_shift_parts(const expr_t *expr, const expr_t *centre,
@@ -151,6 +161,14 @@ int expr_tostring_is_primary_variable_name(const char *name);
 void sort_factors(expr_t **fac, int n);
 bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, sbuf_t *b, int parent_prec);
 void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal);
+
+/**
+ * @brief Emit a radicand, omitting brackets only for an unambiguous single symbol.
+ * @param[in] arg Borrowed radicand expression.
+ * @param[in,out] b Destination native text buffer.
+ * @param[in] parent_prec Enclosing precedence; powered roots retain explicit radicand grouping.
+ */
+void emit_expr_root_argument(const expr_t *arg, sbuf_t *b, int parent_prec);
 bool match_atan_over_argument_denominator(const expr_t *expr, const expr_t **atan_expr_out,
                                                  const expr_t **denominator_out);
 bool match_sum_quotient(const expr_t *expr, const expr_t **factor_out, const expr_t **sum_out);
@@ -199,6 +217,15 @@ bool emit_func_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_
 
 /* special formatting. */
 void emit_TeX_number_value(sbuf_t *b, number_t value);
+
+/**
+ * @brief Emits an exact rational as a stacked fraction without converting it to a terminating decimal.
+ * @param[in,out] buffer Borrowed output buffer; unchanged when no rational fraction is recognised.
+ * @param[in] value Borrowed number whose exact rational representation is to be rendered.
+ * @return True when a fraction was emitted; false when ordinary numeric formatting should be used.
+ */
+bool expr_emit_exact_rational_TeX(sbuf_t *buffer, number_t value);
+
 void emit_TeX_const_value(sbuf_t *b, const expr_t *expr);
 bool emit_TeX_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b);
 void emit_TeX_atom(const expr_t *f, sbuf_t *b);

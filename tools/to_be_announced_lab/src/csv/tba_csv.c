@@ -4,7 +4,7 @@
  *
  * Reads at most 100,000 records, 256 columns and one million cells. Malformed
  * quoting, duplicate/empty headings, NULs and over-budget input fail explicitly.
- * File handling is delegated to file_t; CSV parsing uses string_t cursors.
+ * Inputs remain in memory; CSV parsing uses string_t cursors.
  */
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,6 +18,50 @@ struct tba_csv {
     json_t *headers;
     json_t *overrides;
 };
+
+/* Copy bounded typed rows after decryption without interpreting any server path. */
+tba_csv_t *tba_csv_from_rows(const json_t *data)
+{
+    const json_t *headers = tba_json_get(data, "headers"), *rows = tba_json_get(data, "rows");
+    size_t width = json_array_size(headers), count = json_array_size(rows);
+    if (!width || width > 256 || !count || count > 100000 || count > 1000000 / width)
+        return NULL;
+    tba_csv_t *csv = calloc(1, sizeof *csv);
+    if (!csv)
+        return NULL;
+    csv->headers = json_new_array();
+    csv->index = json_new_object();
+    csv->rows = json_new_array();
+    csv->overrides = json_new_object();
+    bool ok = csv->headers && csv->index && csv->rows && csv->overrides;
+    for (size_t c = 0; ok && c < width; ++c) {
+        const string_t *name = json_string_value(json_array_get(headers, c));
+        ok = name && string_byte_length(name) && string_byte_length(name) <= 256 &&
+             strlen(string_c_str(name)) == string_byte_length(name) &&
+             !json_object_get(csv->index, name) && tba_json_number(csv->index, string_c_str(name), (double)c) &&
+             tba_json_append(csv->headers, string_c_str(name));
+    }
+    ok = ok && json_array_append(csv->rows, csv->headers);
+    for (size_t r = 0; ok && r < count; ++r) {
+        const json_t *row = json_array_get(rows, r);
+        json_t *copy = json_new_array();
+        ok = copy && json_array_size(row) == width;
+        for (size_t c = 0; ok && c < width; ++c) {
+            const json_t *cell = json_array_get(row, c);
+            const string_t *text = json_type(cell) == JSON_NUMBER ? json_number_text(cell) : json_string_value(cell);
+            ok = (text || json_type(cell) == JSON_NULL) &&
+                 (!text || (string_byte_length(text) <= 256 && strlen(string_c_str(text)) == string_byte_length(text))) &&
+                 tba_json_append(copy, text ? string_c_str(text) : "");
+        }
+        ok = ok && json_array_append(csv->rows, copy);
+        json_free(copy);
+    }
+    if (!ok) {
+        tba_csv_free(csv);
+        csv = NULL;
+    }
+    return csv;
+}
 
 static bool tba_csv_field(json_t *row, string_t *field)
 {
@@ -119,15 +163,6 @@ tba_csv_t *tba_csv_parse(const string_t *text)
         tba_csv_free(csv);
         return NULL;
     }
-    return csv;
-}
-
-/* Load through bounded file storage before parsing. */
-tba_csv_t *tba_csv_open(const char *path)
-{
-    string_t *text = tba_file_read(path, 16u * 1024u * 1024u);
-    tba_csv_t *csv = text ? tba_csv_parse(text) : NULL;
-    string_free(text);
     return csv;
 }
 

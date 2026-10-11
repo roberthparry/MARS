@@ -120,6 +120,15 @@ int tba_dom_string(const char *text);
  */
 int tba_dom_text(int value);
 
+/** @brief Count browser string code units. @param text Scoped text. @return Length. */
+unsigned tba_dom_length(int text);
+
+/** @brief Read a browser string code unit. @param text Scoped text. @param index Position. @return Code unit or zero. */
+unsigned tba_dom_char(int text, unsigned index);
+
+/** @brief Slice opaque text. @param text Scoped text. @param begin Start. @param end Exclusive end. @return Scoped text. */
+int tba_dom_slice(int text, unsigned begin, unsigned end);
+
 /**
  * @brief Trim Unicode text and optionally lowercase.
  * @param value Scoped text.
@@ -269,7 +278,7 @@ void tba_dom_timer(unsigned action, int delay);
 /**
  * @brief Queue a browser request and deliver its completion to C.
  * @param url Scoped URL.
- * @param kind GET 0, Protobuf POST 1, file upload 2.
+ * @param kind GET 0, Protobuf POST 1, local file read 2, encrypted stream 3.
  * @param body Scoped payload or File.
  * @param headers Scoped headers.
  * @param action Native completion index.

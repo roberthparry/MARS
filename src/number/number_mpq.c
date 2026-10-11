@@ -11,9 +11,36 @@
 
 #include <stdlib.h>
 
+#include "ustring.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "ustring.h"
+
+/* Certify the integer square with GMP, independently of the floating-point precision. */
+bool num_extract_square_denominator(number_t number, number_t *numerator, number_t *denominator_root)
+{
+    const number_private_t *value = number_impl_const(&number);
+    if (!numerator || !denominator_root || numerator == denominator_root || value->kind != NUMBER_MPQ)
+        return false;
+    mpq_srcptr rational = number_mpq_value(value->value.mpq);
+    if (!rational || mpz_cmp_ui(mpq_denref(rational), 1) <= 0 || !mpz_perfect_square_p(mpq_denref(rational)))
+        return false;
+    mpz_t square_root;
+    mpz_init(square_root);
+    mpz_sqrt(square_root, mpq_denref(rational));
+    number_t top = number_take_mpz(number_mpz_from_mpz(mpq_numref(rational)));
+    number_t bottom = number_take_mpz(number_mpz_from_mpz(square_root));
+    mpz_clear(square_root);
+    if (!num_is_finite(top) || !num_is_finite(bottom)) {
+        num_destroy(&top);
+        num_destroy(&bottom);
+        return false;
+    }
+    num_destroy(numerator);
+    num_destroy(denominator_root);
+    *numerator = top;
+    *denominator_root = bottom;
+    return true;
+}
 
 typedef struct {
     number_const_id_t id;

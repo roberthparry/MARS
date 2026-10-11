@@ -14,8 +14,8 @@
 
 #include "file.h"
 #include "lab_process.h"
-#include "test_cfg_support.h"
 #include "test_harness.h"
+#include "test_cfg_support.h"
 
 /* Exit before the harness can save configuration or recursively register cases. */
 void test_cfg_make_self_fixture(void)
@@ -63,7 +63,7 @@ static bool test_cfg_make_run(bool dry, const char *program, const char *first, 
     args[count++] = "-o";
     args[count++] = "native-config";
     args[count++] = "-o";
-    args[count++] = "check-jurisdiction-db-deps";
+    args[count++] = "check-deps";
     args[count++] = "JURISDICTION_RULES_SOURCES=";
     args[count++] = program;
     args[count++] = location;
@@ -154,10 +154,96 @@ static void test_cfg_make_forward(void)
                      "actual root recipe preserves argv, town precedence, spaces, accents and language exports");
 }
 
+static bool test_cfg_make_uninstall_fixture(const char *directory)
+{
+    static const char *const paths[] = {
+        "jurisdiction/mars_jurisdiction_rules.db", "jurisdiction/mars_jurisdiction_rules.db-journal",
+        "jurisdiction/mars_jurisdiction_rules.db-wal", "jurisdiction/mars_jurisdiction_rules.db-shm",
+        "config/jurisdiction-db.env", "almanac/almanac.db", "config/almanac-db.env", "config/weather.env",
+        "jurisdiction/custom.db", "lab-settings.pb"
+    };
+    bool ok = test_cfg_make_environment();
+    static const char *const directories[] = {"jurisdiction", "config", "almanac"};
+    for (size_t i = 0; i < sizeof(directories) / sizeof(*directories) && ok; ++i) {
+        string_t *path = string_sprintf("%s/.mars/%s", directory, directories[i]);
+        file_t *folder = path ? file_new(path) : NULL;
+        ok = folder && file_create_directory(folder, 0700, true);
+        file_free(folder);
+        string_free(path);
+    }
+    for (size_t i = 0; i < sizeof(paths) / sizeof(*paths) && ok; ++i) {
+        string_t *path = string_sprintf("%s/.mars/%s", directory, paths[i]);
+        file_t *entry = path ? file_new(path) : NULL;
+        ok = entry && file_write_all_bytes(entry, "preserve", 8);
+        file_free(entry);
+        string_free(path);
+    }
+    string_t *home_argument = string_sprintf("HOME=%s", directory);
+    const char *args[] = {"make", "--no-print-directory", "-j1", "uninstall-jurisdiction-db",
+                          home_argument ? string_c_str(home_argument) : "", NULL};
+    /* The HOME override is confined to this child Make process and its disposable fixture. */
+    for (unsigned pass = 0; pass < 2 && ok; ++pass) {
+        string_t *output = NULL;
+        int status = -1;
+        ok = home_argument && lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && status == 0;
+        string_free(output);
+    }
+    for (size_t i = 0; i < sizeof(paths) / sizeof(*paths) && ok; ++i) {
+        string_t *path = string_sprintf("%s/.mars/%s", directory, paths[i]);
+        file_t *entry = path ? file_new(path) : NULL;
+        ok = entry && file_exists(entry) == (i >= 5);
+        file_free(entry);
+        string_free(path);
+    }
+    string_free(home_argument);
+    return ok;
+}
+
+static void test_cfg_make_uninstall(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_uninstall_fixture),
+                     "jurisdiction removal is idempotent and preserves unrelated databases and settings");
+}
+
+static bool test_cfg_make_help_fixture(const char *directory)
+{
+    (void)directory;
+    const char *args[] = {"make", "--no-print-directory", "-j1", "help", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    bool ok = test_cfg_make_environment() &&
+              lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && status == 0 && output &&
+              string_find(output, "make native-lab ") >= 0 && string_find(output, "make test_http_live ") >= 0 &&
+              string_find(output, "make test_lab_native ") >= 0 && string_find(output, "make lab-browser-test ") >= 0;
+    static const char *const obsolete[] = {
+        "lab-workers", "lab-build", "test-http-live", "check-jurisdiction-db-deps",
+        "mars_lab", "equation_lab", "diffequation_lab", "matrix_lab", "integrator_lab",
+        "datetime_lab", "almanac_lab", "almanac_event_lab", "holiday_lab", "ophelia"
+    };
+    for (size_t i = 0; i < sizeof(obsolete) / sizeof(*obsolete) && ok; ++i) {
+        ok = string_find(output, obsolete[i]) < 0;
+        const char *probe[] = {"make", "--no-print-directory", "-j1", "-n", obsolete[i], NULL};
+        string_t *rejected = NULL;
+        status = 0;
+        ok = ok && lab_proc_run(probe, MARS_CONFIG_ROOT_DIR, 30000, 262144, &rejected, &status) && status != 0;
+        string_free(rejected);
+    }
+    string_free(output);
+    return ok;
+}
+
+static void test_cfg_make_help(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_help_fixture),
+                     "help lists current targets and obsolete aliases are removed");
+}
+
 /* Register ordinary Make integration cases before the README groups. */
 void test_cfg_make_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_make_dry, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_reject, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_forward, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_make_uninstall, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_make_help, tests, NULL);
 }
