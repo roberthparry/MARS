@@ -18,7 +18,7 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
-struct de_lie_t {
+struct _de_lie_t {
     expr_t *coordinate[3];
     expr_t *rhs;
 };

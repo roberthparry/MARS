@@ -56,7 +56,7 @@ typedef struct {
 } file_stage_t;
 typedef bool (*file_emit_fn)(void *context, const unsigned char *bytes, size_t size);
 typedef bool (*file_transform_fn)(file_t *source, file_t *output, void *context);
-typedef struct file_decoder_t file_decoder_t;
+typedef struct _file_decoder_t file_decoder_t;
 bool file_stage_begin(file_stage_t *stage, file_t *destination, bool overwrite);
 bool file_stage_publish(file_stage_t *stage);
 void file_stage_discard(file_stage_t *stage);

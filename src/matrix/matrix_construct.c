@@ -18,37 +18,37 @@
    Public API constructors
    ============================================================ */
 
-struct matrix_t *mat_new(size_t rows, size_t cols)
+struct _matrix_t *mat_new(size_t rows, size_t cols)
 {
     return mat_create_dense_with_elem(rows, cols, &number_elem);
 }
 
-struct matrix_t *mat_new_sparse(size_t rows, size_t cols)
+struct _matrix_t *mat_new_sparse(size_t rows, size_t cols)
 {
     return mat_create_sparse_with_elem(rows, cols, &number_elem);
 }
 
-struct matrix_t *mat_new_expr(size_t rows, size_t cols)
+struct _matrix_t *mat_new_expr(size_t rows, size_t cols)
 {
     return mat_create_dense_with_elem(rows, cols, &expr_elem);
 }
 
-struct matrix_t *mat_new_sparse_expr(size_t rows, size_t cols)
+struct _matrix_t *mat_new_sparse_expr(size_t rows, size_t cols)
 {
     return mat_create_sparse_with_elem(rows, cols, &expr_elem);
 }
 
-struct matrix_t *matsq_new(size_t n)
+struct _matrix_t *matsq_new(size_t n)
 {
     return mat_new(n, n);
 }
 
-struct matrix_t *mat_create_identity(size_t n)
+struct _matrix_t *mat_create_identity(size_t n)
 {
     return mat_create_identity_with_elem(n, &number_elem);
 }
 
-struct matrix_t *mat_create_identity_expr(size_t n)
+struct _matrix_t *mat_create_identity_expr(size_t n)
 {
     return mat_create_identity_with_elem(n, &expr_elem);
 }
@@ -101,7 +101,7 @@ matrix_t *mat_create_expr(size_t rows, size_t cols, expr_t *const *data)
    Destruction and basic access
    ============================================================ */
 
-void mat_free(struct matrix_t *A)
+void mat_free(struct _matrix_t *A)
 {
     if (!A)
         return;
@@ -111,12 +111,12 @@ void mat_free(struct matrix_t *A)
     free(A);
 }
 
-void mat_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void mat_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     A->store->get(A, i, j, out);
 }
 
-number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
+number_t mat_get_num(const struct _matrix_t *A, size_t i, size_t j)
 {
     number_t out = NUM_ZERO;
 
@@ -139,17 +139,17 @@ number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
     return out;
 }
 
-void mat_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void mat_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     A->store->set(A, i, j, val);
 }
 
-size_t mat_get_row_count(const struct matrix_t *A)
+size_t mat_get_row_count(const struct _matrix_t *A)
 {
     return A->rows;
 }
 
-size_t mat_get_col_count(const struct matrix_t *A)
+size_t mat_get_col_count(const struct _matrix_t *A)
 {
     return A->cols;
 }

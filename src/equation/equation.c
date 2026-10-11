@@ -23,7 +23,7 @@
 #include "internal/expr_internal.h"
 #include "ustring.h"
 
-struct equation_t {
+struct _equation_t {
     expr_t *lhs;
     expr_t *rhs;
     expr_bindings_t *bindings;

@@ -25,8 +25,8 @@
 
 #include "expression.h"
 
-typedef struct equation_t equation_t;
-typedef struct equation_solutions equation_solutions_t;
+typedef struct _equation_t equation_t;
+typedef struct _equation_solutions_t equation_solutions_t;
 
 /**
  * @brief Create an equation from a left- and right-hand expression.

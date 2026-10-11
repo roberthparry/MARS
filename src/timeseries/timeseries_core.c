@@ -190,7 +190,7 @@ void ts_free(timeseries_t *series)
     free(series);
 }
 
-struct ts_builder_t {
+struct _ts_builder_t {
     number_t *values;
     datetime_t **index;
     bool *missing;

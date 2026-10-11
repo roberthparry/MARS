@@ -140,9 +140,9 @@ typedef struct number_scope_state_t {
     number_scope_arena_block_t *arena_blocks;
 } number_scope_state_t;
 
-struct num_scope_t {
+struct _num_scope_t {
     number_scope_state_t *state;
-    struct num_scope_t *previous;
+    struct _num_scope_t *previous;
     int active;
 };
 

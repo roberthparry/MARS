@@ -36,8 +36,8 @@
 
 #include "expression.h"
 
-typedef struct matrix_t matrix_t;
-typedef struct mat_bindings_t mat_bindings_t;
+typedef struct _matrix_t matrix_t;
+typedef struct _mat_bindings_t mat_bindings_t;
 
 /**
  * @brief Matrix string rendering style.

@@ -19,7 +19,7 @@
 
 #include "file_internal.h"
 
-struct file_decoder_t {
+struct _file_decoder_t {
     ZSTD_DCtx *context;
     file_t *source;
     file_t *output;

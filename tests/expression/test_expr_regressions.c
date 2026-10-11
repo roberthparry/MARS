@@ -3929,7 +3929,7 @@ static void test_sqrt_negative_exact_evaluates_to_i(void)
                   "}\n\n"
                   "output(expr()).",
                   "\\sqrt{-4}"},
-                 {"sqrt(x) with x = -1", "{ sqrt(x) | x = -1 }", "i", "{ √(x) | x = -1 }",
+                 {"sqrt(x) with x = -1", "{ sqrt(x) | x = -1 }", "i", "{ √x | x = -1 }",
                   "expression expr(x) {\n"
                   "    return sqrt(x).\n"
                   "}\n\n"
@@ -4062,7 +4062,7 @@ static void test_unit_complex_cube_root_beautifies_to_cartesian_surds(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -4079,7 +4079,7 @@ static void test_conjugate_unit_complex_cube_root_keeps_cartesian_surd_symmetry(
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 - (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 - (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -4096,7 +4096,7 @@ static void test_root_order_three_uses_the_principal_cube_root_beautification(vo
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·cubrt(2))·(√(3) + 1 + (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + (√(3) - 1)·i)");
 
     free(text);
     expr_free(beautified);
@@ -4114,8 +4114,8 @@ static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) + "
-                       "√(root(2, 4) - √((√(2) + 1)/2))·i)");
+                       "1/√(2)·(√(⁴√(2) + √((√(2) + 1)/2)) + "
+                       "√(⁴√(2) - √((√(2) + 1)/2))·i)");
 
     free(text);
     expr_free(beautified);
@@ -4133,8 +4133,8 @@ static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetr
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(root(2, 4) + √((√(2) + 1)/2)) - "
-                       "√(root(2, 4) - √((√(2) + 1)/2))·i)");
+                       "1/√(2)·(√(⁴√(2) + √((√(2) + 1)/2)) - "
+                       "√(⁴√(2) - √((√(2) + 1)/2))·i)");
 
     free(text);
     expr_free(beautified);

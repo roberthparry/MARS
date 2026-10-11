@@ -30,7 +30,7 @@
 #include "csv.h"
 #include "timeseries.h"
 
-struct timeseries_t {
+struct _timeseries_t {
     size_t length;
     number_t *values;
     datetime_t **index;

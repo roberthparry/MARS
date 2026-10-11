@@ -118,10 +118,10 @@ typedef struct number_vtable_t {
 } number_vtable_t;
 
 typedef number_t *(*number_coerce_fn)(const number_t *number);
-typedef struct complex_t complex_t;
-typedef struct number_mpz_t number_mpz_t;
-typedef struct number_mpq_t number_mpq_t;
-typedef struct number_mpfr_t number_mpfr_t;
+typedef struct _complex_t complex_t;
+typedef struct _number_mpz_t number_mpz_t;
+typedef struct _number_mpq_t number_mpq_t;
+typedef struct _number_mpfr_t number_mpfr_t;
 
 typedef struct number_cdouble_t {
     double _Complex value;
@@ -143,7 +143,7 @@ typedef struct {
     } value;
 } number_private_t;
 
-typedef struct complex_t {
+typedef struct _complex_t {
     int constant_id;
     size_t precision_bits;
     number_t real;
@@ -208,21 +208,21 @@ typedef enum number_const_id_t {
     NUMBER_CONST_COUNT
 } number_const_id_t;
 
-struct number_mpfr_t {
+struct _number_mpfr_t {
     number_const_id_t constant_id;
     bool immortal;
     bool initialised;
     mpfr_t value;
 };
 
-struct number_mpz_t {
+struct _number_mpz_t {
     number_const_id_t constant_id;
     bool immortal;
     bool initialised;
     mpz_t value;
 };
 
-struct number_mpq_t {
+struct _number_mpq_t {
     number_const_id_t constant_id;
     bool immortal;
     bool initialised;

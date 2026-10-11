@@ -27,54 +27,54 @@
    Internal matrix construction helpers (forward declarations)
    ============================================================ */
 
-struct matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem);
-struct matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem);
-struct matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem);
-struct matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem);
-struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
-struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
-bool dense_is_sparse_storage(const struct matrix_t *A);
-bool sparse_is_sparse_storage(const struct matrix_t *A);
-bool identity_is_sparse_storage(const struct matrix_t *A);
-bool diagonal_is_sparse_storage(const struct matrix_t *A);
-bool upper_triangular_is_sparse_storage(const struct matrix_t *A);
-bool lower_triangular_is_sparse_storage(const struct matrix_t *A);
-bool dense_is_sparse_like(const struct matrix_t *A);
-bool sparse_is_sparse_like(const struct matrix_t *A);
-bool identity_is_sparse_like(const struct matrix_t *A);
-bool diagonal_is_sparse_like(const struct matrix_t *A);
-bool upper_triangular_is_sparse_like(const struct matrix_t *A);
-bool lower_triangular_is_sparse_like(const struct matrix_t *A);
-bool store_true(const struct matrix_t *A);
-static bool store_false(const struct matrix_t *A);
-bool dense_is_diagonal(const struct matrix_t *A);
-bool sparse_is_diagonal(const struct matrix_t *A);
-bool upper_triangular_is_diagonal(const struct matrix_t *A);
-bool lower_triangular_is_diagonal(const struct matrix_t *A);
-bool generic_is_upper_triangular(const struct matrix_t *A);
-bool generic_is_lower_triangular(const struct matrix_t *A);
-size_t dense_nonzero_count(const struct matrix_t *A);
-size_t sparse_nonzero_count(const struct matrix_t *A);
-size_t identity_nonzero_count(const struct matrix_t *A);
-size_t diagonal_nonzero_count(const struct matrix_t *A);
-size_t upper_triangular_nonzero_count(const struct matrix_t *A);
-size_t lower_triangular_nonzero_count(const struct matrix_t *A);
-const struct store_vtable *store_self_unary(const struct matrix_t *A);
-const struct store_vtable *identity_unary_store(const struct matrix_t *A);
-const struct store_vtable *store_self_transpose(const struct matrix_t *A);
-const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A);
-const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A);
-struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
+struct _matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct _matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct _matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct _matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct _matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
+struct _matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem);
+bool dense_is_sparse_storage(const struct _matrix_t *A);
+bool sparse_is_sparse_storage(const struct _matrix_t *A);
+bool identity_is_sparse_storage(const struct _matrix_t *A);
+bool diagonal_is_sparse_storage(const struct _matrix_t *A);
+bool upper_triangular_is_sparse_storage(const struct _matrix_t *A);
+bool lower_triangular_is_sparse_storage(const struct _matrix_t *A);
+bool dense_is_sparse_like(const struct _matrix_t *A);
+bool sparse_is_sparse_like(const struct _matrix_t *A);
+bool identity_is_sparse_like(const struct _matrix_t *A);
+bool diagonal_is_sparse_like(const struct _matrix_t *A);
+bool upper_triangular_is_sparse_like(const struct _matrix_t *A);
+bool lower_triangular_is_sparse_like(const struct _matrix_t *A);
+bool store_true(const struct _matrix_t *A);
+static bool store_false(const struct _matrix_t *A);
+bool dense_is_diagonal(const struct _matrix_t *A);
+bool sparse_is_diagonal(const struct _matrix_t *A);
+bool upper_triangular_is_diagonal(const struct _matrix_t *A);
+bool lower_triangular_is_diagonal(const struct _matrix_t *A);
+bool generic_is_upper_triangular(const struct _matrix_t *A);
+bool generic_is_lower_triangular(const struct _matrix_t *A);
+size_t dense_nonzero_count(const struct _matrix_t *A);
+size_t sparse_nonzero_count(const struct _matrix_t *A);
+size_t identity_nonzero_count(const struct _matrix_t *A);
+size_t diagonal_nonzero_count(const struct _matrix_t *A);
+size_t upper_triangular_nonzero_count(const struct _matrix_t *A);
+size_t lower_triangular_nonzero_count(const struct _matrix_t *A);
+const struct store_vtable *store_self_unary(const struct _matrix_t *A);
+const struct store_vtable *identity_unary_store(const struct _matrix_t *A);
+const struct store_vtable *store_self_transpose(const struct _matrix_t *A);
+const struct store_vtable *upper_triangular_transpose_store(const struct _matrix_t *A);
+const struct store_vtable *lower_triangular_transpose_store(const struct _matrix_t *A);
+struct _matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store);
-struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
-                                             const struct matrix_t *layout_src);
-static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
-                                                 const struct matrix_t *A, const struct matrix_t *B);
-static bool mat_uses_sparse_storage(const struct matrix_t *A);
-static bool mat_is_sparse_like(const struct matrix_t *A);
-bool mat_has_diagonal_structure(const struct matrix_t *A);
-bool mat_has_upper_triangular_structure(const struct matrix_t *A);
-bool mat_has_lower_triangular_structure(const struct matrix_t *A);
+struct _matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                             const struct _matrix_t *layout_src);
+static struct _matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                                 const struct _matrix_t *A, const struct _matrix_t *B);
+static bool mat_uses_sparse_storage(const struct _matrix_t *A);
+static bool mat_is_sparse_like(const struct _matrix_t *A);
+bool mat_has_diagonal_structure(const struct _matrix_t *A);
+bool mat_has_upper_triangular_structure(const struct _matrix_t *A);
+bool mat_has_lower_triangular_structure(const struct _matrix_t *A);
 matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *target);
 
 static size_t upper_triangular_capacity(size_t rows, size_t cols)
@@ -108,7 +108,7 @@ typedef struct sparse_entry_t {
     unsigned char value[];
 } sparse_entry_t;
 
-static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, size_t col);
+static sparse_entry_t *sparse_find_prev(const struct _matrix_t *A, size_t row, size_t col);
 
 struct mat_precision_bucket {
     size_t bits;
@@ -143,7 +143,7 @@ static struct mat_precision_bucket *precision_bucket_find(struct mat_precision_b
     return NULL;
 }
 
-static void precision_bucket_inc(struct matrix_t *A, size_t bits, size_t amount)
+static void precision_bucket_inc(struct _matrix_t *A, size_t bits, size_t amount)
 {
     struct mat_precision_bucket *bucket;
 
@@ -167,7 +167,7 @@ static void precision_bucket_inc(struct matrix_t *A, size_t bits, size_t amount)
         A->meta.numeric_min_precision_bits = bits;
 }
 
-static void precision_bucket_dec(struct matrix_t *A, size_t bits, size_t amount)
+static void precision_bucket_dec(struct _matrix_t *A, size_t bits, size_t amount)
 {
     struct mat_precision_bucket *prev = NULL;
     struct mat_precision_bucket *cur;
@@ -206,7 +206,7 @@ static void precision_bucket_dec(struct matrix_t *A, size_t bits, size_t amount)
     }
 }
 
-static void precision_bucket_free_all(struct matrix_t *A)
+static void precision_bucket_free_all(struct _matrix_t *A)
 {
     struct mat_precision_bucket *cur;
 
@@ -221,19 +221,19 @@ static void precision_bucket_free_all(struct matrix_t *A)
     A->meta.numeric_precision_hist = NULL;
 }
 
-void mat_numeric_precision_release(struct matrix_t *A)
+void mat_numeric_precision_release(struct _matrix_t *A)
 {
     precision_bucket_free_all(A);
 }
 
-size_t mat_cached_numeric_precision_bits(const struct matrix_t *A)
+size_t mat_cached_numeric_precision_bits(const struct _matrix_t *A)
 {
     if (!A || A->elem != &number_elem)
         return 106u;
     return A->meta.numeric_min_precision_bits ? A->meta.numeric_min_precision_bits : 106u;
 }
 
-void mat_numeric_precision_note_set(struct matrix_t *A, const void *old_val, const void *new_val)
+void mat_numeric_precision_note_set(struct _matrix_t *A, const void *old_val, const void *new_val)
 {
     size_t old_bits;
     size_t new_bits;
@@ -336,21 +336,21 @@ bool elem_supports_numeric_algorithms(const struct elem_vtable *elem)
     return elem && !elem_is_symbolic(elem);
 }
 
-void mat_value_init_zero(const struct matrix_t *A, void *slot)
+void mat_value_init_zero(const struct _matrix_t *A, void *slot)
 {
     if (!A || !slot)
         return;
     elem_init_zero_value(A->elem, slot);
 }
 
-void mat_value_destroy(const struct matrix_t *A, void *slot)
+void mat_value_destroy(const struct _matrix_t *A, void *slot)
 {
     if (!A || !slot)
         return;
     elem_destroy_value(A->elem, slot);
 }
 
-void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out)
+void mat_get_owned(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
@@ -398,7 +398,7 @@ void mat_raw_value_from_number(const struct elem_vtable *elem, void *out, const 
         *(expr_t **)out = expr_new_const(*source);
 }
 
-static void mat_number_slot_take(struct matrix_t *A, void *slot, number_t *value)
+static void mat_number_slot_take(struct _matrix_t *A, void *slot, number_t *value)
 {
     number_t moved;
     int was_zero;
@@ -425,7 +425,7 @@ static void mat_number_slot_take(struct matrix_t *A, void *slot, number_t *value
         *value = NUM_ZERO;
 }
 
-void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
+void mat_set_num_owned(struct _matrix_t *A, size_t i, size_t j, number_t *value)
 {
     if (!A || A->elem != &number_elem)
         return;
@@ -542,7 +542,7 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
 }
 
 /* Clone the input number and transfer the copy into the matrix's numeric storage. */
-void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j, const number_t *value)
+void mat_set_num_clone(struct _matrix_t *A, size_t i, size_t j, const number_t *value)
 {
     number_t copy = num_is_immortal(*value) ? *value : num_clone(*value);
     mat_set_num_owned(A, i, j, &copy);
@@ -620,7 +620,7 @@ bool expr_is_structural_zero(const void *val)
     return expr_node_is_exact_zero(*(expr_t *const *)val);
 }
 
-bool dense_alloc(struct matrix_t *A)
+bool dense_alloc(struct _matrix_t *A)
 {
     size_t n = A->rows, m = A->cols, es = A->elem->size;
 
@@ -650,7 +650,7 @@ bool dense_alloc(struct matrix_t *A)
     return true;
 }
 
-void dense_free(struct matrix_t *A)
+void dense_free(struct _matrix_t *A)
 {
     if (!A->data)
         return;
@@ -665,12 +665,12 @@ void dense_free(struct matrix_t *A)
     A->data = NULL;
 }
 
-void dense_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void dense_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     memcpy(out, (char *)A->data[i] + j * A->elem->size, A->elem->size);
 }
 
-void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void dense_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     void *slot = (char *)A->data[i] + j * A->elem->size;
     number_t old_num;
@@ -690,7 +690,7 @@ void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val)
         A->nnz--;
 }
 
-void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void dense_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     void *tmp;
 
@@ -702,7 +702,7 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
     A->data[r2] = tmp;
 }
 
-void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
+void dense_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
     unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES],
         out[MATRIX_SCALAR_STORAGE_BYTES];
@@ -727,7 +727,7 @@ void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row
 
 /* ---------- sparse storage ---------- */
 
-static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, size_t col)
+static sparse_entry_t *sparse_find_prev(const struct _matrix_t *A, size_t row, size_t col)
 {
     sparse_entry_t *prev = NULL;
     sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[row] : NULL;
@@ -740,7 +740,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     return prev;
 }
 
-bool sparse_alloc(struct matrix_t *A)
+bool sparse_alloc(struct _matrix_t *A)
 {
     A->data = calloc(A->rows, sizeof(void *));
     if (!A->data)
@@ -749,7 +749,7 @@ bool sparse_alloc(struct matrix_t *A)
     return true;
 }
 
-void sparse_free(struct matrix_t *A)
+void sparse_free(struct _matrix_t *A)
 {
     if (!A->data)
         return;
@@ -769,7 +769,7 @@ void sparse_free(struct matrix_t *A)
     A->nnz = 0;
 }
 
-void sparse_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void sparse_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     sparse_entry_t *prev = sparse_find_prev(A, i, j);
     sparse_entry_t *cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
@@ -782,7 +782,7 @@ void sparse_get(const struct matrix_t *A, size_t i, size_t j, void *out)
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
-void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void sparse_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     sparse_entry_t *prev;
     sparse_entry_t *cur;
@@ -835,7 +835,7 @@ void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
     A->nnz++;
 }
 
-void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void sparse_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     void *tmp;
 
@@ -847,7 +847,7 @@ void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
     A->data[r2] = tmp;
 }
 
-void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
+void sparse_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
     sparse_entry_t *cur;
     unsigned char dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
@@ -872,7 +872,7 @@ void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_ro
     }
 }
 
-void sparse_materialise(struct matrix_t *A)
+void sparse_materialise(struct _matrix_t *A)
 {
     void **old_rows;
     size_t old_nnz;
@@ -911,44 +911,44 @@ void sparse_materialise(struct matrix_t *A)
 
 /* ---------- identity storage ---------- */
 
-void ident_materialise(struct matrix_t *A);
+void ident_materialise(struct _matrix_t *A);
 
-bool ident_alloc(struct matrix_t *A)
+bool ident_alloc(struct _matrix_t *A)
 {
     A->data = NULL;
     A->nnz = A->rows;
     return true;
 }
 
-void ident_free(struct matrix_t *A)
+void ident_free(struct _matrix_t *A)
 {
     (void)A;
 }
 
-void ident_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void ident_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     memcpy(out, (i == j) ? A->elem->one : A->elem->zero, A->elem->size);
 }
 
-void ident_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void ident_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     ident_materialise(A);
     dense_set(A, i, j, val);
 }
 
-void ident_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void ident_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     ident_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
-void ident_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
+void ident_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start, const void *factor)
 {
     ident_materialise(A);
     dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
 }
 
-void ident_materialise(struct matrix_t *A)
+void ident_materialise(struct _matrix_t *A)
 {
     A->store = &dense_store;
     if (!dense_alloc(A))
@@ -961,7 +961,7 @@ void ident_materialise(struct matrix_t *A)
 
 /* ---------- diagonal storage ---------- */
 
-bool diagonal_alloc(struct matrix_t *A)
+bool diagonal_alloc(struct _matrix_t *A)
 {
     size_t i;
 
@@ -988,7 +988,7 @@ bool diagonal_alloc(struct matrix_t *A)
     return true;
 }
 
-void diagonal_free(struct matrix_t *A)
+void diagonal_free(struct _matrix_t *A)
 {
     if (!A->data)
         return;
@@ -1002,12 +1002,12 @@ void diagonal_free(struct matrix_t *A)
     A->nnz = 0;
 }
 
-void diagonal_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void diagonal_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     memcpy(out, (i == j) ? A->data[i] : A->elem->zero, A->elem->size);
 }
 
-void diagonal_materialise(struct matrix_t *A)
+void diagonal_materialise(struct _matrix_t *A)
 {
     void **old_diagonal = A->data;
     size_t old_nnz = A->nnz;
@@ -1030,7 +1030,7 @@ void diagonal_materialise(struct matrix_t *A)
     free(old_diagonal);
 }
 
-void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void diagonal_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (i == j) {
         int was_zero = elem_is_structural_zero(A->elem, A->data[i]);
@@ -1057,13 +1057,13 @@ void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
     dense_set(A, i, j, val);
 }
 
-void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void diagonal_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     diagonal_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
-void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+void diagonal_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
                                  const void *factor)
 {
     diagonal_materialise(A);
@@ -1072,17 +1072,17 @@ void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_
 
 /* ---------- triangular storage ---------- */
 
-static size_t upper_triangular_row_width(const struct matrix_t *A, size_t row)
+static size_t upper_triangular_row_width(const struct _matrix_t *A, size_t row)
 {
     return (row < A->cols) ? (A->cols - row) : 0;
 }
 
-static size_t lower_triangular_row_width(const struct matrix_t *A, size_t row)
+static size_t lower_triangular_row_width(const struct _matrix_t *A, size_t row)
 {
     return (row < A->cols) ? (row + 1) : A->cols;
 }
 
-static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struct matrix_t *, size_t))
+static bool triangular_alloc(struct _matrix_t *A, size_t (*row_width)(const struct _matrix_t *, size_t))
 {
     size_t i;
 
@@ -1117,7 +1117,7 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     return true;
 }
 
-void triangular_free(struct matrix_t *A)
+void triangular_free(struct _matrix_t *A)
 {
     if (!A->data)
         return;
@@ -1136,17 +1136,17 @@ void triangular_free(struct matrix_t *A)
     A->nnz = 0;
 }
 
-bool upper_triangular_alloc(struct matrix_t *A)
+bool upper_triangular_alloc(struct _matrix_t *A)
 {
     return triangular_alloc(A, upper_triangular_row_width);
 }
 
-bool lower_triangular_alloc(struct matrix_t *A)
+bool lower_triangular_alloc(struct _matrix_t *A)
 {
     return triangular_alloc(A, lower_triangular_row_width);
 }
 
-void upper_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void upper_triangular_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     if (i <= j && i < A->cols) {
         memcpy(out, (char *)A->data[i] + (j - i) * A->elem->size, A->elem->size);
@@ -1156,7 +1156,7 @@ void upper_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *ou
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
-void lower_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+void lower_triangular_get(const struct _matrix_t *A, size_t i, size_t j, void *out)
 {
     if (j <= i && j < A->cols) {
         memcpy(out, (char *)A->data[i] + j * A->elem->size, A->elem->size);
@@ -1166,7 +1166,7 @@ void lower_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *ou
     memcpy(out, A->elem->zero, A->elem->size);
 }
 
-void upper_triangular_materialise(struct matrix_t *A)
+void upper_triangular_materialise(struct _matrix_t *A)
 {
     void **old_rows = A->data;
     size_t old_nnz = A->nnz;
@@ -1193,7 +1193,7 @@ void upper_triangular_materialise(struct matrix_t *A)
     free(old_rows);
 }
 
-void lower_triangular_materialise(struct matrix_t *A)
+void lower_triangular_materialise(struct _matrix_t *A)
 {
     void **old_rows = A->data;
     size_t old_nnz = A->nnz;
@@ -1220,7 +1220,7 @@ void lower_triangular_materialise(struct matrix_t *A)
     free(old_rows);
 }
 
-void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void upper_triangular_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (i <= j && i < A->cols) {
         void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
@@ -1248,7 +1248,7 @@ void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *va
     dense_set(A, i, j, val);
 }
 
-void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+void lower_triangular_set(struct _matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (j <= i && j < A->cols) {
         void *slot = (char *)A->data[i] + j * A->elem->size;
@@ -1276,19 +1276,19 @@ void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *va
     dense_set(A, i, j, val);
 }
 
-void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void upper_triangular_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     upper_triangular_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
-void lower_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+void lower_triangular_swap_rows(struct _matrix_t *A, size_t r1, size_t r2)
 {
     lower_triangular_materialise(A);
     dense_swap_rows(A, r1, r2);
 }
 
-void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+void upper_triangular_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
                                          const void *factor)
 {
     unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES],
@@ -1312,7 +1312,7 @@ void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, siz
     elem_destroy_value(A->elem, prod);
 }
 
-void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
+void lower_triangular_row_eliminate_from(struct _matrix_t *A, size_t dst_row, size_t src_row, size_t col_start,
                                          const void *factor)
 {
     lower_triangular_materialise(A);
@@ -1323,10 +1323,10 @@ void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, siz
    Internal constructor helper
    ============================================================ */
 
-static struct matrix_t *mat_create_internal(size_t rows, size_t cols, const struct elem_vtable *elem,
+static struct _matrix_t *mat_create_internal(size_t rows, size_t cols, const struct elem_vtable *elem,
                                             const struct store_vtable *store)
 {
-    struct matrix_t *A = malloc(sizeof(*A));
+    struct _matrix_t *A = malloc(sizeof(*A));
     if (!A)
         return NULL;
 
@@ -1355,112 +1355,112 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols, const stru
    Matrix construction policy helpers
    ============================================================ */
 
-struct matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_dense(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &dense_store);
 }
 
-struct matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_sparse(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &sparse_store);
 }
 
-struct matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_identity(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     if (rows != cols)
         return NULL;
     return mat_create_internal(rows, cols, elem, &identity_store);
 }
 
-struct matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_diagonal(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     if (rows != cols)
         return NULL;
     return mat_create_internal(rows, cols, elem, &diagonal_store);
 }
 
-struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_upper_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &upper_triangular_store);
 }
 
-struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *store_create_lower_triangular(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_internal(rows, cols, elem, &lower_triangular_store);
 }
 
-static bool store_false(const struct matrix_t *A)
+static bool store_false(const struct _matrix_t *A)
 {
     (void)A;
     return false;
 }
 
-bool store_true(const struct matrix_t *A)
+bool store_true(const struct _matrix_t *A)
 {
     return A != NULL;
 }
 
-bool dense_is_sparse_storage(const struct matrix_t *A)
+bool dense_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool sparse_is_sparse_storage(const struct matrix_t *A)
+bool sparse_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_true(A);
 }
 
-bool identity_is_sparse_storage(const struct matrix_t *A)
+bool identity_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool diagonal_is_sparse_storage(const struct matrix_t *A)
+bool diagonal_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool upper_triangular_is_sparse_storage(const struct matrix_t *A)
+bool upper_triangular_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool lower_triangular_is_sparse_storage(const struct matrix_t *A)
+bool lower_triangular_is_sparse_storage(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool dense_is_sparse_like(const struct matrix_t *A)
+bool dense_is_sparse_like(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool sparse_is_sparse_like(const struct matrix_t *A)
+bool sparse_is_sparse_like(const struct _matrix_t *A)
 {
     return store_true(A);
 }
 
-bool identity_is_sparse_like(const struct matrix_t *A)
+bool identity_is_sparse_like(const struct _matrix_t *A)
 {
     return store_true(A);
 }
 
-bool diagonal_is_sparse_like(const struct matrix_t *A)
+bool diagonal_is_sparse_like(const struct _matrix_t *A)
 {
     return store_true(A);
 }
 
-bool upper_triangular_is_sparse_like(const struct matrix_t *A)
+bool upper_triangular_is_sparse_like(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool lower_triangular_is_sparse_like(const struct matrix_t *A)
+bool lower_triangular_is_sparse_like(const struct _matrix_t *A)
 {
     return store_false(A);
 }
 
-bool dense_is_diagonal(const struct matrix_t *A)
+bool dense_is_diagonal(const struct _matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t diag_cap;
@@ -1481,7 +1481,7 @@ bool dense_is_diagonal(const struct matrix_t *A)
     return true;
 }
 
-bool sparse_is_diagonal(const struct matrix_t *A)
+bool sparse_is_diagonal(const struct _matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[i] : NULL;
@@ -1494,7 +1494,7 @@ bool sparse_is_diagonal(const struct matrix_t *A)
     return true;
 }
 
-bool upper_triangular_is_diagonal(const struct matrix_t *A)
+bool upper_triangular_is_diagonal(const struct _matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         size_t width = upper_triangular_row_width(A, i);
@@ -1507,7 +1507,7 @@ bool upper_triangular_is_diagonal(const struct matrix_t *A)
     return true;
 }
 
-bool lower_triangular_is_diagonal(const struct matrix_t *A)
+bool lower_triangular_is_diagonal(const struct _matrix_t *A)
 {
     for (size_t i = 0; i < A->rows; i++) {
         size_t width = lower_triangular_row_width(A, i);
@@ -1520,7 +1520,7 @@ bool lower_triangular_is_diagonal(const struct matrix_t *A)
     return true;
 }
 
-bool generic_is_upper_triangular(const struct matrix_t *A)
+bool generic_is_upper_triangular(const struct _matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = upper_triangular_capacity(A->rows, A->cols);
@@ -1538,7 +1538,7 @@ bool generic_is_upper_triangular(const struct matrix_t *A)
     return true;
 }
 
-bool generic_is_lower_triangular(const struct matrix_t *A)
+bool generic_is_lower_triangular(const struct _matrix_t *A)
 {
     unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = lower_triangular_capacity(A->rows, A->cols);
@@ -1556,65 +1556,65 @@ bool generic_is_lower_triangular(const struct matrix_t *A)
     return true;
 }
 
-size_t dense_nonzero_count(const struct matrix_t *A)
+size_t dense_nonzero_count(const struct _matrix_t *A)
 {
     return A ? A->nnz : 0u;
 }
 
-size_t sparse_nonzero_count(const struct matrix_t *A)
+size_t sparse_nonzero_count(const struct _matrix_t *A)
 {
     return A->nnz;
 }
 
-size_t identity_nonzero_count(const struct matrix_t *A)
+size_t identity_nonzero_count(const struct _matrix_t *A)
 {
     return A->rows;
 }
 
-size_t diagonal_nonzero_count(const struct matrix_t *A)
+size_t diagonal_nonzero_count(const struct _matrix_t *A)
 {
     return A->nnz;
 }
 
-size_t upper_triangular_nonzero_count(const struct matrix_t *A)
+size_t upper_triangular_nonzero_count(const struct _matrix_t *A)
 {
     return A->nnz;
 }
 
-size_t lower_triangular_nonzero_count(const struct matrix_t *A)
+size_t lower_triangular_nonzero_count(const struct _matrix_t *A)
 {
     return A->nnz;
 }
 
-const struct store_vtable *store_self_unary(const struct matrix_t *A)
+const struct store_vtable *store_self_unary(const struct _matrix_t *A)
 {
     return A ? A->store : NULL;
 }
 
-const struct store_vtable *identity_unary_store(const struct matrix_t *A)
+const struct store_vtable *identity_unary_store(const struct _matrix_t *A)
 {
     (void)A;
     return &diagonal_store;
 }
 
-const struct store_vtable *store_self_transpose(const struct matrix_t *A)
+const struct store_vtable *store_self_transpose(const struct _matrix_t *A)
 {
     return A ? A->store : NULL;
 }
 
-const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A)
+const struct store_vtable *upper_triangular_transpose_store(const struct _matrix_t *A)
 {
     (void)A;
     return &lower_triangular_store;
 }
 
-const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A)
+const struct store_vtable *lower_triangular_transpose_store(const struct _matrix_t *A)
 {
     (void)A;
     return &upper_triangular_store;
 }
 
-struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
+struct _matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store)
 {
     if (!elem || !store || !store->create)
@@ -1622,38 +1622,38 @@ struct matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct el
     return store->create(rows, cols, elem);
 }
 
-struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &dense_store);
 }
 
-struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &sparse_store);
 }
 
-struct matrix_t *mat_create_identity_with_elem(size_t n, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_identity_with_elem(size_t n, const struct elem_vtable *elem)
 {
     return mat_create_with_store(n, n, elem, &identity_store);
 }
 
-struct matrix_t *mat_create_diagonal_with_elem(size_t n, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_diagonal_with_elem(size_t n, const struct elem_vtable *elem)
 {
     return mat_create_with_store(n, n, elem, &diagonal_store);
 }
 
-struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &upper_triangular_store);
 }
 
-struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
+struct _matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem)
 {
     return mat_create_with_store(rows, cols, elem, &lower_triangular_store);
 }
 
-struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
-                                                     const struct matrix_t *layout_src)
+struct _matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                                     const struct _matrix_t *layout_src)
 {
     const struct store_vtable *store;
 
@@ -1664,8 +1664,8 @@ struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols, c
     return mat_create_with_store(rows, cols, elem, store);
 }
 
-struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
-                                             const struct matrix_t *layout_src)
+struct _matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                             const struct _matrix_t *layout_src)
 {
     const struct store_vtable *store;
 
@@ -1676,8 +1676,8 @@ struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols, const str
     return mat_create_with_store(rows, cols, elem, store);
 }
 
-static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
-                                                 const struct matrix_t *A, const struct matrix_t *B)
+static struct _matrix_t *mat_create_binary_result(size_t rows, size_t cols, const struct elem_vtable *elem,
+                                                 const struct _matrix_t *A, const struct _matrix_t *B)
 {
     const struct store_vtable *store = &dense_store;
 
@@ -1697,27 +1697,27 @@ static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols, const
     return mat_create_with_store(rows, cols, elem, store);
 }
 
-static bool mat_uses_sparse_storage(const struct matrix_t *A)
+static bool mat_uses_sparse_storage(const struct _matrix_t *A)
 {
     return A && A->store && A->store->is_sparse_storage && A->store->is_sparse_storage(A);
 }
 
-static bool mat_is_sparse_like(const struct matrix_t *A)
+static bool mat_is_sparse_like(const struct _matrix_t *A)
 {
     return A && A->store && A->store->is_sparse_like && A->store->is_sparse_like(A);
 }
 
-bool mat_has_diagonal_structure(const struct matrix_t *A)
+bool mat_has_diagonal_structure(const struct _matrix_t *A)
 {
     return A && A->store && A->store->is_diagonal && A->store->is_diagonal(A);
 }
 
-bool mat_has_upper_triangular_structure(const struct matrix_t *A)
+bool mat_has_upper_triangular_structure(const struct _matrix_t *A)
 {
     return A && A->store && A->store->is_upper_triangular && A->store->is_upper_triangular(A);
 }
 
-bool mat_has_lower_triangular_structure(const struct matrix_t *A)
+bool mat_has_lower_triangular_structure(const struct _matrix_t *A)
 {
     return A && A->store && A->store->is_lower_triangular && A->store->is_lower_triangular(A);
 }
@@ -2666,11 +2666,11 @@ matrix_t *mat_scalar_div(matrix_t *A, const number_t *s)
    Mixed-type matrix operations (2D vtable driven)
    ============================================================ */
 
-static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A, const struct matrix_t *B,
+static struct _matrix_t *mat_add_or_sub_sparse(const struct _matrix_t *A, const struct _matrix_t *B,
                                               const binop_vtable *op, int is_sub)
 {
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
+    struct _matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
     unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
                   out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
@@ -2695,10 +2695,10 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A, const st
     return C;
 }
 
-static struct matrix_t *mat_mul_sparse(const struct matrix_t *A, const struct matrix_t *B, const binop_vtable *op)
+static struct _matrix_t *mat_mul_sparse(const struct _matrix_t *A, const struct _matrix_t *B, const binop_vtable *op)
 {
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
+    struct _matrix_t *As = NULL, *Bs = NULL, *C = NULL;
     unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
                   prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum_acc[MATRIX_SCALAR_STORAGE_BYTES] = {0},
@@ -2711,8 +2711,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A, const struct ma
     elem_init_zero_value(re, sum_acc);
     elem_init_zero_value(re, next_sum);
 
-    As = mat_uses_sparse_storage(A) ? (struct matrix_t *)A : mat_to_sparse(A);
-    Bs = mat_uses_sparse_storage(B) ? (struct matrix_t *)B : mat_to_sparse(B);
+    As = mat_uses_sparse_storage(A) ? (struct _matrix_t *)A : mat_to_sparse(A);
+    Bs = mat_uses_sparse_storage(B) ? (struct _matrix_t *)B : mat_to_sparse(B);
     if (!As || !Bs) {
         elem_destroy_value(re, prod);
         elem_destroy_value(re, sum_acc);
@@ -2777,7 +2777,7 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A, const struct ma
     return C;
 }
 
-struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B)
+struct _matrix_t *mat_add(const struct _matrix_t *A, const struct _matrix_t *B)
 {
     binop_elem_kind ak, bk;
     const binop_vtable *op;
@@ -2797,7 +2797,7 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B)
         return mat_add_or_sub_sparse(A, B, op, 0);
 
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
+    struct _matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C)
         return NULL;
 
@@ -2818,7 +2818,7 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B)
     return C;
 }
 
-struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B)
+struct _matrix_t *mat_sub(const struct _matrix_t *A, const struct _matrix_t *B)
 {
     binop_elem_kind ak, bk;
     const binop_vtable *op;
@@ -2838,7 +2838,7 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B)
         return mat_add_or_sub_sparse(A, B, op, 1);
 
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
+    struct _matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C)
         return NULL;
 
@@ -2859,7 +2859,7 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B)
     return C;
 }
 
-struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B)
+struct _matrix_t *mat_mul(const struct _matrix_t *A, const struct _matrix_t *B)
 {
     binop_elem_kind ak, bk;
     const binop_vtable *op;
@@ -2879,7 +2879,7 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B)
         return mat_mul_sparse(A, B, op);
 
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
+    struct _matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
     if (!C)
         return NULL;
 

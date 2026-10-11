@@ -150,7 +150,7 @@ static inline number_t number_inline_make_qcomplex(qcomplex_t value) {
  * The type is intentionally opaque; callers should only use the
  * `num_scope_*` APIs or the `NUM_SCOPE(name)` helper macro.
  */
-typedef struct num_scope_t num_scope_t;
+typedef struct _num_scope_t num_scope_t;
 
 /** @name Lifecycle
  * Constructors and pure transforms in this section return a live `number_t`

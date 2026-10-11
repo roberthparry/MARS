@@ -21,7 +21,7 @@
 
 #include "diffequation.h"
 
-struct diffequ_t {
+struct _diffequ_t {
     equation_t *equation;
     expr_t *display_lhs;
     expr_t *display_rhs;
@@ -49,7 +49,7 @@ struct diffequ_t {
     char *repeated_quadratic_dependent;
 };
 
-struct diffequ_solve_result_t {
+struct _diffequ_solve_result_t {
     de_solve_status_t status;
     de_solver_t solver;
     equation_t **solutions;

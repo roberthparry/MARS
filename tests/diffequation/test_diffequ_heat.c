@@ -186,7 +186,7 @@ void example_diffequation_half_line_heat(void)
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    const char *expected = "u = x/(2·√(π))·∫^t_0 g(s)·(t - s)^-³⁄₂·exp(-¼·(4a·(t - s) + x²/(t - s)))·ds; "
+    const char *expected = "u = x/(2·√π)·∫^t_0 g(s)·(t - s)^-³⁄₂·exp(-¼·(4a·(t - s) + x²/(t - s)))·ds; "
         "x > 0, t > 0; right half-line, decay at infinity; continuous locally bounded boundary data, "
         "zero at the corner; boundary value by the right-hand spatial limit.";
     bool valid = text && de_solve_result_solver(result) == DE_SOLVER_HALF_LINE_HEAT &&

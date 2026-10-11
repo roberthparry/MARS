@@ -88,7 +88,7 @@ typedef struct _dictionary_t dictionary_t;
  * Entry handles remain valid until the referenced entry is removed or the
  * dictionary is destroyed.
  */
-typedef struct _dict_entry dictionary_entry_t;
+typedef struct _dictionary_entry_t dictionary_entry_t;
 
 /* ------------------------------------------------------------------------- */
 /* Sorting mode                                                              */

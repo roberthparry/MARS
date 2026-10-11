@@ -28,7 +28,7 @@
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
-struct expr_function_temporaries;
+struct _expr_function_temporaries_t;
 
 /**
  * @brief Render solution centres and offsets with structural symmetry and shared denominators.
@@ -39,7 +39,7 @@ struct expr_function_temporaries;
  * @param rendered Zero-initialised output array; caller frees every populated string, even on failure.
  * @return True on success; false on allocation failure or invalid count.
  */
-bool equ_solution_pairs_text(const struct expr_function_temporaries *plan, const expr_t *const *rows,
+bool equ_solution_pairs_text(const struct _expr_function_temporaries_t *plan, const expr_t *const *rows,
                              size_t count, style_t style, string_t **rendered);
 
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);

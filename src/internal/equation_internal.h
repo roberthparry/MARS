@@ -46,7 +46,7 @@ typedef enum equation_search_kind {
     EQUATION_SEARCH_ZETA_ZEROS
 } equation_search_kind_t;
 
-struct equation_solutions {
+struct _equation_solutions_t {
     equation_t **solutions;
     size_t count;
     equation_solve_status_t status;

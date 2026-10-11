@@ -37,11 +37,11 @@
 /**
  * @brief An opaque differential-equation problem.
  */
-typedef struct diffequ_t diffequ_t;
-typedef struct diffequ_solve_result_t diffequ_solve_result_t;
+typedef struct _diffequ_t diffequ_t;
+typedef struct _diffequ_solve_result_t diffequ_solve_result_t;
 
 /** @brief Lie point-symmetry analysis of a scalar second-order ODE. */
-typedef struct de_lie_t de_lie_t;
+typedef struct _de_lie_t de_lie_t;
 
 /**
  * @brief Normalise a scalar second-order ODE to y'' = f(x,y,p), where p = y'.

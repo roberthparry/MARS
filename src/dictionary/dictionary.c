@@ -49,7 +49,7 @@ struct bucket {
 
 /* Opaque entry */
 
-struct _dict_entry {
+struct _dictionary_entry_t {
     struct _dictionary_t *dict;
     size_t index;
 };
@@ -91,7 +91,7 @@ struct _dictionary_t {
     dictionary_destroy_fn value_destroy;
 
     /* scratch entry for APIs that return an opaque handle */
-    struct _dict_entry scratch_entry;
+    struct _dictionary_entry_t scratch_entry;
 };
 
 /* -------------------------------------------------------------------------
@@ -794,7 +794,7 @@ void dictionary_foreach(const dictionary_t *dict, dictionary_foreach_fn fn, void
     if (!dict || !fn)
         return;
 
-    struct _dict_entry entry = {.dict = (struct _dictionary_t *)dict};
+    struct _dictionary_entry_t entry = {.dict = (struct _dictionary_t *)dict};
 
     for (size_t i = 0; i < dict->count; ++i) {
         entry.index = i;

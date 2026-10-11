@@ -825,7 +825,7 @@ For the input:
 the output is:
 
 ```text
-Singular travelling-wave family (not the general solution): u = (v·cosech²(½n·√(v)·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; positive real root; x - x₀ - vt != 0 (moving singularity excluded).
+Singular travelling-wave family (not the general solution): u = (v·cosech²(½n·√v·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; positive real root; x - x₀ - vt != 0 (moving singularity excluded).
 ```
 
 Equivalently,

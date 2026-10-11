@@ -430,10 +430,10 @@ static matrix_t *mat_backward_substitute(const matrix_t *U, const matrix_t *B, c
     return X;
 }
 
-struct matrix_t *mat_transpose(const struct matrix_t *A)
+struct _matrix_t *mat_transpose(const struct _matrix_t *A)
 {
     const struct elem_vtable *e;
-    struct matrix_t *T;
+    struct _matrix_t *T;
     unsigned char v[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A)
@@ -458,10 +458,10 @@ struct matrix_t *mat_transpose(const struct matrix_t *A)
     return T;
 }
 
-struct matrix_t *mat_conj(const struct matrix_t *A)
+struct _matrix_t *mat_conj(const struct _matrix_t *A)
 {
     const struct elem_vtable *e;
-    struct matrix_t *C;
+    struct _matrix_t *C;
     unsigned char v[MATRIX_SCALAR_STORAGE_BYTES], cv[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A)

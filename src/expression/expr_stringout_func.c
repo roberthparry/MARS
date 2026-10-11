@@ -152,7 +152,7 @@ typedef struct {
     size_t capacity;
 } function_dag_table_t;
 
-struct expr_function_temporaries {
+struct _expr_function_temporaries_t {
     function_temporary_table_t temporaries;
     autoname_table_t autonames;
     varlist_t variables;

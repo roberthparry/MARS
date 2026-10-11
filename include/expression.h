@@ -49,7 +49,7 @@
 typedef struct _expr_t expr_t;
 
 /** @brief Opaque symbol bindings produced while parsing an expression. */
-typedef struct expr_bindings_t expr_bindings_t;
+typedef struct _expr_bindings_t expr_bindings_t;
 
 /**
  * @brief Canonical differentiable singleton constants.

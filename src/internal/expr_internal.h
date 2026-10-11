@@ -415,7 +415,7 @@ typedef struct expr_newton_region {
 int expr_goal_seek_newton_one(expr_t *expr, expr_t *variable, number_t target,
                               const expr_goal_seek_options_t *options, const expr_newton_region_t *region);
 
-typedef struct expr_function_temporaries expr_function_temporaries_t;
+typedef struct _expr_function_temporaries_t expr_function_temporaries_t;
 
 /* Build a shared function-temporary plan for several expression roots. */
 expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *roots, size_t count);

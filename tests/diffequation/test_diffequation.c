@@ -1109,7 +1109,7 @@ static void test_diffequ_linear_solution_uses_special_function(void)
     WANT_POINTER("special-function solution text", text, true);
     if (text)
         WANT_TEXT("special-function linear solution", string_c_str(text),
-                    "y = √(π)/(2·√(-1)·exp(x²))·(erf(x·√(-1)) - erf(0))");
+                    "y = √π/(2·√(-1)·exp(x²))·(erf(x·√(-1)) - erf(0))");
 
     string_free(text);
     de_solve_result_free(result);

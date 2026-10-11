@@ -742,7 +742,7 @@ typedef struct {
     bool is_constant;
 } expr_binding_entry_t;
 
-struct expr_bindings_t {
+struct _expr_bindings_t {
     size_t count;
     expr_binding_entry_t *entries;
     dictionary_t *index;

@@ -476,7 +476,7 @@ typedef struct {
     matrix_t *T;  /* Upper-triangular Schur form */
 } mat_schur_factor_t;
 
-typedef struct mat_bindings_t mat_bindings_t;
+typedef struct _mat_bindings_t mat_bindings_t;
 
 typedef enum {
     MAT_STRING_INLINE_SCIENTIFIC,
@@ -1549,7 +1549,7 @@ aliases, fractions and surds, while a later numerical `expr_set_val` update
 replaces the old symbolic value rather than leaving stale binding text.
 
 ```c
-typedef struct mat_bindings_t mat_bindings_t;
+typedef struct _mat_bindings_t mat_bindings_t;
 
 matrix_t *mat_from_string(const char *s);
 matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);

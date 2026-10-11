@@ -27,7 +27,7 @@ typedef struct {
     expr_t *expr;
 } mat_binding_entry_t;
 
-struct mat_bindings_t {
+struct _mat_bindings_t {
     size_t count;
     mat_binding_entry_t *entries;
     dictionary_t *index;
