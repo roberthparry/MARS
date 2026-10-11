@@ -5,16 +5,23 @@
  * Routes dispatch directly through the webserver index. Every request is checked
  * against the private-network policy before asset reads, uploads or calculations.
  * Persistent state/results coordinate prefork workers through atomic files.
+ * Structured routes use version-one Protobuf exclusively; multipart CSV uploads,
+ * text downloads and the standards-required JSON web manifest retain their formats.
  */
 #include <stdlib.h>
 #include <string.h>
 
 #include "lab_mobile.h"
+#include "lab_wire.h"
 #include "tba_forecast.h"
 #include "tba_http.h"
 #include "tba_page.h"
 #include "tba_series.h"
 #include "tba_server.h"
+
+#ifndef TBA_WASM_PATH
+#define TBA_WASM_PATH "tools/to_be_announced_lab/build/release/wasm/tba_browser.wasm"
+#endif
 
 typedef bool (*tba_svr_handler_t)(const websrv_request_t *, websrv_response_t *, tba_server_t *);
 struct tba_server {
@@ -23,10 +30,45 @@ struct tba_server {
     struct tba_svr_context *contexts;
 };
 
-static bool tba_svr_json(websrv_response_t *response, unsigned status, json_t *data)
+static bool tba_svr_protobuf(websrv_response_t *response, unsigned status, json_t *data)
 {
-    bool ok = data && websrv_response_status(response, status) && websrv_response_json(response, data);
+    array_t *bytes = lab_wire_encode(data);
+    if (!bytes) {
+        json_t *error = tba_json_error("Response exceeds the Protobuf limits.");
+        bytes = lab_wire_encode(error);
+        json_free(error);
+        status = 500;
+    }
+    bool ok = bytes && websrv_response_status(response, status) &&
+              tba_http_header_set(response, "Content-Type", "application/x-protobuf") &&
+              websrv_response_body(response, array_get(bytes, 0), array_size(bytes));
+    array_destroy(bytes);
     json_free(data);
+    return ok;
+}
+
+static json_t *tba_svr_payload(const websrv_request_t *request)
+{
+    const string_t *type = tba_http_header(request, "Content-Type");
+    return type && string_view_equals_literal(string_view_all(type), "application/x-protobuf") ?
+        lab_wire_decode(websrv_request_body(request), websrv_request_body_size(request)) : NULL;
+}
+
+static bool tba_svr_wasm(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
+{
+    (void)request;
+    (void)server;
+    file_t *file = file_new_cstr(TBA_WASM_PATH);
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    bool safe = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= 4u * 1024u * 1024u;
+    array_t *bytes = safe ? file_read_all_bytes(file) : NULL;
+    bool ok = bytes ? websrv_response_status(response, 200) &&
+                          tba_http_header_set(response, "Content-Type", "application/wasm") &&
+                          websrv_response_body(response, array_get(bytes, 0), array_size(bytes)) :
+                      tba_svr_protobuf(response, 404, tba_json_error("Build the forecasting browser module first."));
+    array_destroy(bytes);
+    file_info_free(info);
+    file_free(file);
     return ok;
 }
 
@@ -75,31 +117,28 @@ static bool tba_svr_page(const websrv_request_t *request, websrv_response_t *res
 static bool tba_svr_state_get(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
     (void)request;
-    return tba_svr_json(response, 200, tba_app_state(server->app));
+    return tba_svr_protobuf(response, 200, tba_app_state(server->app));
 }
 
 static bool tba_svr_state_post(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    json_t *update = websrv_request_json(request);
+    json_t *update = tba_svr_payload(request);
     if (json_type(update) != JSON_OBJECT) {
         json_free(update);
-        return tba_svr_json(response, 400, tba_json_error("State payload must be an object."));
+        return tba_svr_protobuf(response, 400, tba_json_error("State payload must be an object."));
     }
     bool ok = tba_app_save(server->app, update);
     json_free(update);
     json_t *result = ok ? json_new_object() : tba_json_error("Could not save the worksheet state.");
     if (ok)
         tba_json_flag(result, "ok", true);
-    return tba_svr_json(response, ok ? 200 : 500, result);
+    return tba_svr_protobuf(response, ok ? 200 : 500, result);
 }
 
 static bool tba_svr_columns(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
     (void)server;
-    const string_t *target = websrv_request_target(request);
-    string_offset_t offset = string_find(target, "?");
-    string_t *query = offset < 0 ? string_new() : string_substr(target, (size_t)offset + 1, string_byte_length(target));
-    json_t *params = query ? tba_http_form(query) : NULL;
+    json_t *params = tba_svr_payload(request);
     tba_series_t *series = params ? tba_series_open(tba_json_text(params, "path"), tba_json_text(params, "date_column")) : NULL;
     json_t *result = series ? tba_series_details(series, tba_json_text(params, "value_column"),
                                                 tba_json_text(params, "selected_columns")) : NULL;
@@ -110,8 +149,7 @@ static bool tba_svr_columns(const websrv_request_t *request, websrv_response_t *
     }
     tba_series_free(series);
     json_free(params);
-    string_free(query);
-    return tba_svr_json(response, ok ? 200 : 400, result);
+    return tba_svr_protobuf(response, ok ? 200 : 400, result);
 }
 
 static bool tba_svr_upload(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
@@ -137,7 +175,7 @@ static bool tba_svr_upload(const websrv_request_t *request, websrv_response_t *r
     string_free(filename);
     string_free(text);
     string_free(path);
-    return tba_svr_json(response, ok ? 200 : 400, result);
+    return tba_svr_protobuf(response, ok ? 200 : 400, result);
 }
 
 static json_t *tba_svr_run(tba_server_t *server, const json_t *payload)
@@ -151,40 +189,23 @@ static json_t *tba_svr_run(tba_server_t *server, const json_t *payload)
 
 static bool tba_svr_forecast(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    json_t *payload = websrv_request_json(request);
+    json_t *payload = tba_svr_payload(request);
     bool valid = json_type(payload) == JSON_OBJECT;
     json_t *result = tba_svr_run(server, payload);
     json_free(payload);
-    return tba_svr_json(response, !valid ? 400 : tba_json_bool(result, "ok") ? 200 : 422, result);
-}
-
-static bool tba_svr_forecast_form(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
-{
-    string_t *text = websrv_request_text(request);
-    json_t *payload = text ? tba_http_form(text) : NULL;
-    json_t *result = tba_svr_run(server, payload);
-    if (result)
-        tba_json_string(result, "kind", "to-be-announced-forecast-result");
-    string_t *data = result ? tba_text_script(result) : NULL;
-    string_t *page = data ? string_sprintf("<!doctype html><html><body><script>"
-        "window.parent.postMessage(%S,location.origin);</script></body></html>", data) : NULL;
-    json_free(result);
-    json_free(payload);
-    string_free(data);
-    string_free(text);
-    return tba_svr_text(response, 200, "text/html; charset=utf-8", page);
+    return tba_svr_protobuf(response, !valid ? 400 : tba_json_bool(result, "ok") ? 200 : 422, result);
 }
 
 static bool tba_svr_mobile_get(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
-    return tba_svr_json(response, 200, tba_svr_mobile(request, server));
+    return tba_svr_protobuf(response, 200, tba_svr_mobile(request, server));
 }
 
 static bool tba_svr_funnel(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
 {
     (void)request;
     (void)server;
-    return tba_svr_json(response, 410, tba_json_error("Public access switching is disabled in To-Be-Announced Lab."));
+    return tba_svr_protobuf(response, 410, tba_json_error("Public access switching is disabled in To-Be-Announced Lab."));
 }
 
 static bool tba_svr_download(const websrv_request_t *request, websrv_response_t *response, tba_server_t *server)
@@ -194,7 +215,7 @@ static bool tba_svr_download(const websrv_request_t *request, websrv_response_t 
     const char *data = tba_json_text(result, summary ? "summary_text" : "forecast_csv");
     bool ok;
     if (!*data)
-        ok = tba_svr_json(response, 404, tba_json_error("No completed forecast is available yet."));
+        ok = tba_svr_protobuf(response, 404, tba_json_error("No completed forecast is available yet."));
     else {
         ok = tba_http_header_set(response, "Content-Disposition", summary ?
             "attachment; filename=\"to-be-announced-summary.txt\"" :
@@ -218,7 +239,10 @@ static bool tba_svr_manifest(const websrv_request_t *request, websrv_response_t 
         json_free(manifest);
         return false;
     }
-    return tba_svr_json(response, 200, manifest);
+    bool sent = websrv_response_status(response, 200) && websrv_response_json(response, manifest) &&
+                tba_http_header_set(response, "Content-Type", "application/manifest+json");
+    json_free(manifest);
+    return sent;
 }
 
 typedef struct {
@@ -236,14 +260,14 @@ struct tba_svr_context {
 static const tba_svr_route_t tba_svr_routes[] = {
     {"/", HTTP_GET, tba_svr_page, NULL, NULL}, {"/index.html", HTTP_GET, tba_svr_page, NULL, NULL},
     {"/state", HTTP_GET, tba_svr_state_get, NULL, NULL}, {"/state", HTTP_POST, tba_svr_state_post, NULL, NULL},
-    {"/target-columns", HTTP_GET, tba_svr_columns, NULL, NULL},
+    {"/target-columns", HTTP_POST, tba_svr_columns, NULL, NULL},
     {"/upload-target", HTTP_POST, tba_svr_upload, NULL, NULL}, {"/upload-xreg", HTTP_POST, tba_svr_upload, NULL, NULL},
-    {"/forecast", HTTP_POST, tba_svr_forecast, NULL, NULL}, {"/forecast-form", HTTP_POST, tba_svr_forecast_form, NULL, NULL},
+    {"/forecast", HTTP_POST, tba_svr_forecast, NULL, NULL},
     {"/mobile-access", HTTP_GET, tba_svr_mobile_get, NULL, NULL}, {"/funnel-toggle", HTTP_POST, tba_svr_funnel, NULL, NULL},
     {"/download-summary", HTTP_GET, tba_svr_download, NULL, NULL}, {"/download-forecast", HTTP_GET, tba_svr_download, NULL, NULL},
     {"/manifest.webmanifest", HTTP_GET, tba_svr_manifest, NULL, NULL},
+    {"/wasm/tba_browser.wasm", HTTP_GET, tba_svr_wasm, NULL, NULL},
     {"/index.css", HTTP_GET, NULL, "index.css", "text/css; charset=utf-8"},
-    {"/js/app.js", HTTP_GET, NULL, "js/app.js", "text/javascript; charset=utf-8"},
     {"/js/transport.js", HTTP_GET, NULL, "js/transport.js", "text/javascript; charset=utf-8"},
     {"/favicon.svg", HTTP_GET, NULL, NULL, "image/svg+xml"}
 };
@@ -258,14 +282,19 @@ static bool tba_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         !tba_http_header_set(response, "X-Frame-Options", "SAMEORIGIN"))
         return false;
     if (!tba_http_permitted(request))
-        return tba_svr_json(response, 403, tba_json_error("This forecasting Lab is private. Use this machine, WiFi or Tailscale."));
+        return tba_svr_protobuf(response, 403, tba_json_error("This forecasting Lab is private. Use this machine, WiFi or Tailscale."));
+    if (route->method == HTTP_POST && route->handler != tba_svr_upload) {
+        const string_t *type = tba_http_header(request, "Content-Type");
+        if (!type || !string_view_equals_literal(string_view_all(type), "application/x-protobuf"))
+            return tba_svr_protobuf(response, 415, tba_json_error("Use application/x-protobuf."));
+    }
     if (route->handler)
         return route->handler(request, response, server);
     string_t *asset = route->asset ? tba_asset_path(route->asset) : tba_path("packaging/linux/to-be-announced-lab.svg");
     string_t *text = asset ? tba_file_read(string_c_str(asset), 4u * 1024u * 1024u) : NULL;
     string_free(asset);
     return text ? tba_svr_text(response, 200, route->type, text) :
-                  tba_svr_json(response, 404, tba_json_error("Asset not found."));
+                  tba_svr_protobuf(response, 404, tba_json_error("Asset not found."));
 }
 
 /* Register the existing prefixed and root aliases on a bounded listener. */

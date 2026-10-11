@@ -183,7 +183,8 @@ $(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-too
 # ------------------------------------------------------------
 .PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-jurisdiction-db-deps check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
-all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS) lab-build native-tba-lab
+# Documented scratch examples are opt-in; tests compile their sources directly.
+all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) lab-build native-tba-lab
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -712,12 +713,10 @@ help:
 	@echo "  make DEBUG=1 test_<name>    Build and run a single test (e.g. make test_expression) (debug)"
 	@echo "  make DEBUG=1 memtest_<name> Build and run a single test under valgrind (debug)"
 	@echo "  make bench_<name>           Build and run a benchmark (e.g. make bench_integrator)"
-	@echo "  make scratch                Build all scratch binaries"
+	@echo "  make scratch                Build optional standalone examples (not built by all)"
 	@echo "  make mars_lab               Build and run the Lab expression worker"
-	@echo "  make to-be-announced_lab              Build and run scratch/to-be-announced_lab.c"
 	@echo "  make lab-workers            Build the server with all built-in calculation modes"
 	@echo "  make mars_lab ARGS='...'     Run the server's built-in expression mode"
-	@echo "  make scratch/to-be-announced_lab      Build scratch/to-be-announced_lab.c"
 	@echo "  make mars-lab               Launch the local MARS Lab"
 	@echo "  make mars-lab-stop          Stop the local MARS Lab"
 	@echo "  make mars-lab-restart       Stop and relaunch the local MARS Lab"

@@ -4,7 +4,8 @@
  *
  * Uses independent private fit inputs and argument vectors, with a 60-second
  * limit per model. Fit copies are removed on every exit path; uploaded originals
- * remain untouched. The existing worker continues to own mathematical fitting.
+ * remain untouched. The server's built-in worker owns mathematical fitting and
+ * publishes a private Protobuf result; no scratch console application is used.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -13,6 +14,10 @@
 #include "lab_process.h"
 #include "tba_forecast.h"
 #include "tba_series.h"
+
+#ifndef TBA_SERVER_PATH
+#define TBA_SERVER_PATH "tools/to_be_announced_lab/build/release/to_be_announced_lab"
+#endif
 
 static const char *const tba_forecast_tokens[] = {"regression", "arima", "arimax", "sarima", "sarimax", "auto-arima"};
 static const char *const tba_forecast_labels[] = {"Regression", "ARIMA", "ARIMAX", "SARIMA", "SARIMAX", "Auto-ARIMA"};
@@ -101,6 +106,7 @@ static json_t *tba_forecast_one(tba_app_t *app, const json_t *state, const char 
     tba_series_t *target = NULL, *drivers = NULL;
     string_t *target_fit = NULL, *driver_fit = NULL, *note = NULL, *fit_csv = NULL;
     string_t *driver_csv = NULL, *driver_note = NULL, *output = NULL, *horizon_text = NULL;
+    string_t *worker_result = NULL;
     const char *error = "The selected target CSV or date column could not be read.";
     target = tba_series_open(tba_json_text(state, "target_path"), tba_json_text(state, "target_date_column"));
     if (!target)
@@ -160,7 +166,11 @@ static json_t *tba_forecast_one(tba_app_t *app, const json_t *state, const char 
     error = "Could not prepare private forecast input copies.";
     if (!target_fit || !horizon_text || (drivers && !driver_fit))
         goto done;
-    const char *argv[] = {tba_app_binary(app), "--target", string_c_str(target_fit),
+    worker_result = string_sprintf("%S.result.pb", target_fit);
+    if (!worker_result)
+        goto done;
+    const char *argv[] = {TBA_SERVER_PATH, "--forecast-worker", string_c_str(worker_result),
+        "--target", string_c_str(target_fit),
         "--target-date-column", tba_json_text(meta, "date_column"),
         "--target-value-column", tba_json_text(state, "target_value_column"),
         "--xreg", driver_fit ? string_c_str(driver_fit) : "", "--xreg-date-column", tba_json_text(state, "xreg_date_column"),
@@ -174,7 +184,7 @@ static json_t *tba_forecast_one(tba_app_t *app, const json_t *state, const char 
     error = "The native forecast worker failed, timed out or exceeded its output limit.";
     if (!lab_proc_run(argv, NULL, 60000, 16u * 1024u * 1024u, &output, &status))
         goto done;
-    result = json_from_text(output);
+    result = tba_file_read_message(string_c_str(worker_result));
     if (json_type(result) != JSON_OBJECT || (status && tba_json_bool(result, "ok"))) {
         json_free(result);
         result = NULL;
@@ -224,6 +234,7 @@ done:
     string_free(horizon_text);
     tba_forecast_remove(target_fit);
     tba_forecast_remove(driver_fit);
+    tba_forecast_remove(worker_result);
     if (!result)
         result = tba_json_error(error);
     if (result)
@@ -264,7 +275,7 @@ json_t *tba_forecast_run(tba_app_t *app, const json_t *payload)
     }
     json_t *result = !results ? NULL : json_array_size(results) == 1 ? json_clone(json_array_get(results, 0)) :
                      tba_forecast_combine(results);
-    if (tba_json_bool(result, "ok") && !tba_app_result_save(app, result)) {
+    if (tba_json_bool(result, "ok") && (!tba_forecast_view(result) || !tba_app_result_save(app, result))) {
         json_free(result);
         result = tba_json_error("Forecast completed, but its downloadable result could not be saved.");
     }

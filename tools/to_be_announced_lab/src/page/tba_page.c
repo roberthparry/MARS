@@ -2,12 +2,16 @@
  * @file tba_page.c
  * @brief Safe initial HTML and client-configuration assembly.
  *
- * Native metadata populates the legacy workbench controls. All external strings
+ * Native metadata populates workbench controls. Bootstrap configuration uses the
+ * shared version-one Protobuf envelope (tools/mars_lab/proto/lab.proto), base64
+ * encoded for safe HTML embedding, without a JSON fallback. Other external strings
  * are escaped before insertion; the template engine consumes only original text.
  */
+#include <sodium.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "lab_wire.h"
 #include "tba_forecast.h"
 #include "tba_page.h"
 #include "tba_series.h"
@@ -65,6 +69,19 @@ static bool tba_page_owned(json_t *values, const char *key, string_t *text)
     bool ok = text && tba_json_string(values, key, string_c_str(text));
     string_free(text);
     return ok;
+}
+
+static string_t *tba_page_bootstrap(const json_t *config)
+{
+    array_t *bytes = lab_wire_encode(config);
+    size_t size = bytes ? array_size(bytes) : 0;
+    size_t capacity = sodium_base64_ENCODED_LEN(size, sodium_base64_VARIANT_ORIGINAL);
+    char *encoded = bytes ? malloc(capacity) : NULL;
+    string_t *text = encoded && sodium_bin2base64(encoded, capacity, array_get(bytes, 0), size,
+                                                 sodium_base64_VARIANT_ORIGINAL) ? string_new_with(encoded) : NULL;
+    free(encoded);
+    array_destroy(bytes);
+    return text;
 }
 
 static string_t *tba_page_options(const json_t *items, const char *chosen, bool dates)
@@ -225,7 +242,7 @@ string_t *tba_page_render(const tba_app_t *app, const json_t *mobile)
          tba_json_set(config, "target_meta_map", target_map) && tba_json_set(config, "xreg_columns", driver_columns) &&
          tba_json_set(config, "target_meta", target_meta) && tba_json_set(config, "xreg_meta", driver_meta) &&
          tba_json_set(config, "outliers", outliers) && tba_json_string(config, "control_token", "") &&
-         tba_page_owned(values, "CLIENT_CONFIG", tba_text_script(config)) &&
+         tba_page_owned(values, "CLIENT_CONFIG", tba_page_bootstrap(config)) &&
          tba_page_escaped(values, "BASE_PATH", tba_app_base(app)) &&
          tba_page_escaped(values, "MOBILE_TITLE", tba_json_text(mobile, "title")) &&
          tba_page_escaped(values, "MOBILE_HINT", tba_json_text(mobile, "hint")) &&

@@ -1,8 +1,8 @@
 /**
  * @file tba_app.c
- * @brief Forecasting configuration, locked legacy-state updates and private uploads.
+ * @brief Forecasting configuration, locked Protobuf state and private uploads.
  *
- * Saved state remains .to_be_announced_lab_state.json unless explicitly overridden.
+ * Saved state uses .to_be_announced_lab_state.pb unless explicitly overridden.
  * File locks serialise prefork workers; writes are atomically published. Uploads
  * use generated names, never client filenames, and do not overwrite existing data.
  */
@@ -14,12 +14,8 @@
 
 #include "tba_app.h"
 
-#ifndef TBA_WORKER
-#define TBA_WORKER "build/release/scratch/to-be-announced_lab"
-#endif
-
 struct tba_app {
-    string_t *base, *binary, *state_path, *upload_path, *result_path;
+    string_t *base, *state_path, *upload_path, *result_path;
     json_t *defaults;
 };
 
@@ -38,29 +34,23 @@ static bool tba_app_merge(json_t *state, const json_t *update)
 }
 
 /* Resolve application paths without creating or overwriting saved state. */
-tba_app_t *tba_app_new(const char *binary, const char *base)
+tba_app_t *tba_app_new(const char *base)
 {
     tba_app_t *app = calloc(1, sizeof *app);
     if (!app)
         return NULL;
     const char *state = getenv("MARS_LAB_STATE_FILE"), *uploads = getenv("TBA_LAB_UPLOAD_DIR");
-    const char *worker = binary && *binary ? binary : getenv("MARS_LAB_BINARY");
     const char *prefix = base ? base : getenv("MARS_LAB_PUBLIC_PATH");
     if (!prefix)
         prefix = "/to-be-announced";
     app->base = string_new_with(!strcmp(prefix, "/") ? "" : prefix);
-    app->binary = tba_path(worker && *worker ? worker : TBA_WORKER);
-    app->state_path = tba_path(state && *state ? state : ".to_be_announced_lab_state.json");
+    app->state_path = tba_path(state && *state ? state : ".to_be_announced_lab_state.pb");
     app->upload_path = tba_path(uploads && *uploads ? uploads : ".to_be_announced_uploads");
-    app->result_path = app->upload_path ? string_sprintf("%S/latest_result.json", app->upload_path) : NULL;
-    string_t *defaults_path = tba_asset_path("defaults.json");
-    string_t *text = defaults_path ? tba_file_read(string_c_str(defaults_path), 65536) : NULL;
-    app->defaults = text ? json_from_text(text) : NULL;
-    string_free(text);
-    string_free(defaults_path);
+    app->result_path = app->upload_path ? string_sprintf("%S/latest_result.pb", app->upload_path) : NULL;
+    app->defaults = tba_app_defaults();
     bool prefix_ok = app->base && (!*prefix || prefix[0] == '/') && string_find(app->base, "..") < 0 &&
                      string_find(app->base, "?") < 0 && string_find(app->base, "#") < 0;
-    if (!prefix_ok || !app->binary || !app->state_path || !app->upload_path || !app->result_path ||
+    if (!prefix_ok || !app->state_path || !app->upload_path || !app->result_path ||
         json_type(app->defaults) != JSON_OBJECT) {
         tba_app_free(app);
         return NULL;
@@ -73,7 +63,6 @@ void tba_app_free(tba_app_t *app)
 {
     if (app) {
         string_free(app->base);
-        string_free(app->binary);
         string_free(app->state_path);
         string_free(app->upload_path);
         string_free(app->result_path);
@@ -88,26 +77,18 @@ const char *tba_app_base(const tba_app_t *app)
     return app ? string_c_str(app->base) : "";
 }
 
-/* Borrow the forecast worker path. */
-const char *tba_app_binary(const tba_app_t *app)
-{
-    return app ? string_c_str(app->binary) : "";
-}
-
 /* Load only recognised saved scalar settings over packaged defaults. */
 json_t *tba_app_state(const tba_app_t *app)
 {
     if (!app)
         return NULL;
     json_t *state = json_clone(app->defaults);
-    string_t *text = tba_file_read(string_c_str(app->state_path), 1024 * 1024);
-    json_t *saved = text ? json_from_text(text) : NULL;
+    json_t *saved = tba_file_read_message(string_c_str(app->state_path));
     if (json_type(saved) == JSON_OBJECT && !tba_app_merge(state, saved)) {
         json_free(state);
         state = NULL;
     }
     json_free(saved);
-    string_free(text);
     return state;
 }
 
@@ -118,13 +99,11 @@ bool tba_app_save(const tba_app_t *app, const json_t *update)
         return false;
     string_t *path = string_sprintf("%S.lock", app->state_path);
     file_t *lock = path ? file_new(path) : NULL;
-    bool ok = lock && file_open(lock, FILE_MODE_OPEN_OR_CREATE, FILE_ACCESS_READ_WRITE) && file_chmod(lock, 0600) &&
+    bool ok = lock && tba_file_open_private(lock, FILE_MODE_OPEN_OR_CREATE, FILE_ACCESS_READ_WRITE) &&
               file_lock(lock, true, true);
     json_t *state = ok ? tba_app_state(app) : NULL;
     ok = ok && state && tba_app_merge(state, update);
-    string_t *text = ok ? json_to_string_pretty(state, 2) : NULL;
-    ok = ok && text && tba_file_publish(string_c_str(app->state_path), text);
-    string_free(text);
+    ok = ok && tba_file_publish_message(string_c_str(app->state_path), state);
     json_free(state);
     file_free(lock);
     string_free(path);
@@ -150,9 +129,9 @@ string_t *tba_app_upload(const tba_app_t *app, const string_t *text)
     string_t *path = string_sprintf("%S/upload-%lld-%ld-%ld.csv", app->upload_path, (long long)now.tv_sec, now.tv_nsec,
                                     (long)getpid());
     file_t *file = path ? file_new(path) : NULL;
-    bool created = file && file_open(file, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
+    bool created = file && tba_file_open_private(file, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     bool ok =
-        created && file_chmod(file, 0600) && file_write_text(file, text) && file_sync(file, false) && file_close(file);
+        created && file_write_text(file, text) && file_sync(file, false) && file_close(file);
     if (created && !ok) {
         file_close(file);
         file_delete(file);
@@ -168,17 +147,12 @@ string_t *tba_app_upload(const tba_app_t *app, const string_t *text)
 /* Retain successful results across prefork request workers. */
 bool tba_app_result_save(const tba_app_t *app, const json_t *result)
 {
-    string_t *text = app && tba_json_bool(result, "ok") ? json_to_string(result) : NULL;
-    bool ok = text && tba_app_upload_directory(app) && tba_file_publish(string_c_str(app->result_path), text);
-    string_free(text);
-    return ok;
+    return app && tba_json_bool(result, "ok") && tba_app_upload_directory(app) &&
+           tba_file_publish_message(string_c_str(app->result_path), result);
 }
 
 /* Read the last complete published result. */
 json_t *tba_app_result(const tba_app_t *app)
 {
-    string_t *text = app ? tba_file_read(string_c_str(app->result_path), 32u * 1024u * 1024u) : NULL;
-    json_t *result = text ? json_from_text(text) : NULL;
-    string_free(text);
-    return result;
+    return app ? tba_file_read_message(string_c_str(app->result_path)) : NULL;
 }

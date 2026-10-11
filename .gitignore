@@ -84,6 +84,8 @@ tools/*_state_*.json
 .codex
 .to_be_announced_lab_state.json
 .to_be_announced_lab_state.json.lock
+.to_be_announced_lab_state.pb
+.to_be_announced_lab_state.pb.lock
 .to_be_announced_uploads/
 
 test_data/

@@ -49,6 +49,11 @@ scratch programs, benchmarks and test executables. The `native-tools` target
 groups this bootstrap stage. Explicit order-only dependencies preserve this
 ordering with parallel Make without causing unnecessary rebuilds.
 
+Standalone examples under `scratch/` are optional: normal `make`, `make release`
+and `make debug` do not build their executables. Use `make scratch` to build all
+of them, or `make scratch/<name>` to build one. Their sources remain part of the
+documentation regression tests, which compile and exercise the examples directly.
+
 ### Compiler and libraries
 
 Build tools:

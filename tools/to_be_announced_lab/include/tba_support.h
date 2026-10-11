@@ -34,14 +34,33 @@ json_t *tba_json_error(const char *message);
 bool tba_text_number(const string_t *text, double *value);
 /** @brief Escape HTML text/attributes. @param text Borrowed text. @return Owned string, or NULL. */
 string_t *tba_text_html(const char *text);
-/** @brief Escape JSON for a script data block. @param value Borrowed JSON. @return Owned string, or NULL. */
-string_t *tba_text_script(const json_t *value);
+/**
+ * @brief Open private storage in a single-threaded request worker.
+ * @param file Borrowed closed file handle.
+ * @param mode CREATE_NEW for exclusive creation or OPEN_OR_CREATE for a lock file.
+ * @param access Requested read/write access.
+ * @return Success; the caller owns the resulting open handle. Restores the process umask before returning.
+ */
+bool tba_file_open_private(file_t *file, file_mode_t mode, file_access_t access);
 /** @brief Read a bounded regular file. @param path Borrowed path. @param limit Byte limit. @return Owned text, or NULL. */
 string_t *tba_file_read(const char *path, size_t limit);
 /** @brief Resolve an asset below this tool. @param name Relative asset name. @return Owned path, or NULL. */
 string_t *tba_asset_path(const char *name);
-/** @brief Atomically publish text, mode 0600. @param path Destination. @param text Borrowed text. @return Success. */
-bool tba_file_publish(const char *path, const string_t *text);
+/**
+ * @brief Read a bounded, version-one Protobuf object with no JSON fallback.
+ * @param path Borrowed regular-file path.
+ * @return Owned value tree, or NULL for missing, malformed or oversized data; release with json_free.
+ */
+json_t *tba_file_read_message(const char *path);
+
+/**
+ * @brief Atomically publish a Protobuf object with mode 0600.
+ * @param path Borrowed destination path; its parent must exist.
+ * @param value Borrowed object tree, subject to the shared 4 MiB Protobuf limits.
+ * @return Success. Encoding failure leaves any existing destination unchanged.
+ */
+bool tba_file_publish_message(const char *path, const json_t *value);
+
 /** @brief Resolve a repository path without shell expansion. @param path Borrowed path. @return Owned absolute path. */
 string_t *tba_path(const char *path);
 #endif

@@ -2,22 +2,28 @@
  * @file tba_app.h
  * @brief Opaque application configuration and private persistent storage.
  *
- * Owns defaults and resolved paths for a forecasting server. State updates are
- * locked and atomic; uploads and result files are private. Existing legacy state
- * keys and repository-relative CSV paths are retained. Objects are process-local.
+ * Owns compiled defaults and resolved paths for a forecasting server. State and
+ * result files use Protobuf; updates are locked and atomic. No JSON configuration
+ * or compatibility loader is used. Objects are process-local. The json_t type
+ * represents in-memory values only, not a JSON persistence format.
  */
 #ifndef TBA_APP_H
 #define TBA_APP_H
 #include "tba_support.h"
 typedef struct tba_app tba_app_t;
-/** @brief Configure a Lab. @param binary Optional worker override. @param base Optional URL prefix. @return Owned app or NULL. */
-tba_app_t *tba_app_new(const char *binary, const char *base);
+
+/**
+ * @brief Create the compiled worksheet defaults without file I/O.
+ * @return Independent caller-owned value tree, or NULL on allocation failure; release with json_free.
+ */
+json_t *tba_app_defaults(void);
+
+/** @brief Configure a Lab. @param base Optional URL prefix. @return Owned app or NULL. */
+tba_app_t *tba_app_new(const char *base);
 /** @brief Release configuration. @param app Owned app; NULL is safe. */
 void tba_app_free(tba_app_t *app);
 /** @brief Borrow the URL prefix. @param app App. @return Stable string. */
 const char *tba_app_base(const tba_app_t *app);
-/** @brief Borrow the worker path. @param app App. @return Stable string. */
-const char *tba_app_binary(const tba_app_t *app);
 /** @brief Load defaults overlaid by saved state. @param app App. @return Owned object or NULL. */
 json_t *tba_app_state(const tba_app_t *app);
 /** @brief Atomically merge recognised settings. @param app App. @param update Borrowed object. @return Success. */

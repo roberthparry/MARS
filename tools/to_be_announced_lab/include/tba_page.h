@@ -4,7 +4,7 @@
  *
  * Combines saved settings with native CSV metadata. Template substitutions are
  * single-pass: user data can never introduce further replacement tokens. Browser
- * assets are separate files and receive initial state in an escaped JSON block.
+ * assets are separate files and receive initial state as base64-encoded Protobuf.
  */
 #ifndef TBA_PAGE_H
 #define TBA_PAGE_H

@@ -18,6 +18,7 @@
 
 #include "lab_process.h"
 #include "tba_server.h"
+#include "tba_worker.h"
 
 extern char **environ;
 static volatile sig_atomic_t tba_main_stopping;
@@ -60,7 +61,9 @@ static void tba_main_browser(const char *browser, const char *url)
 /* Launch the native workbench without an interpreter or shell command construction. */
 int main(int argc, char **argv)
 {
-    const char *host = "::", *browser = "", *binary = NULL, *base = NULL;
+    if (argc >= 3 && !strcmp(argv[1], "--forecast-worker"))
+        return tba_worker_main(argc - 2, argv + 2, argv[2]);
+    const char *host = "::", *browser = "", *base = NULL;
     bool open_browser = true;
     uint16_t port = 8766;
     for (int i = 1; i < argc; ++i) {
@@ -70,7 +73,7 @@ int main(int argc, char **argv)
         }
         if (!strcmp(argv[i], "--help")) {
             string_printf("To-Be-Announced Lab (native C)\n"
-                          "Options: --host ADDRESS --port PORT --no-browser --browser PROGRAM --binary PATH --base-path PATH\n");
+                          "Options: --host ADDRESS --port PORT --no-browser --browser PROGRAM --base-path PATH\n");
             return 0;
         }
         const char *option = argv[i];
@@ -80,7 +83,6 @@ int main(int argc, char **argv)
         }
         if (!strcmp(option, "--host")) host = argv[i];
         else if (!strcmp(option, "--browser")) browser = argv[i];
-        else if (!strcmp(option, "--binary")) binary = argv[i];
         else if (!strcmp(option, "--base-path")) base = argv[i];
         else if (!strcmp(option, "--port")) {
             string_t *text = string_new_with(argv[i]);
@@ -99,7 +101,7 @@ int main(int argc, char **argv)
     }
     if (setenv("MARS_LAB_BIND_HOST", host, 1))
         return 1;
-    tba_app_t *app = tba_app_new(binary, base);
+    tba_app_t *app = tba_app_new(base);
     tba_server_t *server = app ? tba_svr_new(app, host, port) : NULL;
     if (!server) {
         string_fprintf(stderr, "Could not start the native forecasting Lab: %s\n", strerror(errno));

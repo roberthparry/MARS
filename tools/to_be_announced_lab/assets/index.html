@@ -38,7 +38,7 @@
         </div>
       </div>
       <div class="hero-badges">
-        <span class="badge">Forecasting-first scratch app</span>
+        <span class="badge">Forecasting workspace</span>
         <span class="badge">Phone-ready with QR access</span>
         <span class="badge">Private by default</span>
         <span class="badge">Suggested settings available</span>
@@ -54,7 +54,7 @@
           </div>
         </div>
         <div class="panel-body">
-          <form id="forecast-form" novalidate action="__BASE_PATH__/forecast-form" method="post" target="forecast-transport" onsubmit="return window.__to_be_announcedPrepareForecastSubmit ? window.__to_be_announcedPrepareForecastSubmit() : true;">
+          <form id="forecast-form" novalidate>
             <input type="hidden" name="target_display_name" value="__TARGET_DISPLAY_NAME__">
             <input type="hidden" name="xreg_display_name" value="__XREG_DISPLAY_NAME__">
             <div class="grid-2">
@@ -439,11 +439,7 @@
 
   </main>
 
-  <iframe name="forecast-transport" title="forecast transport" hidden></iframe>
-
-  <script defer src="__BASE_PATH__/js/transport.js"></script>
-
-  <script id="tba-config" type="application/json">__CLIENT_CONFIG__</script>
-  <script defer src="__BASE_PATH__/js/app.js"></script>
+  <script id="tba-config" type="application/x-protobuf" data-base="__BASE_PATH__">__CLIENT_CONFIG__</script>
+  <script type="module" src="__BASE_PATH__/js/transport.js"></script>
 </body>
 </html>

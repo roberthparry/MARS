@@ -7,9 +7,11 @@
  */
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "lab_wire.h"
 #include "tba_support.h"
 
 #ifndef TBA_ROOT
@@ -71,16 +73,59 @@ string_t *tba_file_read(const char *path, size_t limit)
     return text;
 }
 
-/* Publish a complete private state file without truncating the existing one. */
-bool tba_file_publish(const char *path, const string_t *text)
+/* Workers are single-threaded: protect creation itself, not only a later chmod. */
+bool tba_file_open_private(file_t *file, file_mode_t mode, file_access_t access)
 {
+    if (!file || (mode != FILE_MODE_CREATE_NEW && mode != FILE_MODE_OPEN_OR_CREATE))
+        return false;
+    if (mode == FILE_MODE_OPEN_OR_CREATE && file_exists(file) && !file_chmod(file, 0600))
+        return false;
+    mode_t previous = umask(0077);
+    bool opened = file_open(file, mode, access);
+    umask(previous);
+    return opened;
+}
+
+/* Bound the open-file read, including concurrent growth, before decoding any values. */
+json_t *tba_file_read_message(const char *path)
+{
+    const size_t limit = 4u * 1024u * 1024u;
+    file_t *file = file_new_cstr(path);
+    bool ok = file && file_open_read(file);
+    unsigned char *buffer = ok ? malloc(limit + 1) : NULL;
+    size_t size = 0, count = 0;
+    ok = ok && buffer;
+    while (ok) {
+        ok = file_read(file, buffer + size, limit + 1 - size, &count);
+        if (!ok || !count)
+            break;
+        size += count;
+        if (size > limit) {
+            errno = EFBIG;
+            ok = false;
+        }
+    }
+    json_t *result = ok ? lab_wire_decode(buffer, size) : NULL;
+    free(buffer);
+    file_free(file);
+    return result;
+}
+
+/* Encode before opening a staging file; publish only after a complete private write. */
+bool tba_file_publish_message(const char *path, const json_t *value)
+{
+    array_t *bytes = path ? lab_wire_encode(value) : NULL;
+    if (!bytes)
+        return false;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     string_t *temporary = string_sprintf("%s.%ld.%ld.tmp", path, (long)getpid(), now.tv_nsec);
     file_t *stage = temporary ? file_new(temporary) : NULL;
     file_t *destination = file_new_cstr(path);
-    bool created = stage && file_open(stage, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
-    bool ok = created && destination && file_chmod(stage, 0600) && file_write_text(stage, text) &&
+    bool created = stage && tba_file_open_private(stage, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
+    size_t written = 0;
+    bool ok = created && destination && file_write(stage, array_get(bytes, 0), array_size(bytes), &written) &&
+              written == array_size(bytes) &&
               file_sync(stage, false) && file_close(stage) && file_move(stage, destination, true);
     if (created && !ok) {
         file_close(stage);
@@ -89,5 +134,6 @@ bool tba_file_publish(const char *path, const string_t *text)
     file_free(stage);
     file_free(destination);
     string_free(temporary);
+    array_destroy(bytes);
     return ok;
 }

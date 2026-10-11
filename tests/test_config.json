@@ -3358,10 +3358,22 @@
       "test_lab_wire_schema": true
     }
   },
+  "tools/to_be_announced_lab/tests/browser/test_tba_browser.c": {
+    "tests": {
+      "enabled": true,
+      "test_tba_browser": true
+    }
+  },
   "tools/to_be_announced_lab/tests/test_tba_native.c": {
     "tests": {
       "enabled": true,
-      "test_tba_native_routes": true
+      "test_tba_browser_policy": true,
+      "test_tba_chart": true,
+      "test_tba_defaults": true,
+      "test_tba_forecast_view": true,
+      "test_tba_native_routes": true,
+      "test_tba_protobuf_storage": true,
+      "test_tba_worker": true
     }
   }
 }

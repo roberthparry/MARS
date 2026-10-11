@@ -1,8 +1,8 @@
 /**
- * @file tba_http_form.c
- * @brief Bounded URL-encoded form and multipart CSV upload decoding.
+ * @file tba_http_upload.c
+ * @brief Bounded multipart CSV upload decoding.
  *
- * Parses using MARS string cursors and preserves repeated checkbox selections.
+ * Parses multipart upload headers using MARS string cursors.
  * Multipart requests require exactly one named file part and a closing boundary.
  * Uploaded filenames are display metadata only; storage generates its own names.
  */
@@ -11,89 +11,6 @@
 
 #include "tba_http.h"
 
-static int tba_http_hex(unsigned char ch)
-{
-    if (ch >= '0' && ch <= '9') return ch - '0';
-    if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
-    if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
-    return -1;
-}
-
-static string_t *tba_http_decode(const string_t *source)
-{
-    size_t size = string_byte_length(source), used = 0;
-    char *bytes = malloc(size + 1);
-    string_cursor_t *cursor = string_cursor_new(source);
-    bool ok = bytes && cursor;
-    while (ok && !string_cursor_done(cursor)) {
-        unsigned char ch;
-        ok = string_cursor_peek_ascii(cursor, &ch) && ch != 0;
-        if (!ok)
-            break;
-        string_cursor_next(cursor);
-        if (ch == '%') {
-            unsigned char a, b;
-            ok = string_cursor_peek_ascii(cursor, &a);
-            string_cursor_next(cursor);
-            ok = ok && string_cursor_peek_ascii(cursor, &b);
-            string_cursor_next(cursor);
-            ok = ok && tba_http_hex(a) >= 0 && tba_http_hex(b) >= 0;
-            if (!ok)
-                break;
-            ch = (unsigned char)(tba_http_hex(a) * 16 + tba_http_hex(b));
-        } else if (ch == '+')
-            ch = ' ';
-        ok = ch != 0;
-        bytes[used++] = (char)ch;
-    }
-    string_t *result = ok ? string_new() : NULL;
-    if (result && string_append_utf8_exact(result, bytes, used)) {
-        string_free(result);
-        result = NULL;
-    }
-    string_cursor_free(cursor);
-    free(bytes);
-    return result;
-}
-
-/* Decode form fields, including repeated model/driver/outlier checkbox values. */
-json_t *tba_http_form(const string_t *text)
-{
-    if (!text || string_byte_length(text) > 1024 * 1024)
-        return NULL;
-    size_t count = 0;
-    string_t **fields = string_split(text, "&", &count);
-    json_t *result = count <= 1024 ? json_new_object() : NULL;
-    for (size_t i = 0; result && i < count; ++i) {
-        string_offset_t equal = string_find(fields[i], "=");
-        string_t *raw_key = string_substr(fields[i], 0, equal < 0 ? string_byte_length(fields[i]) : (size_t)equal);
-        string_t *raw_value = equal < 0 ? string_new() : string_substr(fields[i], (size_t)equal + 1, string_byte_length(fields[i]));
-        string_t *key = raw_key ? tba_http_decode(raw_key) : NULL, *value = raw_value ? tba_http_decode(raw_value) : NULL;
-        bool ok = key && value;
-        const char *name = key ? string_c_str(key) : "";
-        const char *group = !strcmp(name, "xreg-column-choice") ? "xreg_columns" :
-                            !strcmp(name, "outlier-choice") ? "outlier_dates" :
-                            !strcmp(name, "model-choice") ? "models" : NULL;
-        string_t *combined = NULL;
-        if (group) {
-            const char *previous = tba_json_text(result, group);
-            combined = string_sprintf("%s%s%S", previous, *previous ? ", " : "", value);
-            ok = ok && combined && tba_json_string(result, group, string_c_str(combined));
-        } else if (*name)
-            ok = ok && tba_json_string(result, name, string_c_str(value));
-        string_free(combined);
-        string_free(raw_key);
-        string_free(raw_value);
-        string_free(key);
-        string_free(value);
-        if (!ok) {
-            json_free(result);
-            result = NULL;
-        }
-    }
-    string_split_free(fields, count);
-    return result;
-}
 
 static string_t *tba_http_parameter(const string_t *header, const char *wanted)
 {

@@ -160,15 +160,3 @@ string_t *tba_text_html(const char *text)
     }
     return result;
 }
-
-/* Protect HTML script delimiters while preserving valid JSON. */
-string_t *tba_text_script(const json_t *value)
-{
-    string_t *text = json_to_string(value);
-    if (text && (string_replace(text, "<", "\\u003c") < 0 || string_replace(text, ">", "\\u003e") < 0 ||
-                 string_replace(text, "&", "\\u0026") < 0)) {
-        string_free(text);
-        return NULL;
-    }
-    return text;
-}
