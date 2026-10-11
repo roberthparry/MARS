@@ -5,7 +5,7 @@
  * Matches supported expression structures and evaluates their specialised integral forms. These fast paths
  * supplement numerical quadrature and must only accept structures whose mathematical assumptions are satisfied.
  *
- * This is part of integrator_t.h. Callers configure opaque integrator handles and inspect completion or error
+ * This is part of integrator-t.h. Callers configure opaque integrator handles and inspect completion or error
  * information rather than relying on a particular internal algorithm.
  */
 

@@ -7,12 +7,12 @@
  * precision-preserving arithmetic and normal numeric-scope ownership rather than separate numerical backends.
  *
  * Cylindrical series and larger special-function algorithms remain in dedicated implementation units. Public
- * declarations and caller-visible behaviour are unchanged in number_t.h.
+ * declarations and caller-visible behaviour are unchanged in number-t.h.
  */
 
 #include <limits.h>
 
-#include "number_t.h"
+#include "number-t.h"
 
 static number_t polynomial(number_t degree, number_t x, unsigned family)
 {

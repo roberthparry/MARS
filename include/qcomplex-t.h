@@ -1,5 +1,5 @@
 /**
- * @file qcomplex_t.h
+ * @file qcomplex-t.h
  * @brief Fixed double-double precision complex arithmetic.
  *
  * qcomplex_t represents a complex value using qfloat_t real and imaginary parts.
@@ -11,7 +11,7 @@
  * Values are passed by value. Precision is approximately 31-32 decimal digits in
  * the representation, not a universal accuracy guarantee for every operation.
  *
- * Use qfloat_t.h for the underlying real arithmetic and number_t.h for the common
+ * Use qfloat-t.h for the underlying real arithmetic and number-t.h for the common
  * MARS numeric interface, exact values or configurable multiprecision. Complex
  * functions follow their documented branch and domain conventions.
  */
@@ -22,7 +22,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 
 typedef struct _string_t string_t;
 

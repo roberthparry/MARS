@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "array_t.h"
+#include "file-t.h"
+#include "array-t.h"
 #include "test_harness.h"
 
 void test_file_explicit_follow_and_text_streams(void)

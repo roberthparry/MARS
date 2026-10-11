@@ -5,7 +5,7 @@
  * Implements dense element storage, growth, copy and cleanup callbacks, sorting and slice or stack operations. Use
  * the public opaque APIs to manage ordered collections without depending on arena layout.
  *
- * This implements the public array_t.h abstraction. Callers should use its opaque handles and documented clone,
+ * This implements the public array-t.h abstraction. Callers should use its opaque handles and documented clone,
  * destroy and borrowing rules rather than depend on the private arena layout.
  */
 
@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_t.h"
-#include "string_t.h"
+#include "array-t.h"
+#include "string-t.h"
 
 #define ARRAY_INIT_CAPACITY 8
 #define STACK_CHUNK_SIZE 32

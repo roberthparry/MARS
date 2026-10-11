@@ -19,8 +19,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "file_t.h"
-#include "array_t.h"
+#include "file-t.h"
+#include "array-t.h"
 #include "test_harness.h"
 
 /* Link-time fault injection is private to this test executable, never the library. */

@@ -10,8 +10,8 @@
  */
 
 #include "test_expr.h"
-#include "matrix_t.h"
-#include "qcomplex_t.h"
+#include "matrix-t.h"
+#include "qcomplex-t.h"
 
 static void test_modified_bessel_k_numeric_layers(void)
 {

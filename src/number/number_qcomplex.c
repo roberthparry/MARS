@@ -5,16 +5,16 @@
  * Adapts qcomplex_t construction and arithmetic to number_t dispatch and ownership. This preserves fixed extended
  * complex precision while exposing the common scalar API.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <stdlib.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Extract the complex payload through its original storage representation. */
 qcomplex_t number_inline_qcomplex(number_t number)

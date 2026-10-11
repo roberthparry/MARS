@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "regex_t.h"
+#include "file-t.h"
+#include "regex-t.h"
 #include "lab_process.h"
 #include "../src/internal/lab_evaluate_internal.h"
 #include "test_lab_math_support.h"

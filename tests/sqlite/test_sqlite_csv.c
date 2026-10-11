@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 #include "test_harness.h"
 #include "test_sqlite_csv.h"
 

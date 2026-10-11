@@ -2,7 +2,7 @@
 
 `webserver` provides a synchronous Linux HTTP listener using the `websrv_`
 prefix and opaque `websrv_t`, `websrv_request_t` and `websrv_response_t`
-handles. Include `webserver_t.h`. It uses Linux sockets and existing MARS
+handles. Include `webserver-t.h`. It uses Linux sockets and existing MARS
 modules; there is no additional library dependency.
 
 Use [http](http.md) to call services; use this module to implement them.
@@ -25,7 +25,7 @@ the socket peer address for access checks; it never trusts forwarded headers.
 
 Routes match the method and exact path before the query string. Paths and
 targets are not percent-decoded, normalised or mapped onto the filesystem.
-Methods use the shared `webmethod_t` enumeration from `webserver_t.h`: GET, POST, PUT, PATCH,
+Methods use the shared `webmethod_t` enumeration from `webserver-t.h`: GET, POST, PUT, PATCH,
 DELETE, HEAD and OPTIONS. Register HEAD explicitly; its response advertises
 the body length but sends no body. An unknown path returns 404; a known path
 with an unregistered method returns 405 with an Allow header. Re-registering
@@ -298,8 +298,8 @@ The source is also available as `scratch/webserver_hello.c`.
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "webserver_t.h"
-#include "http_t.h"
+#include "webserver-t.h"
+#include "http-t.h"
 
 static bool hello(const websrv_request_t *request, websrv_response_t *response, void *context)
 {

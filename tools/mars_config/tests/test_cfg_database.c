@@ -12,8 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "sqlite_t.h"
+#include "file-t.h"
+#include "sqlite-t.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
 #include "cfg_database_internal.h"

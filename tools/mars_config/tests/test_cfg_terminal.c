@@ -23,8 +23,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file_t.h"
-#include "sqlite_t.h"
+#include "file-t.h"
+#include "sqlite-t.h"
 #include "cfg_storage.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

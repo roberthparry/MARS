@@ -12,8 +12,8 @@
 #ifndef MARS_LAB_CALENDAR_H
 #define MARS_LAB_CALENDAR_H
 
-#include "json_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 /**
  * @brief Adapt a supported calendar route, returning a caller-owned JSON response.

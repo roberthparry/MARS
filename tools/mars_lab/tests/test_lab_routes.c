@@ -24,11 +24,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file_t.h"
-#include "http_t.h"
+#include "file-t.h"
+#include "http-t.h"
 #include "lab_server.h"
 #include "lab_wire.h"
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -346,7 +346,7 @@ static bool route_contracts(const char *directory)
     return ok;
 }
 
-/* Host is deliberately protected by http_t.h; send hostile headers only through this bounded socket fixture. */
+/* Host is deliberately protected by http-t.h; send hostile headers only through this bounded socket fixture. */
 static bool hostile_request(const char *host, const char *origin)
 {
     lab_server_t *server = lab_svr_new(NULL, 0, 5000);

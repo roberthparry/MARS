@@ -1,5 +1,5 @@
 /**
- * @file number_t.h
+ * @file number-t.h
  * @brief Generic numeric value cluster with by-value public handles.
  *
  * Use number_t as the common scalar type when arithmetic must combine exact values,
@@ -8,7 +8,7 @@
  * and textual presentation across its supported numeric representations.
  *
  * Choose this layer for general MARS numerical work and configurable multiprecision.
- * Use qfloat_t.h or qcomplex_t.h directly only when their fixed double-double precision
+ * Use qfloat-t.h or qcomplex-t.h directly only when their fixed double-double precision
  * is specifically required. Precision and exactness depend on the input
  * representation and the operation, rather than on the public handle's size.
  *
@@ -58,8 +58,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "qcomplex_t.h"
-#include "qfloat_t.h"
+#include "qcomplex-t.h"
+#include "qfloat-t.h"
 
 typedef struct _string_t string_t;
 

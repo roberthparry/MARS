@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /* Cursor lookahead and consumption. */
 bool expr_parse_cursor_at_identifier_boundary(const string_cursor_t *cursor, string_pos_t pos);

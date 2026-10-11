@@ -5,7 +5,7 @@
  * Recognises and processes supported zeta-equation cases within the equation solver. Keep these specialised
  * numerical and structural rules separate from general polynomial factorisation.
  *
- * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

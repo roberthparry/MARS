@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "lab_evaluate_internal.h"
 #include "lab_presentation_internal.h"
 #include "lab_syntax_internal.h"

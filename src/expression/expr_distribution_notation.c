@@ -5,7 +5,7 @@
  * Builds readable notation for distribution-valued transform results and their conditions. This presentation unit
  * keeps distribution semantics explicit rather than treating singular terms as ordinary numeric functions.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -16,7 +16,7 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Match one complete, explicitly grouped occurrence, not an identifier or term substring. */
 static const char *expr_distribution_group(const char *body, const char *operand)

@@ -1,5 +1,5 @@
 /**
- * @file protobuf_t.h
+ * @file protobuf-t.h
  * @brief Native Protocol Buffers wire-format messages and binary encoding.
  *
  * The opaque protobuf_t message stores ordered fields, including repeated and
@@ -8,7 +8,7 @@
  * message-size and field-count limits.
  *
  * Use this module to build or inspect binary service payloads, including messages
- * passed to the unary gRPC helpers in http_t.h. The application supplies knowledge of
+ * passed to the unary gRPC helpers in http-t.h. The application supplies knowledge of
  * field numbers, types and nested schemas; length-delimited bytes are not
  * automatically interpreted as text or submessages.
  *
@@ -24,7 +24,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "array_t.h"
+#include "array-t.h"
 
 /**
  * @brief Opaque ordered Protocol Buffers wire message; field meaning comes from the application's schema.

@@ -1,5 +1,5 @@
 /**
- * @file string_t.h
+ * @file string-t.h
  * @brief Dynamic text string type with Unicode-aware operations.
  *
  * Use string_t for MARS text storage, parsing, construction, searching and formatting

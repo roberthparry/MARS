@@ -5,7 +5,7 @@
  * Dispatches expression, function and TeX formatting and provides printing and persistence entry points. Recursive
  * rendering is delegated to style-specific files so public wrappers remain separate from notation details.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -29,10 +29,10 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression_t.h"
+#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static int expr_append_padding(string_t *out, int count)
 {

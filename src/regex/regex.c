@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "regex_t.h"
+#include "regex-t.h"
 #include "regex_native.h"
 
 struct _regex_t {

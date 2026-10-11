@@ -5,7 +5,7 @@
  * Matches hyperbolic power families and related analytic spectra, including odd pairs. These specialised rules
  * contribute formulas to the Fourier dispatcher with their parameter assumptions retained.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

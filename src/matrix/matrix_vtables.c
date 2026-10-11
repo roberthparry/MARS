@@ -5,7 +5,7 @@
  * Defines the operation tables connecting supported element kinds and storage layouts to their implementations.
  * This centralises dispatch so public callers do not need representation-specific switches.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

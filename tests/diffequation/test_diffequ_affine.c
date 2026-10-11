@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "diffequation_t.h"
+#include "diffequation-t.h"
 #include "test_harness.h"
 #include "test_diffequ_affine.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

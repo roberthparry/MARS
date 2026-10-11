@@ -5,7 +5,7 @@
  * Resolves redirect targets and compares origins before replaying permitted requests. This policy deliberately
  * excludes unsafe method replay and unrestricted cross-origin credential forwarding.
  *
- * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

@@ -5,7 +5,7 @@
  * Combines compatible terms and factors, merges radical quotients and rebuilds multiplication or division chains.
  * It supplies canonical algebraic structure to the simplifier and beautifier.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -19,7 +19,7 @@
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 extern expr_t *expr_simplify(const expr_t *expr);
 

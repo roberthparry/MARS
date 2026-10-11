@@ -11,7 +11,7 @@
 
 #include <stdbool.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /**
  * @brief Read and trim one line of at most 4096 bytes.

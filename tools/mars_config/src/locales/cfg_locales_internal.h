@@ -9,9 +9,9 @@
 #ifndef MARS_CONFIG_LOCALES_INTERNAL_H
 #define MARS_CONFIG_LOCALES_INTERNAL_H
 
-#include "file_t.h"
-#include "json_t.h"
-#include "string_t.h"
+#include "file-t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 /** Finite snapshot and expansion limits, checked before parsing or appending. */
 enum {

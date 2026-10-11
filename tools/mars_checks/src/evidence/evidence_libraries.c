@@ -3,7 +3,7 @@
  * @brief Dynamic dependency and Debian package evidence collection.
  *
  * Parses ldd records using native strings, resolves dependency links through
- * file_t.h, and hashes regular files. Package metadata is optional; failure to
+ * file-t.h, and hashes regular files. Package metadata is optional; failure to
  * hash a present copyright record or any required library aborts collection.
  */
 #include "evidence_private.h"

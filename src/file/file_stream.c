@@ -5,7 +5,7 @@
  * Owns paths and open streams and implements reading, writing, seeking, locking, truncation and synchronisation.
  * Other file units build on its state checks and error reporting rather than exposing native handles.
  *
- * This belongs to the Linux-only file_t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

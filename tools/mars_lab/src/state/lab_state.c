@@ -19,7 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "lab_page.h"
 #include "lab_state.h"
 

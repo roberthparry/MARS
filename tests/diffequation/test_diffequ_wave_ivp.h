@@ -1,7 +1,7 @@
 #ifndef TEST_DIFFEQU_WAVE_IVP_H
 #define TEST_DIFFEQU_WAVE_IVP_H
 
-#include "diffequation_t.h"
+#include "diffequation-t.h"
 
 /* Shared numerical residual check for wave-equation tests. */
 bool test_diffequ_wave_zero_at_samples(const expr_t *expr, const diffequ_t *de);

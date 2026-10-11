@@ -13,7 +13,7 @@ It is designed to sit directly on top of:
 
 ## Scope
 
-The initial API in [`include/timeseries_t.h`](../include/timeseries_t.h) is aimed
+The initial API in [`include/timeseries-t.h`](../include/timeseries-t.h) is aimed
 at practical forecasting workflows such as:
 
 - multiple regression
@@ -143,7 +143,7 @@ human-readable output.
 
 ## Notes
 
-- All public declarations are in `include/timeseries_t.h`.
+- All public declarations are in `include/timeseries-t.h`.
 - The header currently defines the intended stable public API surface.
 - Implementation can be staged behind this API without committing to all
   internal algorithms at once.

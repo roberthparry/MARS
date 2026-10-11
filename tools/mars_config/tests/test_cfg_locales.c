@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "sqlite_t.h"
-#include "json_t.h"
+#include "file-t.h"
+#include "sqlite-t.h"
+#include "json-t.h"
 #include "lab_process.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

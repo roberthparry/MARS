@@ -5,7 +5,7 @@
  * Applies supported scalar transforms, lag or lead shifts, differences and period aggregations. The output retains
  * time-series indexing rules rather than becoming an unlabelled numeric array.
  *
- * This is part of timeseries_t.h. Maintain the association between values, date indices and model metadata when
+ * This is part of timeseries-t.h. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

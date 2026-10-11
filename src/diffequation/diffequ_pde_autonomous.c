@@ -5,7 +5,7 @@
  * Recognises supported autonomous characteristic fields and constructs invariant solution forms. The general PDE
  * dispatcher calls this specialised path when the coefficient structure matches.
  *
- * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

@@ -9,7 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "file_t.h"
+#include "file-t.h"
 #include "test_timeseries.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

@@ -9,8 +9,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "array_t.h"
-#include "file_t.h"
+#include "array-t.h"
+#include "file-t.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
 #include "lab_forms.h"

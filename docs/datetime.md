@@ -5,7 +5,7 @@ astronomical and calendar-observance helpers.
 
 ## Source Organisation
 
-The public API remains in `include/datetime_t.h`. Implementation files under
+The public API remains in `include/datetime-t.h`. Implementation files under
 `src/datetime/` are grouped by responsibility:
 
 | File | Responsibility |
@@ -67,7 +67,7 @@ work without coupling it to one country's holiday law.
 
 ```c
 #include <stdio.h>
-#include "datetime_t.h"
+#include "datetime-t.h"
 
 int main(void) {
     int years[] = { 2020, 2021, 2022, 2023, 2024, 2025 };
@@ -108,7 +108,7 @@ Chinese New Year 2025: 2025-01-29
 ```c
 #include <stdlib.h>
 #include <stdio.h>
-#include "datetime_t.h"
+#include "datetime-t.h"
 
 int main(void) {
     /* 21 June 2026 at latitude 51.5 N, longitude -0.1 W (London), UTC+0. */
@@ -139,9 +139,9 @@ Moon phase: 2
 ## Example: Additional Calendar Views
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 #include <stdio.h>
-#include "datetime_t.h"
+#include "datetime-t.h"
 
 int main(void) {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
@@ -200,7 +200,7 @@ caller must free.
 
 ## API Reference
 
-All declarations are in `include/datetime_t.h`.
+All declarations are in `include/datetime-t.h`.
 
 ### Enumerations
 

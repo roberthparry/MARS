@@ -3,9 +3,9 @@
 
 #include <stddef.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #include "test_harness.h"
-#include "string_t.h"
+#include "string-t.h"
 
 const test_validity_contract_t *number_validity_contract_exact(void);
 

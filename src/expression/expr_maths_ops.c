@@ -6,7 +6,7 @@
  * constructors. It is the registration and construction layer rather than the numerical implementation of number_t
  * functions.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "expr_maths.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
 {

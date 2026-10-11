@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "cfg_calendar.h"
 #include "cfg_calendar_internal.h"
 #include "test_harness.h"

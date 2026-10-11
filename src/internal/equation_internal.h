@@ -3,7 +3,7 @@
  * @brief Controlled cross-module equation interface.
  *
  * Exposes the limited equation parsing, construction and solution facilities required by other native MARS
- * modules. Use equation_t.h first; this guarded interface is for implementation collaboration, not application or
+ * modules. Use equation-t.h first; this guarded interface is for implementation collaboration, not application or
  * installed public use.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
@@ -15,14 +15,14 @@
 
 #if !defined(MARS_SHARED_EQUATION_INTERNAL_ACCESS) &&                                                                  \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/equation_internal.h is private to the MARS implementation; include equation_t.h instead."
+#error "internal/equation_internal.h is private to the MARS implementation; include equation-t.h instead."
 #endif
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "equation_t.h"
-#include "number_t.h"
+#include "equation-t.h"
+#include "number-t.h"
 
 /* Binding probe for differential equations: undeclared calls are symbolic functions, not scalar products. */
 equation_t *equ_from_differential_text_internal(const string_t *text);

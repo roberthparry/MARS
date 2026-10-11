@@ -5,7 +5,7 @@
  * Converts local time to GMT and derives Delta T, terrestrial time and barycentric time values. This unit joins
  * civil time handling to the time scales required by calendar astronomy.
  *
- * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

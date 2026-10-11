@@ -7,7 +7,7 @@
  * Shared text escaping also serves Function syntax spans. Browser code installs
  * the resulting markup while CSS selects the available-width layout.
  */
-#include "string_t.h"
+#include "string-t.h"
 #include "lab_evaluate_internal.h"
 #include "lab_presentation_internal.h"
 #include "lab_syntax_internal.h"

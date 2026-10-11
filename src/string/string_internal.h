@@ -3,7 +3,7 @@
  * @brief Private UTF-8 string representation and helpers.
  *
  * Defines storage details, validation, normalisation and shared helpers used by string implementation units.
- * External callers should use string_t.h so mutation and Unicode invariants stay under module control.
+ * External callers should use string-t.h so mutation and Unicode invariants stay under module control.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,7 +14,7 @@
 
 #if !defined(MARS_STRING_INTERNAL_ACCESS) &&                                                                           \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "string_internal.h is private to the string module; include string_t.h instead."
+#error "string_internal.h is private to the string module; include string-t.h instead."
 #endif
 
 #include <stdint.h>
@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "string_view.h"
 
 /**

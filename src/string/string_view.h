@@ -3,7 +3,7 @@
  * @brief Private borrowed-view bridges and string operations.
  *
  * Declares internal view-based append, insert and byte-boundary helpers. Views borrow storage and do not expose
- * the string_t layout; public parsing should use the documented cursor and view interfaces in string_t.h.
+ * the string_t layout; public parsing should use the documented cursor and view interfaces in string-t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,7 +14,7 @@
 
 #include <stddef.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /* Raw byte bridges are for parsers that are still being migrated onto
    cursor operations. They do not expose string_t internals or view layout. */

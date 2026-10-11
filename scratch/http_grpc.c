@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "http_t.h"
-#include "protobuf_t.h"
+#include "http-t.h"
+#include "protobuf-t.h"
 
 int main(int argc, char **argv)
 {

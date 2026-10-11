@@ -5,7 +5,7 @@
  * Folds numeric factors, signs and compatible powers inside binding expressions. The binding simplifier calls
  * these helpers to preserve exact symbolic values consistently across output styles.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -21,7 +21,7 @@
 #include "expr_stringout_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static expr_binding_expr_t *binding_expr_fold_to_expr_owned(expr_binding_expr_t *expr, expr_binding_expr_t *folded);
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value);

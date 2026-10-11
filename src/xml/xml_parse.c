@@ -5,7 +5,7 @@
  * Consumes bounded UTF-8 chunks, builds trees or emits reader events and reports malformed input. Unsupported
  * external entities and document-type features are rejected rather than fetched.
  *
- * This is part of xml_t.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * This is part of xml-t.h's native implementation. Keep input bounded and reject unsupported external-entity
  * features; HTTP and SOAP transport belong to the HTTP module.
  */
 
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #define MARS_XML_INTERNAL_ACCESS
 #include "xml_internal.h"
-#include "file_t.h"
+#include "file-t.h"
 
 #include "xml_parse_private.h"
 

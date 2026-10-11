@@ -3,7 +3,7 @@
  * @brief Bounded terminal input and hidden secret confirmation support.
  *
  * Restores terminal echo before returning after ordinary input errors or handled
- * termination signals. Terminal interaction is separate from file_t.h disk I/O.
+ * termination signals. Terminal interaction is separate from file-t.h disk I/O.
  * Call only from the single-threaded installer before any worker is started.
  */
 #include <signal.h>

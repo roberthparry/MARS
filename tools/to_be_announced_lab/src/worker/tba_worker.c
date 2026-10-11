@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "tba_worker.h"
 #include "tba_worker_internal.h"
 

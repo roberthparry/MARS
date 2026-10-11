@@ -19,11 +19,11 @@
 #include <time.h>
 
 #include "test_harness.h"
-#include "expression_t.h"
-#include "integrator_t.h"
+#include "expression-t.h"
+#include "integrator-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_integrator_suite_setup(void);

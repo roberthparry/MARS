@@ -29,7 +29,7 @@ it does not duplicate or free the pointed-to strings.
 ```c
 #include <stdio.h>
 #include <string.h>
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 
 static size_t str_hash(const void *p) {
     const char *s = *(const char * const *)p;
@@ -80,7 +80,7 @@ stored copies on destruction or removal.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 
 struct item { char *name; int value; };
 
@@ -174,7 +174,7 @@ surface.
 
 ## API Reference
 
-All declarations are in `include/dictionary_t.h`.
+All declarations are in `include/dictionary-t.h`.
 
 ### Callback Types
 

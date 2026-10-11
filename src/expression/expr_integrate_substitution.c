@@ -5,7 +5,7 @@
  * Matches compositions whose derivative factors occur in the integrand and constructs the corresponding primitive.
  * The matcher verifies structural compatibility instead of substituting based on similar-looking text.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

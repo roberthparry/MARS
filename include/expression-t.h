@@ -1,5 +1,5 @@
 /**
- * @file expression_t.h
+ * @file expression-t.h
  * @brief Lazy, vtable-driven, reference-counted differentiable value type.
  *
  * This is MARS's symbolic mathematics layer: expr_t graphs represent constants,
@@ -42,8 +42,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 
 /** @brief Opaque reference-counted expression graph node. */
 typedef struct _expr_t expr_t;

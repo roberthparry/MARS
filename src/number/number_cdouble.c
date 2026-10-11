@@ -6,7 +6,7 @@
  * operations. Backend dispatch keeps this fixed precision distinct from double-double and multiprecision complex
  * values.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
@@ -15,10 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static double complex number_cdouble_value(const number_t *number)
 {

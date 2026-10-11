@@ -7,7 +7,7 @@
  * smaller magnitudes and impractically large integers use Unicode powers of ten.
  * Executable source, exact worker fields and transport numbers remain unchanged.
  */
-#include "string_t.h"
+#include "string-t.h"
 #include "lab_syntax_internal.h"
 
 /* Format a complete lexical number, preserving malformed or non-exponential tokens. */

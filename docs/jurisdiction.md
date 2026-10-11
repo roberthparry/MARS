@@ -40,7 +40,7 @@ The following complete example requires the installed jurisdiction database:
 #include <stdlib.h>
 #include <string.h>
 
-#include "jurisdiction_t.h"
+#include "jurisdiction-t.h"
 
 static bool readme_location(const jurisdict_place_t *place, void *context)
 {
@@ -115,7 +115,7 @@ The implementation is split by responsibility within `src/jurisdiction/`:
 
 One module-private header, `jurisdiction_internal.h`, groups the shared engine
 state, calendar helpers, holiday rows and timezone declarations by responsibility.
-Callers continue to use the unchanged public API in `include/jurisdiction_t.h`.
+Callers continue to use the unchanged public API in `include/jurisdiction-t.h`.
 
 ## Basic Usage
 
@@ -123,7 +123,7 @@ Open a jurisdiction engine for a jurisdiction:
 
 ```c
 #include <stdio.h>
-#include "jurisdiction_t.h"
+#include "jurisdiction-t.h"
 
 int main(void)
 {
@@ -788,7 +788,7 @@ require the existing libunistring-enabled build. See the
 
 ```c
 #include <stdio.h>
-#include "jurisdiction_t.h"
+#include "jurisdiction-t.h"
 
 int main(void)
 {
@@ -939,9 +939,9 @@ bool jurisdict_serialize(const jurisdiction_t *jurisdiction, string_t **out_type
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "array_t.h"
-#include "datetime_t.h"
-#include "jurisdiction_t.h"
+#include "array-t.h"
+#include "datetime-t.h"
+#include "jurisdiction-t.h"
 
 int main(void) {
     jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");

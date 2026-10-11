@@ -5,7 +5,7 @@
  * Reads origin-form requests and validates start lines, headers and host information through string views. Strict
  * framing and size limits protect the boundary before application route handlers run.
  *
- * This is part of webserver_t.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * This is part of webserver-t.h's synchronous Linux listener. The HTTP client is a separate module; this
  * implementation does not supply a production worker pool or TLS terminator.
  */
 

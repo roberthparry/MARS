@@ -5,7 +5,7 @@
  * Owns temporary transform expressions and supplies affine matching and parameter checks. Forward and inverse rule
  * units share this context to keep ownership and domain handling consistent.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

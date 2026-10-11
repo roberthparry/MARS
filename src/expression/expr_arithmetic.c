@@ -5,7 +5,7 @@
  * Constructs arithmetic operations and their numeric-operand variants over reference-counted expression graphs.
  * This is the algebra-building layer used by symbolic callers, not merely direct scalar evaluation.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "expr_bindings.h"
-#include "integrator_t.h"
+#include "integrator-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS

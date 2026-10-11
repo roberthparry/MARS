@@ -5,7 +5,7 @@
  * Constructs supported Bessel operations and supplies evaluation, simplification, differentiation and reverse-mode
  * support. Scalar numerical work is delegated to the number layer while order and argument remain symbolic.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

@@ -6,7 +6,7 @@
  * Serialisation entry points share the equation's structural representation rather than inventing a client-side
  * format.
  *
- * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

@@ -14,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "cfg_progress.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

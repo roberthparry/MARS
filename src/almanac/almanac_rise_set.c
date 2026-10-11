@@ -5,7 +5,7 @@
  * Resolves local offsets and UTC search windows, accounts for horizon geometry, and locates body crossings. Sun
  * and Moon wrappers use the same observer-dependent machinery.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 
@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "almanac_engine_internal.h"
-#include "jurisdiction_t.h"
+#include "jurisdiction-t.h"
 
 typedef struct almanac_rise_set_day_t {
     double start_jd;

@@ -1,5 +1,5 @@
 /**
- * @file csv_t.h
+ * @file csv-t.h
  * @brief Bounded UTF-8 CSV record streams, headers and quoted output.
  *
  * csv_t is an opaque reader or writer. Readers consume a borrowed open file_t or
@@ -11,7 +11,7 @@
  * Records are processed incrementally, not retained as a document. Borrowed
  * fields survive until the next csv_next call; header names survive until free.
  * Handles require external synchronisation when shared between threads. File
- * ownership, closing, atomic replacement and durability belong to file_t.h.
+ * ownership, closing, atomic replacement and durability belong to file-t.h.
  */
 #ifndef MARS_CSV_H
 #define MARS_CSV_H
@@ -19,8 +19,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "file_t.h"
-#include "string_t.h"
+#include "file-t.h"
+#include "string-t.h"
 
 /** @brief Opaque CSV reader or writer; release with csv_free(). */
 typedef struct _csv_t csv_t;

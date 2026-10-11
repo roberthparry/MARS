@@ -17,7 +17,7 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Parsing, evaluation and simplification. */
 expr_binding_expr_t *expr_binding_expr_parse_view(string_view_t text, string_t *errmsg);

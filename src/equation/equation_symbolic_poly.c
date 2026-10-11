@@ -5,7 +5,7 @@
  * Collects coefficients that remain expressions rather than immediately becoming numeric values. Symbolic
  * quadratic, quartic and general polynomial paths use these helpers to retain parameters in exact results.
  *
- * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

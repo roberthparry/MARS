@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "test_string.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

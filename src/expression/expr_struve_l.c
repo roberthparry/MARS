@@ -5,7 +5,7 @@
  * Provides the symbolic Struve L node and its supported calculus and simplification paths. It retains order and
  * argument structure while the number layer supplies scalar evaluation.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

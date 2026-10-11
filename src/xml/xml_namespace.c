@@ -5,7 +5,7 @@
  * Tracks namespace declarations and checks expanded element and attribute names during parsing. It prevents prefix
  * spelling from replacing namespace identity in document validation.
  *
- * This is part of xml_t.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * This is part of xml-t.h's native implementation. Keep input bounded and reject unsupported external-entity
  * features; HTTP and SOAP transport belong to the HTTP module.
  */
 

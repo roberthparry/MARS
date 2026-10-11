@@ -15,7 +15,7 @@
 
 #include <stddef.h>
 
-#include "datetime_t.h"
+#include "datetime-t.h"
 
 /*
  * Private datetime state; callers outside this module use the opaque public API.

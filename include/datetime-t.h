@@ -1,5 +1,5 @@
 /**
- * @file datetime_t.h
+ * @file datetime-t.h
  * @brief Gregorian calendar datetime type with astronomical calculations.
  *
  * Use this module for civil date and time construction, calendar arithmetic,
@@ -7,8 +7,8 @@
  * Timezone and daylight-saving helpers support local-time calculations, while
  * Julian dates and basic solar and lunar calculations connect dates to astronomy.
  *
- * datetime_t represents dates and times at second resolution. Use jurisdiction_t.h
- * for configured public-holiday and working-day rules, and almanac_t.h for
+ * datetime_t represents dates and times at second resolution. Use jurisdiction-t.h
+ * for configured public-holiday and working-day rules, and almanac-t.h for
  * catalogue-backed astronomical positions rather than civil calendar operations.
  *
  * Provides an opaque datetime_t type supporting:

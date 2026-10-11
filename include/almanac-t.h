@@ -1,5 +1,5 @@
 /**
- * @file almanac_t.h
+ * @file almanac-t.h
  * @brief Catalogue-backed astronomy, ephemerides and observer-dependent sky positions.
  *
  * The opaque almanac_t engine combines configured ephemeris data with MARS date
@@ -9,7 +9,7 @@
  *
  * Use this module for astronomical almanacs, sky-position queries and navigation
  * calculations that need catalogue-backed results. Available bodies and date
- * coverage depend on the installed data. Use datetime_t.h for civil date operations
+ * coverage depend on the installed data. Use datetime-t.h for civil date operations
  * and its lighter solar and lunar helpers; this module owns the astronomical engine.
  */
 
@@ -18,8 +18,8 @@
 
 #include <stdbool.h>
 
-#include "array_t.h"
-#include "datetime_t.h"
+#include "array-t.h"
+#include "datetime-t.h"
 
 /**
  * @brief Opaque astronomical almanac engine backed by configured ephemeris data.

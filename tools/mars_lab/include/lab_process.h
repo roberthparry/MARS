@@ -93,7 +93,7 @@ bool lab_proc_run(const char *const argv[], const char *cwd, unsigned timeout_ms
  * @param argv Borrowed NULL-terminated argument vector, as for lab_proc_run.
  * @param cwd Optional child working directory, as for lab_proc_run.
  * @param input Borrowed input string; NULL selects /dev/null. Bytes, including NUL,
- * are copied through file_t.h into a private temporary file before spawning. The file
+ * are copied through file-t.h into a private temporary file before spawning. The file
  * is unlinked once the child has opened it. No input/output pipe deadlock is possible.
  * @param timeout_ms Monotonic deadline including input preparation; zero disables it.
  * @param max_output Maximum captured output bytes, as for lab_proc_run.

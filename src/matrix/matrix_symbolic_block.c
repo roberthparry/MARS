@@ -5,7 +5,7 @@
  * Dispatches polynomial invariants, Schur complements, block inverses and block solves over supported matrices.
  * These operations build on the common symbolic and numerical matrix machinery.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

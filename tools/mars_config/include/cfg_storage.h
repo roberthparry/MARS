@@ -9,7 +9,7 @@
 #ifndef MARS_CONFIG_STORAGE_H
 #define MARS_CONFIG_STORAGE_H
 
-#include "file_t.h"
+#include "file-t.h"
 
 /**
  * @brief Resolve MARS_HOME, including ~/ expansion, or the user's ~/.mars directory.

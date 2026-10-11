@@ -14,12 +14,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_t.h"
-#include "datetime_t.h"
-#include "expression_t.h"
-#include "sqlite_t.h"
-#include "timeseries_t.h"
-#include "string_t.h"
+#include "array-t.h"
+#include "datetime-t.h"
+#include "expression-t.h"
+#include "sqlite-t.h"
+#include "timeseries-t.h"
+#include "string-t.h"
 #include "test_harness.h"
 #include "test_sqlite_csv.h"
 

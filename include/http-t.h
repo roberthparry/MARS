@@ -1,5 +1,5 @@
 /**
- * @file http_t.h
+ * @file http-t.h
  * @brief Synchronous C HTTP/HTTPS transport with opaque requests, responses and reusable clients.
  *
  * Use this module to consume web services through reusable clients with configured
@@ -11,7 +11,7 @@
  * JSON, XML and Protocol Buffers provide payload representations, not transport.
  * Include their respective headers when manipulating those documents or messages.
  * SOAP support does not provide automatic WSDL client generation, and gRPC support
- * is limited to uncompressed unary calls. Use webserver_t.h to implement a listening
+ * is limited to uncompressed unary calls. Use webserver-t.h to implement a listening
  * service rather than consume one.
  *
  * Uses libcurl >= 7.86.0 with verified TLS. Redirects and cookies are opt-in; environment proxies and netrc are
@@ -28,17 +28,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "dictionary_t.h"
-#include "file_t.h"
-#include "json_t.h"
-#include "string_t.h"
-#include "webserver_t.h"
-#include "xml_t.h"
+#include "dictionary-t.h"
+#include "file-t.h"
+#include "json-t.h"
+#include "string-t.h"
+#include "webserver-t.h"
+#include "xml-t.h"
 
-/** @brief Opaque Protocol Buffers message; include protobuf_t.h to construct or inspect it. */
+/** @brief Opaque Protocol Buffers message; include protobuf-t.h to construct or inspect it. */
 typedef struct _protobuf_t protobuf_t;
 
-/** @brief Opaque byte-array result; include array_t.h for array access and destruction. */
+/** @brief Opaque byte-array result; include array-t.h for array access and destruction. */
 typedef struct _array_t array_t;
 
 /** @brief Opaque reusable connection owner. */

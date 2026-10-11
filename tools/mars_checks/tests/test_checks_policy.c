@@ -11,7 +11,7 @@
  */
 #include <stdio.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "test_harness.h"
 #include "checks_process.h"
 #include "checks_policy.h"

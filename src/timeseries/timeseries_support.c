@@ -5,14 +5,14 @@
  * Provides allocation, text construction, numeric conversion and model-metadata support used across the module. It
  * centralises cleanup and data preparation rather than defining an independent forecasting method.
  *
- * This is part of timeseries_t.h. Maintain the association between values, date indices and model metadata when
+ * This is part of timeseries-t.h. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
-#include "string_t.h"
-#include "file_t.h"
+#include "string-t.h"
+#include "file-t.h"
 
 static ts_arima_meta_t *ts_arima_meta_head = NULL;
 

@@ -3,8 +3,8 @@
  * @brief Private Linux regex adapter boundary, independent of either regex_t typedef.
  *
  * Used only by the regex module. The native translation unit includes the system
- * regex.h, while the public-facing unit includes regex_t.h; neither needs to rename
- * or expose the other's type. Public callers must use regex_t.h instead.
+ * regex.h, while the public-facing unit includes regex-t.h; neither needs to rename
+ * or expose the other's type. Public callers must use regex-t.h instead.
  */
 #ifndef MARS_REGEX_NATIVE_H
 #define MARS_REGEX_NATIVE_H
@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /** @brief Private compiled libc pattern and owned locale. */
 typedef struct _regex_native_t regex_native_t;

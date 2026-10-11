@@ -5,7 +5,7 @@
  * Implements hash-based membership, dense storage, lazy sorting and union, intersection or difference operations.
  * Clone and destroy callbacks define the lifetime of element resources.
  *
- * This implements set_t.h. Hash and equality policies must agree, and caller-provided clone or destroy callbacks
+ * This implements set-t.h. Hash and equality policies must agree, and caller-provided clone or destroy callbacks
  * define the resource ownership of stored values.
  */
 
@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "set_t.h"
+#include "set-t.h"
 
 /* Internal structures */
 

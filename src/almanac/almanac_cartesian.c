@@ -6,7 +6,7 @@
  * connect ephemeris positions to frame and observer calculations without exposing vector storage through the
  * public almanac API.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

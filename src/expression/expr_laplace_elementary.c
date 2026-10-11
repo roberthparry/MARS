@@ -5,7 +5,7 @@
  * Handles supported elementary, inverse-circular and hyperbolic families. It contributes parameter-aware symbolic
  * formulas to the shared Laplace transform dispatcher.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

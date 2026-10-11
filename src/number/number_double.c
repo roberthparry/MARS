@@ -5,17 +5,17 @@
  * Implements the generic numeric operations for fixed double-precision real values. Explicit double construction
  * retains this representation instead of silently adopting multiprecision storage.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <math.h>
 #include <stdio.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 bool number_is_zero_double(const number_t *number)
 {

@@ -5,7 +5,7 @@
  * Parses, represents and evaluates binding expressions and produces their native, function and TeX forms. It
  * separates variable metadata and supplied values from the main expression's symbolic structure.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -17,8 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "string_t.h"
-#include "expression_t.h"
+#include "string-t.h"
+#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #include "expr_bindings.h"

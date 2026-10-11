@@ -13,7 +13,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "number_t.h"
+#include "number-t.h"
 
 typedef number_t (*number_unary_fn)(number_t);
 typedef number_t (*number_binary_fn)(number_t, number_t);

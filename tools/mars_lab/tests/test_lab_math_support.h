@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "json_t.h"
+#include "json-t.h"
 #include "test_harness.h"
 
 /**

@@ -5,7 +5,7 @@
  * Wraps SQLCipher connections and prepared statements with key validation, typed bindings and result access. MARS
  * object serialisation is persisted as data rather than live pointers or descriptors.
  *
- * This implements sqlite_t.h over SQLCipher. Application key management and database access policy remain separate
+ * This implements sqlite-t.h over SQLCipher. Application key management and database access policy remain separate
  * from encryption of the stored database.
  */
 
@@ -21,7 +21,7 @@
 #endif
 #include <sqlcipher/sqlite3.h>
 
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 #define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_internal.h"
 

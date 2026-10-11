@@ -1,5 +1,5 @@
 /**
- * @file regex_t.h
+ * @file regex-t.h
  * @brief Opaque compiled regular expressions for MARS UTF-8 strings.
  *
  * regex_t owns a reusable POSIX extended expression. Search string_t values,
@@ -10,9 +10,9 @@
  *
  * Linux libc supplies the engine; no additional library is required. This is
  * not PCRE: lookaround, lazy quantifiers and named groups are not supported.
- * Use regex_t.h rather than the system regex.h. Their regex_t typedefs must not
+ * Use regex-t.h rather than the system regex.h. Their regex_t typedefs must not
  * appear in the same translation unit. Do not share a handle concurrently or
- * mutate a subject during a search. Ordinary literal searches belong to string_t.h.
+ * mutate a subject during a search. Ordinary literal searches belong to string-t.h.
  */
 #ifndef MARS_REGEX_H
 #define MARS_REGEX_H
@@ -20,7 +20,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /** @brief Opaque compiled expression; release with regex_free(). */
 typedef struct _regex_t regex_t;

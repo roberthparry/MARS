@@ -1,11 +1,11 @@
 # HTTP and HTTPS
 
-The client and [web server](webserver.md) share `webmethod_t` from `webserver_t.h`:
+The client and [web server](webserver.md) share `webmethod_t` from `webserver-t.h`:
 `HTTP_GET`, `HTTP_POST`, `HTTP_PUT`, `HTTP_PATCH`, `HTTP_DELETE`, `HTTP_HEAD` and
-`HTTP_OPTIONS`. Including `http_t.h` makes these types available.
+`HTTP_OPTIONS`. Including `http-t.h` makes these types available.
 
 The HTTP module consumes web services from C using opaque `http_client_t`,
-`http_request_t` and `http_response_t` handles. Include `http_t.h`.
+`http_request_t` and `http_response_t` handles. Include `http-t.h`.
 Transport uses system libcurl 7.86.0 or newer, with thread-safe global
 initialisation; JSON and XML interpretation stays in the existing
 [JSON](json.md) and native [XML](xml.md) modules.
@@ -132,7 +132,7 @@ scheduler. The service helpers below add SOAP, forms and multipart uploads,
 authentication, session cookies, bounded redirects, event streams, WebSocket
 messages and uncompressed unary gRPC. OAuth helpers cover client credentials
 and refresh tokens, not an interactive browser authorisation workflow.
-Proxy configuration is not exposed. Use `webserver_t.h` to implement a service.
+Proxy configuration is not exposed. Use `webserver-t.h` to implement a service.
 
 ## Complete examples using a real web service
 
@@ -159,7 +159,7 @@ Save as `scratch/http_get.c` (already supplied):
 
 ```c
 #include <stdlib.h>
-#include "http_t.h"
+#include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
@@ -209,7 +209,7 @@ Source: `scratch/http_post_json.c`.
 
 ```c
 #include <stdlib.h>
-#include "http_t.h"
+#include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
@@ -267,7 +267,7 @@ Source: `scratch/http_post_xml.c`.
 
 ```c
 #include <stdlib.h>
-#include "http_t.h"
+#include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
@@ -359,7 +359,7 @@ production credentials to a public echo service.
 ## Public API
 
 All declarations, parameters, return values and ownership rules are documented
-in [http_t.h](../include/http_t.h). The complete function reference follows.
+in [http-t.h](../include/http-t.h). The complete function reference follows.
 
 ### `http_client_new`
 
@@ -781,7 +781,7 @@ event stream. It is also `scratch/http_services.c`; its README test runs after
 the ordinary HTTP tests.
 
 ```c
-#include "http_t.h"
+#include "http-t.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -850,7 +850,7 @@ The formats follow [SOAP 1.1](https://www.w3.org/TR/2000/NOTE-SOAP-20000508/),
 
 ## Unary gRPC over HTTP/2
 
-Include `protobuf_t.h` as well as `http_t.h` to construct or inspect wire messages.
+Include `protobuf-t.h` as well as `http-t.h` to construct or inspect wire messages.
 
 `http_request_set_grpc` prepares a POST using an owned, copied
 [Protocol Buffers](protobuf.md) message. The request URL identifies the service
@@ -883,8 +883,8 @@ unary echo method accepting an unsigned integer field 1. The test runner
 supplies an offline HTTP/2 fixture.
 
 ```c
-#include "http_t.h"
-#include "protobuf_t.h"
+#include "http-t.h"
+#include "protobuf-t.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -924,7 +924,7 @@ Reply: 150
 
 ## WebSocket messages
 
-Include `array_t.h` when inspecting or freeing returned byte arrays.
+Include `array-t.h` when inspecting or freeing returned byte arrays.
 
 `http_websocket_open` upgrades an HTTP/HTTPS GET request, mapping its scheme
 internally to ws/wss. It uses the client's verified TLS trust, optional client
@@ -959,8 +959,8 @@ supports a WebSocket echo upgrade; use HTTPS for credentials or private data.
 The README test runs against the local WebSocket fixture.
 
 ```c
-#include "http_t.h"
-#include "array_t.h"
+#include "http-t.h"
+#include "array-t.h"
 #include <stdlib.h>
 
 int main(int argc, char **argv)

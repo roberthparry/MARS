@@ -5,14 +5,14 @@
  * Decodes encoded text and provides code-point traversal, length, reversal and case-conversion helpers.
  * Grapheme-level user-visible character operations belong to string_grapheme.c.
  *
- * This belongs to string_t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string-t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 
 /* string_utf8.c - UTF-8 codepoint-level navigation and utilities
  *
  * Operations in this file work at the codepoint level (not grapheme cluster
- * level — see string_grapheme.c for that, and string_t.h for the distinction).
+ * level — see string_grapheme.c for that, and string-t.h for the distinction).
  *
  *   Navigation  — utf8_next, string_utf8_prev (advance/retreat by one codepoint)
  *   Length      — string_utf8_length (codepoint count, not byte count)

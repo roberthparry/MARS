@@ -11,7 +11,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "expression_t.h"
+#include "expression-t.h"
 
 enum { SAMPLE_COUNT = 7, DEFAULT_ITERATIONS = 1000 };
 

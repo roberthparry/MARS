@@ -1,5 +1,5 @@
 /**
- * @file json_t.h
+ * @file json-t.h
  * @brief Opaque JSON value tree backed by MARS string, array, and dictionary types.
  *
  * Use json_t for structured interchange, configuration and web-service payloads.
@@ -7,7 +7,7 @@
  * compact or formatted output. Objects use dictionary-backed named members and
  * arrays preserve ordered values.
  *
- * The module represents data independently of HTTP transport. Use http_t.h to send
+ * The module represents data independently of HTTP transport. Use http-t.h to send
  * or receive JSON over the network, and observe ownership rules when inserting,
  * retrieving or replacing child values.
  *
@@ -32,8 +32,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 
 typedef struct _json_t json_t;
 

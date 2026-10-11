@@ -8,9 +8,9 @@
  */
 #ifndef TBA_SUPPORT_H
 #define TBA_SUPPORT_H
-#include "file_t.h"
-#include "json_t.h"
-#include "string_t.h"
+#include "file-t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 /** @brief Borrow a member. @param object Borrowed object. @param key UTF-8 key. @return Borrowed value or NULL. */
 const json_t *tba_json_get(const json_t *object, const char *key);

@@ -41,7 +41,7 @@ README signum example:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -70,7 +70,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -247,8 +247,8 @@ Output: (2x, 2y; 0, 3x²)
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
-#include "number_t.h"
+#include "matrix-t.h"
+#include "number-t.h"
 
 int main(void) {
     /* Hermitian 2×2 matrix with eigenvalues 1 and 4:
@@ -288,8 +288,8 @@ forms `@DELTA` and `@OMEGA`, so you do not need to type Greek letters at the
 keyboard:
 
 ```c
-#include "expression_t.h"
-#include "matrix_t.h"
+#include "expression-t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -367,8 +367,8 @@ This is a pleasing example because the algebra stays exact:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "expression_t.h"
-#include "matrix_t.h"
+#include "expression-t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -438,7 +438,7 @@ eigenvalues = { √(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }, { -√(Δ² + Ω²) | 
 
 ## API Reference
 
-All declarations are in `include/matrix_t.h`.
+All declarations are in `include/matrix-t.h`.
 
 ### Types
 
@@ -874,7 +874,7 @@ Example:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -1246,7 +1246,7 @@ For `A = I + N`, where `N² = 0`, `Y₀(A) = Y₀(1)I − Y₁(1)N`:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -1295,7 +1295,7 @@ For a nilpotent matrix with `A⁴ = 0`, `H₀(A) = (2/π)(A − A³/9)`:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -1363,7 +1363,7 @@ For a nilpotent matrix with `A³ = 0`, `I₀(A) = I + A²/4`:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -1417,7 +1417,7 @@ For a nilpotent matrix with `A² = 0`, the order-zero result is `L₀(A) = 2A/π
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -1702,7 +1702,7 @@ through the ordinary `expr` API:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {
@@ -2086,7 +2086,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void)
 {

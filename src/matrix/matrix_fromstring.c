@@ -5,7 +5,7 @@
  * Reads native matrices and generated matrix functions through string-backed parsing. Symbol tables connect scalar
  * bindings and matrix values without reparsing output in the Lab client.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 
@@ -17,7 +17,7 @@
 #include <sys/types.h>
 
 #define MARS_MATRIX_INTERNAL_ACCESS
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 #include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

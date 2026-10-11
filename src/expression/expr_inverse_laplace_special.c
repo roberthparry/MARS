@@ -5,7 +5,7 @@
  * Recognises supported radical, general-power and special-function spectra. These rules extend elementary inverses
  * without asserting that arbitrary frequency expressions are invertible in closed form.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

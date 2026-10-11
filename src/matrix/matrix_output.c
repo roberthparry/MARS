@@ -5,7 +5,7 @@
  * Implements printf-style matrix output, layout selection and padding through MARS strings. Structural
  * matrix-to-text conversion remains in matrix_tostring.c.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 
@@ -14,8 +14,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "matrix_t.h"
-#include "string_t.h"
+#include "matrix-t.h"
+#include "string-t.h"
 
 static mat_string_style_t mo_matrix_style(int scientific, int layout)
 {

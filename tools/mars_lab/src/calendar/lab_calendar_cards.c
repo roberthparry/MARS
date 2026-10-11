@@ -10,7 +10,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "datetime_t.h"
+#include "datetime-t.h"
 #include "lab_calendar_internal.h"
 
 /* Keep named-town offsets and the location route's JSON contract in one adapter. */

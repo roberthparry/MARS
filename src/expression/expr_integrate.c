@@ -6,7 +6,7 @@
  * Specialised recognisers live in companion units; unmatched integrals retain formal structure rather than
  * pretending to have closed forms.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

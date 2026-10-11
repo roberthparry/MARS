@@ -74,7 +74,7 @@ static const char *lab_math_gaussian_section(const char *input, const char *begi
 
 static void test_laplace_gaussian_inventory(void)
 {
-    const char *header = lab_math_read("include/expression_t.h");
+    const char *header = lab_math_read("include/expression-t.h");
     const char *guide = lab_math_read("docs/expression.md");
     const char *inventory = lab_math_gaussian_section(guide, "### Laplace function coverage", "## Numeric representation");
     string_t *section = string_new_with(lab_math_gaussian_section(header, "expr_t *expr_sin(", "expr_t *expr_E1("));

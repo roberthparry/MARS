@@ -5,7 +5,7 @@
  * Checks supported exact or radial-logarithmic forms and builds potential-based solutions. Initial conditions and
  * square branches are considered when selecting admissible result families.
  *
- * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

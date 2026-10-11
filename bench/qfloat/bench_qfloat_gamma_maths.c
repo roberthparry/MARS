@@ -13,7 +13,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 
 typedef struct bench_result_t {
     char label[64];

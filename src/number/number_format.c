@@ -5,7 +5,7 @@
  * Renders supported number representations and implements printf-style numeric formatting. Exact and complex
  * values retain their appropriate syntax rather than being forced through double conversion.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
@@ -15,10 +15,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 char *number_strdup(const char *text)
 {

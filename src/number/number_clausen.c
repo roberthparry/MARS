@@ -5,13 +5,13 @@
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
  * representation determine the evaluation path.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <limits.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 

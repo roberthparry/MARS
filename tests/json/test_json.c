@@ -12,11 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "json_t.h"
-#include "number_t.h"
+#include "file-t.h"
+#include "json-t.h"
+#include "number-t.h"
 #include "test_harness.h"
-#include "string_t.h"
+#include "string-t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

@@ -14,14 +14,14 @@
 
 #if !defined(MARS_JSON_INTERNAL_ACCESS) &&                                                                             \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "json_internal.h is private to the json module; include json_t.h instead."
+#error "json_internal.h is private to the json module; include json-t.h instead."
 #endif
 
 #include <stdbool.h>
 
-#include "array_t.h"
-#include "dictionary_t.h"
-#include "json_t.h"
+#include "array-t.h"
+#include "dictionary-t.h"
+#include "json-t.h"
 
 typedef struct {
     string_t *text;

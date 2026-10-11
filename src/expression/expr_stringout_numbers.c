@@ -5,7 +5,7 @@
  * Formats constants and evaluated numeric values and removes display artefacts where appropriate. It keeps numeric
  * spelling consistent across renderers without changing the underlying value.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -23,10 +23,10 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression_t.h"
+#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static bool expr_number_scientific_local = false;
 static int expr_number_precision_local = -1;

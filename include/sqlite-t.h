@@ -1,5 +1,5 @@
 /**
- * @file sqlite_t.h
+ * @file sqlite-t.h
  * @brief Opaque SQLCipher-backed storage for MARS objects.
  *
  * Use this module for encrypted persistent data with SQLite query semantics.
@@ -10,7 +10,7 @@
  * schemas and savepoint-protected insertion. Query export delegates escaping
  * to csv_t; CSV syntax remains the responsibility of the CSV module.
  *
- * File-content import/export is available through file_t.h; live handles and open
+ * File-content import/export is available through file-t.h; live handles and open
  * descriptors are not persistent objects. Applications are responsible for key
  * management, transaction policy and handling query or storage failures. Encryption
  * at rest does not replace application-level access control.
@@ -28,8 +28,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "string_t.h"
-#include "csv_t.h"
+#include "string-t.h"
+#include "csv-t.h"
 
 /**
  * @brief Opaque encrypted SQLite database handle.

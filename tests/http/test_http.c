@@ -28,10 +28,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "http_t.h"
-#include "array_t.h"
-#include "file_t.h"
-#include "protobuf_t.h"
+#include "http-t.h"
+#include "array-t.h"
+#include "file-t.h"
+#include "protobuf-t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

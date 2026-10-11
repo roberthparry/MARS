@@ -8,7 +8,7 @@
  */
 #include <stdlib.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "lab_process.h"
 #include "cfg_weather.h"
 #include "test_harness.h"

@@ -8,7 +8,7 @@
 #ifndef TEST_TBA_SUPPORT_H
 #define TEST_TBA_SUPPORT_H
 
-#include "file_t.h"
+#include "file-t.h"
 
 /**
  * @brief Remove a completed test's private directory and its contents.

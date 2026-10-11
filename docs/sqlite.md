@@ -52,8 +52,8 @@ pointer is NULL. Database-specific size limits still apply.
 ```c
 #include <stdio.h>
 
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("secure.db");
@@ -92,8 +92,8 @@ Output:
 ```c
 #include <stdio.h>
 
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("secure.db");
@@ -205,9 +205,9 @@ elements, `array_serialize()` and `array_deserialise()` provide that route.
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "array_t.h"
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "array-t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("secure.db");
@@ -277,10 +277,10 @@ so callers can keep the storage round-trip in one obvious public path.
 ```c
 #include <stdlib.h>
 
-#include "datetime_t.h"
-#include "sqlite_t.h"
-#include "timeseries_t.h"
-#include "string_t.h"
+#include "datetime-t.h"
+#include "sqlite-t.h"
+#include "timeseries-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("secure.db");
@@ -355,9 +355,9 @@ payload-shaping logic at each call site.
 ```c
 #include <stdlib.h>
 
-#include "expression_t.h"
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "expression-t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("secure.db");
@@ -469,7 +469,7 @@ caller and must be released with `sqlite_stmt_finalize()`. It is safe to call
 
 ## API Reference
 
-All declarations are in `include/sqlite_t.h`.
+All declarations are in `include/sqlite-t.h`.
 
 ### Types
 
@@ -672,7 +672,7 @@ storage types and removes the input.
 ```c
 #include <stdlib.h>
 
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 
 int main(void)
 {
@@ -721,7 +721,7 @@ This example uses a single final chunk. The file-to-file streaming example below
 shows the refill callback and a file-backed output writer together.
 
 ```c
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 
 int main(void)
 {
@@ -758,7 +758,7 @@ Imported 2 rows
 ### Example: export query results
 
 ```c
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 
 int main(void)
 {
@@ -818,7 +818,7 @@ may leave a partial file; use staging before publishing production output.
 ```c
 #include <stdlib.h>
 
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 
 /* Caller-owned state passed unchanged to every refill invocation. */
 typedef struct {

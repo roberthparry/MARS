@@ -10,7 +10,7 @@
 #ifndef MARS_TEST_CFG_CALENDAR_FIXTURE_H
 #define MARS_TEST_CFG_CALENDAR_FIXTURE_H
 
-#include "sqlite_t.h"
+#include "sqlite-t.h"
 
 /** Run a callback through test_cfg_isolated after preparing the process-owned immutable seed once. */
 bool test_cfg_calendar_isolated(bool (*callback)(const char *directory));

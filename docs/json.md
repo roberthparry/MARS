@@ -33,8 +33,8 @@ it is not a bounded-memory streaming JSON parser.
 ## Example: Parse and Inspect
 
 ```c
-#include "json_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 static string_t *s(const char *text) {
     return string_new_with(text);
@@ -77,8 +77,8 @@ items=3
 ## Example: Build and Serialise
 
 ```c
-#include "json_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 static string_t *s(const char *text) {
     return string_new_with(text);
@@ -144,9 +144,9 @@ complex numbers, infinities, NaN and symbolic constants can round-trip without
 losing meaning.
 
 ```c
-#include "json_t.h"
-#include "number_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "number-t.h"
+#include "string-t.h"
 
 int main(void) {
     number_t rational = num_create_from_frac(2, 3);
@@ -174,8 +174,8 @@ serialised output prefers mathematical spellings such as `π`.
 ## File Round-Tripping
 
 ```c
-#include "json_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *path = string_new_with("settings.json");
@@ -224,7 +224,7 @@ continue to own their `string_t` keys and values.
 
 ## API Reference
 
-All declarations are in `include/json_t.h`.
+All declarations are in `include/json-t.h`.
 
 ### Types
 

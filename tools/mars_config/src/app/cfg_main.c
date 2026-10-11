@@ -14,7 +14,7 @@
 #include "cfg_database.h"
 #include "cfg_locales.h"
 #include "cfg_weather.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static bool cfg_app_is(const char *text, const char *literal)
 {

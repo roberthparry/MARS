@@ -5,7 +5,7 @@
  * Builds framed Protocol Buffers requests and validates response framing, trailers and status. Streaming RPCs,
  * schema-generated stubs and compressed messages are not implemented here.
  *
- * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

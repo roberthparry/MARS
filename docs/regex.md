@@ -1,7 +1,7 @@
 # Regular expressions
 
-Include `regex_t.h` for the opaque `regex_t` type. Patterns and subjects use
-`string_t` from `string_t.h`. Compile once and reuse the handle for multiple
+Include `regex-t.h` for the opaque `regex_t` type. Patterns and subjects use
+`string_t` from `string-t.h`. Compile once and reuse the handle for multiple
 subjects; the handle does not retain input strings.
 
 ## Matching and ownership
@@ -11,7 +11,7 @@ longest matching, numbered parenthesised groups, alternation and repetition.
 It is not PCRE; lookaround, named groups and lazy quantifiers are not supported.
 The engine uses a private `C.UTF-8` locale and restores the calling thread's
 locale after compilation and matching. No extra library dependency is needed.
-Do not include the system `<regex.h>` alongside `regex_t.h`: both declare a
+Do not include the system `<regex.h>` alongside `regex-t.h`: both declare a
 different `regex_t`. The adapter keeps the system type private.
 
 Patterns and subjects must contain complete UTF-8 without NUL. Matching preserves
@@ -74,7 +74,7 @@ advancing would loop forever.
 ## Capture UTF-8 text
 
 ```c
-#include "regex_t.h"
+#include "regex-t.h"
 
 int main(void)
 {
@@ -108,7 +108,7 @@ Zoë: 42
 This pattern cannot match empty text, so advancing to each match's end is safe.
 
 ```c
-#include "regex_t.h"
+#include "regex-t.h"
 
 int main(void)
 {

@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 

@@ -24,7 +24,7 @@ static file_t *cfg_database_stage_file(const string_t *directory, const char *na
     return file;
 }
 
-/* mkdtemp provides exclusive directory creation; all content I/O uses file_t.h. */
+/* mkdtemp provides exclusive directory creation; all content I/O uses file-t.h. */
 string_t *cfg_database_stage(const string_t *directory)
 {
     string_t *pattern = string_sprintf("%s/.mars-database-XXXXXX", string_c_str(directory));

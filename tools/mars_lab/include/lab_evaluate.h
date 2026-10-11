@@ -12,8 +12,8 @@
 #ifndef LAB_EVALUATE_H
 #define LAB_EVALUATE_H
 
-#include "json_t.h"
-#include "string_t.h"
+#include "json-t.h"
+#include "string-t.h"
 
 /**
  * @brief Evaluate a Lab mathematical route and return an owned JSON response.

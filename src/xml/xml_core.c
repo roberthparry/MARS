@@ -5,7 +5,7 @@
  * Constructs, clones and attaches XML nodes and validates names and text. Ordered children preserve mixed content
  * while attribute storage uses the shared dictionary and string types.
  *
- * This is part of xml_t.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * This is part of xml-t.h's native implementation. Keep input bounded and reject unsupported external-entity
  * features; HTTP and SOAP transport belong to the HTTP module.
  */
 

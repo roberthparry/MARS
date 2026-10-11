@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "expression_t.h"
-#include "matrix_t.h"
-#include "number_t.h"
+#include "expression-t.h"
+#include "matrix-t.h"
+#include "number-t.h"
 
 static uint64_t now_ns(void)
 {

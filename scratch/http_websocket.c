@@ -8,8 +8,8 @@
 
 #include <stdlib.h>
 
-#include "http_t.h"
-#include "array_t.h"
+#include "http-t.h"
+#include "array-t.h"
 
 int main(int argc, char **argv)
 {

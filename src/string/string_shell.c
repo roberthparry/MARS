@@ -2,7 +2,7 @@
  * @file string_shell.c
  * @brief Literal shell-word decoding for configuration strings.
  *
- * Implements string_unquote_shell from string_t.h. A single bounded pass removes
+ * Implements string_unquote_shell from string-t.h. A single bounded pass removes
  * quote delimiters and eligible escape backslashes while preserving the exact
  * remaining UTF-8 bytes. Concatenated fragments support installer-generated
  * quoting of passwords containing apostrophes; no expansion, command execution

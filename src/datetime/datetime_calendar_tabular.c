@@ -5,7 +5,7 @@
  * Implements supported Christian, Islamic, Jewish and Ethiopian date rules and calendar text. Integer calendar
  * conversions and fixed rules are kept separate from the astronomical lunisolar calculations.
  *
- * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 
@@ -15,7 +15,7 @@
 #include <math.h>
 
 #include "datetime_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static long datetime_ethiopian_ymd_to_jdn(int year, int month, int day);
 

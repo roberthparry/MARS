@@ -1,13 +1,13 @@
 /**
- * @file set_t.h
+ * @file set-t.h
  * @brief Generic value-set container with a dense arena and lazy sorting.
  *
  * Use set_t to maintain unique values with hash-based membership, insertion and
  * removal. It supports iteration and sorted access while hiding the storage layout.
  * Equality and hashing callbacks must describe the same notion of a unique value.
  *
- * Clone and destroy callbacks control element resource ownership. Prefer array_t.h
- * when duplicates and positional sequence semantics matter, or dictionary_t.h when
+ * Clone and destroy callbacks control element resource ownership. Prefer array-t.h
+ * when duplicates and positional sequence semantics matter, or dictionary-t.h when
  * each unique key needs an associated value.
  *
  * Design:

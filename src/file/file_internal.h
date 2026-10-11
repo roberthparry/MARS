@@ -17,16 +17,16 @@
 #endif
 
 #if !defined(MARS_FILE_INTERNAL_ACCESS) && !defined(__INTELLISENSE__)
-#error "file_internal.h is private to the file module; include file_t.h instead."
+#error "file_internal.h is private to the file module; include file-t.h instead."
 #endif
 
 #include <dirent.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
-#include "file_t.h"
-#include "array_t.h"
-#include "string_t.h"
+#include "file-t.h"
+#include "array-t.h"
+#include "string-t.h"
 
 struct _file_t {
     char *path;

@@ -6,7 +6,7 @@
  * configuration and accessors. Protocol-specific operations share these handles rather than allocate independent
  * transport APIs.
  *
- * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

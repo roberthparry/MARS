@@ -7,7 +7,7 @@
  * remain in the number module; this file does not introduce another special-function implementation.
  */
 
-#include "number_t.h"
+#include "number-t.h"
 
 /* Round guarded modified Bessel I to double-double precision on the real domain. */
 qfloat_t qf_bessel_i(qfloat_t order, qfloat_t argument)

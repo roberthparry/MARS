@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "lab_mobile.h"
 #include "lab_page.h"
 

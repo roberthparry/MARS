@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime_t.h"
-#include "string_t.h"
+#include "datetime-t.h"
+#include "string-t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

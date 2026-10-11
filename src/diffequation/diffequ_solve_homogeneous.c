@@ -5,7 +5,7 @@
  * Recognises supported homogeneous structure and performs the corresponding variable-ratio reduction. It
  * constructs logarithmic or algebraic solution forms and manages the resulting constant.
  *
- * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

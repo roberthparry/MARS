@@ -14,7 +14,7 @@
 #ifndef LAB_FORMS_H
 #define LAB_FORMS_H
 
-#include "json_t.h"
+#include "json-t.h"
 
 /**
  * @brief Add a legacy selection key and coordinate display to a structured town.

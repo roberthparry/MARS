@@ -3,9 +3,9 @@
  * @brief Datetime allocation, construction and value lifecycle.
  *
  * Manages opaque datetime objects, initialisation, parsing, serialisation and comparison. The specialised calendar
- * and astronomical units share this representation while public callers use datetime_t.h.
+ * and astronomical units share this representation while public callers use datetime-t.h.
  *
- * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 
@@ -20,7 +20,7 @@
 #include <time.h>
 
 #include "datetime_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Allocate an uninitialised datetime object. */
 datetime_t *datetime_alloc()

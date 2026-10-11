@@ -5,7 +5,7 @@
  * Produces native, function and TeX matrix text with binding information and shared-factor presentation.
  * Serialisation uses the same structural values while preserving exact symbolic entries.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 
@@ -17,7 +17,7 @@
 #include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 typedef struct {
     string_t *text;

@@ -1,6 +1,6 @@
 /**
  * @file checks_support.c
- * @brief Owned collections and file_t.h-backed repository traversal for check tools.
+ * @brief Owned collections and file-t.h-backed repository traversal for check tools.
  *
  * These adapters preserve exact source bytes, sort paths deterministically and
  * keep filesystem handles private. Traversal never descends through symlinks.
@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_t.h"
-#include "file_t.h"
-#include "regex_t.h"
+#include "array-t.h"
+#include "file-t.h"
+#include "regex-t.h"
 #include "checks_support.h"
 
 struct checks_strings {

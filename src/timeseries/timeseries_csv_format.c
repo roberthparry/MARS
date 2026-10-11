@@ -8,7 +8,7 @@
  */
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 
-#include "csv_t.h"
+#include "csv-t.h"
 #include "timeseries_internal.h"
 
 static csv_t *ts_csv_writer(const char *const *names, size_t count)

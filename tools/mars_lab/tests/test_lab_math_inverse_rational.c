@@ -8,7 +8,7 @@
  */
 #include <math.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "test_lab_math_support.h"
 
 static const json_t *lab_math_inverse_rational_fields(const char *source)

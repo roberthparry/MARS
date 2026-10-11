@@ -5,7 +5,7 @@
  * Recognises supported hyperbolic powers and products with trigonometric or exponential factors. It builds
  * symbolic primitives through shared ownership and affine-matching helpers.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

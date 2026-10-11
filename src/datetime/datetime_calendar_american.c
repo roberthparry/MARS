@@ -5,7 +5,7 @@
  * Constructs supported observance dates and formatted calendar representations using the module's civil and lunar
  * helpers. These are calendar computations, not jurisdiction-specific public-holiday policy.
  *
- * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 
@@ -14,7 +14,7 @@
 
 #include "datetime_internal.h"
 #include "datetime_astronomy_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static const char *datetime_cherokee_civil_month_name(month_t month)
 {

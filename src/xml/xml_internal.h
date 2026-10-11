@@ -3,7 +3,7 @@
  * @brief Private XML tree and attribute-storage contracts.
  *
  * Defines node storage, children and dictionary-backed attributes, together with validation and attachment
- * helpers. Parser and writer implementations share these contracts while public callers use xml_t.h.
+ * helpers. Parser and writer implementations share these contracts while public callers use xml-t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,8 +14,8 @@
 #if !defined(MARS_XML_INTERNAL_ACCESS)
 #error "xml_internal.h is private to the XML module."
 #endif
-#include "xml_t.h"
-#include "array_t.h"
+#include "xml-t.h"
+#include "array-t.h"
 #define XML_MAX_DEPTH 128u
 struct _xml_t {
     xml_type_t type;

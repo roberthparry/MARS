@@ -14,10 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation_t.h"
-#include "expression_t.h"
-#include "number_t.h"
-#include "string_t.h"
+#include "equation-t.h"
+#include "expression-t.h"
+#include "number-t.h"
+#include "string-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS

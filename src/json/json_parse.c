@@ -5,7 +5,7 @@
  * Reads JSON syntax into native value trees and recognises the supported MARS numeric extension. Parsing validates
  * document structure independently of any HTTP transport or file source.
  *
- * This implements part of json_t.h. JSON values represent data independently of network transport; the HTTP module
+ * This implements part of json-t.h. JSON values represent data independently of network transport; the HTTP module
  * supplies service requests and responses.
  */
 
@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "file_t.h"
+#include "file-t.h"
 
 #define MARS_JSON_INTERNAL_ACCESS
 #include "json_internal.h"

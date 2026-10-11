@@ -16,7 +16,7 @@
 #endif
 
 #include "cfg_calendar_internal.h"
-#include "file_t.h"
+#include "file-t.h"
 
 /* Copy and trim a borrowed optional string. */
 string_t *cfg_calendar_value(const string_t *text)

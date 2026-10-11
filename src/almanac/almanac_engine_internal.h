@@ -13,10 +13,10 @@
 #ifndef MARS_ALMANAC_ENGINE_INTERNAL_H
 #define MARS_ALMANAC_ENGINE_INTERNAL_H
 
-#include "almanac_t.h"
+#include "almanac-t.h"
 #include "almanac_cartesian.h"
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 /* Private position state and interfaces for the almanac implementation. */
 struct _almanac_entry_t {

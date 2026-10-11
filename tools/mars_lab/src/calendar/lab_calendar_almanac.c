@@ -13,8 +13,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "datetime_t.h"
-#include "jurisdiction_t.h"
+#include "datetime-t.h"
+#include "jurisdiction-t.h"
 #include "lab_calendar_internal.h"
 
 static const char *lab_cal_part(string_t **parts, size_t count, size_t index)

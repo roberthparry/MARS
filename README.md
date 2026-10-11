@@ -204,7 +204,7 @@ sample output.
 
 ```c
 #include <stdio.h>
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 
 int main(void) {
     qfloat_t x = qf_from_string("1");
@@ -223,7 +223,7 @@ W0(1) = 0.5671432904097838729999686622103575
 
 ```c
 #include <stdio.h>
-#include "number_t.h"
+#include "number-t.h"
 
 int main(void) {
     number_t x;
@@ -258,8 +258,8 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 
 ```c
 #include <stdio.h>
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 
 int main(void) {
     number_t a = num_create_from_string("2");
@@ -294,8 +294,8 @@ semantics and the `bench_number_scope` benchmark notes.
 
 ```c
 #include <stdio.h>
-#include "expression_t.h"
-#include "number_t.h"
+#include "expression-t.h"
+#include "number-t.h"
 
 /* f(x) = exp(sin(x)) + 3*x^2 - 7 */
 static expr_t *make_f(expr_t *x) {
@@ -378,7 +378,7 @@ f''(x)   = 3.8055231012396292258221776404244325549429604624756689463326935689439
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "matrix_t.h"
+#include "matrix-t.h"
 
 int main(void) {
     mat_bindings_t *bindings = NULL;

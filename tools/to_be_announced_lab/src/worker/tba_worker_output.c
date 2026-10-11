@@ -10,9 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime_t.h"
-#include "matrix_t.h"
-#include "number_t.h"
+#include "datetime-t.h"
+#include "matrix-t.h"
+#include "number-t.h"
 #include "tba_worker_internal.h"
 
 static int tba_worker_appendf(char **buf, size_t *len, size_t *cap, const char *fmt, ...)

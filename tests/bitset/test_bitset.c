@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "test_harness.h"
-#include "bitset_t.h"
+#include "bitset-t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

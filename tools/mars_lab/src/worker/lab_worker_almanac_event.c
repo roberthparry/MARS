@@ -15,8 +15,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "almanac_t.h"
-#include "sqlite_t.h"
+#include "almanac-t.h"
+#include "sqlite-t.h"
 
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "internal/almanac_internal.h"

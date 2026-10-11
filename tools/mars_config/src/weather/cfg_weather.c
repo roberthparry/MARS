@@ -3,7 +3,7 @@
  * @brief Native weather-account opt-in, private key persistence and terminal prompts.
  *
  * Replaces the weather installer script without contacting the provider. File I/O
- * uses file_t.h; terminal interaction uses stdio and termios. Literal string parsing
+ * uses file-t.h; terminal interaction uses stdio and termios. Literal string parsing
  * never executes configuration. A private exclusive temporary file is synced then
  * renamed, so a failed write cannot truncate the previous configuration.
  */
@@ -19,7 +19,7 @@
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
 #include "cfg_weather.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static string_t *cfg_weather_text(const char *text)
 {

@@ -5,17 +5,17 @@
  * Implements complex-number storage and supported operations using the multiprecision backend. It adapts that
  * representation to the shared number_t interface without exposing its allocation details.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 bool number_eq_same_tol_complex(const number_t *a, const number_t *b);
 

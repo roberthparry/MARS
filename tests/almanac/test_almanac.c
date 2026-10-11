@@ -15,13 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
-#include "sqlite_t.h"
-#include "almanac_t.h"
+#include "file-t.h"
+#include "sqlite-t.h"
+#include "almanac-t.h"
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac/almanac_internal.h"
-#include "datetime_t.h"
-#include "jurisdiction_t.h"
+#include "datetime-t.h"
+#include "jurisdiction-t.h"
 #include "spice_oracle.h"
 #include "test_harness.h"
 

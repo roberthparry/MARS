@@ -1,5 +1,5 @@
 /**
- * @file bitset_t.h
+ * @file bitset-t.h
  * @brief Dynamic, thread-safe bitset backed by a uint64_t arena.
  *
  * Use bitset_t for compact flags and membership indexed by non-negative integers.
@@ -7,7 +7,7 @@
  * iteration without allocating a separate object for each flag.
  *
  * This is appropriate for dense identifier ranges, occupancy maps and selection
- * masks. Use set_t.h instead when members are arbitrary values rather than bit
+ * masks. Use set-t.h instead when members are arbitrary values rather than bit
  * positions; very sparse, widely separated positions may need a different storage
  * strategy.
  *

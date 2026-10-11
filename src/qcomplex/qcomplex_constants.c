@@ -5,13 +5,13 @@
  * Defines fixed complex constants in terms of their extended real and imaginary components. These values provide
  * common identities and special values for the complex algorithms.
  *
- * This implements fixed double-double complex arithmetic through qcomplex_t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 
 #include <math.h>
 
-#include "qcomplex_t.h"
+#include "qcomplex-t.h"
 
 /* Exact and sentinel values. */
 const qcomplex_t QC_ZERO = {.re = {.hi = 0.0, .lo = 0.0}, .im = {.hi = 0.0, .lo = 0.0}};

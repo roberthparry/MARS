@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "lab_process.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

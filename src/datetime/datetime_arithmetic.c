@@ -5,7 +5,7 @@
  * Adds civil units and time intervals, refreshes cached Julian values and computes differences. This is the
  * implementation boundary for changing a date without leaving its civil fields and caches inconsistent.
  *
- * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

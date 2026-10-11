@@ -14,14 +14,14 @@
 
 #if !defined(MARS_EQUATION_INTERNAL_ACCESS) &&                                                                         \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "equation_internal.h is private to the equation module; include equation_t.h instead."
+#error "equation_internal.h is private to the equation module; include equation-t.h instead."
 #endif
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "equation_t.h"
-#include "number_t.h"
+#include "equation-t.h"
+#include "number-t.h"
 
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"

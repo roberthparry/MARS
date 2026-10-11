@@ -11,10 +11,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "diffequation_t.h"
-#include "equation_t.h"
-#include "expression_t.h"
-#include "string_t.h"
+#include "diffequation-t.h"
+#include "equation-t.h"
+#include "expression-t.h"
+#include "string-t.h"
 #include "lab_worker_internal.h"
 
 static const char *solve_status_name(de_solve_status_t status)

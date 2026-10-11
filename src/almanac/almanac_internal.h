@@ -14,10 +14,10 @@
 
 #if !defined(MARS_ALMANAC_INTERNAL_ACCESS) &&                                                                          \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "almanac_internal.h is private to the almanac module; include almanac_t.h instead."
+#error "almanac_internal.h is private to the almanac module; include almanac-t.h instead."
 #endif
 
-#include "almanac_t.h"
+#include "almanac-t.h"
 
 typedef struct _almanac_solar_totality_location_t {
     bool found;

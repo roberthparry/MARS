@@ -10,7 +10,7 @@
 #include <locale.h>
 #include <string.h>
 
-#include "regex_t.h"
+#include "regex-t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

@@ -16,13 +16,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_t.h"
-#include "datetime_t.h"
-#include "file_t.h"
-#include "jurisdiction_t.h"
-#include "sqlite_t.h"
+#include "array-t.h"
+#include "datetime-t.h"
+#include "file-t.h"
+#include "jurisdiction-t.h"
+#include "sqlite-t.h"
 #include "test_harness.h"
-#include "string_t.h"
+#include "string-t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

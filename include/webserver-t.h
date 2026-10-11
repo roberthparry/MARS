@@ -1,5 +1,5 @@
 /**
- * @file webserver_t.h
+ * @file webserver-t.h
  * @brief Bounded synchronous Linux web server with opaque handles.
  *
  * Use websrv_t to implement a listening web service with method-and-path routing,
@@ -9,7 +9,7 @@
  *
  * This module is suitable for local services, embedded endpoints and integration
  * tests. It supplies the shared webmethod_t type and HTTP_GET-style method constants.
- * Use http_t.h for client requests. Deployment requiring encrypted connections,
+ * Use http-t.h for client requests. Deployment requiring encrypted connections,
  * concurrent workers or persistent connections needs facilities beyond this server.
  *
  * No TLS, workers or persistent connections. Handles require external synchronisation.
@@ -20,10 +20,10 @@
 #define MARS_WEBSERVER_H
 #include <stdint.h>
 
-#include "dictionary_t.h"
-#include "string_t.h"
-#include "json_t.h"
-#include "xml_t.h"
+#include "dictionary-t.h"
+#include "string-t.h"
+#include "json-t.h"
+#include "xml-t.h"
 
 /** @brief HTTP request methods shared by the client and web server. */
 typedef enum {

@@ -9,8 +9,8 @@
  * or the machine-readable number and Function output formats.
  */
 
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 #include "lab_worker_internal.h"
 
 static string_t *lab_worker_number_real(number_t value, int precision)

@@ -16,7 +16,7 @@
 #include "internal/lab_evaluate_internal.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
-#include "number_t.h"
+#include "number-t.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 

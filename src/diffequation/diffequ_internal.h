@@ -3,7 +3,7 @@
  * @brief Private differential-equation problem and result structures.
  *
  * Stores the parsed equation, display forms, independent variables and conditions shared by construction, solving
- * and formatting code. Public callers inspect these through diffequation_t.h instead of accessing the layout.
+ * and formatting code. Public callers inspect these through diffequation-t.h instead of accessing the layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -16,10 +16,10 @@
 
 #if !defined(MARS_DIFFEQUATION_INTERNAL_ACCESS) &&                                                                     \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "diffequ_internal.h is private to the diffequation module; include diffequation_t.h instead."
+#error "diffequ_internal.h is private to the diffequation module; include diffequation-t.h instead."
 #endif
 
-#include "diffequation_t.h"
+#include "diffequation-t.h"
 
 struct _diffequ_t {
     equation_t *equation;

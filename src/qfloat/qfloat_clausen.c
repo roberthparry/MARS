@@ -5,7 +5,7 @@
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
  * representation determine the evaluation path.
  *
- * This implements fixed double-double real arithmetic through qfloat_t.h. Its approximately 106-bit representation
+ * This implements fixed double-double real arithmetic through qfloat-t.h. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
 

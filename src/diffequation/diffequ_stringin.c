@@ -5,7 +5,7 @@
  * Reads equation text, derivative syntax and initial or boundary conditions into native problem objects. It uses
  * the expression and equation parsers while preserving dependent-function identity.
  *
- * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 
@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "diffequation_t.h"
+#include "diffequation-t.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS

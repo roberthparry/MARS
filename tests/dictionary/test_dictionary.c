@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 #include "test_harness.h"
 #include "test_dict_layout.h"
 

@@ -3,7 +3,7 @@
  * @brief Controlled cross-module numeric interface.
  *
  * Declares selected representation queries, precision conversions and scoped numeric support needed by native MARS
- * modules. Callers should prefer number_t.h and use this guarded interface only where the public API is
+ * modules. Callers should prefer number-t.h and use this guarded interface only where the public API is
  * insufficient.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
@@ -15,10 +15,10 @@
 
 #if !defined(MARS_SHARED_NUMBER_INTERNAL_ACCESS) &&                                                                    \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/number_internal.h is private to the MARS implementation; include number_t.h instead."
+#error "internal/number_internal.h is private to the MARS implementation; include number-t.h instead."
 #endif
 
-#include "number_t.h"
+#include "number-t.h"
 
 number_t number_invalid(void);
 bool num_is_immortal(number_t number);

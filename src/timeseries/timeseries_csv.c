@@ -8,7 +8,7 @@
  */
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 
-#include "csv_t.h"
+#include "csv-t.h"
 #include "timeseries_internal.h"
 
 static bool ts_csv_column(csv_t *csv, const string_t *name, size_t *column)

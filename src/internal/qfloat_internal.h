@@ -3,7 +3,7 @@
  * @brief Controlled cross-module double-double support.
  *
  * Exposes selected coefficient tables and numerical helpers shared with other native numeric implementations. It
- * avoids exposing the whole qfloat private implementation; application code should include qfloat_t.h.
+ * avoids exposing the whole qfloat private implementation; application code should include qfloat-t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,12 +14,12 @@
 
 #if !defined(MARS_SHARED_QFLOAT_INTERNAL_ACCESS) &&                                                                    \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/qfloat_internal.h is private to the MARS implementation; include qfloat_t.h instead."
+#error "internal/qfloat_internal.h is private to the MARS implementation; include qfloat-t.h instead."
 #endif
 
 #include <stddef.h>
 
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 
 extern const size_t QFI_FADDEEVA_TERM_COUNT;
 extern const size_t QFI_LANCZOS_COEFF_COUNT;

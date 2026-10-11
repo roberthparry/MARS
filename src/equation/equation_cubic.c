@@ -5,14 +5,14 @@
  * Attempts rational factorisation and constructs supported cubic radical expressions, with coefficient-based
  * numerical support. This unit supplies degree-three solutions to the equation dispatcher.
  *
- * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS

@@ -3,14 +3,14 @@
  * @brief Private CSV import schema, conversion and transaction support.
  *
  * Shared only by SQLite's CSV implementation units. Public consumers use
- * sqlite_t.h; CSV syntax and stream ownership remain behind csv_t.h.
+ * sqlite-t.h; CSV syntax and stream ownership remain behind csv-t.h.
  */
 #ifndef MARS_SQLITE_CSV_INTERNAL_H
 #define MARS_SQLITE_CSV_INTERNAL_H
 
 #include <locale.h>
 
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 #include "sqlite_internal.h"
 
 /** @brief Owned column plan built before insertion. */

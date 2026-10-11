@@ -5,7 +5,7 @@
  * Implements core storage operations, element handling and shared matrix-function support, including triangular
  * divided-difference paths. Public operations dispatch through these foundations.
  *
- * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 
@@ -13,15 +13,15 @@
 #include <stdlib.h>
 #include <string.h>
 #define MARS_MATRIX_INTERNAL_ACCESS
-#include "matrix_t.h"
+#include "matrix-t.h"
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
-#include "number_t.h"
-#include "qcomplex_t.h"
-#include "qfloat_t.h"
+#include "number-t.h"
+#include "qcomplex-t.h"
+#include "qfloat-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)

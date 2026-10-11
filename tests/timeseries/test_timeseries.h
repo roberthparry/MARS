@@ -6,11 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime_t.h"
-#include "matrix_t.h"
-#include "number_t.h"
+#include "datetime-t.h"
+#include "matrix-t.h"
+#include "number-t.h"
 #include "test_harness.h"
-#include "timeseries_t.h"
+#include "timeseries-t.h"
 
 void run_timeseries_core_tests(void);
 void run_timeseries_output_tests(void);

@@ -11,7 +11,7 @@
 #define MARS_LAB_SERVER_H
 #include <stdint.h>
 
-#include "string_t.h"
+#include "string-t.h"
 
 /** @brief Opaque owner of a Lab listener and complete route set. */
 typedef struct lab_server lab_server_t;

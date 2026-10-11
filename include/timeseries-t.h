@@ -1,5 +1,5 @@
 /**
- * @file timeseries_t.h
+ * @file timeseries-t.h
  * @brief Datetime-indexed forecasting and time-series analysis API.
  *
  * Use this module for dated observations, calendar-aware analysis and forecasting
@@ -7,8 +7,8 @@
  * with numeric values so that alignment, missing observations and forecast periods
  * can be handled explicitly.
  *
- * It combines datetime_t.h indexing with number_t.h arithmetic and statistical model
- * results. Choose matrix_t.h for unindexed numerical tables; this module adds temporal
+ * It combines datetime-t.h indexing with number-t.h arithmetic and statistical model
+ * results. Choose matrix-t.h for unindexed numerical tables; this module adds temporal
  * semantics and supported forecasting workflows rather than a general real-time
  * stream-processing engine.
  *
@@ -34,9 +34,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "datetime_t.h"
-#include "matrix_t.h"
-#include "number_t.h"
+#include "datetime-t.h"
+#include "matrix-t.h"
+#include "number-t.h"
 
 /** @brief Opaque series owning observations, missing flags and optional datetime indices. */
 typedef struct _timeseries_t timeseries_t;

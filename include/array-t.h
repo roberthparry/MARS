@@ -1,5 +1,5 @@
 /**
- * @file array_t.h
+ * @file array-t.h
  * @brief Generic, opaque, appendable, and sortable array container.
  *
  * Use array_t for ordered collections of fixed-size elements that permit duplicates,

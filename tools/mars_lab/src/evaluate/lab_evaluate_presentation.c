@@ -12,8 +12,8 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 #include "lab_presentation.h"
 #include "lab_evaluate_internal.h"
 #include "lab_presentation_internal.h"

@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "../expression/test_expr.h"
-#include "matrix_t.h"
+#include "matrix-t.h"
 #include "test_harness.h"
 
 const test_validity_contract_t *matrix_validity_contract_double_default(void);

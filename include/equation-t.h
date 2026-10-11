@@ -1,5 +1,5 @@
 /**
- * @file equation_t.h
+ * @file equation-t.h
  * @brief Algebraic equations, symbolic isolation and numerical root solving.
  *
  * The opaque equation_t type represents two expressions joined by equality, with
@@ -11,7 +11,7 @@
  * surds where possible; numerical solving is available where an exact solution is
  * not obtained. General equations are not guaranteed to have closed-form solutions.
  *
- * Use expression_t.h for the underlying symbolic expressions and diffequation_t.h for
+ * Use expression-t.h for the underlying symbolic expressions and diffequation-t.h for
  * differential equations. Respect the documented ownership of equation handles,
  * solution collections and borrowed entries within those collections.
  */
@@ -23,7 +23,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "expression_t.h"
+#include "expression-t.h"
 
 typedef struct _equation_t equation_t;
 typedef struct _equation_solutions_t equation_solutions_t;

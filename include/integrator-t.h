@@ -1,5 +1,5 @@
 /**
- * @file integrator_t.h
+ * @file integrator-t.h
  * @brief Adaptive number_t-based numerical integrators.
  *
  * Use integrator_t to calculate definite integrals of MARS expressions with explicit
@@ -27,7 +27,7 @@
 
 #include <stddef.h>
 
-#include "expression_t.h"
+#include "expression-t.h"
 
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;

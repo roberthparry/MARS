@@ -5,7 +5,7 @@
  * Formats complex values through the MARS string and output helpers. It preserves real and imaginary components
  * rather than narrowing the result to ordinary complex double.
  *
- * This implements fixed double-double complex arithmetic through qcomplex_t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 
@@ -15,8 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex_t.h"
-#include "string_t.h"
+#include "qcomplex-t.h"
+#include "string-t.h"
 
 typedef struct {
     char conversion;

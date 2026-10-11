@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "checks_process.h"
 #include "checks_coverage.h"
 
@@ -142,7 +142,7 @@ static checks_strings_t *checks_coverage_files(const string_t *directory, const 
 
 static checks_strings_t *checks_coverage_public(const string_t *root)
 {
-    string_t *path = checks_path(root, "include/file_t.h");
+    string_t *path = checks_path(root, "include/file-t.h");
     string_t *header = checks_read(path);
     string_free(path);
     if (!header)
@@ -396,7 +396,7 @@ int checks_coverage(const string_t *root, int argc, char **argv)
     checks_coverage_source_t *sources = NULL;
     int result = 2;
     if (!reports || !expected || !public) {
-        fprintf(stderr, "file-coverage: cannot read report directory, src/file or include/file_t.h\n");
+        fprintf(stderr, "file-coverage: cannot read report directory, src/file or include/file-t.h\n");
         goto done;
     }
     result = 1;

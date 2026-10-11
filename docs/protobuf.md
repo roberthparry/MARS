@@ -1,6 +1,6 @@
 # Protocol Buffers
 
-Include `protobuf_t.h` to encode and decode bounded Protocol Buffers wire
+Include `protobuf-t.h` to encode and decode bounded Protocol Buffers wire
 messages in native C. No external Protocol Buffers library is required.
 
 Protocol Buffers is a **binary data format**, not a transport. The
@@ -113,7 +113,7 @@ This is also `scratch/protobuf_roundtrip.c`. The field numbers correspond to
 an application schema with an unsigned integer field 1 and string field 2.
 
 ```c
-#include "protobuf_t.h"
+#include "protobuf-t.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>

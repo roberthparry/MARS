@@ -5,7 +5,7 @@
  * Implements borrowed views, parsing cursors, builders, search and normalisation support. These helpers allow text
  * processing to stay in the string_t abstraction without exposing mutable storage.
  *
- * This belongs to string_t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string-t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 
@@ -38,7 +38,7 @@
 
 #define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Views */
 

@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#include "dictionary_t.h"
+#include "dictionary-t.h"
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"

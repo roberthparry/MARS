@@ -5,7 +5,7 @@
  * Escapes and validates XML content while writing to supported sinks and serialised storage. Output preserves tree
  * semantics rather than the original entity spelling or whitespace layout.
  *
- * This is part of xml_t.h's native implementation. Keep input bounded and reject unsupported external-entity
+ * This is part of xml-t.h's native implementation. Keep input bounded and reject unsupported external-entity
  * features; HTTP and SOAP transport belong to the HTTP module.
  */
 
@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
+#include "file-t.h"
 
 #define MARS_XML_INTERNAL_ACCESS
 #include "xml_internal.h"

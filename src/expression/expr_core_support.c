@@ -5,7 +5,7 @@
  * Copies graph metadata and creates independent or symbol-linked clones. These helpers support transformations
  * that must preserve symbol relationships without accidentally sharing mutable graph state.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -16,10 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "expression_t.h"
+#include "expression-t.h"
 
 typedef struct expr_default_constant_alias {
     const char *key;

@@ -20,7 +20,7 @@ copies on removal or destruction.
 
 ```c
 #include <stdio.h>
-#include "array_t.h"
+#include "array-t.h"
 
 int main(void) {
     array_t *arr = array_create(sizeof(int), NULL, NULL);
@@ -48,7 +48,7 @@ int main(void) {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "array_t.h"
+#include "array-t.h"
 
 struct deep {
     char *name;
@@ -181,7 +181,7 @@ A lightweight view into a subrange of an `array_t`. Slices do not copy elements 
 
 ```c
 #include <stdio.h>
-#include "array_t.h"
+#include "array-t.h"
 
 int main(void) {
     array_t *arr = array_create(sizeof(int), NULL, NULL);
@@ -210,7 +210,7 @@ int main(void) {
 
 ```c
 #include <stdio.h>
-#include "array_t.h"
+#include "array-t.h"
 
 static int cmp_int(const void *a, const void *b) {
     return *(const int*)a - *(const int*)b;
@@ -251,7 +251,7 @@ array (unchanged): 7 3 9 1 5
 
 ```c
 #include <stdio.h>
-#include "array_t.h"
+#include "array-t.h"
 
 int main(void) {
     array_t *arr = array_create(sizeof(int), NULL, NULL);
@@ -305,7 +305,7 @@ A LIFO stack backed by an `array_t`. Supports the same ownership model as `array
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "array_t.h"
+#include "array-t.h"
 
 int main(void) {
     stack_t *s = stack_create(sizeof(int), NULL, NULL);
@@ -337,7 +337,7 @@ int main(void) {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "array_t.h"
+#include "array-t.h"
 
 static void str_clone(void *dst, const void *src) {
     const char **s = (const char**)src;

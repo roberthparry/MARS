@@ -16,9 +16,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "file_t.h"
-#include "sqlite_t.h"
-#include "string_t.h"
+#include "file-t.h"
+#include "sqlite-t.h"
+#include "string-t.h"
 
 #include "test_lab_support.h"
 

@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "test_harness.h"
-#include "array_t.h"
+#include "array-t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

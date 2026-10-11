@@ -5,7 +5,7 @@
  * Handles supported power, square-root, cube-root and general-root nodes. The rules distinguish exponent and
  * argument structure so integration is performed with respect to the intended variable.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

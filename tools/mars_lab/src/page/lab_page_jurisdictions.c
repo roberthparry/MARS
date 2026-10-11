@@ -12,7 +12,7 @@
  */
 #include <string.h>
 
-#include "jurisdiction_t.h"
+#include "jurisdiction-t.h"
 #include "lab_forms.h"
 #include "lab_page.h"
 

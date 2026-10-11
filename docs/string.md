@@ -20,7 +20,7 @@ sequences as characters.
 ## Example: Basic Text Manipulation
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_with("Héllo");
@@ -44,7 +44,7 @@ H🙂éllo 🌍
 ## Example: Unicode Text Just Works
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 café 🇬🇧");
@@ -79,7 +79,7 @@ Reversed: 🇬🇧 éfac 👨‍👩‍👧‍👦
 ## Example: Escaping Wide C Strings
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_wide(L"hello π");
@@ -100,7 +100,7 @@ hello π
 ## Example: Character Iteration
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
@@ -139,7 +139,7 @@ slices without inspecting raw storage.
 
 ```c
 #include <stdbool.h>
-#include "string_t.h"
+#include "string-t.h"
 
 static bool name_rune(rune_t rune) {
     return rune_is_alpha_numeric(rune) || rune_is_equal(rune, '_');
@@ -251,7 +251,7 @@ id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]
 ## Example: Fixed-Capacity Buffer
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void) {
     char storage[64];
@@ -331,7 +331,7 @@ raw bytes.
 
 ## API Reference
 
-All declarations are in `include/string_t.h`.
+All declarations are in `include/string-t.h`.
 
 ### Types
 
@@ -396,7 +396,7 @@ Use `%S` for `const string_t *`, `%W` for `string_view_t`, and `%R` for
 
 ```c
 #include <stdio.h>
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void)
 {
@@ -646,7 +646,7 @@ The return value is zero on success or -1 for invalid input, overflow or
 allocation failure. The caller owns both the destination and source storage.
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void)
 {
@@ -700,7 +700,7 @@ unrepresentable storage size gives `EOVERFLOW`. Time and storage are linear in t
 input size; output never exceeds its input byte count.
 
 ```c
-#include "string_t.h"
+#include "string-t.h"
 
 int main(void)
 {

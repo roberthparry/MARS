@@ -6,7 +6,7 @@
  * configuration. Use this unit when changing resource ownership or restoring an engine, rather than numerical
  * event geometry.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 
@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "almanac_engine_internal.h"
 
 void almanac_set_error(almanac_t *almanac, const char *message)

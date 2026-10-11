@@ -5,16 +5,16 @@
  * Adapts qfloat_t operations to the shared numeric value interface. It keeps fixed extended precision distinct
  * from MPFR-backed configurable precision.
  *
- * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <stdlib.h>
 
-#include "number_t.h"
+#include "number-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 /* Extract the double-double payload through its original storage representation. */
 qfloat_t number_inline_qfloat(number_t number)

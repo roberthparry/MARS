@@ -7,7 +7,7 @@
  * existing domain and endpoint behaviour and remain separate from the guarded cylindrical-function adapters.
  */
 
-#include "qfloat_t.h"
+#include "qfloat-t.h"
 
 static qfloat_t polynomial(unsigned long degree, qfloat_t x, unsigned family)
 {

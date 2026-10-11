@@ -10,7 +10,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 
-#include "file_t.h"
+#include "file-t.h"
 #include "test_harness.h"
 #include "checks_evidence.h"
 #include "test_checks.h"

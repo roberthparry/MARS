@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation_t.h"
-#include "expression_t.h"
+#include "equation-t.h"
+#include "expression-t.h"
 #include "test_harness.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"

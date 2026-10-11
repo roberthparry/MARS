@@ -5,7 +5,7 @@
  * Runs rewrite stages and tracks simplification state across graph nodes. Structural matchers, term handling and
  * individual algebraic rules are separated into companion files.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "string_t.h"
+#include "string-t.h"
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"

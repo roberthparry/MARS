@@ -5,7 +5,7 @@
  * Performs the upgrade using the HTTP client's TLS, credential and header policies and owns connection lifetime.
  * Message framing and deadline-aware socket operations are implemented in the I/O companion.
  *
- * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

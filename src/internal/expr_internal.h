@@ -15,7 +15,7 @@
 
 #if !defined(MARS_SHARED_EXPR_INTERNAL_ACCESS) &&                                                                      \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "internal/expr_internal.h is private to the MARS implementation; include expression_t.h instead."
+#error "internal/expr_internal.h is private to the MARS implementation; include expression-t.h instead."
 #endif
 
 #ifndef EXPR_INTERNAL_H
@@ -23,8 +23,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "expression_t.h"
-#include "string_t.h"
+#include "expression-t.h"
+#include "string-t.h"
 
 typedef enum expr_integration_bound_kind {
     EXPR_INTEGRATION_BOUND_DEFINITE = 0,

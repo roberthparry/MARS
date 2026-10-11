@@ -5,7 +5,7 @@
  * Recognises triangular coefficient structure, constructs characteristic charts and verifies their solution forms.
  * Presentation retains the chart and parameter restrictions needed to interpret the result.
  *
- * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

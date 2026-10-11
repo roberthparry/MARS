@@ -5,7 +5,7 @@
  * Tracks and presents restrictions on transform results and specialises supplied constants when they settle those
  * restrictions. It supports consistent native results across expression, function and TeX output.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

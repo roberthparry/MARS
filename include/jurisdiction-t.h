@@ -1,5 +1,5 @@
 /**
- * @file jurisdiction_t.h
+ * @file jurisdiction-t.h
  * @brief Jurisdiction-aware holidays, working days and local-time rules.
  *
  * The configured jurisdiction engine combines rule data with datetime_t values to
@@ -12,7 +12,7 @@
  * Use this module for business calendars and calculations whose result depends on
  * local rules, rather than calendar arithmetic alone. Results depend on the
  * coverage and currency of the configured database; they do not establish legal
- * requirements independently of that data. Use datetime_t.h for the underlying
+ * requirements independently of that data. Use datetime-t.h for the underlying
  * date representation and ordinary date calculations.
  */
 
@@ -21,8 +21,8 @@
 
 #include <stdbool.h>
 
-#include "array_t.h"
-#include "datetime_t.h"
+#include "array-t.h"
+#include "datetime-t.h"
 
 /**
  * @brief Opaque jurisdiction policy engine backed by configured rule data.

@@ -5,7 +5,7 @@
  * Decomposes supported rational forms and constructs exact logarithmic, circular or radical terms, including
  * palindromic quartics. This is a symbolic reduction path, not numerical pole avoidance.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

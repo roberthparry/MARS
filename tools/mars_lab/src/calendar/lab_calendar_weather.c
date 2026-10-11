@@ -12,8 +12,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "datetime_t.h"
-#include "http_t.h"
+#include "datetime-t.h"
+#include "http-t.h"
 #include "lab_calendar_internal.h"
 
 static bool lab_cal_provider_number(const json_t *day, const char *key, double *value)

@@ -7,8 +7,8 @@
  * neither the solver's algebra nor the numerical values are changed by presentation.
  */
 
-#include "number_t.h"
-#include "string_t.h"
+#include "number-t.h"
+#include "string-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

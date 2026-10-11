@@ -5,7 +5,7 @@
  * Creates the listener, registers method-and-path handlers and serves individual connections. The application owns
  * the synchronous serving loop; worker pools and TLS termination are not implemented here.
  *
- * This is part of webserver_t.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * This is part of webserver-t.h's synchronous Linux listener. The HTTP client is a separate module; this
  * implementation does not supply a production worker pool or TLS terminator.
  */
 

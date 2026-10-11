@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include "lab_calendar_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 static bool lab_cal_markup_text(string_t *out, const char *value)
 {

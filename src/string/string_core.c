@@ -5,14 +5,14 @@
  * Allocates and manages string_t storage and implements construction, mutation and formatting. Normalisation and
  * validation policies are maintained at text boundaries rather than delegated to raw caller buffers.
  *
- * This belongs to string_t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string-t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 
 /* string_core.c - memory management, mutation, and formatting for string_t
  *
  * Implements the lifecycle and core mutation operations for the dynamic UTF-8
- * string type defined in string_t.h:
+ * string type defined in string-t.h:
  *
  *   Allocation/free  — string_new, string_new_with, string_clone, string_free
  *   Capacity         — string_reserve (internal), the doubling growth policy
@@ -37,7 +37,7 @@
 #include <wchar.h>
 
 #define MARS_STRING_INTERNAL_ACCESS
-#include "string_t.h"
+#include "string-t.h"
 #include "string_internal.h"
 
 static bool string_utf8_decode_one_strict(const char *data, size_t len, uint32_t *out)

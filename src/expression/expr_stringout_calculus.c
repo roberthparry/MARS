@@ -5,7 +5,7 @@
  * Renders calculus nodes, argument lists and executable integral forms for the output styles. It keeps calculus
  * operators and their bounds structurally distinct from surrounding coefficients.
  *
- * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -26,10 +26,10 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression_t.h"
+#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string_t.h"
+#include "string-t.h"
 
 void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 {
