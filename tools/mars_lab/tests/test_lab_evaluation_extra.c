@@ -144,6 +144,79 @@ static void test_lab_extra_equation(void)
     expect_response("/equation-eval", "{\"equation\":\"x^2=4\",\"precision\":40}", 200u, "solutions", "2");
 }
 
+static void test_lab_extra_equation_real_surd_numerics(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/equation-eval",
+                               "{\"equation\":\"x^4-x^3-26x^2+4x+8=0\",\"precision\":78}", &status);
+    const json_t *roots = test_lab_member(response, "numeric_solutions");
+    bool ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 4u &&
+              contains(response, "solutions", "√");
+    for (size_t i = 0u; i < json_array_size(roots); ++i) {
+        const string_t *root = json_string_value(json_array_get(roots, i));
+        ok = root && string_find(root, "i") < 0 && string_find(root, "≈") >= 0 &&
+             string_find(root, "E") < 0 && string_find(root, "e") < 0 && string_find(root, "×10") < 0 && ok;
+    }
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "78-digit quartic approximations retain four real roots and their exact surds");
+
+    response = request("/equation-eval", "{\"equation\":\"x=1+i/10^90\",\"precision\":78}", &status);
+    roots = test_lab_member(response, "numeric_solutions");
+    ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 1u;
+    for (size_t i = 0u; i < json_array_size(roots); ++i) {
+        const string_t *root = json_string_value(json_array_get(roots, i));
+        ok = root && string_find(root, "×10⁻⁹⁰i") >= 0 && string_find(root, "E") < 0 && ok;
+    }
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "genuine imaginary components of 1e-90 are not suppressed at 78 digits");
+}
+
+static void test_lab_extra_equation_decimal_notation(void)
+{
+    const struct {
+        const char *input;
+        const char *expected;
+    } cases[] = {
+        {"x=sqrt(2)/10000", "0.00014142135623730950488"},
+        {"x=-sqrt(2)/10000", "-0.00014142135623730950488"},
+        {"x=sqrt(2)/100000", "1.4142135623730950488 ×10⁻⁵"},
+        {"x=-sqrt(2)*1e-12", "-1.4142135623730950488 ×10⁻¹²"},
+        {"x=sqrt(2)*1e20", "141421356237309504880"},
+        {"x=sqrt(2)*1e5000", "1.4142135623730950488 ×10⁵⁰⁰⁰"},
+        {"x=0.00001+0.0000002i", "1 ×10⁻⁵ + 2 ×10⁻⁷i"},
+        {"x=-0.0000002i", "-2 ×10⁻⁷i"},
+        {"x=1+i", "1 + i"},
+        {"x=0", "0"},
+    };
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *payload = string_sprintf("{\"equation\":\"%s\",\"precision\":20}", cases[i].input);
+        unsigned status = 0u;
+        json_t *response = payload ? request("/equation-eval", string_c_str(payload), &status) : NULL;
+        const json_t *roots = test_lab_member(response, "numeric_solutions");
+        const string_t *root = json_string_value(json_array_get(roots, 0u));
+        string_offset_t separator = root ? string_find(root, "≈ ") : -1;
+        size_t prefix = 4u;
+        if (separator < 0) {
+            separator = root ? string_find(root, "= ") : -1;
+            prefix = 2u;
+        }
+        string_view_t rhs = root && separator >= 0
+            ? string_view_slice(string_view_all(root), (size_t)separator + prefix, string_byte_length(root))
+            : string_view_empty();
+        bool ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 1u &&
+                  string_view_equals_literal(rhs, cases[i].expected);
+        if (!ok)
+            string_printf("%s: expected %s; received %S\n", cases[i].input, cases[i].expected, root);
+        json_free(response);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "equation numerics use decimals or Unicode powers of ten, never E notation");
+    }
+}
+
 static void test_lab_extra_diffequation(void)
 {
     expect_response("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", 200u, "solutions", "y");
@@ -334,6 +407,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_derivative, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integrator, tests, NULL);

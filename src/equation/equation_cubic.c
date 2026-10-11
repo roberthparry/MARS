@@ -602,8 +602,9 @@ static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, numb
     expr_t *u = negative ? expr_simplify_owned(expr_neg(cube)) : expr_clone(cube);
     number_t minus_p_third = equ_div_long(p, -3L);
     expr_t *product = expr_new_const(minus_p_third);
-    /* Couple the branches through u*v=-p/3 rather than taking independent complex cube roots. */
-    expr_t *v = expr_simplify_owned(expr_div(product, u));
+    /* When the discriminant is negative, u*v=-p/3=|u|^2: keep the conjugate
+     * relationship explicit so real roots do not retain imaginary round-off. */
+    expr_t *v = expr_simplify_owned(num_lt(discriminant, NUM_ZERO) ? expr_conj(u) : expr_div(product, u));
     expr_t *offset = expr_new_const(shift);
     expr_t *omega = equ_cubic_omega_expr(false);
     expr_t *conjugate = equ_cubic_omega_expr(true);

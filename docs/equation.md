@@ -188,7 +188,12 @@ including Ophelia RUN output. When no rational quadratic factor is certified,
 non-degenerate exact real-coefficient quartics use Ferrari's formula with paired
 cube-root branches. These solutions retain nested square and cube roots in the
 native solution set, Lab cards and Ophelia RUN output; complex intermediate
-radicals can occur even for real roots. Degenerate cases keep the existing
+radicals can occur even for real roots. Where the cubic or quartic construction
+proves that paired cube roots are complex conjugates, the native formula retains
+that relationship explicitly. Their imaginary components then cancel during
+numerical evaluation, rather than leaving round-off in real-root approximations.
+No small-imaginary-component display cutoff is applied; genuinely complex roots
+retain their imaginary parts. Degenerate cases keep the existing
 biquadratic or repeated-root handling, and inexact or complex coefficients keep
 the numerical fallback. Rounded root values are never promoted to exact surds.
 

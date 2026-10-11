@@ -421,8 +421,9 @@ Supported format specifiers:
 - `%N` — scientific form for floating-point and complex values, otherwise the
   ordinary exact form
 
-Both specifiers render an exactly zero complex value as `0`, without an
-imaginary suffix, regardless of its storage backend. Small nonzero components
+Both specifiers render an exactly zero complex value as `0`. A nonzero real
+value stored in a complex backend is formatted as its real component, without
+a redundant zero imaginary suffix. Small nonzero imaginary components
 are not treated as zero; field width, padding and explicit sign flags still apply.
 
 Examples:

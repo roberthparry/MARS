@@ -49,6 +49,30 @@ void run_number_formatting_tests(void)
     }
 
     {
+        char buf[256], expected[256];
+        number_t reals[] = {
+            num_create_from_cdouble(CMPLX(1.25, 0.0)),
+            num_create_from_cdouble(CMPLX(-1.25, -0.0)),
+            num_create_from_qcomplex(qc_make(qf_from_double(1.25), QF_ZERO)),
+            num_create_from_string("5/4 + 0i"),
+            num_create_from_string("1.25 + 0.0i")
+        };
+        const char *formats[] = {"%n", "%.40n", "%N", "%.40N", "%+12.3n"};
+        for (size_t i = 0u; i < sizeof(reals) / sizeof(*reals); ++i) {
+            number_t real = num_real_part(reals[i]);
+            ASSERT_TRUE(num_is_real(reals[i]));
+            for (size_t j = 0u; j < sizeof(formats) / sizeof(*formats); ++j) {
+                ASSERT_TRUE(num_sprintf(buf, sizeof(buf), formats[j], reals[i]) > 0);
+                ASSERT_TRUE(num_sprintf(expected, sizeof(expected), formats[j], real) > 0);
+                ASSERT_TRUE(strcmp(buf, expected) == 0);
+                ASSERT_TRUE(strchr(buf, 'i') == NULL);
+            }
+            num_destroy(&real);
+            num_destroy(&reals[i]);
+        }
+    }
+
+    {
         char buf[512];
         number_t dec = num_create_from_string("32.123");
         number_t rat = num_create_from_string("5/6");

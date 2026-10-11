@@ -1436,6 +1436,44 @@ static void test_equation_solves_expanded_quartic_four_real_roots(void)
     equ_free(equation);
 }
 
+static void test_equation_surd_conjugate_cancellation(void)
+{
+    const size_t precisions[] = {40u, 86u, 164u};
+    const struct {
+        const char *source;
+        size_t count;
+        bool real;
+    } cases[] = {
+        {"x^4-x^3-26x^2+4x+8=0", 4u, true},
+        {"x^4-5x^2+x+1=0", 4u, true},
+        {"x^3-3x+1=0", 3u, true},
+        {"x^4+x^3+x^2+x+1=0", 4u, false},
+    };
+    size_t saved_bits = num_get_default_prec_bits();
+    bool ok = true;
+
+    for (size_t p = 0u; p < sizeof(precisions) / sizeof(*precisions); ++p) {
+        num_set_default_prec_digits(precisions[p]);
+        for (size_t c = 0u; c < sizeof(cases) / sizeof(*cases); ++c) {
+            equation_t *equation = equ_from_string(cases[c].source);
+            equation_solutions_t *solutions = equation ? equ_derive_solutions(equation) : NULL;
+            ok = ok && solutions && equ_solutions_count(solutions) == cases[c].count;
+            for (size_t i = 0u; solutions && i < equ_solutions_count(solutions); ++i) {
+                number_t value = expr_eval(equ_rhs(equ_solutions_at(solutions, i)));
+                ok = num_is_finite(value) && num_is_real(value) == cases[c].real && ok;
+                num_destroy(&value);
+            }
+            if (solutions)
+                ok = test_equation_all_solutions_satisfy(equation, equ_binding(equation, "x"),
+                                                        solutions, "1e-30") && ok;
+            equ_solutions_free(solutions);
+            equ_free(equation);
+        }
+    }
+    num_set_default_prec_bits(saved_bits);
+    ASSERT_TRUE(ok);
+}
+
 static void test_equation_solves_expanded_quartic_complex_roots(void)
 {
     equation_t *equation = equ_from_string("x^4 + 5*x^2 + 4 = 0");
@@ -2241,6 +2279,7 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_solves_cubic_with_numeric_parameter_bindings, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_symbolic_cubic_cardano, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_expanded_quartic_four_real_roots, NULL);
+    TEST_RUN_SUBTEST(test_equation_surd_conjugate_cancellation, NULL);
     TEST_RUN_SUBTEST(test_equation_solves_expanded_quartic_complex_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_deduplicates_repeated_quartic_root, NULL);
     TEST_RUN_SUBTEST(test_equation_deduplicates_repeated_irrational_quartic_roots, NULL);

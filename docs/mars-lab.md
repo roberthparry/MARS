@@ -1515,6 +1515,14 @@ The wider design remains in the
 
 ## Equation mode
 
+Numerical solution rows normally use ordinary decimal notation at the selected
+significant-digit precision. Values below `0.0001` use `×10` with a superscript
+exponent instead of `E` notation. Real and imaginary components follow the same
+rule, including genuinely tiny imaginary components. Positive exponents are
+expanded to decimal notation up to exponent 4096; larger magnitudes retain the
+compact superscript form to bound output size. Exact symbolic solutions and
+Function-card source are not rewritten by this display policy.
+
 Zeta equations with an unset unknown use a bounded multi-start Newton search.
 For a zero target, the cards show up to forty numerically verified non-trivial
 zeros in the critical strip up to imaginary magnitude eighty; the trivial

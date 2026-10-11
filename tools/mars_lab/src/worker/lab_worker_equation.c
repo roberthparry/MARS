@@ -61,29 +61,11 @@ static char *number_text_dup(number_t value)
     return copy;
 }
 
-static char *number_precision_text_dup(number_t value, int precision, bool scientific)
+static char *number_precision_text_dup(number_t value, int precision)
 {
-    char fmt[32];
-    int digits = precision > 0 ? precision - (scientific ? 1 : 0) : 0;
-    int needed;
-    char *out;
-
-    if (precision <= 0)
-        return number_text_dup(value);
-
-    snprintf(fmt, sizeof(fmt), "%%.%d%c", digits, scientific ? 'N' : 'n');
-    needed = num_sprintf(NULL, 0u, fmt, value);
-    if (needed < 0)
-        return NULL;
-
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    if (num_sprintf(out, (size_t)needed + 1u, fmt, value) < 0) {
-        free(out);
-        return NULL;
-    }
-
+    string_t *text = lab_worker_number_text(value, precision);
+    char *out = text ? dup_string(string_c_str(text)) : NULL;
+    string_free(text);
     return out;
 }
 
@@ -544,8 +526,8 @@ static char *solution_pair_rhs_text(number_t value, int precision, bool use_TeX)
     number_t real = num_real_part(value);
     number_t imaginary = num_imag_part(value);
     number_t magnitude = num_abs(imaginary);
-    char *real_text = use_TeX ? number_TeX_dup(real) : number_precision_text_dup(real, precision, false);
-    char *imaginary_text = use_TeX ? number_TeX_dup(magnitude) : number_precision_text_dup(magnitude, precision, false);
+    char *real_text = use_TeX ? number_TeX_dup(real) : number_precision_text_dup(real, precision);
+    char *imaginary_text = use_TeX ? number_TeX_dup(magnitude) : number_precision_text_dup(magnitude, precision);
     char *text = NULL;
 
     if (real_text && imaginary_text) {
@@ -1011,7 +993,7 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
         char note[64];
         number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), branch_parameter, &sampled_k,
                                                                 &sampled_branch, &exact);
-        char *value_text = number_precision_text_dup(value, precision, true);
+        char *value_text = number_precision_text_dup(value, precision);
         const char *relation = exact ? "=" : "≈";
 
         sample_note(note, sizeof(note), sampled_k, sampled_branch, branch_parameter);

@@ -222,6 +222,12 @@ static string_t *number_format_value_text(number_t value, char spec, int precisi
     /* Exact complex zero has no imaginary component, irrespective of its storage backend. */
     if (number_vt(&value)->is_complex && num_is_zero(value))
         return string_new_with("0");
+    if (number_vt(&value)->is_complex && num_is_real(value)) {
+        number_t real = num_real_part(value);
+        string_t *text = number_format_value_text(real, spec, precision);
+        num_destroy(&real);
+        return text;
+    }
     if (num_is_exact(value) && !number_vt(&value)->is_complex)
         return num_to_string(value);
     return number_format_inexact_text(&value, spec == 'N', precision);

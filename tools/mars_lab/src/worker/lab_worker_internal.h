@@ -10,6 +10,17 @@
 #ifndef MARS_LAB_WORKER_INTERNAL_H
 #define MARS_LAB_WORKER_INTERNAL_H
 
+#include "number.h"
+#include "ustring.h"
+
+/**
+ * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.
+ * @param value Borrowed value; nonzero imaginary components are retained.
+ * @param precision Significant decimal digits, or non-positive to use the current default.
+ * @return Caller-owned text, released with string_free, or NULL on allocation failure.
+ */
+string_t *lab_worker_number_text(number_t value, int precision);
+
 /**
  * @brief Runs the built-in expression calculation.
  * @param argc Argument count including the mode name.

@@ -117,6 +117,7 @@ int equ_try_quartic_radicals(const number_t *coeffs, const expr_t *wrt, equation
     number_t q_value = expr_eval(q);
     number_t discriminant_value = expr_eval(discriminant);
     bool degenerate = num_is_zero(q_value) || num_is_zero(discriminant_value);
+    bool conjugate_pair = num_lt(discriminant_value, NUM_ZERO);
     num_destroy(&discriminant_value);
     num_destroy(&q_value);
     if (degenerate)
@@ -133,9 +134,12 @@ int equ_try_quartic_radicals(const number_t *coeffs, const expr_t *wrt, equation
     number_t third = num_create_from_frac(1L, 3L);
     expr_t *big_q = keep(&work, expr_pow(argument, &third));
     num_destroy(&third);
+    /* For a negative resolvent discriminant, |Q|^2 = delta0 exactly. Evaluating the
+     * equivalent conjugate pair avoids imaginary round-off in their real sum. */
+    expr_t *paired_q = keep(&work, conjugate_pair ? expr_conj(big_q) : expr_div(delta0, big_q));
     expr_t *z = constant_expression(&work, divide(&work, scale(&work, p, -2L), 3L));
     expr_t *squared = add(&work, z, divide(&work,
-        add(&work, big_q, keep(&work, expr_div(delta0, big_q))), 3L));
+        add(&work, big_q, paired_q), 3L));
     expr_t *s = divide(&work, keep(&work, expr_sqrt(squared)), 2L);
     expr_t *shift = constant_expression(&work, divide(&work, scale(&work, b, -1L), 4L));
     expr_t *base = sub(&work, scale(&work, power(&work, s, 2L), -4L), scale(&work, p, 2L));
