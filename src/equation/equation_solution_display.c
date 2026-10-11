@@ -5,15 +5,15 @@
  * Orders solutions and produces compact text with shared structure retained where possible. It works on solver
  * results rather than altering the mathematical equation to fit an output format.
  *
- * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation.h"
-#include "ustring.h"
+#include "equation_t.h"
+#include "string_t.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

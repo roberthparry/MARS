@@ -53,6 +53,7 @@ This directory contains the longer module documentation for MARS.
 - [`dictionary_t`](./dictionary.md) — generic key/value storage
 - [`set_t`](./set.md) — generic set storage
 - [`array_t`](./array.md) — generic array storage
+- [`regex_t`](./regex.md) — compiled UTF-8 regular expressions and capture spans
 - [`string_t`](./string.md) — UTF-8-aware dynamic strings
 - [`bitset_t`](./bitset.md) — dynamic thread-safe bitset
 - [`integrator_t`](./integrator.md) — adaptive G7K15 / Turan T15/T4 integrator with symbolic fast paths

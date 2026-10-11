@@ -5,7 +5,7 @@
  * Constructs function representations for expressions, transforms and calculus requests, including parameters and
  * initialisations. It preserves executable syntax while sharing the same native algebra as other result styles.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

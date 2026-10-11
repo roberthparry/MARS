@@ -5,7 +5,7 @@
  * Loads catalogue model records, nutation terms and position or frame-rotation segments. This unit owns the
  * translation from stored model data to the structures used by ephemeris evaluation.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

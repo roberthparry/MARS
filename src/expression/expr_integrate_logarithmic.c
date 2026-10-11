@@ -5,7 +5,7 @@
  * Builds supported logarithmic antiderivatives and related reciprocal-quadratic reductions. It handles symbolic
  * coefficients without treating a numeric binding as an algebraic constant substitution.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

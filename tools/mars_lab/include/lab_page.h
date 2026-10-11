@@ -10,7 +10,7 @@
 #ifndef MARS_LAB_PAGE_H
 #define MARS_LAB_PAGE_H
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Render the page, returning an owned string or NULL on failure.

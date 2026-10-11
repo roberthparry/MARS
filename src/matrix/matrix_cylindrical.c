@@ -5,7 +5,7 @@
  * Evaluates supported cylindrical functions using series, spectral or interpolation paths and detaches owned
  * entries safely. Scalar order parameters and matrix arguments retain their distinct roles.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

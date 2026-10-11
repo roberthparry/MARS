@@ -5,7 +5,7 @@
  * Computes QR, Schur and eigenvalue or eigenvector results using precision-aware numerical tolerances. Factor
  * objects own their result storage and require the associated cleanup routines.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 
@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #define MARS_MATRIX_INTERNAL_ACCESS
-#include "matrix.h"
+#include "matrix_t.h"
 #include "matrix_internal.h"
-#include "number.h"
+#include "number_t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 

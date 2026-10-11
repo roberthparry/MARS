@@ -26,9 +26,9 @@
 #include <string.h>
 #include <time.h>
 
-#include "file.h"
-#include "datetime.h"
-#include "sqlite.h"
+#include "file_t.h"
+#include "datetime_t.h"
+#include "sqlite_t.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"
 

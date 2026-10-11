@@ -5,7 +5,7 @@
  * Owns equation and solution containers, coordinates supported solving paths and exposes solution inspection.
  * Polynomial recognisers and specialised root algorithms live in the companion implementation units.
  *
- * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
@@ -15,13 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation.h"
+#include "equation_t.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
-#include "expression.h"
+#include "expression_t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 struct _equation_t {
     expr_t *lhs;

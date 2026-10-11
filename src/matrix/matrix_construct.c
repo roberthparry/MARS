@@ -5,7 +5,7 @@
  * Creates numeric and symbolic matrices in supported storage forms and converts between dense and sparse
  * representations. The public constructors hide storage allocation and element ownership.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

@@ -5,7 +5,7 @@
  * Recognises the supported dependent-square Bernoulli family and constructs its transformed solution and
  * integration constant. It is selected by the ordinary-equation dispatcher.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

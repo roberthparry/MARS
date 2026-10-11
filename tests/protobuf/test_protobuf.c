@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "protobuf.h"
+#include "protobuf_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

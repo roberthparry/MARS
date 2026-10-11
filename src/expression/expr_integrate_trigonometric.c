@@ -5,7 +5,7 @@
  * Recognises supported circular-function products and affine exponential combinations. The resulting
  * antiderivatives remain expression graphs for subsequent simplification and differentiation checks.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

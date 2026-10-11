@@ -27,7 +27,7 @@ README signum example:
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -47,7 +47,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -104,8 +104,8 @@ Common real constants are also available on the real axis, including
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
-#include "qfloat.h"
+#include "qcomplex_t.h"
+#include "qfloat_t.h"
 
 int main(void) {
     /* Euler's identity: exp(iπ) + 1 = 0 */
@@ -131,7 +131,7 @@ imag part    = 0
 
 ## API Reference
 
-All declarations are in `include/qcomplex.h`.
+All declarations are in `include/qcomplex_t.h`.
 
 ### Construction
 
@@ -329,7 +329,7 @@ The shared evaluator limits work precision to 65536 bits and series to
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -378,7 +378,7 @@ there is no asymptotic large-argument implementation.
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -417,7 +417,7 @@ inside the input bounds is guaranteed to pass the numerical guards.
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -456,7 +456,7 @@ provided. See the number guide for the work-precision and iteration limits.
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {
@@ -612,7 +612,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 int main(void)
 {

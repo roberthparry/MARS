@@ -8,9 +8,9 @@
 
 #include <stdbool.h>
 
-#include "json.h"
+#include "json_t.h"
 #include "test_config.h"
-#include "ustring.h"
+#include "string_t.h"
 
 string_t *test_config_compute_global_path(void);
 string_t *test_config_compute_local_path(const string_t *file);

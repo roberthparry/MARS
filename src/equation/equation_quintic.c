@@ -5,7 +5,7 @@
  * Evaluates fifth-degree polynomials and refines real and complex root candidates. It does not promise a general
  * radical formula; exact factor reductions are handled by the polynomial solving machinery.
  *
- * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
@@ -15,7 +15,7 @@
 
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
-#include "number.h"
+#include "number_t.h"
 
 /*
  * A real-coefficient quintic always has at least one real root.  Find that

@@ -5,7 +5,7 @@
  * Builds antiderivatives for supported polynomial products with inverse, logarithmic and related unary functions.
  * The rules perform structural reductions rather than an unrestricted recursive integration-by-parts search.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

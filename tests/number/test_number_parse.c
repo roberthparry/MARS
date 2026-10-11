@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include "test_number.h"
-#include "ustring.h"
+#include "string_t.h"
 
 void run_number_parse_tests(void)
 {

@@ -5,7 +5,7 @@
  * Collects named timezone-rule transitions and materialises their local display dates and times. This unit reports
  * transitions while the timezone unit resolves effective offsets.
  *
- * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * This is part of jurisdiction_t.h and uses configured rule data. Results depend on that data's coverage and
  * currency rather than hard-coded assumptions about the host machine.
  */
 

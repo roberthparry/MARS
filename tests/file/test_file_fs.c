@@ -15,8 +15,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "file.h"
-#include "array.h"
+#include "file_t.h"
+#include "array_t.h"
 #include "test_harness.h"
 
 static file_t *child_path(file_t *parent, const char *name)

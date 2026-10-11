@@ -3,7 +3,7 @@
  * @brief Private paths and bounded configuration reads for native installers.
  *
  * Resolves MARS_HOME and protects existing user-owned, single-link files before
- * reading them through file.h. Configuration text is handled with string_t.
+ * reading them through file_t.h. Configuration text is handled with string_t.
  * No shell expansion beyond a leading ~/ is performed. Called before threads.
  */
 #include <errno.h>
@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 #include "cfg_storage.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static string_t *cfg_storage_environment_text(const char *name)
 {

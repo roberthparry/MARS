@@ -5,7 +5,7 @@
  * Tracks parsed symbols and determines which bindings an expression needs, including formal integral variables. It
  * prevents local dummy symbols from leaking into the caller's binding list.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qfloat.h"
+#include "qfloat_t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #include "expr_stringout.h"

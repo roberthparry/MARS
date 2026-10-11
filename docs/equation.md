@@ -266,8 +266,8 @@ seed-driven numeric cases.
 
 ```c
 #include <stdio.h>
-#include "equation.h"
-#include "number.h"
+#include "equation_t.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -306,8 +306,8 @@ polynomial:
 
 ```c
 #include <stdio.h>
-#include "equation.h"
-#include "number.h"
+#include "equation_t.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -351,8 +351,8 @@ text:
 
 ```c
 #include <stdio.h>
-#include "equation.h"
-#include "number.h"
+#include "equation_t.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -420,7 +420,7 @@ For display code, it is often useful to show the original input on one side and
 derived solutions or residuals on the other.
 
 ```c
-#include "equation.h"
+#include "equation_t.h"
 
 int main(void)
 {

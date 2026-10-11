@@ -5,7 +5,7 @@
  * Combines exact-factor attempts, numerical evaluation and distinct-root assembly for fourth-degree polynomials.
  * The companion quartic surd unit constructs exact radical expressions where supported.
  *
- * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
@@ -15,7 +15,7 @@
 
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
-#include "number.h"
+#include "number_t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 

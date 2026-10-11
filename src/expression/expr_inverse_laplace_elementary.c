@@ -5,7 +5,7 @@
  * Matches supported rational, shifted and hyperbolic forms and reconstructs their time-domain expressions. This
  * unit is selected by the inverse dispatcher, not exposed as a separate public solver.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

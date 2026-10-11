@@ -10,8 +10,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "webserver.h"
-#include "http.h"
+#include "webserver_t.h"
+#include "http_t.h"
 
 static bool hello(const websrv_request_t *request, websrv_response_t *response, void *context)
 {

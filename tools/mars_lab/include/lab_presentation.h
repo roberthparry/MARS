@@ -13,7 +13,7 @@
 #ifndef LAB_PRESENTATION_H
 #define LAB_PRESENTATION_H
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Add a presentation object to an existing native evaluation response.

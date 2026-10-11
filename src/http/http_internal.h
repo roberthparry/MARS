@@ -16,9 +16,9 @@
 #error "http_internal.h is private to the HTTP module."
 #endif
 #include <curl/curl.h>
-#include "http.h"
-#include "array.h"
-#include "protobuf.h"
+#include "http_t.h"
+#include "array_t.h"
+#include "protobuf_t.h"
 #if LIBCURL_VERSION_NUM < 0x075600
 #error "The HTTP module requires libcurl 7.86.0 or newer."
 #endif

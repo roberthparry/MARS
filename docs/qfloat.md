@@ -26,7 +26,7 @@ README signum example:
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -46,7 +46,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -90,7 +90,7 @@ maintained after every operation.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void) {
     const char *inputs[] = {
@@ -178,7 +178,7 @@ specific to `qfloat`; other subsystems still use the broader release defaults.
 
 ## API Reference
 
-All declarations are in `include/qfloat.h`.
+All declarations are in `include/qfloat_t.h`.
 
 ### Constants
 
@@ -373,7 +373,7 @@ also return NaN.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -457,7 +457,7 @@ Input and output for a simple pFq identity:
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -505,7 +505,7 @@ can overflow to infinity or underflow to zero. There is no asymptotic kernel.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -543,7 +543,7 @@ input bounds do not guarantee success at every point.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -580,7 +580,7 @@ kernel uses MPFR/MPC internally, as does `qf_bessel_k`.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -604,7 +604,7 @@ Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {
@@ -759,7 +759,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 int main(void)
 {

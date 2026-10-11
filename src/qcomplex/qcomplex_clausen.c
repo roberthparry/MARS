@@ -5,13 +5,13 @@
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
  * representation determine the evaluation path.
  *
- * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic through qcomplex_t.h. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 
 #include <stdbool.h>
 
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
 

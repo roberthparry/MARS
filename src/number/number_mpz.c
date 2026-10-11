@@ -5,7 +5,7 @@
  * Implements integer storage, arithmetic, comparison and bit-oriented helpers. Exact integers remain separate from
  * real-valued backends until an operation requires promotion.
  *
- * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
@@ -13,7 +13,7 @@
 
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 typedef struct {
     number_const_id_t id;

@@ -15,12 +15,12 @@
 
 #if !defined(MARS_QFLOAT_INTERNAL_ACCESS) &&                                                                           \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "qfloat_internal.h is private to the qfloat module; include qfloat.h instead."
+#error "qfloat_internal.h is private to the qfloat module; include qfloat_t.h instead."
 #endif
 
 #include <math.h>
 
-#include "qfloat.h"
+#include "qfloat_t.h"
 
 #define QF_SPLIT 134217729.0
 

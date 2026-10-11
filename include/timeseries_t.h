@@ -1,5 +1,5 @@
 /**
- * @file timeseries.h
+ * @file timeseries_t.h
  * @brief Datetime-indexed forecasting and time-series analysis API.
  *
  * Use this module for dated observations, calendar-aware analysis and forecasting
@@ -7,8 +7,8 @@
  * with numeric values so that alignment, missing observations and forecast periods
  * can be handled explicitly.
  *
- * It combines datetime.h indexing with number.h arithmetic and statistical model
- * results. Choose matrix.h for unindexed numerical tables; this module adds temporal
+ * It combines datetime_t.h indexing with number_t.h arithmetic and statistical model
+ * results. Choose matrix_t.h for unindexed numerical tables; this module adds temporal
  * semantics and supported forecasting workflows rather than a general real-time
  * stream-processing engine.
  *
@@ -27,16 +27,16 @@
  * frequencies are left for future expansion.
  */
 
-#ifndef TIMESERIES_H
-#define TIMESERIES_H
+#ifndef MARS_TIMESERIES_H
+#define MARS_TIMESERIES_H
 
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "datetime.h"
-#include "matrix.h"
-#include "number.h"
+#include "datetime_t.h"
+#include "matrix_t.h"
+#include "number_t.h"
 
 /** @brief Opaque series owning observations, missing flags and optional datetime indices. */
 typedef struct _timeseries_t timeseries_t;
@@ -1608,4 +1608,4 @@ int ts_backtest_arima(const timeseries_t *y, const matrix_t *xreg, const ts_arim
  */
 void ts_forecast_clear(ts_forecast_t *out);
 
-#endif /* TIMESERIES_H */
+#endif /* MARS_TIMESERIES_H */

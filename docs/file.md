@@ -1,7 +1,7 @@
 # `file_t`, `file_info_t` and `file_key_t`
 
 Linux file and directory I/O with opaque handles, UTF-8 text helpers, permissions,
-ownership, links and immutable metadata snapshots. Include `file.h`; include `ustring.h` or `array.h` when
+ownership, links and immutable metadata snapshots. Include `file_t.h`; include `string_t.h` or `array_t.h` when
 using their returned objects. The API follows the operations described in the
 [ZetCode file tutorial](https://zetcode.com/csharp/file/), adapted to Linux and
 MARS ownership conventions rather than reproducing .NET classes or exceptions.
@@ -9,7 +9,7 @@ MARS ownership conventions rather than reproducing .NET classes or exceptions.
 ## Compression, encryption and object storage
 
 These are explicit operations: ordinary reads and writes do not automatically
-compress or encrypt. Include `file.h`; the database helpers also use `sqlite.h`.
+compress or encrypt. Include `file_t.h`; the database helpers also use `sqlite_t.h`.
 See the [build guide](building.md#file-compression-and-encryption-dependencies)
 for Zstandard and libsodium installation requirements.
 
@@ -386,7 +386,7 @@ never opens target contents, and may traverse beyond the listed directory.
 
 ## Complete public API reference
 
-Every public function in `include/file.h` has an entry below, in header order.
+Every public function in `include/file_t.h` has an entry below, in header order.
 Signatures are declarations, not usage examples. `in` parameters are borrowed
 unless explicitly described as owned; `out` pointers receive results; `in,out`
 handles may change state or error status. Unless stated otherwise, Boolean
@@ -1404,8 +1404,8 @@ hashes it, and removes the file afterwards.
 
 ```c
 #include <assert.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 int main(int argc, char **argv)
 {
@@ -1434,8 +1434,8 @@ ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 void file_lines_example(const char *path)
 {
@@ -1483,8 +1483,8 @@ falcon
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 void file_replace_example(const char *current_path, const char *replacement_path, const char *backup_path)
 {
@@ -1539,8 +1539,8 @@ different path. Compression does not encrypt the contents.
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 void compressed_file_example(const char *source_path, const char *compressed_path, const char *restored_path)
 {
@@ -1592,8 +1592,8 @@ A password is not a replacement for a raw encryption key.
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 void encrypted_only_example(const char *source_path, const char *encrypted_path, const char *restored_path)
 {
@@ -1650,8 +1650,8 @@ securely if the encrypted file is to be read in a later process.
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 
 void encrypted_file_example(const char *source_path, const char *encrypted_path, const char *restored_path)
 {
@@ -1704,9 +1704,9 @@ files remain afterwards for inspection. The literal key is only for this example
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "sqlite.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "sqlite_t.h"
+#include "string_t.h"
 
 void stored_file_example(const char *database_path, const char *source_path, const char *destination_path)
 {
@@ -1759,8 +1759,8 @@ Pass a fresh directory path and paths for its children named `documents` and
 ```c
 #include <assert.h>
 #include <stdio.h>
-#include "file.h"
-#include "array.h"
+#include "file_t.h"
+#include "array_t.h"
 
 void symlink_listing_example(const char *directory_path, const char *documents_path, const char *shortcut_path)
 {

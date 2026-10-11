@@ -25,7 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "http_fixture.h"
 
 typedef void (*fixture_handler_t)(fixture_connection_t *);
@@ -264,7 +264,7 @@ static SSL_CTX *fixture_tls_context(const char *certificate_path, const char *ke
     if (ok && identity)
         ok = X509_STORE_add_cert(SSL_CTX_get_cert_store(context), certificate) == 1;
     X509_free(certificate);
-    /* PEM chains are decoded by OpenSSL; all path access stays in file.h. */
+    /* PEM chains are decoded by OpenSSL; all path access stays in file_t.h. */
     while (ok && (certificate = PEM_read_bio_X509(certificates, NULL, NULL, NULL))) {
         if (identity)
             ok = X509_STORE_add_cert(SSL_CTX_get_cert_store(context), certificate) == 1;

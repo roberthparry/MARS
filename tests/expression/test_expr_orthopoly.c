@@ -10,8 +10,8 @@
  */
 
 #include "test_expr.h"
-#include "matrix.h"
-#include "qcomplex.h"
+#include "matrix_t.h"
+#include "qcomplex_t.h"
 
 static void test_orthopoly_numeric_and_matrix_layers(void)
 {

@@ -6,7 +6,7 @@
  * reductions and numerical roots are kept distinguishable so presentation can preserve exactness where
  * established.
  *
- * This belongs to the equation.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t.h implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 
@@ -19,7 +19,7 @@
 
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
-#include "number.h"
+#include "number_t.h"
 
 /*
  * Numeric polynomials above degree five are solved in constant stack space.

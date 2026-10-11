@@ -5,7 +5,7 @@
  * Inspects file attributes and implements chmod, chown, timestamps and access queries. Path-following and handle
  * policies remain explicit in the individual operations rather than hidden in caller-side stat calls.
  *
- * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t.h implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

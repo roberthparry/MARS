@@ -5,7 +5,7 @@
  * Orders supported sums, series and transform terms consistently in native, function and TeX forms. It is a
  * presentation pass over expression structure, not a separate polynomial solver.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -26,10 +26,10 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression.h"
+#include "expression_t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 #define DISPLAY_POLY_MAX_VARS 16u
 

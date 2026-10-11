@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 #include "test_harness.h"
 #include "test_diffequ_gkdv.h"
 

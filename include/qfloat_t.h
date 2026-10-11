@@ -1,5 +1,5 @@
 /**
- * @file qfloat.h
+ * @file qfloat_t.h
  * @brief Double-double precision floating‑point type (≈106 bits, ~32 decimal digits).
  *
  * Use qfloat_t for real numerical calculations needing more precision than a single
@@ -7,7 +7,7 @@
  * arithmetic, comparisons, conversions and mathematical functions over this type.
  *
  * This is fixed double-double arithmetic, not arbitrary-precision or exact rational
- * arithmetic. Use number.h when a calculation needs those facilities, or qcomplex.h
+ * arithmetic. Use number_t.h when a calculation needs those facilities, or qcomplex_t.h
  * for complex values built from qfloat_t components. Representation precision does
  * not guarantee the same number of accurate digits for ill-conditioned operations.
  *
@@ -34,8 +34,8 @@
  * ensuring a unique, normalised representation.
  */
 
-#ifndef QFLOAT_H
-#define QFLOAT_H
+#ifndef MARS_QFLOAT_H
+#define MARS_QFLOAT_H
 
 #include <math.h>
 #include <stdarg.h>
@@ -1518,4 +1518,4 @@ qfloat_t qf_Li(qfloat_t x);
  */
 qfloat_t qf_E1(qfloat_t x);
 
-#endif /* QFLOAT_H */
+#endif /* MARS_QFLOAT_H */

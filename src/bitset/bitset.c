@@ -5,7 +5,7 @@
  * Manages growable word arrays and implements flag mutation, queries and Boolean combinations. Integer-indexed
  * membership is stored compactly rather than as individually allocated values.
  *
- * This implements bitset.h for dense integer-indexed flags. Keep word storage and locking internal; callers should
+ * This implements bitset_t.h for dense integer-indexed flags. Keep word storage and locking internal; callers should
  * not access the backing words directly.
  */
 
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bitset.h"
+#include "bitset_t.h"
 
 #define BITSET_WORD_BITS 64u
 #define BITSET_INIT_WORDS 1u

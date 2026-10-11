@@ -1,5 +1,5 @@
 /**
- * @file integrator.h
+ * @file integrator_t.h
  * @brief Adaptive number_t-based numerical integrators.
  *
  * Use integrator_t to calculate definite integrals of MARS expressions with explicit
@@ -22,12 +22,12 @@
  * Work limits may stop refinement before that criterion is met; check status.
  */
 
-#ifndef INTEGRATOR_H
-#define INTEGRATOR_H
+#ifndef MARS_INTEGRATOR_H
+#define MARS_INTEGRATOR_H
 
 #include <stddef.h>
 
-#include "expression.h"
+#include "expression_t.h"
 
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;
@@ -250,4 +250,4 @@ int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t
 int intg_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,
                         const number_t *hi, number_t *result, number_t *error_est);
 
-#endif /* INTEGRATOR_H */
+#endif /* MARS_INTEGRATOR_H */

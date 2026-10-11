@@ -5,7 +5,7 @@
  * Validates dictionary-backed response fields and manages binary, text, JSON and XML bodies. This unit prepares
  * content independently of listener routing and socket framing.
  *
- * This is part of webserver.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * This is part of webserver_t.h's synchronous Linux listener. The HTTP client is a separate module; this
  * implementation does not supply a production worker pool or TLS terminator.
  */
 

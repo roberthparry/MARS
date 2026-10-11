@@ -1,13 +1,13 @@
 /**
- * @file set.h
+ * @file set_t.h
  * @brief Generic value-set container with a dense arena and lazy sorting.
  *
  * Use set_t to maintain unique values with hash-based membership, insertion and
  * removal. It supports iteration and sorted access while hiding the storage layout.
  * Equality and hashing callbacks must describe the same notion of a unique value.
  *
- * Clone and destroy callbacks control element resource ownership. Prefer array.h
- * when duplicates and positional sequence semantics matter, or dictionary.h when
+ * Clone and destroy callbacks control element resource ownership. Prefer array_t.h
+ * when duplicates and positional sequence semantics matter, or dictionary_t.h when
  * each unique key needs an associated value.
  *
  * Design:
@@ -20,8 +20,8 @@
  *   - Slot layout is private (E1)
  */
 
-#ifndef SET_H
-#define SET_H
+#ifndef MARS_SET_H
+#define MARS_SET_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -301,4 +301,4 @@ set_t *set_difference(const set_t *a, const set_t *b);
  */
 bool set_is_subset(const set_t *a, const set_t *b);
 
-#endif /* SET_H */
+#endif /* MARS_SET_H */

@@ -5,7 +5,7 @@
  * Constructs supported symmetry generators, brackets and structure constants and examines reductions of scalar
  * differential equations. Unsupported analysis remains explicit rather than becoming an unverified solution.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

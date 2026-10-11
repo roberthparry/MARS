@@ -5,7 +5,7 @@
  * Builds solutions to recognised first-order linear forms and resolves their integration constant where conditions
  * allow. Other nonlinear reductions enter this path only after a verified transformation.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

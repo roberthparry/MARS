@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "ustring.h"
+#include "string_t.h"
 #include "lab_worker.h"
 #include "lab_process.h"
 

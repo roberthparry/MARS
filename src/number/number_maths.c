@@ -5,7 +5,7 @@
  * Dispatches supported scalar functions across number representations and manages mathematical domain handling.
  * Dedicated cylindrical, polynomial and signal families live in companion units.
  *
- * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
@@ -15,12 +15,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "number.h"
+#include "number_t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 enum {
     NUMBER_LAMBERT_W_HALLEY_STEPS = 12,

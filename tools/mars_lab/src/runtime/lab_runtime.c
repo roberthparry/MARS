@@ -21,9 +21,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "lab_runtime.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static string_t *lab_runtime_environment_text(const char *name)
 {

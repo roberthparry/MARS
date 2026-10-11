@@ -7,7 +7,7 @@
  */
 #include <string.h>
 
-#include "datetime.h"
+#include "datetime_t.h"
 #include "tba_dates.h"
 
 /* Parse precisely three numeric components separated by a consistent delimiter. */

@@ -5,7 +5,7 @@
  * Implements value creation and common predicates, ordering and scaling helpers. This is the non-owning, by-value
  * foundation used by arithmetic and formatting code.
  *
- * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * This implements fixed double-double real arithmetic through qfloat_t.h. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 

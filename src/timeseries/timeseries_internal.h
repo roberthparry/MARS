@@ -3,7 +3,7 @@
  * @brief Private indexed-series storage and modelling support.
  *
  * Defines values, date indices and model-related structures and declares helpers shared by analysis, forecasting
- * and formatting units. Public users manipulate series and results through timeseries.h.
+ * and formatting units. Public users manipulate series and results through timeseries_t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,7 +14,7 @@
 
 #if !defined(MARS_TIMESERIES_INTERNAL_ACCESS) &&                                                                       \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "timeseries_internal.h is private to the timeseries module; include timeseries.h instead."
+#error "timeseries_internal.h is private to the timeseries module; include timeseries_t.h instead."
 #endif
 
 #include <errno.h>
@@ -27,8 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "csv.h"
-#include "timeseries.h"
+#include "csv_t.h"
+#include "timeseries_t.h"
 
 struct _timeseries_t {
     size_t length;

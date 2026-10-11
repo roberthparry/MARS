@@ -11,10 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
+#include "expression_t.h"
 #include "lab_evaluate_internal.h"
 #include "lab_presentation_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 /* Consume a temporary JSON node after appending its copy. */
 bool lab_pres_append(json_t *array, json_t *value)

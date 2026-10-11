@@ -23,7 +23,7 @@
 
 #include <stdbool.h>
 
-#include "ustring.h"
+#include "string_t.h"
 
 /* ------------------------------------------------------------------------- */
 /* Configuration mode                                                        */

@@ -4,7 +4,7 @@
  *
  * Declares evaluation, derivative and supporting callbacks bound to mathematical node operations. Operator-table
  * construction and function implementations share this contract; application code uses constructors from
- * expression.h.
+ * expression_t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "expression.h"
-#include "number.h"
+#include "expression_t.h"
+#include "number_t.h"
 
 enum { DEFAULT_SIMPLIFY_ITERS = 4000, DEFAULT_REVERSE_ITERS = 2500, DEFAULT_RUNS = 5 };
 

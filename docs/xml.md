@@ -86,13 +86,13 @@ It does not open a database or encrypt payloads itself. Release its labels with
 
 ## Example: dictionary lookup
 
-Each example includes `xml.h` and `ustring.h`; assertions in the matching
+Each example includes `xml_t.h` and `string_t.h`; assertions in the matching
 README tests check the output. Production callers should check allocation and
 operation failures before inspecting results.
 
 ```c
-#include "xml.h"
-#include "ustring.h"
+#include "xml_t.h"
+#include "string_t.h"
 
 int main(void)
 {
@@ -120,8 +120,8 @@ book: cy
 ## Example: build and escape XML
 
 ```c
-#include "xml.h"
-#include "ustring.h"
+#include "xml_t.h"
+#include "string_t.h"
 
 int main(void)
 {
@@ -152,8 +152,8 @@ Output:
 This example counts elements without constructing a tree.
 
 ```c
-#include "xml.h"
-#include "ustring.h"
+#include "xml_t.h"
+#include "string_t.h"
 
 typedef struct { size_t starts, ends, texts, bytes; bool stop; } event_counts_t;
 
@@ -191,7 +191,7 @@ elements=3 complete=1
 ## Public API reference
 
 All public declarations, parameter contracts and ownership rules are documented
-in [xml.h](../include/xml.h).
+in [xml_t.h](../include/xml_t.h).
 
 | Function | Purpose |
 | --- | --- |

@@ -5,7 +5,7 @@
  * Builds design matrices including supported intercept and trend terms, fits models and produces forecasts.
  * Exogenous row alignment and result ownership are maintained by the surrounding time-series API.
  *
- * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * This is part of timeseries_t.h. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

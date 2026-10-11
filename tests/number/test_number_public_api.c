@@ -2,7 +2,7 @@
  * @file test_number_public_api.c
  * @brief Generic number public-contract regressions.
  *
- * Checks common construction, access and operation behaviour exposed by number.h. These assertions protect
+ * Checks common construction, access and operation behaviour exposed by number_t.h. These assertions protect
  * caller-visible semantics independently of backend-specific details.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and

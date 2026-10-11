@@ -12,10 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime.h"
+#include "datetime_t.h"
 #include "internal/lab_calendar_internal.h"
 #include "lab_process.h"
-#include "sqlite.h"
+#include "sqlite_t.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 

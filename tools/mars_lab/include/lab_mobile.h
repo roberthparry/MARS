@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Return owned title/hint/url/qr/control/tailscale/funnel metadata, or NULL.

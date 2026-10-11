@@ -12,8 +12,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "number.h"
-#include "ustring.h"
+#include "number_t.h"
+#include "string_t.h"
 
 typedef enum bench_format_op_t { BENCH_OP_TO_STRING, BENCH_OP_SPRINTF } bench_format_op_t;
 

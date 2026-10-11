@@ -15,7 +15,7 @@ Small related function families are grouped in two implementation units:
   generic numeric arithmetic and precision policy.
 
 Scoped allocation declarations live in `src/number/number_internal.h`.
-Applications continue to use `number.h`; this organisation does not change
+Applications continue to use `number_t.h`; this organisation does not change
 the public API, numerical algorithms or ownership rules.
 
 ## Signal functions
@@ -35,7 +35,7 @@ README signum example:
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -56,7 +56,7 @@ README example (the scope owns temporary numbers):
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -239,7 +239,7 @@ Example:
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -266,7 +266,7 @@ Example with explicit precision:
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -299,7 +299,7 @@ Named constants such as `NUM_PI`, `NUM_E`, `NUM_LN10`, `NUM_PHI`, and
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -342,7 +342,7 @@ Detaching behaves differently depending on how the scoped value is stored:
 Example with the public cleanup macro:
 
 ```c
-#include "number.h"
+#include "number_t.h"
 
 number_t make_sum(void) {
     NUM_SCOPE(scope);
@@ -372,7 +372,7 @@ sequence is:
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -707,7 +707,7 @@ wrappers additionally have the exponent range of their component type.
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -790,7 +790,7 @@ every point. No scaled or large-argument asymptotic evaluator is provided.
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -851,7 +851,7 @@ do not guarantee success at every point.
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -914,7 +914,7 @@ every point passes the numerical guards.
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -982,8 +982,8 @@ Return conventions in this area:
 
 ```c
 #include <stdio.h>
-#include "number.h"
-#include "ustring.h"
+#include "number_t.h"
+#include "string_t.h"
 
 int main(void) {
     number_t a = num_create_from_string("2");
@@ -1024,9 +1024,9 @@ documented output stays tied to the public `number_t` API.
 ### Exact Rational Arithmetic
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -1049,9 +1049,9 @@ int main(void)
 ### Exact Combinatorics
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -1082,7 +1082,7 @@ MPFR and MPC values.
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -1114,7 +1114,7 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {
@@ -1526,7 +1526,7 @@ README example:
 
 ```c
 #include <stdio.h>
-#include "number.h"
+#include "number_t.h"
 
 int main(void)
 {

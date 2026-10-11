@@ -12,8 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime.h"
-#include "file.h"
+#include "datetime_t.h"
+#include "file_t.h"
 #include "lab_calendar_internal.h"
 #include "lab_page.h"
 

@@ -6,7 +6,7 @@
  * Repeated and unknown fields remain available to schema-aware callers; no external parser or schema compiler is
  * used.
  *
- * This implements protobuf.h. Applications supply schema knowledge and manage message ownership; the HTTP module
+ * This implements protobuf_t.h. Applications supply schema knowledge and manage message ownership; the HTTP module
  * provides transport and gRPC framing.
  */
 
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "protobuf.h"
+#include "protobuf_t.h"
 
 typedef struct {
     uint32_t field;

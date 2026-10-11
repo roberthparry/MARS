@@ -18,7 +18,7 @@
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config/test_config_internal.h"
 #include "test_harness.h"
-#include "ustring.h"
+#include "string_t.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_LOCAL);
 

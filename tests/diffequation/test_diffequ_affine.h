@@ -1,7 +1,7 @@
 #ifndef TEST_DIFFEQU_AFFINE_H
 #define TEST_DIFFEQU_AFFINE_H
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 
 bool test_diffequ_affine_solution_verified(const diffequ_t *de, const equation_t *solution);
 

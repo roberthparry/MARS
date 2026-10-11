@@ -5,7 +5,7 @@
  * Separates integration constants and builds beautified expression matrices. This prepares shared native output
  * structure rather than changing matrix values in a client renderer.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

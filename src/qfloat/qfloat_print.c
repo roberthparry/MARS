@@ -5,7 +5,7 @@
  * Adapts qfloat values to formatted string and stream output. Numeric decimal conversion is shared with the
  * string-conversion implementation rather than delegated to ordinary double formatting.
  *
- * This implements fixed double-double real arithmetic through qfloat.h. Its approximately 106-bit representation
+ * This implements fixed double-double real arithmetic through qfloat_t.h. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
@@ -17,7 +17,7 @@
 #include <string.h>
 
 #include "qfloat_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static int qf_append_repeated_char(string_t *out, char ch, int count)
 {

@@ -3,13 +3,13 @@
  * @brief Private CSV stream storage shared by parsing, headers and output.
  *
  * Owns bounded string buffers and indexed header names. Only src/csv consumes
- * this representation; application and timeseries callers use csv.h.
+ * this representation; application and timeseries callers use csv_t.h.
  */
 #ifndef MARS_CSV_INTERNAL_H
 #define MARS_CSV_INTERNAL_H
 
-#include "dictionary.h"
-#include "csv.h"
+#include "dictionary_t.h"
+#include "csv_t.h"
 
 /** @brief Incremental field syntax, retained between input chunks. */
 typedef enum { CSV_FIELD_START, CSV_FIELD_PLAIN, CSV_FIELD_QUOTED, CSV_FIELD_CLOSED } csv_field_state_t;

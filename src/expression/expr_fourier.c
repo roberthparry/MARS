@@ -5,7 +5,7 @@
  * Coordinates forward and inverse Fourier rules, evaluation and simplification of transform nodes. Specialised
  * pair recognisers supply formulas and domain conditions to this shared result path.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

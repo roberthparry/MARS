@@ -5,7 +5,7 @@
  * Recognises supported branch-dependent spectra and assembles inverse forms and restrictions. It retains singular
  * or principal-value conditions rather than silently selecting an unrestricted ordinary integral.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

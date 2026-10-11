@@ -17,7 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "test_harness.h"
 #include "checks_process.h"
 #include "checks_controls.h"
@@ -281,7 +281,7 @@ static void test_checks_process_interrupt_cleanup(void)
 static void test_checks_markdown_command_failures(void)
 {
     string_t *root = test_checks_root();
-    bool ok = test_checks_write(root, "include/file.h", "int file_open(void);\n") &&
+    bool ok = test_checks_write(root, "include/file_t.h", "int file_open(void);\n") &&
               test_checks_write(root, "docs/file.md", "`file_open()`\n");
     ok = checks_markdown_api(root) == 0 && ok;
     ok = test_checks_write(root, "docs/file.md", "`file_open_extra()`\n") && ok;

@@ -5,7 +5,7 @@
  * Builds recognised evolution formulas using derivative and polynomial symbols in the transform domain. It also
  * supplies solution steps and kernel notation for native presentation.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

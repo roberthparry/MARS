@@ -13,7 +13,7 @@
 #ifndef MARS_DATETIME_ASTRONOMY_INTERNAL_H
 #define MARS_DATETIME_ASTRONOMY_INTERNAL_H
 
-#include "datetime.h"
+#include "datetime_t.h"
 
 /* Private solar, lunar and time-scale helpers shared by calendar calculations. */
 double datetime_true_new_moon_tt(int lunationIndex);

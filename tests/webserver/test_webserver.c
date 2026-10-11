@@ -16,7 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "webserver.h"
+#include "webserver_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

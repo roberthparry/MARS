@@ -46,7 +46,7 @@ equation using Kirchhoff's formula.
   `de_solve_result_steps(...)`, `de_solve_result_steps_TeX(...)`, and
   `de_solve_result_symmetry(...)` is borrowed from the solve result.
 
-The public declarations are in `diffequation.h`.
+The public declarations are in `diffequation_t.h`.
 
 ## Rule-Based Solving and Derivations
 
@@ -1927,7 +1927,7 @@ $\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 
 int main(void)
 {
@@ -1998,7 +1998,7 @@ and `de_solve_result_steps()` or `de_solve_result_steps_TeX()`.
 ```c
 #include <stdio.h>
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 
 int main(void)
 {
@@ -2033,7 +2033,7 @@ retrieve the existing solver's group-name metadata.
 
 ```c
 #include <stdio.h>
-#include "diffequation.h"
+#include "diffequation_t.h"
 
 int main(void)
 {
@@ -2065,7 +2065,7 @@ structure constants = 64 x 8
 
 ## API Reference
 
-All declarations are in `diffequation.h`. A `diffequ_t` holds the **problem**;
+All declarations are in `diffequation_t.h`. A `diffequ_t` holds the **problem**;
 a `diffequ_solve_result_t` holds the **outcome of one solve attempt**.
 Parsing successfully does not guarantee that a symbolic solver supports the
 equation.
@@ -2360,7 +2360,7 @@ whether it succeeded; use the status accessor for that decision.
 
 Return `DE_SOLVER_NONE` when no family is recorded or the result is null.
 The full set of family identifiers is declared by `de_solver_t` in
-`diffequation.h`.
+`diffequation_t.h`.
 
 #### `de_solve_result_count()`
 

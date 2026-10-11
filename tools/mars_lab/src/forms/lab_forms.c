@@ -11,9 +11,9 @@
 #include <ctype.h>
 #include <math.h>
 
-#include "expression.h"
-#include "number.h"
-#include "ustring.h"
+#include "expression_t.h"
+#include "number_t.h"
+#include "string_t.h"
 #include "lab_forms.h"
 
 static const json_t *lab_forms_get(const json_t *object, const char *name)

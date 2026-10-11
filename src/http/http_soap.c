@@ -5,7 +5,7 @@
  * Builds supported SOAP versions using XML nodes and prepares the corresponding HTTP headers and body atomically.
  * It supplies protocol framing, not WSDL-generated service methods.
  *
- * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

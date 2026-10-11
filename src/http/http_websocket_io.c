@@ -5,7 +5,7 @@
  * Sends and receives bounded messages through non-blocking transport with deadlines and validates close
  * information. This is synchronous message I/O, not an application event loop.
  *
- * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

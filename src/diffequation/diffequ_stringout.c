@@ -5,7 +5,7 @@
  * Formats problems, differential forms and derivative notation from their native representation. Display rules
  * preserve the equation and condition structure independently of the solving strategy.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 
@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS

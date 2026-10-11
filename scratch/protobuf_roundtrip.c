@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "protobuf.h"
+#include "protobuf_t.h"
 
 int main(void)
 {

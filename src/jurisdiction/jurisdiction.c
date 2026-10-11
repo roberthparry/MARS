@@ -5,7 +5,7 @@
  * Manages engine lifetime, diagnostics, default jurisdiction and location data, and serialised configuration.
  * Calendar, holiday and timezone units query this shared configured state.
  *
- * This is part of jurisdiction.h and uses configured rule data. Results depend on that data's coverage and
+ * This is part of jurisdiction_t.h and uses configured rule data. Results depend on that data's coverage and
  * currency rather than hard-coded assumptions about the host machine.
  */
 
@@ -15,7 +15,7 @@
 #include <string.h>
 
 #include "jurisdiction_internal.h"
-#include "file.h"
+#include "file_t.h"
 
 void jurisdiction_set_error(jurisdiction_t *jurisdiction, const char *message)
 {

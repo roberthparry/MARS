@@ -5,7 +5,7 @@
  * Implements supported complex mathematical functions and series, including hypergeometric families. The native
  * fixed-precision layer does not depend on a public multiprecision representation.
  *
- * This implements fixed double-double complex arithmetic through qcomplex.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic through qcomplex_t.h. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 
@@ -15,7 +15,7 @@
 
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 enum {
     QC_ERFINV_NEWTON_MAX_STEPS = 10,

@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datetime.h"
-#include "jurisdiction.h"
-#include "ustring.h"
+#include "datetime_t.h"
+#include "jurisdiction_t.h"
+#include "string_t.h"
 #include "lab_worker_internal.h"
 
 typedef struct holiday_lab_options_t {

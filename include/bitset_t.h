@@ -1,5 +1,5 @@
 /**
- * @file bitset.h
+ * @file bitset_t.h
  * @brief Dynamic, thread-safe bitset backed by a uint64_t arena.
  *
  * Use bitset_t for compact flags and membership indexed by non-negative integers.
@@ -7,7 +7,7 @@
  * iteration without allocating a separate object for each flag.
  *
  * This is appropriate for dense identifier ranges, occupancy maps and selection
- * masks. Use set.h instead when members are arbitrary values rather than bit
+ * masks. Use set_t.h instead when members are arbitrary values rather than bit
  * positions; very sparse, widely separated positions may need a different storage
  * strategy.
  *
@@ -15,8 +15,8 @@
  * any index passed to a mutating function. Out-of-range reads return false.
  */
 
-#ifndef BITSET_H
-#define BITSET_H
+#ifndef MARS_BITSET_H
+#define MARS_BITSET_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -205,4 +205,4 @@ bool bitset_xor(bitset_t *dst, const bitset_t *src);
  */
 void bitset_not(bitset_t *bs);
 
-#endif /* BITSET_H */
+#endif /* MARS_BITSET_H */

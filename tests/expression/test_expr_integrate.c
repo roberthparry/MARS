@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 
-#include "integrator.h"
+#include "integrator_t.h"
 #include "test_expr.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

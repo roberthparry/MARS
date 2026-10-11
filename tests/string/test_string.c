@@ -14,14 +14,31 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "string_t.h"
 #include "test_string.h"
-#include "ustring.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* ------------------------------------------------------------------------- */
 /* Tests                                                                     */
 /* ------------------------------------------------------------------------- */
+
+static void test_string_is_valid_utf8(void)
+{
+    const char *bytes[] = {"", "ASCII", "e\xcc\x81", "🙂", "a\0b", "\x80", "\xe2\x82", "\xc0\xaf",
+                           "\xed\xa0\x80", "\xf4\x90\x80\x80"};
+    const size_t sizes[] = {0, 5, 3, 4, 3, 1, 2, 2, 3, 4};
+    TEST_ASSERT_TRUE(!string_is_valid_utf8(NULL), "NULL is not text");
+    for (size_t i = 0; i < sizeof(sizes) / sizeof(*sizes); ++i) {
+        string_t *text = string_new();
+        TEST_ASSERT_TRUE(text && string_append_bytes(text, bytes[i], sizes[i]) == 0, "raw UTF-8 fixture");
+        errno = EDOM;
+        bool valid = string_is_valid_utf8(text);
+        bool ok = valid == (i < 5) && errno == EDOM && string_byte_length(text) == sizes[i];
+        string_free(text);
+        TEST_ASSERT_TRUE(ok, "strict allocation-free UTF-8 validation preserves errno and bytes");
+    }
+}
 
 static void test_split_basic(void)
 {
@@ -1089,6 +1106,7 @@ static void example_unquote_shell(void)
 int tests_main(void)
 {
     TEST_SECTION("Core");
+    TEST_RUN_IN_GROUP(test_string_is_valid_utf8, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_append_utf8_exact, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_append_bytes, tests, NULL);
     TEST_RUN_IN_GROUP(test_string_unquote_shell_words, tests, NULL);

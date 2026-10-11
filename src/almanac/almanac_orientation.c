@@ -5,7 +5,7 @@
  * Computes Aries hour angle, obliquity, nutation and frame rotations needed by apparent coordinates. It supplies
  * shared orientation calculations rather than performing observer-specific event searches.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

@@ -88,9 +88,9 @@ reusing their slots. Destroy returned numbers when they are no longer needed.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "integrator.h"
-#include "number.h"
+#include "expression_t.h"
+#include "integrator_t.h"
+#include "number_t.h"
 
 int main(void) {
     integrator_t *ig = intg_new();
@@ -137,9 +137,9 @@ over `number_t` bounds and tolerances.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "integrator.h"
-#include "number.h"
+#include "expression_t.h"
+#include "integrator_t.h"
+#include "number_t.h"
 
 int main(void) {
     /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
@@ -183,9 +183,9 @@ multiple dimensions:
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "integrator.h"
-#include "number.h"
+#include "expression_t.h"
+#include "integrator_t.h"
+#include "number_t.h"
 
 int main(void) {
     integrator_t *ig = intg_new();
@@ -244,9 +244,9 @@ intervals = 1
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "integrator.h"
-#include "number.h"
+#include "expression_t.h"
+#include "integrator_t.h"
+#include "number_t.h"
 
 int main(void) {
     /* ∫₀¹ x^2.5 dx = 1 / 3.5 */
@@ -287,7 +287,7 @@ int main(void) {
 
 ## API Reference
 
-All declarations are in `include/integrator.h`.
+All declarations are in `include/integrator_t.h`.
 
 ### Types
 
@@ -310,7 +310,7 @@ All declarations are in `include/integrator.h`.
   - Returns `0` on convergence, `1` if `max_intervals` was reached, `-1` on `NULL` argument or allocation failure.
   - `error_est` may be `NULL`.
   - Reversed limits (`a > b`) are handled correctly.
-  - Requires `#include "expression.h"`; that is already included transitively via `integrator.h`.
+  - Requires `#include "expression_t.h"`; that is already included transitively via `integrator_t.h`.
 
 - `int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var, number_t ay, number_t by, number_t *result, number_t *error_est)` — 2-D adaptive quadrature over `[ax,bx] × [ay,by]`. Adapts in `y`; evaluates the inner `x` integral with the same `number_t` engine.
 

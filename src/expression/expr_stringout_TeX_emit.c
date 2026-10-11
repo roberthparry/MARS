@@ -5,7 +5,7 @@
  * Emits node operations with grouping, source ordering and style-aware mathematical notation. It renders native
  * expression structure rather than introducing client-side simplification.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -26,10 +26,10 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression.h"
+#include "expression_t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static _Thread_local unsigned TeX_source_order_depth;
 

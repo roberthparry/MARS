@@ -5,7 +5,7 @@
  * Constructs exact determinants, adjugates, nullspaces, ranks and pseudoinverses where supported. Expression
  * simplification and zero tests govern the algebraic elimination paths.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

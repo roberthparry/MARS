@@ -17,7 +17,7 @@
 
 #include <stdbool.h>
 
-#include "sqlite.h"
+#include "sqlite_t.h"
 
 /**
  * @brief Form an accent-insensitive, case-folded catalogue lookup key.

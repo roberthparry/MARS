@@ -5,7 +5,7 @@
  * Matches supported Gaussian exponents, linear-over-quadratic terms and quadratic logarithms. These structural
  * rules build exact symbolic forms before any numerical integral fallback.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

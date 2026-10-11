@@ -1,5 +1,5 @@
 /**
- * @file matrix.h
+ * @file matrix_t.h
  * @brief Generic high-precision matrix type over `number_t` and `expr_t`.
  *
  * Use matrix_t for numeric and symbolic linear algebra, including matrix arithmetic,
@@ -8,7 +8,7 @@
  * matrices without exposing their storage layout.
  *
  * Element domains, dimensions and structural assumptions determine which operations
- * are meaningful. Use number.h for scalar arithmetic and expression.h for symbolic
+ * are meaningful. Use number_t.h for scalar arithmetic and expression_t.h for symbolic
  * entries; consult individual operations for ownership and singularity handling.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
@@ -27,14 +27,14 @@
  * vtables. No type switches or storage switches appear in user code.
  */
 
-#ifndef MATRIX_H
-#define MATRIX_H
+#ifndef MARS_MATRIX_H
+#define MARS_MATRIX_H
 
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "expression.h"
+#include "expression_t.h"
 
 typedef struct _matrix_t matrix_t;
 typedef struct _mat_bindings_t mat_bindings_t;
@@ -1854,4 +1854,4 @@ bool mat_serialize(const matrix_t *A, string_t **out_type, string_t **out_encodi
  */
 matrix_t *mat_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
 
-#endif /* MATRIX_H */
+#endif /* MARS_MATRIX_H */

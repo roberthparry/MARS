@@ -8,7 +8,7 @@
  * jurisdiction database. Change these tables and rebuild to change packaged defaults.
  */
 #include "lab_page.h"
-#include "number.h"
+#include "number_t.h"
 
 typedef struct {
     const char *name;

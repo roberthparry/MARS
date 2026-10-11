@@ -12,10 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
-#include "matrix.h"
-#include "number.h"
-#include "ustring.h"
+#include "expression_t.h"
+#include "matrix_t.h"
+#include "number_t.h"
+#include "string_t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "lab_worker_internal.h"

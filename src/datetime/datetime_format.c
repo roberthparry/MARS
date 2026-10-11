@@ -5,7 +5,7 @@
  * Parses format tokens with string cursors and builds formatted text, including calendar names and ordinal forms.
  * Use this unit for presentation conventions, not date arithmetic or timezone policy.
  *
- * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 
@@ -15,7 +15,7 @@
 #include <string.h>
 
 #include "datetime_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static char datetime_ascii_upper(char ch)
 {

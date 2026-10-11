@@ -8,7 +8,7 @@
 #ifndef TEST_LAB_BROWSER_FIXTURES_H
 #define TEST_LAB_BROWSER_FIXTURES_H
 
-#include "ustring.h"
+#include "string_t.h"
 
 /**
  * @brief Append encoded native calendar fixtures to the browser test script.

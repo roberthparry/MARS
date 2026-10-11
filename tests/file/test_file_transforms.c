@@ -15,8 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file.h"
-#include "array.h"
+#include "file_t.h"
+#include "array_t.h"
 #include "test_harness.h"
 
 typedef struct {

@@ -10,12 +10,12 @@
 #include <ctype.h>
 #include <errno.h>
 #include <math.h>
-#include <regex.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "file.h"
+#include "file_t.h"
+#include "regex_t.h"
 #include "lab_process.h"
 #include "../src/internal/lab_evaluate_internal.h"
 #include "test_lab_math_support.h"
@@ -296,17 +296,21 @@ void lab_math_contains(const char *actual, const char *fragment, bool present)
                                                      fragment, actual));
 }
 
-/* POSIX expressions used here are translated explicitly from the Python originals. */
+/* Match native worker text through the shared regular-expression module. */
 void lab_math_regex(const char *actual, const char *pattern, bool present)
 {
-    regex_t expression;
-    int status = regcomp(&expression, pattern, REG_EXTENDED | REG_NEWLINE);
-    if (!lab_math_check(status == 0, pattern))
-        return;
-    int result = regexec(&expression, actual, 0, NULL, 0);
-    TEST_ASSERT_TRUE(result == 0 || result == REG_NOMATCH, pattern);
-    TEST_ASSERT_TRUE((result == 0) == present, lab_math_format("pattern [%s] in [%s]", pattern, actual));
-    regfree(&expression);
+    string_t *source = string_new(), *subject = string_new();
+    bool ready = source && subject && string_append_utf8_exact(source, pattern, strlen(pattern)) == 0 &&
+                 string_append_utf8_exact(subject, actual, strlen(actual)) == 0;
+    regex_options_t options = regex_options_default();
+    options.multiline = true;
+    regex_t *expression = ready ? regex_new(source, &options, NULL) : NULL;
+    regex_status_t result = expression ? regex_test(expression, subject, NULL) : REGEX_ERROR;
+    regex_free(expression);
+    string_free(subject);
+    string_free(source);
+    TEST_ASSERT_TRUE(result != REGEX_ERROR, pattern);
+    TEST_ASSERT_TRUE((result == REGEX_MATCH) == present, lab_math_format("pattern [%s] in [%s]", pattern, actual));
 }
 
 /* Reject NaN explicitly through the strict comparison. */

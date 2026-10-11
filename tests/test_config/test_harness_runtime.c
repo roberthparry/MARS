@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #include "test_harness.h"
-#include "ustring.h"
+#include "string_t.h"
 
 typedef enum { TEST_OUTCOME_PASS, TEST_OUTCOME_FAIL, TEST_OUTCOME_SKIP } test_outcome_t;
 

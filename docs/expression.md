@@ -401,7 +401,7 @@ cannot repair a non-integrable finite singularity or super-exponential growth.
 Distributional and principal-value transforms are separate operations and are
 not silently substituted for the ordinary transform.
 
-The inventory covers the mathematical constructors in `include/expression.h`.
+The inventory covers the mathematical constructors in `include/expression_t.h`.
 Parser aliases share their underlying operation; they do not need separate
 transform formulas. Structural operations such as differentiation, integration,
 binding, serialisation and parsing are not scalar function families.
@@ -1536,7 +1536,7 @@ specialised pattern code remains local to the module that owns the rule family.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
+#include "expression_t.h"
 
 int main(void)
 {
@@ -1590,8 +1590,8 @@ tested for non-linear monomial arguments, Bessel J, Bessel Y and Lommel s.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "number.h"
+#include "expression_t.h"
+#include "number_t.h"
 
 /* f(x) = exp(sin(x)) + 3*x^2 - 7 */
 static expr_t *make_f(expr_t *x) {
@@ -1708,8 +1708,8 @@ independent, and an unnamed numerical `NaN` is not treated as such a symbol.
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "expression.h"
-#include "number.h"
+#include "expression_t.h"
+#include "number_t.h"
 
 int main(void) {
     expr_bindings_t *bindings = NULL;
@@ -1786,8 +1786,8 @@ undefined and the derivative routines return a symbolic `NaN` node.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "number.h"
+#include "expression_t.h"
+#include "number_t.h"
 
 /* f(x, y) = x² + x·y + y² */
 int main(void) {
@@ -1860,7 +1860,7 @@ you only need to evaluate it and don't want to manage another owning handle:
 
 ```c
 #include <stdio.h>
-#include "expression.h"
+#include "expression_t.h"
 
 int main(void)
 {
@@ -1893,8 +1893,8 @@ in a single pass than to build one symbolic derivative expression per variable.
 
 ```c
 #include <stdio.h>
-#include "expression.h"
-#include "number.h"
+#include "expression_t.h"
+#include "number_t.h"
 
 int main(void) {
     number_t x0 = num_create_from_string("1");
@@ -2156,7 +2156,7 @@ this guarantee from their bounds, not from their names or supplied binding value
 
 ## API Reference
 
-All public declarations are in `include/expression.h`.
+All public declarations are in `include/expression_t.h`.
 
 ### Constructors — Constants
 
@@ -2329,7 +2329,7 @@ This complete example prints three principal roots without evaluating `x`:
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "expression.h"
+#include "expression_t.h"
 
 int main(void)
 {

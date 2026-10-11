@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
-#include "qfloat.h"
+#include "expression_t.h"
+#include "qfloat_t.h"
 #include "test_harness.h"
 
 /** Create a constant from a double and release the temporary number. */

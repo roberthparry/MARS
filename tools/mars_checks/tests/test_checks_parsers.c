@@ -6,11 +6,27 @@
  * fences, stable identifiers and output matching. All input lives in MARS strings;
  * no compiler or shell is needed by these correctness cases.
  */
-#include "test_harness.h"
 #include "checks_process.h"
 #include "checks_controls.h"
 #include "checks_readme.h"
+#include "test_harness.h"
 #include "test_checks.h"
+
+static void test_checks_regex_captures(void)
+{
+    string_t *source = checks_text("first\nZoë=42\n");
+    string_t *capture = NULL;
+    bool ok = checks_match(source, "^([[:alpha:]]+)=([0-9]+)$", 1, &capture) && checks_equal(capture, "Zoë");
+    string_free(capture);
+    capture = NULL;
+    ok = checks_match(source, "(missing)?Zoë", 1, &capture) && !capture && ok;
+    string_free(capture);
+    capture = NULL;
+    ok = !checks_match(source, "absent", 0, &capture) && !capture && ok;
+    string_free(capture);
+    string_free(source);
+    TEST_ASSERT_TRUE(ok, "shared regex preserves line anchors, UTF-8 captures and absent groups");
+}
 
 static void test_checks_shell_words(void)
 {
@@ -134,6 +150,7 @@ static void test_checks_output_normalisation(void)
 /* Register parser correctness cases under the global configuration. */
 void test_checks_parser_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_checks_regex_captures, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_shell_words, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_shell_words_reject_malformed, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_extractor_finds_prototypes_and_inline_functions_only, tests, NULL);

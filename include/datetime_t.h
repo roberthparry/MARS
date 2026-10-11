@@ -1,5 +1,5 @@
 /**
- * @file datetime.h
+ * @file datetime_t.h
  * @brief Gregorian calendar datetime type with astronomical calculations.
  *
  * Use this module for civil date and time construction, calendar arithmetic,
@@ -7,8 +7,8 @@
  * Timezone and daylight-saving helpers support local-time calculations, while
  * Julian dates and basic solar and lunar calculations connect dates to astronomy.
  *
- * datetime_t represents dates and times at second resolution. Use jurisdiction.h
- * for configured public-holiday and working-day rules, and almanac.h for
+ * datetime_t represents dates and times at second resolution. Use jurisdiction_t.h
+ * for configured public-holiday and working-day rules, and almanac_t.h for
  * catalogue-backed astronomical positions rather than civil calendar operations.
  *
  * Provides an opaque datetime_t type supporting:
@@ -23,8 +23,8 @@
  * exactly once for each handle returned by a constructor.
  */
 
-#ifndef _DATETIME_H
-#define _DATETIME_H
+#ifndef MARS_DATETIME_H
+#define MARS_DATETIME_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -1309,4 +1309,4 @@ datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)
  */
 datetime_t *datetime_next_weekday(const datetime_t *dttm, weekday_t weekday);
 
-#endif //_DATETIME_H
+#endif //MARS_DATETIME_H

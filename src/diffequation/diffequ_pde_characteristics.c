@@ -5,7 +5,7 @@
  * Extracts supported dependent-variable powers and cyclic first integrals and attempts characteristic solutions.
  * It complements transport-specific solvers rather than supplying a universal PDE algorithm.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

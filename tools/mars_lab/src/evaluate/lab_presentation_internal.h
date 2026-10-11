@@ -9,7 +9,7 @@
 #ifndef LAB_PRESENTATION_INTERNAL_H
 #define LAB_PRESENTATION_INTERNAL_H
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Append escaped text-node content, retaining exact Unicode and carriage returns.

@@ -3,7 +3,7 @@
  * @brief Private expression graph layout and operator machinery.
  *
  * Defines node metadata, operation kinds, vtables and helpers used throughout the expression implementation. Other
- * modules must use expression.h or the controlled src/internal/expr_internal.h interface rather than depend
+ * modules must use expression_t.h or the controlled src/internal/expr_internal.h interface rather than depend
  * directly on this full layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
@@ -22,16 +22,16 @@
 
 #if !defined(MARS_EXPR_INTERNAL_ACCESS) &&                                                                             \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "expr_internal.h is private to the expression module; include expression.h instead."
+#error "expr_internal.h is private to the expression module; include expression_t.h instead."
 #endif
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include "dictionary.h"
-#include "expression.h"
-#include "qfloat.h"
+#include "dictionary_t.h"
+#include "expression_t.h"
+#include "qfloat_t.h"
 
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 

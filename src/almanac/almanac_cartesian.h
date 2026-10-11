@@ -4,7 +4,7 @@
  *
  * Defines the three-component vector representation and arithmetic or rotation helpers shared by ephemeris,
  * orientation and observer calculations. Use it inside the almanac implementation; public callers obtain positions
- * through almanac.h.
+ * through almanac_t.h.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

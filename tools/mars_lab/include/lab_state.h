@@ -10,7 +10,7 @@
 #ifndef MARS_LAB_STATE_H
 #define MARS_LAB_STATE_H
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Load owned state with defaults, or NULL on I/O, parsing or locking failure.

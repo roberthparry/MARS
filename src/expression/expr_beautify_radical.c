@@ -5,7 +5,7 @@
  * Combines scales and radicands and normalises root factors while preserving their mathematical meaning. This unit
  * improves exact surd presentation after simplification rather than approximating roots numerically.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

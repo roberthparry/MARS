@@ -15,16 +15,16 @@
 
 #if !defined(MARS_MATRIX_INTERNAL_ACCESS) &&                                                                           \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "matrix_internal.h is private to the matrix module; include matrix.h instead."
+#error "matrix_internal.h is private to the matrix module; include matrix_t.h instead."
 #endif
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "matrix.h"
+#include "matrix_t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 /** Evaluate a scalar expression's Taylor series on an equal-diagonal triangular numeric matrix. */
 matrix_t *mat_number_unary_taylor_from_expr(const matrix_t *A, expr_t *(*build_expr)(const expr_t *));
@@ -198,7 +198,7 @@ typedef struct matrix_meta_t {
 } matrix_meta_t;
 
 /* ============================================================
-   Matrix object (opaque in matrix.h)
+   Matrix object (opaque in matrix_t.h)
    ============================================================ */
 
 struct _matrix_t {

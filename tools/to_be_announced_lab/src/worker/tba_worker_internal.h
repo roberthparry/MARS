@@ -8,7 +8,7 @@
  */
 #ifndef TBA_WORKER_INTERNAL_H
 #define TBA_WORKER_INTERNAL_H
-#include "timeseries.h"
+#include "timeseries_t.h"
 #include "tba_support.h"
 
 typedef enum {

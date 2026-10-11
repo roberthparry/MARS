@@ -1,5 +1,5 @@
 /**
- * @file diffequation.h
+ * @file diffequation_t.h
  * @brief Construction, parsing, inspection, and formatting of differential equations.
  *
  * Use this module to represent and solve supported ordinary and partial differential
@@ -9,7 +9,7 @@
  *
  * The solver recognises particular mathematical families rather than promising a
  * closed-form solution for every differential equation. Check the reported result
- * and retained conditions; use equation.h for algebraic equations without
+ * and retained conditions; use equation_t.h for algebraic equations without
  * differential constraints.
  *
  * A problem consists of a base equation, its independent variables, constant
@@ -26,13 +26,13 @@
  * harmonic family when no boundary data are supplied.
  */
 
-#ifndef DIFFEQUATION_H
-#define DIFFEQUATION_H
+#ifndef MARS_DIFFEQUATION_H
+#define MARS_DIFFEQUATION_H
 
 #include <stddef.h>
 
-#include "equation.h"
-#include "matrix.h"
+#include "equation_t.h"
+#include "matrix_t.h"
 
 /**
  * @brief An opaque differential-equation problem.
@@ -574,4 +574,4 @@ const expr_t *de_solve_result_parameter(const diffequ_solve_result_t *result);
  */
 const equation_t *de_solve_result_parameter_constraint(const diffequ_solve_result_t *result);
 
-#endif /* DIFFEQUATION_H */
+#endif /* MARS_DIFFEQUATION_H */

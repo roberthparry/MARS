@@ -7,7 +7,7 @@
  * their existing domain and endpoint behaviour and remain separate from the guarded cylindrical-function adapters.
  */
 
-#include "qcomplex.h"
+#include "qcomplex_t.h"
 
 static qcomplex_t polynomial(unsigned long degree, qcomplex_t x, unsigned family)
 {

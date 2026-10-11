@@ -1,5 +1,5 @@
 /**
- * @file array.h
+ * @file array_t.h
  * @brief Generic, opaque, appendable, and sortable array container.
  *
  * Use array_t for ordered collections of fixed-size elements that permit duplicates,
@@ -15,8 +15,8 @@
  * via user-supplied clone and destroy callbacks.
  */
 
-#ifndef ARRAY_H
-#define ARRAY_H
+#ifndef MARS_ARRAY_H
+#define MARS_ARRAY_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -466,4 +466,4 @@ bool stack_push(stack_t *stack, const void *elem);
  */
 void *stack_pop(stack_t *stack);
 
-#endif /* ARRAY_H */
+#endif /* MARS_ARRAY_H */

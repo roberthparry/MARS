@@ -5,7 +5,7 @@
  * Finds supported shifted ratios and reduces them to a solvable form. Conditions are transformed consistently so
  * the returned constant belongs to the original problem.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

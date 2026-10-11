@@ -5,7 +5,7 @@
  * Builds supported power and reciprocal series forms and expands recognised series requests. It preserves symbolic
  * terms and indices instead of replacing the series with a sampled numerical approximation.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -19,10 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
+#include "expression_t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 typedef struct {
     size_t start;

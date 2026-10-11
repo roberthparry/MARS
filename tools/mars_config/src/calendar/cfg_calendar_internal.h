@@ -11,7 +11,7 @@
 
 #include <time.h>
 
-#include "array.h"
+#include "array_t.h"
 #include "cfg_calendar.h"
 
 /** @brief Owned, fully resolved calendar location. */

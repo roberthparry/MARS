@@ -9,8 +9,8 @@
 #ifndef LAB_WIRE_H
 #define LAB_WIRE_H
 
-#include "json.h"
-#include "protobuf.h"
+#include "json_t.h"
+#include "protobuf_t.h"
 
 /**
  * @brief Encode a version-one object envelope.

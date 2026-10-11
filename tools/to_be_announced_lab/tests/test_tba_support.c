@@ -5,7 +5,7 @@
  * Uses file_t for all I/O and string_t paths; symlinks are unlinked, not followed.
  * Limits accommodate Firefox's disposable profile without accepting arbitrary roots.
  */
-#include "ustring.h"
+#include "string_t.h"
 #include "test_tba_support.h"
 
 static bool test_tba_remove(file_t *directory, unsigned depth, size_t *remaining)

@@ -18,12 +18,12 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#include "almanac.h"
-#include "array.h"
-#include "datetime.h"
-#include "jurisdiction.h"
-#include "sqlite.h"
-#include "ustring.h"
+#include "almanac_t.h"
+#include "array_t.h"
+#include "datetime_t.h"
+#include "jurisdiction_t.h"
+#include "sqlite_t.h"
+#include "string_t.h"
 #include "lab_worker_internal.h"
 
 typedef struct datetime_lab_options_t {

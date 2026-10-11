@@ -13,8 +13,8 @@
 #include <stdlib.h>
 
 #include "cfg_calendar_internal.h"
-#include "datetime.h"
-#include "jurisdiction.h"
+#include "datetime_t.h"
+#include "jurisdiction_t.h"
 
 typedef struct {
     sqlite_stmt_t *label;

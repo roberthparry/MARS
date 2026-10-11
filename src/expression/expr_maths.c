@@ -5,7 +5,7 @@
  * Implements operation callbacks for elementary and special functions, including incomplete-gamma families.
  * Operator construction and public wrappers are defined separately in expr_maths_ops.c.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -15,7 +15,7 @@
 
 #include "expr_bindings.h"
 #include "expr_maths.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static int expr_text_to_unsigned_long(const string_t *text, unsigned long *out)
 {

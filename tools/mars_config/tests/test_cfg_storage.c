@@ -8,7 +8,7 @@
  */
 #include <stdlib.h>
 
-#include "ustring.h"
+#include "string_t.h"
 #include "cfg_storage.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"

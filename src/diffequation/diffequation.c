@@ -5,13 +5,13 @@
  * Owns problem objects, independent variables, parameters and initial or boundary conditions. Parsing, solving and
  * formatting units share this representation without exposing it through the public API.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 
 #include <stdlib.h>
 
-#include "diffequation.h"
+#include "diffequation_t.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 

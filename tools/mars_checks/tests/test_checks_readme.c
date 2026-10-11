@@ -15,7 +15,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "test_harness.h"
 #include "checks_process.h"
 #include "checks_readme.h"

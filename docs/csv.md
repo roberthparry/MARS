@@ -1,6 +1,6 @@
 # CSV
 
-`csv.h` provides opaque `csv_t` readers and writers for UTF-8 comma-separated
+`csv_t.h` provides opaque `csv_t` readers and writers for UTF-8 comma-separated
 records. It depends only on existing MARS modules: `string_t` for text,
 `file_t` for file I/O and `dictionary_t` for indexed header lookup.
 Use it for general tabular interchange; the [timeseries module](timeseries.md)
@@ -88,7 +88,7 @@ its actual field count; fields are never implicitly padded or discarded.
 
 ## Public API
 
-All names below are declared in `csv.h`; detailed parameter and ownership
+All names below are declared in `csv_t.h`; detailed parameter and ownership
 contracts are also available in its Doxygen comments.
 
 | Function | Contract |
@@ -127,7 +127,7 @@ facilities. Do not treat a failed CSV object as reusable; inspect and free it.
 ## Example: reading named columns
 
 ```c
-#include "csv.h"
+#include "csv_t.h"
 
 int main(void)
 {
@@ -157,7 +157,7 @@ Zoë: hello, world
 ## Example: writing headers and escaped text
 
 ```c
-#include "csv.h"
+#include "csv_t.h"
 
 int main(void)
 {

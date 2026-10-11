@@ -6,7 +6,7 @@
  * connect celestial states to a specified observer rather than duplicate coordinate conversions in individual
  * event finders.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

@@ -20,7 +20,7 @@ sequences as characters.
 ## Example: Basic Text Manipulation
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void) {
     string_t *s = string_new_with("Héllo");
@@ -44,7 +44,7 @@ H🙂éllo 🌍
 ## Example: Unicode Text Just Works
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 café 🇬🇧");
@@ -79,7 +79,7 @@ Reversed: 🇬🇧 éfac 👨‍👩‍👧‍👦
 ## Example: Escaping Wide C Strings
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void) {
     string_t *s = string_new_wide(L"hello π");
@@ -100,7 +100,7 @@ hello π
 ## Example: Character Iteration
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
@@ -139,7 +139,7 @@ slices without inspecting raw storage.
 
 ```c
 #include <stdbool.h>
-#include "ustring.h"
+#include "string_t.h"
 
 static bool name_rune(rune_t rune) {
     return rune_is_alpha_numeric(rune) || rune_is_equal(rune, '_');
@@ -251,7 +251,7 @@ id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]
 ## Example: Fixed-Capacity Buffer
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void) {
     char storage[64];
@@ -331,7 +331,7 @@ raw bytes.
 
 ## API Reference
 
-All declarations are in `include/ustring.h`.
+All declarations are in `include/string_t.h`.
 
 ### Types
 
@@ -396,7 +396,7 @@ Use `%S` for `const string_t *`, `%W` for `string_view_t`, and `%R` for
 
 ```c
 #include <stdio.h>
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void)
 {
@@ -627,6 +627,11 @@ bool string_view_peek_rune_value(string_view_t view, string_pos_t pos, uint32_t 
 
 ## Exact UTF-8 protocol spelling
 
+`string_is_valid_utf8(s)` validates complete UTF-8 without copying, normalising or
+changing `errno`. It accepts empty text and embedded NUL scalars, but rejects NULL,
+truncated sequences, overlong encodings, surrogates and out-of-range code points.
+Use it after assembling raw byte fragments, before Unicode operations.
+
 `string_append_utf8_exact(s, buffer, size)` appends complete UTF-8 scalars without
 NFC normalisation. Unlike ordinary text appends, it preserves canonically
 equivalent but differently encoded spellings, which XML names and namespace
@@ -641,7 +646,7 @@ The return value is zero on success or -1 for invalid input, overflow or
 allocation failure. The caller owns both the destination and source storage.
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void)
 {
@@ -695,7 +700,7 @@ unrepresentable storage size gives `EOVERFLOW`. Time and storage are linear in t
 input size; output never exceeds its input byte count.
 
 ```c
-#include "ustring.h"
+#include "string_t.h"
 
 int main(void)
 {

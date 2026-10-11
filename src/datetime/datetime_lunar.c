@@ -5,7 +5,7 @@
  * Calculates phase times and searches for new moons in local-day windows. Lunisolar calendar constructors use
  * these lightweight astronomical helpers; catalogue-backed sky positions belong to the almanac module.
  *
- * This is part of the datetime.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

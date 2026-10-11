@@ -11,8 +11,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "expression.h"
-#include "integrator.h"
+#include "expression_t.h"
+#include "integrator_t.h"
 
 static uint64_t now_ns(void)
 {

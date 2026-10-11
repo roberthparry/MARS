@@ -16,8 +16,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file.h"
-#include "webserver.h"
+#include "file_t.h"
+#include "webserver_t.h"
 #include "tba_server.h"
 #include "test_harness.h"
 #include "test_tba_support.h"

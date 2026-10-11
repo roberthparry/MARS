@@ -5,7 +5,7 @@
  * Coordinates two-variable and multivariable solving strategies and recognised stationary or harmonic cases.
  * Family-specific solvers return matched results or leave the problem unresolved.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

@@ -14,7 +14,7 @@
 #ifndef MARS_CHECKS_EVIDENCE_H
 #define MARS_CHECKS_EVIDENCE_H
 
-#include "ustring.h"
+#include "string_t.h"
 
 /**
  * @brief Write release evidence using --library, --output and --allow-dirty.

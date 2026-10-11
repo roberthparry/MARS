@@ -3,7 +3,7 @@
  * @brief Compiler word splitting and synchronous child execution without a shell.
  *
  * POSIX spawn redirects descriptors to private files; all capture content is
- * subsequently read through file.h. Owned process groups are killed after normal
+ * subsequently read through file_t.h. Owned process groups are killed after normal
  * completion as well as errors and timeouts, before the direct child is reaped.
  * Private capture trees are removed on every return path.
  */

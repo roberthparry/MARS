@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex.h"
-#include "qfloat.h"
+#include "qcomplex_t.h"
+#include "qfloat_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

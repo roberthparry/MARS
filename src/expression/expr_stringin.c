@@ -5,7 +5,7 @@
  * Parses native mathematical notation, bindings and generated function bodies into expression graphs. Shared
  * scanner and symbol-table helpers keep Unicode aliases and variable identity consistent.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -64,9 +64,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ustring.h"
-#include "qfloat.h"
-#include "expression.h"
+#include "string_t.h"
+#include "qfloat_t.h"
+#include "expression_t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 

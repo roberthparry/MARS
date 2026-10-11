@@ -10,7 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "csv.h"
+#include "csv_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

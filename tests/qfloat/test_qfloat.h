@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "qfloat.h"
+#include "qfloat_t.h"
 #include "test_harness.h"
 
 void print_q(const char *label, qfloat_t x);

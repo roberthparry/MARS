@@ -5,7 +5,7 @@
  * Applies operation-specific simplification to the lightweight expressions retained in bindings. It keeps exact
  * supplied values readable without substituting every binding into the main expression graph.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

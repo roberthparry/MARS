@@ -12,7 +12,7 @@
 #ifndef LAB_SYNTAX_INTERNAL_H
 #define LAB_SYNTAX_INTERNAL_H
 
-#include "json.h"
+#include "json_t.h"
 
 /**
  * @brief Format one unsigned numeric token for display without changing its digits.

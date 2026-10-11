@@ -5,14 +5,14 @@
  * Builds supported arbitrary-order linear solution families, including repeated quadratic operators. Root
  * multiplicities and forcing structure determine the basis and particular solution used.
  *
- * This is an implementation unit behind diffequation.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit behind diffequation_t.h. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "matrix.h"
+#include "matrix_t.h"
 
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation/equation_internal.h"

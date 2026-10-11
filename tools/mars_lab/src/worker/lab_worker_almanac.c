@@ -16,8 +16,8 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#include "almanac.h"
-#include "sqlite.h"
+#include "almanac_t.h"
+#include "sqlite_t.h"
 #include "lab_worker_internal.h"
 
 typedef struct almanac_lab_options_t {

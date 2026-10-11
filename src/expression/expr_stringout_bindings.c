@@ -5,7 +5,7 @@
  * Formats names and exact right-hand-side binding expressions for native, function and TeX output. It preserves
  * unset or symbolic values instead of partially evaluating the displayed algebra.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

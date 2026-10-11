@@ -2,7 +2,7 @@
  * @file cfg_database_sql.c
  * @brief Bounded recursive import of packaged SQL through the native SQLCipher API.
  *
- * Reads fixed-size chunks using file.h, preserving exact UTF-8 SQL in string_t.
+ * Reads fixed-size chunks using file_t.h, preserving exact UTF-8 SQL in string_t.
  * SQLCipher's public completeness lexer handles quoted delimiters, comments and
  * trigger bodies. Large literal VALUES inserts use savepoint-protected batches.
  * A line is limited to 1 MiB, other pending SQL to 16 MiB and .read

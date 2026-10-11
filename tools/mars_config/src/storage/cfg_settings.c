@@ -4,14 +4,14 @@
  *
  * Reads bounded configuration strings, understands concatenated quotes and escaped
  * characters, and never executes substitutions. Duplicate conflicting assignments
- * are rejected. Publication uses file.h and an exclusive private staging file.
+ * are rejected. Publication uses file_t.h and an exclusive private staging file.
  */
 #include <sodium.h>
 #include <string.h>
 #include <sys/stat.h>
 
 #include "cfg_storage.h"
-#include "ustring.h"
+#include "string_t.h"
 
 /* Copy and trim optional command-line or environment text. */
 string_t *cfg_storage_value(const char *text)

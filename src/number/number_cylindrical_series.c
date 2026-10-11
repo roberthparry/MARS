@@ -6,7 +6,7 @@
  * kernel. Exact component conversion, cancellation guards and numeric-scope ownership follow the existing number
  * policy. The shared precision selector also serves the separate Bessel K and Y algorithms.
  *
- * This is part of number.h's implementation, not an independent special-function API. Series-family selection
+ * This is part of number_t.h's implementation, not an independent special-function API. Series-family selection
  * and logarithmic-gamma details remain private to this translation unit.
  */
 

@@ -27,7 +27,7 @@ duplicate or free the pointed-to strings.
 ```c
 #include <stdio.h>
 #include <string.h>
-#include "set.h"
+#include "set_t.h"
 
 static size_t str_hash(const void *p) {
     const char *s = *(const char * const *)p;
@@ -85,7 +85,7 @@ copies on destruction.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "set.h"
+#include "set_t.h"
 
 static size_t str_hash(const void *p) {
     const char *s = *(const char * const *)p;
@@ -171,7 +171,7 @@ positions.
 
 ## API Reference
 
-All declarations are in `include/set.h`.
+All declarations are in `include/set_t.h`.
 
 ### Callback Types
 

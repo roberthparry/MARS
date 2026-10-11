@@ -8,7 +8,7 @@
  */
 #include <string.h>
 
-#include "expression.h"
+#include "expression_t.h"
 #include "lab_presentation.h"
 #include "test_harness.h"
 #include "test_lab_support.h"

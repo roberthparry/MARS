@@ -10,8 +10,8 @@
 #ifndef MARS_LAB_WORKER_INTERNAL_H
 #define MARS_LAB_WORKER_INTERNAL_H
 
-#include "number.h"
-#include "ustring.h"
+#include "number_t.h"
+#include "string_t.h"
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

@@ -12,7 +12,7 @@
 #include <string.h>
 
 #include "http_fixture.h"
-#include "json.h"
+#include "json_t.h"
 
 static bool fixture_header(fixture_connection_t *connection, const char *name, const char *value)
 {

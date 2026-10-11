@@ -1,6 +1,6 @@
 /**
  * @file checks_support.c
- * @brief Owned collections and file.h-backed repository traversal for check tools.
+ * @brief Owned collections and file_t.h-backed repository traversal for check tools.
  *
  * These adapters preserve exact source bytes, sort paths deterministically and
  * keep filesystem handles private. Traversal never descends through symlinks.
@@ -8,13 +8,13 @@
  */
 #include <ctype.h>
 #include <errno.h>
-#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "array.h"
-#include "file.h"
+#include "array_t.h"
+#include "file_t.h"
+#include "regex_t.h"
 #include "checks_support.h"
 
 struct checks_strings {
@@ -302,21 +302,31 @@ checks_strings_t *checks_split(const string_t *text, unsigned char separator)
     return items;
 }
 
-/* Adapt POSIX regular expressions to owned MARS strings. */
+/* Match repository text through the shared UTF-8 regular-expression module. */
 bool checks_match(const string_t *text, const char *pattern, size_t group, string_t **capture)
 {
-    regex_t expression;
-    regmatch_t matches[8];
+    regex_span_t matches[8];
     if (capture)
         *capture = NULL;
-    if (group >= 8 || regcomp(&expression, pattern, REG_EXTENDED | REG_NEWLINE))
+    if (group >= 8)
         checks_fatal("invalid checker expression");
-    bool found = regexec(&expression, string_c_str(text), 8, matches, 0) == 0;
-    if (found && capture && matches[group].rm_so >= 0)
-        *capture =
-            checks_slice(text, (size_t)matches[group].rm_so, (size_t)(matches[group].rm_eo - matches[group].rm_so));
-    regfree(&expression);
-    return found;
+    string_t *source = checks_text(pattern);
+    regex_options_t options = regex_options_default();
+    options.multiline = true;
+    regex_t *expression = regex_new(source, &options, NULL);
+    string_free(source);
+    if (!expression)
+        checks_fatal("invalid checker expression");
+    regex_status_t status = regex_search(expression, text, 0, matches, group + 1, NULL);
+    if (status == REGEX_MATCH && capture && matches[group].matched) {
+        *capture = regex_capture(text, &matches[group]);
+        if (!*capture)
+            status = REGEX_ERROR;
+    }
+    regex_free(expression);
+    if (status == REGEX_ERROR)
+        checks_fatal("checker expression search failed");
+    return status == REGEX_MATCH;
 }
 
 /* Collapse ASCII whitespace in C declarations. */

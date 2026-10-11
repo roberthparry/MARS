@@ -213,7 +213,7 @@ check-source-policy: $(CHECKS_BIN)
 # to the number backend and must not leak across this module boundary.
 check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 	@if grep -ERn '#include[[:space:]]*[<"](mpfr|mpc)\.h|(^|[^[:alnum:]_])(mpfr_|mpc_)' \
-		include/qfloat.h include/qcomplex.h src/qfloat src/qcomplex; then \
+		include/qfloat_t.h include/qcomplex_t.h src/qfloat src/qcomplex; then \
 		echo "qfloat/qcomplex must not use MPFR or MPC."; \
 		exit 1; \
 	fi
@@ -401,7 +401,7 @@ $(BENCH_BINS) $(SCRATCH_BINS) \
 $(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) \
 $(CONFIG_OBJS) $(CONFIG_PROGRAM) $(CONFIG_TEST_OBJS) $(CHECKS_OBJS) $(CHECKS_BIN) $(CHECKS_TEST_OBJS): | check-deps
 
-$(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file.h src/file/file_internal.h Makefile
+$(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file_t.h src/file/file_internal.h Makefile
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -O0 -g --coverage $(INCLUDES) -c $< -o $@
 

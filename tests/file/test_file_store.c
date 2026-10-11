@@ -16,9 +16,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "file.h"
-#include "array.h"
-#include "sqlite.h"
+#include "file_t.h"
+#include "array_t.h"
+#include "sqlite_t.h"
 #include "test_harness.h"
 
 /* Exported tests are registered by test_file.c; this file owns no suite configuration. */

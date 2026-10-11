@@ -7,7 +7,7 @@
  */
 #ifndef MARS_LAB_SERVER_INTERNAL_H
 #define MARS_LAB_SERVER_INTERNAL_H
-#include "webserver.h"
+#include "webserver_t.h"
 
 /**
  * @brief Check socket identity and browser request headers.

@@ -5,7 +5,7 @@
  * Wraps rendered TeX bodies with the required presentation context, including partial and total derivative
  * notation. Recursive node emission is handled by expr_stringout_TeX_emit.c.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "test_config.h"
-#include "ustring.h"
+#include "string_t.h"
 
 typedef void (*test_fn)(void);
 

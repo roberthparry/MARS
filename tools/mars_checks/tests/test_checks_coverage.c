@@ -18,7 +18,7 @@
 static bool test_checks_coverage_tree(const string_t *root)
 {
     return test_checks_write(root, "src/file/file_one.c", "int file_one(void) { return 1; }\n") &&
-           test_checks_write(root, "include/file.h", "int file_one(void);\nint file_one(void);\n");
+           test_checks_write(root, "include/file_t.h", "int file_one(void);\nint file_one(void);\n");
 }
 
 static string_t *test_checks_coverage_json(unsigned covered, unsigned lines, unsigned taken, unsigned branches,
@@ -199,7 +199,7 @@ static void test_checks_coverage_aggregate_and_filtering(void)
               test_checks_coverage_compress(root, "reports ; $literal/file_a.gcov.json", second) &&
               test_checks_write(root, "reports ; $literal/other.gcov.json.gz", "ignored non-matching name");
     ok = ok && test_checks_coverage_run(root) == 0;
-    string_replace(first, "{\"files\":[", "{\"files\":[{\"file\":\"include/file.h\"},");
+    string_replace(first, "{\"files\":[", "{\"files\":[{\"file\":\"include/file_t.h\"},");
     string_replace(first, "src/file/file_one.c", "./src//file/./file_one.c");
     ok = test_checks_coverage_compress(root, "reports ; $literal/file_z.gcov.json", first) && ok;
     ok = test_checks_coverage_run(root) == 0 && ok;
@@ -218,13 +218,13 @@ static void test_checks_coverage_empty_inventories(void)
     string_free(directory);
     string_t *json = test_checks_coverage_json(1, 1, 1, 1, "1");
     ok = test_checks_coverage_compress(root, "reports ; $literal/file_one.gcov.json", json) && ok;
-    ok = test_checks_write(root, "include/file.h", "/* no public functions */\n") && ok;
+    ok = test_checks_write(root, "include/file_t.h", "/* no public functions */\n") && ok;
     ok = test_checks_coverage_run(root) == 1 && ok;
     string_free(json);
     ok = test_checks_finish(root) && ok;
     root = test_checks_root();
     directory = checks_path(root, "src/file");
-    ok = checks_mkdir(directory) && test_checks_write(root, "include/file.h", "int file_one(void);\n") && ok;
+    ok = checks_mkdir(directory) && test_checks_write(root, "include/file_t.h", "int file_one(void);\n") && ok;
     string_free(directory);
     json = test_checks_coverage_json(1, 1, 1, 1, "1");
     ok = test_checks_coverage_compress(root, "reports ; $literal/file_one.gcov.json", json) && ok;

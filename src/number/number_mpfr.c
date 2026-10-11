@@ -5,7 +5,7 @@
  * Adapts MPFR-backed real values to generic numeric lifecycle, arithmetic and constants. Precision is carried by
  * the backend rather than inferred from formatted decimal output.
  *
- * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
@@ -13,10 +13,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "number.h"
+#include "number_t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 bool number_eq_same_tol_mpfr(const number_t *a, const number_t *b);
 

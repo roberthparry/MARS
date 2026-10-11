@@ -18,8 +18,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "file.h"
-#include "array.h"
+#include "file_t.h"
+#include "array_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -636,7 +636,7 @@ static void test_file_advisory_locks(void)
     file_free(first);
 }
 
-/* The POSIX signal test is isolated from array.h's existing stack_t typedef. */
+/* The POSIX signal test is isolated from array_t.h's existing stack_t typedef. */
 void test_file_delayed_write_failure_is_reported(void);
 void test_file_copy_failure_preserves_destination(void);
 void test_file_directory_listing_and_removal(void);

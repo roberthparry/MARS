@@ -5,7 +5,7 @@
  * Constructs supported direct antiderivatives and definite values for named primitive families, including
  * logarithmic and exponential integrals. It is used when a recognised primitive avoids a more general reduction.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

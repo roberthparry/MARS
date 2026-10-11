@@ -17,7 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "lab_server.h"
 #include "lab_state.h"
 #include "test_harness.h"

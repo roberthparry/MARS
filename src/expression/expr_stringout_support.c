@@ -5,7 +5,7 @@
  * Supports output construction and reusable Cartesian composition views. Temporary display structures are owned
  * and cleared here so wrappers and emitters can share them safely.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression.h"
+#include "expression_t.h"
 #include "expr_stringin_scan.h"
 #include "expr_stringout.h"
 

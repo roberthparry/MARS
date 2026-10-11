@@ -9,7 +9,7 @@
 #ifndef MARS_TEST_LAB_SUPPORT_H
 #define MARS_TEST_LAB_SUPPORT_H
 
-#include "json.h"
+#include "json_t.h"
 
 /** Parse literal JSON into a caller-owned tree. */
 json_t *test_lab_json(const char *text);

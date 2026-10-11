@@ -15,7 +15,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "test_harness.h"
 
 /* Pipes synchronise processes; all regular-file operations still use the file API. */

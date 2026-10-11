@@ -4,7 +4,7 @@
  *
  * Builds the packaged jurisdiction database once in a disposable child home, then
  * retains only its closed database in a private runner-owned directory. Ordinary
- * and README cases copy that read-only seed through file.h and receive freshly
+ * and README cases copy that read-only seed through file_t.h and receive freshly
  * quoted, home-specific saved configuration. Production installers and SQLCipher
  * security settings are unchanged. Explicit finalisation reports cleanup errors;
  * an owner-PID-guarded exit hook is a fallback for early runner termination.
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
 #include "test_harness.h"

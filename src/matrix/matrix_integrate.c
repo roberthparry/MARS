@@ -5,7 +5,7 @@
  * Builds entrywise and supported spectral antiderivatives, repeated integrals and integration-constant families.
  * Formal or unresolved expressions remain represented rather than being silently discarded.
  *
- * This is part of matrix.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of matrix_t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

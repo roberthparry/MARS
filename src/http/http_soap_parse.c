@@ -5,7 +5,7 @@
  * Validates envelope structure, resolves namespace aliases and extracts body and fault information. Parsed SOAP
  * failure details remain distinct from HTTP transport status.
  *
- * This is part of the synchronous http.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_t.h client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

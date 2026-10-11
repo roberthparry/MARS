@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file.h"
-#include "xml.h"
+#include "file_t.h"
+#include "xml_t.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);

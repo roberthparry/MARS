@@ -9,8 +9,8 @@
 #ifndef MARS_CONFIG_DATABASE_INTERNAL_H
 #define MARS_CONFIG_DATABASE_INTERNAL_H
 
-#include "file.h"
-#include "sqlite.h"
+#include "file_t.h"
+#include "sqlite_t.h"
 
 /** Bounded literal INSERT state, owned by a single recursive SQL stream. */
 typedef struct cfg_database_values {

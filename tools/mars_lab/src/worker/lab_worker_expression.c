@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation.h"
-#include "expression.h"
-#include "ustring.h"
+#include "equation_t.h"
+#include "expression_t.h"
+#include "string_t.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

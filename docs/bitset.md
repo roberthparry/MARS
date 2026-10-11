@@ -10,7 +10,7 @@
 
 ```c
 #include <stdio.h>
-#include "bitset.h"
+#include "bitset_t.h"
 
 int main(void) {
     bitset_t *bs = bitset_create(0);
@@ -44,7 +44,7 @@ popcount: 4
 
 ```c
 #include <stdio.h>
-#include "bitset.h"
+#include "bitset_t.h"
 
 int main(void) {
     bitset_t *a = bitset_create(64);
@@ -74,7 +74,7 @@ AND result: 4 5 6 7
 
 ## API Reference
 
-All declarations are in `include/bitset.h`.
+All declarations are in `include/bitset_t.h`.
 
 ### Constants
 

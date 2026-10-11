@@ -5,14 +5,14 @@
  * Allocates and manages string_t storage and implements construction, mutation and formatting. Normalisation and
  * validation policies are maintained at text boundaries rather than delegated to raw caller buffers.
  *
- * This belongs to ustring.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string_t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 
 /* string_core.c - memory management, mutation, and formatting for string_t
  *
  * Implements the lifecycle and core mutation operations for the dynamic UTF-8
- * string type defined in ustring.h:
+ * string type defined in string_t.h:
  *
  *   Allocation/free  — string_new, string_new_with, string_clone, string_free
  *   Capacity         — string_reserve (internal), the doubling growth policy
@@ -37,8 +37,8 @@
 #include <wchar.h>
 
 #define MARS_STRING_INTERNAL_ACCESS
+#include "string_t.h"
 #include "string_internal.h"
-#include "ustring.h"
 
 static bool string_utf8_decode_one_strict(const char *data, size_t len, uint32_t *out)
 {
@@ -208,6 +208,23 @@ int string_append_bytes(string_t *s, const char *buffer, size_t size)
     return 0;
 }
 
+static bool string_utf8_valid_bytes(const char *buffer, size_t size)
+{
+    for (size_t pos = 0; pos < size;) {
+        size_t width = string_utf8_scalar_width((unsigned char)buffer[pos]);
+        if (!width || width > size - pos || !string_utf8_decode_one_strict(buffer + pos, width, NULL))
+            return false;
+        pos += width;
+    }
+    return true;
+}
+
+/* Validate raw text in place, without allocating a temporary string. */
+bool string_is_valid_utf8(const string_t *s)
+{
+    return s && string_utf8_valid_bytes(s->data, s->len);
+}
+
 /* Validate and append protocol text without changing Unicode spelling. */
 int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
 {
@@ -216,12 +233,8 @@ int string_append_utf8_exact(string_t *s, const char *buffer, size_t size)
     if ((uintptr_t)buffer >= (uintptr_t)s->data && (uintptr_t)buffer - (uintptr_t)s->data <= s->len &&
         size > s->len - (size_t)((uintptr_t)buffer - (uintptr_t)s->data))
         return -1;
-    for (size_t pos = 0; pos < size;) {
-        size_t width = string_utf8_scalar_width((unsigned char)buffer[pos]);
-        if (!width || width > size - pos || !string_utf8_decode_one_strict(buffer + pos, width, NULL))
-            return -1;
-        pos += width;
-    }
+    if (!string_utf8_valid_bytes(buffer, size))
+        return -1;
     return string_append_bytes(s, buffer, size);
 }
 

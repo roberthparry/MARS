@@ -11,7 +11,7 @@
 #ifndef MARS_CHECKS_COVERAGE_H
 #define MARS_CHECKS_COVERAGE_H
 
-#include "ustring.h"
+#include "string_t.h"
 
 /**
  * @brief Implement file-coverage DIR relative to the supplied repository root.

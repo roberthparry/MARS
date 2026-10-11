@@ -9,7 +9,7 @@
 #ifndef MARS_EVIDENCE_PRIVATE_H
 #define MARS_EVIDENCE_PRIVATE_H
 
-#include "file.h"
+#include "file_t.h"
 #include "checks_process.h"
 
 /**
@@ -40,7 +40,7 @@ void evidence_text(json_t *object, const char *key, const string_t *value);
 string_t *evidence_run(const string_t *root, const char *const *argv, bool include_errors);
 
 /**
- * @brief Resolve a file path through file.h.
+ * @brief Resolve a file path through file_t.h.
  * @param path Borrowed existing path, which may include symbolic links.
  * @return Owned canonical absolute name, or NULL on failure; release with string_free.
  */

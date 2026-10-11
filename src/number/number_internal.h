@@ -3,7 +3,7 @@
  * @brief Private numeric representations and backend contracts.
  *
  * Defines the number implementation's backend kinds, storage access and shared arithmetic helpers. Other modules
- * should use number.h or src/internal/number_internal.h rather than depend on this complete backend layout.
+ * should use number_t.h or src/internal/number_internal.h rather than depend on this complete backend layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.
@@ -14,14 +14,14 @@
 
 #if !defined(MARS_NUMBER_INTERNAL_ACCESS) &&                                                                           \
     (!defined(__INTELLISENSE__) || (defined(__INCLUDE_LEVEL__) && __INCLUDE_LEVEL__ > 0))
-#error "number_internal.h is private to the number module; include number.h instead."
+#error "number_internal.h is private to the number module; include number_t.h instead."
 #endif
 
 #include <string.h>
 
 #include <mpc.h>
 
-#include "number.h"
+#include "number_t.h"
 
 /* Scoped allocation services implemented by number_core.c. */
 void *number_scope_mem_alloc(size_t size, size_t align);

@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "dictionary.h"
+#include "dictionary_t.h"
 #include "test_harness.h"
 #include "test_dict_layout.h"
 

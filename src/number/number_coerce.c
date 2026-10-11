@@ -5,17 +5,17 @@
  * Converts or clones values between supported number backends and chooses compatible representations for
  * operations. This is the central boundary for exactness, precision and real-to-complex promotion.
  *
- * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 
 #include <complex.h>
 #include <stdlib.h>
 
-#include "number.h"
+#include "number_t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "ustring.h"
+#include "string_t.h"
 
 static bool number_kind_is_exact_real(number_kind_t kind)
 {

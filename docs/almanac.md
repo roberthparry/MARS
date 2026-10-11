@@ -19,7 +19,7 @@ workbook ownership are recorded in the
 
 ## Source Organisation
 
-The public API remains in `include/almanac.h`. Implementation files under
+The public API remains in `include/almanac_t.h`. Implementation files under
 `src/almanac/` are grouped by responsibility:
 
 | File | Responsibility |
@@ -265,9 +265,9 @@ single body entry. For solar eclipses, prefer the dedicated local event search:
 ```c
 #include <stdio.h>
 
-#include "almanac.h"
-#include "array.h"
-#include "datetime.h"
+#include "almanac_t.h"
+#include "array_t.h"
+#include "datetime_t.h"
 
 static datetime_t *datetime_from_event_time(const almanac_event_time_t *event_time)
 {
@@ -422,7 +422,7 @@ The serialised form uses:
 
 ## API Reference
 
-All declarations are in `include/almanac.h`.
+All declarations are in `include/almanac_t.h`.
 
 ### Allocation
 

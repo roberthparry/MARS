@@ -8,7 +8,7 @@
 #ifndef TBA_HTTP_H
 #define TBA_HTTP_H
 
-#include "webserver.h"
+#include "webserver_t.h"
 
 /** @brief Check the real socket peer, ignoring untrusted forwarding headers.
  * @param request Borrowed request.

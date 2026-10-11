@@ -5,7 +5,7 @@
  * Owns tolerances, subdivision limits, exact-result state and integrator lifecycle. It coordinates expression and
  * symbolic entry points with numerical implementations rather than embedding every quadrature method here.
  *
- * This is part of integrator.h. Callers configure opaque integrator handles and inspect completion or error
+ * This is part of integrator_t.h. Callers configure opaque integrator handles and inspect completion or error
  * information rather than relying on a particular internal algorithm.
  */
 

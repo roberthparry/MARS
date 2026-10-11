@@ -266,6 +266,13 @@ That places libraries in `/usr/local/lib` and public headers in
 dependency inventory, licensing policy, privacy notice, almanac and visual
 provenance records, and compliance status are installed in
 `/usr/local/share/doc/mars`, so they remain with packaged installations.
+Public header filenames follow `<module>_t.h`, for example `string_t.h`,
+`regex_t.h` and `file_t.h`; their guards use `MARS_<MODULE>_H`. Include these
+names from the installed `mars` directory (or add that directory to your
+compiler's include search path). This is a source-level rename: earlier header
+names are no longer supplied as compatibility wrappers. Public type and function
+names are unchanged. Private implementation headers are not installed.
+
 Override paths as needed:
 
 ```sh

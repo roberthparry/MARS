@@ -5,7 +5,7 @@
  * Builds differenced responses and lag maps, fits supported seasonal or exogenous models and produces forecasts
  * and residual diagnostics. Model cleanup preserves ownership of the fitted state and result arrays.
  *
- * This is part of timeseries.h. Maintain the association between values, date indices and model metadata when
+ * This is part of timeseries_t.h. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

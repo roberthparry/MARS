@@ -5,7 +5,7 @@
  * Derives phase details and refines body-Sun longitude relationships near estimated events. The phase and node
  * helpers also support the initial candidate selection used by eclipse searches.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use almanac_t.h and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

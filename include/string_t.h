@@ -1,5 +1,5 @@
 /**
- * @file ustring.h
+ * @file string_t.h
  * @brief Dynamic text string type with Unicode-aware operations.
  *
  * Use string_t for MARS text storage, parsing, construction, searching and formatting
@@ -34,8 +34,8 @@
  * valid text unless explicitly documented otherwise.
  */
 
-#ifndef USTRING_H
-#define USTRING_H
+#ifndef MARS_STRING_H
+#define MARS_STRING_H
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -248,6 +248,14 @@ int string_append_chars(string_t *s, const char *buffer, size_t size);
  * @return Zero on success; -1 on invalid arguments, overflow or allocation failure.
  */
 int string_append_bytes(string_t *s, const char *buffer, size_t size);
+
+/**
+ * @brief Validate complete UTF-8 without copying or normalising its bytes.
+ * @param s Borrowed string, possibly assembled from raw fragments.
+ * @return True for valid UTF-8, including empty text and embedded NUL scalars; false for NULL,
+ * incomplete, overlong, surrogate or out-of-range encodings. Does not modify the string or errno.
+ */
+bool string_is_valid_utf8(const string_t *s);
 
 /**
  * @brief Append complete UTF-8 scalars verbatim, without Unicode normalisation.
@@ -1451,4 +1459,4 @@ int string_builder_append_char(string_builder_t *b, char c);
  */
 int string_builder_format(string_builder_t *b, const char *fmt, ...);
 
-#endif /* USTRING_H */
+#endif /* MARS_STRING_H */

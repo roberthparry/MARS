@@ -5,7 +5,7 @@
  * Extracts affine arguments and polynomial factors for symbolic rules, including products with unary functions.
  * Integration and simplification use these recognisers instead of matching printed text.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -15,7 +15,7 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "expression.h"
+#include "expression_t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 

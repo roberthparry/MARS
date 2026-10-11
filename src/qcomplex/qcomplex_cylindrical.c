@@ -7,7 +7,7 @@
  * remain in the number module; this file does not introduce another special-function implementation.
  */
 
-#include "number.h"
+#include "number_t.h"
 
 /* Round principal modified Bessel I to complex double-double precision. */
 qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument)

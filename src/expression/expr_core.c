@@ -5,7 +5,7 @@
  * Allocates nodes, manages their references and caches, and constructs variables, constants and derivative graphs.
  * This is the central ownership and evaluation machinery on which the symbolic units depend.
  *
- * This is part of the expression.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expression_t.h implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -37,10 +37,10 @@
 #include <stdlib.h>
 
 #include "expr_bindings.h"
-#include "number.h"
+#include "number_t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "expression.h"
+#include "expression_t.h"
 
 /* Pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of

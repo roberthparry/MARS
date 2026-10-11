@@ -5,7 +5,7 @@
  * Evaluates the modified Bessel K family, including the supported order-dependent branches. It supplies a
  * decaying-solution counterpart to Bessel I while respecting this numeric layer's domain.
  *
- * This belongs to number.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

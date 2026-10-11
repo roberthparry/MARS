@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "file.h"
+#include "file_t.h"
 #include "lab_page.h"
 #include "lab_state.h"
 #include "test_harness.h"

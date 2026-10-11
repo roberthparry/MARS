@@ -15,7 +15,7 @@
 #include <time.h>
 #include <openssl/ssl.h>
 
-#include "ustring.h"
+#include "string_t.h"
 
 typedef struct {
     int fd;

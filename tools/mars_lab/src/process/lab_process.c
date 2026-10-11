@@ -5,7 +5,7 @@
  * Implements the private lab_process.h interface using GNU/Linux spawn actions,
  * a non-blocking capture pipe and monotonic deadlines. Child output is retained
  * in the public string module's storage. POSIX descriptor I/O is necessary here:
- * the current public file.h API has no descriptor-adoption operation and opens
+ * the current public file_t.h API has no descriptor-adoption operation and opens
  * regular files only, so it cannot represent this anonymous pipe. This execution
  * core has no dependency on the Lab's calculation registry or server entry points.
  * Built-in calculation command construction lives separately in lab_process_worker.c.
@@ -32,8 +32,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "file.h"
-#include "ustring.h"
+#include "file_t.h"
+#include "string_t.h"
 #include "lab_process.h"
 
 extern char **environ;

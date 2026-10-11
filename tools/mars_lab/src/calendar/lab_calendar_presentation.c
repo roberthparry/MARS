@@ -10,7 +10,7 @@
  */
 #include <string.h>
 
-#include "ustring.h"
+#include "string_t.h"
 #include "lab_calendar_internal.h"
 
 static bool lab_cal_pres_put(json_t *object, const char *name, json_t *value)

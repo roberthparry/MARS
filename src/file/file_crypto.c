@@ -5,7 +5,7 @@
  * Uses libsodium secretstream to process file data and verify encrypted streams. Decrypted output is staged until
  * authentication and stream completion succeed; keys and sensitive buffers require the cleanup performed here.
  *
- * This belongs to the Linux-only file.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t.h implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 
