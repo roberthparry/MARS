@@ -14,13 +14,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
 
 extern expr_t *expr_simplify(const expr_t *expr);
 
@@ -1559,7 +1559,8 @@ void expr_merge_coefficient_sqrt_terms(number_t *coefficient, expr_t **terms, si
 static bool expr_radicand_nonnegative_local(const expr_t *expr)
 {
     if (expr_is_const(expr))
-        return num_is_real(expr->c) && num_is_finite(expr->c) && num_ge(expr->c, NUM_ZERO);
+        return expr_simplify_allows_const_identity_fold(expr) && num_is_real(expr->c) &&
+               num_is_finite(expr->c) && num_ge(expr->c, NUM_ZERO);
     if (expr_is_op(expr, &ops_abs))
         return true;
     if (expr_is_op(expr, &ops_add) || expr_is_op(expr, &ops_mul) || expr_is_op(expr, &ops_div))
@@ -1629,13 +1630,16 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_
             expr_t *quotient;
             expr_t *simp_arg;
             expr_t *raw;
+            expr_t *denominator_radicand = expr_sqrt_radicand_owned_local(den_terms[j]);
 
             /* A non-negative denominator preserves principal branches wherever the quotient is defined. */
-            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a ||
-                !expr_radicand_nonnegative_local(den_terms[j]->a) || expr_const_is_zero(den_terms[j]->a))
+            if (!denominator_radicand || !expr_radicand_nonnegative_local(denominator_radicand) ||
+                expr_const_is_zero(denominator_radicand)) {
+                expr_free(denominator_radicand);
                 continue;
+            }
 
-            quotient = expr_div(numerator_radicand, den_terms[j]->a);
+            quotient = expr_div(numerator_radicand, denominator_radicand);
             simp_arg = quotient ? expr_simplify(quotient) : NULL;
             raw = simp_arg ? expr_sqrt(simp_arg) : NULL;
             if (raw) {
@@ -1647,6 +1651,7 @@ void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms, expr_t **den_
             expr_free(raw);
             expr_free(simp_arg);
             expr_free(quotient);
+            expr_free(denominator_radicand);
             break;
         }
         expr_free(numerator_radicand);

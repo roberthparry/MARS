@@ -1443,6 +1443,38 @@ argument long enough to integrate it before presentation expansion; in
 particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
 as native Cartesian expressions rather than unevaluated integral nodes.
 
+Gaussian cumulative integrals also have a direct outer-integration rule. For an
+integrand `exp(a*t^2+b*t+c)`, it completes the square and uses `erf` or `erfc`,
+then applies integration by parts to a non-constant affine upper endpoint. This avoids
+general substitution search and nested numerical quadrature. The lower endpoint
+may be finite or either infinity; the coefficients and lower endpoint must be
+independent of the outer integration variable. Parameters remain symbolic and
+the result retains the decay condition `Re(-a) > 0`, rather than assuming a
+width is positive or replacing it with its current binding. The affine slope
+must remain non-zero; that condition is retained too. Non-affine endpoints,
+higher-degree exponents and parameter-dependent outer integrands are not covered
+by this shortcut. Complex values remain subject to the existing numerical
+limitations of the error-function backend.
+
+Arithmetic lifts operand conditions to the whole result before cancelling factors,
+so convergence restrictions do not appear inside a numerator or denominator.
+These predicates retain their live bindings, including after arithmetic cancels
+the dependent body to zero. The Gaussian scale uses a principal square root rather than a square root of a
+reciprocal. Positive constant radical factors cancel, but a symbolic width's
+square root is not replaced by the width or its current numerical value: doing
+so would change negative-width or complex branches. Named parameters remain live
+when simplifying exact unary functions too.
+
+The native calculus display path can separately use supplied parameter signs in a
+disposable rendering snapshot. With a positive real binding it reduces the
+principal root of a parameter square to that parameter, retaining its name; with
+a negative binding it uses the negative of the parameter. It also omits parameter
+conditions already proved by the supplied values. Unknown or complex signs are
+not guessed, the active calculus variable is never treated as fixed, and the
+generic symbolic result remains unchanged. This binding-specific display is
+rebuilt whenever the user changes a binding; it must not be reused as an
+unconditional identity.
+
 Quadratic-logarithm and affine-over-quadratic integrals share a discriminant
 rule. For `a*x*x+b*x+c`, a known negative `4*a*c-b*b` selects an inverse
 hyperbolic tangent; a zero discriminant uses a rational primitive. This avoids

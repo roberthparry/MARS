@@ -1326,6 +1326,13 @@ static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor, const ex
         num_destroy(&scale);
         return NULL;
     }
+    if (expr_is_op(antiderivative, &ops_real_domain)) {
+        left = integrate_scale_antiderivative_sum(factor, antiderivative->a);
+        out = left ? expr_with_domain_of(left, antiderivative) : NULL;
+        expr_free(left);
+        num_destroy(&scale);
+        return out;
+    }
     if (expr_is_op(antiderivative, &ops_mul) && antiderivative->a && antiderivative->b &&
         (expr_is_addsub(antiderivative->a) || expr_is_addsub(antiderivative->b))) {
         const expr_t *sum = expr_is_addsub(antiderivative->a) ? antiderivative->a : antiderivative->b;
@@ -1425,7 +1432,11 @@ static expr_t *integrate_div_constant_denominator(const expr_t *expr, const expr
         return NULL;
 
     inner = expr_integrate_dispatch(expr->a, wrt);
-    quotient = inner ? expr_div(inner, expr->b) : NULL;
+    expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *factor = one ? expr_div(one, expr->b) : NULL;
+    quotient = inner && factor ? integrate_scale_antiderivative_sum(factor, inner) : NULL;
+    expr_free(factor);
+    expr_free(one);
     expr_free(inner);
     return simplify_owned(quotient);
 }

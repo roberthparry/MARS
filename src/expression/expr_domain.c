@@ -290,8 +290,10 @@ static expr_t *real_domain_simplify(const expr_t *expr, expr_t *a, expr_t *b)
             if (domain_predicate_implies(pair, seen)) {
                 expr_free(seen->a);
                 expr_free(seen->b->a);
-                seen->a = expr_clone(pair->a);
-                seen->b->a = expr_clone(pair->b->a);
+                seen->a = pair->a;
+                seen->b->a = pair->b->a;
+                expr_retain(seen->a);
+                expr_retain(seen->b->a);
                 duplicate = true;
                 break;
             }
@@ -314,9 +316,12 @@ static expr_t *real_domain_simplify(const expr_t *expr, expr_t *a, expr_t *b)
             continue;
         }
         *tail = expr_alloc(&ops_argument_list);
-        (*tail)->a = expr_clone(pair->a);
+        /* Keep the predicate's live symbols linked to the formula's bindings. */
+        (*tail)->a = pair->a;
+        expr_retain((*tail)->a);
         (*tail)->b = expr_alloc(&ops_argument_list);
-        (*tail)->b->a = expr_clone(pair->b->a);
+        (*tail)->b->a = pair->b->a;
+        expr_retain((*tail)->b->a);
         tail = &(*tail)->b->b;
     }
     expr_free(b);

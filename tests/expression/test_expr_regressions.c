@@ -3191,6 +3191,122 @@ static void test_sqrt_quotient_combines_positive_real_denominator(void)
     expr_free(pi);
 }
 
+static void test_radical_quotient_preserves_named_parameter(void)
+{
+    number_t initial = num_create_from_long(15);
+    expr_t *width = expr_new_named_const(initial, "s");
+    expr_t *square = expr_pow(width, &NUM_TWO);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *scale = expr_mul_long(pi, 2);
+    expr_t *radicand = expr_mul(scale, square);
+    expr_t *numerator = expr_sqrt(radicand);
+    expr_t *denominator = expr_sqrt(scale);
+    expr_t *quotient = expr_div(numerator, denominator);
+    expr_t *simplified = expr_simplify(quotient);
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    TEST_ASSERT_STR_EQ(text, "√(s²)");
+    /* A named constant is still a live parameter; never freeze its initial square root. */
+    test_expr_set_val_d(width, -3.0);
+    check_q_at(__FILE__, __LINE__, 1, "principal root retains the negative width's magnitude",
+               expr_eval_qf(simplified), qf_from_double(3.0));
+    free(text);
+    expr_free(simplified);
+    expr_free(quotient);
+    expr_free(denominator);
+    expr_free(numerator);
+    expr_free(radicand);
+    expr_free(scale);
+    expr_free(pi);
+    expr_free(square);
+    expr_free(width);
+    num_destroy(&initial);
+}
+
+static void test_bound_display_parameter_signs(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{x+sqrt(s^2)/s | x=1; s=15}", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    expr_t *s = expr_bindings_get(bindings, "s");
+    char *before = expr_to_string(source, style_UNBOUND);
+    static const double widths[] = {15.0, -15.0};
+    static const char *const expected[] = {"x + 1", "x - 1"};
+    for (size_t i = 0u; i < sizeof widths / sizeof *widths; ++i) {
+        test_expr_set_val_d(s, widths[i]);
+        expr_t *display = expr_specialise_bound_display(source, x);
+        char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+        TEST_ASSERT_STR_EQ(text, expected[i]);
+        free(text);
+        expr_free(display);
+    }
+    test_expr_set_val_d(s, 15.0);
+    char *after = expr_to_string(source, style_UNBOUND);
+    TEST_ASSERT_STR_EQ(after, before);
+    free(after);
+    free(before);
+    expr_free(source);
+    expr_bindings_free(bindings);
+
+    static const struct { const char *source; const char *expected; } cases[] = {
+        { "{sqrt(x^2) | x=15}", "√(x²)" },
+        { "{x+sqrt(s^2)/s | x=1; s=?}", NULL },
+        { "{x+2 where (Re(1/(2*s^2))>0) | x=1; s=15}", "x + 2" },
+        { "{x+2 where (Re(1/(2*s^2))>0) | x=1; s=-15}", "x + 2" },
+        { "{x where (Re(1/(2*s^2))>0) | x=1; s=0}", "NAN" },
+        { "{x where (Re(1/(2*s^2))>0) | x=1; s=i}", "NAN" },
+        { "{sqrt(2*s^2) | x=1; s=15}", NULL }
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        bindings = NULL;
+        source = expr_from_string(cases[i].source, &bindings);
+        x = expr_bindings_get(bindings, "x");
+        expr_t *display = expr_specialise_bound_display(source, x);
+        char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+        ASSERT_NOT_NULL(text);
+        if (cases[i].expected)
+            TEST_ASSERT_STR_EQ(text, cases[i].expected);
+        else if (i == 1u)
+            ASSERT_TRUE(strstr(text, "√(s²)") != NULL);
+        else
+            ASSERT_TRUE(strstr(text, "s") && !strstr(text, "s²"));
+        free(text);
+        expr_free(display);
+        expr_free(source);
+        expr_bindings_free(bindings);
+    }
+}
+
+static void test_arithmetic_lifts_domain_conditions(void)
+{
+    static const char *const sources[] = {
+        "{2*(x where (Re(x)>0)) | x=2}",
+        "{(x where (Re(x)>0))/2 | x=2}",
+        "{2/(x where (Re(x)>0)) | x=2}",
+        "{1+(x where (Re(x)>0)) | x=2}",
+        "{1-(x where (Re(x)>0)) | x=2}",
+        "{-(x where (Re(x)>0)) | x=2}",
+        "{0*(x where (Re(x)>0)) | x=2}",
+        "{(x where (Re(x)>0))-(x where (Re(x)>0)) | x=2}"
+    };
+    for (size_t i = 0u; i < sizeof sources / sizeof *sources; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *source = expr_from_string(sources[i], &bindings);
+        expr_t *simplified = source ? expr_simplify(source) : NULL;
+        char *text = simplified ? expr_to_function_body(simplified) : NULL;
+        ASSERT_TRUE(text && strstr(text, " where (Re(x) > 0)"));
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        ASSERT_NOT_NULL(x);
+        test_expr_set_val_d(x, -1.0);
+        number_t invalid = expr_eval(simplified);
+        ASSERT_TRUE(num_is_nan(invalid));
+        num_destroy(&invalid);
+        free(text);
+        expr_free(simplified);
+        expr_free(source);
+        expr_bindings_free(bindings);
+    }
+}
+
 static void test_radical_display_cancels_rational_scales(void)
 {
     static const struct { const char *input; const char *expected; } cases[] = {
@@ -4785,6 +4901,9 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_sqrt_quotient_combines_positive_real_denominator, NULL);
+    TEST_RUN_SUBTEST(test_radical_quotient_preserves_named_parameter, NULL);
+    TEST_RUN_SUBTEST(test_bound_display_parameter_signs, NULL);
+    TEST_RUN_SUBTEST(test_arithmetic_lifts_domain_conditions, NULL);
     TEST_RUN_SUBTEST(test_radical_display_cancels_rational_scales, NULL);
     TEST_RUN_SUBTEST(test_radical_display_preserves_principal_branches, NULL);
     TEST_RUN_SUBTEST(test_real_scalar_over_square_root_combines_into_one_root, NULL);

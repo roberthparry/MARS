@@ -85,6 +85,28 @@ static void test_lab_function_matrix_regressions(void)
     }
 }
 
+static void test_lab_function_bound_calculus_display(void)
+{
+    static const struct { const char *source, *expected; } cases[] = {
+        {"expression f(x,const s,const C) { return integral(sqrt(s^2)/s,x). } "
+         "x=?. const s=15. const C=?. output(f(x,s,C)).", "{ x + C | x = ?; C = ? }"},
+        {"expression f(x,const s,const C) { return integral(sqrt(s^2)/s,x). } "
+         "x=?. const s=-15. const C=?. output(f(x,s,C)).", "{ -x + C | x = ?; C = ? }"},
+        {"expression f(x,const s,const C) { return integral(sqrt(s^2)/s,x). } "
+         "x=?. const s=?. const C=?. output(f(x,s,C)).", "√(s²)"},
+        {"expression f(x,y) { return sqrt(x^2)+sqrt(y^2). } x=15. y=3. outputa(f(x,y)).", "√(x²)"},
+        {"expression f(x,const s) { if (realpart(s)>0) { return x+2. } else { return @nan. } } "
+         "x=?. const s=15. output(f(x,s)).", "{ x + 2 | x = ? }"},
+        {"expression f(x,const s) { if (realpart(s)>0) { return x+2. } else { return @nan. } } "
+         "x=?. const s=?. output(f(x,s)).", "Re(s) > 0"},
+        {"expression f(x,const s) { if (realpart(s)>0) { return x+2. } else { return @nan. } } "
+         "x=?. const s=-15. output(f(x,s)).", "NAN"}
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i)
+        TEST_ASSERT_TRUE(test_lab_function_output(cases[i].source, cases[i].expected, i < 2u || i == 4u || i == 6u),
+                         "Run output uses constant signs without specialising free variables or dropping unknown guards");
+}
+
 static void test_lab_function_guards_and_names(void)
 {
     const char *conditions[] = {"realpart(s)>0 && 1<0", "realpart(s)>0 || 1>0", "1<0 && realpart(s)>0",
@@ -196,7 +218,7 @@ static void test_lab_function_readme_examples(void)
         {"output(integral(sin(x), x, 0, @pi)).", "2"},
         {"expression expr(x, const C) {\n    return integral(sin(x), x).\n}\nx = ?.\nconst C = ?.\noutput(expr(x, "
          "C)).\n",
-         "{ C - cos(x) | x = ?; C = ? }"},
+         "{ -cos(x) + C | x = ?; C = ? }"},
         {"expression expr(x) {\n    return derivative(sin(x), x, 1).\n}\nx = ?.\noutput(expr(x)).\n",
          "{ cos(x) | x = ? }"},
         {"expression expr(s) {\n    if (realpart(s) > 0) {\n        return laplace(integral(sin(x), x, t), t, s).\n    "
@@ -216,6 +238,7 @@ static void test_lab_function_readme_examples(void)
 void test_lab_function_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_function_scalar_regressions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_function_bound_calculus_display, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_function_matrix_regressions, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_function_guards_and_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_function_rejected_programmes, tests, NULL);

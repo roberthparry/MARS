@@ -69,13 +69,35 @@ expr_t *expr_complex_unary_cartesian_for_display(const expr_t *expr);
 expr_t *expr_beautify_imaginary_cartesian_product_for_display(const expr_t *expr);
 
 /**
- * @brief Move a named additive constant last without resimplifying the displayed algebra.
+ * @brief Move a named additive constant last inside any outer domain restrictions, without resimplifying.
  *
  * @param expr Expression whose named addend should be reordered.
  * @param name Name of the additive constant to move.
  * @return Owning reordered expression, or `NULL` when the named addend is absent.
  */
 expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *name);
+
+/**
+ * @brief Match a primitive plus its named integration constant through outer domain restrictions.
+ * @param expr Borrowed antiderivative family returned by expr_integrate_family().
+ * @param primitive_out Receives the borrowed primitive, or NULL on failure.
+ * @param constant_out Receives the borrowed integration constant, or NULL on failure.
+ * @return Whether the family has the expected additive structure.
+ */
+bool expr_match_antiderivative_family(const expr_t *expr, const expr_t **primitive_out, const expr_t **constant_out);
+
+/**
+ * @brief Build a display snapshot using supplied parameter signs and proven domain conditions.
+ *
+ * Retains parameter names, removes roots of real parameter squares using their
+ * current signs, and omits satisfied parameter-only conditions. Never treats the
+ * active variable as a fixed parameter. Rebuild after every binding change; the
+ * result is valid for the supplied bindings, not as an unconditional identity.
+ * @param expr Borrowed generic result; not modified.
+ * @param wrt Borrowed active calculus variable, or NULL to protect all variables and use only constant bindings.
+ * @return Owned display snapshot, or NULL for a missing expression.
+ */
+expr_t *expr_specialise_bound_display(const expr_t *expr, const expr_t *wrt);
 
 /**
  * @brief Place the imaginary unit last in Cartesian coefficients for display.

@@ -44,8 +44,6 @@ bool expr_simplify_allows_const_identity_fold(const expr_t *expr)
 {
     if (!expr || !expr_is_op(expr, &ops_const))
         return false;
-    if (!expr->binding_expr)
-        return true;
     if (expr->name && *expr->name) {
         number_t value;
         bool is_default;
@@ -57,6 +55,8 @@ bool expr_simplify_allows_const_identity_fold(const expr_t *expr)
             num_destroy(&value);
         return is_default;
     }
+    if (!expr->binding_expr)
+        return true;
     return expr->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER || expr->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
 }
 
@@ -247,7 +247,7 @@ static bool expr_contains_var_for_value_fold(const expr_t *expr)
 {
     if (!expr)
         return false;
-    if (expr_is_var(expr))
+    if (expr_is_var(expr) || (expr_is_named_const(expr) && !expr_simplify_allows_const_identity_fold(expr)))
         return true;
     return expr_contains_var_for_value_fold(expr->a) || expr_contains_var_for_value_fold(expr->b);
 }

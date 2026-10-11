@@ -160,6 +160,14 @@ void hyperbolic_antiderivative_once_local(const number_t *a_src, const number_t 
 
 /* Dispatcher rule entry points. */
 expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt);
+
+/**
+ * @brief Integrate a Gaussian cumulative integral with an affine upper endpoint.
+ * @param expr Borrowed integral node; its integrand and lower endpoint must be independent of wrt.
+ * @param wrt Borrowed integration variable.
+ * @return Owned conditioned primitive, or NULL when the structural rule does not apply.
+ */
+expr_t *integrate_cumulative_gaussian_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_constant_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_var_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt);

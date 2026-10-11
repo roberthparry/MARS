@@ -23,6 +23,8 @@
 #include "string-t.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -1037,11 +1039,22 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
                 value_free(result);
                 continue;
             }
-            expr_t *simplified = expr_beautify(value);
+            const expr_t *constant = NULL;
+            expr_match_antiderivative_family(value, NULL, &constant);
+            string_t *constant_name = constant ? string_new_with(expr_symbol_name(constant)) : NULL;
+            expr_t *simplified = expr_specialise_bound_display(value, NULL);
             if (simplified) {
                 expr_free(value);
                 value = simplified;
             }
+            if (constant_name) {
+                expr_t *ordered = expr_move_named_addend_last_for_display(value, string_c_str(constant_name));
+                if (ordered) {
+                    expr_free(value);
+                    value = ordered;
+                }
+            }
+            string_free(constant_name);
             number_t number = expr_eval(value);
             if (!algebraic && !num_is_nan(number)) {
                 num_printf("%.*n\n", (int)runtime->precision, number);

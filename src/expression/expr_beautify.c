@@ -1749,6 +1749,15 @@ static expr_t *expr_beautify_remove_named_addend_for_display(const expr_t *expr,
 /* Move a named additive constant last without resimplifying the displayed algebra. */
 expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *name)
 {
+    if (expr_is_op(expr, &ops_real_domain)) {
+        const expr_t *body = expr;
+        while (expr_is_op(body, &ops_real_domain))
+            body = body->a;
+        expr_t *ordered = expr_move_named_addend_last_for_display(body, name);
+        expr_t *out = ordered ? expr_with_domain_of(ordered, expr) : NULL;
+        expr_free(ordered);
+        return out;
+    }
     expr_t *constant = NULL;
     expr_t *rest = expr_beautify_remove_named_addend_for_display(expr, name, &constant);
     expr_t *out = NULL;
@@ -1763,6 +1772,24 @@ expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *
     expr_free(rest);
     expr_free(constant);
     return out;
+}
+
+/* Read the generated constant before presentation simplification reorders the family. */
+bool expr_match_antiderivative_family(const expr_t *expr, const expr_t **primitive_out, const expr_t **constant_out)
+{
+    if (primitive_out)
+        *primitive_out = NULL;
+    if (constant_out)
+        *constant_out = NULL;
+    while (expr_is_op(expr, &ops_real_domain))
+        expr = expr->a;
+    if (!expr_is_op(expr, &ops_add) || !expr_is_named_const(expr->b))
+        return false;
+    if (primitive_out)
+        *primitive_out = expr->a;
+    if (constant_out)
+        *constant_out = expr->b;
+    return true;
 }
 
 static expr_t *expr_beautify_imaginary_unit_last_term(const expr_t *expr, bool *changed)

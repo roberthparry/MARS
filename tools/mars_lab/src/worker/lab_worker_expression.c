@@ -2281,15 +2281,20 @@ int lab_worker_expression(int argc, char **argv)
                 const expr_t *family_right = NULL;
                 const char *integration_constant_name = NULL;
                 expr_t *weighted_integral_left = NULL;
-                bool family_subtract = false;
 
-                if (expr_match_add_sub_expr(integral, &family_left, &family_right, &family_subtract) &&
-                    !family_subtract && expr_is_named_const(family_right))
+                if (expr_match_antiderivative_family(integral, &family_left, &family_right))
                     integration_constant_name = expr_symbol_name(family_right);
                 weighted_integral_left = integration_constant_name
                                              ? expr_finite_weighted_sinh_lerch_form(family_left)
                                              : NULL;
                 display_integral = weighted_integral_left ? expr_add(weighted_integral_left, family_right) : NULL;
+                if (display_integral) {
+                    expr_t *conditioned = expr_with_domain_of(display_integral, integral);
+                    if (conditioned) {
+                        expr_free(display_integral);
+                        display_integral = conditioned;
+                    }
+                }
                 expr_free(weighted_integral_left);
                 if (!display_integral)
                     display_integral = expr_contains_summation_for_display(integral)
@@ -2297,6 +2302,12 @@ int lab_worker_expression(int argc, char **argv)
                                            : display_polynomial_simplified(integral, wrt, complex_cartesian);
                 if (!display_integral)
                     display_integral = integral;
+                expr_t *bound_integral = expr_specialise_bound_display(display_integral, wrt);
+                if (bound_integral) {
+                    if (display_integral != integral)
+                        expr_free(display_integral);
+                    display_integral = bound_integral;
+                }
                 if (integration_constant_name) {
                     expr_t *ordered_integral =
                         expr_move_named_addend_last_for_display(display_integral, integration_constant_name);

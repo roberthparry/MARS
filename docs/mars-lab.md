@@ -851,6 +851,26 @@ not to the checks that choose a symbolic presentation. High-precision quadrature
 can still exceed the Lab's calculation timeout; this separation does not reduce
 the requested numerical precision.
 
+The Expression-mode integral action recognises Gaussian cumulative integrals
+directly, including affine upper endpoints and infinite lower endpoints. Native
+integration produces an `erf`/`erfc` primitive with symbolic parameters and its
+Gaussian decay condition; it does not numerically integrate the cumulative
+integral again or increase the worker timeout. Evaluation of the original
+probability and integration of that probability with respect to its endpoint
+remain separate operations. See [symbolic integration](expression.md#symbolic-integration).
+The native simplifier cancels common Gaussian factors and places convergence
+conditions after the complete formula. For display, supplied real parameter signs
+can remove roots of squares while keeping the parameters symbolic. A positive
+width binding therefore cancels its root-to-width ratio; negative bindings use
+the opposite sign. Conditions proved by the current parameter values are omitted.
+Unknown or complex parameter signs retain their generic roots; conditions remain
+unless the supplied values prove them.
+The active integration variable stays free. These display choices are recomputed
+on each evaluation and do not change the generic antiderivative.
+The generated integration constant is the last term of the displayed formula,
+before any domain condition; conditions remain after the binding bar in the
+Expression card.
+
 Supported elementary functions with an explicit symbolic complex argument are
 presented in Cartesian `p + qi` form. The complete set comprises `exp`, `ln`,
 `lg`; the circular functions `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`;
@@ -1372,13 +1392,18 @@ output(expr(x, C)).
 RUN output:
 
 ```text
-{ C - cos(x) | x = ?; C = ? }
+{ -cos(x) + C | x = ?; C = ? }
 ```
 
 The two-argument call generates the integration constant itself. Its parameter
 allows a supplied value of that constant to be used; the programme does not
 append `+ C`. Definite integrals retain the four-argument form
 `integral(expression, variable, lower, upper)` and generate no arbitrary constant.
+Symbolic RUN output places the integration constant last. Like the main integral
+cards, it uses supplied constant bindings to simplify parameter square roots and
+omit conditions they prove, without replacing parameter names by numbers. Free
+variables remain symbolic; unknown conditions remain visible. Each run rebuilds
+this display from the current bindings.
 Supplied bindings are preserved in the executable programme, including exact
 symbolic values. With the indefinite integral above, setting `x` to `pi` and `C`
 to zero produces:

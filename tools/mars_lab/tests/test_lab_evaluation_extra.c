@@ -159,6 +159,58 @@ static void test_lab_extra_integral(void)
                     "x");
 }
 
+static void test_lab_extra_gaussian_integral(void)
+{
+    static const unsigned precisions[] = {17u, 78u, 155u};
+    for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+        unsigned status = 0u;
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"{100*(1 - 1/(√(2π)σ)·∫^x_-∞ e^(-½·(t - μ)²/σ²)·dt)"
+            " | x=160; μ=100; σ=15}\",\"action\":\"integral\",\"wrt\":\"x\",\"precision\":%u}", precisions[i]);
+        json_t *result = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        const string_t *integral = json_string_value(test_lab_member(result, "integral"));
+        bool bound_condition = integral && string_find(integral, " | ") >= 0 &&
+                               string_find(integral, "Re(") < 0 &&
+                               string_find(integral, "where") < 0;
+        bool ok = status == 200u && test_lab_ok(result, true) && contains(result, "integral", "erfc") &&
+                  contains(result, "integral", " + C |") && contains(result, "integral_TeX", " + C") &&
+                  !contains(result, "integral_TeX", "\\mathfrak{Re}") &&
+                  !contains(result, "integral_TeX", "\\sqrt{\\sigma^{2}}") &&
+                  !contains(result, "integral_TeX", "\\int") && contains(result, "integral_TeX", "erfc") &&
+                  !contains(result, "integral_TeX", "\\sqrt{\\frac{1}") &&
+                  contains(result, "value", "0.00316712418331") && bound_condition;
+        if (!ok)
+            show_failure(result);
+        string_t *route = string_new_with("/function-run");
+        string_t *source_key = string_new_with("source"), *precision_key = string_new_with("precision");
+        json_t *run_payload = json_new_object();
+        const json_t *programme = test_lab_member(result, "integral_function");
+        string_t *precision_text = string_sprintf("%u", precisions[i]);
+        json_t *precision = precision_text ? json_new_number(precision_text) : NULL;
+        bool ready = route && source_key && precision_key && run_payload && programme && precision &&
+                     json_object_set(run_payload, source_key, programme) &&
+                     json_object_set(run_payload, precision_key, precision);
+        json_t *run = ready ? lab_eval_request(route, run_payload, &status) : NULL;
+        bool run_ok = status == 200u && test_lab_ok(run, true) && contains(run, "output", " + C |") &&
+                      contains(run, "output", "erfc") && contains(run, "output", "σ") &&
+                      !contains(run, "output", "Re(") && !contains(run, "output", "where") &&
+                      !contains(run, "output", "√(σ²)") && !contains(run, "output", "√(2·σ²)");
+        if (!run_ok)
+            show_failure(run);
+        json_free(run);
+        json_free(precision);
+        string_free(precision_text);
+        json_free(run_payload);
+        string_free(precision_key);
+        string_free(source_key);
+        string_free(route);
+        json_free(result);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "the Unicode Gaussian integral action returns its closed form at each precision");
+        TEST_ASSERT_TRUE(run_ok, "the generated Function card retains the formula, omits proven guards and ends in C");
+    }
+}
+
 static void test_lab_extra_equation(void)
 {
     expect_response("/equation-eval", "{\"equation\":\"x^2=4\",\"precision\":40}", 200u, "solutions", "2");
@@ -521,6 +573,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_binding_edit, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_derivative, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integral, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_gaussian_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);

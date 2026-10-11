@@ -5288,7 +5288,8 @@ div_fallback_2:
     if (((expr_is_addsub(a) || ((expr_is_pow_d_expr(a) || expr_is_sqrt_expr(a)) && expr_is_addsub(a->a))) &&
          (expr_is_addsub(b) || ((expr_is_pow_d_expr(b) || expr_is_sqrt_expr(b)) && expr_is_addsub(b->a)))) ||
         (!expr_is_addsub(a) && (expr_is_op(a, &ops_mul) || expr_is_div(a) || expr_is_negative_real_power_local(a) ||
-                                expr_is_op(b, &ops_mul) || expr_is_div(b) || expr_is_negative_real_power_local(b))))
+                                expr_is_op(b, &ops_mul) || expr_is_div(b) || expr_is_negative_real_power_local(b) ||
+                                expr_is_neg(a) || expr_is_neg(b))))
         return expr_simplify_flat_quotient_local(a, b);
 
     if (expr_struct_eq(a, b) || expr_polynomials_equal_deg4(a, b)) {
@@ -6102,6 +6103,39 @@ static expr_t *expr_simplify_once(const expr_t *expr)
 
     expr_t *a = expr->a ? expr_simplify(expr->a) : NULL;
     expr_t *b = expr->b ? expr_simplify(expr->b) : NULL;
+
+    /* Arithmetic requires both operands: their restrictions govern the whole result,
+     * including cancellations such as zero times a restricted expression. Do not
+     * move restrictions across binders, conditional branches or function arguments. */
+    bool arithmetic = expr_is_addsub(expr) || expr_is_op(expr, &ops_mul) ||
+                      expr_is_op(expr, &ops_div) || expr_is_neg(expr);
+    if (arithmetic && (expr_is_op(a, &ops_real_domain) || expr_is_op(b, &ops_real_domain))) {
+        expr_t *raw = expr_alloc(expr->ops);
+        const expr_t *left = a, *right = b;
+        while (expr_is_op(left, &ops_real_domain))
+            left = left->a;
+        while (expr_is_op(right, &ops_real_domain))
+            right = right->a;
+        raw->a = (expr_t *)left;
+        raw->b = (expr_t *)right;
+        expr_retain(raw->a);
+        expr_retain(raw->b);
+        out = expr_simplify(raw);
+        expr_free(raw);
+        if (out && expr_is_op(a, &ops_real_domain)) {
+            expr_t *wrapped = expr_with_domain_of(out, a);
+            expr_free(out);
+            out = wrapped;
+        }
+        if (out && expr_is_op(b, &ops_real_domain)) {
+            expr_t *wrapped = expr_with_domain_of(out, b);
+            expr_free(out);
+            out = wrapped;
+        }
+        expr_free(a);
+        expr_free(b);
+        return out;
+    }
 
     if (expr->ops->simplify)
         out = expr->ops->simplify(expr, a, b);

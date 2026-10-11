@@ -3146,6 +3146,158 @@ static void test_integrate_improper_gaussian_bound_parameters(void)
     expr_bindings_free(bindings);
 }
 
+static void test_integrate_cumulative_gaussian(void)
+{
+    static const double points[] = {-0.5, 0.25, 1.25};
+    static const char *const sources[] = {
+        "{integral(exp(-(t-m)^2/(2*s^2)),t,-inf,x) | x=0, m=1, s=2}",
+        "{integral(e^(-(t-m)^2/(2*s^2)),t,inf,2*x+1) | x=0, m=-1, s=-2}",
+        "{integral(exp(-2*t^2+3*t-1),t,-2,3*x-1) | x=0}",
+        "{integral(exp(-t^2),t,0,x) | x=0}"
+    };
+    for (size_t i = 0u; i < sizeof sources / sizeof *sources; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *source = expr_from_string(sources[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        char *before = source ? expr_to_string(source, style_UNBOUND) : NULL;
+        expr_t *primitive = x ? expr_integrate(source, x) : NULL;
+        expr_t *derivative = primitive ? expr_create_deriv(primitive, x) : NULL;
+        ASSERT_NOT_NULL(primitive);
+        ASSERT_NOT_NULL(derivative);
+        ASSERT_TRUE(!expr_contains_integral_operation(primitive));
+        expr_t *width = expr_bindings_get(bindings, "s");
+        number_t saved_width = width ? expr_eval(width) : num_clone(NUM_NAN);
+        /* Change a live parameter after construction, before evaluating either result. */
+        if (width)
+            test_expr_set_val_d(width, -3.0);
+        for (size_t j = 0u; j < sizeof points / sizeof *points; ++j) {
+            test_expr_set_val_d(x, points[j]);
+            check_q_at(__FILE__, __LINE__, 1, "cumulative Gaussian derivative", expr_eval_qf(derivative),
+                       expr_eval_qf(source));
+        }
+        if (width) {
+            test_expr_set_val_d(width, 0.0);
+            number_t invalid = expr_eval(primitive);
+            ASSERT_TRUE(num_is_nan(invalid));
+            num_destroy(&invalid);
+            expr_set_val(width, saved_width);
+        }
+        num_destroy(&saved_width);
+        test_expr_set_val_d(x, 0.0);
+        char *after = expr_to_string(source, style_UNBOUND);
+        TEST_ASSERT_STR_EQ(after, before);
+        free(after);
+        free(before);
+        expr_free(derivative);
+        expr_free(primitive);
+        expr_free(source);
+        expr_bindings_free(bindings);
+    }
+}
+
+static void test_integrate_cumulative_gaussian_precision(void)
+{
+    size_t saved_precision = num_get_default_prec_digits();
+    num_set_default_prec_digits(163u);
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{100*(1-1/(sqrt(2*pi)*s)*integral(exp(-(t-m)^2/(2*s^2)),t,-inf,x))"
+                                      " | x=160; m=100; s=15}", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *primitive = x ? expr_integrate(source, x) : NULL;
+    expr_t *derivative = primitive ? expr_create_deriv(primitive, x) : NULL;
+    expr_t *reference = expr_from_string("50*erfc(4/sqrt(2))", NULL);
+    number_t actual = derivative ? expr_eval(derivative) : num_clone(NUM_NAN);
+    number_t expected = reference ? expr_eval(reference) : num_clone(NUM_NAN);
+    number_t difference = num_sub(actual, expected);
+    number_t error = num_abs(difference);
+    number_t tolerance = num_create_from_string("1e-140");
+    bool ok = primitive && !expr_contains_integral_operation(primitive) && num_is_finite(actual) && num_lt(error, tolerance);
+    char *rendered = primitive ? expr_to_string(primitive, style_LATEX) : NULL;
+    /* Conditions belong after the complete formula, not inside its fractions. */
+    const char *condition = rendered ? strstr(rendered, "\\quad") : NULL;
+    bool compact = condition && !strstr(condition, "\\operatorname{erfc}") &&
+                   !strstr(rendered, "\\sqrt{\\frac{1}");
+    int group_depth = 0;
+    for (const char *cursor = rendered; condition && cursor < condition; ++cursor) {
+        if (*cursor == '\\' && (cursor[1] == '{' || cursor[1] == '}'))
+            ++cursor;
+        else if (*cursor == '{')
+            ++group_depth;
+        else if (*cursor == '}')
+            --group_depth;
+    }
+    bool condition_outside_fraction = condition && group_depth == 0;
+    free(rendered);
+    expr_t *family = expr_integrate_family(source, x);
+    const expr_t *family_body = NULL, *family_constant = NULL;
+    bool matched_family = expr_match_antiderivative_family(family, &family_body, &family_constant);
+    expr_t *display = family ? expr_simplify(family) : NULL;
+    expr_t *ordered = matched_family && display
+                          ? expr_move_named_addend_last_for_display(display, expr_symbol_name(family_constant))
+                          : NULL;
+    char *family_text = ordered ? expr_to_string(ordered, style_EXPRESSION) : NULL;
+    char *family_TeX = ordered ? expr_to_string(ordered, style_LATEX) : NULL;
+    bool constant_last = family_text && strstr(family_text, " + C |") &&
+                         family_TeX && strstr(family_TeX, " + C\\quad");
+    free(family_TeX);
+    free(family_text);
+    expr_free(ordered);
+    expr_free(display);
+    expr_free(family);
+    num_destroy(&tolerance);
+    num_destroy(&error);
+    num_destroy(&difference);
+    num_destroy(&expected);
+    num_destroy(&actual);
+    expr_free(reference);
+    expr_free(derivative);
+    expr_free(primitive);
+    expr_free(source);
+    expr_bindings_free(bindings);
+    num_set_default_prec_digits(saved_precision);
+    TEST_ASSERT_TRUE(ok, "the 155-digit Gaussian probability has a closed, binding-preserving primitive");
+    TEST_ASSERT_TRUE(compact, "Gaussian factors cancel and the domain follows the complete primitive");
+    TEST_ASSERT_TRUE(condition_outside_fraction, "the condition is outside every TeX numerator and denominator group");
+    TEST_ASSERT_TRUE(constant_last, "the integration constant follows the whole conditioned primitive in both styles");
+}
+
+static void test_integrate_cumulative_gaussian_guards(void)
+{
+    static const char *const unsupported[] = {
+        "{integral(exp(-t^4),t,0,x) | x=1}",
+        "{integral(exp(-t^2),t,0,x^2) | x=1}",
+        "{integral(exp(-t^2+x),t,0,x) | x=1}",
+        "{integral(exp(-t^2),t,x-1,x) | x=1}",
+        "{integral(exp(t^2),t,0,x) | x=1}"
+    };
+    for (size_t i = 0u; i < sizeof unsupported / sizeof *unsupported; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *source = expr_from_string(unsupported[i], &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *primitive = x ? expr_integrate(source, x) : NULL;
+        bool ok = source && x && !primitive;
+        expr_free(primitive);
+        expr_free(source);
+        expr_bindings_free(bindings);
+        TEST_ASSERT_TRUE(ok, "the cumulative Gaussian shortcut rejects unsupported structures");
+    }
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{integral(exp(a*t^2),t,-inf,x) | x=1, a=-1}", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
+    expr_t *primitive = x ? expr_integrate(source, x) : NULL;
+    ASSERT_NOT_NULL(primitive);
+    ASSERT_NOT_NULL(a);
+    test_expr_set_val_d(a, 1.0);
+    number_t invalid = expr_eval(primitive);
+    bool rejected = num_is_nan(invalid);
+    num_destroy(&invalid);
+    expr_free(primitive);
+    expr_free(source);
+    expr_bindings_free(bindings);
+    TEST_ASSERT_TRUE(rejected, "changing a live coefficient cannot bypass the improper convergence condition");
+}
+
 static void test_integrate_unevaluated_integral_constant_upper(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -4025,6 +4177,9 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_leibniz_derivative, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);
     TEST_RUN_SUBTEST(test_integrate_improper_gaussian_bound_parameters, NULL);
+    TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian, NULL);
+    TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian_precision, NULL);
+    TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian_guards, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_constant_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_chain_rule_upper, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_explicit_bounds, NULL);
