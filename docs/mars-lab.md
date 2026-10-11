@@ -4,11 +4,13 @@ MARS Lab is the browser-based graphical client supplied with MARS. It provides
 one workspace for expressions, equations, differential equations, matrices,
 symbolic and numerical integration, civil date calculations and the
 astronomical almanac. The browser is the presentation layer: mathematical work
-is sent to the local MARS helper programs, which use MARSlib.
+is sent to the native server's built-in calculation modes, which use MARSlib.
 
 ## Installing and starting the Lab
 
-MARS Lab runs as a native C server with isolated native calculation workers.
+MARS Lab runs as a native C server with calculation modes linked into that same
+executable. It launches itself with `--worker MODE` for isolated calculations;
+no separate scratch worker binaries are required.
 The browser runs C/WebAssembly with JavaScript browser adapters and HTML/CSS, served from
 `tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
 (served as `/index.css`), an ordered import list for the component styles in `assets/css/`.

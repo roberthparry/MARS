@@ -315,6 +315,23 @@ services and relevant authorities where accuracy is critical.
 
 ## Separately installed tools
 
+### LLVM, Clang and LLD
+
+MARS acknowledges the LLVM project contributors for the LLVM compiler
+infrastructure, Clang C compiler and LLD linker. The Lab build uses Clang's
+WebAssembly backend and LLD's `wasm-ld` to produce its freestanding browser
+module. These are separately installed build tools, not linked MARS runtime
+libraries; MARS does not bundle their source or executables.
+
+The project's principal licence is Apache License 2.0 with LLVM exceptions
+(`Apache-2.0 WITH LLVM-exception`). Legacy and third-party components may have
+additional terms. If redistributing the toolchain, retain the licence and
+component notices supplied with the exact packages, rather than relying only
+on this summary. See the [LLVM licence](https://github.com/llvm/llvm-project/blob/main/llvm/LICENSE.TXT)
+and [licensing policy](https://llvm.org/docs/DeveloperPolicy.html#license).
+
+### Rendering and optional integration tools
+
 MARS Lab invokes TeX Live, dvisvgm and, optionally, Tailscale and desktop
 integration tools. These programs are installed separately and are not
 incorporated into MARS. Their licences govern their own programs. TeX Live is a
