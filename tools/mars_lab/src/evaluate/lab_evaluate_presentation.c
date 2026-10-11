@@ -338,6 +338,17 @@ static string_t *lab_pres_equation_solution_text(const json_t *fields, const jso
     return text;
 }
 
+static bool lab_pres_card_markup(json_t *entries, json_t *seen, const json_t *object, const char *key)
+{
+    const string_t *source = json_string_value(lab_eval_get(object, key));
+    if (!source || !string_byte_length(source) || json_object_get(seen, source)) return true;
+    json_t *present = json_new_bool(true);
+    bool ok = present && json_object_set(seen, source, present) &&
+              lab_pres_append(entries, lab_pres_matrix_headings(source));
+    json_free(present);
+    return ok;
+}
+
 /* Enrich completed native responses without changing their mathematical representations. */
 bool lab_presentation_adapt(json_t *fields)
 {
@@ -346,6 +357,12 @@ bool lab_presentation_adapt(json_t *fields)
     json_t *metadata = json_new_object(), *calculus = json_new_array(), *solutions = json_new_array();
     bool ok = metadata && calculus && solutions &&
               lab_pres_calculus_cards(metadata, fields, calculus);
+    const string_t *programme_output = json_string_value(lab_eval_get(fields, "output"));
+    if (ok && programme_output) {
+        string_t *display = lab_pres_display_numbers(programme_output);
+        ok = display && lab_eval_set(metadata, "output_display", string_c_str(display));
+        string_free(display);
+    }
     string_t *solution_text = string_new_with(lab_eval_text(fields, "solutions"));
     size_t count = 0u;
     string_t **lines = solution_text ? string_split(solution_text, "\n", &count) : NULL;
@@ -436,23 +453,32 @@ bool lab_presentation_adapt(json_t *fields)
         if (!duplicate && !lab_pres_append(syntax, lab_pres_function_syntax(source))) ok = false;
     }
     if (!lab_eval_put(metadata, "function_syntax", syntax)) ok = false;
-    json_t *headings = json_new_array();
+    json_t *headings = json_new_array(), *seen_headings = json_new_object();
+    ok = ok && headings && seen_headings;
     static const char *const heading_fields[] = {
         "display_expression", "full_display_expression", "expression", "result", "display_result",
         "display_expression_pretty", "expression_pretty", "display_value", "full_value", "value",
-        "display_function", "full_display_function", "function"
+        "display_function", "full_display_function", "function", "display_equation", "full_display_equation",
+        "equation", "problem", "solutions"
     };
-    for (size_t i = 0u; headings && i < sizeof(heading_fields) / sizeof(*heading_fields); ++i) {
-        const string_t *source = json_string_value(lab_eval_get(fields, heading_fields[i]));
-        if (!source || !string_byte_length(source)) continue;
-        bool duplicate = false;
-        /* Thirteen fixed fields, deduplicated to bound repeated wire metadata. */
-        for (size_t j = 0u; j < i; ++j) {
-            const string_t *earlier = json_string_value(lab_eval_get(fields, heading_fields[j]));
-            if (earlier && !string_compare(source, earlier)) duplicate = true;
-        }
-        if (!duplicate && !lab_pres_append(headings, lab_pres_matrix_headings(source))) ok = false;
+    for (size_t i = 0u; ok && i < sizeof(heading_fields) / sizeof(*heading_fields); ++i)
+        ok = lab_pres_card_markup(headings, seen_headings, fields, heading_fields[i]);
+    /* These cards are assembled above, rather than copied from a single worker field. */
+    ok = ok && lab_pres_card_markup(headings, seen_headings, metadata, "equation_solution_text") &&
+         lab_pres_card_markup(headings, seen_headings, metadata, "solver_text") &&
+         lab_pres_card_markup(headings, seen_headings, lab_eval_get(metadata, "integrator"), "detail_text") &&
+         lab_pres_card_markup(headings, seen_headings, lab_eval_get(metadata, "integrator"), "value_text");
+    const json_t *cards = lab_eval_get(metadata, "calculus");
+    static const char *const actions[] = {"derivative", "integral"};
+    for (size_t i = 0; ok && i < 2u; ++i) {
+        const json_t *card = lab_eval_get(cards, actions[i]);
+        ok = lab_pres_card_markup(headings, seen_headings, card, "expression") &&
+             lab_pres_card_markup(headings, seen_headings, card, "value");
     }
+    const json_t *editor_entries = lab_eval_get(metadata, "editors");
+    for (size_t i = 0; ok && i < json_array_size(editor_entries); ++i)
+        ok = lab_pres_card_markup(headings, seen_headings, json_array_get(editor_entries, i), "display");
+    json_free(seen_headings);
     if (!lab_eval_put(metadata, "matrix_headings", headings)) ok = false;
     ok = ok && lab_pres_expansions(metadata, fields);
     if (ok)

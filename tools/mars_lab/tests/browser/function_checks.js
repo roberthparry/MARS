@@ -85,6 +85,8 @@ window.checkLabFunction = async function checkLabFunction() {
                 functionRunOutput.textContent, String(output || '').trimEnd() || 'Programme completed without output.',
                 'success trims trailing whitespace only');
         }
+        complete(2, {output: '1e-5\n', presentation: {output_display: '1×10⁻⁵\n'}});
+        equal(functionRunOutput.textContent, '1×10⁻⁵', 'native numerical typography is displayed without parsing');
         for (const output of ['', ' \n', '  partial μ\n']) {
             for (const error of ['', ' \t ', ' native diagnostic \n']) {
                 complete(1, {output, error});

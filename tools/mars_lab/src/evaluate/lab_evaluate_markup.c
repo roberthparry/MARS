@@ -7,9 +7,10 @@
  * Shared text escaping also serves Function syntax spans. Browser code installs
  * the resulting markup while CSS selects the available-width layout.
  */
+#include "ustring.h"
 #include "lab_evaluate_internal.h"
 #include "lab_presentation_internal.h"
-#include "ustring.h"
+#include "lab_syntax_internal.h"
 
 /* Escape text nodes without changing Unicode or carriage returns. */
 bool lab_pres_html_text(string_t *html, const string_t *text)
@@ -33,6 +34,14 @@ bool lab_pres_html_text(string_t *html, const string_t *text)
     return ok;
 }
 
+static bool lab_pres_matrix_number_html(string_t *html, const string_t *source)
+{
+    string_t *display = lab_pres_display_numbers(source);
+    bool ok = display && lab_pres_html_text(html, display);
+    string_free(display);
+    return ok;
+}
+
 /* Build one complete layout or an empty fragment for the plain-text fallback. */
 string_t *lab_pres_matrix_markup(const json_t *terms)
 {
@@ -48,7 +57,7 @@ string_t *lab_pres_matrix_markup(const json_t *terms)
         ok = ok && !string_append_cstr(html, "<span class=\"matrix-term-display\">");
         if (factor && string_byte_length(factor))
             ok = ok && !string_append_cstr(html, "<span class=\"matrix-factor\">") &&
-                 lab_pres_html_text(html, factor) &&
+                 lab_pres_matrix_number_html(html, factor) &&
                  !string_append_cstr(html, "</span><span class=\"matrix-product-operator\">·</span>");
         size_t width = json_array_size(json_array_get(rows, 0));
         ok = ok && width &&
@@ -62,7 +71,7 @@ string_t *lab_pres_matrix_markup(const json_t *terms)
             for (size_t c = 0; ok && c < width; ++c) {
                 const string_t *cell = json_string_value(json_array_get(row, c));
                 ok = cell && !string_append_cstr(html, "<span class=\"matrix-cell\">") &&
-                     lab_pres_html_text(html, cell) && !string_append_cstr(html, "</span>");
+                     lab_pres_matrix_number_html(html, cell) && !string_append_cstr(html, "</span>");
             }
         }
         ok = ok && !string_append_cstr(html, "</span><span class=\"matrix-bracket\">)</span></span></span>");

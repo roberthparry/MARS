@@ -150,7 +150,8 @@ static void test_lab_syntax_matrix_headings(void)
             ++headings;
         }
     }
-    ok = ok && headings == 2u && json_array_size(entries) == 1u && lab_syntax_test_lossless(entry, source) &&
+    ok = ok && headings == 2u && json_array_size(entries) == 2u && lab_syntax_test_lossless(entry, source) &&
+         !strcmp(test_lab_text(json_array_get(entries, 1u), "source"), string_c_str(source) + 1u) &&
          lab_syntax_test_token(entry, "EigenVALUES", "heading") &&
          lab_syntax_test_token(entry, "eigenvectors", "heading") &&
          strstr(test_lab_text(entry, "html"), "<span class=\"matrix-section-heading\">eigenvalues</span> &#13;\n");
@@ -175,6 +176,73 @@ static void test_lab_syntax_matrix_heading_bound(void)
     TEST_ASSERT_TRUE(ok, "excessive matrix heading spans fall back to complete original text");
 }
 
+static void test_lab_syntax_number_display(void)
+{
+    static const struct { const char *source; const char *display; } cases[] = {
+        {"1e-4", "0.0001"},
+        {"-1.25E-005", "-1.25×10⁻⁵"},
+        {"1e-12 + 2E-9i", "1×10⁻¹² + 2×10⁻⁹i"},
+        {"1.234567890123456789012345678901234567890123456789e-78",
+         "1.234567890123456789012345678901234567890123456789×10⁻⁷⁸"},
+        {"1.25E+3", "1250"},
+        {"1.25e0", "1.25"},
+        {".125e1", "1.25"},
+        {"1.25e5000", "1.25×10⁵⁰⁰⁰"},
+        {"1e-999999999999999999999", "1×10⁻⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹⁹"},
+        {"1.234...e+78", "1.234...×10⁷⁸"},
+        {"x1e5 + rate2E3 + e + E + exp(x)", "x1e5 + rate2E3 + e + E + exp(x)"},
+        {"\"1e-5\" + '2E3' + `3e-5`", "\"1e-5\" + '2E3' + `3e-5`"},
+        {"`` 1e-5\n1e-5", "`` 1e-5\n1×10⁻⁵"},
+        {"1e+ + 1E- + 1.2.3", "1e+ + 1E- + 1.2.3"},
+        {"1e-5 < 2e-5 & 3e-5", "1×10⁻⁵ &lt; 2×10⁻⁵ &amp; 3×10⁻⁵"},
+    };
+    bool ok = true;
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
+        string_t *source = string_new_with(cases[i].source);
+        json_t *fields = json_new_object();
+        bool adapted = source && fields && lab_syntax_test_set(fields, "result", source) &&
+                       lab_presentation_adapt(fields);
+        const json_t *entries = test_lab_member(test_lab_member(fields, "presentation"), "matrix_headings");
+        const json_t *entry = json_array_get(entries, 0u);
+        bool match = adapted && !strcmp(test_lab_text(entry, "html"), cases[i].display) &&
+                     lab_syntax_test_lossless(entry, source) &&
+                     !strcmp(test_lab_text(fields, "result"), cases[i].source);
+        if (!match) string_printf("number display: %s -> %s\n", cases[i].source, test_lab_text(entry, "html"));
+        ok = ok && match;
+        json_free(fields);
+        string_free(source);
+    }
+    TEST_ASSERT_TRUE(ok, "native card typography preserves numeric digits and source while replacing exponent notation");
+}
+
+static void test_lab_syntax_mode_numbers(void)
+{
+    json_t *fields = test_lab_json(
+        "{\"expression\":\"1e-5*x\",\"problem\":\"y'=1e-5*y\",\"solutions\":\"y=1e-5*exp(x)\","
+        "\"function\":\"expression f() { return 1e-5. }\","
+        "\"derivative\":\"d/dx = 1e-5\",\"derivative_value\":\"1e-5\","
+        "\"integral\":\"∫dx = 1e-5*x\",\"integral_value\":\"1e-5\","
+        "\"value\":\"1e-5\",\"error\":\"2e-20\",\"bound\":\"x in [0, 1e-5]\","
+        "\"steps\":\"y=1e-5*exp(x)\"}");
+    bool ok = fields && lab_presentation_adapt(fields);
+    const json_t *metadata = test_lab_member(fields, "presentation");
+    const json_t *headings = test_lab_member(metadata, "matrix_headings");
+    const json_t *function = json_array_get(test_lab_member(metadata, "function_syntax"), 0);
+    ok = ok && strstr(test_lab_text(function, "html"), ">1×10⁻⁵</span>") &&
+         strstr(test_lab_text(function, "source"), "1e-5");
+    unsigned matched = 0u;
+    for (size_t i = 0u; i < json_array_size(headings); ++i) {
+        const json_t *entry = json_array_get(headings, i);
+        const char *source = test_lab_text(entry, "source"), *html = test_lab_text(entry, "html");
+        if (!strstr(source, "1e-5")) continue;
+        ok = ok && !strstr(html, "1e-5") && strstr(html, "1×10⁻⁵");
+        if (strstr(source, "error ≈")) ok = ok && strstr(html, "2×10⁻²⁰");
+        ++matched;
+    }
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok && matched >= 7u, "all numerical, symbolic, calculus and solver card sources receive native markup");
+}
+
 /* Register lexical metadata regressions before the suite's README examples. */
 void test_lab_syntax_cases(void)
 {
@@ -184,4 +252,6 @@ void test_lab_syntax_cases(void)
     TEST_RUN_IN_GROUP(test_lab_syntax_span_bound, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_syntax_matrix_headings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_syntax_matrix_heading_bound, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_syntax_number_display, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_syntax_mode_numbers, tests, NULL);
 }

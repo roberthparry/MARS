@@ -405,6 +405,16 @@ MARS Lab expression-presentation regressions live in
 native adapters and result cards without a Python server. README examples run
 after the ordinary native cases.
 
+Number-presentation coverage includes `test_lab_syntax_number_display`,
+`test_lab_syntax_mode_numbers` and `test_lab_extra_number_card_markup`.
+These check decimal thresholds, signed and large exponents, complex components,
+lossless source spans, HTML escaping, and numerical output from the Expression,
+Matrix, Integrator and Function workers at 17 and 78 digits. Existing equation
+regressions cover the corresponding root displays. Presentation tests also
+ensure that abbreviating a long mantissa retains its exponent. The browser
+suite verifies that Value cards install the native power-of-ten markup and
+Function execution displays the native text without client-side number parsing.
+
 Lab test fixtures honour `TMPDIR` and otherwise use `/tmp`. The `lab-browser-test`
 target sets `TMPDIR` to its absolute build directory so Snap-packaged Firefox can
 access the disposable profile: Snap's private `/tmp` cannot see the host's `/tmp`.

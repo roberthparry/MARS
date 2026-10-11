@@ -383,6 +383,7 @@ static string_t *lab_pres_compact(const string_t *source)
         size_t integer_end = candidate ? lab_pres_decimal_end(view, digits) : digits;
         size_t end = integer_end;
         bool decimal = false, exponent = false;
+        size_t exponent_marker = 0u;
         if (candidate && string_view_peek_ascii(view, end, &next) && next == '.' &&
             string_view_peek_ascii(view, end + 1u, &next) && isdigit(next)) {
             decimal = true;
@@ -395,6 +396,7 @@ static string_t *lab_pres_compact(const string_t *source)
             size_t exponent_end = lab_pres_decimal_end(view, exponent_start);
             if (exponent_end > exponent_start) {
                 exponent = true;
+                exponent_marker = end;
                 end = exponent_end;
             }
         }
@@ -412,8 +414,14 @@ static string_t *lab_pres_compact(const string_t *source)
                 string_free(head);
                 string_free(tail);
             } else if (decimal || exponent) {
-                string_t *head = string_substr(source, start, 16u);
-                ok = head && !string_append_string(out, head) && !string_append_cstr(out, "...");
+                size_t mantissa_end = exponent ? exponent_marker : end;
+                bool abbreviated = mantissa_end - start > 16u;
+                string_t *head = string_substr(source, start, abbreviated ? 16u : mantissa_end - start);
+                string_t *power = exponent ? string_substr(source, exponent_marker, end - exponent_marker) : NULL;
+                ok = head && !string_append_string(out, head) &&
+                     (!abbreviated || !string_append_cstr(out, "...")) &&
+                     (!exponent || (power && !string_append_string(out, power)));
+                string_free(power);
                 string_free(head);
             } else {
                 string_t *whole = string_substr(source, start, end - start);

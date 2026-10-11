@@ -2722,6 +2722,7 @@
       "test_lab_extra_invalid_type": true,
       "test_lab_extra_matrix": true,
       "test_lab_extra_native_records": true,
+      "test_lab_extra_number_card_markup": true,
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_unsafe_TeX_environment": true,
@@ -3361,6 +3362,8 @@
       "test_lab_syntax_literals": true,
       "test_lab_syntax_matrix_heading_bound": true,
       "test_lab_syntax_matrix_headings": true,
+      "test_lab_syntax_mode_numbers": true,
+      "test_lab_syntax_number_display": true,
       "test_lab_syntax_span_bound": true,
       "test_lab_syntax_variants": true
     }

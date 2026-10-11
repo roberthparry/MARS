@@ -44,6 +44,10 @@ This directory contains the longer module documentation for MARS.
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries
 - [`timeseries_t`](./timeseries.md) — datetime-indexed forecasting and time-series analysis
 - [`json_t`](./json.md) — opaque JSON value tree with string-backed parsing and `number_t` fidelity
+- [`xml_t`](./xml.md) — native streaming XML and dictionary-backed attributes
+- [`http_client_t`](./http.md) — HTTP/HTTPS, SOAP, forms, event streams, WebSocket and unary gRPC
+- [`websrv_t`](./webserver.md) — bounded synchronous Linux web services and exact routing
+- [`protobuf_t`](./protobuf.md) — native bounded Protocol Buffers encoding and decoding
 - [`sqlite_t`](./sqlite.md) — opaque SQLCipher-backed SQLite storage for encrypted object persistence
 - [`dictionary_t`](./dictionary.md) — generic key/value storage
 - [`set_t`](./set.md) — generic set storage
@@ -77,6 +81,13 @@ multiprecision backends:
 
 `sqlite_t` uses [SQLCipher](https://www.zetetic.net/sqlcipher/) for encrypted
 SQLite-compatible storage.
+
+File compression and authenticated encryption use Zstandard and libsodium.
+HTTP transport uses libcurl; nghttp2 supplies HTTP/2 in the verified libcurl
+build. The native webserver, XML and Protobuf modules add no external runtime
+library. Clang and LLD build the Lab's C/WebAssembly browser module; TeX Live
+and dvisvgm render its mathematical output. OpenSSL is also used directly by
+the local protocol test fixtures, not by the public webserver module.
 
 The repository's [third-party notices](../THIRD_PARTY_NOTICES.md) record the
 required SQLCipher notice and the licences and provenance of other external

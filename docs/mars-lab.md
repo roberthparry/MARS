@@ -216,7 +216,11 @@ The separate `result_text.js` script and route are removed. Native C supplies
 escaped Function highlighting and matrix-heading markup alongside the exact
 source and lexical spans. User text is escaped, including carriage returns so
 HTML parsing cannot normalise them; class names come only from native token
-kinds. Oversized presentations omit markup and display literal source instead.
+kinds. `src/evaluate/lab_evaluate_numbers.c` formats numeric display tokens
+without rounding, evaluating or changing the saved source. The same native
+markup supplies symbolic cards, matrix cells, calculus values, equation
+solutions and integrator estimates; Function execution receives separate
+display text. Oversized presentations omit markup and display literal source instead.
 `results.js` installs these presentations and the native calendar markup;
 the Function Run browser handler lives with the other requests in `api.js`.
 
@@ -758,6 +762,8 @@ These targets also recognise older Lab binary names and locations. Restart waits
 for the old processes to exit; if shutdown takes more than ten seconds, it stops
 with an error instead of launching a competing instance.
 
+### Result-card conventions
+
 Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
 calculation, so moving between modes or restarting the Lab does not restore an
@@ -767,7 +773,17 @@ helpers. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
 When numerical results use powers of ten, the mantissa is joined directly to
 `×10` and its superscript exponent, without an intervening space. Real and
-imaginary components use the same notation.
+imaginary components use the same notation. Native display markup applies this
+consistently to Expression, Equation, Differential equation, Matrix and Integrator
+cards, including calculus values, matrix cells, bounds and error estimates.
+Small numbers retain ordinary decimals through the fourth decimal place;
+smaller magnitudes use superscript exponents. Practical positive exponents are
+expanded to ordinary decimals, with a 4096-place bound on expansion.
+Function cards and their Run Output use the same display typography, but copying, running and reusing
+their source preserves the original executable notation. Identifiers, quoted
+strings and comments are not rewritten; TeX remains independently rendered.
+Compact displays retain the exponent when shortening a mantissa. The original
+full source remains available through expansion and the card's source metadata.
 
 On a desktop-sized screen, each mode now follows the natural page height rather
 than forcing the editor and result panels into the remaining viewport. This

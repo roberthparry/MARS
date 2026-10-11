@@ -10,6 +10,7 @@
  */
 #include <string.h>
 
+#include "lab_presentation.h"
 #include "internal/lab_evaluate_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -243,6 +244,52 @@ static void test_lab_extra_equation_decimal_notation(void)
     }
 }
 
+static void test_lab_extra_number_card_markup(void)
+{
+    static const struct { const char *route; const char *payload; const char *key; } cases[] = {
+        {"/eval", "{\"expression\":\"exp(-20)\"}", "value"},
+        {"/matrix-eval", "{\"matrix\":\"(exp(-20),0;0,0)\",\"operation\":\"trace\"}", "value"},
+        {"/integrator-eval", "{\"expression\":\"exp(-20)\","
+                             "\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"1\"}]}", "value"},
+        {"/function-run", "{\"source\":\"output(exp(-20)).\"}", "output"},
+    };
+    const unsigned precisions[] = {17u, 78u};
+    for (size_t p = 0; p < 2u; ++p) {
+        bool ok = true;
+        for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+            json_t *payload = test_lab_json(cases[i].payload);
+            string_t *digits = string_sprintf("%u", precisions[p]);
+            lab_eval_put(payload, "precision", json_new_number(digits));
+            string_t *path = string_new_with(cases[i].route);
+            unsigned status = 0u;
+            json_t *result = lab_eval_request(path, payload, &status);
+            bool adapted = result && lab_presentation_adapt(result);
+            const json_t *metadata = test_lab_member(result, "presentation");
+            const char *raw = test_lab_text(result, cases[i].key);
+            bool displayed = false;
+            if (!strcmp(cases[i].key, "output")) {
+                displayed = strstr(test_lab_text(metadata, "output_display"), "×10⁻⁹") != NULL;
+            } else {
+                const json_t *entries = test_lab_member(metadata, "matrix_headings");
+                /* Inspect the bounded native wire list used by the browser's source-keyed cache. */
+                for (size_t j = 0; j < json_array_size(entries); ++j) {
+                    const json_t *entry = json_array_get(entries, j);
+                    if (!strcmp(test_lab_text(entry, "source"), raw))
+                        displayed = strstr(test_lab_text(entry, "html"), "×10⁻⁹") != NULL;
+                }
+            }
+            bool matched = adapted && status == 200u && test_lab_ok(result, true) && displayed;
+            if (!matched) show_failure(result);
+            ok = ok && matched;
+            json_free(result);
+            json_free(payload);
+            string_free(path);
+            string_free(digits);
+        }
+        TEST_ASSERT_TRUE(ok, "native workers retain executable values and supply power-of-ten card displays at both precisions");
+    }
+}
+
 static void test_lab_extra_diffequation(void)
 {
     expect_response("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", 200u, "solutions", "y");
@@ -457,6 +504,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integrator, tests, NULL);

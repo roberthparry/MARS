@@ -18,16 +18,24 @@ The compliance command normally requires its control files in the Git index;
 `COMPLIANCE_ARGS=--allow-untracked` passes that option through `make check-compliance`.
 
 `tools/mars_config` owns the `almanac`, `jurisdiction` and `weather` installation
-subcommands. Existing `install-almanac-db`, `install-jurisdiction-db` and
+subcommands and the `locales` calendar-name SQL generator. Existing
+`install-almanac-db`, `install-jurisdiction-db` and
 `install-mars-lab` targets call it. Configuration uses `string_t` for literal
 parsing, the file module for filesystem operations and the database module for
 SQLCipher access. It does not invoke a shell to interpret credentials.
+The `locales` command regenerates or verifies the maintained seed from pinned
+inputs under `tools/mars_config/data/`; see the
+[jurisdiction guide](jurisdiction.md) for its options and data provenance.
 
 Database installers build and validate private staged databases before publishing
 them. Existing databases and saved configuration are retained when validation
 fails. Database and configuration publication uses separate atomic renames with
 rollback on reported errors; the pair is not a crash-atomic filesystem
 transaction. Run installations serially and close database consumers first.
+Live source-byte progress bars and elapsed-time indicators distinguish measured
+imports from work without a known total. Redirected output receives periodic
+status lines instead of terminal animation. The desktop installer also labels
+its stages; progress never claims successful completion after a failed stage.
 
 For import diagnostics, set `MARS_CONFIG_IMPORT_TRACE=1` when running an
 installer. It reports bounded-source byte counts and wall/CPU timings, separating
@@ -82,13 +90,13 @@ Optional libraries:
 On Debian/Ubuntu, install everything used by the default build with:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
+sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
 If you disable libunistring support, it is not required:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
+sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 make ENABLE_UNISTRING=0
 ```
 
@@ -201,7 +209,8 @@ See the [Lab guide](mars-lab.md) and [third-party notices](../THIRD_PARTY_NOTICE
 
 ## Common Targets
 
-Default release build, shared library, tests, and any registered benchmarks:
+Default release build, libraries, native maintenance applications, MARS Lab
+and its WebAssembly assets, tests, and registered benchmarks:
 
 ```sh
 make
@@ -237,7 +246,7 @@ Check required development libraries before building or installing:
 make check-deps
 ```
 
-Check the development libraries and MARS Lab TeX rendering tools:
+Check the development libraries and MARS Lab TeX rendering and WebAssembly tools:
 
 ```sh
 make check-lab-deps
@@ -280,14 +289,14 @@ make mars-lab-restart
 ```
 
 ```text
-MARS Lab running at http://localhost:<port>/
+MARS Lab (native C) running at http://127.0.0.1:<port>/
 Stopped MARS Lab.
-MARS Lab running at http://localhost:<port>/
+MARS Lab (native C) running at http://127.0.0.1:<port>/
 ```
 
 `make mars-lab-restart` stops a Lab process belonging to the current user,
-rebuilds the helper when necessary and launches it again.
-`make mars-lab` performs the same native server and worker build check
+rebuilds the server and browser assets when necessary and launches it again.
+`make mars-lab` performs the same native server and built-in calculation-mode build check
 before starting the browser client; the installed desktop launcher starts the
 native executable directly.
 

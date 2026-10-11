@@ -49,6 +49,7 @@ static void test_lab_presentation_matrix(void)
               strstr(test_lab_text(result, "html"), "class=\"matrix-factor\">1.5</span>") &&
               strstr(test_lab_text(result, "html"), "style=\"--matrix-columns:2\"") &&
               strstr(test_lab_text(result, "html"), "class=\"matrix-cell\">f(x,y)</span>") &&
+              strstr(test_lab_text(result, "html"), "class=\"matrix-cell\">1×10⁻²⁰</span>") &&
               strstr(test_lab_text(result, "html"), "class=\"matrix-sum-operator\">+</span>");
     json_free(result);
     result = lab_pres_test_request("{\"action\":\"matrix\",\"text\":\"(<img src=x>, &; μ, 4)\"}", &status);
@@ -243,6 +244,12 @@ static void test_lab_presentation_compaction(void)
     bool ok = status == 200 &&
               !strcmp(test_lab_text(editor, "display"), "{ x | x = 1.2345678901234567890123...e+29; a = 1/3 }") &&
               !strcmp(test_lab_text(editor, "expression"), "{ x | x = 123456789012345678901234567890; a = 1/3 }");
+    json_free(result);
+    result = lab_pres_test_request(
+        "{\"action\":\"editor\",\"text\":\"{ x | x=1.2345678901234567890123456789e-78 }\"}", &status);
+    editor = test_lab_member(result, "editor");
+    ok = ok && status == 200u &&
+         !strcmp(test_lab_text(editor, "display"), "{ x | x = 1.23456789012345...e-78 }");
     json_free(result);
     TEST_ASSERT_TRUE(ok, "native numeric compaction retains the complete authored source independently");
 }

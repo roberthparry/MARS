@@ -67,8 +67,9 @@ calculation modes running locally. Expression mode presents supported functions
 of `x + iy`, their derivatives and their antiderivatives in Cartesian `p + qi` form. Explicit
 fractional powers retain every root branch, while named root functions remain
 single-valued. Native algebraic-series recognition supplies the sigma step and
-domain-appropriate closed form, and a Value card appears whenever all required
-parameters have been supplied. Finite progressions recognise exact geometric,
+domain-appropriate closed form, and a Value card appears whenever a numerical
+value exists, including when simplification makes unset bindings irrelevant.
+Finite progressions recognise exact geometric,
 log-gamma, q-digamma, power-sum and small-rational residue identities, including
 composite symbolic steps such as `kax`. Inverse tangent families use compact
 log-gamma forms where available, while unsupported functions visibly remain
@@ -85,8 +86,7 @@ make mars-lab
 ```
 
 ```text
-MARS Lab running at http://localhost:<port>/
-Press Ctrl+C to stop.
+MARS Lab (native C) running at http://127.0.0.1:<port>/
 ```
 
 [![MARS Lab evaluating a symbolic matrix power](docs/images/mars-lab/matrix.png)](docs/images/mars-lab/matrix.png)
@@ -106,12 +106,14 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
+- Clang and LLD for the Lab's WebAssembly asset, included in the default build
+- OpenSSL development files for the native HTTPS protocol test fixtures
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
 On Debian/Ubuntu, install the default build requirements with:
 
 ```sh
-sudo apt install build-essential pkg-config libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev
+sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
 Use `make check-deps` to check for required development headers and link
@@ -121,7 +123,9 @@ MARS Lab runs as a native C server with calculation modes linked into the same
 `mars_lab` executable. It launches isolated child instances with `--worker MODE`,
 not separate scratch binaries, and renders TeX through `latex` and `dvisvgm`.
 Its browser interface uses HTML, CSS, JavaScript DOM adapters and a freestanding
-C/WebAssembly module for binary transport and worksheet limit validation.
+C/WebAssembly module for Protobuf transport, worksheet state, validation,
+request workflows and result-card control. JavaScript supplies browser API
+access; mathematical evaluation and mathematical formatting remain native.
 Native `mars_config` handles installation and links SQLCipher directly;
 neither Python nor the `sqlcipher` CLI is required for installing or
 running the Lab. Lab builds also check Clang's WebAssembly target and LLVM's
@@ -148,6 +152,12 @@ No Emscripten, Python, external JavaScript codec or Protobuf compiler is needed.
 Browser API calls now send typed Protobuf envelopes and request Protobuf replies;
 the native adapter uses MARS's existing Protobuf module. See the
 [Lab wire contract](docs/protobuf.md#mars-lab-browser-wire-contract).
+
+Result cards use consistent decimal or `×10`/superscript notation across the
+mathematical modes, including Function execution output. Native display markup
+preserves the original executable source for copying, running and reuse; the
+browser does not reinterpret the mathematics. See the
+[Lab result-card conventions](docs/mars-lab.md#result-card-conventions).
 
 The C browser modules own Protobuf traversal, schema validation, worksheet state,
 undo/redo history, precision and integration-budget limits, request routing and

@@ -7,8 +7,9 @@
  * parsing or evaluating mathematics. A bounded token pass collects array names
  * in a keyed JSON object; a second pass emits lossless spans for DOM rendering.
  * All storage is local to a call. Incomplete source remains displayable.
- * Matrix headings are recognised only as complete trimmed lines; surrounding
- * whitespace and all non-heading output remain exact source text.
+ * Matrix headings are recognised only as complete trimmed lines. Source spans
+ * remain lossless; escaped markup uses decimal or Unicode power-of-ten typography
+ * for numeric tokens, leaving executable source and authored comments unchanged.
  */
 #include <ctype.h>
 #include <stdlib.h>
@@ -32,7 +33,9 @@ static bool lab_syntax_html(json_t *result, const json_t *spans)
         const json_t *span = json_array_get(spans, i);
         const char *kind = lab_eval_text(span, "kind");
         bool heading = !strcmp(kind, "heading");
-        string_t *text = string_new_with(lab_eval_text(span, heading ? "display" : "text"));
+        string_t *source = string_new_with(lab_eval_text(span, heading ? "display" : "text"));
+        string_t *text = source ? lab_pres_display_numbers(source) : NULL;
+        string_free(source);
         if (*kind) {
             if (heading) ok = !string_append_cstr(html, "<span class=\"matrix-section-heading\">");
             else ok = string_append_format(html, "<span class=\"function-token-%s%s\">", kind,
@@ -188,8 +191,17 @@ static void lab_syntax_number(string_cursor_t *cursor)
         if (!lab_syntax_digit(cursor)) string_cursor_seek(cursor, point);
         else while (lab_syntax_digit(cursor)) string_cursor_next(cursor);
     }
+    size_t exponent = string_cursor_position(cursor);
+    if (lab_syntax_ascii(cursor, '.')) {
+        unsigned dots = 0u;
+        while (dots < 3u && lab_syntax_ascii(cursor, '.')) {
+            ++dots;
+            string_cursor_next(cursor);
+        }
+        if (dots != 3u || !(lab_syntax_ascii(cursor, 'e') || lab_syntax_ascii(cursor, 'E')))
+            string_cursor_seek(cursor, exponent);
+    }
     if (lab_syntax_ascii(cursor, 'e') || lab_syntax_ascii(cursor, 'E')) {
-        size_t exponent = string_cursor_position(cursor);
         string_cursor_next(cursor);
         if (lab_syntax_ascii(cursor, '+') || lab_syntax_ascii(cursor, '-')) string_cursor_next(cursor);
         if (!lab_syntax_digit(cursor)) string_cursor_seek(cursor, exponent);
@@ -260,6 +272,34 @@ finished:
         if (!token->text) return false;
     }
     return true;
+}
+
+/* Reuse the source lexer so names, quoted text and comments never become numbers. */
+string_t *lab_pres_display_numbers(const string_t *source)
+{
+    string_cursor_t *cursor = string_cursor_new(source);
+    string_t *out = string_new();
+    bool ok = cursor && out, primable = false;
+    while (ok && !string_cursor_done(cursor)) {
+        lab_syntax_token_t token = {0};
+        if (primable && lab_syntax_ascii(cursor, '\'')) {
+            string_cursor_next(cursor);
+            token.text = string_new_with("'");
+            ok = token.text != NULL;
+        } else {
+            ok = lab_syntax_scan(cursor, &token);
+            primable = ok && (token.word || string_view_equals_literal(string_view_all(token.text), ")") ||
+                             string_view_equals_literal(string_view_all(token.text), "]"));
+        }
+        string_t *display = ok && token.kind == syntax_number ? lab_pres_number_literal(token.text) : NULL;
+        ok = ok && (token.kind != syntax_number || display) &&
+             !string_append_string(out, display ? display : token.text) && string_byte_length(out) <= 1048576u;
+        string_free(display);
+        string_free(token.text);
+    }
+    string_cursor_free(cursor);
+    if (!ok) { string_free(out); return NULL; }
+    return out;
 }
 
 static bool lab_syntax_type(const char *word)

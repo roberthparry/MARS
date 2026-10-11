@@ -72,6 +72,14 @@ window.checkLabSyntax = async function checkLabSyntax() {
                     'native spans do not cover the entire card');
             }
         });
+        await labRequests.run('evaluate', 'expression', async request => {
+            const {response, data} = await fetchEvaluation('exp(-20)', '', '', '', '', request);
+            check(labRequests.outcome(request, response, data) === 2, 'small-value evaluation failed');
+            labDOM.call('lab_result_text_render', labResultCaches, host, data.value, 2);
+            check(host.textContent.includes('×10⁻⁹'), 'Value card retained machine exponent notation');
+            check(!/[eE][+-]?\d/.test(host.textContent), 'Value card contains an e/E exponent');
+            check(labMatrixHeadings.get(data.value)?.source === data.value, 'raw numeric source was changed');
+        });
         const {response, data} = await fetchMatrixEvaluation(
             {matrixText: '(1,0;0,2)', operation: 'eigendecompose', operand: '', skipSave: true});
         check(response.ok && data.ok !== false, 'native matrix evaluation failed');

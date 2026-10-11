@@ -51,7 +51,8 @@ void lab_function_complete(unsigned outcome, int timed_out, int data, int error)
         text = timed_out ? lab_dom_string("Execution request timed out.")
                          : lab_dom_join(lab_dom_string("Could not run programme: "), lab_dom_get(error, "message"), "");
     } else {
-        int output = lab_dom_clean(lab_dom_get(data, "output"), 3);
+        int display = lab_dom_get(lab_dom_get(data, "presentation"), "output_display");
+        int output = lab_dom_clean(lab_dom_type(display) == 3 ? display : lab_dom_get(data, "output"), 3);
         int diagnostic = lab_dom_clean(lab_dom_get(data, "error"), 0);
         if (outcome == 2) {
             text = lab_dom_truth(output) ? output : lab_dom_string("Programme completed without output.");
