@@ -670,6 +670,41 @@ void test_deriv_hypot(void)
     expr_free(x);
 }
 
+static void test_deriv_error_function_exact_scales(void)
+{
+    static const struct { const char *source, *expected; bool gaussian; } cases[] = {
+        {"{sqrt(pi)*erf(x)/2 | x=0.25}", "{exp(-x^2) | x=0.25}", true},
+        {"{-sqrt(pi)*erfc(x)/2 | x=0.25}", "{exp(-x^2) | x=0.25}", true},
+        {"{2*erfinv(x)/sqrt(pi) | x=0.25}", "{exp(erfinv(x)^2) | x=0.25}", true},
+        {"{-2*erfcinv(x)/sqrt(pi) | x=0.25}", "{exp(erfcinv(x)^2) | x=0.25}", true},
+        {"{(exp(-x^2)+2*C*x+x*sqrt(pi)*erf(x))/2+C1 | x=0.25; C=2; C1=3}",
+         "{sqrt(pi)*erf(x)/2+C | x=0.25; C=2}", false}
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *source = expr_from_string(cases[i].source, &bindings);
+        expr_t *x = expr_bindings_get(bindings, "x");
+        expr_t *derivative = source && x ? expr_create_deriv(source, x) : NULL;
+        expr_t *display = derivative ? expr_beautify(derivative) : NULL;
+        expr_t *expected = expr_from_string(cases[i].expected, NULL);
+        char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
+        printf("Exact derivative: %s\n", text ? text : "(null)");
+        ASSERT_NOT_NULL(derivative);
+        ASSERT_TRUE(text && !strstr(text, "/√π") && !strstr(text, "/√(π)"));
+        ASSERT_TRUE(text && (strstr(text, "exp") != NULL) == cases[i].gaussian);
+        if (!cases[i].gaussian)
+            ASSERT_TRUE(text && strstr(text, " + C") && !strstr(text, "C₁"));
+        check_q_at(__FILE__, __LINE__, 1, "exact error-function derivative scale", expr_eval_qf(derivative),
+                   expr_eval_qf(expected));
+        free(text);
+        expr_free(expected);
+        expr_free(display);
+        expr_free(derivative);
+        expr_free(source);
+        expr_bindings_free(bindings);
+    }
+}
+
 void test_deriv_erf(void)
 {
     expr_t *x = test_expr_new_var_d(0.5);
@@ -1136,6 +1171,7 @@ void test_first_derivatives(void)
     TEST_RUN_SUBTEST(test_deriv_abs, NULL);
     TEST_RUN_SUBTEST(test_deriv_hypot, NULL);
     TEST_RUN_SUBTEST(test_deriv_erf, NULL);
+    TEST_RUN_SUBTEST(test_deriv_error_function_exact_scales, NULL);
     TEST_RUN_SUBTEST(test_deriv_erfc, NULL);
     TEST_RUN_SUBTEST(test_deriv_erfinv, NULL);
     TEST_RUN_SUBTEST(test_deriv_erfcinv, NULL);

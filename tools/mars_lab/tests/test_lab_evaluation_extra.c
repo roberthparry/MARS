@@ -159,6 +159,40 @@ static void test_lab_extra_integral(void)
                     "x");
 }
 
+static void test_lab_extra_gaussian_derivative_round_trip(void)
+{
+    static const unsigned precisions[] = {17u, 78u, 155u};
+    for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+        unsigned status = 0u;
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"{½·(exp(-x²)+2Cx+x·√π·erf(x))+C₁ | x=160; C=?; C₁=?}\","
+            "\"action\":\"derivative\",\"wrt\":\"x\",\"precision\":%u}", precisions[i]);
+        json_t *result = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        bool ok = status == 200u && test_lab_ok(result, true) &&
+                  contains(result, "derivative", "½·√π·erf(x) + C |") &&
+                  !contains(result, "derivative", "exp") && !contains(result, "derivative", "C₁") &&
+                  !contains(result, "derivative_TeX", "e^{") && contains(result, "derivative_TeX", " + C");
+        string_t *route = string_new_with("/function-run"), *key = string_new_with("source");
+        json_t *input = json_new_object();
+        const json_t *programme = test_lab_member(result, "derivative_function");
+        bool ready = route && key && input && programme && json_object_set(input, key, programme);
+        json_t *run = ready ? lab_eval_request(route, input, &status) : NULL;
+        bool run_ok = status == 200u && test_lab_ok(run, true) &&
+                      contains(run, "output", "½·√π·erf(x) + C |") && !contains(run, "output", "exp");
+        if (!ok)
+            show_failure(result);
+        if (!run_ok)
+            show_failure(run);
+        json_free(run);
+        json_free(input);
+        string_free(key);
+        string_free(route);
+        json_free(result);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok && run_ok, "differentiating the Gaussian primitive cancels exponential terms in cards and Run");
+    }
+}
+
 static void test_lab_extra_repeated_gaussian_integral(void)
 {
     static const unsigned precisions[] = {17u, 78u, 155u};
@@ -610,6 +644,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_gaussian_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_repeated_gaussian_integral, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_gaussian_derivative_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);

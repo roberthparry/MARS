@@ -2609,6 +2609,45 @@ cleanup:
     return matched;
 }
 
+/* Extract a leading parameter addend without changing its coefficient or arbitrary-constant value. */
+static expr_t *expr_beautify_parameter_addend_last(const expr_t *expr)
+{
+    const expr_t *body = expr, *sum = NULL, *parameter = NULL;
+    number_t scale = num_clone(NUM_ONE), coefficient = num_clone(NUM_ONE), total = num_new();
+    expr_t *right = NULL, *constant = NULL, *raw = NULL, *out = NULL;
+    while (expr_is_op(body, &ops_real_domain))
+        body = body->a;
+    if (!expr_match_scaled_expr(body, &scale, &sum))
+        sum = body;
+    if (!expr_is_op(sum, &ops_add))
+        goto cleanup;
+    if (!expr_match_scaled_expr(sum->a, &coefficient, &parameter))
+        parameter = sum->a;
+    if (!expr_is_named_const(parameter) ||
+        expr_simplify_allows_const_identity_fold(parameter) || expr_is_const(sum->b) ||
+        !num_is_exact(scale) || !num_is_exact(coefficient))
+        goto cleanup;
+    num_destroy(&total);
+    total = num_mul(scale, coefficient);
+    right = expr_mul_simplify_owned(expr_new_const(scale), expr_clone(sum->b));
+    constant = expr_mul_simplify_owned(expr_new_const(total), expr_clone(parameter));
+    raw = right && constant ? expr_add(right, constant) : NULL;
+    if (expr_is_op(expr, &ops_real_domain))
+        out = raw ? expr_with_domain_of(raw, expr) : NULL;
+    else {
+        out = raw;
+        raw = NULL;
+    }
+cleanup:
+    expr_free(raw);
+    expr_free(constant);
+    expr_free(right);
+    num_destroy(&total);
+    num_destroy(&coefficient);
+    num_destroy(&scale);
+    return out;
+}
+
 /* Beautify an expression tree which has already received its intended algebraic simplification. */
 expr_t *expr_beautify_presimplified(const expr_t *expr)
 {
@@ -2626,6 +2665,11 @@ expr_t *expr_beautify_presimplified(const expr_t *expr)
     }
     symmetric = expr_beautify_node(source, false);
     beautified = symmetric ? expr_beautify_node(symmetric, true) : NULL;
+    expr_t *ordered = expr_beautify_parameter_addend_last(beautified);
+    if (ordered) {
+        expr_free(beautified);
+        beautified = ordered;
+    }
     expr_free(symmetric);
     expr_free(expanded);
     return beautified;

@@ -189,13 +189,6 @@ static expr_t *expr_chain_rule_with_factor(const expr_t *expr, expr_t *factor)
     return out;
 }
 
-static expr_t *expr_const_num_local(number_t value)
-{
-    NUM_SCOPE(scope);
-    expr_t *expr = expr_new_const(value);
-    return expr;
-}
-
 static expr_t *expr_log10_scale_factor_local(void)
 {
     NUM_SCOPE(scope);
@@ -207,21 +200,18 @@ static expr_t *expr_log10_scale_factor_local(void)
     return expr;
 }
 
-static expr_t *expr_const_ratio_local(number_t numerator, number_t denominator)
+/* Preserve the radical so error-function chain rules can cancel exact Gaussian factors. */
+static expr_t *expr_error_function_scale_local(bool inverse, bool negative)
 {
-    NUM_SCOPE(scope);
-    number_t value = num_div(numerator, denominator);
-
-    return expr_const_num_local(value);
-}
-
-static expr_t *expr_const_neg_ratio_local(number_t numerator, number_t denominator)
-{
-    NUM_SCOPE(scope);
-    number_t value = num_div(numerator, denominator);
-    number_t neg_value = num_neg(value);
-
-    return expr_const_num_local(neg_value);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *root = expr_sqrt(pi);
+    expr_t *scale = inverse ? expr_div_long(root, 2L) : expr_num_div(&NUM_TWO, root);
+    expr_t *out = negative ? expr_neg(scale) : scale;
+    if (negative)
+        expr_free(scale);
+    expr_free(root);
+    expr_free(pi);
+    return out;
 }
 
 number_t eval_sin(expr_t *expr)
@@ -1728,7 +1718,7 @@ expr_t *deriv_conj(expr_t *expr)
 expr_t *deriv_erf(expr_t *expr)
 {
     expr_t *da = expr_get_dx_internal(expr->a);
-    expr_t *c = expr_const_num_local(NUM_2_SQRTPI);
+    expr_t *c = expr_error_function_scale_local(false, false);
     expr_t *a2 = expr_pow_long(expr->a, 2);
     expr_t *neg_a2 = expr_neg(a2);
     expr_t *ea2 = expr_exp(neg_a2);
@@ -1746,7 +1736,7 @@ expr_t *deriv_erf(expr_t *expr)
 expr_t *deriv_erfc(expr_t *expr)
 {
     expr_t *da = expr_get_dx_internal(expr->a);
-    expr_t *c = expr_const_num_local(NUM_NEG_TWO_OVER_SQRT_PI);
+    expr_t *c = expr_error_function_scale_local(false, true);
     expr_t *a2 = expr_pow_long(expr->a, 2);
     expr_t *neg_a2 = expr_neg(a2);
     expr_t *ea2 = expr_exp(neg_a2);
@@ -1792,7 +1782,7 @@ expr_t *deriv_erfinv(expr_t *expr)
     expr_t *w = expr_erfinv(expr->a);
     expr_t *w2 = expr_pow_long(w, 2);
     expr_t *ew2 = expr_exp(w2);
-    expr_t *c = expr_const_ratio_local(NUM_SQRT_PI, NUM_TWO);
+    expr_t *c = expr_error_function_scale_local(true, false);
     expr_t *fac = expr_mul(c, ew2);
     expr_t *out = expr_mul(fac, da);
     expr_free(da);
@@ -1810,7 +1800,7 @@ expr_t *deriv_erfcinv(expr_t *expr)
     expr_t *w = expr_erfcinv(expr->a);
     expr_t *w2 = expr_pow_long(w, 2);
     expr_t *ew2 = expr_exp(w2);
-    expr_t *c = expr_const_neg_ratio_local(NUM_SQRT_PI, NUM_TWO);
+    expr_t *c = expr_error_function_scale_local(true, true);
     expr_t *fac = expr_mul(c, ew2);
     expr_t *out = expr_mul(fac, da);
     expr_free(da);

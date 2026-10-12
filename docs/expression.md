@@ -1449,6 +1449,11 @@ radical cancellation when scaling `erf`/`erfc` primitives, including their linea
 integration-by-parts forms and repeated integration of a Gaussian.
 Independent factors are extracted from nested products before numerical
 polynomial matching, preserving both their exact form and live parameter bindings.
+The symbolic derivatives of `erf`, `erfc`, `erfinv` and `erfcinv` likewise retain
+exact square-root-of-pi factors. Differentiating the repeated Gaussian primitive
+therefore cancels its opposite exponential terms rather than displaying numerical
+coefficients disguised as radicals. Standalone parameter addends follow the
+formula in beautified output, including a surviving integration constant.
 
 Gaussian cumulative integrals also have a direct outer-integration rule. For an
 integrand `exp(a*t^2+b*t+c)`, it completes the square and uses `erf` or `erfc`,
