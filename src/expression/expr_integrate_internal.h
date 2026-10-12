@@ -168,6 +168,18 @@ expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt);
  * @return Owned conditioned primitive, or NULL when the structural rule does not apply.
  */
 expr_t *integrate_cumulative_gaussian_rule(const expr_t *expr, const expr_t *wrt);
+
+/**
+ * @brief Split a product's independent factor before numerical polynomial matching can lose its exact form.
+ * @param expr Borrowed product to inspect; leaves retain their live bindings.
+ * @param wrt Borrowed integration variable.
+ * @param factor_out Receives an owned independent factor on success.
+ * @param rest_out Receives an owned remaining product on success.
+ * @return Whether a factor was extracted; output pointers are unchanged on failure.
+ */
+bool split_wrt_independent_product_factor(const expr_t *expr, const expr_t *wrt, expr_t **factor_out,
+                                          expr_t **rest_out);
+
 expr_t *integrate_constant_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_var_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_add_rule(const expr_t *expr, const expr_t *wrt);

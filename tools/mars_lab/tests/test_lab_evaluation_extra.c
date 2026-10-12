@@ -159,6 +159,41 @@ static void test_lab_extra_integral(void)
                     "x");
 }
 
+static void test_lab_extra_repeated_gaussian_integral(void)
+{
+    static const unsigned precisions[] = {17u, 78u, 155u};
+    for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+        unsigned status = 0u;
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"{sqrt(pi)*erf(x)/2+C | x=?; C=?}\","
+            "\"action\":\"integral\",\"wrt\":\"x\",\"precision\":%u}", precisions[i]);
+        json_t *result = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        bool ok = status == 200u && test_lab_ok(result, true) &&
+                  contains(result, "integral", "½·(exp(-x²) + 2Cx + x·√π·erf(x)) + C₁ |") &&
+                  !contains(result, "integral_TeX", "\\frac{1}{\\sqrt{\\pi}}") &&
+                  contains(result, "integral_TeX", " + C_{1}");
+        string_t *route = string_new_with("/function-run"), *key = string_new_with("source");
+        json_t *input = json_new_object();
+        const json_t *programme = test_lab_member(result, "integral_function");
+        bool ready = route && key && input && programme && json_object_set(input, key, programme);
+        json_t *run = ready ? lab_eval_request(route, input, &status) : NULL;
+        bool run_ok = status == 200u && test_lab_ok(run, true) &&
+                      contains(run, "output", "exp(-x²)") && contains(run, "output", " + C₁ |") &&
+                      !contains(run, "output", "/√π");
+        if (!ok)
+            show_failure(result);
+        if (!run_ok)
+            show_failure(run);
+        json_free(run);
+        json_free(input);
+        string_free(key);
+        string_free(route);
+        json_free(result);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok && run_ok, "repeated integration cancels reciprocal radicals in cards and Run output");
+    }
+}
+
 static void test_lab_extra_gaussian_integral(void)
 {
     static const unsigned precisions[] = {17u, 78u, 155u};
@@ -574,6 +609,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_derivative, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_gaussian_integral, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_repeated_gaussian_integral, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);

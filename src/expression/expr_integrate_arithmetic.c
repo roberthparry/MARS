@@ -1283,6 +1283,20 @@ expr_t *integrate_mul_rule(const expr_t *expr, const expr_t *wrt)
             return simplify_owned(product);
     }
 
+    /* Product grouping must not hide exact parameter factors from the scaling rule. */
+    if (left_depends && right_depends) {
+        expr_t *factor = NULL, *rest = NULL;
+        if (split_wrt_independent_product_factor(expr, wrt, &factor, &rest)) {
+            inner = expr_integrate_dispatch(rest, wrt);
+            product = inner ? integrate_scale_antiderivative_sum(factor, inner) : NULL;
+            expr_free(inner);
+            expr_free(rest);
+            expr_free(factor);
+            if (product)
+                return simplify_owned(product);
+        }
+    }
+
     matched = integrate_linear_times_abs(expr, wrt);
     if (matched)
         return matched;

@@ -3146,6 +3146,41 @@ static void test_integrate_improper_gaussian_bound_parameters(void)
     expr_bindings_free(bindings);
 }
 
+static void test_integrate_erf_radical_cancellation(void)
+{
+    static const double points[] = {-0.5, 0.25, 1.25};
+    static const char *const sources[] = {
+        "{sqrt(pi)*erf(x) | x=0}",
+        "{sqrt(pi)*erfc(x) | x=0}",
+        "{sqrt(pi)*x*erf(x) | x=0}",
+        "{sqrt(pi)*x*erfc(x) | x=0}",
+        "{sqrt(pi)*erf(2*x+1)/2+C | x=0; C=3}"
+    };
+    for (size_t i = 0u; i < sizeof sources / sizeof *sources; ++i)
+        assert_string_antiderivative_matches_without(sources[i], points, sizeof points / sizeof *points,
+                                                     "exp", "/√π", "/√(π)");
+
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{exp(-x^2) | x=0}", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    expr_t *first = expr_integrate(source, x);
+    expr_t *second = first ? expr_integrate(first, x) : NULL;
+    expr_t *derivative = second ? expr_create_deriv(second, x) : NULL;
+    ASSERT_NOT_NULL(derivative);
+    char *text = second ? expr_to_string(second, style_UNBOUND) : NULL;
+    ASSERT_TRUE(text && strstr(text, "erf") && !strstr(text, "/√π") && !strstr(text, "/√(π)"));
+    for (size_t i = 0u; i < sizeof points / sizeof *points; ++i) {
+        test_expr_set_val_d(x, points[i]);
+        check_q_at(__FILE__, __LINE__, 1, "repeated Gaussian integral", expr_eval_qf(derivative), expr_eval_qf(first));
+    }
+    free(text);
+    expr_free(derivative);
+    expr_free(second);
+    expr_free(first);
+    expr_free(source);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_cumulative_gaussian(void)
 {
     static const double points[] = {-0.5, 0.25, 1.25};
@@ -4178,6 +4213,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_evaluation, NULL);
     TEST_RUN_SUBTEST(test_integrate_improper_gaussian_bound_parameters, NULL);
     TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian, NULL);
+    TEST_RUN_SUBTEST(test_integrate_erf_radical_cancellation, NULL);
     TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian_precision, NULL);
     TEST_RUN_SUBTEST(test_integrate_cumulative_gaussian_guards, NULL);
     TEST_RUN_SUBTEST(test_integrate_unevaluated_integral_constant_upper, NULL);

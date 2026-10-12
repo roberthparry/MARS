@@ -435,10 +435,12 @@ static expr_t *build_exp_neg_u_sq_over_sqrt_pi(const expr_t *u_sq)
 {
     expr_t *neg_u_sq = u_sq ? expr_neg(u_sq) : NULL;
     expr_t *exp_term = neg_u_sq ? expr_exp(neg_u_sq) : NULL;
-    expr_t *sqrt_pi = expr_new_const(NUM_SQRT_PI);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *sqrt_pi = expr_sqrt(pi);
     expr_t *correction = (exp_term && sqrt_pi) ? expr_div(exp_term, sqrt_pi) : NULL;
 
     expr_free(sqrt_pi);
+    expr_free(pi);
     expr_free(exp_term);
     expr_free(neg_u_sq);
     return correction;
@@ -640,11 +642,13 @@ static expr_t *build_linear_erf_erfc_term(const expr_t *u, expr_t *inverse_u, co
     expr_t *exp_term = neg_u_sq ? expr_exp(neg_u_sq) : NULL;
     expr_t *u_exp_term = (u && exp_term) ? expr_mul(u, exp_term) : NULL;
     expr_t *twice_u_exp_term = u_exp_term ? expr_mul_num(u_exp_term, &NUM_TWO) : NULL;
-    expr_t *sqrt_pi = expr_new_const(NUM_SQRT_PI);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *sqrt_pi = expr_sqrt(pi);
     expr_t *correction = (twice_u_exp_term && sqrt_pi) ? expr_div(twice_u_exp_term, sqrt_pi) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, correction, is_add);
 
     expr_free(sqrt_pi);
+    expr_free(pi);
     expr_free(twice_u_exp_term);
     expr_free(u_exp_term);
     expr_free(exp_term);

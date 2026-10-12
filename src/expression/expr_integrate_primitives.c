@@ -1200,7 +1200,11 @@ expr_t *integrate_erf_rule(const expr_t *expr, const expr_t *wrt)
     u_sq = expr_pow(expr->a, &NUM_TWO);
     neg_u_sq = u_sq ? expr_neg(u_sq) : NULL;
     exp_term = neg_u_sq ? expr_exp(neg_u_sq) : NULL;
-    gaussian_term = exp_term ? expr_mul_num(exp_term, &NUM_SQRT1ONPI) : NULL;
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *sqrt_pi = expr_sqrt(pi);
+    gaussian_term = exp_term && sqrt_pi ? expr_div(exp_term, sqrt_pi) : NULL;
+    expr_free(sqrt_pi);
+    expr_free(pi);
     raw = (u_erf_u && gaussian_term) ? expr_add(u_erf_u, gaussian_term) : NULL;
 
     expr_free(gaussian_term);
@@ -1233,7 +1237,11 @@ expr_t *integrate_erfc_rule(const expr_t *expr, const expr_t *wrt)
     u_sq = expr_pow(expr->a, &NUM_TWO);
     neg_u_sq = u_sq ? expr_neg(u_sq) : NULL;
     exp_term = neg_u_sq ? expr_exp(neg_u_sq) : NULL;
-    gaussian_term = exp_term ? expr_mul_num(exp_term, &NUM_SQRT1ONPI) : NULL;
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *sqrt_pi = expr_sqrt(pi);
+    gaussian_term = exp_term && sqrt_pi ? expr_div(exp_term, sqrt_pi) : NULL;
+    expr_free(sqrt_pi);
+    expr_free(pi);
     raw = (u_erfc_u && gaussian_term) ? expr_sub(u_erfc_u, gaussian_term) : NULL;
 
     expr_free(gaussian_term);

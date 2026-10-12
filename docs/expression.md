@@ -1443,6 +1443,13 @@ argument long enough to integrate it before presentation expansion; in
 particular, both the `x` and `y` antiderivatives of `tanh(x + iy)` are returned
 as native Cartesian expressions rather than unevaluated integral nodes.
 
+In error-function primitives, the Gaussian correction retains its explicit square
+root of pi rather than an opaque numerical coefficient. This permits exact
+radical cancellation when scaling `erf`/`erfc` primitives, including their linear
+integration-by-parts forms and repeated integration of a Gaussian.
+Independent factors are extracted from nested products before numerical
+polynomial matching, preserving both their exact form and live parameter bindings.
+
 Gaussian cumulative integrals also have a direct outer-integration rule. For an
 integrand `exp(a*t^2+b*t+c)`, it completes the square and uses `erf` or `erfc`,
 then applies integration by parts to a non-constant affine upper endpoint. This avoids

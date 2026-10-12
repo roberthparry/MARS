@@ -227,8 +227,9 @@ static void poly_copy_local(number_t *dst, const number_t *src, size_t count)
     }
 }
 
-static bool split_wrt_independent_product_factor(const expr_t *expr, const expr_t *wrt, expr_t **factor_out,
-                                                 expr_t **rest_out)
+/* Split an exact parameter factor without detaching its live bindings. */
+bool split_wrt_independent_product_factor(const expr_t *expr, const expr_t *wrt, expr_t **factor_out,
+                                          expr_t **rest_out)
 {
     const expr_t *left = NULL;
     const expr_t *right = NULL;
@@ -241,7 +242,8 @@ static bool split_wrt_independent_product_factor(const expr_t *expr, const expr_
         return false;
 
     if (!depends_on_wrt(expr, wrt)) {
-        factor = expr_clone(expr);
+        factor = (expr_t *)expr;
+        expr_retain(factor);
         rest = expr_new_const(NUM_ONE);
         ok = factor && rest;
         goto cleanup;
@@ -251,15 +253,19 @@ static bool split_wrt_independent_product_factor(const expr_t *expr, const expr_
         return false;
 
     if (!depends_on_wrt(left, wrt)) {
-        factor = expr_clone(left);
-        rest = expr_clone(right);
+        factor = (expr_t *)left;
+        rest = (expr_t *)right;
+        expr_retain(factor);
+        expr_retain(rest);
         ok = factor && rest;
         goto cleanup;
     }
 
     if (!depends_on_wrt(right, wrt)) {
-        factor = expr_clone(right);
-        rest = expr_clone(left);
+        factor = (expr_t *)right;
+        rest = (expr_t *)left;
+        expr_retain(factor);
+        expr_retain(rest);
         ok = factor && rest;
         goto cleanup;
     }
