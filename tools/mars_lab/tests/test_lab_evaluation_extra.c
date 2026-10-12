@@ -435,6 +435,37 @@ static void test_lab_extra_diffequation(void)
     expect_response("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", 200u, "solutions", "y");
 }
 
+static void test_lab_extra_context_results(void)
+{
+    unsigned status = 0;
+    json_t *response = request("/equation-eval",
+                               "{\"equation\":\"{x=sqrt(s^2) | x=?; s=15}\",\"precision\":40}", &status);
+    bool ok = status == 200 && test_lab_ok(response, true) && contains(response, "solutions", "x = 15") &&
+              !contains(response, "solutions", "√");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "equation cards retain their established bound-constant substitution policy");
+    response = request("/matrix-eval",
+                       "{\"matrix\":\"{ (sqrt([s]^2),0;0,1) | ; [s]=15 }\",\"operation\":\"simplify\"}",
+                       &status);
+    ok = status == 200 && test_lab_ok(response, true) && contains(response, "result", "s") &&
+         !contains(response, "result", "√");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "matrix cards share assumption-aware symbolic simplification");
+    response = request("/matrix-eval",
+                       "{\"matrix\":\"{ (sqrt([s]^2),0;0,1) | [s]=15 }\",\"operation\":\"simplify\"}",
+                       &status);
+    ok = status == 200 && test_lab_ok(response, true) && contains(response, "result", "√") &&
+         contains(response, "value", "15");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "a variable sample affects numerical evaluation but does not prove its sign");
+}
+
 static void test_lab_extra_matrix(void)
 {
     expect_response("/matrix-eval", "{\"matrix\":\"(1,2;3,4)\",\"operation\":\"det\"}", 200u, "result", "-2");
@@ -650,6 +681,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_context_results, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integrator, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_function, tests, NULL);

@@ -29,9 +29,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "qfloat-t.h"
 #include "dictionary-t.h"
 #include "expression-t.h"
-#include "qfloat-t.h"
+#include "expr_context-t.h"
 
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 

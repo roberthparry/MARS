@@ -91,7 +91,7 @@ static char *dup_trimmed_range(const char *start, const char *end)
     return copy;
 }
 
-static char *matrix_algebraic_input(const char *text)
+static char *matrix_algebraic_input(const char *text, mat_bindings_t *bindings)
 {
     const char *start = text;
     const char *end;
@@ -127,7 +127,33 @@ static char *matrix_algebraic_input(const char *text)
                  memchr(cursor + 1, '=', (size_t)((end - 1) - (cursor + 1))) != NULL)
             binding_separator = cursor;
     }
-    return binding_separator ? dup_trimmed_range(start + 1, binding_separator) : dup_trimmed_range(start, end);
+    if (!binding_separator)
+        return dup_trimmed_range(start, end);
+
+    /* Remove values, not symbol roles: reparsing a bare formula can turn a constant into a variable. */
+    char *body = dup_trimmed_range(start + 1, binding_separator);
+    string_t *variables = string_new();
+    string_t *constants = string_new();
+    string_t *unbound = NULL;
+    char *result = NULL;
+    if (!body || !variables || !constants)
+        goto cleanup;
+    for (size_t i = 0; i < mat_bindings_count(bindings); ++i) {
+        const char *name = mat_bindings_name_at(bindings, i);
+        string_t *group = mat_bindings_is_constant_at(bindings, i) ? constants : variables;
+        if (!name || string_append_format(group, "%s[%s] = ?", string_byte_length(group) ? ", " : "", name) < 0)
+            goto cleanup;
+    }
+    unbound = string_sprintf("{ %s | %S; %S }", body, variables, constants);
+    if (unbound)
+        result = dup_string(string_c_str(unbound));
+
+cleanup:
+    string_free(unbound);
+    string_free(constants);
+    string_free(variables);
+    free(body);
+    return result;
 }
 
 static char *expr_text_dup(const expr_t *expr, style_t style)
@@ -796,6 +822,13 @@ static void print_eigendecomposition_number_fields(number_t *eigenvalues, size_t
 
 static void print_expr_scalar_field(const matrix_t *matrix, const char *operation, expr_t *expr)
 {
+    expr_context_t *context = expr_context_from_expression(expr, NULL);
+    expr_t *simplified = expr_context_refine(context, expr);
+    expr_context_free(context);
+    if (simplified) {
+        expr_free(expr);
+        expr = simplified;
+    }
     char *result_text = expr ? expr_text_dup(expr, style_UNBOUND) : NULL;
     char *expression_text = expr_card_text_dup(expr);
     char *function_text = expr ? expr_text_dup(expr, style_FUNCTION) : NULL;
@@ -1071,7 +1104,7 @@ int lab_worker_matrix(int argc, char **argv)
         matrix_t *algebraic_matrix = NULL;
         expr_t *algebraic_scalar = NULL;
 
-        algebraic_input = matrix_algebraic_input(input);
+        algebraic_input = matrix_algebraic_input(input, bindings);
         if (algebraic_input && strcmp(algebraic_input, input) != 0 &&
             mat_expression_evaluate(algebraic_input, &algebraic_bindings, &algebraic_operation, &algebraic_matrix,
                                     &algebraic_scalar) == 0 &&
@@ -1193,6 +1226,13 @@ result_ready:
     result_bindings = mat_bindings_from_matrix(result);
     if (!matrix_bindings_copy_values(result_bindings, bindings))
         goto cleanup;
+    matrix_t *context_result = mat_simplify_with_context(result, NULL);
+    if (!context_result)
+        goto cleanup;
+    mat_free(result);
+    result = context_result;
+    mat_bindings_free(result_bindings);
+    result_bindings = mat_bindings_from_matrix(result);
     print_matrix_fields(result);
     if (matrix_bindings_are_resolved(result_bindings)) {
         const matrix_t *value_source = bound_matrix_is_result ? bound_matrix : result;

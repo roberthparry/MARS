@@ -12,10 +12,10 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_maths.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_maths.h"
 
 static void expr_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
@@ -566,12 +566,27 @@ void expr_reverse_hypot(const expr_t *expr, const number_t *out_bar, number_t *a
     *b_bar = expr_reverse_num_mul(*out_bar, bx);
 }
 
+/* Materialise Gaussian coefficients at the current operand precision, not an earlier cached precision. */
+static number_t expr_reverse_gaussian_constant(number_t constant, number_t sample, number_t adjoint)
+{
+    size_t precision = num_get_default_prec_bits();
+    size_t sample_precision = num_get_prec_bits(sample);
+    size_t adjoint_precision = num_get_prec_bits(adjoint);
+    if (sample_precision > precision)
+        precision = sample_precision;
+    if (adjoint_precision > precision)
+        precision = adjoint_precision;
+    return num_const_prec(constant, precision);
+}
+
 void expr_reverse_erf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t x_sq = expr_reverse_num_sq(expr_eval_num_internal(expr->a));
     number_t neg_x_sq = num_neg(x_sq);
     number_t exp_term = num_exp(neg_x_sq);
-    number_t factor = num_mul(NUM_2_SQRTPI, exp_term);
+    number_t scale = expr_reverse_gaussian_constant(NUM_2_SQRTPI, exp_term, *out_bar);
+    number_t factor = num_mul(scale, exp_term);
+    num_destroy(&scale);
 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
@@ -581,7 +596,9 @@ void expr_reverse_erfc(const expr_t *expr, const number_t *out_bar, number_t *a_
     number_t x_sq = expr_reverse_num_sq(expr_eval_num_internal(expr->a));
     number_t neg_x_sq = num_neg(x_sq);
     number_t exp_term = num_exp(neg_x_sq);
-    number_t factor = num_mul(NUM_NEG_TWO_OVER_SQRT_PI, exp_term);
+    number_t scale = expr_reverse_gaussian_constant(NUM_NEG_TWO_OVER_SQRT_PI, exp_term, *out_bar);
+    number_t factor = num_mul(scale, exp_term);
+    num_destroy(&scale);
 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
@@ -590,7 +607,9 @@ void expr_reverse_erfinv(const expr_t *expr, const number_t *out_bar, number_t *
 {
     number_t y_sq = expr_reverse_num_sq(expr_eval_num_internal(expr));
     number_t exp_term = num_exp(y_sq);
-    number_t scale = num_div(NUM_SQRT_PI, NUM_TWO);
+    number_t root = expr_reverse_gaussian_constant(NUM_SQRT_PI, exp_term, *out_bar);
+    number_t scale = num_div(root, NUM_TWO);
+    num_destroy(&root);
     number_t factor = num_mul(scale, exp_term);
 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
@@ -599,9 +618,11 @@ void expr_reverse_erfinv(const expr_t *expr, const number_t *out_bar, number_t *
 void expr_reverse_erfcinv(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t y_sq = expr_reverse_num_sq(expr_eval_num_internal(expr));
-    number_t scale = num_div(NUM_SQRT_PI, NUM_TWO);
-    number_t neg_scale = num_neg(scale);
     number_t exp_term = num_exp(y_sq);
+    number_t root = expr_reverse_gaussian_constant(NUM_SQRT_PI, exp_term, *out_bar);
+    number_t scale = num_div(root, NUM_TWO);
+    num_destroy(&root);
+    number_t neg_scale = num_neg(scale);
     number_t factor = num_mul(neg_scale, exp_term);
 
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);

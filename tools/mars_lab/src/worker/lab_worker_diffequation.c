@@ -147,7 +147,7 @@ int lab_worker_diffequation(int argc, char **argv)
         return 2;
     }
 
-    result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
+    result = de_solve_with_context(de, DE_SOLVE_OPTION_STEPS, NULL);
     if (!result) {
         de_free(de);
         fprintf(stderr, "error could not allocate differential-equation result\n");

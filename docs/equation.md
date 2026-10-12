@@ -14,6 +14,50 @@ The intended public workflow is:
 2. Derive solutions through `equ_derive_solutions(...)`.
 3. Inspect the resulting isolated equations with `equ_solutions_at(...)`.
 
+## Context-aware results
+
+`equ_simplify_with_context(equation, context)` returns an independently owned
+equation whose sides use the shared [expression context](expr_context.md).
+`equ_derive_solutions_with_context(equation, context)` solves normally, then applies
+the same simplification to its solution formulae. Pass NULL to capture named
+constant bindings automatically; numerical variable guesses never supply sign
+proofs. Release these results with `equ_free()` and `equ_solutions_free()`.
+
+The context does not filter roots, prove an equation true, change numerical seeds
+or select solver branches. Unknown conditions remain, and search/completeness
+metadata is preserved. Sides carrying specialised solver notation are left
+unchanged. Recompute from the original problem whenever assumptions change.
+
+This complete README example retains the parameter name while using its positive
+binding to simplify the principal root:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "equation-t.h"
+
+int main(void)
+{
+    equation_t *source = equ_from_string("{x=sqrt(s^2) | x=?; s=15}");
+    equation_t *display = equ_simplify_with_context(source, NULL);
+    if (!display)
+        return 1;
+    char *text = expr_to_string(equ_rhs(display), style_UNBOUND);
+    puts(text);
+    free(text);
+    equ_free(display);
+    equ_free(source);
+    return 0;
+}
+```
+
+Output:
+
+```text
+s
+```
+
 ## Ownership
 
 - `equ_new(lhs, rhs)` returns an owning `equation_t *`.

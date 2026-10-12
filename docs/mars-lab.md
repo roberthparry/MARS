@@ -867,6 +867,14 @@ Unknown or complex parameter signs retain their generic roots; conditions remain
 unless the supplied values prove them.
 The active integration variable stays free. These display choices are recomputed
 on each evaluation and do not change the generic antiderivative.
+The native [`expr_context_t` module](expr_context.md) owns these binding snapshots
+and symbol roles, including the matching Function Run display path. No
+assumption inference or algebraic rewriting is performed in the browser.
+Equation solutions, differential-equation solutions and symbolic matrix results
+also use the shared context simplifier in their native workers. Supplied named
+constants can justify sign and domain simplifications; free-variable values remain
+evaluation data, not assumptions. This does not change solver branch selection or
+matrix pivot rules, and unknown restrictions remain visible.
 The generated integration constant is the last term of the displayed formula,
 before any domain condition; conditions remain after the binding bar in the
 Expression card.

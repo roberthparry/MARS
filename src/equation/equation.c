@@ -15,13 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation-t.h"
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation_internal.h"
+#include "string-t.h"
 #include "expression-t.h"
+#include "equation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "string-t.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 struct _equation_t {
     expr_t *lhs;
@@ -33,6 +33,45 @@ struct _equation_t {
     string_t *rhs_display_unbound;
     bool power_series_domain;
 };
+
+/* Simplify an independent result while preserving specialised solver notation and domains. */
+equation_t *equ_simplify_with_context(const equation_t *equation, const expr_context_t *context)
+{
+    expr_context_t *captured = NULL;
+    equation_t *result = NULL;
+    expr_t *lhs = NULL, *rhs = NULL;
+
+    if (!equation)
+        return NULL;
+    if (!context) {
+        captured = expr_context_new();
+        if (!captured || !expr_context_capture_symbols(captured, equation->lhs, NULL) ||
+            !expr_context_capture_symbols(captured, equation->rhs, NULL))
+            goto cleanup;
+        context = captured;
+    }
+    lhs = equation->lhs_display_TeX || equation->lhs_display_unbound ? expr_clone(equation->lhs) :
+          expr_context_refine(context, equation->lhs);
+    rhs = equation->rhs_display_TeX || equation->rhs_display_unbound ? expr_clone(equation->rhs) :
+          expr_context_refine(context, equation->rhs);
+    if (!lhs || !rhs)
+        goto cleanup;
+    result = equation->bindings ? equ_new_with_inferred_bindings(lhs, rhs) : equ_new(lhs, rhs);
+    if (result) {
+        result->power_series_domain = equation->power_series_domain;
+        if (equ_set_display_TeX(result, equation->lhs_display_TeX, equation->rhs_display_TeX) != 0 ||
+            equ_set_display_unbound(result, equation->lhs_display_unbound, equation->rhs_display_unbound) != 0) {
+            equ_free(result);
+            result = NULL;
+        }
+    }
+
+cleanup:
+    expr_free(rhs);
+    expr_free(lhs);
+    expr_context_free(captured);
+    return result;
+}
 
 static void equ_solutions_reset(equation_solutions_t *solutions)
 {

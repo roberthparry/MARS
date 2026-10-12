@@ -15,12 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dictionary-t.h"
-#include "equation-t.h"
-#include "expression-t.h"
-#include "matrix-t.h"
 #include "number-t.h"
 #include "string-t.h"
+#include "dictionary-t.h"
+#include "expression-t.h"
+#include "expr_context-t.h"
+#include "equation-t.h"
+#include "matrix-t.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -1042,7 +1043,9 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
             const expr_t *constant = NULL;
             expr_match_antiderivative_family(value, NULL, &constant);
             string_t *constant_name = constant ? string_new_with(expr_symbol_name(constant)) : NULL;
-            expr_t *simplified = expr_specialise_bound_display(value, NULL);
+            expr_context_t *context = expr_context_from_expression(value, NULL);
+            expr_t *simplified = expr_context_simplify(context, value);
+            expr_context_free(context);
             if (simplified) {
                 expr_free(value);
                 value = simplified;

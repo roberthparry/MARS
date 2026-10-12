@@ -26,6 +26,57 @@ second-order equations, one-dimensional forced wave initial-value problems
 using d'Alembert–Duhamel integrals, and the three-dimensional homogeneous wave
 equation using Kirchhoff's formula.
 
+## Context-aware results
+
+`de_solve_with_context(de, options, context)` performs the ordinary solve, then
+uses the shared [expression context](expr_context.md) for solution equations,
+envelope constraints and series coefficients/centre. A NULL context captures
+named constant bindings while protecting all free variables. The problem is
+unchanged; release the owning result with `de_solve_result_free()`.
+
+This does not extend solver coverage or select solution branches. Status,
+diagnostics and derivation steps still describe the original solve. Specialised
+solver notation and unresolved restrictions are preserved. Recompute from the
+original problem when assumptions or bindings change.
+
+This complete README example supplies a positive parameter assumption without
+substituting a numerical value into the solution:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *de = de_from_string("{ Dx(y) = sqrt(a^2) | x = ?; a = ?; y(0) = 0 }");
+    expr_context_t *context = expr_context_new();
+    if (!de || !expr_context_set(context, de_constant(de, "a"),
+                                 EXPR_CONTEXT_PARAMETER, EXPR_CONTEXT_POSITIVE, NUM_NAN))
+        return 1;
+    diffequ_solve_result_t *result = de_solve_with_context(de, DE_SOLVE_OPTION_NONE, context);
+    if (!result || de_solve_result_count(result) != 1)
+        return 1;
+    char *text = expr_to_string(equ_rhs(de_solve_result_at(result, 0)), style_UNBOUND);
+    printf("Symbolic parameter: %d\n", text && strstr(text, "a") != NULL);
+    printf("Root removed: %d\n", text && strstr(text, "√") == NULL);
+    free(text);
+    de_solve_result_free(result);
+    expr_context_free(context);
+    de_free(de);
+    return 0;
+}
+```
+
+Output:
+
+```text
+Symbolic parameter: 1
+Root removed: 1
+```
+
 ## Ownership
 
 - `de_new(...)`, `de_from_string(...)`, and `de_from_text(...)` return owning

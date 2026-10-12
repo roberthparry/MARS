@@ -313,7 +313,7 @@ static const char *solution_binding_name(expr_bindings_t *bindings, const equati
         const char *name = expr_bindings_name_at(bindings, i);
         expr_t *binding_expr = expr_bindings_expr_at(bindings, i);
 
-        if (expr_bindings_is_constant_at(bindings, i) || binding_expr != lhs || !name)
+        if (expr_bindings_is_constant_at(bindings, i) || !expr_struct_eq(binding_expr, lhs) || !name)
             continue;
         return name;
     }
@@ -332,7 +332,7 @@ static size_t solution_binding_order(expr_bindings_t *bindings, const equation_t
     for (size_t i = 0u; i < count; ++i) {
         expr_t *binding_expr = expr_bindings_expr_at(bindings, i);
 
-        if (!expr_bindings_is_constant_at(bindings, i) && binding_expr == lhs)
+        if (!expr_bindings_is_constant_at(bindings, i) && expr_struct_eq(binding_expr, lhs))
             return i;
     }
 
@@ -1100,7 +1100,7 @@ int lab_worker_equation(int argc, char **argv)
         return 1;
     }
 
-    solutions = equ_derive_solutions(equation);
+    solutions = equ_derive_solutions_with_context(equation, NULL);
     if (!solutions)
         rc = 1;
     else if (equ_solutions_count(solutions) > 0u)

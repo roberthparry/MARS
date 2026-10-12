@@ -143,6 +143,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"dictionary-t.h", "dictionary.md"},
                                                  {"diffequation-t.h", "diffequation.md"},
                                                  {"equation-t.h", "equation.md"},
+                                                 {"expr_context-t.h", "expr_context.md"},
                                                  {"expression-t.h", "expression.md"},
                                                  {"file-t.h", "file.md"},
                                                  {"http-t.h", "http.md"},

@@ -42,6 +42,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   zeta calculus, finite sum and product notation, Li₁ and Lerch-transcendent
   calculus, symbolic matrix integration and structural matcher helpers for
   higher-level symbolic code
+- **`expr_context_t`** — owned symbol roles, assumptions and numerical binding snapshots for symbolic display
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
@@ -414,6 +415,7 @@ int main(void) {
 
 | Module | Description | Docs |
 |---|---|---|
+| `expr_context_t` | Owned assumptions, symbol roles and binding-aware expression snapshots | [`docs/expr_context.md`](./docs/expr_context.md) |
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](./docs/datetime.md) |
 | `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](./docs/timeseries.md) |
 | `json_t` | Opaque JSON value tree with string-backed parsing and serialisation | [`docs/json.md`](./docs/json.md) |

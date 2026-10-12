@@ -8,6 +8,131 @@ complex values through the `number_t` layer. Storage remains pluggable
 All operations dispatch through internal vtables; no type switches or storage
 switches appear in user code.
 
+## Context-aware matrices
+
+The `matrix_context.c` implementation supplies `mat_simplify_with_context(A,
+context)`: an owning snapshot using the shared [expression context](expr_context.md)
+for every symbolic entry. A NULL context captures named constants, not numerical
+variable guesses. Numeric matrices are copied unchanged, storage is preserved,
+and unknown restrictions remain. This API does not change pivot selection or
+prove that an inverse exists. Recompute from the original matrix after changing
+the context; free each result with `mat_free()`.
+
+This complete README example supplies a positive assumption without a numerical
+value. The principal-root ratio then simplifies to one:
+
+```c
+#include <stdio.h>
+
+#include "matrix-t.h"
+
+int main(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *entry = expr_from_string("sqrt(s^2)/s", &bindings);
+    matrix_t *source = mat_create_expr(1, 1, &entry);
+    expr_context_t *context = expr_context_new();
+    if (!expr_context_set(context, expr_bindings_get(bindings, "s"),
+                          EXPR_CONTEXT_FREE, EXPR_CONTEXT_POSITIVE, NUM_NAN))
+        return 1;
+    matrix_t *display = mat_simplify_with_context(source, context);
+    if (!display)
+        return 1;
+    expr_t *result = NULL;
+    mat_get(display, 0, 0, &result);
+    number_t value = expr_eval(result);
+    printf("Unit entry: %d\n", num_eq(value, NUM_ONE));
+    num_destroy(&value);
+    mat_free(display);
+    mat_free(source);
+    expr_context_free(context);
+    expr_free(entry);
+    expr_bindings_free(bindings);
+    return 0;
+}
+```
+
+Output:
+
+```text
+Unit entry: 1
+```
+
+## Guarded solving and inversion
+
+`mat_solve_with_context(A, B, context)` solves `A X = B`, and
+`mat_inverse_with_context(A, context)` solves against the identity. These opt-in
+APIs require an explicit context and return caller-owned symbolic matrices,
+including for numeric inputs. Release results with `mat_free()`.
+
+Unlike the ordinary matrix solver, this implementation introduces a division
+only after `expr_context_proves()` establishes that its pivot is non-zero. It
+tries subsequent rows when the current candidate lacks evidence. Variable samples
+are not assumptions; parameter bindings may provide evidence. All right-hand-side
+columns share one elimination pass. Inputs remain unchanged, and parameter names
+remain symbolic. Recompute from the original matrices after a context change.
+
+A NULL result reports the reason through `errno`:
+
+- `EAGAIN`: no pivot was proved non-zero. This is not a singularity claim; more
+  assumptions or stronger algebraic reasoning may establish invertibility.
+- `EDOM`: a remaining elimination column was structurally zero.
+- `EINVAL`: missing context, empty matrices or incompatible dimensions.
+- `ENOMEM`: allocation failure or unrepresentable working-array size.
+
+An explicitly zero parameter is never accepted as a pivot, but an unreduced
+symbolic zero can still report `EAGAIN`. This solver does not enumerate parameter
+cases, establish the validity of pre-existing input-domain restrictions, or supply
+numerically stable floating-point pivoting. Use the ordinary numerical APIs for
+numerical conditioning. Dense symbolic work uses cubic elimination with expression
+costs on top, and storage proportional to the augmented matrix. Existing APIs and
+the Lab's default solve/inverse operations retain their existing behaviour.
+
+This complete README example refuses an unproved pivot, then solves after adding
+the precise assumption required:
+
+```c
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "matrix-t.h"
+
+int main(void)
+{
+    expr_t *x = expr_new_named_var(NUM_NAN, "x");
+    matrix_t *a = mat_create_expr(1, 1, &x);
+    matrix_t *b = mat_create_identity(1);
+    expr_context_t *context = expr_context_new();
+    matrix_t *result = mat_solve_with_context(a, b, context);
+    printf("Needs non-zero assumption: %d\n", result == NULL && errno == EAGAIN);
+    mat_free(result);
+    if (!expr_context_set(context, x, EXPR_CONTEXT_FREE, EXPR_CONTEXT_NONZERO, NUM_NAN))
+        return 1;
+    result = mat_solve_with_context(a, b, context);
+    if (!result)
+        return 1;
+    expr_t *entry = NULL;
+    mat_get(result, 0, 0, &entry);
+    char *text = expr_to_string(entry, style_UNBOUND);
+    printf("Solution: %s\n", text);
+    free(text);
+    mat_free(result);
+    expr_context_free(context);
+    mat_free(b);
+    mat_free(a);
+    expr_free(x);
+    return 0;
+}
+```
+
+Output:
+
+```text
+Needs non-zero assumption: 1
+Solution: 1/x
+```
+
 ## Source organisation
 
 `src/matrix/matrix_cylindrical.c` keeps the Bessel I/K/Y and Struve H/L

@@ -23,8 +23,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "expression-t.h"
 #include "string-t.h"
+#include "expression-t.h"
+#include "expr_context-t.h"
 
 typedef enum expr_integration_bound_kind {
     EXPR_INTEGRATION_BOUND_DEFINITE = 0,
@@ -85,19 +86,6 @@ expr_t *expr_move_named_addend_last_for_display(const expr_t *expr, const char *
  * @return Whether the family has the expected additive structure.
  */
 bool expr_match_antiderivative_family(const expr_t *expr, const expr_t **primitive_out, const expr_t **constant_out);
-
-/**
- * @brief Build a display snapshot using supplied parameter signs and proven domain conditions.
- *
- * Retains parameter names, removes roots of real parameter squares using their
- * current signs, and omits satisfied parameter-only conditions. Never treats the
- * active variable as a fixed parameter. Rebuild after every binding change; the
- * result is valid for the supplied bindings, not as an unconditional identity.
- * @param expr Borrowed generic result; not modified.
- * @param wrt Borrowed active calculus variable, or NULL to protect all variables and use only constant bindings.
- * @return Owned display snapshot, or NULL for a missing expression.
- */
-expr_t *expr_specialise_bound_display(const expr_t *expr, const expr_t *wrt);
 
 /**
  * @brief Place the imaginary unit last in Cartesian coefficients for display.
@@ -475,5 +463,17 @@ expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindin
 
 /** @brief Parse authored calculus operations without replacing them with their results. */
 expr_t *expr_from_string_preserving_calculus_internal(const char *source);
+
+/** @brief Describe a context-eligible symbol: variable identity or borrowed named-constant name. */
+bool expr_context_symbol_identity(const expr_t *symbol, uint64_t *identity, const char **name);
+
+/** @brief Capture non-scoped symbols into an empty context, preserving the active variable's freedom. */
+bool expr_context_capture_symbols(expr_context_t *context, const expr_t *source, const expr_t *wrt);
+
+/** @brief Clone, bind and refine non-scoped symbols; optionally beautify even when no proof changes the algebra. */
+expr_t *expr_context_snapshot(const expr_context_t *context, const expr_t *source, bool beautify_unchanged);
+
+/** @brief Infer structural context facts without numerical sampling of compound expressions. */
+unsigned expr_context_proven_facts(const expr_context_t *context, const expr_t *source);
 
 #endif /* EXPR_SHARED_INTERNAL_H */

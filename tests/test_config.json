@@ -507,6 +507,28 @@
       }
     }
   },
+  "tests/expr_context/test_context_solver.c": {
+    "test_context_guarded_inverse": true,
+    "test_context_guarded_multiple_rhs": true,
+    "test_context_guarded_parameter_snapshot": true,
+    "test_context_guarded_row_exchange": true,
+    "test_context_structural_proofs": true
+  },
+  "tests/expr_context/test_expr_context.c": {
+    "example_expr_context_binding": true,
+    "test_context_binding_snapshots": true,
+    "test_context_conditions": true,
+    "test_context_consumer_boundaries": true,
+    "test_context_differential_metadata": true,
+    "test_context_differential_results": true,
+    "test_context_equation_results": true,
+    "test_context_free_and_assumed": true,
+    "test_context_invalid_updates": true,
+    "test_context_many_symbols": true,
+    "test_context_matrix_results": true,
+    "test_context_scopes_and_conflicts": true,
+    "test_context_symbol_identity": true
+  },
   "tests/expression/test_expr_arithmetic.c": {
     "tests": {
       "enabled": true,
@@ -2811,7 +2833,8 @@
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true
+      "test_lab_extra_unsafe_TeX_input": true,
+      "test_lab_extra_context_results": true
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {

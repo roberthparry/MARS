@@ -14,6 +14,8 @@
  * Use expression-t.h for the underlying symbolic expressions and diffequation-t.h for
  * differential equations. Respect the documented ownership of equation handles,
  * solution collections and borrowed entries within those collections.
+ * Context-aware result APIs share the expr_context module's conservative sign
+ * and domain simplification without changing root selection or numerical seeds.
  */
 
 #ifndef MARS_EQUATION_H
@@ -24,6 +26,7 @@
 #include <stddef.h>
 
 #include "expression-t.h"
+#include "expr_context-t.h"
 
 typedef struct _equation_t equation_t;
 typedef struct _equation_solutions_t equation_solutions_t;
@@ -122,6 +125,16 @@ expr_t *equ_residual(const equation_t *equation);
 equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt);
 
 /**
+ * @brief Return an owning equation snapshot simplified under a symbol context.
+ * @param equation Borrowed source equation; never modified.
+ * @param context Borrowed context, or NULL to capture named constants while keeping variables free.
+ * @return Owned equation, or NULL on failure; release with equ_free().
+ * Names remain symbolic and unknown conditions remain. Special solver notation is preserved without
+ * rewriting its underlying side. This is result simplification, not a proof that the equation holds.
+ */
+equation_t *equ_simplify_with_context(const equation_t *equation, const expr_context_t *context);
+
+/**
  * @brief Return true when the equation is already isolated as @c wrt = f(...)
  *        and the right-hand side does not contain @p wrt.
  *
@@ -160,6 +173,16 @@ void equ_solutions_free(equation_solutions_t *solutions);
  * that no roots exist; check equ_solutions_proven_empty.
  */
 equation_solutions_t *equ_derive_solutions(const equation_t *equation);
+
+/**
+ * @brief Derive solutions and simplify their formulae under a symbol context.
+ * @param equation Borrowed problem; its bindings still control solving and numerical starting guesses.
+ * @param context Borrowed context, or NULL to capture each result's constant bindings.
+ * @return Owned solution collection, or NULL on failure; release with equ_solutions_free().
+ * The context affects returned formulae only: it neither selects solver branches nor filters roots.
+ * Search notes and completeness status are preserved. Recompute from the original problem after changes.
+ */
+equation_solutions_t *equ_derive_solutions_with_context(const equation_t *equation, const expr_context_t *context);
 
 /**
  * @brief Return the number of solutions currently stored in @p solutions.

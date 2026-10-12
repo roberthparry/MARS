@@ -57,6 +57,7 @@ This directory contains the longer module documentation for MARS.
 - [`string_t`](./string.md) — UTF-8-aware dynamic strings
 - [`bitset_t`](./bitset.md) — dynamic thread-safe bitset
 - [`integrator_t`](./integrator.md) — adaptive G7K15 / Turan T15/T4 integrator with symbolic fast paths
+- [`expr_context_t`](./expr_context.md) — owned assumptions, symbol roles and binding-aware expression snapshots
 
 ## Guides
 

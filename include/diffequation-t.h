@@ -6,6 +6,8 @@
  * equations with explicit variables, parameters and conditions. It builds on the
  * expression and equation modules and exposes inspection and presentation of the
  * problem and its results.
+ * Context-aware result simplification shares expr_context assumptions without
+ * changing solver selection, derivation steps or independent-variable semantics.
  *
  * The solver recognises particular mathematical families rather than promising a
  * closed-form solution for every differential equation. Check the reported result
@@ -429,6 +431,19 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de);
  *         cannot be allocated. Release it with de_solve_result_free().
  */
 diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options);
+
+/**
+ * @brief Solve and context-simplify the resulting formulae without modifying the problem.
+ * @param de Borrowed differential-equation problem.
+ * @param options Bitwise OR of de_solve_option_t values.
+ * @param context Borrowed context, or NULL to capture result constants while keeping variables free.
+ * @return Owned result, or NULL on failure; release with de_solve_result_free().
+ * Solver selection, conditions and derivation steps are unchanged. Solution equations, envelope
+ * constraints and series data use the context; unresolved restrictions and specialised notation remain.
+ * This does not use assumptions to extend solver coverage or select solution branches.
+ */
+diffequ_solve_result_t *de_solve_with_context(const diffequ_t *de, unsigned int options,
+                                           const expr_context_t *context);
 
 /**
  * @brief Construct a local Taylor solution of a polynomial second-order ODE.

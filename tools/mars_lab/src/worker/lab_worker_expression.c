@@ -14,9 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation-t.h"
-#include "expression-t.h"
 #include "string-t.h"
+#include "expression-t.h"
+#include "expr_context-t.h"
+#include "equation-t.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
@@ -2302,7 +2303,9 @@ int lab_worker_expression(int argc, char **argv)
                                            : display_polynomial_simplified(integral, wrt, complex_cartesian);
                 if (!display_integral)
                     display_integral = integral;
-                expr_t *bound_integral = expr_specialise_bound_display(display_integral, wrt);
+                expr_context_t *context = expr_context_from_expression(display_integral, wrt);
+                expr_t *bound_integral = expr_context_simplify(context, display_integral);
+                expr_context_free(context);
                 if (bound_integral) {
                     if (display_integral != integral)
                         expr_free(display_integral);

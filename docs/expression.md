@@ -2597,6 +2597,20 @@ decide whether derivative controls should be shown.
 
 - `void expr_free(expr_t *expr)` — decrement refcount; free the node and recursively its children when it reaches zero. Must be called exactly once per owning handle.
 
+### Assumptions and binding snapshots
+
+Use the separate [`expr_context_t` module](expr_context.md) to distinguish explicit
+assumptions from current numerical bindings and to mark symbols as free or as
+parameters for display purposes. It owns independent snapshots and delegates
+symbolic simplification to this module without substituting parameter values into
+the displayed formula. Recompute from the original expression after changing a
+context; previously simplified snapshots are not generic identities.
+
+Numerical reverse-mode derivatives of `erf`, `erfc` and their inverses realise
+their Gaussian coefficients at the current operand/adjoint precision. Warming
+constant caches during an earlier double-precision calculation must not reduce
+the accuracy of a later higher-precision derivative.
+
 ### String Conversion
 
 The native formatter keeps its public conversion, printing and serialisation

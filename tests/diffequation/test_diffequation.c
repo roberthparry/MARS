@@ -975,7 +975,7 @@ static void test_diffequ_solves_quadratic_separable_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("quadratic separable solution text", text, true);
     if (text)
-        WANT_TEXT("quadratic separable solution", string_c_str(text), "y = -1/(½·(x² - 2))");
+        WANT_TEXT("quadratic separable solution", string_c_str(text), "y = -2/(x² - 2)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -4513,7 +4513,7 @@ static void test_diffequ_solves_parameter_linear_pde(void)
         WANT_POINTER("parameter-linear PDE derivation forms integrating factor",
                        strstr(de_solve_result_steps(result), "μ = exp(∫(2y)dy) = exp(y²)"), true);
         WANT_POINTER("parameter-linear PDE derivation reaches arbitrary function",
-                       strstr(de_solve_result_steps(result), "μz = ½x·(y² - 1)·exp(y²) + F(x)"), true);
+                       strstr(de_solve_result_steps(result), "μz = ½x·exp(y²)·(y² - 1) + F(x)"), true);
     }
     WANT_POINTER("parameter-linear PDE TeX derivation", result ? de_solve_result_steps_TeX(result) : NULL, true);
 

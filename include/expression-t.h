@@ -13,6 +13,9 @@
  * used by equation, differential-equation and symbolic matrix operations. Symbolic
  * operations have mathematical domain restrictions and do not cover every possible
  * closed-form problem.
+ * The separate expr_context module, exposed through the expr_context-t.h public
+ * header, owns assumptions and binding snapshots for context-dependent display
+ * simplification without changing this graph.
  *
  * Ownership rules:
  *   • Constructors and derivative builders normally return owning handles, released with expr_free().

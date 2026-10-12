@@ -10,6 +10,8 @@
  * Element domains, dimensions and structural assumptions determine which operations
  * are meaningful. Use number-t.h for scalar arithmetic and expression-t.h for symbolic
  * entries; consult individual operations for ownership and singularity handling.
+ * Context-aware snapshots share expr_context sign and domain proofs for symbolic
+ * entries. Separate opt-in context solvers require proven non-zero pivots before division.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
  * details such as element type, storage representation, and vtables.
@@ -35,6 +37,7 @@
 #include <stddef.h>
 
 #include "expression-t.h"
+#include "expr_context-t.h"
 
 typedef struct _matrix_t matrix_t;
 typedef struct _mat_bindings_t mat_bindings_t;
@@ -1676,6 +1679,40 @@ matrix_t *mat_E1(const matrix_t *A);
  * matrices this is equivalent to a plain copy.
  */
 matrix_t *mat_simplify_symbolic(const matrix_t *A);
+
+/**
+ * @brief Return an owning matrix snapshot with context-simplified symbolic entries.
+ * @param A Borrowed matrix; its entries and storage remain unchanged.
+ * @param context Borrowed context, or NULL to capture each entry's constants while keeping variables free.
+ * @return Owned matrix, or NULL on failure; release with mat_free().
+ * Numeric matrices are copied unchanged. Unknown restrictions remain; this does not authorise
+ * divisions by unproved non-zero pivots or change matrix solving algorithms.
+ */
+matrix_t *mat_simplify_with_context(const matrix_t *A, const expr_context_t *context);
+
+/**
+ * @brief Solve A X = B using only context-proven non-zero elimination pivots.
+ * @param A Borrowed, non-empty square numeric or symbolic matrix.
+ * @param B Borrowed right-hand sides with A's row count and at least one column.
+ * @param context Required borrowed context; free-variable values never establish pivot validity.
+ * @return Owned symbolic matrix, or NULL with errno; release with mat_free().
+ * EAGAIN means no provably non-zero pivot was found, not that the matrix is singular.
+ * EDOM means an elimination column was structurally zero; EINVAL denotes invalid dimensions
+ * or context. Allocation failure reports ENOMEM. Rows are exchanged when a later pivot is proved.
+ * All newly introduced divisions are guarded; existing input-domain restrictions remain the
+ * caller's responsibility. This conservative solver does not enumerate parameter-dependent cases.
+ * Inputs remain unchanged. Names remain symbolic; recompute after changing the context.
+ */
+matrix_t *mat_solve_with_context(const matrix_t *A, const matrix_t *B, const expr_context_t *context);
+
+/**
+ * @brief Invert a non-empty square matrix with the guarded context solver.
+ * @param A Borrowed numeric or symbolic matrix, never modified.
+ * @param context Required borrowed context.
+ * @return Owned symbolic inverse, or NULL with the errno meanings of mat_solve_with_context().
+ * Solves against the identity, using the same proof policy and row exchanges for every column.
+ */
+matrix_t *mat_inverse_with_context(const matrix_t *A, const expr_context_t *context);
 
 /**
  * @brief Return a copy of a matrix whose symbolic entries have been arranged for readable presentation.

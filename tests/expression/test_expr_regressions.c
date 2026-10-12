@@ -11,10 +11,11 @@
 
 #include <math.h>
 
-#include "test_expr.h"
-
+#include "expr_context-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+
+#include "test_expr.h"
 
 static void test_unset_constant_clones_combine_symbolically(void)
 {
@@ -1303,6 +1304,13 @@ static void test_eval_num_function_values(void)
 
 static void test_eval_num_function_derivatives(void)
 {
+    /* A previous double-precision request must not lower later Gaussian derivative accuracy. */
+    size_t saved_precision = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_bits(53u), 0);
+    ASSERT_TRUE(isfinite(num_to_double(NUM_2_SQRTPI)));
+    ASSERT_TRUE(isfinite(num_to_double(NUM_NEG_TWO_OVER_SQRT_PI)));
+    ASSERT_TRUE(isfinite(num_to_double(NUM_SQRT_PI)));
+    ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
     static const unary_eval_case_t unary_cases[] = {
         UCASE("sin", "0.5", expr_sin, num_sin),
         UCASE("cos", "0.5", expr_cos, num_cos),
@@ -3233,7 +3241,9 @@ static void test_bound_display_parameter_signs(void)
     static const char *const expected[] = {"x + 1", "x - 1"};
     for (size_t i = 0u; i < sizeof widths / sizeof *widths; ++i) {
         test_expr_set_val_d(s, widths[i]);
-        expr_t *display = expr_specialise_bound_display(source, x);
+        expr_context_t *context = expr_context_from_expression(source, x);
+        expr_t *display = expr_context_simplify(context, source);
+        expr_context_free(context);
         char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
         TEST_ASSERT_STR_EQ(text, expected[i]);
         free(text);
@@ -3260,7 +3270,9 @@ static void test_bound_display_parameter_signs(void)
         bindings = NULL;
         source = expr_from_string(cases[i].source, &bindings);
         x = expr_bindings_get(bindings, "x");
-        expr_t *display = expr_specialise_bound_display(source, x);
+        expr_context_t *context = expr_context_from_expression(source, x);
+        expr_t *display = expr_context_simplify(context, source);
+        expr_context_free(context);
         char *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
         ASSERT_NOT_NULL(text);
         if (cases[i].expected)
