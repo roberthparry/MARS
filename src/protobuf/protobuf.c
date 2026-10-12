@@ -23,6 +23,7 @@ typedef struct {
     unsigned char *bytes;
     size_t size;
 } record_t;
+
 struct _protobuf_t {
     array_t *records;
     size_t limit, fields, encoded;
