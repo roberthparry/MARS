@@ -411,6 +411,7 @@ static void number_clear_immortal_mpfr(number_mpfr_t *value)
 
 void number_constants_shutdown(void)
 {
+    number_physical_constants_shutdown();
     number_complex_clear_mpc_cache(&number_neg_i_complex_value);
     number_complex_clear_mpc_cache(&number_i_complex_value);
 
@@ -496,7 +497,16 @@ static const number_t *const number_const_exact_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE_EIGHTH] = &NUM_ONE_EIGHTH,
     [NUMBER_CONST_ONE_TENTH] = &NUM_ONE_TENTH,
     [NUMBER_CONST_TWO] = &NUM_TWO,
-    [NUMBER_CONST_TEN] = &NUM_TEN};
+    [NUMBER_CONST_TEN] = &NUM_TEN,
+    [NUMBER_CONST_SPEED_OF_LIGHT] = &NUM_SPEED_OF_LIGHT,
+    [NUMBER_CONST_ELEMENTARY_CHARGE] = &NUM_ELEMENTARY_CHARGE,
+    [NUMBER_CONST_PLANCK] = &NUM_PLANCK,
+    [NUMBER_CONST_BOLTZMANN] = &NUM_BOLTZMANN,
+    [NUMBER_CONST_AVOGADRO] = &NUM_AVOGADRO,
+    [NUMBER_CONST_STANDARD_GRAVITY] = &NUM_STANDARD_GRAVITY,
+    [NUMBER_CONST_ASTRONOMICAL_UNIT] = &NUM_ASTRONOMICAL_UNIT,
+    [NUMBER_CONST_JULIAN_YEAR] = &NUM_JULIAN_YEAR,
+};
 
 static const double number_const_double_table[NUMBER_CONST_COUNT] = {[NUMBER_CONST_ZERO] = 0.0,
                                                                      [NUMBER_CONST_ONE] = 1.0,

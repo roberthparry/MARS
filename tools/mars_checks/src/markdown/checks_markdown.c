@@ -157,6 +157,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"protobuf-t.h", "protobuf.md"},
                                                  {"qcomplex-t.h", "qcomplex.md"},
                                                  {"qfloat-t.h", "qfloat.md"},
+                                                 {"quantity-t.h", "quantity.md"},
                                                  {"regex-t.h", "regex.md"},
                                                  {"set-t.h", "set.md"},
                                                  {"sqlite-t.h", "sqlite.md"},

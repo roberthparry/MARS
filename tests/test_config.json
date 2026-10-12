@@ -109,6 +109,31 @@
     "test_computation_scopes": true,
     "test_computation_sum_product_recovery": true
   },
+  "tests/computation/test_computation_module_readme.c": {
+    "example_computation_almanac": true,
+    "example_computation_csv": true,
+    "example_computation_diffequation": true,
+    "example_computation_equation": true,
+    "example_computation_matrix": true,
+    "example_computation_sqlite": true,
+    "example_computation_timeseries": true
+  },
+  "tests/computation/test_computation_modules.c": {
+    "test_computation_almanac_stop": true,
+    "test_computation_csv_long_record": true,
+    "test_computation_csv_stop": true,
+    "test_computation_diffequation_stop": true,
+    "test_computation_equation_bindings": true,
+    "test_computation_equation_stop": true,
+    "test_computation_forecast_uncertainty_stop": true,
+    "test_computation_matrix_factors": true,
+    "test_computation_matrix_stop": true,
+    "test_computation_sqlite_callback_stop": true,
+    "test_computation_sqlite_export_stop": true,
+    "test_computation_sqlite_file_stop": true,
+    "test_computation_sqlite_rollback": true,
+    "test_computation_timeseries_stop": true
+  },
   "tests/csv/test_csv.c": {
     "example_csv_read": true,
     "example_csv_write": true,
@@ -599,10 +624,10 @@
         "test_deriv_digamma": true,
         "test_deriv_div_d": true,
         "test_deriv_erf": true,
-        "test_deriv_error_function_exact_scales": true,
         "test_deriv_erfc": true,
         "test_deriv_erfcinv": true,
         "test_deriv_erfinv": true,
+        "test_deriv_error_function_exact_scales": true,
         "test_deriv_exp": true,
         "test_deriv_exp_tanh": true,
         "test_deriv_floor_and_ceil": true,
@@ -734,6 +759,17 @@
       }
     }
   },
+  "tests/expression/test_expr_imaginary.c": {
+    "tests": {
+      "enabled": true,
+      "test_expr_t_imaginary_axis": {
+        "enabled": true,
+        "test_imaginary_atan_poles_and_branches": true,
+        "test_imaginary_axis_identities": true,
+        "test_symbolic_cartesian_zero_components": true
+      }
+    }
+  },
   "tests/expression/test_expr_integrate.c": {
     "tests": {
       "enabled": true,
@@ -755,12 +791,12 @@
         "test_integrate_collects_repeated_inverse_and_log_terms": true,
         "test_integrate_constant_base_affine_exponent": true,
         "test_integrate_cumulative_gaussian": true,
-        "test_integrate_erf_radical_cancellation": true,
-        "test_integrate_cumulative_gaussian_precision": true,
         "test_integrate_cumulative_gaussian_guards": true,
+        "test_integrate_cumulative_gaussian_precision": true,
         "test_integrate_definite_quadratic_combines_exact_constants": true,
         "test_integrate_definite_quadratic_compact_exact_result": true,
         "test_integrate_definite_symbolic_bounds": true,
+        "test_integrate_erf_radical_cancellation": true,
         "test_integrate_exact_symbolic_atan_affine_scale": true,
         "test_integrate_family_retains_unsupported_integral": true,
         "test_integrate_frequency_product_families": true,
@@ -862,6 +898,7 @@
       "test_runtime_regressions": {
         "enabled": true,
         "test_arbitrary_function_sums_keep_individual_coefficients": true,
+        "test_arithmetic_lifts_domain_conditions": true,
         "test_atan_quotient_derivative_simplifies_to_quartic": true,
         "test_binary_constants_preserve_user_literals_in_derivatives": true,
         "test_binding_direct_inverse_numeric_expression_simplifies": true,
@@ -871,6 +908,7 @@
         "test_binding_lambert_inverse_numeric_expression_simplifies": true,
         "test_binding_principal_inverse_numeric_expression_simplifies": true,
         "test_binding_successor_and_trig_shape_simplifies": true,
+        "test_bound_display_parameter_signs": true,
         "test_bound_euler_symbol_survives_derivative_simplify": true,
         "test_cartesian_tanh_has_native_symbolic_integrals": true,
         "test_clausen_derivatives_and_bindings": true,
@@ -941,6 +979,7 @@
         "test_pure_imaginary_square_root_reduces_to_cartesian_components": true,
         "test_radical_display_cancels_rational_scales": true,
         "test_radical_display_preserves_principal_branches": true,
+        "test_radical_quotient_preserves_named_parameter": true,
         "test_real_scalar_over_square_root_combines_into_one_root": true,
         "test_removable_trig_quotient_at_zero_evaluates_to_limit": true,
         "test_repeated_preserved_log_factor_combines_as_power": true,
@@ -960,9 +999,6 @@
         "test_sqrt_is_principal_but_explicit_half_power_preserves_both_roots": true,
         "test_sqrt_negative_exact_evaluates_to_i": true,
         "test_sqrt_quotient_combines_positive_real_denominator": true,
-        "test_radical_quotient_preserves_named_parameter": true,
-        "test_bound_display_parameter_signs": true,
-        "test_arithmetic_lifts_domain_conditions": true,
         "test_symbolic_complex_power_derivative_keeps_base_log": true,
         "test_symbolic_complex_square_expands_to_cartesian_form": true,
         "test_symbolic_complex_square_root_beautifies_to_cartesian_form": true,
@@ -1291,6 +1327,7 @@
       "test_d_variants": true,
       "test_expr_t_from_string": true,
       "test_expr_t_goal_seek": true,
+      "test_expr_t_imaginary_axis": true,
       "test_expr_t_to_string": true,
       "test_expr_tree_match_helpers": true,
       "test_first_derivatives": true,
@@ -1301,8 +1338,7 @@
       "test_reverse_mode": true,
       "test_runtime_regressions": true,
       "test_second_derivatives": true,
-      "test_symbolic_integration": true,
-      "test_expr_t_imaginary_axis": true
+      "test_symbolic_integration": true
     }
   },
   "tests/file/test_file.c": {
@@ -1893,7 +1929,8 @@
       "run_number_parse_tests": true,
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
-      "run_number_special_function_tests": true
+      "run_number_special_function_tests": true,
+      "run_number_physical_constant_tests": true
     }
   },
   "tests/number/test_number_backend_parity.c": {
@@ -2264,6 +2301,24 @@
       }
     }
   },
+  "tests/quantity/test_quantity.c": {
+    "example_quantity_angles": true,
+    "example_quantity_energy": true,
+    "example_quantity_speed": true,
+    "example_quantity_temperature": true,
+    "test_quantity_aliases": true,
+    "test_quantity_arithmetic": true,
+    "test_quantity_exact_conversions": true,
+    "test_quantity_functions_complex": true,
+    "test_quantity_parser_and_ownership": true,
+    "test_quantity_precision": true,
+    "test_quantity_temperature": true,
+    "test_quantity_text": true,
+    "test_quantity_selected_precision": true,
+    "example_quantity_constants_precision": true,
+    "example_quantity_tons": true,
+    "example_quantity_acceleration": true
+  },
   "tests/regex/test_regex.c": {
     "example_regex_capture": true,
     "example_regex_iteration": true,
@@ -2546,6 +2601,10 @@
       "docs_qfloat_008": true,
       "docs_qfloat_009": true,
       "docs_qfloat_017": true,
+      "docs_quantity_001": true,
+      "docs_quantity_002": true,
+      "docs_quantity_003": true,
+      "docs_quantity_004": true,
       "docs_set_001": true,
       "docs_set_002": true,
       "docs_sqlite_001": true,
@@ -2565,7 +2624,11 @@
       "docs_xml_001": true,
       "docs_xml_002": true,
       "docs_xml_003": true,
-      "enabled": true
+      "enabled": true,
+      "docs_number_051": true,
+      "docs_quantity_005": true,
+      "docs_quantity_006": true,
+      "docs_quantity_007": true
     }
   },
   "tools/mars_checks/tests/test_checks_controls.c": {
@@ -2828,6 +2891,7 @@
       "test_lab_extra_bindings": true,
       "test_lab_extra_calendar_fallback": true,
       "test_lab_extra_constant_identity": true,
+      "test_lab_extra_context_results": true,
       "test_lab_extra_derivative": true,
       "test_lab_extra_diffequation": true,
       "test_lab_extra_editor_and_cards": true,
@@ -2841,9 +2905,8 @@
       "test_lab_extra_expression": true,
       "test_lab_extra_function": true,
       "test_lab_extra_function_precision_limit": true,
-      "test_lab_extra_gaussian_integral": true,
       "test_lab_extra_gaussian_derivative_round_trip": true,
-      "test_lab_extra_repeated_gaussian_integral": true,
+      "test_lab_extra_gaussian_integral": true,
       "test_lab_extra_goal_seek": true,
       "test_lab_extra_help_examples": true,
       "test_lab_extra_integral": true,
@@ -2857,10 +2920,10 @@
       "test_lab_extra_number_card_markup": true,
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
+      "test_lab_extra_repeated_gaussian_integral": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true,
-      "test_lab_extra_context_results": true
+      "test_lab_extra_unsafe_TeX_input": true
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {
@@ -3207,6 +3270,18 @@
       "test_zero_rate_is_a_constant_transform": true
     }
   },
+  "tools/mars_lab/tests/test_lab_math_imaginary.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_symbolic_imaginary_axis": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_imaginary_axis_formula_cards": true,
+      "test_symbolic_imaginary_axis_bound_values": true,
+      "test_symbolic_imaginary_axis_formula_cards": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_math_inverse_elementary.c": {
     "tests": {
       "enabled": true,
@@ -3505,6 +3580,16 @@
       "test_lab_syntax_variants": true
     }
   },
+  "tools/mars_lab/tests/test_lab_wasm_build.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_lab_wasm_assembly": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_lab_wasm_assembly_plans": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_wire.c": {
     "tests": {
       "enabled": true,
@@ -3535,64 +3620,6 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
-    }
-  },
-  "tests/computation/test_computation_modules.c": {
-    "test_computation_almanac_stop": true,
-    "test_computation_csv_long_record": true,
-    "test_computation_csv_stop": true,
-    "test_computation_diffequation_stop": true,
-    "test_computation_equation_bindings": true,
-    "test_computation_equation_stop": true,
-    "test_computation_matrix_factors": true,
-    "test_computation_matrix_stop": true,
-    "test_computation_sqlite_callback_stop": true,
-    "test_computation_sqlite_export_stop": true,
-    "test_computation_sqlite_file_stop": true,
-    "test_computation_sqlite_rollback": true,
-    "test_computation_timeseries_stop": true,
-    "test_computation_forecast_uncertainty_stop": true
-  },
-  "tests/computation/test_computation_module_readme.c": {
-    "example_computation_almanac": true,
-    "example_computation_csv": true,
-    "example_computation_diffequation": true,
-    "example_computation_equation": true,
-    "example_computation_matrix": true,
-    "example_computation_sqlite": true,
-    "example_computation_timeseries": true
-  },
-  "tests/expression/test_expr_imaginary.c": {
-    "tests": {
-      "enabled": true,
-      "test_expr_t_imaginary_axis": {
-        "enabled": true,
-        "test_imaginary_atan_poles_and_branches": true,
-        "test_imaginary_axis_identities": true,
-        "test_symbolic_cartesian_zero_components": true
-      }
-    }
-  },
-  "tools/mars_lab/tests/test_lab_math_imaginary.c": {
-    "tests": {
-      "enabled": true,
-      "test_imaginary_axis_formula_cards": true,
-      "test_symbolic_imaginary_axis_formula_cards": true,
-      "test_symbolic_imaginary_axis_bound_values": true
-    },
-    "readme_examples": {
-      "enabled": true,
-      "example_symbolic_imaginary_axis": true
-    }
-  },
-  "tools/mars_lab/tests/test_lab_wasm_build.c": {
-    "tests": {
-      "enabled": true,
-      "test_lab_wasm_assembly_plans": true
-    },
-    "readme_examples": {
-      "enabled": true,
-      "example_lab_wasm_assembly": true
     }
   }
 }

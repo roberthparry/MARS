@@ -1542,3 +1542,79 @@ Output:
 ```text
 Hermite H3(2) = 40
 ```
+
+## Physical immortal constants
+
+These `number_t` globals are exact, process-lifetime scalar definitions, alongside
+the mathematical immortals. They carry no dimensions; use
+[quantity_t](quantity.md#shared-constants-and-selected-precision) to attach units.
+
+| Constant | Exact SI value | Unit |
+| --- | --- | --- |
+| `NUM_SPEED_OF_LIGHT` | 299792458 | m/s |
+| `NUM_ELEMENTARY_CHARGE` | 1.602176634 × 10⁻¹⁹ | C (A s) |
+| `NUM_PLANCK` | 6.62607015 × 10⁻³⁴ | J s |
+| `NUM_BOLTZMANN` | 1.380649 × 10⁻²³ | J/K |
+| `NUM_AVOGADRO` | 6.02214076 × 10²³ | mol⁻¹ |
+| `NUM_STANDARD_GRAVITY` | 9.80665 | m/s² |
+| `NUM_ASTRONOMICAL_UNIT` | 149597870700 | m |
+| `NUM_JULIAN_YEAR` | 31557600 | s |
+
+The first five follow the [BIPM defining constants](https://www.bipm.org/en/measurement-units/si-defining-constants).
+Standard gravity is the [NIST conventional acceleration](https://physics.nist.gov/cgi-bin/cuu/Value?gn),
+not a prediction of local gravity. Astronomical units and Julian years follow
+the [IAU conventions](https://iauarchive.eso.org/public/themes/measuring/).
+No measured constant is presented as having unlimited physical accuracy.
+
+Copies can be passed to `num_destroy()` safely. Never pass the global objects
+themselves to mutating APIs. Exact definitions survive precision changes and
+the existing numeric shutdown/reinitialisation lifecycle. They are C API names,
+not new mathematical parser aliases; this avoids ambiguous symbols such as c,
+e and h.
+
+`num_const()` materialises at the current precision. Integers and rationals
+within its size budget stay exact; larger fractions become rounded numeric
+values. `num_const_prec()` applies the explicitly requested precision and
+rational budget independently of the default. The immortal source is unchanged.
+
+`num_get_fraction_parts(value, &numerator, &denominator)` extracts independently
+owned exact integer components without applying the floating-point budget.
+It accepts exact integers and rationals, with a positive denominator; inexact,
+complex or invalid input fails without changing the outputs. Initialise both
+outputs and pass distinct addresses. Release them with `num_destroy()`.
+
+README example: retrieve the elementary charge's exact ratio even at 53 bits.
+
+```c
+#include <string.h>
+
+#include "string-t.h"
+#include "number-t.h"
+
+int main(void)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits(53);
+    number_t numerator = {0}, denominator = {0};
+    bool ok = num_get_fraction_parts(NUM_ELEMENTARY_CHARGE, &numerator, &denominator);
+    if (!ok)
+        return 1;
+    string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
+    string_printf("elementary charge: %S/%S C\n", top, bottom);
+    if (!top || !bottom || strcmp(string_c_str(top), "801088317") ||
+        strcmp(string_c_str(bottom), "5000000000000000000000000000"))
+        return 1;
+    string_free(top);
+    string_free(bottom);
+    num_destroy(&numerator);
+    num_destroy(&denominator);
+    num_set_default_prec_bits(saved);
+    return 0;
+}
+```
+
+Output:
+
+```text
+elementary charge: 801088317/5000000000000000000000000000 C
+```

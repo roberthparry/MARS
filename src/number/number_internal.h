@@ -205,6 +205,14 @@ typedef enum number_const_id_t {
     NUMBER_CONST_NINF,
     NUMBER_CONST_I,
     NUMBER_CONST_NEG_I,
+    NUMBER_CONST_SPEED_OF_LIGHT,
+    NUMBER_CONST_ELEMENTARY_CHARGE,
+    NUMBER_CONST_PLANCK,
+    NUMBER_CONST_BOLTZMANN,
+    NUMBER_CONST_AVOGADRO,
+    NUMBER_CONST_STANDARD_GRAVITY,
+    NUMBER_CONST_ASTRONOMICAL_UNIT,
+    NUMBER_CONST_JULIAN_YEAR,
     NUMBER_CONST_COUNT
 } number_const_id_t;
 
@@ -386,6 +394,12 @@ double _Complex number_const_cdouble_value(number_const_id_t id);
 bool number_const_has_ldexp(number_const_id_t id);
 int number_const_ldexp_value(number_const_id_t id);
 void number_constants_shutdown(void);
+
+/** @brief Borrow an exact SI-valued physical constant's integer-ratio definition, or NULL. */
+const char *number_physical_exact_source(number_const_id_t id);
+
+/** @brief Clear lazy physical-constant storage at the normal numeric shutdown boundary. */
+void number_physical_constants_shutdown(void);
 number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits);
 number_t number_create_exact_mpfr_dyadic_prec(long numerator, int exponent2, size_t precision_bits);
 number_t number_const_return_like(const number_t *like, number_const_id_t id);

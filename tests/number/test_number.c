@@ -43,6 +43,7 @@ int tests_main(void)
 
     TEST_SECTION("Constants");
     TEST_RUN_IN_GROUP(run_number_constant_tests, tests, "number,constants");
+    TEST_RUN_IN_GROUP(run_number_physical_constant_tests, tests, "number,physical-constants");
 
     TEST_SECTION("Formatting");
     TEST_RUN_IN_GROUP(run_number_formatting_tests, tests, "number,formatting");

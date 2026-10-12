@@ -27,6 +27,8 @@ This directory contains the longer module documentation for MARS.
 - [`qfloat_t`](./qfloat.md) — independent double-double arithmetic and real
   special functions, including harmonic polynomials, Riemann and Hurwitz zeta,
   Li₁ and the Lerch transcendent
+- [`quantity_t`](./quantity.md) — immutable physical quantities, exact unit factors,
+  dimensional arithmetic, temperature points and astronomical/angular conversions
 - [`qcomplex_t`](./qcomplex.md) — independent double-double complex arithmetic
   and complex special functions, including harmonic polynomials, Li₁ and the
   Lerch transcendent

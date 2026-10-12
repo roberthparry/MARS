@@ -18,6 +18,9 @@ void run_number_fixed_precision_tests(void);
 void run_number_multiprecision_tests(void);
 void run_number_promotion_tests(void);
 void run_number_constant_tests(void);
+
+/** @brief Check exact physical constants, ownership and requested precision. */
+void run_number_physical_constant_tests(void);
 void run_number_public_api_tests(void);
 void run_number_formatting_tests(void);
 void run_number_special_function_tests(void);

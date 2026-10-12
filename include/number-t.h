@@ -3,7 +3,7 @@
  * @brief Generic numeric value cluster with by-value public handles.
  *
  * Use number_t as the common scalar type when arithmetic must combine exact values,
- * high-precision real or complex numbers and mathematical constants. The API
+ * high-precision real or complex numbers and mathematical or exact physical constants. The API
  * supplies construction, conversion, comparison, arithmetic, mathematical functions
  * and textual presentation across its supported numeric representations.
  *
@@ -347,6 +347,47 @@ extern const number_t NUM_NEG_I; /**< -i */
  */
 number_t num_pow10(int exponent10);
 
+/** @name Exact physical and conventional constants (SI-valued, immortal scalars)
+ * These carry no dimensions; use quantity_new() to attach the documented units.
+ * num_destroy() is harmless on copies. num_const() materialises at the selected
+ * precision and rational-size budget without changing these exact definitions.
+ * @{
+ */
+/** @brief Exact speed of light in vacuum, 299792458 m/s. */
+extern const number_t NUM_SPEED_OF_LIGHT;
+
+/** @brief Exact positive elementary charge, 1.602176634 × 10⁻¹⁹ C. */
+extern const number_t NUM_ELEMENTARY_CHARGE;
+
+/** @brief Exact Planck constant, 6.62607015 × 10⁻³⁴ J s. */
+extern const number_t NUM_PLANCK;
+
+/** @brief Exact Boltzmann constant, 1.380649 × 10⁻²³ J/K. */
+extern const number_t NUM_BOLTZMANN;
+
+/** @brief Exact Avogadro constant, 6.02214076 × 10²³ mol⁻¹. */
+extern const number_t NUM_AVOGADRO;
+
+/** @brief Exact conventional standard gravity, 9.80665 m/s²; not local gravity. */
+extern const number_t NUM_STANDARD_GRAVITY;
+
+/** @brief Exact astronomical unit in metres. */
+extern const number_t NUM_ASTRONOMICAL_UNIT;
+
+/** @brief Exact Julian year in seconds (365.25 days). */
+extern const number_t NUM_JULIAN_YEAR;
+/** @} */
+
+/**
+ * @brief Extract independently owned exact integer numerator and positive denominator.
+ *
+ * Accepts exact integers and rationals, including immortal constants, without
+ * applying the floating-point precision budget. Outputs must be distinct,
+ * initialised number_t objects and are replaced only on success. Inexact,
+ * complex or invalid input returns false and leaves both outputs unchanged.
+ */
+bool num_get_fraction_parts(number_t value, number_t *numerator, number_t *denominator);
+
 /**
  * @brief Returns an independent live copy of a `number_t`.
  *
@@ -358,7 +399,8 @@ number_t num_clone(const number_t number);
 /**
  * @brief Materialises a named constant using the current default precision policy.
  *
- * Exact constants such as `NUM_ZERO` or `NUM_HALF` are copied as exact values.
+ * Integers and rationals within the selected rational-size budget remain exact.
+ * Larger rational constants are rounded without modifying their immortal definitions.
  * Inexact multiprecision constants such as `NUM_PI` or `NUM_E` are realised at
  * the library's current default working precision.
  */
@@ -368,8 +410,9 @@ number_t num_const(number_t constant);
  * @brief Materialises a named constant at an explicit binary precision.
  *
  * This is the direct way to request a multiprecision constant such as `NUM_PI`
- * or `NUM_I` at a specific number of bits. Exact constants remain exact;
- * inexact multiprecision constants are rebuilt or copied at `precision_bits`.
+ * or `NUM_I` at a specific number of bits. Integers remain exact; rational
+ * materialisation uses the requested precision's size budget, not the global one.
+ * Inexact multiprecision constants are rebuilt or copied at `precision_bits`.
  * Passing `0` uses the current default working precision instead.
  */
 number_t num_const_prec(number_t constant, size_t precision_bits);

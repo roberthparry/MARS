@@ -54,6 +54,11 @@ static qfloat_t qfloat_from_mpq_value(const number_mpq_t *value)
 
     if (!value || number_mpq_ensure(value) != 0)
         return QF_NAN;
+    if (value->immortal) {
+        out = number_const_qfloat(value->constant_id);
+        if (!qf_isnan(out))
+            return out;
+    }
     num_text = mpz_get_str(NULL, 10, mpq_numref(value->value));
     den_text = mpz_get_str(NULL, 10, mpq_denref(value->value));
     num = num_text ? string_new_with(num_text) : NULL;
@@ -332,36 +337,30 @@ static number_t *number_coerce_clone_mpq(const number_t *number)
 static number_t *number_coerce_mpq_to_double(const number_t *number)
 {
     qfloat_t value;
-    number_const_id_t id;
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
-                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_double(qf_to_double(value));
 }
 
 static number_t *number_coerce_mpq_to_qfloat(const number_t *number)
 {
     qfloat_t value;
-    number_const_id_t id;
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
-                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_qfloat(value);
 }
 
 static number_t *number_coerce_mpq_to_cdouble(const number_t *number)
 {
     qfloat_t value;
-    number_const_id_t id;
 
     if (!number)
         return NULL;
-    value = number_const_id_from_immortal(number, &id) ? number_const_qfloat(id)
-                                                       : qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
+    value = qfloat_from_mpq_value(number_impl_const(number)->value.mpq);
     return qf_isnan(value) ? NULL : number_wrap_cdouble(qf_to_double(value));
 }
 

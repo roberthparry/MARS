@@ -985,9 +985,8 @@ number_t number_take_mpz(number_mpz_t *value)
     return number;
 }
 
-static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *value)
+static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *value, size_t precision_bits)
 {
-    size_t precision_bits;
     size_t numerator_bits;
     size_t denominator_bits;
     mpq_srcptr q;
@@ -995,7 +994,6 @@ static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *valu
     if (!value || number_mpq_ensure(value) != 0)
         return false;
 
-    precision_bits = number_default_precision_bits;
     if (precision_bits == 0u)
         return false;
 
@@ -1006,17 +1004,17 @@ static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *valu
     return denominator_bits > precision_bits || numerator_bits + denominator_bits > 2u * precision_bits;
 }
 
-static number_t number_take_mpq_budgeted(number_t number)
+static number_t number_take_mpq_budgeted(number_t number, size_t precision_bits)
 {
     number_t converted;
     number_mpq_t *value = number_impl(&number)->value.mpq;
 
-    if (!value || !number_mpq_exceeds_working_precision_budget(value)) {
+    if (!value || !number_mpq_exceeds_working_precision_budget(value, precision_bits)) {
         number_scope_register_value(&number);
         return number;
     }
 
-    converted = num_as_inexact_real_prec(number, number_default_precision_bits);
+    converted = num_as_inexact_real_prec(number, precision_bits);
     if (num_is_nan(converted)) {
         number_scope_register_value(&number);
         return number;
@@ -1035,7 +1033,7 @@ number_t number_take_mpq(number_mpq_t *value)
         return number_invalid();
     number.storage[0] = NUMBER_MPQ;
     number_impl(&number)->value.mpq = value;
-    return number_take_mpq_budgeted(number);
+    return number_take_mpq_budgeted(number, number_default_precision_bits);
 }
 
 number_t number_take(number_t *boxed_number)
@@ -1047,7 +1045,7 @@ number_t number_take(number_t *boxed_number)
     memcpy(&value, boxed_number, sizeof(value));
     free(boxed_number);
     if (number_kind_value(&value) == NUMBER_MPQ)
-        return number_take_mpq_budgeted(value);
+        return number_take_mpq_budgeted(value, number_default_precision_bits);
     number_scope_register_value(&value);
     return value;
 }
@@ -2719,7 +2717,14 @@ number_t num_const_prec(number_t constant, size_t precision_bits)
 
     vt = number_vt(&constant);
     materialized = vt && vt->const_prec ? vt->const_prec(&constant, bits) : NULL;
-    return materialized ? number_take(materialized) : number_invalid();
+    if (!materialized)
+        return number_invalid();
+    number_t value = *materialized;
+    free(materialized);
+    if (number_kind_value(&value) == NUMBER_MPQ)
+        return number_take_mpq_budgeted(value, bits);
+    number_scope_register_value(&value);
+    return value;
 }
 
 number_t num_const_prec_digits(number_t constant, size_t significant_digits)

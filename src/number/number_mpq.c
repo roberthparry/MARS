@@ -15,6 +15,36 @@
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
+/* Extract exact components without passing the fraction through the rounding budget. */
+bool num_get_fraction_parts(number_t number, number_t *numerator, number_t *denominator)
+{
+    const number_private_t *value = number_impl_const(&number);
+    if (!numerator || !denominator || numerator == denominator)
+        return false;
+    number_t top = {0}, bottom = {0};
+    if (value->kind == NUMBER_MPZ) {
+        top = num_clone(number);
+        bottom = num_clone(NUM_ONE);
+    } else if (value->kind == NUMBER_MPQ) {
+        mpq_srcptr rational = number_mpq_value(value->value.mpq);
+        if (!rational)
+            return false;
+        top = number_take_mpz(number_mpz_from_mpz(mpq_numref(rational)));
+        bottom = number_take_mpz(number_mpz_from_mpz(mpq_denref(rational)));
+    } else
+        return false;
+    if (!num_is_finite(top) || !num_is_finite(bottom)) {
+        num_destroy(&top);
+        num_destroy(&bottom);
+        return false;
+    }
+    num_destroy(numerator);
+    num_destroy(denominator);
+    *numerator = top;
+    *denominator = bottom;
+    return true;
+}
+
 /* Certify the integer square with GMP, independently of the floating-point precision. */
 bool num_extract_square_denominator(number_t number, number_t *numerator, number_t *denominator_root)
 {
@@ -43,21 +73,20 @@ bool num_extract_square_denominator(number_t number, number_t *numerator, number
 }
 
 typedef struct {
-    number_const_id_t id;
-    long numerator;
-    unsigned long denominator;
-} number_mpq_const_source_t;
-
-typedef struct {
     unsigned long numerator;
     unsigned long denominator;
     const char *glyph;
 } number_mpq_fraction_glyph_t;
 
-static const number_mpq_const_source_t number_mpq_const_sources[] = {
-    {NUMBER_CONST_HALF, 1L, 2u},      {NUMBER_CONST_ONE_AND_HALF, 3L, 2u}, {NUMBER_CONST_ONE_THIRD, 1L, 3u},
-    {NUMBER_CONST_QUARTER, 1L, 4u},   {NUMBER_CONST_ONE_SIXTH, 1L, 6u},    {NUMBER_CONST_ONE_EIGHTH, 1L, 8u},
-    {NUMBER_CONST_ONE_TENTH, 1L, 10u}};
+static const char *const number_mpq_const_sources[NUMBER_CONST_COUNT] = {
+    [NUMBER_CONST_HALF]         = "1/2",
+    [NUMBER_CONST_ONE_AND_HALF] = "3/2",
+    [NUMBER_CONST_ONE_THIRD]    = "1/3",
+    [NUMBER_CONST_QUARTER]      = "1/4",
+    [NUMBER_CONST_ONE_SIXTH]    = "1/6",
+    [NUMBER_CONST_ONE_EIGHTH]   = "1/8",
+    [NUMBER_CONST_ONE_TENTH]    = "1/10",
+};
 
 static const number_mpq_fraction_glyph_t number_mpq_fraction_glyphs[] = {
     {1u, 2u, "½"}, {1u, 3u, "⅓"}, {2u, 3u, "⅔"}, {1u, 4u, "¼"}, {3u, 4u, "¾"}, {1u, 5u, "⅕"},
@@ -82,18 +111,12 @@ static int number_mpq_init(number_mpq_t *value)
     return 0;
 }
 
-static bool number_mpq_const_fraction(number_const_id_t id, long *numerator_out, unsigned long *denominator_out)
+static const char *number_mpq_const_source(number_const_id_t id)
 {
-    for (size_t i = 0u; i < sizeof(number_mpq_const_sources) / sizeof(number_mpq_const_sources[0]); ++i) {
-        if (number_mpq_const_sources[i].id == id) {
-            if (numerator_out)
-                *numerator_out = number_mpq_const_sources[i].numerator;
-            if (denominator_out)
-                *denominator_out = number_mpq_const_sources[i].denominator;
-            return true;
-        }
-    }
-    return false;
+    if ((unsigned)id >= NUMBER_CONST_COUNT)
+        return NULL;
+    const char *source = number_mpq_const_sources[id];
+    return source ? source : number_physical_exact_source(id);
 }
 
 static const char *number_mpq_fraction_glyph_lookup(mpz_srcptr numerator, mpz_srcptr denominator)
@@ -314,10 +337,8 @@ static string_t *number_mpq_format_stacked_fraction_text(bool negative, mpz_srcp
 number_mpq_t *number_mpq_from_const_id(number_const_id_t id)
 {
     number_mpq_t *out;
-    long ignored_numerator;
-    unsigned long ignored_denominator;
 
-    if (!number_mpq_const_fraction(id, &ignored_numerator, &ignored_denominator))
+    if (!number_mpq_const_source(id))
         return NULL;
     out = malloc(sizeof(*out));
     if (!out)
@@ -438,18 +459,18 @@ void number_mpq_free(number_mpq_t *value)
 int number_mpq_ensure(const number_mpq_t *value)
 {
     number_mpq_t *mutable_value = (number_mpq_t *)value;
-    long numerator;
-    unsigned long denominator;
+    const char *source;
 
     if (!value)
         return -1;
     if (value->initialised)
         return 0;
-    if (!number_mpq_const_fraction(value->constant_id, &numerator, &denominator))
+    if (!(source = number_mpq_const_source(value->constant_id)))
         return -1;
     if (number_mpq_init(mutable_value) != 0)
         return -1;
-    mpq_set_si(mutable_value->value, numerator, denominator);
+    if (mpq_set_str(mutable_value->value, source, 10) != 0)
+        return -1;
     mpq_canonicalize(mutable_value->value);
     return 0;
 }

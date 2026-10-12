@@ -194,6 +194,25 @@ static void number_readme_sgn_example(void)
     ASSERT_TRUE(strcmp(output, "sgn(-2/3) = -1\n") == 0);
 }
 
+/* README example: exact physical definitions remain available at double precision. */
+static void number_readme_physical_example(void)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits(53);
+    number_t numerator = {0}, denominator = {0};
+    bool ok = num_get_fraction_parts(NUM_ELEMENTARY_CHARGE, &numerator, &denominator);
+    ASSERT_TRUE(ok);
+    string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
+    string_printf("elementary charge: %S/%S C\n", top, bottom);
+    ASSERT_TRUE(strcmp(string_c_str(top), "801088317") == 0);
+    ASSERT_TRUE(strcmp(string_c_str(bottom), "5000000000000000000000000000") == 0);
+    string_free(top);
+    string_free(bottom);
+    num_destroy(&numerator);
+    num_destroy(&denominator);
+    num_set_default_prec_bits(saved);
+}
+
 void run_number_readme_example_tests(void)
 {
     number_readme_rational_basic();
@@ -205,4 +224,5 @@ void run_number_readme_example_tests(void)
     number_readme_struve_h_example();
     run_number_bessel_y_readme_tests();
     number_readme_sgn_example();
+    number_readme_physical_example();
 }

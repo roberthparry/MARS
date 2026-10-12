@@ -43,6 +43,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   calculus, symbolic matrix integration and structural matcher helpers for
   higher-level symbolic code
 - **`expr_context_t`** — owned symbol roles, assumptions and numerical binding snapshots for symbolic display
+- **`quantity_t`** — immutable physical quantities, dimension-checked arithmetic and exact unit conversion factors
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`json_t`** — opaque JSON value tree with string-backed parsing, serialisation, file round-tripping, and `number_t` extension support
@@ -434,6 +435,7 @@ int main(void) {
 | `computation_t` | Shared cooperative calculation control and progress reporting | [`docs/computation.md`](./docs/computation.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](./docs/number.md) |
 | `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](./docs/qfloat.md) |
+| `quantity_t` | Dimension-checked physical quantities, exact conversion factors and affine temperatures | [`docs/quantity.md`](./docs/quantity.md) |
 | `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](./docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](./docs/matrix.md) |
 | `equation_t` | Parsed equations with symbolic isolation and numeric fallback | [`docs/equation.md`](./docs/equation.md) |
