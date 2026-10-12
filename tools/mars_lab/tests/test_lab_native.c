@@ -583,6 +583,7 @@ int tests_main(void)
     test_lab_state_cases();
     test_lab_mobile_cases();
     test_lab_runtime_cases();
+    test_lab_wasm_build_cases();
     test_lab_route_cases();
     test_lab_wire_cases();
     test_lab_presentation_cases();
@@ -594,5 +595,6 @@ int tests_main(void)
     TEST_SECTION("README examples (last)");
     test_lab_function_readme_cases();
     test_lab_math_readme_cases();
+    test_lab_wasm_build_readme_cases();
     return TEST_EXIT_CODE();
 }

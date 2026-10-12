@@ -588,6 +588,10 @@ generated dependency files rebuild the implementations affected by a header chan
 Objects and dependency files mirror the source layout under
 `build/<configuration>/wasm/src/`; both browser assets live in
 `build/<configuration>/wasm/`.
+The optional `make lab-wasm-asm` target writes per-source `.s` assembly listings
+beside the objects, with separate `.s.d` dependencies. See
+[inspecting WebAssembly assembly](building.md#inspecting-webassembly-assembly)
+for the command, output and debug-build paths. Normal builds do not generate listings.
 Native result-markup generation in `src/calendar/lab_calendar_markup.c` and
 `src/evaluate/lab_evaluate_markup.c` runs on the server, not in WebAssembly.
 

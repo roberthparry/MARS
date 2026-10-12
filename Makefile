@@ -713,6 +713,7 @@ help:
 	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
 	@printf '  %-40s %s\n' "make scratch" "Build optional standalone examples (not built by all)"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
+	@printf '  %-40s %s\n' "make lab-wasm-asm" "Generate optional Lab WebAssembly assembly listings"
 	@printf '  %-40s %s\n' "make test_lab_native" "Run native Lab tests"
 	@printf '  %-40s %s\n' "make lab-browser-test" "Run Lab browser tests"
 	@printf '  %-40s %s\n' "make mars-lab" "Launch the local MARS Lab"

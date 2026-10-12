@@ -53,6 +53,12 @@ void test_lab_mobile_cases(void);
 /** Register isolated runtime key creation and preservation assertions without logging secrets. */
 void test_lab_runtime_cases(void);
 
+/** @brief Register optional WebAssembly assembly build-graph checks. */
+void test_lab_wasm_build_cases(void);
+
+/** @brief Run the documented assembly command after ordinary tests. */
+void test_lab_wasm_build_readme_cases(void);
+
 /** Register and run HTTP route integration assertions with sequential server children. */
 void test_lab_route_cases(void);
 

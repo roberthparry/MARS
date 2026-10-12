@@ -214,6 +214,33 @@ Module Worker support is required for responses of at least 128 KiB; failure to
 start the worker is reported rather than silently blocking the browser thread.
 See the [Lab guide](mars-lab.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).
 
+### Inspecting WebAssembly assembly
+
+To generate Clang's per-source WebAssembly assembly listings without building or
+restarting the native server, run:
+
+```sh
+make -s -j1 lab-wasm-asm
+```
+
+Output:
+
+```text
+MARS Lab WebAssembly compile/link probe passed.
+MARS Lab WebAssembly assembly: tools/mars_lab/build/release/wasm/src/
+```
+
+Each C module produces a matching `.s` file, such as
+`tools/mars_lab/build/release/wasm/src/lab_memory.s`. Add `DEBUG=1` to use
+`build/debug/wasm/src/`; both configurations use the same optimised WASM flags
+as their normal object builds. The Lab-local equivalent is
+`make -C tools/mars_lab wasm-asm`.
+
+These are pre-link WebAssembly instructions, not native CPU assembly or the
+final linked module's WAT representation. Listings have their own `.s.d` header
+dependencies, remain optional in normal builds, are ignored by Git, and are
+removed with the other Lab build artefacts by `make clean` or `make clean-lab`.
+
 ## Common Targets
 
 Default release build, libraries, native maintenance applications, MARS Lab

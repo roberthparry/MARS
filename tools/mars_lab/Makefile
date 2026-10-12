@@ -7,9 +7,12 @@ ifeq ($(abspath $(firstword $(MAKEFILE_LIST))),$(abspath $(lastword $(MAKEFILE_L
 MARS_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 DEBUG ?= 0
 
-.PHONY: all test browser-test memtest run clean help check-wasm-deps
+.PHONY: all test browser-test memtest run clean help check-wasm-deps wasm-asm
 check-wasm-deps:
 	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) check-lab-wasm-deps
+
+wasm-asm:
+	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) lab-wasm-asm
 
 all:
 	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) native-lab
@@ -32,6 +35,7 @@ clean:
 help:
 	@echo "MARS Lab: make [DEBUG=1] | make test | make browser-test | make memtest | make run ARGS='--no-browser' | make clean"
 	@echo "Executable: build/release/mars_lab (or build/debug/mars_lab)"
+	@echo "Optional assembly: make [DEBUG=1] wasm-asm"
 
 else
 
@@ -52,13 +56,25 @@ LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
 LAB_CODEC_WASM := $(LAB_BUILD_DIR)/wasm/lab_codec.wasm
 LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
 LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
+LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
+LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
+                   -nostdlib -Wmissing-prototypes -Itools/mars_lab/wasm/include
 
 $(LAB_BUILD_DIR)/wasm/src/%.o: tools/mars_lab/wasm/src/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
-	"$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
-	    -nostdlib -Wmissing-prototypes -MMD -MP -MF $(@:.o=.d) -Itools/mars_lab/wasm/include -c $< -o $@
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+# Optional inspection output; separate dependency files must not replace the object dependencies.
+$(LAB_BUILD_DIR)/wasm/src/%.s: tools/mars_lab/wasm/src/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+.PHONY: lab-wasm-asm
+lab-wasm-asm: $(LAB_WASM_ASM)
+	@echo "MARS Lab WebAssembly assembly: $(LAB_BUILD_DIR)/wasm/src/"
 
 -include $(LAB_WASM_OBJS:.o=.d)
+-include $(LAB_WASM_ASM:%=%.d)
 
 # Only the declared browser bridge may remain unresolved; never import missing libc or module functions.
 $(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
