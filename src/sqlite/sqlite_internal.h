@@ -30,4 +30,7 @@ sqlite3 *sqlite_native_handle(sqlite_t *db);
 /** @brief Copy a database error. @param db Borrowed database. @param message Borrowed diagnostic text. */
 void sqlite_set_error(sqlite_t *db, const char *message);
 
+/** @brief Copy an error and retain its optional cause; empty text clears both representations. */
+void sqlite_set_diagnostic_error(sqlite_t *db, const char *domain, int code, const char *message, diagnostic_t *cause);
+
 #endif /* MARS_SQLITE_INTERNAL_H */

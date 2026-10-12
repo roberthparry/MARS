@@ -25,8 +25,13 @@
  * worker output to 4 MiB. Workers have individual bounded execution times.
  * Unknown routes return NULL without changing status, permitting dispatch to
  * other adapters. Recognised invalid requests return 400; worker failures return
- * 422. Optional rendering failures do not discard mathematical results. State
- * is never saved here. Free the result with json_free(). NULL with status set to
+ * 422. Optional rendering failures do not discard mathematical results.
+ * Failure responses additionally carry failure_diagnostic: an outcome domain,
+ * numeric code, message and flat ordered causes array. Request codes are HTTP
+ * statuses, process codes are errno values, and worker codes are exit statuses.
+ * Existing error text and timeout fields remain available even if creating the
+ * optional diagnostic fails. These objects are transported as Protobuf, not JSON text.
+ * State is never saved here. Free the result with json_free(). NULL with status set to
  * 500 indicates allocation failure for a recognised route.
  * @param route Borrowed exact browser route, including its leading slash.
  * @param payload Borrowed JSON request object.

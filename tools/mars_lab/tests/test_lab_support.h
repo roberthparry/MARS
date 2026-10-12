@@ -32,6 +32,12 @@ bool test_lab_catalogue_database(const char *directory);
 /** Register and run mathematical and calendar adapter integration assertions. */
 void test_lab_evaluation_cases(void);
 
+/** @brief Run executor-backed renderer and diagnostic regressions sequentially. */
+void test_lab_render_job_cases(void);
+
+/** @brief Run process, request and Protobuf diagnostic regressions sequentially. */
+void test_lab_diagnostic_cases(void);
+
 /** Register native Function-card runtime and generated-programme regressions. */
 void test_lab_function_cases(void);
 

@@ -11,6 +11,7 @@
 
 /* sqlite_core.c - SQLCipher-backed opaque SQLite storage for MARS objects */
 
+#include <errno.h>
 #include <stdint.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -28,12 +29,14 @@
 struct _sqlite_t {
     sqlite3 *handle;
     string_t *error;
+    diagnostic_t *diagnostic;
 };
 
 struct _sqlite_stmt_t {
     sqlite_t *db;
     sqlite3_stmt *handle;
     string_t *error;
+    diagnostic_t *diagnostic;
 };
 
 static bool sqlite_text_is_empty(const string_t *text)
@@ -41,32 +44,46 @@ static bool sqlite_text_is_empty(const string_t *text)
     return !text || string_byte_length(text) == 0u;
 }
 
-void sqlite_set_error(sqlite_t *db, const char *message)
+void sqlite_set_diagnostic_error(sqlite_t *db, const char *domain, int code, const char *message, diagnostic_t *cause)
 {
     if (!db)
         return;
-
+    int saved = errno;
+    const char *text = message ? message : "sqlite error";
+    diagnostic_t *diagnostic = *text ? diagnostic_new(DIAGNOSTIC_ERROR, domain, code, text, NULL, cause) : NULL;
+    diagnostic_free(db->diagnostic);
+    db->diagnostic = diagnostic;
     if (!db->error)
         db->error = string_new();
-    if (!db->error)
-        return;
+    if (db->error) {
+        string_clear(db->error);
+        (void)string_append_cstr(db->error, text);
+    }
+    errno = saved;
+}
 
-    string_clear(db->error);
-    (void)string_append_cstr(db->error, message ? message : "sqlite error");
+void sqlite_set_error(sqlite_t *db, const char *message)
+{
+    sqlite_set_diagnostic_error(db, "sqlite", SQLITE_ERROR, message, NULL);
 }
 
 static void sqlite_stmt_set_error(sqlite_stmt_t *stmt, const char *message)
 {
     if (!stmt)
         return;
-
+    int saved = errno;
+    diagnostic_free(stmt->diagnostic);
+    stmt->diagnostic = stmt->db->diagnostic ? diagnostic_retain(stmt->db->diagnostic) : NULL;
     if (!stmt->error)
         stmt->error = string_new();
-    if (!stmt->error)
+    if (!stmt->error) {
+        errno = saved;
         return;
+    }
 
     string_clear(stmt->error);
     (void)string_append_cstr(stmt->error, message ? message : "sqlite statement error");
+    errno = saved;
 }
 
 static bool sqlite_set_error_code(sqlite_t *db, int rc)
@@ -75,7 +92,9 @@ static bool sqlite_set_error_code(sqlite_t *db, int rc)
 
     if (db && db->handle)
         message = sqlite3_errmsg(db->handle);
-    sqlite_set_error(db, message);
+    int extended = db && db->handle ? sqlite3_extended_errcode(db->handle) : rc;
+    int code = (extended & 0xff) == (rc & 0xff) ? extended : rc;
+    sqlite_set_diagnostic_error(db, "sqlite", code, message, NULL);
     return rc == SQLITE_OK || rc == SQLITE_ROW || rc == SQLITE_DONE;
 }
 
@@ -191,12 +210,23 @@ void sqlite_close(sqlite_t *db)
     if (db->handle)
         sqlite3_close(db->handle);
     string_free(db->error);
+    diagnostic_free(db->diagnostic);
     free(db);
 }
 
 const string_t *sqlite_last_error(const sqlite_t *db)
 {
     return db ? db->error : NULL;
+}
+
+/* Share immutable error context without extending the connection lifetime. */
+diagnostic_t *sqlite_diagnostic(const sqlite_t *db)
+{
+    if (!db) {
+        errno = EINVAL;
+        return NULL;
+    }
+    return db->diagnostic ? diagnostic_retain(db->diagnostic) : NULL;
 }
 
 bool sqlite_exec(sqlite_t *db, const string_t *sql)
@@ -217,7 +247,8 @@ bool sqlite_exec_cstr(sqlite_t *db, const char *sql)
 
     rc = sqlite3_exec(db->handle, sql, NULL, NULL, &errmsg);
     if (rc != SQLITE_OK) {
-        sqlite_set_error(db, errmsg ? errmsg : sqlite3_errmsg(db->handle));
+        sqlite_set_diagnostic_error(db, "sqlite", sqlite3_extended_errcode(db->handle),
+                                    errmsg ? errmsg : sqlite3_errmsg(db->handle), NULL);
         sqlite3_free(errmsg);
         return false;
     }
@@ -472,6 +503,7 @@ void sqlite_stmt_finalize(sqlite_stmt_t *stmt)
     if (stmt->handle)
         sqlite3_finalize(stmt->handle);
     string_free(stmt->error);
+    diagnostic_free(stmt->diagnostic);
     free(stmt);
 }
 
@@ -648,4 +680,14 @@ bool sqlite_stmt_column_is_null(sqlite_stmt_t *stmt, int column)
 const string_t *sqlite_stmt_last_error(const sqlite_stmt_t *stmt)
 {
     return stmt ? stmt->error : NULL;
+}
+
+/* The retained record remains valid after statement finalisation. */
+diagnostic_t *sqlite_stmt_diagnostic(const sqlite_stmt_t *stmt)
+{
+    if (!stmt) {
+        errno = EINVAL;
+        return NULL;
+    }
+    return stmt->diagnostic ? diagnostic_retain(stmt->diagnostic) : NULL;
 }

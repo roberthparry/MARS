@@ -365,9 +365,12 @@ static void lab_eval_expression_fields(json_t *fields)
     }
     lab_eval_binding_array(fields, "derivative_bindings", "derivative_binding_values");
     lab_eval_binding_array(fields, "integral_bindings", "integral_binding_values");
-    lab_eval_render_field(fields, "display_TeX", "svg", "render_error");
-    lab_eval_render_field(fields, "derivative_TeX", "derivative_svg", "derivative_render_error");
-    lab_eval_render_field(fields, "integral_TeX", "integral_svg", "integral_render_error");
+    static const lab_eval_render_spec_t cards[] = {
+        {"display_TeX", "svg", "render_error"},
+        {"derivative_TeX", "derivative_svg", "derivative_render_error"},
+        {"integral_TeX", "integral_svg", "integral_render_error"},
+    };
+    lab_eval_render_fields(fields, cards, sizeof(cards) / sizeof(*cards));
 }
 
 static void lab_eval_matrix_fields(json_t *fields)
@@ -395,8 +398,11 @@ static void lab_eval_matrix_fields(json_t *fields)
     string_free(summary);
     if (lab_eval_unset_value(lab_eval_text(fields, "value")))
         lab_eval_set(fields, "value", "");
-    lab_eval_render_field(fields, "tex", "svg", "render_error");
-    lab_eval_render_field(fields, "value_TeX", "value_svg", "value_render_error");
+    static const lab_eval_render_spec_t cards[] = {
+        {"tex", "svg", "render_error"},
+        {"value_TeX", "value_svg", "value_render_error"},
+    };
+    lab_eval_render_fields(fields, cards, sizeof(cards) / sizeof(*cards));
 }
 
 static void lab_eval_equation_fields(json_t *fields)
@@ -424,9 +430,12 @@ static void lab_eval_diffequation_fields(json_t *fields)
         lab_eval_alias(fields, "display_wrapped_TeX", "display_TeX");
     lab_eval_alias(fields, "steps_left_TeX", "steps_TeX");
     lab_eval_alias(fields, "steps_wrapped_TeX", "steps_TeX");
-    lab_eval_render_field(fields, "display_TeX", "svg", "render_error");
-    if (strcmp(lab_eval_text(fields, "display_TeX"), lab_eval_text(fields, "display_wrapped_TeX")))
-        lab_eval_render_field(fields, "display_wrapped_TeX", "wrapped_svg", "wrapped_render_error");
+    static const lab_eval_render_spec_t cards[] = {
+        {"display_TeX", "svg", "render_error"},
+        {"display_wrapped_TeX", "wrapped_svg", "wrapped_render_error"},
+    };
+    bool distinct = strcmp(lab_eval_text(fields, "display_TeX"), lab_eval_text(fields, "display_wrapped_TeX")) != 0;
+    lab_eval_render_fields(fields, cards, distinct ? 2 : 1);
 }
 
 static void lab_eval_integrator_fields(json_t *fields)

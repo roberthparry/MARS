@@ -1,5 +1,9 @@
 # `computation_t`
 
+[`executor_t`](executor.md) runs callbacks under this control in a bounded native
+worker pool. Tasks inherit it through `computation_run()`; the executor never
+automatically completes a shared control.
+
 `computation_t` is an opaque, reference-counted control for cooperative
 calculation stopping and progress reporting. Include `computation-t.h`.
 It controls **work**, not mathematical assumptions: use

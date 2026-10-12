@@ -58,6 +58,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
 - **`lock_t`** — opaque mutex, recursive lock, reader/writer lock, semaphore and completion-event handles, with optional scope cleanup
 - **`thread_t`** — native callback threads with completion checks, timed waits, joining and detachment
+- **`executor_t`** — bounded native worker pools with cancellable task handles and owned results
+- **`diagnostic_t`** — immutable structured diagnostics with source locations and cause chains
 - **`computation_t`** — shared calculation cancellation, monotonic deadlines, work budgets and progress callbacks
 - **`integrator_t`** — adaptive tanh–sinh / Gauss–Kronrod integration with symbolic fast paths and shared calculation control
 
@@ -432,6 +434,8 @@ int main(void) {
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](./docs/bitset.md) |
 | `lock_t` | Opaque mutex, reader/writer, semaphore and completion-event class cluster | [`docs/lock.md`](./docs/lock.md) |
 | `thread_t` | Owned native callback threads with lock-backed completion waits | [`docs/thread.md`](./docs/thread.md) |
+| `executor_t` | Bounded native execution, cooperative task control and owned results | [`docs/executor.md`](./docs/executor.md) |
+| `diagnostic_t` | Immutable error records, source locations and retained causes | [`docs/diagnostic.md`](./docs/diagnostic.md) |
 | `computation_t` | Shared cooperative calculation control and progress reporting | [`docs/computation.md`](./docs/computation.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](./docs/number.md) |
 | `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](./docs/qfloat.md) |

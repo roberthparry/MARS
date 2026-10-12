@@ -15,6 +15,7 @@
 #error "Private header requires MARS_LAB_EVALUATE_INTERNAL_ACCESS."
 #endif
 
+#include "diagnostic-t.h"
 #include "lab_evaluate.h"
 
 /** @brief Look up a borrowed JSON member using a UTF-8 key. */
@@ -28,6 +29,9 @@ bool lab_eval_put(json_t *object, const char *key, json_t *value);
 
 /** @brief Copy UTF-8 text into a JSON member. */
 bool lab_eval_set(json_t *object, const char *key, const char *value);
+
+/** @brief Copy outcome domain/code/message and ordered causes into failure_diagnostic for Protobuf transport. */
+bool lab_eval_set_diagnostic(json_t *object, const diagnostic_t *error);
 
 /**
  * @brief Calculate the integrator worker deadline in milliseconds without overflow.
@@ -68,7 +72,17 @@ void lab_eval_adapt(json_t *fields, const char *mode);
  * @brief Render restricted mathematical TeX through bounded native processes.
  * @return Owned SVG on success; otherwise NULL and an owned diagnostic in error.
  */
-string_t *lab_eval_render(const string_t *TeX, string_t **error);
+string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error);
+
+/** @brief One immutable source/destination/error mapping, resolved on the request thread only. */
+typedef struct {
+    const char *source;
+    const char *destination;
+    const char *error_key;
+} lab_eval_render_spec_t;
+
+/** @brief Render up to three independent cards using two native workers; update JSON only after joining. */
+void lab_eval_render_fields(json_t *fields, const lab_eval_render_spec_t *specs, size_t count);
 
 /** @brief Render one native TeX field, retaining a diagnostic on failure. */
 void lab_eval_render_field(json_t *fields, const char *source, const char *destination, const char *error_key);

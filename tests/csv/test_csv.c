@@ -418,6 +418,47 @@ static void example_csv_write(void)
     csv_free(csv);
 }
 
+static void test_csv_diagnostic_snapshot(void)
+{
+    csv_t *csv = csv_test_reader("\"unfinished", NULL);
+    TEST_ASSERT_NOT_NULL(csv);
+    errno = ERANGE;
+    bool ok = !csv_diagnostic(csv) && errno == ERANGE && csv_next(csv) == CSV_ERROR;
+    csv_error_t error = csv_error(csv);
+    diagnostic_t *snapshot = csv_diagnostic(csv);
+    ok = snapshot && diagnostic_code(snapshot) == error.code &&
+         !strcmp(diagnostic_domain(snapshot), "csv") && diagnostic_location(snapshot)->offset == error.byte &&
+         diagnostic_location(snapshot)->line == error.line && !diagnostic_location(snapshot)->column && ok;
+    csv_free(csv);
+    ok = snapshot && strstr(diagnostic_message(snapshot), "record 1, field 1") && ok;
+    diagnostic_free(snapshot);
+    ok = !csv_diagnostic(NULL) && errno == EINVAL && ok;
+    csv_t *writer = csv_writer_new(NULL, NULL);
+    TEST_ASSERT_NOT_NULL(writer);
+    ok = !csv_write(writer, NULL, 0) && ok;
+    snapshot = csv_diagnostic(writer);
+    ok = snapshot && !diagnostic_location(snapshot) && ok;
+    diagnostic_free(snapshot);
+    csv_free(writer);
+    TEST_ASSERT_TRUE(ok, "owned diagnostics preserve sticky error positions without inventing writer locations");
+}
+
+/* README example: retain a parse failure after releasing its stream. */
+static void example_csv_diagnostic(void)
+{
+    csv_t *csv = csv_reader_new(NULL, NULL);
+    string_t *input = string_new_with("\"unfinished");
+    bool failed = csv && input && csv_feed(csv, input, true) && csv_next(csv) == CSV_ERROR;
+    diagnostic_t *error = failed ? csv_diagnostic(csv) : NULL;
+    csv_free(csv);
+    string_free(input);
+    bool ok = error && diagnostic_location(error);
+    if (ok)
+        printf("%s: %s; line %zu\n", diagnostic_domain(error), diagnostic_message(error), diagnostic_location(error)->line);
+    diagnostic_free(error);
+    TEST_ASSERT_TRUE(ok, "README retained CSV failure");
+}
+
 int tests_main(void)
 {
     TEST_RUN_CASE(test_csv_records, NULL);
@@ -429,8 +470,10 @@ int tests_main(void)
     TEST_RUN_CASE(test_csv_writer_limits, NULL);
     TEST_RUN_CASE(test_csv_varied_roundtrips, NULL);
     TEST_RUN_CASE(test_csv_files, NULL);
+    TEST_RUN_CASE(test_csv_diagnostic_snapshot, NULL);
     TEST_SECTION("README examples");
     TEST_RUN_OUTPUT(example_csv_read);
     TEST_RUN_OUTPUT(example_csv_write);
+    TEST_RUN_OUTPUT(example_csv_diagnostic);
     return TEST_EXIT_CODE();
 }

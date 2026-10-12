@@ -530,6 +530,36 @@ static void test_lab_extra_render_TeX(void)
     expect_response("/diffequation-eval", "{\"diffequation\":\"y'+2y=0\"}", 200u, "svg", "<svg");
 }
 
+static void test_lab_extra_matrix_power_bindings(void)
+{
+    const char *values[] = {"2", "@pi", "?"};
+    for (size_t i = 0; i < sizeof(values) / sizeof(*values); ++i) {
+        string_t *payload = string_sprintf("{\"matrix\":\"{ (1,2;3,4)^x | x=%s }\"}", values[i]);
+        unsigned status = 0;
+        json_t *response = request("/matrix-eval", string_c_str(payload), &status);
+        bool ok = status == 200 && contains(response, "expression", "x") && contains(response, "svg", "<svg") &&
+                  !contains(response, "expression", "NAN");
+        if (i < 2)
+            ok = ok && *lab_eval_text(response, "value") && !contains(response, "value", "NAN");
+        else
+            ok = ok && !*lab_eval_text(response, "value");
+        if (i == 1)
+            ok = ok && contains(response, "expression", "x = π");
+        if (!ok)
+            show_failure(response);
+        json_free(response);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "repeated binding snapshots retain symbolic powers and exact bindings across updates");
+    }
+}
+
+static void test_lab_extra_conjugate_pair_identity(void)
+{
+    expect_response("/equation-eval", "{\"equation\":\"(x+1)^4 = 1\"}", 200u, "display_TeX", "\\pm");
+    expect_response("/equation-eval", "{\"equation\":\"x^2+2*x+2 = 0\"}", 200u, "display_solutions", "-1 ± i");
+    expect_response("/equation-eval", "{\"equation\":\"x^2+2*x+3 = 0\"}", 200u, "display_TeX", "\\pm");
+}
+
 static void test_lab_extra_projection_fonts(void)
 {
     static const struct { const char *route; const char *payload; const char *field; } cases[] = {
@@ -687,6 +717,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_function, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_goal_seek, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_render_TeX, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_matrix_power_bindings, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_conjugate_pair_identity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_projection_fonts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_escape, tests, NULL);

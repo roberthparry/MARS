@@ -5,6 +5,10 @@ public type, with specialised backend operations selected by `lock_new()`.
 It is native, process-local synchronisation built on pthreads, not browser
 WebAssembly threading or shared-memory inter-process locking.
 
+[`executor_t`](executor.md) uses mutex clones for its bounded task queue and
+persistent events for work availability, idle detection and task completion.
+Applications can use the same public lock API to protect data shared by callbacks.
+
 ## Choose the purpose
 
 | Kind | Purpose | Initial argument | Wait/unlock behaviour |

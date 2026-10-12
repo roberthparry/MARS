@@ -1014,3 +1014,58 @@ Output:
 ```text
 Stopped: 1
 ```
+
+## Retained structured errors
+
+`sqlite_diagnostic(db)` and `sqlite_stmt_diagnostic(stmt)` retain the most recent
+[`diagnostic_t`](diagnostic.md) record. Release it with `diagnostic_free()`.
+Unlike borrowed `sqlite_last_error()` and `sqlite_stmt_last_error()` text, these
+snapshots survive subsequent errors, statement finalisation and connection
+closure. The connection and statement remain caller-synchronised objects; only
+the retained immutable diagnostic is independently shareable.
+
+The `sqlite` domain uses SQLite result codes, including extended codes when
+available. Local wrapper validation messages use `SQLITE_ERROR`. The `sqlite.csv`
+domain uses errno-style import/export failure codes. An underlying parser error
+is preserved as a `csv` cause with its record/field message and input location;
+native SQL failures have a `sqlite` cause. Savepoint cleanup does not discard the
+original cause. Retained snapshots remain valid after the CSV reader is freed
+and the input file is rewound or removed.
+
+NULL with unchanged `errno` means no diagnostic is available; a NULL handle sets
+`EINVAL`. Diagnostic allocation failure never changes the operation's original
+error: existing text and `sqlite_csv_report_t` interfaces remain supported.
+Successful operations need not clear a prior error, matching the existing text
+API; successful CSV transfers explicitly clear the database diagnostic.
+
+These are internal error records, not automatically safe public messages: native
+SQLite messages can name schema objects and CSV source locations can name files.
+Applications decide which details to expose to their clients.
+
+```c
+#include <stdio.h>
+
+#include "sqlite-t.h"
+
+int main(void)
+{
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    bool failed = db && !sqlite_exec_cstr(db, "SELECT * FROM missing_table");
+    diagnostic_t *error = failed ? sqlite_diagnostic(db) : NULL;
+    sqlite_close(db);
+    string_free(path);
+    string_free(key);
+    if (error)
+        printf("%s: %s\n", diagnostic_domain(error), diagnostic_message(error));
+    bool ok = error != NULL;
+    diagnostic_free(error);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+sqlite: no such table: missing_table
+```

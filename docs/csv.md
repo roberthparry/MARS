@@ -256,3 +256,47 @@ Output:
 ```text
 Stopped: 1
 ```
+
+## Retained structured errors
+
+`csv_diagnostic(csv)` creates an owned [`diagnostic_t`](diagnostic.md) snapshot
+of the first sticky stream failure. The `csv` domain uses errno-style codes.
+The message records the logical record and field; reader locations contain the
+consumed-byte offset and physical line, with no guessed character column.
+Writers do not claim an input location. No field contents are copied. File-backed
+readers include their file path as a source name, so treat diagnostics as potentially
+sensitive metadata when deciding what to expose to a remote client.
+
+Release the snapshot with `diagnostic_free()`. It survives stream destruction and
+can be shared by retained reference across threads; accessing the CSV handle
+still requires normal caller synchronisation. NULL with unchanged `errno` means
+no stream error; a NULL CSV handle sets `EINVAL`, allocation failure sets `ENOMEM`.
+The existing allocation-free `csv_error()` report remains available. SQLite CSV
+ingestion uses these snapshots as causes in its own structured error.
+
+```c
+#include <stdio.h>
+
+#include "csv-t.h"
+
+int main(void)
+{
+    csv_t *csv = csv_reader_new(NULL, NULL);
+    string_t *input = string_new_with("\"unfinished");
+    bool failed = csv && input && csv_feed(csv, input, true) && csv_next(csv) == CSV_ERROR;
+    diagnostic_t *error = failed ? csv_diagnostic(csv) : NULL;
+    csv_free(csv);
+    string_free(input);
+    bool ok = error && diagnostic_location(error);
+    if (ok)
+        printf("%s: %s; line %zu\n", diagnostic_domain(error), diagnostic_message(error), diagnostic_location(error)->line);
+    diagnostic_free(error);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+csv: Invalid CSV syntax or stream operation (record 1, field 1); line 1
+```

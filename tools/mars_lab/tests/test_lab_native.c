@@ -577,6 +577,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_process_worker_control, tests, NULL);
     TEST_SECTION("Native MARS Lab integration");
     test_lab_evaluation_cases();
+    test_lab_render_job_cases();
+    test_lab_diagnostic_cases();
     test_lab_evaluation_extra_cases();
     test_lab_function_cases();
     test_lab_calendar_extra_cases();

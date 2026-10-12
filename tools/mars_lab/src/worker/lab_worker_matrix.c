@@ -12,10 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "expression-t.h"
-#include "matrix-t.h"
-#include "number-t.h"
 #include "string-t.h"
+#include "number-t.h"
+#include "expression-t.h"
+#include "expr_context-t.h"
+#include "matrix-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
@@ -506,6 +507,26 @@ static bool matrix_bindings_copy_values(mat_bindings_t *destination, mat_binding
             return false;
     }
     return true;
+}
+
+/* Apply each binding to every cloned occurrence, not only its representative node. */
+static matrix_t *matrix_refine_bindings(const matrix_t *matrix, mat_bindings_t *bindings)
+{
+    expr_context_t *context = expr_context_new();
+    if (!context)
+        return NULL;
+    bool ok = true;
+    for (size_t i = 0; ok && i < mat_bindings_count(bindings); ++i) {
+        expr_t *symbol = mat_bindings_expr_at(bindings, i);
+        number_t value = expr_get_val(symbol);
+        expr_context_role_t role = mat_bindings_is_constant_at(bindings, i) ? EXPR_CONTEXT_PARAMETER : EXPR_CONTEXT_FREE;
+        if (num_is_finite(value) || num_is_nan(value))
+            ok = expr_context_set(context, symbol, role, 0, value);
+        num_destroy(&value);
+    }
+    matrix_t *result = ok ? mat_simplify_with_context(matrix, context) : NULL;
+    expr_context_free(context);
+    return result;
 }
 
 static bool expression_bindings_copy_values(expr_t *expression, mat_bindings_t *source)
@@ -1226,7 +1247,7 @@ result_ready:
     result_bindings = mat_bindings_from_matrix(result);
     if (!matrix_bindings_copy_values(result_bindings, bindings))
         goto cleanup;
-    matrix_t *context_result = mat_simplify_with_context(result, NULL);
+    matrix_t *context_result = matrix_refine_bindings(result, result_bindings);
     if (!context_result)
         goto cleanup;
     mat_free(result);

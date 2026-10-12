@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lab_process.h"
 #define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
-#include "lab_process.h"
 
 typedef struct {
     const char *route;
@@ -120,6 +120,9 @@ static json_t *lab_eval_failure(unsigned *status, unsigned code, const char *mes
         json_free(result);
         return NULL;
     }
+    diagnostic_t *error = diagnostic_new(DIAGNOSTIC_ERROR, "lab.request", code, message, NULL, NULL);
+    lab_eval_set_diagnostic(result, error);
+    diagnostic_free(error);
     return result;
 }
 
@@ -135,7 +138,7 @@ unsigned lab_eval_integrator_timeout(unsigned precision, unsigned cap)
 }
 
 /* Preserve a process deadline failure separately from unavailable workers and output limits. */
-json_t *lab_eval_worker_failure(unsigned *status, int process_error, unsigned timeout_ms)
+static json_t *lab_eval_worker_failure_text(unsigned *status, int process_error, unsigned timeout_ms)
 {
     if (process_error == ECANCELED || process_error == E2BIG || process_error == EIO) {
         const char *code = process_error == ECANCELED ? "ECANCELED" : process_error == E2BIG ? "E2BIG" : "EIO";
@@ -161,6 +164,16 @@ json_t *lab_eval_worker_failure(unsigned *status, int process_error, unsigned ti
     }
     string_free(message);
     string_free(deadline);
+    return result;
+}
+
+/* Preserve legacy text and timeout fields while adding typed process metadata. */
+json_t *lab_eval_worker_failure(unsigned *status, int process_error, unsigned timeout_ms)
+{
+    json_t *result = lab_eval_worker_failure_text(status, process_error, timeout_ms);
+    diagnostic_t *error = lab_proc_diagnostic(false, process_error, -1, timeout_ms);
+    lab_eval_set_diagnostic(result, error);
+    diagnostic_free(error);
     return result;
 }
 
@@ -273,12 +286,19 @@ static void lab_eval_integrator_bindings(json_t *fields, const char *precision)
     const char *argv[] = {"mars_lab", expression, "x", precision, "bindings", NULL};
     string_t *output = NULL;
     int exit_status = -1;
-    if (lab_proc_run_worker(argv, ".", NULL, 10000u, 4u * 1024u * 1024u, &output, &exit_status) && !exit_status) {
+    bool completed = lab_proc_run_worker(argv, ".", NULL, 10000u, 4u * 1024u * 1024u, &output, &exit_status);
+    int process_error = errno;
+    if (completed && !exit_status) {
         json_t *bindings = lab_eval_fields(output);
         lab_eval_set(fields, "bindings", lab_eval_text(bindings, "bindings"));
         json_free(bindings);
     } else {
-        lab_eval_set(fields, "binding_error", "The native binding worker could not enumerate integrand bindings.");
+        diagnostic_t *error = lab_proc_diagnostic(completed, process_error, exit_status, 10000u);
+        string_t *description = error ? diagnostic_to_string(error) : NULL;
+        lab_eval_set(fields, "binding_error", description ? string_c_str(description) :
+                         "The native binding worker could not enumerate integrand bindings.");
+        string_free(description);
+        diagnostic_free(error);
     }
     string_free(output);
 }
@@ -292,25 +312,29 @@ static json_t *lab_eval_function_run(const string_t *source, unsigned precision,
     string_t *output = NULL;
     int exit_status = -1;
     bool completed = lab_proc_run_worker(argv, ".", source, 30000u, 4u * 1024u * 1024u, &output, &exit_status);
+    int process_error = errno;
+    diagnostic_t *error = lab_proc_diagnostic(completed, process_error, exit_status, 30000u);
     if (!completed) {
-        int process_error = errno;
+        json_t *result = lab_eval_worker_failure(status, process_error, 30000u);
+        lab_eval_set_diagnostic(result, error);
+        diagnostic_free(error);
         string_free(output);
         string_free(digits);
-        return lab_eval_worker_failure(status, process_error, 30000u);
+        return result;
     }
     json_t *result = json_new_object();
-    bool ok = completed && exit_status == 0;
+    bool ok = exit_status == 0;
     lab_eval_put(result, "ok", json_new_bool(ok));
     string_t *display = ok && output ? lab_eval_display_bindings(output) : NULL;
     lab_eval_set(result, "output", display ? string_c_str(display) : output ? string_c_str(output) : "");
     string_free(display);
     lab_eval_set(result, "error",
-                 ok           ? ""
-                 : !completed ? "Ophelia could not complete (unavailable, timeout or output limit)"
-                 : output     ? string_c_str(output)
-                              : "Ophelia failed");
+                 ok ? "" : output && string_byte_length(output) ? string_c_str(output) :
+                            error ? diagnostic_message(error) : "Native function evaluation failed");
     if (status)
         *status = ok ? 200u : 422u;
+    lab_eval_set_diagnostic(result, error);
+    diagnostic_free(error);
     string_free(output);
     string_free(digits);
 
@@ -334,18 +358,23 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     if (!lab_eval_valid_text(input, true))
         return lab_eval_failure(status, 400u, "Input must be a non-empty string of at most 64 KiB without NUL bytes");
     if (!entry->worker) {
-        string_t *error = NULL;
+        diagnostic_t *error = NULL;
         string_t *svg = lab_eval_render(input, &error);
+        string_t *description = error ? diagnostic_to_string(error) : NULL;
         json_t *result =
-            svg ? json_new_object() : lab_eval_failure(status, 422u, error ? string_c_str(error) : "Rendering failed");
+            svg ? json_new_object() : lab_eval_failure(status, 422u, description ? string_c_str(description) :
+                                                                   error ? diagnostic_message(error) : "Rendering failed");
         if (svg) {
             lab_eval_put(result, "ok", json_new_bool(true));
             lab_eval_set(result, "svg", string_c_str(svg));
             if (status)
                 *status = 200u;
         }
+        if (error)
+            lab_eval_set_diagnostic(result, error);
         string_free(svg);
-        string_free(error);
+        string_free(description);
+        diagnostic_free(error);
         return result;
     }
     unsigned precision = 96u;
@@ -390,10 +419,13 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     json_t *result = NULL;
     string_t *output = NULL;
     int exit_status = -1;
+    bool completed = valid && lab_proc_run_worker(args.argv, ".", NULL, timeout_ms, 4u * 1024u * 1024u,
+                                                  &output, &exit_status);
+    int process_error = errno;
+    diagnostic_t *worker_error = valid ? lab_proc_diagnostic(completed, process_error, exit_status, timeout_ms) : NULL;
     if (!valid) {
         result = lab_eval_failure(status, 400u, "Invalid operation, binding, bounds or argument size");
-    } else if (!lab_proc_run_worker(args.argv, ".", NULL, timeout_ms, 4u * 1024u * 1024u, &output, &exit_status)) {
-        int process_error = errno;
+    } else if (!completed) {
         result = lab_eval_worker_failure(status, process_error, timeout_ms);
         if (output)
             lab_eval_set(result, "raw", string_c_str(output));
@@ -419,7 +451,8 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
                 if (status)
                     *status = exit_status ? 422u : 200u;
                 if (exit_status) {
-                    const char *raw = output ? string_c_str(output) : "Native evaluation failed";
+                    const char *raw = output && string_byte_length(output) ? string_c_str(output) :
+                                         worker_error ? diagnostic_message(worker_error) : "Native evaluation failed";
                     lab_eval_set(result, "error", raw);
                     lab_eval_set(result, "raw", raw);
                     lab_eval_set(result, "raw_error", raw);
@@ -432,6 +465,8 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
             }
         }
     }
+    lab_eval_set_diagnostic(result, worker_error);
+    diagnostic_free(worker_error);
     string_free(output);
     for (size_t i = 0u; i < args.count; ++i)
         string_free(args.owned[i]);

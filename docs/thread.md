@@ -1,5 +1,10 @@
 # Native threads
 
+For a bounded queue over reusable native workers, use [`executor_t`](executor.md).
+It builds on `thread_t` and `lock_t`, adding independent task handles, cooperative
+controls and structured diagnostics. Direct `thread_t` use remains appropriate
+when an application needs to own one callback thread's lifecycle explicitly.
+
 For cooperative cancellation and shared calculation budgets within a callback,
 use [`computation_t`](computation.md). It does not replace thread completion or
 joining: after requesting cancellation, still join before releasing borrowed

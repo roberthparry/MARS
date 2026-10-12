@@ -25,6 +25,8 @@
  * shared work budgets are cooperative; callers must check operation failure and
  * computation_status() before using outputs. See docs/sqlite.md for checkpoint
  * coverage, ownership and the corresponding executable example.
+ * Retained diagnostic_t snapshots accompany database and statement errors;
+ * CSV failures preserve their stream location as a structured cause.
  */
 
 #ifndef MARS_SQLITE_H
@@ -97,6 +99,15 @@ void sqlite_close(sqlite_t *db);
  * @return Last error text, or `NULL` if unavailable.
  */
 const string_t *sqlite_last_error(const sqlite_t *db);
+
+/**
+ * @brief Retain the latest database diagnostic, independent of later operations and sqlite_close().
+ * NULL with unchanged errno means no diagnostic; NULL db sets EINVAL. Release with diagnostic_free().
+ * The sqlite domain uses SQLite result codes; sqlite.csv uses errno-style codes and may carry a csv cause.
+ * Diagnostic allocation failure never replaces the operation's error; text/report APIs remain available.
+ * Serialise access with database operations; only the returned immutable diagnostic is shareable.
+ */
+diagnostic_t *sqlite_diagnostic(const sqlite_t *db);
 
 /**
  * @brief Executes SQL supplied as a `string_t`.
@@ -377,6 +388,13 @@ bool sqlite_stmt_column_is_null(sqlite_stmt_t *stmt, int column);
  * @return Last error text, or `NULL` if unavailable.
  */
 const string_t *sqlite_stmt_last_error(const sqlite_stmt_t *stmt);
+
+/**
+ * @brief Retain the latest statement diagnostic, surviving reset, finalisation and connection closure.
+ * NULL with unchanged errno means absent; NULL stmt sets EINVAL. Release with diagnostic_free().
+ * As with sqlite_stmt_last_error(), subsequent successful operations need not clear a prior error.
+ */
+diagnostic_t *sqlite_stmt_diagnostic(const sqlite_stmt_t *stmt);
 
 /** @brief Import column policy; AUTO is available only for replayable file imports. */
 typedef enum {

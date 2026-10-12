@@ -50,6 +50,12 @@ void lab_proc_set_cancel_check(bool (*check)(void *), void *argument)
     lab_process_cancel_argument = argument;
 }
 
+/* A worker receives an explicit snapshot rather than inheriting another thread's TLS implicitly. */
+lab_proc_cancel_context_t lab_proc_cancel_context(void)
+{
+    return (lab_proc_cancel_context_t){lab_process_cancel_check, lab_process_cancel_argument};
+}
+
 static bool lab_proc_cancelled(void)
 {
     return (lab_process_cancel_flag && *lab_process_cancel_flag) ||

@@ -239,3 +239,34 @@ csv_error_t csv_error(const csv_t *csv)
 {
     return csv ? csv->error : (csv_error_t){.code = EINVAL};
 }
+
+/* Copy structured stream context without retaining any input field contents. */
+diagnostic_t *csv_diagnostic(const csv_t *csv)
+{
+    static const char *const reasons[] = {
+        [EINVAL]     = "Invalid CSV syntax or stream operation",
+        [EILSEQ]     = "Invalid UTF-8 or NUL byte",
+        [EOVERFLOW]  = "CSV size limit exceeded",
+        [ENOMEM]     = "CSV allocation failed",
+        [ECANCELED]  = "CSV operation cancelled",
+        [ETIMEDOUT]  = "CSV operation timed out",
+        [E2BIG]      = "CSV work budget exhausted",
+        [EIO]        = "CSV input/output failed",
+    };
+    if (!csv) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (!csv->error.code)
+        return NULL;
+    const csv_error_t *error = &csv->error;
+    const char *reason = (unsigned)error->code < sizeof(reasons) / sizeof(*reasons) ? reasons[error->code] : NULL;
+    string_t *message = string_sprintf("%s (record %zu, field %zu)", reason ? reason : "CSV stream failure",
+                                       error->record, error->field);
+    diagnostic_location_t location = {.source = csv->file ? file_path(csv->file) : NULL,
+                                       .offset = error->byte, .line = error->line};
+    diagnostic_t *diagnostic = message ? diagnostic_new(DIAGNOSTIC_ERROR, "csv", error->code, string_c_str(message),
+                                                        csv->writer ? NULL : &location, NULL) : NULL;
+    string_free(message);
+    return diagnostic;
+}

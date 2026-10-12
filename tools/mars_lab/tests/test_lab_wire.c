@@ -10,6 +10,8 @@
 #include <string.h>
 
 #include "lab_wire.h"
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
+#include "internal/lab_evaluate_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -327,9 +329,35 @@ static void test_lab_wire_depth_boundary(void)
     TEST_ASSERT_TRUE(ok, "depth 32 accepted; depth 33 rejected by encoder and decoder, with root at depth zero");
 }
 
+static void test_lab_diagnostic_wire_chain(void)
+{
+    diagnostic_t *error = NULL;
+    for (int i = 0; i < 64; ++i) {
+        diagnostic_t *next = diagnostic_new(DIAGNOSTIC_ERROR, "test", i, "failure", NULL, error);
+        diagnostic_free(error);
+        error = next;
+    }
+    json_t *response = json_new_object();
+    bool ok = error && diagnostic_depth(error) == 64 && lab_eval_set_diagnostic(response, error);
+    diagnostic_free(error);
+    array_t *bytes = ok ? lab_wire_encode(response) : NULL;
+    json_free(response);
+    json_t *decoded = bytes ? lab_wire_decode(array_get(bytes, 0), array_size(bytes)) : NULL;
+    array_destroy(bytes);
+    const json_t *record = test_lab_member(decoded, "failure_diagnostic");
+    const json_t *causes = test_lab_member(record, "causes");
+    const json_t *last = json_array_get(causes, 62);
+    ok = ok && !strcmp(test_lab_text(record, "domain"), "test") &&
+         !strcmp(string_c_str(json_number_text(test_lab_member(record, "code"))), "63") && json_array_size(causes) == 63 &&
+         !strcmp(string_c_str(json_number_text(test_lab_member(last, "code"))), "0");
+    json_free(decoded);
+    TEST_ASSERT_TRUE(ok, "the complete retained chain survives Protobuf within its bounded nesting depth");
+}
+
 /* Register transport checks before the suite's README examples. */
 void test_lab_wire_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_diagnostic_wire_chain, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wire_roundtrip, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wire_rejections, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wire_schema, tests, NULL);

@@ -17,9 +17,20 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "diagnostic-t.h"
 #include "lab_process_request.h"
 
 typedef struct _string_t string_t;
+
+/**
+ * @brief Snapshot a completed process call using its saved errno and exit status.
+ * Pass the boolean return, saved errno, returned status and supplied timeout immediately after a run.
+ * Success with exit zero returns NULL; otherwise returns an owned diagnostic released with diagnostic_free().
+ * The lab.process domain uses errno codes, lab.worker uses exit statuses. Collection failures retain an
+ * available child status as a cause. No arguments, input, environment or captured output are copied.
+ * errno is preserved, including on diagnostic allocation failure; legacy status/output remain authoritative.
+ */
+diagnostic_t *lab_proc_diagnostic(bool completed, int process_error, int exit_status, unsigned timeout_ms);
 
 /**
  * @brief Resolves a known calculation mode to the server or an explicit diagnostic override.

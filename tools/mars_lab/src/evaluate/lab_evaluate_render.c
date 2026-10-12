@@ -14,13 +14,14 @@
 #define _GNU_SOURCE
 #endif
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "file-t.h"
+#include "lab_process.h"
 #define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
-#include "lab_process.h"
 
 /* Sorted mathematical vocabulary. No expansion, I/O or definition primitives. */
 static const char *const commands[] = {
@@ -376,19 +377,24 @@ static bool lab_eval_namespace_svg(string_t *svg, const char *suffix)
 }
 
 /* Render an allowlisted mathematical document in an isolated working directory. */
-string_t *lab_eval_render(const string_t *TeX, string_t **error)
+string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error)
 {
     if (error)
         *error = NULL;
     if (!lab_eval_permitted_TeX(TeX)) {
         if (error)
-            *error = string_new_with("TeX is empty, too large, or contains an unsupported command or environment");
+            *error = diagnostic_new(DIAGNOSTIC_ERROR, "lab.render", EINVAL,
+                                     "TeX is empty, too large, or contains an unsupported command or environment", NULL, NULL);
+        errno = EINVAL;
         return NULL;
     }
     char directory[] = "/tmp/mars-lab-TeX-XXXXXX";
     if (!mkdtemp(directory)) {
+        int code = errno;
         if (error)
-            *error = string_new_with("Could not create a private TeX directory");
+            *error = diagnostic_new(DIAGNOSTIC_ERROR, "lab.render", code,
+                                     "Could not create a private TeX directory", NULL, NULL);
+        errno = code;
         return NULL;
     }
     string_t *document = string_sprintf("\\documentclass{article}\n\\pagestyle{empty}\n"
@@ -397,6 +403,7 @@ string_t *lab_eval_render(const string_t *TeX, string_t **error)
                                         string_c_str(TeX));
     file_t *source = lab_eval_render_file(directory, "expr.tex");
     bool ok = source && document && file_write_all_text(source, document);
+    int code = ok ? 0 : errno ? errno : ENOMEM;
     file_free(source);
     string_free(document);
     string_t *output = NULL;
@@ -411,17 +418,26 @@ string_t *lab_eval_render(const string_t *TeX, string_t **error)
                                 "-halt-on-error",
                                 "expr.tex",
                                 NULL};
-    if (ok)
-        ok = lab_proc_run(latex_argv, directory, 10000u, 262144u, &output, &exit_status) && !exit_status;
+    const char *stage = "Writing TeX input failed";
+    if (ok) {
+        stage = "latex rendering failed";
+        bool ran = lab_proc_run(latex_argv, directory, 10000u, 262144u, &output, &exit_status);
+        code = ran ? (exit_status ? EIO : 0) : errno;
+        ok = ran && !exit_status;
+    }
     if (ok) {
         string_free(output);
         output = NULL;
         const char *svg_argv[] = {"dvisvgm",  "--no-fonts", "--no-specials", "--exact-bbox",
                                   "expr.dvi", "-o",         "expr.svg",      NULL};
-        ok = lab_proc_run(svg_argv, directory, 10000u, 262144u, &output, &exit_status) && !exit_status;
+        stage = "dvisvgm rendering failed";
+        bool ran = lab_proc_run(svg_argv, directory, 10000u, 262144u, &output, &exit_status);
+        code = ran ? (exit_status ? EIO : 0) : errno;
+        ok = ran && !exit_status;
     }
     string_t *svg = NULL;
     if (ok) {
+        stage = "Reading rendered SVG failed";
         file_t *destination = lab_eval_render_file(directory, "expr.svg");
         file_info_t *info = destination ? file_get_info(destination) : NULL;
         if (info && file_info_size(info) <= 4u * 1024u * 1024u)
@@ -432,14 +448,20 @@ string_t *lab_eval_render(const string_t *TeX, string_t **error)
             string_free(svg);
             svg = NULL;
         }
+        if (!svg)
+            code = EIO;
     }
     if (!svg && error) {
-        *error = output && string_byte_length(output)
-                     ? string_clone(output)
-                     : string_new_with("TeX rendering failed: check latex/dvisvgm availability and rendering limits");
+        diagnostic_t *cause = output && string_byte_length(output)
+                                  ? diagnostic_new(DIAGNOSTIC_ERROR, "lab.process", exit_status,
+                                                     string_c_str(output), NULL, NULL) : NULL;
+        *error = diagnostic_new(DIAGNOSTIC_ERROR, "lab.render", code ? code : EIO, stage, NULL, cause);
+        diagnostic_free(cause);
     }
     string_free(output);
     lab_eval_clean_directory(directory);
+    if (!svg)
+        errno = code ? code : EIO;
     return svg;
 }
 
@@ -449,12 +471,15 @@ void lab_eval_render_field(json_t *fields, const char *source, const char *desti
     const string_t *TeX = json_string_value(lab_eval_get(fields, source));
     if (!TeX || !string_byte_length(TeX) || !strcmp(string_c_str(TeX), "(null)"))
         return;
-    string_t *error = NULL;
+    diagnostic_t *error = NULL;
     string_t *svg = lab_eval_render(TeX, &error);
     if (svg)
         lab_eval_set(fields, destination, string_c_str(svg));
-    else if (error)
-        lab_eval_set(fields, error_key, string_c_str(error));
+    else if (error) {
+        string_t *description = diagnostic_to_string(error);
+        lab_eval_set(fields, error_key, description ? string_c_str(description) : diagnostic_message(error));
+        string_free(description);
+    }
     string_free(svg);
-    string_free(error);
+    diagnostic_free(error);
 }

@@ -135,9 +135,11 @@
     "test_computation_timeseries_stop": true
   },
   "tests/csv/test_csv.c": {
+    "example_csv_diagnostic": true,
     "example_csv_read": true,
     "example_csv_write": true,
     "test_csv_chunk_boundaries": true,
+    "test_csv_diagnostic_snapshot": true,
     "test_csv_files": true,
     "test_csv_headers": true,
     "test_csv_invalid_input": true,
@@ -211,6 +213,14 @@
       "test_dttm_computeTimeZoneOffset_uninitialised": true,
       "test_dttm_julian_roundtrip": true
     }
+  },
+  "tests/diagnostic/test_diagnostic.c": {
+    "example_diagnostic_chain": true,
+    "test_diagnostic_concurrent": true,
+    "test_diagnostic_depth": true,
+    "test_diagnostic_invalid": true,
+    "test_diagnostic_locations": true,
+    "test_diagnostic_ownership": true
   },
   "tests/dictionary/test_dictionary.c": {
     "readme_examples": {
@@ -555,6 +565,21 @@
         "test_equation_future_solves_sin_family": true
       }
     }
+  },
+  "tests/executor/test_executor.c": {
+    "example_executor_diagnostic": true,
+    "example_executor_result": true,
+    "test_executor_cancellation": true,
+    "test_executor_cancelled_ownership": true,
+    "test_executor_concurrent_producers": true,
+    "test_executor_deadline": true,
+    "test_executor_dependencies": true,
+    "test_executor_failures": true,
+    "test_executor_invalid": true,
+    "test_executor_ownership": true,
+    "test_executor_queue": true,
+    "test_executor_startup_failures": true,
+    "test_executor_submission_failures": true
   },
   "tests/expr_context/test_context_solver.c": {
     "test_context_guarded_inverse": true,
@@ -1927,10 +1952,10 @@
       "run_number_multiprecision_tests": true,
       "run_number_nonfinite_series_tests": true,
       "run_number_parse_tests": true,
+      "run_number_physical_constant_tests": true,
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
-      "run_number_special_function_tests": true,
-      "run_number_physical_constant_tests": true
+      "run_number_special_function_tests": true
     }
   },
   "tests/number/test_number_backend_parity.c": {
@@ -2302,22 +2327,22 @@
     }
   },
   "tests/quantity/test_quantity.c": {
+    "example_quantity_acceleration": true,
     "example_quantity_angles": true,
+    "example_quantity_constants_precision": true,
     "example_quantity_energy": true,
     "example_quantity_speed": true,
     "example_quantity_temperature": true,
+    "example_quantity_tons": true,
     "test_quantity_aliases": true,
     "test_quantity_arithmetic": true,
     "test_quantity_exact_conversions": true,
     "test_quantity_functions_complex": true,
     "test_quantity_parser_and_ownership": true,
     "test_quantity_precision": true,
-    "test_quantity_temperature": true,
-    "test_quantity_text": true,
     "test_quantity_selected_precision": true,
-    "example_quantity_constants_precision": true,
-    "example_quantity_tons": true,
-    "example_quantity_acceleration": true
+    "test_quantity_temperature": true,
+    "test_quantity_text": true
   },
   "tests/regex/test_regex.c": {
     "example_regex_capture": true,
@@ -2368,16 +2393,19 @@
       "example_sqlite_csv_export": true,
       "example_sqlite_csv_file": true,
       "example_sqlite_csv_file_stream": true,
-      "example_sqlite_csv_stream": true
+      "example_sqlite_csv_stream": true,
+      "example_sqlite_diagnostic": true
     },
     "tests": {
       "enabled": true,
       "test_sqlite_csv_bad_input": true,
       "test_sqlite_csv_boundaries": true,
+      "test_sqlite_csv_diagnostic_chain": true,
       "test_sqlite_csv_export": true,
       "test_sqlite_csv_inference": true,
       "test_sqlite_csv_mapping_and_identifiers": true,
-      "test_sqlite_csv_stream_rollback": true
+      "test_sqlite_csv_stream_rollback": true,
+      "test_sqlite_diagnostic_lifetimes": true
     }
   },
   "tests/string/test_string.c": {
@@ -2515,9 +2543,14 @@
       "docs_array_011": true,
       "docs_bitset_001": true,
       "docs_bitset_002": true,
+      "docs_csv_001": true,
+      "docs_csv_002": true,
+      "docs_csv_003": true,
+      "docs_csv_004": true,
       "docs_datetime_001": true,
       "docs_datetime_002": true,
       "docs_datetime_003": true,
+      "docs_diagnostic_001": true,
       "docs_dictionary_001": true,
       "docs_dictionary_002": true,
       "docs_diffequation_001": true,
@@ -2527,6 +2560,8 @@
       "docs_equation_003": true,
       "docs_equation_004": true,
       "docs_equation_005": true,
+      "docs_executor_001": true,
+      "docs_executor_002": true,
       "docs_expression_001": true,
       "docs_expression_002": true,
       "docs_expression_003": true,
@@ -2543,6 +2578,8 @@
       "docs_http_001": true,
       "docs_http_002": true,
       "docs_http_003": true,
+      "docs_http_005": true,
+      "docs_http_006": true,
       "docs_integrator_001": true,
       "docs_integrator_002": true,
       "docs_integrator_003": true,
@@ -2583,6 +2620,7 @@
       "docs_number_016": true,
       "docs_number_017": true,
       "docs_number_050": true,
+      "docs_number_051": true,
       "docs_qcomplex_001": true,
       "docs_qcomplex_002": true,
       "docs_qcomplex_004": true,
@@ -2605,6 +2643,9 @@
       "docs_quantity_002": true,
       "docs_quantity_003": true,
       "docs_quantity_004": true,
+      "docs_quantity_005": true,
+      "docs_quantity_006": true,
+      "docs_quantity_007": true,
       "docs_set_001": true,
       "docs_set_002": true,
       "docs_sqlite_001": true,
@@ -2612,6 +2653,12 @@
       "docs_sqlite_003": true,
       "docs_sqlite_004": true,
       "docs_sqlite_005": true,
+      "docs_sqlite_009": true,
+      "docs_sqlite_010": true,
+      "docs_sqlite_011": true,
+      "docs_sqlite_012": true,
+      "docs_sqlite_013": true,
+      "docs_sqlite_014": true,
       "docs_string_001": true,
       "docs_string_002": true,
       "docs_string_003": true,
@@ -2624,11 +2671,7 @@
       "docs_xml_001": true,
       "docs_xml_002": true,
       "docs_xml_003": true,
-      "enabled": true,
-      "docs_number_051": true,
-      "docs_quantity_005": true,
-      "docs_quantity_006": true,
-      "docs_quantity_007": true
+      "enabled": true
     }
   },
   "tools/mars_checks/tests/test_checks_controls.c": {
@@ -2871,6 +2914,13 @@
       "test_lab_calendar_worker_observances": true
     }
   },
+  "tools/mars_lab/tests/test_lab_diagnostics.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_process_diagnostics": true,
+      "test_lab_request_diagnostics": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_evaluation.c": {
     "tests": {
       "enabled": true,
@@ -2890,6 +2940,7 @@
       "test_lab_extra_binding_edit": true,
       "test_lab_extra_bindings": true,
       "test_lab_extra_calendar_fallback": true,
+      "test_lab_extra_conjugate_pair_identity": true,
       "test_lab_extra_constant_identity": true,
       "test_lab_extra_context_results": true,
       "test_lab_extra_derivative": true,
@@ -2916,6 +2967,7 @@
       "test_lab_extra_invalid_precision": true,
       "test_lab_extra_invalid_type": true,
       "test_lab_extra_matrix": true,
+      "test_lab_extra_matrix_power_bindings": true,
       "test_lab_extra_native_records": true,
       "test_lab_extra_number_card_markup": true,
       "test_lab_extra_projection_fonts": true,
@@ -3541,6 +3593,14 @@
       "test_lab_presentation_unset": true
     }
   },
+  "tools/mars_lab/tests/test_lab_render_jobs.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_render_batch": true,
+      "test_lab_render_batch_cancellation": true,
+      "test_lab_render_diagnostic": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_routes.c": {
     "tests": {
       "enabled": true,
@@ -3593,6 +3653,7 @@
   "tools/mars_lab/tests/test_lab_wire.c": {
     "tests": {
       "enabled": true,
+      "test_lab_diagnostic_wire_chain": true,
       "test_lab_wire_byte_boundary": true,
       "test_lab_wire_depth_boundary": true,
       "test_lab_wire_node_boundary": true,

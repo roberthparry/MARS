@@ -14,10 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "equation-t.h"
-#include "expression-t.h"
-#include "number-t.h"
 #include "string-t.h"
+#include "number-t.h"
+#include "expression-t.h"
+#include "equation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
@@ -488,7 +488,7 @@ static bool solution_conjugate_pair(const equation_solutions_t *solutions, const
     bool paired = false;
 
     /* Sorting makes conjugates adjacent. Only literal numbers qualify; do not sample symbolic families. */
-    if (first && second && equ_lhs(first) == equ_lhs(second) &&
+    if (first && second && expr_struct_eq(equ_lhs(first), equ_lhs(second)) &&
         expr_match_const_value(equ_rhs(first), &first_value) &&
         expr_match_const_value(equ_rhs(second), &second_value) &&
         num_is_finite(first_value) && !num_is_real(first_value) && num_is_finite(second_value)) {
@@ -567,7 +567,7 @@ static char *solution_symbolic_pair_text(const equation_solutions_t *solutions, 
                         expr_match_const_value(equ_rhs(second), &other_literal);
     num_destroy(&other_literal);
     /* Pair expression trees, never approximate values or parameterised families. */
-    if (!first || !second || numeric_pair || equ_lhs(first) != equ_lhs(second) ||
+    if (!first || !second || numeric_pair || !expr_struct_eq(equ_lhs(first), equ_lhs(second)) ||
         expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
         expr_has_unbound_parameters(equ_rhs(second), 0u, NULL) ||
         !expr_cartesian_parts_for_display(equ_rhs(first), &real, &imaginary, &has_imaginary) ||

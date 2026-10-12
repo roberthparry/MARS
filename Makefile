@@ -356,6 +356,7 @@ $(SHARED_LIB): Makefile $(OBJS)
 # Test binaries
 # ------------------------------------------------------------
 $(TEST_BUILD_DIR)/matrix/test_matrix: TEST_LINK_FLAGS = -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=string_free -Wl,--wrap=expr_to_text_symbolic
+$(TEST_BUILD_DIR)/executor/test_executor: TEST_LINK_FLAGS = -Wl,--wrap=calloc -Wl,--wrap=thread_new
 
 FILE_TEST_WRAPS := malloc calloc realloc strdup read write rename renameat2 unlink fsync fdatasync fchownat \
                    fdopen fdopendir readdir statx fstat fclose close fchmod ftello fseeko ferror

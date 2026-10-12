@@ -565,6 +565,76 @@ static void example_sqlite_csv_file_stream(void)
     TEST_ASSERT_INT_EQ(exported.rows, 2);
 }
 
+static void test_sqlite_diagnostic_lifetimes(void)
+{
+    sqlite_t *db = test_csv_database();
+    TEST_ASSERT_NOT_NULL(db);
+    errno = ERANGE;
+    bool ok = !sqlite_diagnostic(db) && errno == ERANGE;
+    ok = !sqlite_exec_cstr(db, "SELECT * FROM missing_diagnostic_table") && ok;
+    diagnostic_t *first = sqlite_diagnostic(db);
+    ok = first && !strcmp(diagnostic_domain(first), "sqlite") && diagnostic_code(first) != 0 && ok;
+    sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, "SELECT ?1");
+    TEST_ASSERT_NOT_NULL(stmt);
+    ok = !sqlite_stmt_bind_int(stmt, 2, 7) && ok;
+    diagnostic_t *binding = sqlite_stmt_diagnostic(stmt);
+    ok = binding && diagnostic_code(binding) == 25 && ok; /* SQLITE_RANGE, not a stale connection code. */
+    sqlite_stmt_finalize(stmt);
+    ok = sqlite_exec_cstr(db, "CREATE TABLE unique_values(value INTEGER UNIQUE); INSERT INTO unique_values VALUES(1)") && ok;
+    stmt = sqlite_stmt_prepare(db, "INSERT INTO unique_values VALUES(1)");
+    TEST_ASSERT_NOT_NULL(stmt);
+    ok = sqlite_stmt_step(stmt) == SQLITE_STEP_ERROR && ok;
+    diagnostic_t *constraint = sqlite_stmt_diagnostic(stmt);
+    ok = constraint && (diagnostic_code(constraint) & 255) == 19 && ok;
+    sqlite_stmt_finalize(stmt);
+    sqlite_close(db);
+    ok = first && strstr(diagnostic_message(first), "missing_diagnostic_table") &&
+         binding && diagnostic_code(binding) == 25 && constraint && diagnostic_message(constraint) && ok;
+    diagnostic_free(first);
+    diagnostic_free(binding);
+    diagnostic_free(constraint);
+    ok = !sqlite_diagnostic(NULL) && errno == EINVAL && !sqlite_stmt_diagnostic(NULL) && errno == EINVAL && ok;
+    TEST_ASSERT_TRUE(ok, "database and statement diagnostics retain the original code after updates and closure");
+}
+
+static void test_sqlite_csv_diagnostic_chain(void)
+{
+    sqlite_t *db = test_csv_database();
+    TEST_ASSERT_NOT_NULL(db);
+    sqlite_csv_report_t report;
+    bool ok = !test_csv_import(db, "name\n\"unfinished", "data", NULL, &report);
+    diagnostic_t *error = sqlite_diagnostic(db);
+    const diagnostic_t *cause = error ? diagnostic_cause(error) : NULL;
+    ok = error && !strcmp(diagnostic_domain(error), "sqlite.csv") && diagnostic_code(error) == report.code &&
+         cause && !strcmp(diagnostic_domain(cause), "csv") && diagnostic_location(cause) &&
+         diagnostic_location(cause)->offset == report.csv_error.byte &&
+         diagnostic_location(cause)->line == report.csv_error.line && ok;
+    ok = test_csv_import(db, "name\nvalid\n", "valid_data", NULL, &report) && ok;
+    errno = ERANGE;
+    ok = !sqlite_diagnostic(db) && errno == ERANGE && ok;
+    sqlite_close(db);
+    ok = cause && strstr(diagnostic_message(cause), "record 2") && ok;
+    diagnostic_free(error);
+    TEST_ASSERT_TRUE(ok, "ingestion chains retain CSV locations after rollback, reader cleanup and subsequent success");
+}
+
+/* README example: error records survive database closure without retaining the connection. */
+static void example_sqlite_diagnostic(void)
+{
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    bool failed = db && !sqlite_exec_cstr(db, "SELECT * FROM missing_table");
+    diagnostic_t *error = failed ? sqlite_diagnostic(db) : NULL;
+    sqlite_close(db);
+    string_free(path);
+    string_free(key);
+    if (error)
+        printf("%s: %s\n", diagnostic_domain(error), diagnostic_message(error));
+    bool ok = error != NULL;
+    diagnostic_free(error);
+    TEST_ASSERT_TRUE(ok, "README retained database error");
+}
+
 /* Register the ordinary cases in the existing SQLite suite. */
 void test_sqlite_csv_cases(void)
 {
@@ -574,6 +644,8 @@ void test_sqlite_csv_cases(void)
     TEST_RUN_IN_GROUP(test_sqlite_csv_bad_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_csv_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_csv_export, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sqlite_diagnostic_lifetimes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sqlite_csv_diagnostic_chain, tests, NULL);
 }
 
 /* Keep README demonstrations last in the suite. */
@@ -583,4 +655,5 @@ void test_sqlite_csv_examples(void)
     TEST_RUN_OUTPUT_IN_GROUP(example_sqlite_csv_stream, readme_examples);
     TEST_RUN_OUTPUT_IN_GROUP(example_sqlite_csv_export, readme_examples);
     TEST_RUN_OUTPUT_IN_GROUP(example_sqlite_csv_file_stream, readme_examples);
+    TEST_RUN_OUTPUT_IN_GROUP(example_sqlite_diagnostic, readme_examples);
 }

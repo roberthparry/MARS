@@ -19,7 +19,7 @@ bool sqlite_csv_fail(sqlite_csv_context_t *c, int code, const char *message)
 {
     if (!c->report->code) {
         c->report->code = code;
-        sqlite_set_error(c->db, message);
+        sqlite_set_diagnostic_error(c->db, "sqlite.csv", code, message, NULL);
     }
     errno = c->report->code;
     return false;
@@ -27,17 +27,34 @@ bool sqlite_csv_fail(sqlite_csv_context_t *c, int code, const char *message)
 
 bool sqlite_csv_sql_error(sqlite_csv_context_t *c)
 {
-    if (!c->report->code)
+    if (!c->report->code) {
         c->report->sqlite_code = sqlite3_extended_errcode(c->native);
-    return sqlite_csv_fail(c, EIO, sqlite3_errmsg(c->native));
+        const char *message = sqlite3_errmsg(c->native);
+        diagnostic_t *cause = diagnostic_new(DIAGNOSTIC_ERROR, "sqlite", c->report->sqlite_code, message, NULL, NULL);
+        sqlite_csv_fail(c, EIO, message);
+        sqlite_set_diagnostic_error(c->db, "sqlite.csv", EIO, message, cause);
+        diagnostic_free(cause);
+    }
+    errno = c->report->code;
+    return false;
 }
 
 bool sqlite_csv_stream_error(sqlite_csv_context_t *c, csv_t *csv)
 {
+    if (c->report->code) {
+        errno = c->report->code;
+        return false;
+    }
     c->report->csv_error = csv_error(csv);
     c->report->record = c->report->csv_error.record;
     c->report->column = c->report->csv_error.field;
-    return sqlite_csv_fail(c, c->report->csv_error.code ? c->report->csv_error.code : EINVAL, "CSV stream failure");
+    int code = c->report->csv_error.code ? c->report->csv_error.code : EINVAL;
+    diagnostic_t *cause = csv_diagnostic(csv);
+    sqlite_csv_fail(c, code, "CSV stream failure");
+    sqlite_set_diagnostic_error(c->db, "sqlite.csv", code, "CSV stream failure", cause);
+    diagnostic_free(cause);
+    errno = code;
+    return false;
 }
 
 static bool sqlite_csv_digit(string_view_t view, size_t at, unsigned char *digit)

@@ -92,8 +92,13 @@ static bool sqlite_csv_insert(sqlite_csv_context_t *c, csv_t *reader, csv_status
         /* Native cleanup deliberately leaves the copied first diagnostic intact. */
         int rollback = sqlite3_exec(c->native, "ROLLBACK TO mars_csv_import", NULL, NULL, NULL);
         int release = sqlite3_exec(c->native, "RELEASE mars_csv_import", NULL, NULL, NULL);
-        if ((rollback != SQLITE_OK || release != SQLITE_OK) && !sqlite3_get_autocommit(c->native))
-            sqlite_set_error(c->db, "CSV import failed and savepoint cleanup failed; inspect the enclosing transaction");
+        if ((rollback != SQLITE_OK || release != SQLITE_OK) && !sqlite3_get_autocommit(c->native)) {
+            diagnostic_t *cause = sqlite_diagnostic(c->db);
+            sqlite_set_diagnostic_error(c->db, "sqlite.csv", EIO,
+                                        "CSV import failed and savepoint cleanup failed; inspect the enclosing transaction",
+                                        cause);
+            diagnostic_free(cause);
+        }
         return false;
     }
     c->report->rows = rows;

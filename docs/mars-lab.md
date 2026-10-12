@@ -117,6 +117,50 @@ switching remains disabled. TeX rendering additionally rejects non-mathematical
 commands and file-access primitives; unsupported TeX produces a rendering
 diagnostic rather than discarding the calculation.
 
+Multi-card TeX rendering uses [`executor_t`](executor.md): a request-local pool
+has two native workers and three queue slots, handling at most three independent
+cards. Each job owns a copied TeX input and supervises its own isolated
+`latex`/`dvisvgm` processes and private temporary directory. Mathematical workers
+remain separate processes; number precision and mathematical graphs are not shared
+between rendering threads. Browser workers are unchanged.
+
+Request cancellation is explicitly copied to each rendering thread. The pool is
+joined before the request context is released, then the request thread publishes
+SVGs and errors in card order. Workers never mutate shared response objects.
+Single-card work stays synchronous; pool allocation or submission failure falls
+back to synchronous rendering. Existing subprocess deadlines, output limits and
+process-group cleanup still apply. No executor is kept alive across server forks.
+Renderer failures use retained `diagnostic_t` records, with child-output details
+as a cause; the existing browser-facing error text remains available.
+
+Native failure responses also carry `failure_diagnostic` through the existing
+Protobuf value envelope. It contains `domain`, numeric `code`, `message` and a
+flat `causes` array, ordered from immediate cause to deepest cause. Flattening
+preserves all 64 permitted diagnostic records without exceeding the wire's
+nesting limit. This field is separate from any native mathematical `diagnostic`
+text. Existing `error`, `error_code`, `timeout_ms` and worker return-code fields
+retain their meanings; diagnostic allocation failure does not mask those fields.
+
+| Domain | Meaning of the code |
+| --- | --- |
+| `lab.request` | HTTP validation or response-contract status, such as 400 or 502. |
+| `lab.process` | Saved errno: missing executable, timeout, cancellation, output limit or transport failure. |
+| `lab.worker` | Reaped native child exit status, including a status retained beneath a collection failure. |
+| `lab.render` | Rendering failure code; its cause may retain renderer output. |
+
+`lab_proc_diagnostic()` builds an owned snapshot from a run's explicit result,
+saved errno, exit status and timeout. It preserves errno and does not retain
+arguments, input, environment variables or captured output. Calculation, Function,
+integrand-binding and calendar adapters use it; calendar callers keep their
+existing textual error interface. There is no shared last-error record. Existing
+raw calculation output and renderer logs remain potentially sensitive and must
+not be treated as safe public logging merely because an error is structured.
+
+Matrix display refinement applies each supplied binding to every cloned symbol
+occurrence while retaining the symbolic formula and exact displayed bindings.
+Equation conjugate pairing compares structural left-hand-side identity, not
+allocation addresses, in both ordinary text and TeX output.
+
 The C regression suite lives in `tools/mars_lab/tests/`. `make -j1 -C tools/mars_lab test`
 (or root `make -j1 test_lab_native`) checks worker execution and cancellation, mathematical
 response contracts, TeX restrictions, state persistence, cache-key preservation,

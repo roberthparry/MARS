@@ -18,6 +18,8 @@
  * shared work budgets are cooperative; callers must check operation failure and
  * computation_status() before using outputs. See docs/csv.md for checkpoint
  * coverage, ownership and the corresponding executable example.
+ * csv_diagnostic() copies a sticky stream failure into an independently owned
+ * diagnostic_t, suitable for cross-thread reporting and database cause chains.
  */
 #ifndef MARS_CSV_H
 #define MARS_CSV_H
@@ -27,6 +29,7 @@
 
 #include "file-t.h"
 #include "string-t.h"
+#include "diagnostic-t.h"
 
 /** @brief Opaque CSV reader or writer; release with csv_free(). */
 typedef struct _csv_t csv_t;
@@ -164,5 +167,14 @@ const string_t *csv_output(const csv_t *csv);
 /** @brief Inspect the first stream error; successful calls do not clear a failure.
  * @param csv Borrowed handle. @return Error snapshot; NULL produces EINVAL with zero positions. */
 csv_error_t csv_error(const csv_t *csv);
+
+/**
+ * @brief Create an owned structured snapshot of the sticky stream error; release with diagnostic_free().
+ * The csv domain uses errno-style codes. Reader locations report consumed-byte offset and physical line,
+ * not a guessed character column; record and field are included in the message. No input data is copied.
+ * NULL with unchanged errno means no stream error; NULL input sets EINVAL and allocation failure sets ENOMEM.
+ * The snapshot survives csv_free(); serialise access to the CSV handle as for csv_error().
+ */
+diagnostic_t *csv_diagnostic(const csv_t *csv);
 
 #endif

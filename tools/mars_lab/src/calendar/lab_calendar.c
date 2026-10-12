@@ -16,11 +16,11 @@
 #include <time.h>
 
 #include "file-t.h"
-#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
-#include "lab_calendar_internal.h"
 #include "lab_page.h"
 #include "lab_process.h"
 #include "lab_state.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
+#include "lab_calendar_internal.h"
 
 /* Borrow an object member without transferring ownership. */
 const json_t *lab_cal_get(const json_t *object, const char *key)
@@ -197,6 +197,7 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
     int exit_status = -1;
     bool ran = lab_proc_run_worker(argv, root, NULL, timeout, 4u * 1024u * 1024u, &output, &exit_status);
     int process_error = errno;
+    diagnostic_t *error = lab_proc_diagnostic(ran, process_error, exit_status, timeout);
     json_t *fields = ran && exit_status == 0 && output ? lab_cal_parse_output(output) : NULL;
     if (!fields) {
         /* Always retain crash/exit information, even if the child printed ordinary fields first. */
@@ -204,7 +205,12 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
             output = string_new();
         string_append_format(output, "\n%s failed (exit %d, process error %d).", name, exit_status,
                              ran ? 0 : process_error);
+        string_t *description = error ? diagnostic_to_string(error) : NULL;
+        if (description)
+            string_append_format(output, "\n%S", description);
+        string_free(description);
     }
+    diagnostic_free(error);
     if (diagnostic)
         *diagnostic = output;
     else
