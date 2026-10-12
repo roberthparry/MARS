@@ -137,6 +137,18 @@ unsigned lab_eval_integrator_timeout(unsigned precision, unsigned cap)
 /* Preserve a process deadline failure separately from unavailable workers and output limits. */
 json_t *lab_eval_worker_failure(unsigned *status, int process_error, unsigned timeout_ms)
 {
+    if (process_error == ECANCELED || process_error == E2BIG || process_error == EIO) {
+        const char *code = process_error == ECANCELED ? "ECANCELED" : process_error == E2BIG ? "E2BIG" : "EIO";
+        const char *message = process_error == ECANCELED ? "Calculation cancelled"
+                              : process_error == E2BIG ? "Calculation work budget exhausted"
+                                                      : "Calculation control failed";
+        json_t *result = lab_eval_failure(status, 422u, message);
+        if (result && !lab_eval_set(result, "error_code", code)) {
+            json_free(result);
+            return NULL;
+        }
+        return result;
+    }
     if (process_error != ETIMEDOUT)
         return lab_eval_failure(status, 422u, "Native worker could not complete (unavailable or output limit)");
     string_t *message = string_sprintf("Native worker timed out after %u ms (ETIMEDOUT)", timeout_ms);
@@ -280,6 +292,12 @@ static json_t *lab_eval_function_run(const string_t *source, unsigned precision,
     string_t *output = NULL;
     int exit_status = -1;
     bool completed = lab_proc_run_worker(argv, ".", source, 30000u, 4u * 1024u * 1024u, &output, &exit_status);
+    if (!completed) {
+        int process_error = errno;
+        string_free(output);
+        string_free(digits);
+        return lab_eval_worker_failure(status, process_error, 30000u);
+    }
     json_t *result = json_new_object();
     bool ok = completed && exit_status == 0;
     lab_eval_put(result, "ok", json_new_bool(ok));

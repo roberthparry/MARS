@@ -25,6 +25,12 @@
  * MARS's datetime layer currently has second resolution, but this module's
  * frequency semantics intentionally start at daily granularity. Sub-daily
  * frequencies are left for future expansion.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/timeseries.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_TIMESERIES_H
@@ -1522,6 +1528,8 @@ int ts_arima_ljung_box(const ts_arima_result_t *model, size_t max_lag, number_t 
  * differenced models, then reintegrates forecasts. This limits the validity of integrated-model forecasts. Bounds use a
  * fixed 1.96 multiplier regardless of level; sigma defaults to one when sigma2 is not positive. For entirely
  * non-negative history, lower bounds are clipped to zero. Means, standard errors and bounds are in response units.
+ * An optional computation_run() scope also covers impulse responses, uncertainty accumulation and reintegration.
+ * Stopping discards incomplete output series without changing the fitted model or history.
  *
  * @param model Non-NULL borrowed fit at its original address; absent metadata omits model-specific terms.
  * @param history Non-NULL borrowed dated history with present observations, enough lags and a usable final datetime.

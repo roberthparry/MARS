@@ -449,7 +449,7 @@ static number_t eval_finite_summation(expr_t *expr)
         return num_clone(NUM_NAN);
     }
     sum = num_clone(NUM_ZERO);
-    for (long value = lower_value; value <= upper_value; ++value) {
+    for (long value = lower_value; value <= upper_value && expr_computation_step("expression.sum"); ++value) {
         number_t index_value = num_create_from_long(value);
         number_t term;
         number_t updated;
@@ -501,7 +501,7 @@ static number_t eval_finite_product(expr_t *expr)
         return num_clone(NUM_NAN);
 
     product = num_clone(NUM_ONE);
-    for (long value = lower_value; value <= upper_value; ++value) {
+    for (long value = lower_value; value <= upper_value && expr_computation_step("expression.product"); ++value) {
         number_t index_value = num_create_from_long(value);
         expr_t *index_expression = expr_new_const(index_value);
         expr_t *factor_expression = index_expression ? expr_substitute(expr->a, index, index_expression) : NULL;
@@ -793,7 +793,7 @@ static number_t eval_finite_inverse_progression(const expr_t *expr, long upper_v
         return num_clone(NUM_NAN);
     }
 
-    for (long k = 1L; k <= upper_value; ++k) {
+    for (long k = 1L; k <= upper_value && expr_computation_step("expression.sum"); ++k) {
         number_t argument = num_mul_long(step_value, k);
         number_t term = evaluate(argument);
         number_t updated = num_add(sum, term);
@@ -847,7 +847,7 @@ static number_t eval_finite_qdigamma_progression(const expr_t *expr, long upper_
         num_destroy(&sum);
         return num_clone(NUM_NAN);
     }
-    for (long k = 1L; k <= upper_value; ++k) {
+    for (long k = 1L; k <= upper_value && expr_computation_step("expression.sum"); ++k) {
         number_t angle = num_mul_long(step_value, k);
         number_t term;
         number_t next;
@@ -1041,7 +1041,8 @@ static number_t eval_finite_weighted_hyperbolic(expr_t *expr, long upper_value)
     q_power = num_clone(NUM_ONE);
     dominant_scaled = num_clone(NUM_ZERO);
     decaying = num_clone(NUM_ZERO);
-    for (long offset = 0L; offset < upper_value && offset < maximum_tail_terms; ++offset) {
+    for (long offset = 0L; offset < upper_value && offset < maximum_tail_terms &&
+                          expr_computation_step("expression.sum"); ++offset) {
         number_t denominator = num_create_from_long(upper_value - offset);
         number_t term = num_div(q_power, denominator);
         number_t updated = num_add(dominant_scaled, term);
@@ -1064,7 +1065,7 @@ static number_t eval_finite_weighted_hyperbolic(expr_t *expr, long upper_value)
     }
     num_destroy(&q_power);
     q_power = num_clone(q);
-    for (long k = 1L; k <= upper_value && k <= maximum_tail_terms; ++k) {
+    for (long k = 1L; k <= upper_value && k <= maximum_tail_terms && expr_computation_step("expression.sum"); ++k) {
         number_t denominator = num_create_from_long(k);
         number_t term = num_div(q_power, denominator);
         number_t updated = num_add(decaying, term);
@@ -1508,7 +1509,7 @@ static number_t eval_finite_weighted_circular(const expr_t *step_expr, long uppe
     }
     sin_k = num_clone(sin_step);
     cos_k = num_clone(cos_step);
-    for (long k = 1L; k <= upper_value; ++k) {
+    for (long k = 1L; k <= upper_value && expr_computation_step("expression.sum"); ++k) {
         number_t denominator = num_create_from_long(k);
         number_t term = num_div(kind == EXPR_FINITE_WEIGHTED_CIRCULAR_SIN ? sin_k : cos_k, denominator);
         number_t updated = num_add(sum, term);

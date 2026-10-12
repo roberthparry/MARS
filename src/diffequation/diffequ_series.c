@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
@@ -258,7 +261,7 @@ static bool de_series_steps(const diffequ_t *de, diffequ_solve_result_t *result)
 }
 
 /* Match Taylor coefficients using truncated polynomial arithmetic for the parsed normal form. */
-diffequ_solve_result_t *de_solve_series(const diffequ_t *de, size_t degree, unsigned int options)
+static diffequ_solve_result_t *de_solve_series_impl(const diffequ_t *de, size_t degree, unsigned int options)
 {
     if (!de || degree < 2u || degree > 8u)
         return de_solve_result_new(DE_SOLVE_STATUS_INVALID, DE_SOLVER_NONE,
@@ -325,6 +328,8 @@ diffequ_solve_result_t *de_solve_series(const diffequ_t *de, size_t degree, unsi
     if (!result->series_coefficients[0] || !result->series_coefficients[1])
         goto failed;
     for (size_t n = 0u; n + 2u <= degree; ++n) {
+        if (!computation_step_current("diffequation.coefficient"))
+            goto failed;
         expr_t *inputs[3][9] = {{NULL}};
         bool valid = true;
         for (size_t k = 0u; k <= n; ++k) {
@@ -389,4 +394,16 @@ cleanup:
     expr_free(residual);
     de_lie_free(normal);
     return result ? result : de_solve_result_new(status, DE_SOLVER_NONE, reason);
+}
+/* Do not publish partial series or context-specialised solutions after stopping. */
+diffequ_solve_result_t *de_solve_series(const diffequ_t *de, size_t degree, unsigned int options)
+{
+    if (!computation_step_current("diffequation.result"))
+        return NULL;
+    diffequ_solve_result_t *result = de_solve_series_impl(de, degree, options);
+    if (!computation_poll_current()) {
+        de_solve_result_free(result);
+        return NULL;
+    }
+    return result;
 }

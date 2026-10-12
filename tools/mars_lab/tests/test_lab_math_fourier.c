@@ -569,7 +569,7 @@ static void test_readme_fourier_examples(void)
 {
     /* README examples: docs/expression.md, angular-frequency Fourier table. */
     const char *cases[][2] = {
-        {"@F{exp(-t^2)}", "√(π)·exp(-¼ω²) where (ω ∈ ℝ)"},
+        {"@F{exp(-t^2)}", "√π·exp(-¼ω²) where (ω ∈ ℝ)"},
         {"@Finv{exp(-ω^2)}", "½·exp(-¼t²)/√(π) where (t ∈ ℝ)"},
         {"@F{rect(t)}", "sinc(ω/(2π)) where (ω ∈ ℝ)"},
         {"@F{delta(t)}", "1"},

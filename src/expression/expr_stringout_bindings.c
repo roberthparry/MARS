@@ -274,11 +274,27 @@ const char *expr_name_or_default(const expr_t *expr, const char *fallback)
     return (expr->name && *expr->name) ? expr->name : fallback;
 }
 
+static bool binding_rhs_is_unset(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (!expr->binding_expr)
+        return num_is_nan(expr->c);
+    if (expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER)
+        return false;
+    number_t value = NUM_ZERO;
+    bool unset = expr_binding_expr_number_value(expr->binding_expr, &value) && num_is_nan(value);
+    num_destroy(&value);
+    return unset;
+}
+
 char *binding_rhs_expr_string_local(const expr_t *expr)
 {
     string_t *text;
     char *out;
 
+    if (binding_rhs_is_unset(expr))
+        return expr_tostring_xstrdup("?");
     if (expr && expr->binding_expr)
         return expr_binding_expr_to_string(expr->binding_expr);
     text = expr ? num_to_string(expr->c) : NULL;
@@ -293,6 +309,8 @@ char *binding_rhs_TeX_string_local(const expr_t *expr)
     char *text;
     char *tex;
 
+    if (binding_rhs_is_unset(expr))
+        return expr_tostring_xstrdup("?");
     if (expr && expr->binding_expr)
         return expr_binding_expr_to_TeX(expr->binding_expr);
     number_text = expr ? num_to_string(expr->c) : NULL;

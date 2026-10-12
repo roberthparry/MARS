@@ -349,6 +349,8 @@ expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt)
 
     if (!expr || !expr->ops)
         return NULL;
+    if (!expr_computation_step("expression.integrate"))
+        return NULL;
 
     rule = integrate_dispatch_rule_for_kind(expr->ops->kind);
     return (rule && rule->primitive) ? rule->primitive(expr, wrt) : NULL;
@@ -359,6 +361,8 @@ expr_t *expr_integrate_dispatch(const expr_t *expr, const expr_t *wrt)
     const expr_integrate_dispatch_rule_t *rule;
 
     if (!expr || !wrt)
+        return NULL;
+    if (!expr_computation_step("expression.integrate"))
         return NULL;
 
     if (!depends_on_wrt(expr, wrt))
@@ -862,12 +866,18 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt)
     expr_t *result;
     expr_t *linked;
 
+    if (!expr_computation_step("expression.integrate"))
+        return NULL;
     if (expr_integrate_depth > 0u)
         return expr_integrate_impl(expr, wrt);
 
     expr_integrate_depth++;
     result = expr_integrate_impl(expr, wrt);
     expr_integrate_depth--;
+    if (!expr_computation_active()) {
+        expr_free(result);
+        return NULL;
+    }
     if (result && expr_integrate_contains_summation_local(result))
         return result;
     linked = result ? expr_clone_linked_symbols(result, expr) : NULL;

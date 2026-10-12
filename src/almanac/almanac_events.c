@@ -14,12 +14,17 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
 bool almanac_event_window_is_valid(almanac_t *almanac, const datetime_t *start, const datetime_t *end,
     double *out_start_jd, double *out_end_jd)
 {
+    if (!computation_step_current("almanac.search"))
+        return false;
     double start_jd;
     double end_jd;
 
@@ -39,7 +44,7 @@ bool almanac_event_window_is_valid(almanac_t *almanac, const datetime_t *start, 
     }
     *out_start_jd = start_jd;
     *out_end_jd = end_jd;
-    return true;
+    return computation_poll_current();
 }
 
 void almanac_event_time_from_jds(double jd, double local_jd, almanac_event_time_t *out)
@@ -74,6 +79,8 @@ bool almanac_event_time_datetime(const almanac_event_time_t *event_time, datetim
 bool almanac_bisect_event_residual(almanac_t *almanac, almanac_event_residual_fn residual, void *context, double left_jd,
     double right_jd, double *out_jd)
 {
+    if (!computation_step_current("almanac.search"))
+        return false;
     double left_value;
     double right_value;
     bool last_replaced_left = false;
@@ -88,11 +95,11 @@ bool almanac_bisect_event_residual(almanac_t *almanac, almanac_event_residual_fn
         return false;
     if (left_value == 0.0) {
         *out_jd = left_jd;
-        return true;
+        return computation_poll_current();
     }
     if (right_value == 0.0) {
         *out_jd = right_jd;
-        return true;
+        return computation_poll_current();
     }
     if (left_value * right_value > 0.0)
         return false;
@@ -103,6 +110,8 @@ bool almanac_bisect_event_residual(almanac_t *almanac, almanac_event_residual_fn
      * bisection, but normally converges in a handful of ephemeris samples.
      */
     for (iteration = 0; iteration < 24; ++iteration) {
+        if (!computation_step_current("almanac.refine"))
+            return false;
         double candidate_jd = (left_jd * right_value - right_jd * left_value) / (right_value - left_value);
         double candidate_value;
 
@@ -113,7 +122,7 @@ bool almanac_bisect_event_residual(almanac_t *almanac, almanac_event_residual_fn
             return false;
         if (fabs(candidate_value) < 1e-9 || fabs(right_jd - left_jd) < 1e-8) {
             *out_jd = candidate_jd;
-            return true;
+            return computation_poll_current();
         }
         if (left_value * candidate_value <= 0.0) {
             right_jd = candidate_jd;
@@ -133,12 +142,14 @@ bool almanac_bisect_event_residual(almanac_t *almanac, almanac_event_residual_fn
     }
 
     *out_jd = 0.5 * (left_jd + right_jd);
-    return true;
+    return computation_poll_current();
 }
 
 double almanac_find_contact_jd(almanac_t *almanac, almanac_event_residual_fn residual, void *context, double greatest_jd,
     double direction, double max_span_days, double step_days)
 {
+    if (!computation_step_current("almanac.search"))
+        return NAN;
     double previous_jd = greatest_jd;
     double previous_value;
     double offset;
@@ -151,6 +162,8 @@ double almanac_find_contact_jd(almanac_t *almanac, almanac_event_residual_fn res
         return NAN;
 
     for (offset = step_days; offset <= max_span_days + 1e-9; offset += step_days) {
+        if (!computation_step_current("almanac.refine"))
+            return NAN;
         double probe_jd = greatest_jd + direction * offset;
         double probe_value = residual(almanac, probe_jd, context);
 
@@ -177,6 +190,8 @@ double almanac_find_contact_jd(almanac_t *almanac, almanac_event_residual_fn res
 double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn metric, void *context, double centre_jd,
     double half_span_days, double sample_step_days, int refinement_iterations)
 {
+    if (!computation_step_current("almanac.search"))
+        return NAN;
     double best_jd = centre_jd;
     double best_value;
     double probe;
@@ -184,12 +199,14 @@ double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn
     int iteration;
 
     if (!metric || !(half_span_days > 0.0) || !(sample_step_days > 0.0))
-        return centre_jd;
+        return computation_poll_current() ? centre_jd : NAN;
     best_value = metric(almanac, centre_jd, context);
     if (!(best_value == best_value))
         best_value = DBL_MAX;
 
     for (probe = centre_jd - half_span_days; probe <= centre_jd + half_span_days + 1e-9; probe += sample_step_days) {
+        if (!computation_step_current("almanac.refine"))
+            return NAN;
         double value = metric(almanac, probe, context);
 
         if (value == value && value < best_value) {
@@ -198,7 +215,7 @@ double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn
         }
     }
     if (best_value == DBL_MAX)
-        return centre_jd;
+        return computation_poll_current() ? centre_jd : NAN;
 
     /*
      * ESAA 8.42 obtains greatest eclipse by rapidly interpolating the
@@ -210,9 +227,11 @@ double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn
      */
     step = fmin(sample_step_days, fmin(best_jd - (centre_jd - half_span_days), centre_jd + half_span_days - best_jd));
     if (!(step > 0.0))
-        return best_jd;
+        return computation_poll_current() ? best_jd : NAN;
 
     for (iteration = 0; iteration < refinement_iterations && step > 1e-10; ++iteration) {
+        if (!computation_step_current("almanac.refine"))
+            return NAN;
         double left_value = metric(almanac, best_jd - step, context);
         double centre_value = metric(almanac, best_jd, context);
         double right_value = metric(almanac, best_jd + step, context);
@@ -247,5 +266,5 @@ double almanac_find_local_minimum_jd(almanac_t *almanac, almanac_event_metric_fn
         step *= 0.25;
     }
 
-    return best_jd;
+    return computation_poll_current() ? best_jd : NAN;
 }

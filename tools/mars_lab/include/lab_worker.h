@@ -25,4 +25,15 @@ const char *lab_worker_environment(const char *name);
  */
 int lab_worker_dispatch(int argc, char **argv);
 
+/** @brief Parse timeout and work-limit prefixes, then execute a mode under cooperative control in a fresh process. */
+int lab_worker_dispatch_controlled(int argc, char **argv);
+
+/** @brief Reserved controlled-worker exit codes; only interpreted for built-in workers. */
+enum {
+    LAB_WORKER_CANCELLED = 120,
+    LAB_WORKER_TIMED_OUT = 121,
+    LAB_WORKER_BUDGET_EXHAUSTED = 122,
+    LAB_WORKER_CONTROL_FAILED = 123
+};
+
 #endif

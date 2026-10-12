@@ -2,6 +2,45 @@
 
 `expr_t` is a reference-counted expression DAG for differentiable values.
 
+## Cooperative calculation control
+
+Use [`computation_run()`](computation.md#scoped-native-calculations) to place native
+work under a shared cancellation flag, deadline and work allowance without changing
+expression ownership. Evaluation, differentiation (including reverse derivatives),
+simplification, beautification, integration dispatch and bounded sum/product loops
+have checkpoints. Each node visit or iteration charges algorithm-specific work;
+cached visits can still be charged. Progress stages use the `expression.*` prefix,
+with unknown totals and periodic synchronous reports.
+
+Always check the scope's return value and discard its outputs on false. Some legacy
+symbolic calls return an unchanged or partial expression while unwinding; that is
+not a successful mathematical result. Interrupted values and derivatives are not
+published into their caches, so graphs remain reusable after the scope ends.
+This does not make graphs thread-safe or make parsing, rendering, every symbolic
+search loop or individual numerical primitives interruptible. Retain hard process
+supervision where needed. The computation guide includes a tested recovery example.
+
+## Imaginary-axis presentation
+
+Native presentation reduces trigonometric and hyperbolic functions on the imaginary
+axis using exact identities, removing zero real or imaginary terms before rendering.
+Cartesian separation preserves this reduction for symbolic arguments as well as
+constants, without reintroducing a zero summand. Unset scalar bindings display
+as `?`, not `NAN`; an actual undefined numerical expression still displays as such.
+For example, `sinh(ix)` produces `{ sin(x)·i | x = ? }` in Expression output;
+the TeX body is the same formula without the binding section.
+The same symbolic result supplies Expression, Function and TeX output; its numerical
+evaluation retains the selected precision. Inverse identities preserve principal
+branches and are not inferred from a variable's current numerical binding.
+In particular, an unbound coefficient of `i` must not be assumed real when
+expanding inverse functions: the formula must remain valid after a complex
+binding is supplied. Where branch safety is unproved, the inverse call is retained.
+
+The inverse tangent has poles at `i` and `-i`. These remain symbolic in the formula
+rather than expanding into undefined Cartesian subexpressions. Numerical evaluation
+retains the backend's signed imaginary-infinity convention at these poles; it is
+not a finite principal value.
+
 ## Laplace transforms
 
 Expression mode accepts the forward unilateral Laplace operator `@L`, its

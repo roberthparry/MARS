@@ -57,7 +57,8 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
 - **`lock_t`** — opaque mutex, recursive lock, reader/writer lock, semaphore and completion-event handles, with optional scope cleanup
 - **`thread_t`** — native callback threads with completion checks, timed waits, joining and detachment
-- **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `expr_t` integrands
+- **`computation_t`** — shared calculation cancellation, monotonic deadlines, work budgets and progress callbacks
+- **`integrator_t`** — adaptive tanh–sinh / Gauss–Kronrod integration with symbolic fast paths and shared calculation control
 
 ## MARS Lab
 
@@ -430,6 +431,7 @@ int main(void) {
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](./docs/bitset.md) |
 | `lock_t` | Opaque mutex, reader/writer, semaphore and completion-event class cluster | [`docs/lock.md`](./docs/lock.md) |
 | `thread_t` | Owned native callback threads with lock-backed completion waits | [`docs/thread.md`](./docs/thread.md) |
+| `computation_t` | Shared cooperative calculation control and progress reporting | [`docs/computation.md`](./docs/computation.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](./docs/number.md) |
 | `qfloat_t` | Double-double arithmetic, circular function families, and special functions | [`docs/qfloat.md`](./docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic, circular function families, and special functions | [`docs/qcomplex.md`](./docs/qcomplex.md) |
@@ -441,7 +443,7 @@ int main(void) {
 | `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](./docs/jurisdiction.md) |
 | `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](./docs/sqlite.md) |
 | `file_t`, `file_info_t`, `file_key_t` | Linux file I/O, metadata, compression, authenticated encryption and SQLCipher transfers | [`docs/file.md`](./docs/file.md) |
-| `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](./docs/integrator.md) |
+| `integrator_t` | Adaptive tanh–sinh / Gauss–Kronrod integration | [`docs/integrator.md`](./docs/integrator.md) |
 
 ## Build
 

@@ -2623,3 +2623,63 @@ $y''=(dp/dy)(dy/dx)=p\,dp/dy$. The velocity is thus treated as a function of
 the original dependent coordinate. This is a local order reduction, not a completed solve;
 check equilibrium solutions separately. Return `NULL` for a non-autonomous
 equation, null analysis or failure. Release the result with `equ_free()`.
+
+## Optional computation control
+
+`de_solve`, `de_solve_with_options`, `de_solve_with_context` and
+`de_solve_series` inherit `computation_run`. Method selection and Taylor
+coefficient work share the allowance with nested Expression and Equation
+operations. A stopped solve returns NULL, not an unsupported or partially
+solved result. The parsed problem remains reusable.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "diffequation-t.h"
+
+typedef struct {
+    diffequ_t *input;
+    diffequ_solve_result_t *result;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    job->result = de_solve(job->input);
+    return job->result != NULL;
+}
+
+int main(void)
+{
+    job_t job = {.input = de_from_string("y\' = y")};
+    if (!job.input)
+        return 1;
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    de_solve_result_free(job.result);
+    de_free(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

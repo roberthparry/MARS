@@ -15,6 +15,9 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -513,6 +516,10 @@ static bool almanac_equatorial_from_chebyshev(almanac_t *almanac, const almanac_
 bool almanac_compute_state_for_model(almanac_t *almanac, const almanac_model_row_t *model, const datetime_t *moment,
     almanac_state_t *state)
 {
+    if (!computation_step_current("almanac.ephemeris")) {
+        almanac_set_error(almanac, "calculation stopped");
+        return false;
+    }
     double ephemeris_jd;
 
     if (!almanac || !model || !moment || !state) {
@@ -562,6 +569,10 @@ bool almanac_compute_state_for_model(almanac_t *almanac, const almanac_model_row
 
 bool almanac_state_for_body_at_jd(almanac_t *almanac, almanac_body_id_t body_id, double jd, almanac_state_t *out_state)
 {
+    if (!computation_step_current("almanac.ephemeris")) {
+        almanac_set_error(almanac, "calculation stopped");
+        return false;
+    }
     datetime_t *moment;
     almanac_model_row_t model;
     bool ok;

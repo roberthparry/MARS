@@ -32,7 +32,14 @@ struct _integrator_t {
     size_t max_intervals;
     size_t last_intervals;
     expr_t *last_exact_result;
+    computation_t *computation;
 };
+
+/** @brief Reserve shared work or poll cancellation; absent control permits work. */
+bool intg_checkpoint(integrator_t *ig, uint64_t work);
+
+/** @brief Publish a stage with unknown total and poll for observer cancellation. */
+bool intg_report(integrator_t *ig, const char *stage, uint64_t completed);
 
 void intg_clear_exact_result(integrator_t *ig);
 void intg_set_exact_result_owned(integrator_t *ig, expr_t *expr);

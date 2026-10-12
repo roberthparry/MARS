@@ -6,6 +6,9 @@
  * independent symbolic snapshots. Context assumptions never change solver selection.
  */
 #include "expr_context-t.h"
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 
@@ -36,7 +39,7 @@ static bool de_context_equation(equation_t **slot, const expr_context_t *context
 }
 
 /* Solve first, then share the expression context's proof rules across the result. */
-diffequ_solve_result_t *de_solve_with_context(const diffequ_t *de, unsigned int options,
+static diffequ_solve_result_t *de_solve_with_context_impl(const diffequ_t *de, unsigned int options,
                                            const expr_context_t *context)
 {
     diffequ_solve_result_t *result = de_solve_with_options(de, options);
@@ -57,4 +60,17 @@ diffequ_solve_result_t *de_solve_with_context(const diffequ_t *de, unsigned int 
 failure:
     de_solve_result_free(result);
     return NULL;
+}
+/* Do not publish partial series or context-specialised solutions after stopping. */
+diffequ_solve_result_t *de_solve_with_context(const diffequ_t *de, unsigned int options,
+                                           const expr_context_t *context)
+{
+    if (!computation_step_current("diffequation.result"))
+        return NULL;
+    diffequ_solve_result_t *result = de_solve_with_context_impl(de, options, context);
+    if (!computation_poll_current()) {
+        de_solve_result_free(result);
+        return NULL;
+    }
+    return result;
 }

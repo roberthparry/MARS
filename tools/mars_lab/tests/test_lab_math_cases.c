@@ -41,6 +41,8 @@ void test_lab_math_fourier_readme_cases(void);
 void test_lab_math_fourier_tanh_cases(void);
 void test_lab_math_fourier_tanh_readme_cases(void);
 void test_lab_math_inverse_elementary_cases(void);
+void test_lab_math_imaginary_cases(void);
+void test_lab_math_imaginary_readme_cases(void);
 void test_lab_math_inverse_gaussian_cases(void);
 void test_lab_math_inverse_general_cases(void);
 void test_lab_math_inverse_general_readme_cases(void);
@@ -68,6 +70,7 @@ void test_lab_math_style_readme_cases(void);
 /* Register every ordinary mathematical worker case before README examples. */
 void test_lab_math_cases(void)
 {
+    test_lab_math_imaginary_cases();
     test_lab_math_cylindrical_bessel_i_cases();
     test_lab_math_cylindrical_bessel_y_cases();
     test_lab_math_cylindrical_struve_h_cases();
@@ -104,6 +107,7 @@ void test_lab_math_cases(void)
 /* Run all mathematical README examples after the ordinary Lab regressions. */
 void test_lab_math_readme_cases(void)
 {
+    test_lab_math_imaginary_readme_cases();
     test_lab_math_cylindrical_bessel_i_readme_cases();
     test_lab_math_cylindrical_bessel_y_readme_cases();
     test_lab_math_cylindrical_struve_h_readme_cases();

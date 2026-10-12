@@ -20,6 +20,9 @@
  *      total_error <= max(abs_tol, rel_tol * |result|)
  *
  * Work limits may stop refinement before that criterion is met; check status.
+ * An optional retained computation_t shares cancellation, deadlines and work
+ * reservations across all dimensions and successive calls. Integrators remain
+ * single-caller objects even when their computation control is shared.
  */
 
 #ifndef MARS_INTEGRATOR_H
@@ -27,6 +30,7 @@
 
 #include <stddef.h>
 
+#include "computation-t.h"
 #include "expression-t.h"
 
 /** Opaque integrator handle. */
@@ -73,6 +77,23 @@ void intg_set_tolerance(integrator_t *ig, number_t abs_tol, number_t rel_tol);
 void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
 
 /**
+ * @brief Retain shared calculation control, replacing the previous reference; NULL detaches it.
+ * Returns false with EINVAL for a missing integrator, or if retaining the new control fails.
+ * Configure only while idle. Calls do not reset or complete the shared control.
+ * Each symbolic fast-path attempt and each fresh integrand evaluation reserves one unit;
+ * all dimensions share the same budget. Cached quadrature nodes do not reserve additional units.
+ * Progress reports have unknown total and run on the integration thread; observers must
+ * not re-enter, reconfigure or destroy this integrator or change its expressions/precision.
+ * All handle-based integration calls return -2 when the control is no longer active,
+ * with result/error set to NaN and exact-result state cleared. Inspect computation_status()
+ * for the reason. Without an attached control, calls inherit computation_current().
+ * computation_run() also enables expression checkpoints within symbolic and numerical
+ * calls, including standalone symbolic APIs; individual primitives remain non-interruptible.
+ * A different explicitly attached control inside a scope gives -2 with EBUSY and cleared outputs.
+ */
+bool intg_set_computation(integrator_t *ig, computation_t *computation);
+
+/**
  * @brief Integrate an expr_t expression over [a, b].
  *
  * Uses the shared number_t adaptive engine and evaluates an
@@ -103,6 +124,7 @@ void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
  *
  * @return  0  Converged within tolerance.
  * @return  1  Maximum subintervals reached before convergence.
+ * @return -2  Shared computation stopped; result and error are NaN.
  * @return -1  Null argument or internal allocation failure.
  */
 int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t a, number_t b, number_t *result,
@@ -169,6 +191,7 @@ expr_t *intg_integrate_iterated_symbolic_best_effort(const expr_t *integrand, si
  *
  * @return  0  Converged within tolerance.
  * @return  1  Maximum subintervals reached before convergence.
+ * @return -2  Shared computation stopped; result and error are NaN.
  * @return -1  Null argument or internal allocation failure.
  */
 int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var,
@@ -196,6 +219,7 @@ int intg_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t
  *
  * @return  0  Converged within tolerance.
  * @return  1  Maximum subintervals reached before convergence.
+ * @return -2  Shared computation stopped; result and error are NaN.
  * @return -1  Null argument or internal allocation failure.
  */
 int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t ax, number_t bx, expr_t *y_var,
@@ -245,6 +269,7 @@ int intg_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t
  *
  * @return  0  Converged within tolerance.
  * @return  1  Maximum subintervals reached before convergence.
+ * @return -2  Shared computation stopped; result and error are NaN.
  * @return -1  Null argument, ndim == 0, or internal allocation failure.
  */
 int intg_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,

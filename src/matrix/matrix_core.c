@@ -12,17 +12,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "qfloat-t.h"
+#include "qcomplex-t.h"
+#include "number-t.h"
+#include "string-t.h"
 #include "matrix-t.h"
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_vtable_defs.h"
-#include "number-t.h"
-#include "qcomplex-t.h"
-#include "qfloat-t.h"
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
-#include "string-t.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)
@@ -2698,6 +2701,8 @@ static struct _matrix_t *mat_add_or_sub_sparse(const struct _matrix_t *A, const 
 
 static struct _matrix_t *mat_mul_sparse(const struct _matrix_t *A, const struct _matrix_t *B, const binop_vtable *op)
 {
+    if (!computation_step_current("matrix.multiply"))
+        return NULL;
     const struct elem_vtable *re = op->result_elem;
     struct _matrix_t *As = NULL, *Bs = NULL, *C = NULL;
     unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0},
@@ -2737,7 +2742,7 @@ static struct _matrix_t *mat_mul_sparse(const struct _matrix_t *A, const struct 
         return NULL;
     }
 
-    for (size_t i = 0; i < As->rows; i++) {
+    for (size_t i = 0; i < As->rows && computation_step_current("matrix.row"); i++) {
         sparse_entry_t *a_cur = As->data ? (sparse_entry_t *)As->data[i] : NULL;
 
         while (a_cur) {
@@ -2775,6 +2780,10 @@ static struct _matrix_t *mat_mul_sparse(const struct _matrix_t *A, const struct 
     elem_destroy_value(re, prod);
     elem_destroy_value(re, sum_acc);
     elem_destroy_value(re, next_sum);
+    if (!computation_poll_current()) {
+        mat_free(C);
+        return NULL;
+    }
     return C;
 }
 
@@ -2862,6 +2871,8 @@ struct _matrix_t *mat_sub(const struct _matrix_t *A, const struct _matrix_t *B)
 
 struct _matrix_t *mat_mul(const struct _matrix_t *A, const struct _matrix_t *B)
 {
+    if (!computation_step_current("matrix.multiply"))
+        return NULL;
     binop_elem_kind ak, bk;
     const binop_vtable *op;
 
@@ -2891,7 +2902,7 @@ struct _matrix_t *mat_mul(const struct _matrix_t *A, const struct _matrix_t *B)
     elem_init_zero_value(re, sum);
     elem_init_zero_value(re, next_sum);
 
-    for (size_t i = 0; i < A->rows; i++) {
+    for (size_t i = 0; i < A->rows && computation_step_current("matrix.row"); i++) {
         for (size_t j = 0; j < B->cols; j++) {
 
             elem_copy_value(re, sum, re->zero);
@@ -2923,6 +2934,10 @@ struct _matrix_t *mat_mul(const struct _matrix_t *A, const struct _matrix_t *B)
         return NULL;
     }
 
+    if (!computation_poll_current()) {
+        mat_free(C);
+        return NULL;
+    }
     return C;
 }
 

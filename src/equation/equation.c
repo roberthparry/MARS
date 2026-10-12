@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "string-t.h"
+#include "computation-t.h"
 #include "expression-t.h"
 #include "equation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -303,6 +304,8 @@ static int equ_solutions_append(equation_solutions_t *solutions, equation_t *sol
     equation_t **items;
 
     if (!solutions || !solution)
+        return -1;
+    if (!equ_computation_step("equation.solution"))
         return -1;
 
     for (size_t i = 0u; i < solutions->count; ++i) {
@@ -2316,6 +2319,10 @@ static number_t *equ_snapshot_binding_values(expr_bindings_t *bindings)
         expr_t *expr = expr_bindings_expr_at(bindings, i);
 
         values[i] = expr ? expr_eval(expr) : num_new();
+        if (!equ_computation_active()) {
+            equ_free_binding_value_snapshot(bindings, values);
+            return NULL;
+        }
     }
     return values;
 }
@@ -2364,6 +2371,8 @@ int equ_solve_numeric_into(const equation_t *equation, expr_bindings_t *bindings
     equ_solutions_reset(solutions);
     if (!equation || !bindings)
         goto cleanup_no_goal;
+    if (!equ_computation_step("equation.numeric"))
+        goto cleanup_no_goal;
 
     solutions->status = EQUATION_SOLVE_UNSOLVED;
     residual = equ_residual(equation);
@@ -2394,121 +2403,56 @@ int equ_solve_numeric_into(const equation_t *equation, expr_bindings_t *bindings
     expr_goal_seek_result_clear(&goal_result);
 
 cleanup_no_goal:
+    if (!equ_computation_active()) {
+        equ_restore_binding_values(bindings, original_values);
+        equ_solutions_clear(solutions);
+        rc = -1;
+    }
     equ_free_binding_value_snapshot(bindings, original_values);
     num_destroy(&target);
     expr_free(residual);
     return rc < 0 ? -1 : 0;
 }
 
+/* Try the fixed ordered solver pipeline; stop before any fallback after cancellation. */
 int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
-    int unary_inverse_rc;
-    int unary_periodic_rc;
-    int atan_sum_rc;
-    int self_power_rc;
-    int repeated_power_rc;
-    int affine_rc;
-    int zero_product_rc;
-    int quadratic_rc;
-    int cubic_rc;
-    int quartic_rc;
-    int quintic_rc;
-    int general_polynomial_rc;
-
+    typedef int (*solver_t)(const equation_t *, const expr_t *, equation_solutions_t *);
+    static const solver_t solvers[] = {
+        equ_try_solve_unary_inverse, equ_try_solve_unary_periodic, equ_try_solve_atan_sum,
+        equ_try_solve_self_power, equ_try_solve_repeated_power_polynomial, equ_try_solve_affine,
+        equ_try_solve_general_polynomial, equ_try_solve_zero_product, equ_try_solve_quadratic,
+        equ_try_solve_cubic, equ_try_solve_quartic, equ_try_solve_quintic
+    };
     if (!solutions)
         return -1;
-
     equ_solutions_reset(solutions);
-
-    if (!equation || !wrt)
+    if (!equation || !wrt || !equ_computation_step("equation.solve"))
         return -1;
-
     solutions->status = EQUATION_SOLVE_UNSOLVED;
-
+    int rc = 1;
     if (equ_is_solved_for(equation, wrt))
-        return equ_append_existing_solution(equation, solutions);
-
-    unary_inverse_rc = equ_try_solve_unary_inverse(equation, wrt, solutions);
-    if (unary_inverse_rc == 0)
-        return 0;
-    if (unary_inverse_rc < 0)
+        rc = equ_append_existing_solution(equation, solutions);
+    /* Twelve ordered alternatives, not a key lookup. Whole-polynomial collection
+     * precedes factor solving so complex conjugate coefficients can cancel. */
+    for (size_t i = 0; rc > 0 && i < sizeof(solvers) / sizeof(*solvers); ++i) {
+        if (!equ_computation_step("equation.symbolic")) {
+            rc = -1;
+            break;
+        }
+        rc = solvers[i](equation, wrt, solutions);
+        if (!equ_computation_active())
+            rc = -1;
+    }
+    if (!equ_computation_active() || rc < 0) {
+        equ_solutions_clear(solutions);
+        equ_computation_active();
         return -1;
-
-    unary_periodic_rc = equ_try_solve_unary_periodic(equation, wrt, solutions);
-    if (unary_periodic_rc == 0)
-        return 0;
-    if (unary_periodic_rc < 0)
-        return -1;
-
-    atan_sum_rc = equ_try_solve_atan_sum(equation, wrt, solutions);
-    if (atan_sum_rc == 0)
-        return 0;
-    if (atan_sum_rc < 0)
-        return -1;
-
-    self_power_rc = equ_try_solve_self_power(equation, wrt, solutions);
-    if (self_power_rc == 0)
-        return 0;
-    if (self_power_rc < 0)
-        return -1;
-
-    repeated_power_rc = equ_try_solve_repeated_power_polynomial(equation, wrt, solutions);
-    if (repeated_power_rc == 0)
-        return 0;
-    if (repeated_power_rc < 0)
-        return -1;
-
-    affine_rc = equ_try_solve_affine(equation, wrt, solutions);
-    if (affine_rc == 0)
-        return 0;
-    if (affine_rc < 0)
-        return -1;
-
-    /*
-     * High-degree products may be internally regrouped into factors with
-     * complex coefficients. Collect the complete polynomial first so
-     * conjugate coefficients cancel before any individual factor is solved.
-     */
-    general_polynomial_rc = equ_try_solve_general_polynomial(equation, wrt, solutions);
-    if (general_polynomial_rc == 0)
-        return 0;
-    if (general_polynomial_rc < 0)
-        return -1;
-
-    zero_product_rc = equ_try_solve_zero_product(equation, wrt, solutions);
-    if (zero_product_rc == 0)
-        return 0;
-    if (zero_product_rc < 0)
-        return -1;
-
-    quadratic_rc = equ_try_solve_quadratic(equation, wrt, solutions);
-    if (quadratic_rc == 0)
-        return 0;
-    if (quadratic_rc < 0)
-        return -1;
-
-    cubic_rc = equ_try_solve_cubic(equation, wrt, solutions);
-    if (cubic_rc == 0)
-        return 0;
-    if (cubic_rc < 0)
-        return -1;
-
-    quartic_rc = equ_try_solve_quartic(equation, wrt, solutions);
-    if (quartic_rc == 0)
-        return 0;
-    if (quartic_rc < 0)
-        return -1;
-
-    quintic_rc = equ_try_solve_quintic(equation, wrt, solutions);
-    if (quintic_rc == 0)
-        return 0;
-    if (quintic_rc < 0)
-        return -1;
-
+    }
     return 0;
 }
 
-equation_solutions_t *equ_derive_solutions(const equation_t *equation)
+static equation_solutions_t *equ_derive_solutions_impl(const equation_t *equation)
 {
     equation_solutions_t *solutions = equ_solutions_new();
     expr_bindings_t *bindings = equ_bindings(equation);
@@ -2541,10 +2485,10 @@ equation_solutions_t *equ_derive_solutions(const equation_t *equation)
             goto error;
         used_numeric = true;
         if (equ_solve_numeric_into(equation, bindings, &options, solutions) != 0) {
-            num_destroy(&options.tolerance);
             goto error;
         }
         num_destroy(&options.tolerance);
+        used_numeric = false;
     }
 
     return solutions;
@@ -2556,6 +2500,27 @@ error:
         equ_solutions_free(solutions);
     }
     return NULL;
+}
+
+/* Publish only a complete solve; stopped work restores its original numeric bindings. */
+equation_solutions_t *equ_derive_solutions(const equation_t *equation)
+{
+    if (!equ_computation_step("equation.begin"))
+        return NULL;
+    expr_bindings_t *bindings = equ_bindings(equation);
+    bool snapshot = computation_current() && expr_bindings_count(bindings) > 0;
+    number_t *original = snapshot ? equ_snapshot_binding_values(bindings) : NULL;
+    if (snapshot && !original)
+        return NULL;
+    equation_solutions_t *result = equ_derive_solutions_impl(equation);
+    if (!equ_computation_active()) {
+        equ_restore_binding_values(bindings, original);
+        equ_solutions_free(result);
+        result = NULL;
+    }
+    equ_free_binding_value_snapshot(bindings, original);
+    equ_computation_active();
+    return result;
 }
 
 size_t equ_solutions_count(const equation_solutions_t *solutions)

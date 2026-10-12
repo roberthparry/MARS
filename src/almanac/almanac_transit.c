@@ -14,6 +14,9 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -258,6 +261,11 @@ array_t *almanac_find_solar_transits_for_body(almanac_t *almanac, almanac_body_i
     first_cycle = (long)floor((start_jd - reference_jd) / synodic_period_days) - 1L;
     last_cycle = (long)ceil((end_jd - reference_jd) / synodic_period_days) + 1L;
     for (cycle = first_cycle; cycle <= last_cycle; ++cycle) {
+        if (!computation_step_current("almanac.candidate")) {
+            array_destroy(events);
+            almanac_set_error(almanac, "calculation stopped");
+            return NULL;
+        }
         double estimate_jd = reference_jd + (double)cycle * synodic_period_days;
         double conjunction_jd;
 
@@ -284,6 +292,11 @@ array_t *almanac_find_solar_transits_for_body(almanac_t *almanac, almanac_body_i
         }
     }
 
+    if (!computation_poll_current()) {
+        array_destroy(events);
+        almanac_set_error(almanac, "calculation stopped");
+        return NULL;
+    }
     return events;
 }
 

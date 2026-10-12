@@ -845,3 +845,71 @@ Returns the public result described by year type.
 ```c
 ts_year_type_t ts_year_type(const timeseries_t *series);
 ```
+
+## Optional computation control
+
+Regression fitting, ARIMA fitting, automatic model selection, prediction and
+correlation diagnostics inherit `computation_run`, including their nested
+Matrix work. Candidate models, fitting iterations, observations, prediction
+steps and correlation lags provide checkpoints. A stopped search discards its
+best-so-far model rather than reporting it as the completed selection.
+Prediction also checks impulse-response generation (`timeseries.impulse`),
+uncertainty accumulation (`timeseries.uncertainty`) and ordinary or seasonal
+reintegration (`timeseries.reintegrate`). A stop during any of these stages
+discards all four output series while leaving the fitted model reusable.
+Initialise result structures to zero and clear them normally after use.
+CSV ingestion and output also inherit the scope through `csv_t`.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "timeseries-t.h"
+
+typedef struct {
+    timeseries_t *input;
+    ts_arima_spec_t spec;
+    ts_arima_result_t result;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    return ts_auto_arima(job->input, NULL, 1, 0, 0, 0, 0, 0, 0,
+                         TS_IC_AIC, NULL, &job->spec, &job->result) == 0;
+}
+
+int main(void)
+{
+    const double values[] = {2, 4, 3, 7, 5, 9, 8, 11, 10, 13, 12, 15};
+    job_t job = {.input = ts_new_from_doubles(values, 12)};
+    if (!job.input)
+        return 1;
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    ts_arima_result_clear(&job.result);
+    ts_free(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

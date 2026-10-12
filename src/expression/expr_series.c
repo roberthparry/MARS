@@ -19,10 +19,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "expression-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "string-t.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_computation_internal.h"
 
 typedef struct {
     size_t start;
@@ -2711,6 +2713,8 @@ static bool expr_series_sum_inverse_index_power(const number_t *coefficients, si
         return false;
 
     for (size_t index_value = coefficient_count + 1u; index_value <= endpoint; ++index_value) {
+        if (!expr_computation_step("expression.series"))
+            goto cleanup;
         number_t index = num_create_from_long((long)index_value);
         number_t index_power = num_pow_int(index, exponent);
         number_t term = num_div(coefficients[0], index_power);
@@ -2998,6 +3002,8 @@ static bool expr_series_sum_alternating_arithmetic_reciprocal(const number_t *co
         goto cleanup;
 
     for (size_t index = coefficient_count; index <= endpoint; ++index) {
+        if (!expr_computation_step("expression.series"))
+            goto cleanup;
         number_t term;
         number_t next_sum;
 
@@ -3342,6 +3348,8 @@ static bool expr_series_sum_polynomial(const number_t *coefficients, size_t coef
         goto cleanup;
 
     for (size_t iteration = 0u; iteration < 1000000u; ++iteration) {
+        if (!expr_computation_step("expression.series"))
+            goto cleanup;
         number_t next_sum;
 
         for (size_t order = degree; order > 0u; --order) {
@@ -4405,6 +4413,11 @@ string_t *expr_expand_series_text(string_view_t source, string_t **display_TeX_o
         return NULL;
 
     for (size_t pass = 0u; pass < 32u; ++pass) {
+        if (!expr_computation_step("expression.series")) {
+            string_free(display_TeX);
+            string_free(current);
+            return NULL;
+        }
         string_t *next;
         string_t *next_display_TeX = NULL;
         bool expanded = false;

@@ -85,6 +85,30 @@
       "test_unset_range": true
     }
   },
+  "tests/computation/test_computation.c": {
+    "example_computation_integrator": true,
+    "example_computation_progress": true,
+    "test_computation_budget": true,
+    "test_computation_concurrent_budget": true,
+    "test_computation_deadline": true,
+    "test_computation_integrator_deadline": true,
+    "test_computation_integrator_exact_and_wrappers": true,
+    "test_computation_integrator_numerical": true,
+    "test_computation_integrator_observer": true,
+    "test_computation_integrator_shared": true,
+    "test_computation_integrator_success": true,
+    "test_computation_invalid": true,
+    "test_computation_lifecycle": true,
+    "test_computation_progress": true,
+    "test_computation_thread_cancel": true
+  },
+  "tests/computation/test_computation_expression.c": {
+    "example_computation_scope": true,
+    "test_computation_expression_recovery": true,
+    "test_computation_inherited_integrator": true,
+    "test_computation_scopes": true,
+    "test_computation_sum_product_recovery": true
+  },
   "tests/csv/test_csv.c": {
     "example_csv_read": true,
     "example_csv_write": true,
@@ -1277,7 +1301,8 @@
       "test_reverse_mode": true,
       "test_runtime_regressions": true,
       "test_second_derivatives": true,
-      "test_symbolic_integration": true
+      "test_symbolic_integration": true,
+      "test_expr_t_imaginary_axis": true
     }
   },
   "tests/file/test_file.c": {
@@ -2384,6 +2409,7 @@
       "test_websrv_documents": true,
       "test_websrv_exact_bytes": true,
       "test_websrv_header_boundary": true,
+      "test_websrv_input_closure": true,
       "test_websrv_lifetime": true,
       "test_websrv_limits_and_timeout": true,
       "test_websrv_malformed": true,
@@ -3403,6 +3429,7 @@
       "enabled": true,
       "test_process_builtin_workers": true,
       "test_process_cancellation": true,
+      "test_process_cooperative_stop": true,
       "test_process_cwd": true,
       "test_process_descendant_overflow": true,
       "test_process_descendant_timeout": true,
@@ -3414,6 +3441,7 @@
       "test_process_success": true,
       "test_process_timeout": true,
       "test_process_unicode": true,
+      "test_process_worker_control": true,
       "test_process_worker_execution": true,
       "test_process_worker_invalid_arguments": true,
       "test_process_worker_paths": true
@@ -3507,6 +3535,54 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
+    }
+  },
+  "tests/computation/test_computation_modules.c": {
+    "test_computation_almanac_stop": true,
+    "test_computation_csv_long_record": true,
+    "test_computation_csv_stop": true,
+    "test_computation_diffequation_stop": true,
+    "test_computation_equation_bindings": true,
+    "test_computation_equation_stop": true,
+    "test_computation_matrix_factors": true,
+    "test_computation_matrix_stop": true,
+    "test_computation_sqlite_callback_stop": true,
+    "test_computation_sqlite_export_stop": true,
+    "test_computation_sqlite_file_stop": true,
+    "test_computation_sqlite_rollback": true,
+    "test_computation_timeseries_stop": true,
+    "test_computation_forecast_uncertainty_stop": true
+  },
+  "tests/computation/test_computation_module_readme.c": {
+    "example_computation_almanac": true,
+    "example_computation_csv": true,
+    "example_computation_diffequation": true,
+    "example_computation_equation": true,
+    "example_computation_matrix": true,
+    "example_computation_sqlite": true,
+    "example_computation_timeseries": true
+  },
+  "tests/expression/test_expr_imaginary.c": {
+    "tests": {
+      "enabled": true,
+      "test_expr_t_imaginary_axis": {
+        "enabled": true,
+        "test_imaginary_atan_poles_and_branches": true,
+        "test_imaginary_axis_identities": true,
+        "test_symbolic_cartesian_zero_components": true
+      }
+    }
+  },
+  "tools/mars_lab/tests/test_lab_math_imaginary.c": {
+    "tests": {
+      "enabled": true,
+      "test_imaginary_axis_formula_cards": true,
+      "test_symbolic_imaginary_axis_formula_cards": true,
+      "test_symbolic_imaginary_axis_bound_values": true
+    },
+    "readme_examples": {
+      "enabled": true,
+      "example_symbolic_imaginary_axis": true
     }
   }
 }

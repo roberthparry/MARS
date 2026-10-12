@@ -138,6 +138,7 @@ int checks_markdown_api(const string_t *root)
     static const struct module_guide guides[] = {{"almanac-t.h", "almanac.md"},
                                                  {"array-t.h", "array.md"},
                                                  {"bitset-t.h", "bitset.md"},
+                                                 {"computation-t.h", "computation.md"},
                                                  {"csv-t.h", "csv.md"},
                                                  {"datetime-t.h", "datetime.md"},
                                                  {"dictionary-t.h", "dictionary.md"},

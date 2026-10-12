@@ -8,6 +8,9 @@
  */
 #include <errno.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_CSV_INTERNAL_ACCESS
 #include "csv_internal.h"
 
@@ -56,6 +59,8 @@ static bool csv_write_field(csv_t *csv, string_t *out, const string_t *field)
     string_view_t view = string_view_all(field);
     /* One bounded pass selects quoting; a second emits the field, escaping each quote. */
     for (size_t i = 0; !quoted && i < length; ++i) {
+        if ((i & 4095u) == 0 && !computation_step_current("csv.bytes"))
+            return csv_fail(csv, errno);
         unsigned char c;
         if (string_view_peek_ascii(view, i, &c))
             quoted = c == '"' || c == '\r' || c == '\n' || c == (unsigned char)csv->options.delimiter;
@@ -64,6 +69,8 @@ static bool csv_write_field(csv_t *csv, string_t *out, const string_t *field)
         return false;
     size_t start = 0;
     for (size_t i = 0; quoted && i < length; ++i) {
+        if ((i & 4095u) == 0 && !computation_step_current("csv.bytes"))
+            return csv_fail(csv, errno);
         unsigned char c;
         if (string_view_peek_ascii(view, i, &c) && c == '"') {
             if (!csv_write_append(csv, out, string_c_str(field) + start, i - start) ||
@@ -81,6 +88,8 @@ bool csv_write(csv_t *csv, const string_t *const *fields, size_t count)
 {
     if (!csv || !csv->writer || csv->finished || csv->error.code || !fields || !count)
         return csv_fail(csv, EINVAL);
+    if (!computation_step_current("csv.write"))
+        return csv_fail(csv, errno);
     if (count > csv->options.max_columns)
         return csv_fail(csv, EOVERFLOW);
     if (csv->options.strict_columns && csv->width && count != csv->width)
@@ -97,6 +106,8 @@ bool csv_write(csv_t *csv, const string_t *const *fields, size_t count)
     csv->count = 0;
     if (ok && string_append_cstr(record, csv->options.crlf ? "\r\n" : "\n") != 0)
         ok = csv_fail(csv, ENOMEM);
+    if (ok && !computation_poll_current())
+        ok = csv_fail(csv, errno);
     if (ok)
         ok = csv_write_bom(csv) && csv_publish(csv, record);
     string_free(record);
@@ -113,6 +124,8 @@ bool csv_finish(csv_t *csv)
 {
     if (!csv || !csv->writer || csv->error.code)
         return csv_fail(csv, EINVAL);
+    if (!computation_poll_current())
+        return csv_fail(csv, errno);
     if (csv->finished)
         return true;
     if (!csv_write_bom(csv) || (csv->file && !file_flush(csv->file)))

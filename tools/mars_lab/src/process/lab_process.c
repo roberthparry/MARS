@@ -40,6 +40,21 @@ extern char **environ;
 
 
 static const volatile sig_atomic_t *lab_process_cancel_flag;
+static _Thread_local bool (*lab_process_cancel_check)(void *);
+static _Thread_local void *lab_process_cancel_argument;
+
+/* Install only around the request's synchronous child-processing work. */
+void lab_proc_set_cancel_check(bool (*check)(void *), void *argument)
+{
+    lab_process_cancel_check = check;
+    lab_process_cancel_argument = argument;
+}
+
+static bool lab_proc_cancelled(void)
+{
+    return (lab_process_cancel_flag && *lab_process_cancel_flag) ||
+           (lab_process_cancel_check && lab_process_cancel_check(lab_process_cancel_argument));
+}
 
 /* Register the worker-owned flag before running child processes. */
 void lab_proc_set_cancel_flag(const volatile sig_atomic_t *flag)
@@ -100,7 +115,7 @@ static int lab_proc_spawn(pid_t *child, const char *const argv[], const char *cw
 /* Return a short polling interval, respecting the remaining monotonic deadline. */
 static int lab_proc_interval(const struct timespec *start, unsigned timeout_ms)
 {
-    if (lab_process_cancel_flag && *lab_process_cancel_flag) {
+    if (lab_proc_cancelled()) {
         errno = ECANCELED;
         return -1;
     }
@@ -176,7 +191,7 @@ static int lab_proc_collect(pid_t child, int reader, const struct timespec *star
     bool exited = false;
     char buffer[4096 + 3];
     for (;;) {
-        if (lab_process_cancel_flag && *lab_process_cancel_flag)
+        if (lab_proc_cancelled())
             return ECANCELED;
         if (!exited) {
             siginfo_t info = {0};
@@ -239,9 +254,28 @@ bool lab_proc_run(const char *const argv[], const char *cwd, unsigned timeout_ms
     return lab_proc_run_input(argv, cwd, NULL, timeout_ms, max_output, output, exit_status);
 }
 
-/* Prepare optional file-backed input, then run and always reap the direct child. */
-bool lab_proc_run_input(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
-                        size_t max_output, string_t **output, int *exit_status)
+/* Give a signal-aware child a fixed grace period; descendants are killed by the caller afterwards. */
+static void lab_proc_cooperative_stop(pid_t child)
+{
+    struct timespec start, now;
+    kill(child, SIGTERM);
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        return;
+    for (;;) {
+        siginfo_t info = {0};
+        if (waitid(P_PID, (id_t)child, &info, WEXITED | WNOHANG | WNOWAIT) == 0 && info.si_pid == child)
+            return;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            return;
+        int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000000000 + now.tv_nsec - start.tv_nsec;
+        if (elapsed >= 250000000)
+            return;
+        poll(NULL, 0, 5);
+    }
+}
+
+static bool lab_proc_run_input_mode(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
+                                   size_t max_output, string_t **output, int *exit_status, bool cooperative)
 {
     if (output)
         *output = NULL;
@@ -307,6 +341,8 @@ bool lab_proc_run_input(const char *const argv[], const char *cwd, const string_
     if (!error)
         error = lab_proc_collect(child, descriptors[0], &start, timeout_ms, max_output, *output);
     if (error) {
+        if (cooperative && (error == ECANCELED || error == ETIMEDOUT))
+            lab_proc_cooperative_stop(child);
         kill(-child, SIGKILL);
         kill(child, SIGKILL);
     }
@@ -344,4 +380,18 @@ cleanup:
         close(descriptors[1]);
     errno = error;
     return error == 0;
+}
+
+/* Generic external programmes retain the original immediate-stop policy. */
+bool lab_proc_run_input(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
+                        size_t max_output, string_t **output, int *exit_status)
+{
+    return lab_proc_run_input_mode(argv, cwd, input, timeout_ms, max_output, output, exit_status, false);
+}
+
+/* Built-in workers may unwind normally before the fixed hard-stop grace expires. */
+bool lab_proc_run_input_cooperative(const char *const argv[], const char *cwd, const string_t *input,
+                                   unsigned timeout_ms, size_t max_output, string_t **output, int *exit_status)
+{
+    return lab_proc_run_input_mode(argv, cwd, input, timeout_ms, max_output, output, exit_status, true);
 }

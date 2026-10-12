@@ -332,6 +332,8 @@ static bool equ_symbolic_poly_collect_power(const expr_t *expr, const expr_t *wr
 
 static bool equ_symbolic_poly_collect(const expr_t *expr, const expr_t *wrt, equation_symbolic_poly_t *poly)
 {
+    if (!equ_computation_step("equation.polynomial"))
+        return false;
     const expr_t *left = NULL;
     const expr_t *right = NULL;
     bool is_sub = false;

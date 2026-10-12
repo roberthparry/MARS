@@ -541,3 +541,63 @@ Returns the public result described by vsprintf text.
 ```c
 string_t *equ_vsprintf_text(const char *fmt, va_list ap);
 ```
+
+## Optional computation control
+
+Equation solving inherits the optional scope established by `computation_run`.
+Symbolic attempts, polynomial collection, root seeding, Newton refinement,
+deflation and numerical goal seeking share the caller's allowance. A stopped
+solve returns NULL, discards partial roots and restores binding values changed
+by numerical solving. Context-aware solving shares the same scope.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "equation-t.h"
+
+typedef struct {
+    equation_t *input;
+    equation_solutions_t *result;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    job->result = equ_derive_solutions(job->input);
+    return job->result != NULL;
+}
+
+int main(void)
+{
+    job_t job = {.input = equ_from_string("x^5 - x - 1 = 0")};
+    if (!job.input)
+        return 1;
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    equ_solutions_free(job.result);
+    equ_free(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

@@ -33,6 +33,7 @@ struct _websrv_t {
     bool active;
 };
 struct _websrv_request_t {
+    int connection_fd;
     webmethod_t method;
     string_t *target, *path, *peer;
     unsigned char *body;

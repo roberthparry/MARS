@@ -14,6 +14,9 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -125,6 +128,8 @@ bool almanac_refine_body_sun_longitude_near(almanac_t *almanac, almanac_body_id_
     if (!almanac || !out_jd || !(max_step_days > 0.0))
         return false;
     for (iteration = 0; iteration < 12; ++iteration) {
+        if (!computation_step_current("almanac.phase"))
+            return false;
         double value = almanac_body_sun_longitude_residual_degrees(almanac, body_id, jd, target_degrees);
         double before;
         double after;
@@ -200,6 +205,8 @@ bool almanac_next_moon_phase_exact(almanac_t *almanac, const datetime_t *after, 
 
     root_jd = NAN;
     for (attempt = 0; attempt < 2; ++attempt) {
+        if (!computation_step_current("almanac.phase"))
+            return false;
         guess_jd = almanac_mean_moon_phase_jd(k);
         if (!almanac_refine_body_sun_longitude_near(almanac, ALMANAC_BODY_ID_MOON, target_degrees, guess_jd, 2.0,
                                                     &root_jd)) {
@@ -226,5 +233,5 @@ bool almanac_next_moon_phase_exact(almanac_t *almanac, const datetime_t *after, 
     out->time.local_jd = root_jd;
     out->phase_angle_degrees = moon_entry.phase_angle_degrees;
     out->illuminated_fraction = phase_details.illuminated_fraction;
-    return true;
+    return computation_poll_current();
 }

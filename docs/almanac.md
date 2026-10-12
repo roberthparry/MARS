@@ -845,3 +845,68 @@ Returns the public result described by solar transit solar semi diameter degrees
 ```c
 double almanac_solar_transit_solar_semi_diameter_degrees(const almanac_solar_transit_t *event);
 ```
+
+## Optional computation control
+
+Ephemeris evaluations, phase searches, eclipse/transit candidate scans,
+event refinement and totality searches inherit `computation_run`. Nested
+calculations share the same budget and deadline. Stopped array searches
+return NULL and destroy partial event arrays; stopped scalar searches return
+false. Read output records only after success. The configured engine remains
+usable outside the stopped scope.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "almanac-t.h"
+
+typedef struct {
+    almanac_t *input;
+    datetime_t *after;
+    almanac_moon_phase_event_t result;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    return almanac_next_moon_phase_exact(job->input, job->after, ALMANAC_MOON_PHASE_NEW, &job->result);
+}
+
+int main(void)
+{
+    /* Requires the configured Almanac database, as do ordinary event searches. */
+    job_t job = {.input = almanac_open(), .after = datetime_alloc()};
+    if (!job.input || !job.after || !datetime_init_jd(job.after, 2461041.5)) {
+        almanac_close(job.input);
+        datetime_dealloc(job.after);
+        return 1;
+    }
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    datetime_dealloc(job.after);
+    almanac_close(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

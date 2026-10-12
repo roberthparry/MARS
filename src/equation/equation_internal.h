@@ -30,6 +30,12 @@ equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, ex
 
 struct _expr_function_temporaries_t;
 
+/** @brief Reserve and report one solver attempt, search seed or numerical iteration in the current scope. */
+bool equ_computation_step(const char *stage);
+
+/** @brief Poll the current scope before fallback or publishing solutions; no work is reserved. */
+bool equ_computation_active(void);
+
 /**
  * @brief Render solution centres and offsets with structural symmetry and shared denominators.
  * @param plan Required borrowed temporary-binding plan.

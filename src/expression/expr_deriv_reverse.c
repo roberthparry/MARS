@@ -133,6 +133,8 @@ static int reverse_collect_postorder(const expr_t *node, const expr_t ***nodes, 
 {
     if (!node)
         return 0;
+    if (!expr_computation_step("expression.reverse_collect"))
+        return -1;
     if (reverse_find_node(*nodes, *count, node) >= 0)
         return 0;
     if (node->ops->arity != EXPR_OP_ATOM && reverse_collect_postorder(node->a, nodes, count, capacity) != 0)
@@ -204,6 +206,13 @@ int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const 
     bars[node_count - 1u] = NUM_ONE;
 
     for (size_t i = node_count; i-- > 0u;) {
+        if (!expr_computation_step("expression.reverse")) {
+            reverse_destroy_numbers(bars, node_count);
+            free(bars);
+            free(nodes);
+            num_destroy(&value);
+            return -1;
+        }
         const expr_t *node = nodes[i];
         int a_index;
         int b_index;
@@ -268,6 +277,13 @@ int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const 
         }
     }
 
+    if (!expr_computation_active()) {
+        reverse_destroy_numbers(bars, node_count);
+        free(bars);
+        free(nodes);
+        num_destroy(&value);
+        return -1;
+    }
     if (value_out)
         *value_out = value;
     else

@@ -16,6 +16,12 @@
  * solution collections and borrowed entries within those collections.
  * Context-aware result APIs share the expr_context module's conservative sign
  * and domain simplification without changing root selection or numerical seeds.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/equation.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_EQUATION_H
@@ -166,6 +172,8 @@ void equ_solutions_free(equation_solutions_t *solutions);
  *
  * The caller owns the returned solution set and must release it with
  * equ_solutions_free().
+ * A stopped computation_run() scope returns NULL, discards partial solutions
+ * and restores numerical starting bindings. The scope is optional.
  *
  * @param[in] equation Borrowed equation to inspect or operate on; ownership is unchanged.
  * @return Caller-owned solution set, possibly empty, or NULL on failure; release with equ_solutions_free.

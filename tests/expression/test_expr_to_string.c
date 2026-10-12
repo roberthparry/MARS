@@ -902,7 +902,7 @@ static void test_to_string_symbolic_constants_TeX(void)
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
 
     const char *want = "\\left\\{ e^{\\pi\\mkern-2mu i\\mkern-2mu \\frac{3}{2}\\mkern-2mu x} "
-                         "\\;\\middle|\\; x = NAN \\right\\}";
+                         "\\;\\middle|\\; x = ? \\right\\}";
 
     TeX_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
 
@@ -1345,13 +1345,13 @@ static void test_to_string_polynomial_degree_order_expr(void)
         const char *label;
         const char *source;
         const char *want;
-    } cases[] = {{"polynomial terms sort by degree in x then y", "{ y^2+x*y+x^2 | x = NAN, y = NAN }",
-                  "{ x² + xy + y² | y = NAN, x = NAN }"},
+    } cases[] = {{"polynomial terms sort by degree in x then y", "{ y^2+x*y+x^2 | x = ?, y = ? }",
+                  "{ x² + xy + y² | y = ?, x = ? }"},
                  {"polynomial terms sort lexicographically across variables",
-                  "{ c*y^3+b*x*y^2+a*x*y+x^2 | x = NAN, y = NAN; a = NAN, b = NAN, c = NAN }",
-                  "{ x² + bxy² + axy + cy³ | y = NAN, x = NAN; c = NAN, b = NAN, a = NAN }"},
-                 {"polynomial terms sort by x then y then z", "{ y*z^2+x*z+x*y^2+x^2 | x = NAN, y = NAN, z = NAN }",
-                  "{ x² + xy² + xz + yz² | y = NAN, z = NAN, x = NAN }"}};
+                  "{ c*y^3+b*x*y^2+a*x*y+x^2 | x = ?, y = ?; a = ?, b = ?, c = ? }",
+                  "{ x² + bxy² + axy + cy³ | y = ?, x = ?; c = ?, b = ?, a = ? }"},
+                 {"polynomial terms sort by x then y then z", "{ y*z^2+x*z+x*y^2+x^2 | x = ?, y = ?, z = ? }",
+                  "{ x² + xy² + xz + yz² | y = ?, z = ?, x = ? }"}};
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         expr_t *f = expr_from_string(cases[i].source, NULL);
@@ -1673,7 +1673,7 @@ static void test_to_string_power_of_power_simplifies_expr(void)
     expr_t *f = expr_from_string("{ (a^(-x))² | x = NAN; a = NAN }", NULL);
     expr_t *simp = f ? expr_simplify(f) : NULL;
     char *got = simp ? expr_to_string(simp, style_EXPRESSION) : NULL;
-    const char *want = "{ a^(-2x) | x = NAN; a = NAN }";
+    const char *want = "{ a^(-2x) | x = ?; a = ? }";
 
     if (str_eq(got, want))
         to_string_pass("power of power simplifies (EXPR)", got, want);
@@ -1690,7 +1690,7 @@ static void test_to_string_powered_exponent_TeX(void)
     expr_t *f = expr_from_string("{ a^(x^2) | x = NAN; a = NAN }", NULL);
     char *got = f ? expr_to_string(f, style_LATEX) : NULL;
     const char *want = "\\left\\{ a^{x^{2}} \\;\\middle|\\; "
-                         "x = NAN; a = NAN \\right\\}";
+                         "x = ?; a = ? \\right\\}";
 
     if (str_eq(got, want))
         to_string_pass("powered exponent renders without double superscript (TEX)", got, want);

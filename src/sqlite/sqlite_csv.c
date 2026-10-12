@@ -10,6 +10,9 @@
 #include <errno.h>
 #include <stdint.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
@@ -34,7 +37,8 @@ static bool sqlite_csv_start(sqlite_csv_context_t *c, sqlite_t *db, const string
     c->locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
     if (!c->table || !c->locale)
         return sqlite_csv_fail(c, EINVAL, "Invalid CSV table identifier or numeric locale");
-    return true;
+    return computation_step_current("sqlite.csv.begin") ||
+           sqlite_csv_fail(c, errno, "CSV import stopped");
 }
 
 static csv_status_t sqlite_csv_next(sqlite_csv_context_t *c, csv_t *reader,
@@ -62,7 +66,10 @@ static bool sqlite_csv_insert(sqlite_csv_context_t *c, csv_t *reader, csv_status
     size_t rows = 0;
     while (ok && status == CSV_ROW) {
         c->report->record = csv_record_count(reader);
-        ok = sqlite_csv_row(c, reader, false, stmt);
+        ok = computation_step_current("sqlite.csv.insert") ||
+             sqlite_csv_fail(c, errno, "CSV import stopped");
+        if (ok)
+            ok = sqlite_csv_row(c, reader, false, stmt);
         if (ok && sqlite3_step(stmt) != SQLITE_DONE)
             ok = sqlite_csv_sql_error(c);
         if (ok && (sqlite3_reset(stmt) != SQLITE_OK || sqlite3_clear_bindings(stmt) != SQLITE_OK))
@@ -76,6 +83,8 @@ static bool sqlite_csv_insert(sqlite_csv_context_t *c, csv_t *reader, csv_status
     ok = ok && status == CSV_END;
     if (ok && compare_count && rows != expected)
         ok = sqlite_csv_fail(c, EINVAL, "CSV file changed between inference and insertion");
+    if (ok && !computation_poll_current())
+        ok = sqlite_csv_fail(c, errno, "CSV import stopped");
     sqlite3_finalize(stmt);
     if (ok && sqlite3_exec(c->native, "RELEASE mars_csv_import", NULL, NULL, NULL) != SQLITE_OK)
         ok = sqlite_csv_sql_error(c);
@@ -117,7 +126,10 @@ bool sqlite_import_csv(sqlite_t *db, file_t *input, const string_t *table,
         c.report->record = header_width ? 2 : 1;
     while (ok && status == CSV_ROW) {
         c.report->record = csv_record_count(reader);
-        ok = sqlite_csv_row(&c, reader, true, NULL);
+        ok = computation_step_current("sqlite.csv.infer") ||
+             sqlite_csv_fail(&c, errno, "CSV inference stopped");
+        if (ok)
+            ok = sqlite_csv_row(&c, reader, true, NULL);
         if (ok) {
             ++rows;
             ++c.report->record;

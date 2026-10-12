@@ -189,3 +189,70 @@ Zoë,"hello, world"
 
 Both examples run last in `tests/csv/test_csv.c`. Run the suite with
 `make -j1 test_csv`; the module needs no additional external library.
+
+## Optional computation control
+
+`csv_next`, `csv_write` and `csv_finish` inherit `computation_run`.
+Record boundaries and blocks within long fields provide cooperative stopping.
+A stopped reader returns `CSV_ERROR`; a stopped writer returns false. The
+stream retains a sticky diagnostic, so create a new reader/writer to restart.
+Already consumed input and previously published output cannot be recalled.
+No partial parsed record is returned; file I/O itself is not made asynchronous.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "csv-t.h"
+
+typedef struct {
+    csv_t *input;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    csv_status_t status;
+    while ((status = csv_next(job->input)) == CSV_ROW) {
+        /* Consume only complete records here. */
+    }
+    return status == CSV_END;
+}
+
+int main(void)
+{
+    job_t job = {.input = csv_reader_new(NULL, NULL)};
+    string_t *text = string_new_with("one,two\nthree,four\n");
+    if (!job.input || !text || !csv_feed(job.input, text, true)) {
+        csv_free(job.input);
+        string_free(text);
+        return 1;
+    }
+    string_free(text);
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    csv_free(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

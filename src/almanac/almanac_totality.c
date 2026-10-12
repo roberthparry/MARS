@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -290,6 +293,8 @@ static bool almanac_probable_land_point(double latitude_degrees, double longitud
 bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t *observer,
     const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out)
 {
+    if (!computation_step_current("almanac.totality"))
+        return false;
     almanac_solar_totality_location_t best;
     almanac_solar_totality_location_t candidate;
     double radius_km;
@@ -309,14 +314,18 @@ bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t
     if (almanac_probe_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, observer->latitude_degrees,
                                      observer->longitude_degrees, &candidate)) {
         *out = candidate;
-        return true;
+        return computation_poll_current();
     }
 
     for (radius_km = 75.0; radius_km <= 12000.0 && !coarse_found; radius_km += 75.0) {
+        if (!computation_step_current("almanac.totality"))
+            return false;
         double bearing_step = radius_km < 750.0 ? 15.0 : 7.5;
         double bearing;
 
         for (bearing = 0.0; bearing < 360.0; bearing += bearing_step) {
+            if (!computation_step_current("almanac.totality"))
+                return false;
             double lat;
             double lon;
 
@@ -337,9 +346,13 @@ bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t
         almanac_solar_totality_location_t refined = best;
 
         for (north_km = -300.0; north_km <= 300.0; north_km += 25.0) {
+            if (!computation_step_current("almanac.totality"))
+                return false;
             double east_km;
 
             for (east_km = -300.0; east_km <= 300.0; east_km += 25.0) {
+                if (!computation_step_current("almanac.totality"))
+                    return false;
                 double lat;
                 double lon;
 
@@ -358,13 +371,15 @@ bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t
     }
 
     *out = best;
-    return true;
+    return computation_poll_current();
 }
 
 /* Check totality at the observer's location. */
 bool almanac_solar_eclipse_totality_at(almanac_t *almanac, const almanac_observer_t *observer,
     const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out)
 {
+    if (!computation_step_current("almanac.totality"))
+        return false;
     almanac_solar_totality_location_t candidate;
     almanac_solar_totality_location_t refined;
 
@@ -388,7 +403,7 @@ bool almanac_solar_eclipse_totality_at(almanac_t *almanac, const almanac_observe
     }
     if (out)
         *out = refined;
-    return true;
+    return computation_poll_current();
 }
 
 /* Refine a nearby candidate location into a totality result. */
@@ -396,6 +411,8 @@ bool almanac_solar_eclipse_totality_from_seed(almanac_t *almanac, const almanac_
     const almanac_observer_t *seed, const almanac_solar_eclipse_t *eclipse, double tolerance_degrees,
     almanac_solar_totality_location_t *out)
 {
+    if (!computation_step_current("almanac.totality"))
+        return false;
     almanac_solar_totality_location_t candidate;
     double local_jd;
     double score_degrees;
@@ -424,6 +441,8 @@ bool almanac_solar_eclipse_totality_from_seed(almanac_t *almanac, const almanac_
 bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac_observer_t *seed,
     const almanac_solar_eclipse_t *eclipse, double *out_score_degrees)
 {
+    if (!computation_step_current("almanac.totality"))
+        return false;
     if (out_score_degrees)
         *out_score_degrees = NAN;
     if (!almanac || !seed || !eclipse || !out_score_degrees) {
@@ -441,6 +460,8 @@ bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac
 bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_observer_t *observer,
     const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out)
 {
+    if (!computation_step_current("almanac.totality"))
+        return false;
     almanac_solar_totality_location_t best;
     almanac_solar_totality_location_t candidate;
     almanac_solar_totality_location_t path_seed;
@@ -466,17 +487,19 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
         almanac_probe_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, observer->latitude_degrees,
                                      observer->longitude_degrees, &candidate)) {
         *out = candidate;
-        return true;
+        return computation_poll_current();
     }
 
     have_path_seed = almanac_nearest_solar_totality(almanac, observer, eclipse, &path_seed) && path_seed.found;
     if (have_path_seed && almanac_probable_land_point(path_seed.latitude_degrees, path_seed.longitude_degrees)) {
         *out = path_seed;
-        return true;
+        return computation_poll_current();
     }
 
     if (!best.found) {
         for (box_index = 0u; box_index < box_count; ++box_index) {
+            if (!computation_step_current("almanac.totality"))
+                return false;
             box_distances[box_index].index = box_index;
             box_distances[box_index].distance_km =
                 have_path_seed
@@ -487,6 +510,8 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
         qsort(box_distances, box_count, sizeof(box_distances[0]), almanac_land_box_distance_compare);
 
         for (box_index = 0u; box_index < box_count; ++box_index) {
+            if (!computation_step_current("almanac.totality"))
+                return false;
             const almanac_land_box_t *box = &ALMANAC_PROBABLE_LAND_BOXES[box_distances[box_index].index];
             double lat_step = (box->max_lat - box->min_lat) > 20.0 ? 1.0 : 0.5;
             double lon_step = (box->max_lon - box->min_lon) > 20.0 ? 1.0 : 0.5;
@@ -498,9 +523,13 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
                 break;
 
             for (lat = box->min_lat; lat <= box->max_lat + 1e-9; lat += lat_step) {
+                if (!computation_step_current("almanac.totality"))
+                    return false;
                 double lon;
 
                 for (lon = box->min_lon; lon <= box->max_lon + 1e-9; lon += lon_step) {
+                    if (!computation_step_current("almanac.totality"))
+                        return false;
                     if (best.found &&
                         almanac_surface_distance_km(observer->latitude_degrees, observer->longitude_degrees, lat, lon) >
                             best.distance_km + 25.0) {
@@ -525,15 +554,21 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
         size_t pass;
 
         for (pass = 0u; pass < sizeof(refine_radii_km) / sizeof(refine_radii_km[0]); ++pass) {
+            if (!computation_step_current("almanac.totality"))
+                return false;
             almanac_solar_totality_location_t refined = best;
             double north_km;
 
             for (north_km = -refine_radii_km[pass]; north_km <= refine_radii_km[pass];
                  north_km += refine_steps_km[pass]) {
+                if (!computation_step_current("almanac.totality"))
+                    return false;
                 double east_km;
 
                 for (east_km = -refine_radii_km[pass]; east_km <= refine_radii_km[pass];
                      east_km += refine_steps_km[pass]) {
+                    if (!computation_step_current("almanac.totality"))
+                        return false;
                     double lat;
                     double lon;
 
@@ -555,5 +590,5 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
     }
 
     *out = best;
-    return true;
+    return computation_poll_current();
 }

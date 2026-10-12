@@ -26,6 +26,12 @@
  * from explicit axis-aligned boundary data. The two-dimensional Laplace
  * equation is solved in Cartesian and polar coordinates as a general
  * harmonic family when no boundary data are supplied.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/diffequation.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_DIFFEQUATION_H
@@ -413,7 +419,8 @@ char *de_to_string(const diffequ_t *de, style_t style);
  *
  * @param de Differential-equation problem to solve.
  * @return An owning solve result, or `NULL` only when the result object itself
- *         cannot be allocated. Release it with de_solve_result_free().
+ *         cannot be allocated or the optional computation_run() scope stops.
+ *         Release it with de_solve_result_free().
  */
 diffequ_solve_result_t *de_solve(const diffequ_t *de);
 
@@ -428,7 +435,8 @@ diffequ_solve_result_t *de_solve(const diffequ_t *de);
  * @param de Differential-equation problem to solve.
  * @param options Bitwise OR of ::de_solve_option_t values.
  * @return An owning solve result, or `NULL` only when the result object itself
- *         cannot be allocated. Release it with de_solve_result_free().
+ *         cannot be allocated or the optional computation_run() scope stops.
+ *         Release it with de_solve_result_free().
  */
 diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options);
 

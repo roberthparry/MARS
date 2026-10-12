@@ -1080,11 +1080,11 @@ void test_second_deriv_complex_product(void)
     expr_t *second = first && theta ? expr_create_deriv(first, theta) : NULL;
     char *text = second ? expr_to_string(second, style_EXPRESSION) : NULL;
 
-    if (str_eq(text, "{ -r·exp(iθ) | r = NAN, θ = NAN }"))
-        to_string_pass("d²/dθ²{r·exp(iθ)}", text, "{ -r·exp(iθ) | r = NAN, θ = NAN }");
+    if (str_eq(text, "{ -r·exp(iθ) | r = ?, θ = ? }"))
+        to_string_pass("d²/dθ²{r·exp(iθ)}", text, "{ -r·exp(iθ) | r = ?, θ = ? }");
     else
         to_string_fail(__FILE__, __LINE__, 1, "d²/dθ²{r·exp(iθ)}", text,
-                       "{ -r·exp(iθ) | r = NAN, θ = NAN }");
+                       "{ -r·exp(iθ) | r = ?, θ = ? }");
 
     free(text);
     expr_free(second);

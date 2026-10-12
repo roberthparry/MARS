@@ -56,7 +56,8 @@ This directory contains the longer module documentation for MARS.
 - [`regex_t`](./regex.md) — compiled UTF-8 regular expressions and capture spans
 - [`string_t`](./string.md) — UTF-8-aware dynamic strings
 - [`bitset_t`](./bitset.md) — dynamic thread-safe bitset
-- [`integrator_t`](./integrator.md) — adaptive G7K15 / Turan T15/T4 integrator with symbolic fast paths
+- [`integrator_t`](./integrator.md) — adaptive tanh–sinh / Gauss–Kronrod integration with symbolic fast paths
+- [`computation_t`](./computation.md) — shared cooperative cancellation, monotonic deadlines, work budgets and progress
 - [`expr_context_t`](./expr_context.md) — owned assumptions, symbol roles and binding-aware expression snapshots
 
 ## Guides

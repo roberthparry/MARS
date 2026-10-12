@@ -1,5 +1,10 @@
 # Native threads
 
+For cooperative cancellation and shared calculation budgets within a callback,
+use [`computation_t`](computation.md). It does not replace thread completion or
+joining: after requesting cancellation, still join before releasing borrowed
+callback arguments. The worker must reach checkpoints to observe a stop request.
+
 Include `thread-t.h` for the opaque `thread_t` callback handle. Synchronisation
 belongs to the [`lock_t` class cluster](lock.md); there are no embedded thread
 mutex or condition types. Each thread owns a completion-event handle, and the

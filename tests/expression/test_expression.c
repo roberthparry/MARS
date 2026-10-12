@@ -660,6 +660,9 @@ int tests_main(void)
     TEST_SECTION("Runtime regressions");
     TEST_RUN_IN_GROUP(test_runtime_regressions, tests, NULL);
 
+    TEST_SECTION("Imaginary-axis presentation");
+    TEST_RUN_IN_GROUP(test_expr_t_imaginary_axis, tests, NULL);
+
     TEST_SECTION("Reverse mode");
     TEST_RUN_IN_GROUP(test_reverse_mode, tests, NULL);
 

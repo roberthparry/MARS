@@ -11,6 +11,12 @@
  * calculations that need catalogue-backed results. Available bodies and date
  * coverage depend on the installed data. Use datetime-t.h for civil date operations
  * and its lighter solar and lunar helpers; this module owns the astronomical engine.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/almanac.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_ALMANAC_H

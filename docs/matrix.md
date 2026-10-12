@@ -2230,3 +2230,66 @@ Output:
 ```text
 T3((0, 1; 0, 0)) = (0, -3; 0, 0)
 ```
+
+## Optional computation control
+
+Multiplication, linear solving, LU, QR, Cholesky, SVD, Schur and numerical
+eigensystems inherit `computation_run`. Checkpoints cover rows, pivots,
+columns and iterative refinement. Stopped operations return their failure
+sentinel (NULL or a negative status); incomplete factors and eigenpairs are
+not published. Initialise result structures to zero and use their normal
+cleanup functions. Existing populated result structures must be released
+before reuse, as for uncontrolled calls.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "matrix-t.h"
+
+typedef struct {
+    matrix_t *input;
+    mat_qr_factor_t result;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    return mat_qr_factor(job->input, &job->result) == 0;
+}
+
+int main(void)
+{
+    job_t job = {.input = mat_new(3, 3)};
+    if (!job.input)
+        return 1;
+    for (size_t i = 0; i < 3; ++i)
+        mat_set(job.input, i, i, &NUM_ONE);
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    mat_qr_factor_free(&job.result);
+    mat_free(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

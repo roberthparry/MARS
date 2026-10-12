@@ -924,3 +924,93 @@ name containing a comma. The example removes its temporary directory afterwards.
 
 These four examples run last in `tests/sqlite/test_sqlite_csv.c`, after the
 ordinary tests in the existing `make -j1 test_sqlite` suite.
+
+## Optional computation control
+
+`sqlite_import_csv`, `sqlite_import_csv_reader` and `sqlite_export_csv`
+inherit `computation_run`, including the CSV parser/writer and refill callbacks.
+Inference and inserted/exported rows provide checkpoints. A stopped import
+rolls back its own savepoint when stopping is observed before its release,
+including a newly created destination table, and reports zero imported rows
+without rolling back the caller's outer transaction. Savepoint release is the
+publication boundary: cancellation arriving after a successful release cannot
+undo that import, even if subsequent work in the same scope stops. Failed replayable file imports restore the starting file position;
+non-replayable callback input cannot be rewound. Export may already have
+published complete rows: its report counts those rows, so use a temporary
+output file if atomic publication is required.
+
+Import checkpoints surround SQLite statements rather than forcibly interrupting
+a write statement: SQLite interruption can roll back an enclosing transaction.
+A blocked I/O callback or one native statement must return before the next
+checkpoint can stop the operation.
+
+Without a scope, the existing API and algorithm-specific limits are unchanged.
+Stopping is cooperative, not a hard real-time guarantee. Work units mix nested
+algorithm steps and are not a percentage or a count of input records; exact
+counts may change with implementation. Progress observers run synchronously
+and must not re-enter calculations. Check both the operation result and
+`computation_status`; a false operation result with an active control is an
+ordinary algorithm/input failure. See [computation_t](computation.md).
+
+This deliberately small budget demonstrates stopping. Increase it, use a
+timeout, or cancel the control from another thread for normal application use.
+
+```c
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "sqlite-t.h"
+
+typedef struct {
+    sqlite_t *input;
+    csv_t *reader;
+    string_t *table;
+    sqlite_csv_report_t report;
+} job_t;
+
+static bool calculate(void *argument)
+{
+    job_t *job = argument;
+    sqlite_csv_column_t column = {.type = SQLITE_CSV_INTEGER};
+    sqlite_csv_options_t options = sqlite_csv_options_default();
+    options.columns = &column;
+    options.column_count = 1;
+    return sqlite_import_csv_reader(job->input, job->reader, job->table, &options, NULL, NULL, &job->report);
+}
+
+int main(void)
+{
+    string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
+    csv_options_t csv_options = csv_options_default();
+    csv_options.first_row_header = true;
+    job_t job = {.input = sqlite_open_encrypted(path, key),
+                 .reader = csv_reader_new(NULL, &csv_options), .table = string_new_with("items")};
+    string_t *text = string_new_with("n\n1\n2\n3\n");
+    string_free(path);
+    string_free(key);
+    if (!job.input || !job.reader || !job.table || !text || !csv_feed(job.reader, text, true)) {
+        csv_free(job.reader);
+        string_free(job.table);
+        sqlite_close(job.input);
+        string_free(text);
+        return 1;
+    }
+    string_free(text);
+    computation_options_t options = {.work_limit = 4};
+    computation_t *control = computation_new(&options);
+    bool ok = control && computation_run(control, calculate, &job);
+    bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Stopped: %d\n", stopped);
+    csv_free(job.reader);
+    string_free(job.table);
+    sqlite_close(job.input);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Stopped: 1
+```

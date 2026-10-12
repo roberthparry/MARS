@@ -11,6 +11,7 @@
 
 #include "array-t.h"
 #include "file-t.h"
+#include "lab_process_request.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
 #include "lab_forms.h"
@@ -151,6 +152,12 @@ static bool lab_svr_asset_request(const websrv_request_t *request, websrv_respon
     return lab_svr_static_asset(request, response, asset->path, asset->type);
 }
 
+/* Browser requests stay open while awaiting their result; an observed input close cancels native work. */
+static bool lab_svr_calculation_cancelled(void *argument)
+{
+    return websrv_request_input_closed(argument);
+}
+
 static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t *response, void *context)
 {
     lab_server_t *server = context;
@@ -255,10 +262,12 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
     }
     unsigned status = 200;
     bool presentation = lab_svr_equal(path, "/presentation"), forms = lab_svr_equal(path, "/forms");
+    lab_proc_set_cancel_check(lab_svr_calculation_cancelled, (void *)request);
     json_t *result = presentation ? lab_presentation_request(payload, &status)
                                  : forms ? lab_forms_request(payload, &status) : lab_eval_request(path, payload, &status);
     if (!result)
         result = lab_cal_request(path, payload, &status);
+    lab_proc_set_cancel_check(NULL, NULL);
     if (result && !presentation && !forms && !lab_presentation_adapt(result)) {
         json_free(result);
         result = NULL;

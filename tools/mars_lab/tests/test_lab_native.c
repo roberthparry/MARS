@@ -28,6 +28,7 @@
 
 #include "file-t.h"
 #include "lab_process.h"
+#include "lab_worker.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -497,6 +498,62 @@ static void test_process_cancellation(void)
     TEST_ASSERT_TRUE(ok && restored, "worker SIGTERM cancels, kills the group and reaps before returning");
 }
 
+static bool process_request_cancelled(void *argument)
+{
+    return *(bool *)argument;
+}
+
+static void test_process_cooperative_stop(void)
+{
+    const char *const graceful[] = {"/bin/sh", "-c", "trap 'exit 42' TERM; printf ready; while :; do :; done", NULL};
+    const char *const stubborn[] = {"/bin/sh", "-c", "trap '' TERM; printf ready; while :; do :; done", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    bool ran = lab_proc_run_input_cooperative(graceful, NULL, NULL, 150, 64, &output, &status);
+    int error = errno;
+    bool unwound = !ran && error == ETIMEDOUT && status == 42 && output_equals(output, "ready");
+    string_free(output);
+    ran = lab_proc_run_input_cooperative(stubborn, NULL, NULL, 150, 64, &output, &status);
+    error = errno;
+    bool killed = !ran && error == ETIMEDOUT && status == 128 + SIGKILL && output_equals(output, "ready");
+    string_free(output);
+    bool cancelled = true;
+    lab_proc_set_cancel_check(process_request_cancelled, &cancelled);
+    const char *const noop[] = {"/bin/true", NULL};
+    ran = lab_proc_run_input_cooperative(noop, NULL, NULL, 1000, 64, &output, &status);
+    bool rejected = !ran && errno == ECANCELED && status == -1;
+    string_free(output);
+    lab_proc_set_cancel_check(NULL, NULL);
+    TEST_ASSERT_TRUE(unwound && killed && rejected, "cooperative cleanup and request-local cancellation are bounded");
+}
+
+static bool worker_control_checks(const char *directory)
+{
+    (void)directory;
+    unsetenv("MARS_LAB_BINARY");
+    const char *const args[] = {"mars_lab", "x*x+2*x+1", "x", "40", "derivative", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    bool configured = setenv("MARS_LAB_WORK_LIMIT", "1", 1) == 0;
+    bool ran = configured && lab_proc_run_worker(args, NULL, NULL, 3000, 1024 * 1024, &output, &status);
+    bool bounded = !ran && errno == E2BIG && status == LAB_WORKER_BUDGET_EXHAUSTED;
+    string_free(output);
+    configured = setenv("MARS_LAB_WORK_LIMIT", "invalid", 1) == 0;
+    ran = configured && lab_proc_run_worker(args, NULL, NULL, 3000, 1024 * 1024, &output, &status);
+    bool invalid = !ran && errno == EIO && status == LAB_WORKER_CONTROL_FAILED;
+    string_free(output);
+    unsetenv("MARS_LAB_WORK_LIMIT");
+    ran = lab_proc_run_worker(args, NULL, NULL, 3000, 1024 * 1024, &output, &status);
+    bool recovered = ran && status == 0;
+    string_free(output);
+    return bounded && invalid && recovered;
+}
+
+static void test_process_worker_control(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(worker_control_checks), "worker control errors cross process boundary distinctly");
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Native MARS Lab child processes");
@@ -516,6 +573,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_process_unicode, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_cancellation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_process_cooperative_stop, tests, NULL);
+    TEST_RUN_IN_GROUP(test_process_worker_control, tests, NULL);
     TEST_SECTION("Native MARS Lab integration");
     test_lab_evaluation_cases();
     test_lab_evaluation_extra_cases();

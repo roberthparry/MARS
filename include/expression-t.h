@@ -16,6 +16,9 @@
  * The separate expr_context module, exposed through the expr_context-t.h public
  * header, owns assumptions and binding snapshots for context-dependent display
  * simplification without changing this graph.
+ * Scoped computation_run() controls cooperative evaluation and symbolic checkpoints.
+ * On a false scope result, discard its outputs; stopped work does not publish partial
+ * value or derivative caches. Individual numerical primitives remain non-interruptible.
  *
  * Ownership rules:
  *   • Constructors and derivative builders normally return owning handles, released with expr_free().

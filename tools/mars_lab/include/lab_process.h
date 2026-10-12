@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "lab_process_request.h"
+
 typedef struct _string_t string_t;
 
 /**
@@ -27,7 +29,7 @@ typedef struct _string_t string_t;
  * @details By default every mode resolves to MARS_LAB_SERVER_PATH, compiled for
  * the active build configuration. A non-empty per-mode MARS_LAB_*_BINARY override
  * selects an external diagnostic executable. Use lab_proc_run_worker to supply
- * the necessary --worker dispatch arguments; this path alone is not a command.
+ * the necessary --worker-control dispatch arguments; this path alone is not a command.
  */
 string_t *lab_proc_worker_path(const char *name);
 
@@ -42,9 +44,11 @@ string_t *lab_proc_worker_path(const char *name);
  * @param output Required owned output destination, initialised to NULL; release with string_free.
  * @param exit_status Required child exit status destination, initialised to -1.
  * @return Collection success as for lab_proc_run_input; an unknown mode gives EINVAL.
+ * Built-in control stops return false with ECANCELED, ETIMEDOUT, E2BIG or EIO.
  * @details Uses the same cancellation, descriptor, output-limit and process-group
  * cleanup as lab_proc_run_input. Explicit per-mode executable overrides receive
- * the original calculation arguments without the server's --worker prefix.
+ * the original calculation arguments without the server's --worker-control prefix.
+ * Built-ins receive a fresh computation scope and at most 250 ms of cooperative cleanup.
  */
 bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
                          size_t max_output, string_t **output, int *exit_status);
@@ -59,6 +63,14 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
  * @param flag Borrowed signal-safe cancellation flag, or NULL to disable it.
  */
 void lab_proc_set_cancel_flag(const volatile sig_atomic_t *flag);
+
+/**
+ * @brief Run a cooperative worker, allowing at most 250 ms to unwind after cancellation or timeout.
+ * The parent sends SIGTERM, then retains SIGKILL and reaping as final safeguards.
+ * Other arguments and errors match lab_proc_run_input(); output-limit failures still kill immediately.
+ */
+bool lab_proc_run_input_cooperative(const char *const argv[], const char *cwd, const string_t *input,
+                                   unsigned timeout_ms, size_t max_output, string_t **output, int *exit_status);
 
 /**
  * @brief Executes a programme without a shell and collects its merged output.

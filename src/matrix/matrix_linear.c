@@ -13,12 +13,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_internal.h"
 #define MARS_MATRIX_INTERNAL_ACCESS
 #include "matrix_vtable_defs.h"
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
 
 static bool mat_uses_sparse_like_storage(const matrix_t *A)
 {
@@ -251,7 +254,7 @@ static matrix_t *mat_solve_diagonal(const matrix_t *A, const matrix_t *B, const 
         elem_destroy_value(elem, diag);
         elem_init_zero_value(elem, diag);
         mat_get_owned(A, i, i, diag);
-        if (mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
+        if (!computation_step_current("matrix.substitute") || mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
             elem_destroy_value(elem, diag);
             elem_destroy_value(elem, inv_diag);
             elem_destroy_value(elem, rhs);
@@ -307,7 +310,7 @@ static matrix_t *mat_forward_substitute(const matrix_t *L, const matrix_t *B, co
         elem_destroy_value(elem, diag);
         elem_init_zero_value(elem, diag);
         mat_get_owned(L, i, i, diag);
-        if (mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
+        if (!computation_step_current("matrix.substitute") || mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
             elem_destroy_value(elem, diag);
             elem_destroy_value(elem, inv_diag);
             elem_destroy_value(elem, sum);
@@ -381,7 +384,7 @@ static matrix_t *mat_backward_substitute(const matrix_t *U, const matrix_t *B, c
         elem_destroy_value(elem, diag);
         elem_init_zero_value(elem, diag);
         mat_get_owned(U, ii, ii, diag);
-        if (mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
+        if (!computation_step_current("matrix.substitute") || mat_elem_abs2_below(elem, diag, &near_zero_tol)) {
             elem_destroy_value(elem, diag);
             elem_destroy_value(elem, inv_diag);
             elem_destroy_value(elem, sum);
@@ -575,7 +578,7 @@ int mat_det_expr(const matrix_t *A, expr_t **determinant)
     return mat_det_expr_exact(A, determinant);
 }
 
-int mat_det(const matrix_t *A, number_t *determinant)
+static int mat_det_impl(const matrix_t *A, number_t *determinant)
 {
     size_t n;
     const struct elem_vtable *e;
@@ -642,7 +645,7 @@ int mat_det(const matrix_t *A, number_t *determinant)
 
     elem_copy_value(e, det, e->one);
 
-    for (size_t k = 0; k < n; k++) {
+    for (size_t k = 0; k < n && computation_step_current("matrix.determinant"); k++) {
         mat_get_owned(M, k, k, pivot);
         if (elem_is_structural_zero(e, pivot)) {
             *determinant = num_clone(NUM_ZERO);
@@ -726,13 +729,30 @@ int mat_det(const matrix_t *A, number_t *determinant)
     mat_free(M);
     return 0;
 }
+/* Keep the caller's scalar unchanged if elimination is stopped. */
+int mat_det(const matrix_t *A, number_t *determinant)
+{
+    if (!determinant || !computation_step_current("matrix.determinant"))
+        return -1;
+    number_t result = NUM_ZERO;
+    int rc = mat_det_impl(A, &result);
+    if (!computation_poll_current())
+        rc = -1;
+    if (rc == 0) {
+        *determinant = result;
+        result = NUM_ZERO;
+    }
+    num_destroy(&result);
+    return rc;
+}
+
 
 matrix_t *mat_adjugate(const matrix_t *A)
 {
     return mat_adjugate_exact(A);
 }
 
-matrix_t *mat_inverse(const matrix_t *A)
+static matrix_t *mat_inverse_impl(const matrix_t *A)
 {
     size_t n;
     const struct elem_vtable *e;
@@ -799,7 +819,7 @@ matrix_t *mat_inverse(const matrix_t *A)
         return NULL;
     }
 
-    for (size_t k = 0; k < n; k++) {
+    for (size_t k = 0; k < n && computation_step_current("matrix.inverse"); k++) {
         mat_get_owned(M, k, k, pivot);
         if (elem_is_structural_zero(e, pivot)) {
             elem_destroy_value(e, v);
@@ -907,8 +927,21 @@ matrix_t *mat_inverse(const matrix_t *A)
     mat_free(M);
     return I;
 }
+/* Discard results if nested numerical or symbolic work stops. */
+matrix_t *mat_inverse(const matrix_t *A)
+{
+    if (!computation_step_current("matrix.solve"))
+        return NULL;
+    matrix_t *result = mat_inverse_impl(A);
+    if (!computation_poll_current()) {
+        mat_free(result);
+        return NULL;
+    }
+    return result;
+}
 
-matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
+
+static matrix_t *mat_solve_impl(const matrix_t *A, const matrix_t *B)
 {
     mat_lu_factor_t lu = {0};
     const struct elem_vtable *e;
@@ -990,8 +1023,21 @@ fail:
     mat_lu_factor_free(&lu);
     return NULL;
 }
+/* Discard results if nested numerical or symbolic work stops. */
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
+{
+    if (!computation_step_current("matrix.solve"))
+        return NULL;
+    matrix_t *result = mat_solve_impl(A, B);
+    if (!computation_poll_current()) {
+        mat_free(result);
+        return NULL;
+    }
+    return result;
+}
 
-matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
+
+static matrix_t *mat_least_squares_impl(const matrix_t *A, const matrix_t *B)
 {
     matrix_t *A_pinv = NULL, *Bn = NULL, *X = NULL;
 
@@ -1017,6 +1063,19 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
     mat_free(Bn);
     return X;
 }
+/* Discard results if nested numerical or symbolic work stops. */
+matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
+{
+    if (!computation_step_current("matrix.solve"))
+        return NULL;
+    matrix_t *result = mat_least_squares_impl(A, B);
+    if (!computation_poll_current()) {
+        mat_free(result);
+        return NULL;
+    }
+    return result;
+}
+
 
 void mat_lu_factor_free(mat_lu_factor_t *out)
 {
@@ -1080,7 +1139,7 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
         elem_destroy_value(e, pivot);
         elem_init_zero_value(e, pivot);
         mat_get_owned(U, pivot_row, k, pivot);
-        if (mat_elem_abs2_below(e, pivot, &near_zero_tol)) {
+        if (!computation_step_current("matrix.lu") || mat_elem_abs2_below(e, pivot, &near_zero_tol)) {
             elem_destroy_value(e, pivot);
             elem_destroy_value(e, inv_pivot);
             elem_destroy_value(e, factor);

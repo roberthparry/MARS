@@ -403,7 +403,7 @@ static int goal_solve_real_one(expr_t *expr, expr_t *var, number_t target, numbe
         goto cleanup;
     }
 
-    for (size_t i = 0u; i < max_iterations; ++i) {
+    for (size_t i = 0u; i < max_iterations && expr_computation_step("expression.goal_seek"); ++i) {
         number_t left = num_sub(x0, step);
         number_t right = num_add(x0, step);
         number_t fleft = (number_t){0};
@@ -490,7 +490,7 @@ static int goal_solve_real_one(expr_t *expr, expr_t *var, number_t target, numbe
     if (!bracketed)
         goto cleanup;
 
-    for (size_t i = 0u; i < max_iterations * 4u; ++i) {
+    for (size_t i = 0u; i < max_iterations * 4u && expr_computation_step("expression.goal_seek"); ++i) {
         number_t sum = num_add(lo, hi);
         number_t mid = num_div(sum, NUM_TWO);
         number_t fmid = (number_t){0};
@@ -588,7 +588,7 @@ static int goal_complex_newton_from(expr_t *expr, expr_t *var, number_t target, 
 
     goal_set_var(var, x, digits);
 
-    for (size_t i = 0u; i < max_iterations; ++i) {
+    for (size_t i = 0u; i < max_iterations && expr_computation_step("expression.goal_seek"); ++i) {
         number_t value = (number_t){0};
         number_t residual = (number_t){0};
         number_t derivative = (number_t){0};
@@ -738,7 +738,7 @@ static int goal_solve_complex_one(expr_t *expr, expr_t *var, number_t target, nu
         seeds[2] = goal_work_value(NUM_NEG_I, digits);
         seeds[3] = goal_work_value(NUM_I, digits);
 
-        for (size_t i = 0u; i < seed_count; ++i) {
+        for (size_t i = 0u; i < seed_count && expr_computation_step("expression.goal_seek_seed"); ++i) {
             size_t attempt_iterations = 0u;
             size_t attempt_limit = i < 2u ? probe_limit : max_iterations;
 
@@ -833,7 +833,7 @@ static int goal_solve_real_multi(expr_t *expr, expr_t **vars, size_t nvars, numb
         values[i] = goal_start_value(vars[i], digits);
     goal_set_vars(vars, values, nvars, digits);
 
-    for (size_t iter = 0u; iter < max_iterations; ++iter) {
+    for (size_t iter = 0u; iter < max_iterations && expr_computation_step("expression.goal_seek"); ++iter) {
         number_t *derivs = calloc(nvars, sizeof(*derivs));
         number_t residual = (number_t){0};
         number_t residual_mag;
@@ -1018,7 +1018,7 @@ int expr_goal_seek(expr_t *expr, expr_bindings_t *bindings, number_t target, con
         goto cleanup;
     }
 
-    if (options && options->allow_complex && nvars == 1 &&
+    if (expr_computation_active() && options && options->allow_complex && nvars == 1 &&
         goal_solve_complex_one(expr, vars[0], target, tolerance, work_digits, max_iterations, &iterations) == 0) {
         rc = goal_finish(expr, bindings, target, tolerance, options, true, iterations, result);
     }
@@ -1027,6 +1027,8 @@ cleanup:
     num_destroy(&tolerance);
 cleanup_no_tol:
     free(vars);
+    if (!expr_computation_active())
+        rc = -1;
     if (rc != 0)
         expr_goal_seek_result_clear(result);
     return rc;

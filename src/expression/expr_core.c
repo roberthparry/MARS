@@ -83,6 +83,8 @@ static number_t expr_eval_cached_num(const expr_t *expr)
 {
     if (!expr)
         return NUM_ZERO;
+    if (!expr_computation_step("expression.evaluate"))
+        return NUM_NAN;
 
     expr_t *m = (expr_t *)expr;
 
@@ -93,6 +95,10 @@ static number_t expr_eval_cached_num(const expr_t *expr)
             number_t refreshed;
 
             if (expr_binding_expr_eval_if_precision_increased(m->binding_expr, &refreshed)) {
+                if (!expr_computation_active()) {
+                    num_destroy(&refreshed);
+                    return NUM_NAN;
+                }
                 expr_store_const_num(m, num_clone(refreshed));
                 expr_store_value_num(m, refreshed);
                 m->x_valid = 1;
@@ -108,13 +114,20 @@ static number_t expr_eval_cached_num(const expr_t *expr)
     expr_eval_cached_num(m->a);
     if (m->ops->arity == EXPR_OP_BINARY)
         expr_eval_cached_num(m->b);
+    if (!expr_computation_active())
+        return NUM_NAN;
 
     uint64_t child_epoch = m->a ? m->a->epoch : 0;
     if (m->b && m->b->epoch > child_epoch)
         child_epoch = m->b->epoch;
 
     if (!m->x_valid || child_epoch > m->epoch) {
-        expr_store_value_num(m, m->ops->eval(m));
+        number_t value = m->ops->eval(m);
+        if (!expr_computation_active()) {
+            num_destroy(&value);
+            return NUM_NAN;
+        }
+        expr_store_value_num(m, value);
         m->x_valid = 1;
         m->epoch = child_epoch;
     }
@@ -138,6 +151,8 @@ static expr_t *expr_build_dx(expr_t *expr)
 {
     if (!expr || !expr->ops->deriv)
         return NULL;
+    if (!expr_computation_step("expression.derivative"))
+        return expr_nan_const_shared();
 
     uint64_t wrt_id = current_wrt_id();
 
@@ -149,6 +164,10 @@ static expr_t *expr_build_dx(expr_t *expr)
 
     /* Not cached: compute and insert at head. */
     expr_t *dx = expr->ops->deriv(expr); /* refcount = 1, tl_wrt still set */
+    if (!expr_computation_active()) {
+        expr_free(dx);
+        return expr_nan_const_shared();
+    }
     expr_deriv_cache_t *ce = malloc(sizeof *ce);
     if (!ce)
         abort();
@@ -161,6 +180,8 @@ static expr_t *expr_build_dx(expr_t *expr)
 
 bool expr_is_differentiable(const expr_t *expr)
 {
+    if (!expr_computation_step("expression.derivative"))
+        return false;
     if (!expr)
         return false;
     if (expr->ops && expr->ops->diff_kind == EXPR_DIFF_NONE)
@@ -509,12 +530,14 @@ expr_t *expr_create_deriv(const expr_t *expr, const expr_t *wrt)
 
     if (!expr || !wrt)
         return NULL;
+    if (!expr_computation_step("expression.derivative"))
+        return expr_new_const(NUM_NAN);
     if (expr_is_one_sided_log(expr)) {
         expr_t *variable = (expr_t *)wrt;
         return expr_new_formal_derivative(expr, 1u, &variable);
     }
     result = expr_create_deriv_impl(expr, wrt);
-    linked = result ? expr_clone_linked_symbols(result, expr) : NULL;
+    linked = result && expr_computation_active() ? expr_clone_linked_symbols(result, expr) : NULL;
     expr_free(result);
     return linked;
 }

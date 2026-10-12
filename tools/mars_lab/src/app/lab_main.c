@@ -113,6 +113,8 @@ static pid_t lab_app_start_worker(lab_server_t *server)
 /* Parse options, start request workers and synchronously reap them on shutdown. */
 int main(int argc, char **argv)
 {
+    if (argc > 1 && lab_app_option(argv[1], "--worker-control"))
+        return lab_worker_dispatch_controlled(argc - 2, argv + 2);
     if (argc > 1 && lab_app_option(argv[1], "--worker"))
         return lab_worker_dispatch(argc - 2, argv + 2);
     const char *host = "127.0.0.1", *browser = "xdg-open";

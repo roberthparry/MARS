@@ -506,6 +506,32 @@ static void test_websrv_peer_dual_stack(void)
     TEST_ASSERT_TRUE(peer_exchange("::", AF_INET6, "::1"), "IPv6 wildcard also accepts IPv6 loopback");
 }
 
+static bool inspect_input_closure(const websrv_request_t *request, websrv_response_t *response, void *context)
+{
+    bool expected = *(bool *)context;
+    bool closed = websrv_request_input_closed(request);
+    for (unsigned attempt = 0; expected && !closed && attempt < 100; ++attempt) {
+        usleep(1000);
+        closed = websrv_request_input_closed(request);
+    }
+    return websrv_response_body(response, closed == expected ? "matched" : "mismatch", closed == expected ? 7 : 8);
+}
+
+static void test_websrv_input_closure(void)
+{
+    TEST_ASSERT_TRUE(websrv_request_input_closed(NULL) && errno == EINVAL, "NULL input is invalid");
+    const char request[] = "GET /echo HTTP/1.1\r\nHost: local\r\n\r\n";
+    for (unsigned state = 0; state < 2; ++state) {
+        bool closed = state != 0;
+        websrv_t *server = fixture(inspect_input_closure, &closed, NULL);
+        string_t *reply = server ? exchange(server, request, sizeof(request) - 1, closed, 1) : NULL;
+        bool ok = reply && contains(reply, "matched");
+        string_free(reply);
+        websrv_free(server);
+        TEST_ASSERT_TRUE(ok, "input half-close is observable without preventing the response");
+    }
+}
+
 /* README example: execute the complete documented program last. */
 static void example_webserver_hello(void)
 {
@@ -528,6 +554,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_websrv_peer_ipv4, tests, NULL);
     TEST_RUN_IN_GROUP(test_websrv_peer_ipv6, tests, NULL);
     TEST_RUN_IN_GROUP(test_websrv_peer_dual_stack, tests, NULL);
+    TEST_RUN_IN_GROUP(test_websrv_input_closure, tests, NULL);
     TEST_SECTION("README Output Examples");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_webserver_hello, readme_examples, "webserver,readme,output");
     return TEST_EXIT_CODE();

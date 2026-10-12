@@ -9,11 +9,16 @@
  * constructing or transforming results.
  */
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
 int ts_acf(const timeseries_t *series, size_t max_lag, matrix_t **out)
 {
+    if (!computation_step_current("timeseries.diagnostic"))
+        return -1;
     double *vals = NULL, mean = 0.0, denom = 0.0;
     size_t n = 0u, i, lag;
     double *acf = NULL;
@@ -35,11 +40,21 @@ int ts_acf(const timeseries_t *series, size_t max_lag, matrix_t **out)
         return -1;
     }
     for (lag = 0u; lag <= max_lag; ++lag) {
+        if (!computation_step_current("timeseries.lag")) {
+            free(vals);
+            free(acf);
+            return -1;
+        }
         double num = 0.0;
 
         for (i = lag; i < n; ++i)
             num += (vals[i] - mean) * (vals[i - lag] - mean);
         acf[lag] = denom == 0.0 ? 0.0 : num / denom;
+    }
+    if (!computation_poll_current()) {
+        free(vals);
+        free(acf);
+        return -1;
     }
     *out = ts_make_column_matrix_from_doubles(acf, max_lag + 1u);
     free(vals);
@@ -49,6 +64,8 @@ int ts_acf(const timeseries_t *series, size_t max_lag, matrix_t **out)
 
 int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
 {
+    if (!computation_step_current("timeseries.diagnostic"))
+        return -1;
     matrix_t *acf_mat = NULL;
     double *acf = NULL;
     double *phi = NULL;
@@ -74,6 +91,13 @@ int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
     }
     pacf[0] = 1.0;
     for (k = 1u; k <= max_lag; ++k) {
+        if (!computation_step_current("timeseries.lag")) {
+            mat_free(acf_mat);
+            free(acf);
+            free(phi);
+            free(pacf);
+            return -1;
+        }
         double num = acf[k];
         double den = 1.0;
 
@@ -88,6 +112,13 @@ int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
         }
         pacf[k] = phi[k * (max_lag + 1u) + k];
     }
+    if (!computation_poll_current()) {
+        mat_free(acf_mat);
+        free(acf);
+        free(phi);
+        free(pacf);
+        return -1;
+    }
     *out = ts_make_column_matrix_from_doubles(pacf, max_lag + 1u);
     mat_free(acf_mat);
     free(acf);
@@ -98,6 +129,8 @@ int ts_pacf(const timeseries_t *series, size_t max_lag, matrix_t **out)
 
 int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_t **out)
 {
+    if (!computation_step_current("timeseries.diagnostic"))
+        return -1;
     timeseries_t *xa = NULL, *ya = NULL;
     size_t n, lag;
     double *vals = NULL;
@@ -114,6 +147,12 @@ int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_
         return -1;
     }
     for (lag = 0u; lag <= max_lag; ++lag) {
+        if (!computation_step_current("timeseries.lag")) {
+            ts_free(xa);
+            ts_free(ya);
+            free(vals);
+            return -1;
+        }
         double sx = 0.0, sy = 0.0, sxy = 0.0;
         size_t count = 0u, i;
 
@@ -126,6 +165,12 @@ int ts_ccf(const timeseries_t *x, const timeseries_t *y, size_t max_lag, matrix_
             count++;
         }
         vals[lag] = count == 0u ? NAN : (sxy / (double)count) - (sx / (double)count) * (sy / (double)count);
+    }
+    if (!computation_poll_current()) {
+        ts_free(xa);
+        ts_free(ya);
+        free(vals);
+        return -1;
     }
     *out = ts_make_column_matrix_from_doubles(vals, max_lag + 1u);
     free(vals);

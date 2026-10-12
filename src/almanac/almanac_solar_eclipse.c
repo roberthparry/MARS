@@ -13,6 +13,9 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -259,6 +262,11 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac, const almanac_observer_
     first_k = (long)floor((start_jd - base_new_moon_jd) / synodic_month_days) - 2L;
     last_k = (long)ceil((end_jd - base_new_moon_jd) / synodic_month_days) + 2L;
     for (k = first_k; k <= last_k; ++k) {
+        if (!computation_step_current("almanac.candidate")) {
+            array_destroy(events);
+            almanac_set_error(almanac, "calculation stopped");
+            return NULL;
+        }
         almanac_solar_eclipse_t eclipse;
         double phase_jd;
         double local_jd;
@@ -283,6 +291,11 @@ array_t *almanac_find_solar_eclipses(almanac_t *almanac, const almanac_observer_
         }
     }
 
+    if (!computation_poll_current()) {
+        array_destroy(events);
+        almanac_set_error(almanac, "calculation stopped");
+        return NULL;
+    }
     return events;
 }
 

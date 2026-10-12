@@ -1710,7 +1710,7 @@ static void test_simplify_lambert_exp_to_quotient(void)
     char *zero_text;
 
     check_simplified_expression_string("exp(W(x)) simplification (EXPR)", "{ exp(W(x)) | x = NAN }",
-                                       "{ x/W(x) | x = NAN }");
+                                       "{ x/W(x) | x = ? }");
     check_simplified_expression_string("exp(W(0)) keeps removable singularity folded (binding)", "{ exp(W(0)) }", "1");
 
     zero = expr_new_const(NUM_ZERO);
@@ -1790,158 +1790,158 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         const char *label;
     } cases[] = {
         {
-            "{ sin(x)^2 + cos(x)^2 | x = NAN }",
+            "{ sin(x)^2 + cos(x)^2 | x = ? }",
             "1",
             "sin^2(x)+cos^2(x) simplifies to 1",
         },
         {
-            "{ cos(x)^2 - sin(x)^2 | x = NAN }",
-            "{ cos(2x) | x = NAN }",
+            "{ cos(x)^2 - sin(x)^2 | x = ? }",
+            "{ cos(2x) | x = ? }",
             "cos^2(x)-sin^2(x) simplifies to cos(2x)",
         },
         {
-            "{ -sin(x)^2 + cos(x)^2 | x = NAN }",
-            "{ cos(2x) | x = NAN }",
+            "{ -sin(x)^2 + cos(x)^2 | x = ? }",
+            "{ cos(2x) | x = ? }",
             "-sin^2(x)+cos^2(x) simplifies to cos(2x)",
         },
         {
-            "{ sin(x)/cos(x) | x = NAN }",
-            "{ tan(x) | x = NAN }",
+            "{ sin(x)/cos(x) | x = ? }",
+            "{ tan(x) | x = ? }",
             "sin(x)/cos(x) simplifies to tan(x)",
         },
         {
             "{ (tan(x) + tan(y))/(1 - tan(x)*tan(y)) | x = ?, y = ? }",
-            "{ tan(x + y) | x = NAN, y = NAN }",
+            "{ tan(x + y) | x = ?, y = ? }",
             "tangent addition quotient simplifies to tan(x+y)",
         },
         {
             "{ (tan(x) - tan(y))/(1 + tan(y)*tan(x)) | x = ?, y = ? }",
-            "{ tan(x - y) | x = NAN, y = NAN }",
+            "{ tan(x - y) | x = ?, y = ? }",
             "tangent subtraction quotient simplifies to tan(x-y)",
         },
         {
-            "{ (x^2)^3 | x = NAN }",
-            "{ x⁶ | x = NAN }",
+            "{ (x^2)^3 | x = ? }",
+            "{ x⁶ | x = ? }",
             "(x^2)^3 simplifies to x^6",
         },
         {
-            "{ exp(x)^3 | x = NAN }",
-            "{ exp(3x) | x = NAN }",
+            "{ exp(x)^3 | x = ? }",
+            "{ exp(3x) | x = ? }",
             "exp(x)^3 simplifies to exp(3x)",
         },
         {
-            "{ e^x | x = NAN }",
-            "{ exp(x) | x = NAN }",
+            "{ e^x | x = ? }",
+            "{ exp(x) | x = ? }",
             "e^x simplifies to exp(x)",
         },
         {
-            "{ (e^x)^2 | x = NAN }",
-            "{ exp(2x) | x = NAN }",
+            "{ (e^x)^2 | x = ? }",
+            "{ exp(2x) | x = ? }",
             "(e^x)^2 simplifies to exp(2x)",
         },
         {
-            "{ e^x^2 | x = NAN }",
-            "{ exp(2x) | x = NAN }",
+            "{ e^x^2 | x = ? }",
+            "{ exp(2x) | x = ? }",
             "e^x^2 simplifies left-associatively to exp(2x)",
         },
         {
-            "{ e^(x^2) | x = NAN }",
-            "{ exp(x²) | x = NAN }",
+            "{ e^(x^2) | x = ? }",
+            "{ exp(x²) | x = ? }",
             "e^(x^2) keeps the power inside the exponent",
         },
         {
-            "{ exp(x)*exp(y) | x = NAN, y = NAN }",
-            "{ exp(x + y) | x = NAN, y = NAN }",
+            "{ exp(x)*exp(y) | x = ?, y = ? }",
+            "{ exp(x + y) | x = ?, y = ? }",
             "exp(x)*exp(y) simplifies to exp(x+y)",
         },
         {
-            "{ 1/cos(x) | x = NAN }",
-            "{ sec(x) | x = NAN }",
+            "{ 1/cos(x) | x = ? }",
+            "{ sec(x) | x = ? }",
             "1/cos(x) simplifies to sec(x)",
         },
         {
-            "{ 1/sin(x) | x = NAN }",
-            "{ cosec(x) | x = NAN }",
+            "{ 1/sin(x) | x = ? }",
+            "{ cosec(x) | x = ? }",
             "1/sin(x) simplifies to cosec(x)",
         },
         {
-            "{ 1/tan(x) | x = NAN }",
-            "{ cot(x) | x = NAN }",
+            "{ 1/tan(x) | x = ? }",
+            "{ cot(x) | x = ? }",
             "1/tan(x) simplifies to cot(x)",
         },
         {
-            "{ 1/tan(x)^3 | x = NAN }",
-            "{ cot³(x) | x = NAN }",
+            "{ 1/tan(x)^3 | x = ? }",
+            "{ cot³(x) | x = ? }",
             "1/tan(x)^3 simplifies to cot^3(x)",
         },
         {
-            "{ 1/sec(x) | x = NAN }",
-            "{ cos(x) | x = NAN }",
+            "{ 1/sec(x) | x = ? }",
+            "{ cos(x) | x = ? }",
             "1/sec(x) simplifies to cos(x)",
         },
         {
-            "{ 1/cosec(x) | x = NAN }",
-            "{ sin(x) | x = NAN }",
+            "{ 1/cosec(x) | x = ? }",
+            "{ sin(x) | x = ? }",
             "1/cosec(x) simplifies to sin(x)",
         },
         {
-            "{ 1/cot(x) | x = NAN }",
-            "{ tan(x) | x = NAN }",
+            "{ 1/cot(x) | x = ? }",
+            "{ tan(x) | x = ? }",
             "1/cot(x) simplifies to tan(x)",
         },
         {
-            "{ atan(tan(x)) | x = NAN }",
-            "{ x - π·⌊½·(2x/π + 1)⌋ | x = NAN }",
+            "{ atan(tan(x)) | x = ? }",
+            "{ x - π·⌊½·(2x/π + 1)⌋ | x = ? }",
             "atan(tan(x)) simplifies to saw-tooth principal value",
         },
         {
-            "{ tan(x - pi*floor(1/2*(2*x/pi + 1))) | x = NAN }",
-            "{ tan(x) | x = NAN }",
+            "{ tan(x - pi*floor(1/2*(2*x/pi + 1))) | x = ? }",
+            "{ tan(x) | x = ? }",
             "tan of atan(tan) saw-tooth simplifies by periodicity",
         },
         {
-            "{ tan(x - floor(pi*(1.5+3.2i))) | x = NAN }",
-            "{ tan(x - 4 + 10i) | x = NAN }",
+            "{ tan(x - floor(pi*(1.5+3.2i))) | x = ? }",
+            "{ tan(x - 4 + 10i) | x = ? }",
             "floor of complex const folds inside tan argument",
         },
         {
-            "{ tan(atan(tan(x))) | x = NAN }",
-            "{ tan(x) | x = NAN }",
+            "{ tan(atan(tan(x))) | x = ? }",
+            "{ tan(x) | x = ? }",
             "tan(atan(tan(x))) simplifies to tan(x)",
         },
         {
-            "{ cos(x)*tan(x) | x = NAN }",
-            "{ sin(x) | x = NAN }",
+            "{ cos(x)*tan(x) | x = ? }",
+            "{ sin(x) | x = ? }",
             "cos(x)*tan(x) simplifies to sin(x)",
         },
         {
-            "{ tan(x)*cos(x) | x = NAN }",
-            "{ sin(x) | x = NAN }",
+            "{ tan(x)*cos(x) | x = ? }",
+            "{ sin(x) | x = ? }",
             "tan(x)*cos(x) simplifies to sin(x)",
         },
         {
-            "{ sin(x)*cos(x) | x = NAN }",
-            "{ ½·sin(2x) | x = NAN }",
+            "{ sin(x)*cos(x) | x = ? }",
+            "{ ½·sin(2x) | x = ? }",
             "sin(x)*cos(x) simplifies to half sin double angle",
         },
         {
-            "{ cos(x)*sin(x) | x = NAN }",
-            "{ ½·sin(2x) | x = NAN }",
+            "{ cos(x)*sin(x) | x = ? }",
+            "{ ½·sin(2x) | x = ? }",
             "cos(x)*sin(x) simplifies to half sin double angle",
         },
         {
-            "{ cos(x)+i*sin(x) | x = NAN }",
-            "{ exp(ix) | x = NAN }",
+            "{ cos(x)+i*sin(x) | x = ? }",
+            "{ exp(ix) | x = ? }",
             "Euler identity simplifies to exponential form",
         },
         {
-            "{ ln(cos(x)+i*sin(x)) | x = NAN }",
-            "{ ix | x = NAN }",
+            "{ ln(cos(x)+i*sin(x)) | x = ? }",
+            "{ ix | x = ? }",
             "logarithm of an Euler identity simplifies",
         },
         {
-            "{ (cos(x)+i*sin(x))^2 | x = NAN }",
-            "{ exp(2ix) | x = NAN }",
+            "{ (cos(x)+i*sin(x))^2 | x = ? }",
+            "{ exp(2ix) | x = ? }",
             "Euler-form square simplifies to an exponential",
         },
         {
@@ -1951,123 +1951,123 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ (sqrt(2)/2*sqrt(sqrt(x^2+y^2)+x)+i*sqrt(2)/2*y*sqrt(sqrt(x^2+y^2)-x)/abs(y))^2 | "
-            "x = NAN, y = NAN }",
-            "{ x + iy | x = NAN, y = NAN }",
+            "x = ?, y = ? }",
+            "{ x + iy | x = ?, y = ? }",
             "square of the Cartesian principal complex root simplifies to its argument",
         },
         {
-            "{ cosh(x)^2 - sinh(x)^2 | x = NAN }",
+            "{ cosh(x)^2 - sinh(x)^2 | x = ? }",
             "1",
             "cosh^2(x)-sinh^2(x) simplifies to 1",
         },
         {
-            "{ sinh(x)^2 + cosh(x)^2 | x = NAN }",
-            "{ cosh(2x) | x = NAN }",
+            "{ sinh(x)^2 + cosh(x)^2 | x = ? }",
+            "{ cosh(2x) | x = ? }",
             "sinh^2(x)+cosh^2(x) simplifies to cosh(2x)",
         },
         {
-            "{ cosh(x)^2 + sinh(x)^2 | x = NAN }",
-            "{ cosh(2x) | x = NAN }",
+            "{ cosh(x)^2 + sinh(x)^2 | x = ? }",
+            "{ cosh(2x) | x = ? }",
             "cosh^2(x)+sinh^2(x) simplifies to cosh(2x)",
         },
         {
-            "{ sinh(x)/cosh(x) | x = NAN }",
-            "{ tanh(x) | x = NAN }",
+            "{ sinh(x)/cosh(x) | x = ? }",
+            "{ tanh(x) | x = ? }",
             "sinh(x)/cosh(x) simplifies to tanh(x)",
         },
         {
-            "{ 1/cosh(x) | x = NAN }",
-            "{ sech(x) | x = NAN }",
+            "{ 1/cosh(x) | x = ? }",
+            "{ sech(x) | x = ? }",
             "1/cosh(x) simplifies to sech(x)",
         },
         {
-            "{ 1/sinh(x) | x = NAN }",
-            "{ cosech(x) | x = NAN }",
+            "{ 1/sinh(x) | x = ? }",
+            "{ cosech(x) | x = ? }",
             "1/sinh(x) simplifies to cosech(x)",
         },
         {
-            "{ 1/tanh(x) | x = NAN }",
-            "{ coth(x) | x = NAN }",
+            "{ 1/tanh(x) | x = ? }",
+            "{ coth(x) | x = ? }",
             "1/tanh(x) simplifies to coth(x)",
         },
         {
-            "{ 1/sech(x) | x = NAN }",
-            "{ cosh(x) | x = NAN }",
+            "{ 1/sech(x) | x = ? }",
+            "{ cosh(x) | x = ? }",
             "1/sech(x) simplifies to cosh(x)",
         },
         {
-            "{ 1/cosech(x) | x = NAN }",
-            "{ sinh(x) | x = NAN }",
+            "{ 1/cosech(x) | x = ? }",
+            "{ sinh(x) | x = ? }",
             "1/cosech(x) simplifies to sinh(x)",
         },
         {
-            "{ 1/coth(x) | x = NAN }",
-            "{ tanh(x) | x = NAN }",
+            "{ 1/coth(x) | x = ? }",
+            "{ tanh(x) | x = ? }",
             "1/coth(x) simplifies to tanh(x)",
         },
         {
-            "{ cosh(x)*tanh(x) | x = NAN }",
-            "{ sinh(x) | x = NAN }",
+            "{ cosh(x)*tanh(x) | x = ? }",
+            "{ sinh(x) | x = ? }",
             "cosh(x)*tanh(x) simplifies to sinh(x)",
         },
         {
-            "{ tanh(x)*cosh(x) | x = NAN }",
-            "{ sinh(x) | x = NAN }",
+            "{ tanh(x)*cosh(x) | x = ? }",
+            "{ sinh(x) | x = ? }",
             "tanh(x)*cosh(x) simplifies to sinh(x)",
         },
         {
-            "{ sinh(x)*cosh(x) | x = NAN }",
-            "{ ½·sinh(2x) | x = NAN }",
+            "{ sinh(x)*cosh(x) | x = ? }",
+            "{ ½·sinh(2x) | x = ? }",
             "sinh(x)*cosh(x) simplifies to half sinh double angle",
         },
         {
-            "{ cosh(x)*sinh(x) | x = NAN }",
-            "{ ½·sinh(2x) | x = NAN }",
+            "{ cosh(x)*sinh(x) | x = ? }",
+            "{ ½·sinh(2x) | x = ? }",
             "cosh(x)*sinh(x) simplifies to half sinh double angle",
         },
         {
-            "{ sinh(i*x) | x = NAN }",
-            "{ i·sin(x) | x = NAN }",
+            "{ sinh(i*x) | x = ? }",
+            "{ i·sin(x) | x = ? }",
             "sinh(i*x) simplifies to i*sin(x)",
         },
         {
-            "{ cosh(i*x) | x = NAN }",
-            "{ cos(x) | x = NAN }",
+            "{ cosh(i*x) | x = ? }",
+            "{ cos(x) | x = ? }",
             "cosh(i*x) simplifies to cos(x)",
         },
         {
-            "{ cos(i*x) | x = NAN }",
-            "{ cosh(x) | x = NAN }",
+            "{ cos(i*x) | x = ? }",
+            "{ cosh(x) | x = ? }",
             "cos(i*x) simplifies to cosh(x)",
         },
         {
-            "{ sin(i*x) | x = NAN }",
-            "{ i·sinh(x) | x = NAN }",
+            "{ sin(i*x) | x = ? }",
+            "{ i·sinh(x) | x = ? }",
             "sin(i*x) simplifies to i*sinh(x)",
         },
         {
             "{ -i*sin(i*x) | x = ? }",
-            "{ sinh(x) | x = NAN }",
+            "{ sinh(x) | x = ? }",
             "-i*sin(i*x) simplifies to sinh(x)",
         },
         {
             "{ i^3*sinh(x) | x = ? }",
-            "{ (-i)·sinh(x) | x = NAN }",
+            "{ (-i)·sinh(x) | x = ? }",
             "i^3*sinh(x) simplifies to -i*sinh(x)",
         },
         {
             "{ (i)^2*sinh(x) | x = ? }",
-            "{ -sinh(x) | x = NAN }",
+            "{ -sinh(x) | x = ? }",
             "(i)^2*sinh(x) simplifies to -sinh(x)",
         },
         {
-            "{ ii*sin(x) | x = NAN }",
-            "{ -sin(x) | x = NAN }",
+            "{ ii*sin(x) | x = ? }",
+            "{ -sin(x) | x = ? }",
             "i*i*sin(x) simplifies to -sin(x)",
         },
         {
             "{ (3 + 4i)*sinh((1 + 2i)*(1-i)*x) | x = ? }",
-            "{ (3 + 4i)·sinh((3 + i)x) | x = NAN }",
+            "{ (3 + 4i)·sinh((3 + i)x) | x = ? }",
             "numeric complex factors fold before multiplying variables",
         },
         {
@@ -2077,7 +2077,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ a₀a₁a₂a₃a₄x | x = ?; a₀ = 1024, a₁ = 27, a₂ = 389017, a₃ = 241, a₄ = 1103863 }",
-            "{ a₀a₁a₂a₃a₄x | x = NAN; a₀ = 1024, a₁ = 27, a₂ = 389017, a₃ = 241, a₄ = 1103863 }",
+            "{ a₀a₁a₂a₃a₄x | x = ?; a₀ = 1024, a₁ = 27, a₂ = 389017, a₃ = 241, a₄ = 1103863 }",
             "bound constants stay before variables in products",
         },
     };
@@ -2132,7 +2132,7 @@ static void test_pure_imaginary_addend_stays_ungrouped(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ 1/13*exp(1/13*(x + 5i)) | x = ? }", &bindings);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *want = "{ ¹⁄₁₃·exp(¹⁄₁₃·(x + 5i)) | x = NAN }";
+    const char *want = "{ ¹⁄₁₃·exp(¹⁄₁₃·(x + 5i)) | x = ? }";
 
     if (str_eq(text, want))
         to_string_pass("pure imaginary addend stays ungrouped", text, want);
@@ -2429,8 +2429,8 @@ static void test_gamma_successor_product_simplifies(void)
     expr_t *not_recurrence_simp = not_recurrence ? expr_simplify(not_recurrence) : NULL;
     char *recurrence_text = recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
     char *not_recurrence_text = not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
-    const char *recurrence_want = "{ Γ(x + 1) | x = NAN }";
-    const char *not_recurrence_want = "{ (x + 1)·Γ(x) | x = NAN }";
+    const char *recurrence_want = "{ Γ(x + 1) | x = ? }";
+    const char *not_recurrence_want = "{ (x + 1)·Γ(x) | x = ? }";
 
     if (str_eq(recurrence_text, recurrence_want))
         to_string_pass("x*gamma(x) simplifies by gamma recurrence", recurrence_text, recurrence_want);
@@ -2460,8 +2460,8 @@ static void test_lgamma_successor_sum_simplifies(void)
     expr_t *not_recurrence_simp = not_recurrence ? expr_simplify(not_recurrence) : NULL;
     char *recurrence_text = recurrence_simp ? expr_to_string(recurrence_simp, style_EXPRESSION) : NULL;
     char *not_recurrence_text = not_recurrence_simp ? expr_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
-    const char *recurrence_want = "{ lnΓ(x + 1) | x = NAN }";
-    const char *not_recurrence_want = "{ ln(x + 1) + lnΓ(x) | x = NAN }";
+    const char *recurrence_want = "{ lnΓ(x + 1) | x = ? }";
+    const char *not_recurrence_want = "{ ln(x + 1) + lnΓ(x) | x = ? }";
 
     if (str_eq(recurrence_text, recurrence_want))
         to_string_pass("ln(x)+lgamma(x) simplifies by log-gamma recurrence", recurrence_text, recurrence_want);
@@ -2505,7 +2505,7 @@ static void test_symbolic_negative_pi_derivative_stays_symbolic(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ -³⁄₂π/√(x) | x = NAN }";
+    const char *want = "{ -³⁄₂π/√(x) | x = ? }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("negative symbolic pi derivative stays symbolic", deriv_text, want);
@@ -2526,7 +2526,7 @@ static void test_pow_derivative_preserves_literal_base_log(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ ln(10)·10^x | x = NAN }";
+    const char *want = "{ ln(10)·10^x | x = ? }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("10^x derivative preserves ln(10)", deriv_text, want);
@@ -2552,7 +2552,7 @@ static void test_symbolic_complex_power_derivative_keeps_base_log(void)
         to_string_pass("a^(ix) derivative keeps ln(a)", deriv_text, deriv_text);
     else
         to_string_fail(__FILE__, __LINE__, 1, "a^(ix) derivative keeps ln(a)", deriv_text ? deriv_text : "(null)",
-                       "{ i·ln(a)·a^(ix) | x = NAN; a = NAN }");
+                       "{ i·ln(a)·a^(ix) | x = ?; a = ? }");
 
     free(deriv_text);
     expr_free(deriv);
@@ -2567,7 +2567,7 @@ static void test_symbolic_power_derivative_uses_n_minus_one_form(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ n·x^(n - 1) | n = NAN, x = NAN }";
+    const char *want = "{ n·x^(n - 1) | n = ?, x = ? }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("x^n derivative simplifies to n*x^(n-1)", deriv_text, want);
@@ -2591,8 +2591,8 @@ static void test_named_half_exponent_round_trips_as_symbolic_power(void)
     expr_t *x = round_bindings ? expr_bindings_get(round_bindings, "x") : NULL;
     expr_t *deriv = (round && x) ? expr_create_deriv(round, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *expr_want = "{ (x + a)^n | x = NAN; a = 2, n = ¹⁄₂ }";
-    const char *deriv_want = "{ n·(x + a)^(n - 1) | x = NAN; n = ¹⁄₂, a = 2 }";
+    const char *expr_want = "{ (x + a)^n | x = ?; a = 2, n = ¹⁄₂ }";
+    const char *deriv_want = "{ n·(x + a)^(n - 1) | x = ?; n = ¹⁄₂, a = 2 }";
 
     if (str_eq(expr_text, expr_want))
         to_string_pass("named half exponent round-trips as symbolic power", expr_text, expr_want);
@@ -2623,8 +2623,8 @@ static void test_symbolic_function_power_matches_parenthesized_power(void)
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *expr_want = "{ sin(x)^n | x = NAN; n = NAN }";
-    const char *deriv_want = "{ n·cos(x)·sin(x)^(n - 1) | x = NAN; n = NAN }";
+    const char *expr_want = "{ sin(x)^n | x = ?; n = ? }";
+    const char *deriv_want = "{ n·cos(x)·sin(x)^(n - 1) | x = ?; n = ? }";
 
     if (str_eq(expr_text, expr_want))
         to_string_pass("sin^n(x) parses as sin(x)^n", expr_text, expr_want);
@@ -2654,11 +2654,11 @@ static void test_inverse_power_function_notation_uses_supported_inverses_only(vo
     char *asin_text = asin_expr ? expr_to_string(asin_expr, style_EXPRESSION) : NULL;
     char *sqrt_power_text = sqrt_power_expr ? expr_to_string(sqrt_power_expr, style_EXPRESSION) : NULL;
 
-    if (str_eq(asin_text, "{ asin(x) | x = NAN }"))
-        to_string_pass("sin^-1(x) parses as asin(x)", asin_text, "{ asin(x) | x = NAN }");
+    if (str_eq(asin_text, "{ asin(x) | x = ? }"))
+        to_string_pass("sin^-1(x) parses as asin(x)", asin_text, "{ asin(x) | x = ? }");
     else
         to_string_fail(__FILE__, __LINE__, 1, "sin^-1(x) parses as asin(x)", asin_text ? asin_text : "(null)",
-                       "{ asin(x) | x = NAN }");
+                       "{ asin(x) | x = ? }");
 
     if (log_expr == NULL)
         to_string_pass("log^-1(x) is rejected", "(null)", "(null)");
@@ -2670,11 +2670,11 @@ static void test_inverse_power_function_notation_uses_supported_inverses_only(vo
     else
         to_string_fail(__FILE__, __LINE__, 1, "sqrt^-1(x) is rejected", "(non-null)", "(null)");
 
-    if (str_eq(sqrt_power_text, "{ 1/√(x) | x = NAN }"))
-        to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text, "{ 1/√(x) | x = NAN }");
+    if (str_eq(sqrt_power_text, "{ 1/√(x) | x = ? }"))
+        to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text, "{ 1/√(x) | x = ? }");
     else
         to_string_fail(__FILE__, __LINE__, 1, "sqrt(x)^-1 remains valid", sqrt_power_text ? sqrt_power_text : "(null)",
-                       "{ 1/√(x) | x = NAN }");
+                       "{ 1/√(x) | x = ? }");
 
     free(sqrt_power_text);
     free(asin_text);
@@ -2712,7 +2712,7 @@ static void test_log_of_imaginary_product_derivative_cancels_i(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ 1/(x·ln(10)) | x = NAN }";
+    const char *want = "{ 1/(x·ln(10)) | x = ? }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("log(ix) derivative cancels imaginary unit", deriv_text, want);
@@ -2753,7 +2753,7 @@ static void test_ln10_product_expression_round_trips(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ 1/(x·ln(10)) | x = NAN }", &bindings);
     char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *want = "{ 1/(x·ln(10)) | x = NAN }";
+    const char *want = "{ 1/(x·ln(10)) | x = ? }";
 
     if (str_eq(text, want))
         to_string_pass("ln(10) product expression round-trips", text, want);
@@ -2985,7 +2985,7 @@ static void test_repeated_preserved_log_factor_combines_as_power(void)
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ ln(10)²·10^x | x = NAN }";
+    const char *want = "{ ln(10)²·10^x | x = ? }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("repeated preserved ln(10) factors combine as ln(10)^2", deriv_text, want);
@@ -3007,8 +3007,8 @@ static void test_preserved_log_power_chain_combines_as_power(void)
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *expr_want = "{ ln(10)³·10^x | x = NAN }";
-    const char *deriv_want = "{ ln(10)⁴·10^x | x = NAN }";
+    const char *expr_want = "{ ln(10)³·10^x | x = ? }";
+    const char *deriv_want = "{ ln(10)⁴·10^x | x = ? }";
 
     if (str_eq(expr_text, expr_want))
         to_string_pass("preserved ln(10)^2*ln(10) combines as ln(10)^3", expr_text, expr_want);
@@ -3036,9 +3036,9 @@ static void test_unary_constants_preserve_user_literals_in_derivatives(void)
         const char *want;
         const char *label;
     } cases[] = {
-        {"{ sin(1)*x | x = NAN }", "sin(1)", "sin(1)*x derivative preserves sin(1)"},
-        {"{ sqrt(2)*x | x = NAN }", "√(2)", "sqrt(2)*x derivative preserves sqrt(2)"},
-        {"{ exp(1)*x | x = NAN }", "exp(1)", "exp(1)*x derivative preserves exp(1)"},
+        {"{ sin(1)*x | x = ? }", "sin(1)", "sin(1)*x derivative preserves sin(1)"},
+        {"{ sqrt(2)*x | x = ? }", "√(2)", "sqrt(2)*x derivative preserves sqrt(2)"},
+        {"{ exp(1)*x | x = ? }", "exp(1)", "exp(1)*x derivative preserves exp(1)"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3071,7 +3071,7 @@ static void test_preserved_reciprocal_constant_derivative_round_trips(void)
     char *deriv_TeX = NULL;
     int derivative_is_parse_safe;
     int TeX_keeps_symbolic_pi;
-    const char *deriv_want = "{ -2x·exp(-x²)/√(π) | x = NAN }";
+    const char *deriv_want = "{ -2x·exp(-x²)/√(π) | x = ? }";
 
     num_set_default_prec_digits(100u);
     expr = expr_from_string("{ 1/sqrt(pi)*exp(-x^2) | x = NAN }", &bindings);
@@ -3112,15 +3112,15 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         const char *label;
         bool simplify_expr;
     } cases[] = {
-        {"{ atan2(1,2)*x | x = NAN }", "{ atan2(1, 2)x | x = NAN }", "atan2(1, 2)", "atan2(1,2)*x preserves atan2(1,2)",
+        {"{ atan2(1,2)*x | x = ? }", "{ atan2(1, 2)x | x = ? }", "atan2(1, 2)", "atan2(1,2)*x preserves atan2(1,2)",
          false},
-        {"{ hypot(3,4)*x | x = NAN }", "{ hypot(3, 4)x | x = NAN }", "hypot(3, 4)", "hypot(3,4)*x preserves hypot(3,4)",
+        {"{ hypot(3,4)*x | x = ? }", "{ hypot(3, 4)x | x = ? }", "hypot(3, 4)", "hypot(3,4)*x preserves hypot(3,4)",
          false},
-        {"{ beta(2,3)*x | x = NAN }", "{ B(2, 3)x | x = NAN }", "B(2, 3)", "beta(2,3)*x preserves B(2,3)",
+        {"{ beta(2,3)*x | x = ? }", "{ B(2, 3)x | x = ? }", "B(2, 3)", "beta(2,3)*x preserves B(2,3)",
          false},
-        {"{ logbeta(2,3)*x | x = NAN }", "{ -ln(12)x | x = NAN }", "-ln(12)",
+        {"{ logbeta(2,3)*x | x = ? }", "{ -ln(12)x | x = ? }", "-ln(12)",
          "logbeta(2,3)*x rewrites exactly to -ln(12)", true},
-        {"{ logbeta(1,1)*x | x = NAN }", "0", "0", "logbeta(1,1)*x rewrites exactly to zero", true},
+        {"{ logbeta(1,1)*x | x = ? }", "0", "0", "logbeta(1,1)*x rewrites exactly to zero", true},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -3160,7 +3160,7 @@ static void test_symbolic_negative_pi_quotient_stays_symbolic(void)
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string("{ (1/2)*(-3*pi)/sqrt(x) | x = NAN }", &bindings);
     char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    const char *want = "{ -³⁄₂π/√(x) | x = NAN }";
+    const char *want = "{ -³⁄₂π/√(x) | x = ? }";
 
     if (str_eq(expr_text, want))
         to_string_pass("negative symbolic pi quotient stays symbolic", expr_text, want);

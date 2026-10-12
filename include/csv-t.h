@@ -12,6 +12,12 @@
  * fields survive until the next csv_next call; header names survive until free.
  * Handles require external synchronisation when shared between threads. File
  * ownership, closing, atomic replacement and durability belong to file-t.h.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/csv.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 #ifndef MARS_CSV_H
 #define MARS_CSV_H

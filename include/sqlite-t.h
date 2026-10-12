@@ -19,6 +19,12 @@
  * in terms of SQLite semantics. The implementation uses SQLCipher and refuses
  * to open a database without a non-empty key, so files created through this API
  * are encrypted at rest.
+ *
+ * Long-running CSV ingestion/export paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/sqlite.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_SQLITE_H

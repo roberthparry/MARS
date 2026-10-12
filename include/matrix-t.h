@@ -27,6 +27,12 @@
  * Numeric matrices store `number_t` values and symbolic matrices store
  * retained `expr_t *` handles. All operations dispatch through internal
  * vtables. No type switches or storage switches appear in user code.
+ *
+ * Long-running calculation paths cooperate with an optional computation_run() scope.
+ * Without a scope, existing calls remain supported. Cancellation, deadlines and
+ * shared work budgets are cooperative; callers must check operation failure and
+ * computation_status() before using outputs. See docs/matrix.md for checkpoint
+ * coverage, ownership and the corresponding executable example.
  */
 
 #ifndef MARS_MATRIX_H

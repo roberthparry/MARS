@@ -140,7 +140,7 @@ int websrv_serve_once(websrv_t *s, unsigned wait_ms)
     if (fd < 0) return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
     s->active = true;
     int64_t deadline = websrv_now() + s->limits.timeout_ms;
-    websrv_request_t request = {0};
+    websrv_request_t request = {.connection_fd = fd};
     websrv_response_t response = {
         .status = 200, .max_body = s->limits.max_body_bytes, .max_headers = s->limits.max_header_bytes,
         .headers = websrv_dict_new(sizeof(string_t *)), .header_bytes = 192
@@ -184,4 +184,18 @@ done:;
     s->active = false;
     errno = saved;
     return result;
+}
+
+/* Observe transport closure without consuming pipelined bytes or changing socket ownership. */
+bool websrv_request_input_closed(const websrv_request_t *request)
+{
+    if (!request) {
+        errno = EINVAL;
+        return true;
+    }
+    struct pollfd descriptor = {.fd = request->connection_fd, .events = POLLRDHUP};
+    int result = poll(&descriptor, 1, 0);
+    if (result < 0)
+        return errno != EINTR;
+    return result > 0 && (descriptor.revents & (POLLRDHUP | POLLHUP | POLLERR | POLLNVAL)) != 0;
 }

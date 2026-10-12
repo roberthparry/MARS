@@ -6,6 +6,8 @@
  * bounded requests and application callbacks. Opaque request and response handles
  * provide text, binary, JSON and XML body handling, while the caller controls the
  * synchronous serving loop.
+ * A handler can non-destructively inspect input closure for protocol-specific
+ * cancellation; a sending half-close does not itself prevent a response.
  *
  * This module is suitable for local services, embedded endpoints and integration
  * tests. It supplies the shared webmethod_t type and HTTP_GET-style method constants.
@@ -118,6 +120,15 @@ webmethod_t websrv_request_method(const websrv_request_t *request);
  * @return Borrowed IP address text, or NULL for NULL input. IPv4-mapped IPv6 addresses remain mapped.
  */
 const string_t *websrv_request_peer(const websrv_request_t *request);
+
+/**
+ * @brief Non-blockingly observe closure/error of the request peer's sending side during a handler.
+ * True includes TCP half-close: it does not prove the peer cannot still receive a response.
+ * Does not consume bytes or expose/close the socket. Applications may treat this as cancellation
+ * only when their protocol forbids half-closing while awaiting a result. NULL returns true with EINVAL.
+ * A reverse proxy may keep its upstream connection open after its client disconnects.
+ */
+bool websrv_request_input_closed(const websrv_request_t *request);
 
 /**
  * @brief Borrow the raw origin-form target including query; no URL decoding.

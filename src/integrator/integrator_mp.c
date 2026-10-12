@@ -11,15 +11,14 @@
  * information rather than relying on a particular internal algorithm.
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <limits.h>
-
-#define MARS_INTEGRATOR_INTERNAL_ACCESS
-#include "integrator_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
+#define MARS_INTEGRATOR_INTERNAL_ACCESS
+#include "integrator_internal.h"
 
 typedef struct {
     number_t a;
@@ -29,11 +28,6 @@ typedef struct {
 } mp_subinterval_t;
 
 typedef int (*mp_eval_fn)(void *ctx, const number_t x, number_t *out);
-
-typedef struct {
-    expr_t *expr;
-    expr_t *x_var;
-} mp_expr_ctx_t;
 
 typedef struct {
     integrator_t *ig;
@@ -113,15 +107,6 @@ static int mp_eval_at(expr_t *expr, expr_t *x_var, const number_t x, number_t *o
 
     intg_expr_set_val_num(x_var, x);
     return intg_expr_eval_num_real(expr, out);
-}
-
-static int mp_eval_expr_ctx(void *ctx, const number_t x, number_t *out)
-{
-    mp_expr_ctx_t *expr_ctx = (mp_expr_ctx_t *)ctx;
-
-    if (!expr_ctx)
-        return -1;
-    return mp_eval_at(expr_ctx->expr, expr_ctx->x_var, x, out);
 }
 
 static int mp_interval_init_eval(mp_eval_fn eval, void *ctx, const number_t a, const number_t b, mp_subinterval_t *out)
@@ -419,7 +404,8 @@ cleanup:
     return status;
 }
 
-static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t center, const number_t half_width,
+static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, integrator_t *ig,
+                                  const number_t center, const number_t half_width,
                                   const number_t a, const number_t b,
                                   const number_t pi_over_two, const number_t h, const number_t term_tolerance,
                                   size_t min_steps, int max_steps, const mp_tanh_sinh_cache_t *previous,
@@ -441,6 +427,8 @@ static int mp_tanh_sinh_sum_for_h(mp_eval_fn eval, void *ctx, const number_t cen
         goto fail;
 
     for (size_t k = 0u; k <= (size_t)max_steps; ++k) {
+        if (!intg_checkpoint(ig, 0))
+            goto fail;
         mp_tanh_sinh_node_t node;
         if (!(k % 2u) && k / 2u < previous->count) {
             /* Halving h leaves this node's coordinate unchanged and halves its weight.
@@ -488,7 +476,8 @@ fail:
     return -1;
 }
 
-static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_t b, number_t abs_tol, number_t rel_tol,
+static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, integrator_t *ig,
+                                 number_t a, number_t b, number_t abs_tol, number_t rel_tol,
                                  size_t max_intervals, number_t *result_out, number_t *error_out, size_t *steps_out)
 {
     number_t ab_sum = num_add(a, b);
@@ -521,6 +510,10 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
         ++refine_limit;
 
     for (int level = 0; level < refine_limit; ++level) {
+        if (!intg_report(ig, "integration.tanh_sinh", (uint64_t)level)) {
+            status = -1;
+            goto cleanup;
+        }
         number_t level_sum = NUM_ZERO;
         number_t level_last_term = NUM_ZERO;
         number_t threshold = NUM_ZERO;
@@ -547,7 +540,7 @@ static int mp_tanh_sinh_integral(mp_eval_fn eval, void *ctx, number_t a, number_
             level_max_steps = (int)remaining_steps - 1;
         size_t level_min_steps = (size_t)level_max_steps + 1u;
         int sum_status =
-            mp_tanh_sinh_sum_for_h(eval, ctx, center, half_width, a, b, pi_over_two, h, term_tolerance, level_min_steps,
+            mp_tanh_sinh_sum_for_h(eval, ctx, ig, center, half_width, a, b, pi_over_two, h, term_tolerance, level_min_steps,
                                    level_max_steps, &previous_nodes, &current_nodes, &level_sum, &level_last_term,
                                    &level_steps);
 
@@ -748,8 +741,14 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx, integrator_t *ig, nu
         number_t ts_result = NUM_ZERO;
         number_t ts_error = NUM_ZERO;
         size_t ts_steps = 0u;
-        int ts_status = mp_tanh_sinh_integral(eval, ctx, a_work, b_work, abs_tol, rel_tol, ig->max_intervals,
+        int ts_status = mp_tanh_sinh_integral(eval, ctx, ig, a_work, b_work, abs_tol, rel_tol, ig->max_intervals,
                                               &ts_result, &ts_error, &ts_steps);
+
+        if (!intg_checkpoint(ig, 0)) {
+            num_destroy(&ts_error);
+            num_destroy(&ts_result);
+            goto fail;
+        }
 
         if (ts_status == 0 ||
             (ts_status > 0 && user_digits >= 80u && num_is_finite(ts_error) && !num_is_nan(ts_error))) {
@@ -795,6 +794,8 @@ static int mp_adaptive_integral(mp_eval_fn eval, void *ctx, integrator_t *ig, nu
     total_err = num_clone(intervals[0].error);
 
     while (1) {
+        if (!intg_report(ig, "integration.gauss_kronrod", count))
+            goto fail;
         number_t thresh = mp_tolerance_threshold(abs_tol, rel_tol, total);
         size_t worst = 0u;
 
@@ -913,33 +914,6 @@ cleanup:
     return status;
 }
 
-static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out);
-
-int intg_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, number_t a, number_t b, number_t *result,
-                  number_t *error_est)
-{
-    mp_expr_ctx_t expr_ctx;
-    expr_t *vars[1];
-    number_t lo[1];
-    number_t hi[1];
-    int fast_status;
-
-    if (!ig || !expr || !x_var || !result)
-        return -1;
-
-    intg_clear_exact_result(ig);
-    vars[0] = x_var;
-    lo[0] = a;
-    hi[0] = b;
-    fast_status = try_integral_multi_special_affine(ig, expr, 1u, vars, lo, hi, result, error_est);
-    if (fast_status != 0)
-        return fast_status > 0 ? 0 : -1;
-
-    expr_ctx.expr = expr;
-    expr_ctx.x_var = x_var;
-    return mp_adaptive_integral(mp_eval_expr_ctx, &expr_ctx, ig, a, b, result, error_est);
-}
-
 static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
 {
     mp_multi_ctx_t *multi = (mp_multi_ctx_t *)ctx;
@@ -947,15 +921,19 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
     size_t saved_last_intervals;
     expr_t *saved_exact_result = NULL;
 
-    if (!multi || !out || multi->ndim == 0)
+    if (!multi || !out || multi->ndim == 0 || !intg_checkpoint(multi->ig, 0))
         return -1;
 
     outer = multi->ndim - 1u;
+
+    if (multi->ndim == 1u) {
+        if (!intg_checkpoint(multi->ig, 1))
+            return -1;
+        int status = mp_eval_at(multi->expr, multi->vars[0], x, out);
+        return intg_checkpoint(multi->ig, 0) ? status : -1;
+    }
+
     expr_set_val(multi->vars[outer], x);
-
-    if (multi->ndim == 1u)
-        return mp_eval_at(multi->expr, multi->vars[0], x, out);
-
     saved_last_intervals = multi->ig->last_intervals;
     saved_exact_result = expr_retain_expr(intg_get_exact_result(multi->ig));
     {
@@ -982,7 +960,11 @@ int intg_integral_multi_num(integrator_t *ig, expr_t *expr, size_t ndim, expr_t 
     if (!ig || !expr || !vars || !lo || !hi || !result || ndim == 0)
         return -1;
 
+    if (!intg_report(ig, "integration.symbolic", 0) || !intg_checkpoint(ig, 1))
+        return -1;
     fast_status = try_integral_multi_special_affine(ig, expr, ndim, vars, lo, hi, result, error_est);
+    if (!intg_checkpoint(ig, 0))
+        return -1;
     if (fast_status != 0)
         return fast_status > 0 ? 0 : -1;
 

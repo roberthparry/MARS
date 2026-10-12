@@ -9,6 +9,9 @@
  * constructing or transforming results.
  */
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
@@ -23,6 +26,10 @@ static matrix_t *ts_augmented_xreg(const matrix_t *xreg, size_t rows, bool inclu
     if (!X)
         return NULL;
     for (r = 0u; r < rows; ++r) {
+        if (!computation_step_current("timeseries.design")) {
+            mat_free(X);
+            return NULL;
+        }
         col = 0u;
         if (include_intercept) {
             number_t one = NUM_ONE;
@@ -55,6 +62,8 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
     if (!y || !out)
         return -1;
     memset(out, 0, sizeof(*out));
+    if (!computation_step_current("timeseries.regression"))
+        goto fail;
     Y = ts_to_column_matrix(y);
     if (!Y)
         return -1;
@@ -79,6 +88,8 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
     if (!fitted || !residuals)
         goto fail;
     for (i = 0u; i < n; ++i) {
+        if (!computation_step_current("timeseries.observation"))
+            goto fail;
         number_t fv = mat_get_num(fit, i, 0);
         number_t rv = mat_get_num(resid_col, i, 0);
         double yd = num_to_double(y->values[i]);
@@ -93,6 +104,8 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
     }
     mean /= (double)n;
     for (i = 0u; i < n; ++i) {
+        if (!computation_step_current("timeseries.observation"))
+            goto fail;
         double yd = num_to_double(y->values[i]);
         double diff = yd - mean;
         sst += diff * diff;
@@ -162,6 +175,8 @@ int ts_regression_fit_internal(const timeseries_t *y, const matrix_t *xreg, bool
             XtX_inv = NULL;
         }
     }
+    if (!computation_poll_current())
+        goto fail;
     mat_free(Y);
     mat_free(X);
     mat_free(fit);
@@ -182,6 +197,7 @@ fail:
     mat_free(XtX_inv);
     ts_free(fitted);
     ts_free(residuals);
+    ts_regression_result_clear(out);
     return -1;
 }
 
@@ -204,6 +220,8 @@ int ts_regression_forecast(const ts_regression_result_t *model, const matrix_t *
     if (!model || !model->coefficients || !future_xreg || !history || !out)
         return -1;
     memset(out, 0, sizeof(*out));
+    if (!computation_step_current("timeseries.regression"))
+        goto fail;
     rows = mat_get_row_count(future_xreg);
     cols = mat_get_col_count(future_xreg);
     beta_rows = mat_get_row_count(model->coefficients);
@@ -220,6 +238,8 @@ int ts_regression_forecast(const ts_regression_result_t *model, const matrix_t *
     if (!mean || !stderr || !lower || !upper)
         goto fail;
     for (i = 0u; i < rows; ++i) {
+        if (!computation_step_current("timeseries.observation"))
+            goto fail;
         number_t mu = mat_get_num(model->coefficients, 0u, 0u);
         number_t se = num_clone(model->rmse);
         number_t width = num_mul(z, se);
@@ -244,6 +264,8 @@ int ts_regression_forecast(const ts_regression_result_t *model, const matrix_t *
         num_destroy(&mu);
         num_destroy(&width);
     }
+    if (!computation_poll_current())
+        goto fail;
     out->mean = mean;
     out->stderr = stderr;
     out->lower = lower;

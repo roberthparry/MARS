@@ -133,7 +133,7 @@ static bool equ_quintic_newton_from(const number_t *coeffs, number_t start, numb
     number_t derivative = num_new();
     bool converged = false;
 
-    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS; ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS && equ_computation_step("equation.newton"); ++iteration) {
         number_t step;
         number_t next;
 
@@ -156,7 +156,7 @@ static bool equ_quintic_newton_from(const number_t *coeffs, number_t start, numb
         z = next;
     }
 
-    if (!converged) {
+    if (!converged && equ_computation_active()) {
         equ_quintic_eval(coeffs, z, &value, NULL);
         converged = equ_quintic_magnitude_le(value, tolerance);
     }
@@ -200,7 +200,7 @@ static bool equ_quintic_find_real_root(const number_t *coeffs, number_t toleranc
     if (!num_is_real(value_left) || !num_is_real(value_right) || num_sign(value_left) == num_sign(value_right))
         goto cleanup;
 
-    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS; ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_QUINTIC_NEWTON_ITERATIONS && equ_computation_step("equation.newton"); ++iteration) {
         number_t candidate = num_new();
         bool use_newton = false;
 

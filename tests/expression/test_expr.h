@@ -146,6 +146,9 @@ void test_second_derivatives(void);
 void test_expr_t_to_string(void);
 void test_expr_t_from_string(void);
 void test_expr_t_goal_seek(void);
+
+/** Check imaginary-axis identities and principal-branch presentation. */
+void test_expr_t_imaginary_axis(void);
 void test_partial_derivatives(void);
 void test_expr_tree_match_helpers(void);
 void test_symbolic_integration(void);

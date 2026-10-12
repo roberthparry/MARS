@@ -16,8 +16,13 @@ equation_solutions_t *equ_derive_solutions_with_context(const equation_t *equati
     if (!result)
         return NULL;
     for (size_t i = 0; i < result->count; ++i) {
+        if (!equ_computation_step("equation.context")) {
+            equ_solutions_free(result);
+            return NULL;
+        }
         equation_t *simplified = equ_simplify_with_context(result->solutions[i], context);
-        if (!simplified) {
+        if (!simplified || !equ_computation_active()) {
+            equ_free(simplified);
             equ_solutions_free(result);
             return NULL;
         }

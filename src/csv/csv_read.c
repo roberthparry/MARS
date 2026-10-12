@@ -9,6 +9,9 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_CSV_INTERNAL_ACCESS
 #include "csv_internal.h"
 
@@ -88,6 +91,8 @@ static bool csv_push_field(csv_t *csv)
 
 static bool csv_end_row(csv_t *csv)
 {
+    if (!computation_poll_current())
+        return csv_fail(csv, errno);
     if (!csv_push_field(csv))
         return false;
     if (!csv->header_ready && csv->options.first_row_header) {
@@ -126,7 +131,19 @@ csv_status_t csv_next(csv_t *csv)
         csv_clear_row(csv);
     if (csv->error.code)
         return CSV_ERROR;
+    if (!computation_step_current("csv.read")) {
+        csv_fail(csv, errno);
+        return CSV_ERROR;
+    }
+    size_t checked_bytes = 0;
     for (;;) {
+        if (++checked_bytes == 4096) {
+            checked_bytes = 0;
+            if (!computation_step_current("csv.bytes")) {
+                csv_fail(csv, errno);
+                return CSV_ERROR;
+            }
+        }
         size_t available = string_byte_length(csv->buffer) - csv->position;
         if ((!available || (!csv->bom_checked && available < 3)) && !csv->final) {
             csv->need_input = true;

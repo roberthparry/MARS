@@ -34,6 +34,9 @@
 #include "expression-t.h"
 #include "expr_context-t.h"
 
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_computation_internal.h"
+
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 
 typedef enum {

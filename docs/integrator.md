@@ -17,6 +17,94 @@ multidimensional wrappers; `integrator_mp.c` owns numerical quadrature and
 
 ---
 
+## Cooperative calculation control
+
+`intg_set_computation(ig, control)` retains a [`computation_t`](computation.md)
+reference, replacing the previous reference. Pass NULL to detach. Configure only
+while idle; sharing a control does not make integrators or expressions safe for
+concurrent mutation. The control and integrator have independent lifetimes.
+
+All handle-based numerical entry points share the control across dimensions and
+successive calls. Each symbolic fast-path attempt and each fresh leaf integrand
+evaluation reserves one work unit. Reused tanh–sinh nodes do not consume this
+budget again, although they still count towards the integrator's existing logical
+subdivision limit. Thus the two limits measure different things. No component
+of a nested integration resets or completes the shared control.
+
+Checks bracket symbolic attempts and numerical evaluations, and occur during
+refinement. An attached control alone brackets expression calls. To check inside
+those calls too, use `computation_run()`: unattached integrators inherit its control,
+and expression visits and sum/product iterations also consume the shared budget.
+Standalone `intg_integrate_iterated_symbolic()` and
+`intg_integrate_iterated_symbolic_best_effort()` benefit through scoped expression
+checkpoints despite having no integrator handle. Individual numerical primitives
+remain non-interruptible. Retain a process timeout for a hard outer deadline.
+
+Return status **-2** means the attached control is no longer active: inspect
+`computation_status()` for cancellation, timeout, exhausted work or another
+terminal state. On -2, the numerical result and error are NaN, interval count is
+zero and the exact-result cache is cleared. Do not treat these as a partial
+estimate. Existing statuses remain 0 for convergence, 1 for the subdivision cap
+before convergence and -1 for invalid input or numerical/internal failure.
+Ordinary failures do not automatically mark a shared calculation as failed.
+An explicitly attached control different from the current scope also returns -2
+with unavailable outputs and `errno = EBUSY`, without stopping either control.
+
+Progress stages are `integration.symbolic`, `integration.tanh_sinh`,
+`integration.gauss_kronrod` and `integration.return`. Totals are unknown;
+completed counts describe the current stage, not an overall percentage. The
+aggregate `work_used` counter spans nested calls. Reports run synchronously on
+the integration thread. An observer may cancel but must not re-enter, reconfigure
+or destroy the integrator, or change its input expressions or numeric precision.
+An `integration.return` report is not a declaration of convergence or completion.
+
+### README example: a shared work limit
+
+The one-unit budget permits the symbolic attempt but no numerical integrand
+evaluations. The result is explicitly unavailable when quadrature needs more work.
+
+```c
+#include <inttypes.h>
+#include <stdio.h>
+
+#include "computation-t.h"
+#include "integrator-t.h"
+
+int main(void)
+{
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    integrator_t *ig = intg_new();
+    expr_bindings_t *bindings = NULL;
+    expr_t *formula = expr_from_string("sin(x*x)", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    if (!control || !ig || !formula || !x || !intg_set_computation(ig, control)) {
+        expr_free(formula);
+        expr_bindings_free(bindings);
+        intg_free(ig);
+        computation_free(control);
+        return 1;
+    }
+    number_t value = NUM_NAN;
+    int result = intg_integral(ig, formula, x, NUM_ZERO, NUM_ONE, &value, NULL);
+    bool stopped = result == -2 && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
+    printf("Budget exhausted: %d; work: %" PRIu64 "; value unavailable: %d\n",
+           stopped, computation_work_used(control), num_is_nan(value));
+    num_destroy(&value);
+    expr_free(formula);
+    expr_bindings_free(bindings);
+    intg_free(ig);
+    computation_free(control);
+    return stopped ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Budget exhausted: 1; work: 1; value unavailable: 1
+```
+
 ## Algorithms
 
 ### Multiprecision endpoint handling

@@ -2429,6 +2429,8 @@ static expr_t *expr_beautify_product_signs_owned(expr_t *expr)
 
 static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_roots)
 {
+    if (!expr_computation_step("expression.beautify"))
+        return expr_retain_expr(expr);
     expr_t *left = NULL;
     expr_t *right = NULL;
     expr_t *rebuilt = NULL;
@@ -2740,6 +2742,41 @@ expr_t *expr_distribute_negative_for_display(const expr_t *expr)
     return out;
 }
 
+/* Consume Cartesian coefficients without manufacturing zero summands or refactoring a common scale. */
+static expr_t *expr_join_cartesian_for_display(expr_t *real, expr_t *imaginary, bool subtract)
+{
+    expr_t *term = NULL;
+    expr_t *out = NULL;
+
+    if (!real || !imaginary)
+        goto cleanup;
+    if (expr_is_exact_zero(imaginary)) {
+        out = real;
+        real = NULL;
+        goto cleanup;
+    }
+    term = expr_mul_simplify_owned(expr_new_const(NUM_I), imaginary);
+    imaginary = NULL;
+    if (!term)
+        goto cleanup;
+    if (expr_is_exact_zero(real)) {
+        out = subtract ? expr_negate_owned(term) : term;
+        term = NULL;
+    } else {
+        out = expr_new_binary_internal(subtract ? &ops_sub : &ops_add, real, term);
+        if (out) {
+            real = NULL;
+            term = NULL;
+        }
+    }
+
+cleanup:
+    expr_free(term);
+    expr_free(imaginary);
+    expr_free(real);
+    return out;
+}
+
 /* Separate a top-level Cartesian value without factoring a shared real scale back out. */
 expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
 {
@@ -2753,8 +2790,6 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
     expr_t *direct_imaginary = NULL;
     expr_t *real = NULL;
     expr_t *imaginary = NULL;
-    expr_t *imaginary_unit = NULL;
-    expr_t *imaginary_term = NULL;
     expr_t *out = NULL;
     bool has_imaginary = false;
     bool subtract = false;
@@ -2762,19 +2797,9 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
 
     if (expr_beautify_cartesian_parts(expr, &real, &imaginary, &has_imaginary, true)) {
         if (has_imaginary) {
-            imaginary_unit = expr_new_const(NUM_I);
-            imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
-            if (imaginary_term) {
-                imaginary_unit = NULL;
-                imaginary = NULL;
-            }
-            out = imaginary_term ? expr_new_binary_internal(&ops_add, real, imaginary_term) : NULL;
-            if (out) {
-                real = NULL;
-                imaginary_term = NULL;
-                expr_binding_expr_free(out->binding_expr);
-                out->binding_expr = NULL;
-            }
+            out = expr_join_cartesian_for_display(real, imaginary, false);
+            real = NULL;
+            imaginary = NULL;
             goto cleanup;
         }
         expr_free(imaginary);
@@ -2794,17 +2819,9 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
         direct_imaginary = NULL;
         if (imaginary_sign < 0)
             imaginary = expr_negate_owned(imaginary);
-        imaginary_unit = expr_new_const(NUM_I);
-        imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
-        if (imaginary_term) {
-            imaginary_unit = NULL;
-            imaginary = NULL;
-        }
-        out = real && imaginary_term ? expr_new_binary_internal(&ops_add, real, imaginary_term) : NULL;
-        if (out) {
-            real = NULL;
-            imaginary_term = NULL;
-        }
+        out = expr_join_cartesian_for_display(real, imaginary, false);
+        real = NULL;
+        imaginary = NULL;
         goto cleanup;
     }
 
@@ -2833,45 +2850,21 @@ expr_t *expr_separate_cartesian_for_display(const expr_t *expr)
         imaginary = expr_mul_simplify_owned(expr_clone(scale), direct_imaginary);
         direct_imaginary = NULL;
         imaginary_sign = subtract ? -imaginary_sign : imaginary_sign;
-        imaginary_unit = expr_new_const(NUM_I);
-        imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
-        if (imaginary_term) {
-            imaginary_unit = NULL;
-            imaginary = NULL;
-        }
-        out = real && imaginary_term
-                  ? expr_new_binary_internal(imaginary_sign < 0 ? &ops_sub : &ops_add, real, imaginary_term)
-                  : NULL;
-        if (out) {
-            real = NULL;
-            imaginary_term = NULL;
-            expr_binding_expr_free(out->binding_expr);
-            out->binding_expr = NULL;
-        }
+        out = expr_join_cartesian_for_display(real, imaginary, imaginary_sign < 0);
+        real = NULL;
+        imaginary = NULL;
         goto cleanup;
     }
 
     if (!expr_beautify_cartesian_parts(expr, &real, &imaginary, &has_imaginary, true) || !has_imaginary)
         goto cleanup;
-    imaginary_unit = expr_new_const(NUM_I);
-    imaginary_term = imaginary_unit ? expr_new_binary_internal(&ops_mul, imaginary_unit, imaginary) : NULL;
-    if (imaginary_term) {
-        imaginary_unit = NULL;
-        imaginary = NULL;
-    }
-    out = imaginary_term ? expr_new_binary_internal(&ops_add, real, imaginary_term) : NULL;
-    if (out) {
-        real = NULL;
-        imaginary_term = NULL;
-        expr_binding_expr_free(out->binding_expr);
-        out->binding_expr = NULL;
-    }
+    out = expr_join_cartesian_for_display(real, imaginary, false);
+    real = NULL;
+    imaginary = NULL;
 
 cleanup:
     expr_free(owned_scale);
     expr_free(direct_imaginary);
-    expr_free(imaginary_term);
-    expr_free(imaginary_unit);
     expr_free(imaginary);
     expr_free(real);
     return out;

@@ -125,6 +125,10 @@ static bool equ_poly_mul(const number_t *left, const number_t *right, number_t *
         return false;
 
     for (size_t i = 0u; i < count; ++i) {
+        if (!equ_computation_step("equation.polynomial_product")) {
+            equ_poly_free(tmp, product_count);
+            return false;
+        }
         for (size_t j = 0u; j < count; ++j) {
             number_t product = num_mul(left[i], right[j]);
             number_t next = num_add(tmp[i + j], product);
@@ -276,6 +280,8 @@ cleanup_exponent:
 
 static bool equ_collect_poly(const expr_t *expr, const expr_t *wrt, size_t max_degree, number_t *out)
 {
+    if (!equ_computation_step("equation.polynomial"))
+        return false;
     size_t count = max_degree + 1u;
     expr_t *vars[1];
     size_t index = 0u;
@@ -394,6 +400,8 @@ static bool equ_polynomial_exponent(number_t value, size_t *exponent_out)
 
 static bool equ_polynomial_degree(const expr_t *expr, const expr_t *wrt, size_t *degree_out)
 {
+    if (!equ_computation_step("equation.polynomial"))
+        return false;
     expr_t *vars[1];
     size_t index = 0u;
     size_t left_degree;

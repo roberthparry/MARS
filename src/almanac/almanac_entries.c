@@ -16,6 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
@@ -574,7 +577,7 @@ almanac_entry_t *almanac_new_body_entry(almanac_t *almanac, almanac_body_id_t bo
         almanac_set_error(almanac, "failed to allocate almanac entry");
         return NULL;
     }
-    if (!almanac_entry_fill_body(almanac, body_id, moment, entry)) {
+    if (!almanac_entry_fill_body(almanac, body_id, moment, entry) || !computation_poll_current()) {
         free(entry);
         return NULL;
     }
@@ -656,7 +659,8 @@ array_t *almanac_snapshot(almanac_t *almanac, const datetime_t *moment)
         almanac_body_id_t body_id = (almanac_body_id_t)sqlite_stmt_column_int(stmt, 0);
         almanac_entry_t entry;
 
-        if (!almanac_entry_fill_body(almanac, body_id, moment, &entry) || !array_add(entries, &entry)) {
+        if (!computation_step_current("almanac.snapshot") ||
+            !almanac_entry_fill_body(almanac, body_id, moment, &entry) || !array_add(entries, &entry)) {
             sqlite_stmt_finalize(stmt);
             array_destroy(entries);
             if (!string_length(almanac->error))
@@ -672,5 +676,9 @@ array_t *almanac_snapshot(almanac_t *almanac, const datetime_t *moment)
         return NULL;
     }
 
+    if (!computation_poll_current()) {
+        array_destroy(entries);
+        return NULL;
+    }
     return entries;
 }

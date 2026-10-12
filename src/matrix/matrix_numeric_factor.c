@@ -13,12 +13,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "matrix-t.h"
-#define MARS_MATRIX_INTERNAL_ACCESS
-#include "matrix_internal.h"
+
 #include "number-t.h"
+#include "matrix-t.h"
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix_internal.h"
 
 enum { MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50 };
 
@@ -54,7 +57,7 @@ void mat_qr_factor_free(mat_qr_factor_t *out)
     out->Q = out->R = NULL;
 }
 
-int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
+static int mat_qr_factor_controlled_impl(const matrix_t *A, mat_qr_factor_t *out)
 {
     size_t m, n, kdim;
     size_t z_count, q_count, r_count;
@@ -93,7 +96,7 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         for (size_t j = 0; j < n; ++j)
             Z[i * n + j] = mat_get_num(A, i, j);
 
-    for (size_t j = 0; j < n; j++) {
+    for (size_t j = 0; j < n && computation_step_current("matrix.qr"); j++) {
         number_t *v = malloc(m * sizeof(number_t));
         size_t imax = (j < kdim) ? j : kdim;
         if (!v) {
@@ -208,6 +211,21 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
     return 0;
 }
 
+/* Keep incomplete factors private until scoped work succeeds. */
+int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
+{
+    if (!A || !out || !computation_step_current("matrix.factor"))
+        return -1;
+    mat_qr_factor_t result = {0};
+    int rc = mat_qr_factor_controlled_impl(A, &result);
+    if (!computation_poll_current() || rc != 0) {
+        mat_qr_factor_free(&result);
+        return rc != 0 ? rc : -1;
+    }
+    *out = result;
+    return 0;
+}
+
 void mat_cholesky_free(mat_cholesky_t *out)
 {
     if (!out)
@@ -216,7 +234,7 @@ void mat_cholesky_free(mat_cholesky_t *out)
     out->L = NULL;
 }
 
-int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
+static int mat_cholesky_controlled_impl(const matrix_t *A, mat_cholesky_t *out)
 {
     const struct store_vtable *lower_store;
     number_t *Z = NULL, *Ln = NULL;
@@ -249,7 +267,7 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
         for (size_t j = 0; j < n; ++j)
             Z[i * n + j] = mat_get_num(A, i, j);
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n && computation_step_current("matrix.cholesky"); i++) {
         for (size_t j = 0; j <= i; j++) {
             number_t sum = num_clone(Z[i * n + j]);
 
@@ -332,6 +350,21 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
     if (!out->L)
         return -3;
 
+    return 0;
+}
+
+/* Keep incomplete factors private until scoped work succeeds. */
+int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
+{
+    if (!A || !out || !computation_step_current("matrix.factor"))
+        return -1;
+    mat_cholesky_t result = {0};
+    int rc = mat_cholesky_controlled_impl(A, &result);
+    if (!computation_poll_current() || rc != 0) {
+        mat_cholesky_free(&result);
+        return rc != 0 ? rc : -1;
+    }
+    *out = result;
     return 0;
 }
 
@@ -493,7 +526,7 @@ static int mat_norm_via_svd(const matrix_t *A, double *out)
     return 0;
 }
 
-int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
+static int mat_svd_factor_controlled_impl(const matrix_t *A, mat_svd_factor_t *out)
 {
     size_t m, n, kdim;
     number_t *Z = NULL, *LeftN = NULL, *RightN = NULL;
@@ -503,7 +536,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     number_t *sigma = NULL;
     number_t *sigma_sorted = NULL;
     size_t *order = NULL;
-    int rc;
+    int rc = -1;
 
     if (!A || !out)
         return -1;
@@ -523,6 +556,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     for (size_t i = 0; i < ((m != 0 && n != 0) ? (m * n) : 1u); ++i)
         Z[i] = NUM_ZERO;
     for (size_t i = 0; i < m; ++i) {
+        if (!computation_step_current("matrix.svd")) {
+            rc = -1;
+            goto fail;
+        }
         for (size_t j = 0; j < n; ++j) {
             number_t v = mat_get_num(A, i, j);
             Z[i * n + j] = num_clone(v);
@@ -552,6 +589,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             goto fail;
         }
         for (size_t i = 0; i < n; ++i) {
+            if (!computation_step_current("matrix.svd")) {
+                rc = -1;
+                goto fail;
+            }
             for (size_t j = 0; j < n; ++j) {
                 number_t sum = NUM_ZERO;
                 for (size_t r = 0; r < m; ++r) {
@@ -643,6 +684,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             goto fail;
         }
         for (size_t i = 0; i < m; ++i) {
+        if (!computation_step_current("matrix.svd")) {
+            rc = -1;
+            goto fail;
+        }
             for (size_t j = 0; j < m; ++j) {
                 number_t sum = NUM_ZERO;
                 for (size_t c = 0; c < n; ++c) {
@@ -745,6 +790,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     out->V = mat_create_dense_with_elem(n, kdim, &number_elem);
     if (out->U) {
         for (size_t i = 0; i < m; ++i) {
+        if (!computation_step_current("matrix.svd")) {
+            rc = -1;
+            goto fail;
+        }
             for (size_t j = 0; j < kdim; ++j) {
                 mat_set_num_owned(out->U, i, j, &LeftN[i * kdim + j]);
             }
@@ -752,6 +801,10 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     }
     if (out->V) {
         for (size_t i = 0; i < n; ++i) {
+            if (!computation_step_current("matrix.svd")) {
+                rc = -1;
+                goto fail;
+            }
             for (size_t j = 0; j < kdim; ++j) {
                 mat_set_num_owned(out->V, i, j, &RightN[i * kdim + j]);
             }
@@ -803,6 +856,21 @@ fail:
     if (rc != 0)
         mat_svd_factor_free(out);
     return rc;
+}
+
+/* Keep incomplete factors private until scoped work succeeds. */
+int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
+{
+    if (!A || !out || !computation_step_current("matrix.factor"))
+        return -1;
+    mat_svd_factor_t result = {0};
+    int rc = mat_svd_factor_controlled_impl(A, &result);
+    if (!computation_poll_current() || rc != 0) {
+        mat_svd_factor_free(&result);
+        return rc != 0 ? rc : -1;
+    }
+    *out = result;
+    return 0;
 }
 
 typedef int (*mat_norm_function_t)(const matrix_t *A, double *out);
@@ -2023,7 +2091,7 @@ static void hermitian_jacobi_ws_run(hermitian_jacobi_ws_t *ws)
     }
     tol = fro2 * 1e-29;
 
-    for (int sweep = 0; sweep < MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS; sweep++) {
+    for (int sweep = 0; sweep < MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS && computation_step_current("matrix.jacobi"); sweep++) {
         for (size_t p = 0; p < n - 1; p++)
             for (size_t q = p + 1; q < n; q++)
                 jacobi_apply(ws->W, ws->V, n, p, q);
@@ -2249,6 +2317,10 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, number_t *eigenvalues
         return -3;
     }
     hermitian_jacobi_ws_run(&ws);
+    if (!computation_poll_current()) {
+        hermitian_jacobi_ws_free(&ws);
+        return -1;
+    }
 
     if (eigenvalues) {
         number_t *ev = eigenvalues;
@@ -2483,6 +2555,8 @@ static int hessenberg_reduce(number_t *Hn, number_t *Qn, size_t n)
         return 0;
 
     for (size_t k = 0; k + 2 < n; ++k) {
+        if (!computation_step_current("matrix.hessenberg"))
+            return -1;
         size_t m = n - (k + 1);
         number_t *v = calloc(m ? m : 1u, sizeof(*v));
 
@@ -2884,6 +2958,8 @@ static int schur_qr(number_t *Hn, number_t *Qn, size_t n, double eps)
 
             int iter = 0;
             while (iter++ < max_iter) {
+                if (!computation_step_current("matrix.schur"))
+                    return -1;
                 for (size_t k = 0; k < m; ++k) {
                     number_t a;
                     number_t b;
@@ -3129,7 +3205,7 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues, 
     return 0;
 }
 
-int mat_eigendecompose(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
+static int mat_eigendecompose_impl(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
 {
     if (!A)
         return -1;
@@ -3146,6 +3222,36 @@ int mat_eigendecompose(const matrix_t *A, number_t *eigenvalues, matrix_t **eige
         return mat_eigendecompose_hermitian(A, eigenvalues, eigenvectors);
     return mat_eigendecompose_general(A, eigenvalues, eigenvectors);
 }
+/* Publish eigenpairs only after the complete calculation succeeds. */
+int mat_eigendecompose(const matrix_t *A, number_t *eigenvalues, matrix_t **eigenvectors)
+{
+    if (!A || !computation_step_current("matrix.eigen"))
+        return -1;
+    size_t n = A->rows;
+    number_t *values = eigenvalues ? calloc(n ? n : 1, sizeof(*values)) : NULL;
+    matrix_t *vectors = NULL;
+    if (eigenvalues && !values)
+        return -1;
+    int rc = mat_eigendecompose_impl(A, values, eigenvectors ? &vectors : NULL);
+    if (!computation_poll_current())
+        rc = -1;
+    if (rc == 0) {
+        for (size_t i = 0; values && i < n; ++i) {
+            eigenvalues[i] = values[i];
+            values[i] = NUM_ZERO;
+        }
+        if (eigenvectors) {
+            *eigenvectors = vectors;
+            vectors = NULL;
+        }
+    }
+    for (size_t i = 0; values && i < n; ++i)
+        num_destroy(&values[i]);
+    free(values);
+    mat_free(vectors);
+    return rc;
+}
+
 
 int mat_eigenvalues(const matrix_t *A, number_t *eigenvalues)
 {
@@ -3174,7 +3280,7 @@ matrix_t *mat_eigenvectors(const matrix_t *A)
    Public Schur API
    ============================================================ */
 
-int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
+static int mat_schur_factor_controlled_impl(const matrix_t *A, mat_schur_factor_t *out)
 {
     schur_workspace_t ws = {0};
     matrix_t *Qmat = NULL;
@@ -3224,6 +3330,21 @@ int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
     out->Q = Qmat;
     out->T = Tmat;
     schur_workspace_free(&ws);
+    return 0;
+}
+
+/* Keep incomplete factors private until scoped work succeeds. */
+int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
+{
+    if (!A || !out || !computation_step_current("matrix.factor"))
+        return -1;
+    mat_schur_factor_t result = {0};
+    int rc = mat_schur_factor_controlled_impl(A, &result);
+    if (!computation_poll_current() || rc != 0) {
+        mat_schur_factor_free(&result);
+        return rc != 0 ? rc : -1;
+    }
+    *out = result;
     return 0;
 }
 

@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
 
@@ -663,10 +666,14 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
     char *laplace_steps_TeX = NULL;
     diffequ_solve_result_t *stationary = NULL;
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_wave_ivp(de, residual, include_steps);
     if (result)
         goto cleanup;
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_half_line_heat(de, residual, include_steps);
     if (result)
         goto cleanup;
@@ -707,14 +714,20 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_second_order_constant(de, residual, include_steps);
     if (result)
         goto cleanup;
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_radial_euler(de, residual, include_steps);
     if (result)
         goto cleanup;
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_autonomous_transport(de, residual, include_steps);
     if (result)
         goto cleanup;
@@ -752,11 +765,17 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_affine_transport(de, residual, include_steps);
     if (result)
         goto cleanup;
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_triangular_transport(de, residual, include_steps);
     if (result)
+        goto cleanup;
+    if (!computation_step_current("diffequation.pde_method"))
         goto cleanup;
     result = de_pde_solve_gradient_envelope(de, residual, include_steps);
     if (result)
@@ -767,10 +786,14 @@ diffequ_solve_result_t *de_pde_solve_two_variable(const diffequ_t *de, const exp
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_kdv(de, residual, include_steps);
     if (result)
         goto cleanup;
 
+    if (!computation_step_current("diffequation.pde_method"))
+        goto cleanup;
     result = de_pde_solve_fourier_evolution(de, residual, include_steps);
     if (result)
         goto cleanup;
@@ -796,6 +819,10 @@ cleanup:
     equ_free(transport_solution);
     equ_free(laplace_solution);
     equ_free(polar_laplace_solution);
+    if (!computation_poll_current()) {
+        de_solve_result_free(result);
+        return NULL;
+    }
     return result;
 }
 

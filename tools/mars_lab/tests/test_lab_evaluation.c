@@ -221,7 +221,7 @@ static void test_lab_worker_deadline_diagnostic(void)
     json_free(response);
     TEST_ASSERT_TRUE(ok, "saved ETIMEDOUT produces a precise failure code, deadline and message without waiting");
 
-    const int errors[] = {ENOENT, EOVERFLOW, ECANCELED};
+    const int errors[] = {ENOENT, EOVERFLOW};
     for (size_t i = 0u; i < sizeof(errors) / sizeof(*errors); ++i) {
         response = lab_eval_worker_failure(&status, errors[i], 80000u);
         ok = response && status == 422u && test_lab_ok(response, false) &&
@@ -230,6 +230,15 @@ static void test_lab_worker_deadline_diagnostic(void)
                      "Native worker could not complete (unavailable or output limit)");
         json_free(response);
         TEST_ASSERT_TRUE(ok, "non-timeout process failures are not misreported as deadline expiry");
+    }
+    const int stops[] = {ECANCELED, E2BIG, EIO};
+    const char *codes[] = {"ECANCELED", "E2BIG", "EIO"};
+    for (size_t i = 0; i < sizeof(stops) / sizeof(*stops); ++i) {
+        response = lab_eval_worker_failure(&status, stops[i], 80000u);
+        ok = response && status == 422u && test_lab_ok(response, false) &&
+             !strcmp(test_lab_text(response, "error_code"), codes[i]) && !test_lab_member(response, "timeout_ms");
+        json_free(response);
+        TEST_ASSERT_TRUE(ok, "control stops retain their precise reason without a false timeout");
     }
 }
 

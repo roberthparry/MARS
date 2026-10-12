@@ -9,6 +9,9 @@
  * constructing or transforming results.
  */
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
 
@@ -231,6 +234,10 @@ static int ts_arima_reintegrate_forecast_path(const double *history, size_t hist
         if (!reconstructed)
             goto fail;
         for (i = 0u; i < horizon; ++i) {
+            if (!computation_step_current("timeseries.reintegrate")) {
+                free(reconstructed);
+                goto fail;
+            }
             double lag_value;
 
             if (i >= spec->season_period) {
@@ -253,6 +260,10 @@ static int ts_arima_reintegrate_forecast_path(const double *history, size_t hist
         if (!reconstructed)
             goto fail;
         for (i = 0u; i < horizon; ++i) {
+            if (!computation_step_current("timeseries.reintegrate")) {
+                free(reconstructed);
+                goto fail;
+            }
             double lag_value = i > 0u ? reconstructed[i - 1u] : base[history_length - 1u];
             reconstructed[i] = current[i] + lag_value;
         }
@@ -307,6 +318,11 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model, const double *h
     double *psi = NULL;
     double *phi_lags = NULL;
     double *theta_lags = NULL;
+    double *zero_diff = NULL;
+    double *base_levels = NULL;
+    double *resp_diff = NULL;
+    double *resp_levels = NULL;
+    int result = -1;
     size_t max_lag = 0u;
     size_t i, j;
 
@@ -319,11 +335,13 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model, const double *h
     phi_lags = calloc(max_lag ? max_lag : 1u, sizeof(*phi_lags));
     theta_lags = calloc(max_lag ? max_lag : 1u, sizeof(*theta_lags));
     if (!psi || !phi_lags || !theta_lags)
-        return -1;
+        goto cleanup;
     if (max_lag > 0u && meta)
         ts_arima_build_lag_maps(model, &meta->spec, phi_lags, theta_lags, max_lag);
     psi[0u] = 1.0;
     for (i = 1u; i < horizon; ++i) {
+        if (!computation_step_current("timeseries.impulse"))
+            goto cleanup;
         double next = (i <= max_lag) ? theta_lags[i - 1u] : 0.0;
 
         for (j = 1u; j <= max_lag && j <= i; ++j)
@@ -335,53 +353,30 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model, const double *h
         double accum = 0.0;
 
         for (i = 0u; i < horizon; ++i) {
+            if (!computation_step_current("timeseries.uncertainty"))
+                goto cleanup;
             accum += psi[i] * psi[i];
             out_stderr[i] = sigma * sqrt(accum);
         }
     } else {
-        double *zero_diff = NULL;
-        double *base_levels = NULL;
-        double *resp_diff = NULL;
-        double *resp_levels = NULL;
-
         zero_diff = calloc(horizon ? horizon : 1u, sizeof(*zero_diff));
         base_levels = calloc(horizon ? horizon : 1u, sizeof(*base_levels));
         resp_diff = calloc(horizon ? horizon : 1u, sizeof(*resp_diff));
         resp_levels = calloc(horizon ? horizon : 1u, sizeof(*resp_levels));
-        if (!zero_diff || !base_levels || !resp_diff || !resp_levels) {
-            free(zero_diff);
-            free(base_levels);
-            free(resp_diff);
-            free(resp_levels);
-            free(psi);
-            return -1;
-        }
+        if (!zero_diff || !base_levels || !resp_diff || !resp_levels)
+            goto cleanup;
         if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec, zero_diff, horizon, base_levels) !=
-            0) {
-            free(zero_diff);
-            free(base_levels);
-            free(resp_diff);
-            free(resp_levels);
-            free(psi);
-            free(phi_lags);
-            free(theta_lags);
-            return -1;
-        }
+            0)
+            goto cleanup;
         for (j = 0u; j < horizon; ++j) {
+            if (!computation_step_current("timeseries.uncertainty"))
+                goto cleanup;
             memset(resp_diff, 0, horizon * sizeof(*resp_diff));
             for (i = j; i < horizon; ++i)
                 resp_diff[i] = psi[i - j];
             if (ts_arima_reintegrate_forecast_path(history, history_length, &meta->spec, resp_diff, horizon,
-                                                   resp_levels) != 0) {
-                free(zero_diff);
-                free(base_levels);
-                free(resp_diff);
-                free(resp_levels);
-                free(psi);
-                free(phi_lags);
-                free(theta_lags);
-                return -1;
-            }
+                                                   resp_levels) != 0)
+                goto cleanup;
             for (i = 0u; i < horizon; ++i) {
                 double delta = resp_levels[i] - base_levels[i];
                 out_stderr[i] += delta * delta;
@@ -389,16 +384,19 @@ static int ts_arima_level_stderr(const ts_arima_result_t *model, const double *h
         }
         for (i = 0u; i < horizon; ++i)
             out_stderr[i] = sigma * sqrt(out_stderr[i]);
-        free(zero_diff);
-        free(base_levels);
-        free(resp_diff);
-        free(resp_levels);
     }
 
+    result = computation_poll_current() ? 0 : -1;
+
+cleanup:
+    free(zero_diff);
+    free(base_levels);
+    free(resp_diff);
+    free(resp_levels);
     free(psi);
     free(phi_lags);
     free(theta_lags);
-    return 0;
+    return result;
 }
 
 static size_t ts_first_nonmissing_index(const timeseries_t *series)
@@ -553,6 +551,10 @@ static matrix_t *ts_arima_dynamic_design_matrix(const timeseries_t *response, co
     if (!X)
         return NULL;
     for (r = 0u; r < rows; ++r) {
+        if (!computation_step_current("timeseries.design")) {
+            mat_free(X);
+            return NULL;
+        }
         size_t t = trim + r;
 
         c = 0u;
@@ -737,6 +739,8 @@ int ts_arima_fit(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spe
     if (!y || !spec || !out)
         return -1;
     memset(out, 0, sizeof(*out));
+    if (!computation_step_current("timeseries.begin"))
+        goto fail;
     dy = ts_build_arima_response(y, spec);
     response_start = ts_first_nonmissing_index(dy);
     dy_clean = dy ? ts_drop_missing(dy) : NULL;
@@ -779,6 +783,8 @@ int ts_arima_fit(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spe
     }
 
     for (i = 0u; i < max_iterations; ++i) {
+        if (!computation_step_current("timeseries.iteration"))
+            goto fail;
         size_t beta_len = 0u;
         double max_change = 0.0;
         size_t k;
@@ -872,6 +878,8 @@ int ts_arima_fit(const timeseries_t *y, const matrix_t *xreg, const ts_arima_spe
         out->fitted = display_fitted;
         display_fitted = NULL;
     }
+    if (!computation_poll_current())
+        goto fail;
     ts_regression_result_clear(&reg);
     ts_regression_result_clear(&latest);
     ts_free(y_trim);
@@ -920,6 +928,10 @@ int ts_auto_arima(const timeseries_t *y, const matrix_t *xreg, size_t max_p, siz
                         for (Q = 0u; Q <= max_Q; ++Q) {
                             double score;
 
+                            if (!computation_step_current("timeseries.candidate")) {
+                                ts_arima_result_clear(best_fit);
+                                return -1;
+                            }
                             memset(&candidate, 0, sizeof(candidate));
                             spec.p = p;
                             spec.d = d;
@@ -958,6 +970,10 @@ int ts_auto_arima(const timeseries_t *y, const matrix_t *xreg, size_t max_p, siz
                 }
             }
         }
+    }
+    if (!computation_poll_current()) {
+        ts_arima_result_clear(best_fit);
+        return -1;
     }
     return isfinite(best_score) ? 0 : -1;
 }
@@ -1032,6 +1048,8 @@ int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *histor
         return -1;
     meta = ts_arima_meta_find(model);
     memset(out, 0, sizeof(*out));
+    if (!computation_step_current("timeseries.begin"))
+        goto fail;
     if (ts_series_to_double_array(history, &yd, &n, 0u) != 0 || n == 0u)
         goto fail;
     if (future_xreg && mat_get_row_count(future_xreg) < horizon)
@@ -1074,6 +1092,8 @@ int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *histor
         ts_arima_extract_residual_history(model->innovations, n, trim, residual_history);
     }
     for (i = 0u; i < horizon; ++i) {
+        if (!computation_step_current("timeseries.iteration"))
+            goto fail;
         double pred = 0.0;
         size_t j;
 
@@ -1133,6 +1153,8 @@ int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *histor
     if (ts_arima_level_stderr(model, yd, n, horizon, sigma, stderr_levels) != 0)
         goto fail;
     for (i = 0u; i < horizon; ++i) {
+        if (!computation_step_current("timeseries.iteration"))
+            goto fail;
         double se_level = stderr_levels[i];
         double lower_level = pred_levels[i] - (z_width * se_level);
         double upper_level = pred_levels[i] + (z_width * se_level);
@@ -1151,6 +1173,8 @@ int ts_arima_forecast(const ts_arima_result_t *model, const timeseries_t *histor
         lower->values[i] = lo;
         upper->values[i] = hi;
     }
+    if (!computation_poll_current())
+        goto fail;
     out->mean = mean;
     out->stderr = stderr;
     out->lower = lower;

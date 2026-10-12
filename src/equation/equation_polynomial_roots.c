@@ -505,7 +505,7 @@ static bool equ_general_newton_from(const number_t *coeffs, size_t degree, numbe
     number_t derivative = num_new();
     bool converged = false;
 
-    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS; ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS && equ_computation_step("equation.newton"); ++iteration) {
         number_t step;
         number_t next;
 
@@ -528,7 +528,7 @@ static bool equ_general_newton_from(const number_t *coeffs, size_t degree, numbe
         z = next;
     }
 
-    if (!converged) {
+    if (!converged && equ_computation_active()) {
         equ_general_eval(coeffs, degree, z, &value, NULL);
         converged = equ_general_magnitude_le(value, tolerance);
     }
@@ -594,7 +594,7 @@ static bool equ_general_find_real_root(const number_t *coeffs, size_t degree, nu
     if (!num_is_real(value_left) || !num_is_real(value_right) || num_sign(value_left) == num_sign(value_right))
         goto cleanup;
 
-    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS; ++iteration) {
+    for (size_t iteration = 0u; iteration < EQU_POLY_NEWTON_ITERATIONS && equ_computation_step("equation.newton"); ++iteration) {
         number_t candidate = num_new();
         bool use_newton = false;
 
@@ -663,7 +663,7 @@ static bool equ_general_find_complex_root(const number_t *coeffs, size_t degree,
 
     if (seed_count == SIZE_MAX)
         return false;
-    for (size_t i = 0u; i < seed_count; ++i) {
+    for (size_t i = 0u; i < seed_count && equ_computation_step("equation.seed"); ++i) {
         number_t seed = equ_general_seed(i, seed_count, bound);
         bool found = equ_general_newton_from(coeffs, degree, seed, tolerance, root_out);
 
@@ -873,6 +873,10 @@ int equ_try_solve_general_polynomial(const equation_t *equation, const expr_t *w
      */
     active_degree = original_degree;
     while (active_degree > 4u) {
+        if (!equ_computation_step("equation.deflate")) {
+            rc = -1;
+            goto cleanup;
+        }
         number_t snapped;
         bool active_coefficients_real = equ_polynomial_coefficients_real(active_coeffs, active_degree);
 
@@ -931,6 +935,10 @@ int equ_try_solve_general_polynomial(const equation_t *equation, const expr_t *w
     }
 
     for (size_t i = 0u; i < root_count; ++i) {
+        if (!equ_computation_step("equation.refine")) {
+            rc = -1;
+            goto cleanup;
+        }
         if (equ_general_append_distinct(original_coeffs, original_degree, wrt, roots[i], newton_tolerance,
                                         distinct_tolerance, seen, &seen_count, solutions) != 0)
             goto cleanup;

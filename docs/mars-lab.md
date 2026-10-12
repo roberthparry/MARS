@@ -6,11 +6,41 @@ symbolic and numerical integration, civil date calculations and the
 astronomical almanac. The browser is the presentation layer: mathematical work
 is sent to the native server's built-in calculation modes, which use MARSlib.
 
+## Native calculation control
+
+Each built-in calculation process enters a fresh [`computation_t`](computation.md)
+scope. Expression evaluation and symbolic checkpoints, and nested numerical
+integration, share cancellation, a monotonic deadline and optional work accounting.
+Set `MARS_LAB_WORK_LIMIT` in the server environment to a non-negative integer;
+the default zero means unlimited work. This algorithm-dependent allowance is not
+the Integrator card's subdivision ceiling and is not a wall-clock performance measure.
+Invalid configuration fails the calculation explicitly.
+
+When the parent observes cancellation or timeout, it sends SIGTERM and allows
+up to 250 ms for checkpoint-driven cleanup before terminating and reaping the
+process group. The child's signal handler only sets a flag. Existing output limits
+and hard process supervision remain necessary for unchecked operations and numerical
+primitives. Diagnostic executable overrides retain immediate termination and do not
+receive the built-in computation scope.
+
+The server polls the request socket during calculation supervision. Browser aborts
+that close the connection therefore request cancellation; this is best-effort
+through reverse proxies, which may retain the upstream connection. Lab requests
+must not half-close their sending side while awaiting a calculation response.
+This policy is opt-in at the Lab route layer, not a general webserver restriction.
+
+Stopped calculations return distinct `ECANCELED`, `ETIMEDOUT`, `E2BIG` (work budget)
+or `EIO` (control failure) error codes through the existing Protobuf response.
+Partially produced mathematical output is not published as a successful result.
+Native progress callbacks are available to library callers; this does not add
+streaming browser progress or promise a percentage-complete estimate.
+
 ## Installing and starting the Lab
 
 MARS Lab runs as a native C server with calculation modes linked into that same
-executable. It launches itself with `--worker MODE` for isolated calculations;
+executable. It launches itself with `--worker-control TIMEOUT_MS WORK_LIMIT MODE` for isolated calculations;
 no separate scratch worker binaries are required.
+
 The browser runs C/WebAssembly with JavaScript browser adapters and HTML/CSS, served from
 `tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
 (served as `/index.css`), an ordered import list for the component styles in `assets/css/`.

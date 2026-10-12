@@ -1921,6 +1921,82 @@ cleanup:
     return ok;
 }
 
+/* Reduce imaginary-axis functions before the general Cartesian formula introduces zero terms. */
+static expr_t *expr_cartesian_imaginary_axis(const expr_t *op, const expr_t *real,
+                                            const expr_t *imaginary, int imaginary_sign)
+{
+    typedef struct {
+        expr_t *(*build)(const expr_t *);
+        int imaginary_factor;
+        bool inverse;
+    } axis_rule_t;
+    static const axis_rule_t rules[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_SIN]     = {expr_sinh,    1, false},
+        [EXPR_KIND_COS]     = {expr_cosh,    0, false},
+        [EXPR_KIND_TAN]     = {expr_tanh,    1, false},
+        [EXPR_KIND_SINH]    = {expr_sin,     1, false},
+        [EXPR_KIND_COSH]    = {expr_cos,     0, false},
+        [EXPR_KIND_TANH]    = {expr_tan,     1, false},
+        [EXPR_KIND_SEC]     = {expr_sech,    0, false},
+        [EXPR_KIND_COSEC]   = {expr_cosech, -1, false},
+        [EXPR_KIND_COT]     = {expr_coth,   -1, false},
+        [EXPR_KIND_SECH]    = {expr_sec,     0, false},
+        [EXPR_KIND_COSECH]  = {expr_cosec,  -1, false},
+        [EXPR_KIND_COTH]    = {expr_cot,    -1, false},
+        [EXPR_KIND_ASIN]    = {NULL,        0, true },
+        [EXPR_KIND_ACOS]    = {NULL,        0, true },
+        [EXPR_KIND_ATAN]    = {NULL,        0, true },
+        [EXPR_KIND_ASINH]   = {NULL,        0, true },
+        [EXPR_KIND_ACOSH]   = {NULL,        0, true },
+        [EXPR_KIND_ATANH]   = {NULL,        0, true },
+        [EXPR_KIND_ASEC]    = {NULL,        0, true },
+        [EXPR_KIND_ACOSEC]  = {NULL,        0, true },
+        [EXPR_KIND_ACOT]    = {NULL,        0, true },
+        [EXPR_KIND_ASECH]   = {NULL,        0, true },
+        [EXPR_KIND_ACOSECH] = {NULL,        0, true },
+        [EXPR_KIND_ACOTH]   = {NULL,        0, true },
+    };
+    if (!expr_is_exact_zero(real))
+        return NULL;
+    expr_op_kind_t kind = op->ops->kind;
+    expr_t *argument = imaginary_sign < 0 ? expr_neg(imaginary) : expr_clone(imaginary);
+    if (!argument)
+        return NULL;
+    const axis_rule_t *rule = &rules[kind];
+    expr_t *result = NULL;
+    if (rule->build) {
+        expr_t *inner = rule->build(argument);
+        if (rule->imaginary_factor) {
+            expr_t *unit = expr_new_named_const(rule->imaginary_factor < 0 ? NUM_NEG_I : NUM_I,
+                                               rule->imaginary_factor < 0 ? "-i" : "i");
+            result = expr_mul_simplify_owned(unit, inner);
+        } else {
+            result = inner;
+        }
+    } else if (rule->inverse) {
+        number_t value = NUM_ZERO;
+        /* Unknown coefficients may later be complex or lie on a principal-branch cut. */
+        result = expr_clone(op);
+        /* Restrict inverse identities to an exactly known real axis coefficient; never use a variable's binding. */
+        if ((kind == EXPR_KIND_ASIN || kind == EXPR_KIND_ACOS || kind == EXPR_KIND_ATAN) &&
+            expr_match_const_value(argument, &value) && num_is_real(value) && num_is_finite(value)) {
+            number_t magnitude = num_abs(value);
+            if (kind != EXPR_KIND_ATAN || num_lt(magnitude, NUM_ONE)) {
+                expr_t *inner = kind == EXPR_KIND_ATAN ? expr_atanh(argument) : expr_asinh(argument);
+                expr_t *unit = expr_new_named_const(NUM_I, "i");
+                expr_free(result);
+                result = expr_mul_simplify_owned(unit, inner);
+                if (kind == EXPR_KIND_ACOS)
+                    result = expr_sub_simplify_owned(expr_new_pi_ratio_long(1L, 2u), result);
+            }
+            num_destroy(&magnitude);
+        }
+        num_destroy(&value);
+    }
+    expr_free(argument);
+    return result;
+}
+
 expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_node)
 {
     const expr_t *left;
@@ -2069,6 +2145,13 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
     }
 
     imaginary = owned_imaginary;
+    expr_t *axis = expr_cartesian_imaginary_axis(op, real, imaginary, imaginary_sign);
+    if (axis) {
+        expr_free(owned_imaginary);
+        expr_free(owned_real);
+        expr_free(arg_node);
+        return axis;
+    }
     real_orientation_source = real;
     imaginary_orientation_source = imaginary;
 
@@ -2190,11 +2273,13 @@ expr_t *expr_simplify_try_complex_unary_cartesian(const expr_t *op, expr_t *arg_
         imaginary_coefficient = expr_cartesian_tangent_part(real, imaginary, hyperbolic_tangent, true);
     }
     imaginary_unit = expr_new_named_const(NUM_I, "i");
-    imaginary_part = imaginary_unit && imaginary_coefficient ? expr_mul(imaginary_unit, imaginary_coefficient) : NULL;
-    out = real_part && imaginary_part
-              ? expr_new_binary_internal(imaginary_sign < 0 ? &ops_sub : &ops_add, real_part, imaginary_part)
-              : NULL;
-    if (out) {
+    imaginary_part = imaginary_unit && imaginary_coefficient
+                         ? expr_mul_simplify_owned(expr_clone(imaginary_unit), expr_clone(imaginary_coefficient))
+                         : NULL;
+    out = NULL;
+    if (real_part && imaginary_part) {
+        out = imaginary_sign < 0 ? expr_sub_simplify_owned(real_part, imaginary_part)
+                                 : expr_add_simplify_owned(real_part, imaginary_part);
         real_part = NULL;
         imaginary_part = NULL;
     }
@@ -2254,10 +2339,12 @@ static expr_t *expr_complex_unary_cartesian_for_display_recursive(const expr_t *
         argument = expr_clone(rebuilt->a);
         expanded = argument ? expr_simplify_try_complex_unary_cartesian(rebuilt, argument) : NULL;
         if (expanded) {
+            bool different = !expr_struct_eq(rebuilt, expanded);
+
             expr_free(rebuilt);
             rebuilt = expanded;
             expanded = NULL;
-            *changed = true;
+            *changed |= different;
         } else {
             expr_free(argument);
         }
@@ -2364,6 +2451,18 @@ expr_t *expr_simplify_try_imag_trig_bridge(const expr_t *op, expr_t *arg_node)
 
     if (expr_is_op(op, &ops_asin) || expr_is_op(op, &ops_atan) || expr_is_op(op, &ops_asinh) ||
         expr_is_op(op, &ops_atanh)) {
+        number_t value = NUM_ZERO;
+        bool safe = expr_match_const_value(arg, &value) && num_is_real(value) && num_is_finite(value);
+        if (safe && (expr_is_op(op, &ops_atan) || expr_is_op(op, &ops_asinh))) {
+            number_t magnitude = num_abs(value);
+            safe = num_lt(magnitude, NUM_ONE);
+            num_destroy(&magnitude);
+        }
+        num_destroy(&value);
+        if (!safe) {
+            expr_free(arg);
+            return NULL;
+        }
         expr_t *i = expr_new_named_const(NUM_I, "i");
 
         if (expr_is_op(op, &ops_asin))

@@ -127,9 +127,9 @@ static void test_from_string_laplace(void)
     check_parse_num("Integer domain satisfied", "{1/s | s=2; n=5; nonnegative_integer(n)}", "1/2", __LINE__);
     check_parse_num("Laplace negative frequency", "{@L(sin(-2*t)^3) | s=1}", "-48/185", __LINE__);
     check_parse_num("Laplace explicit target", "{Laplace(t,t,p) | p=2}", "1/4", __LINE__);
-    check_parse_expr("Laplace canonical call", "@L(f(t),t,p)", "{ ℒ(f(t), t, p) | p = NAN }", __LINE__);
+    check_parse_expr("Laplace canonical call", "@L(f(t),t,p)", "{ ℒ(f(t), t, p) | p = ? }", __LINE__);
     check_parse_TeX("Laplace convergence", "@L(t)",
-                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\mathfrak{Re}(s)>0) \\;\\middle|\\; s = NAN \\right\\}",
+                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\mathfrak{Re}(s)>0) \\;\\middle|\\; s = ? \\right\\}",
                     __LINE__);
 }
 
@@ -380,22 +380,22 @@ static void test_from_string_function_hash(void)
     check_parse_val("bare Lambert aliases remain ordinary algebra without call parentheses",
                     "{ w + w0 + wm1 + wn | w = 1; w0 = 2; m1 = 3; n = 4 }", 10.0, __LINE__);
     check_parse_expr("w followed by call parentheses selects principal Lambert W", "w(x)",
-                     "{ W(x) | x = NAN }", __LINE__);
+                     "{ W(x) | x = ? }", __LINE__);
     check_parse_expr("w0 followed by call parentheses selects Lambert W zero branch", "w0(x)",
-                     "{ W₀(x) | x = NAN }", __LINE__);
+                     "{ W₀(x) | x = ? }", __LINE__);
     check_parse_expr("wm1 followed by call parentheses selects Lambert W minus-one branch", "wm1(x)",
-                     "{ W₋₁(x) | x = NAN }", __LINE__);
+                     "{ W₋₁(x) | x = ? }", __LINE__);
     check_parse_expr("wn followed by call parentheses selects a named Lambert W branch", "wn(n,x)",
-                     "{ Wₙ(n, x) | x = NAN; n = NAN }", __LINE__);
+                     "{ Wₙ(n, x) | x = ?; n = ? }", __LINE__);
     check_parse_num("zeta is registered in the perfect hash", "zeta(3)",
                     "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
-    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ ζ'(x) | x = NAN }", __LINE__);
+    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ ζ'(x) | x = ? }", __LINE__);
     check_parse_expr("zetap bindings use the binding perfect hash", "{ zetap(x) | x = 3 }",
                      "{ ζ'(x) | x = 3 }", __LINE__);
-    check_parse_expr("zeta-prime symbol selects the Riemann derivative", "ζ'(x)", "{ ζ'(x) | x = NAN }", __LINE__);
+    check_parse_expr("zeta-prime symbol selects the Riemann derivative", "ζ'(x)", "{ ζ'(x) | x = ? }", __LINE__);
     check_parse_expr("zeta-prime symbol selects the Hurwitz derivative", "ζ'(s, a)",
-                     "{ ζ'(s, a) | s = NAN; a = NAN }", __LINE__);
-    check_parse_expr("the zeta symbol is a perfect-hash alias", "ζ(x)", "{ ζ(x) | x = NAN }", __LINE__);
+                     "{ ζ'(s, a) | s = ?; a = ? }", __LINE__);
+    check_parse_expr("the zeta symbol is a perfect-hash alias", "ζ(x)", "{ ζ(x) | x = ? }", __LINE__);
     check_parse_num("the zeta symbol evaluates through its alias", "ζ(3)",
                     "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
     check_parse_num("two-argument zeta selects Hurwitz zeta", "zeta(2.5, 101)",
@@ -632,7 +632,7 @@ static void test_from_string_conjugation(void)
     check_parse_num("conj alias evaluates", "conj(1 + 2i)", "1 - 2i", __LINE__);
     check_parse_num("conjugate alias evaluates", "conjugate(1 + 2i)", "1 - 2i", __LINE__);
     check_parse_num("postfix conjugate evaluates", "(1 + 2i)^*", "1 - 2i", __LINE__);
-    check_parse_expr("symbolic modulus bars parse", "|z|", "{ |z| | z = NAN }", __LINE__);
+    check_parse_expr("symbolic modulus bars parse", "|z|", "{ |z| | z = ? }", __LINE__);
     check_parse_val("complex modulus bars evaluate", "|1 + 2i|", sqrt(5.0), __LINE__);
     check_parse_val("implicit coefficient before modulus", "{2|x| | x=-3}", 6.0, __LINE__);
     check_parse_val("adjacent moduli multiply", "{|x||x+1| | x=-3}", 6.0, __LINE__);
@@ -686,10 +686,10 @@ static void test_from_string_arithmetic(void)
     check_parse_val("x\xc2\xb3 = 8", "{ x\xc2\xb3 | x = 2 }", 8.0, __LINE__);
     /* Caret exponent */
     check_parse_val("x^2.5 at 4 = 32", "{ x^2.5 | x = 4 }", 32.0, __LINE__);
-    check_parse_expr("power binds before following division", "{ x^2/6 | x = NAN }", "{ x²/6 | x = NAN }", __LINE__);
+    check_parse_expr("power binds before following division", "{ x^2/6 | x = NAN }", "{ x²/6 | x = ? }", __LINE__);
     check_parse_expr("unit fractional exponent shorthand remains an exponent", "{ x^1/3 | x = NAN }",
-                     "{ x^⅓ | x = NAN }", __LINE__);
-    check_parse_expr("parenthesised rational remains an exponent", "{ x^(2/6) | x = NAN }", "{ x^⅓ | x = NAN }",
+                     "{ x^⅓ | x = ? }", __LINE__);
+    check_parse_expr("parenthesised rational remains an exponent", "{ x^(2/6) | x = NAN }", "{ x^⅓ | x = ? }",
                      __LINE__);
     check_parse_num("decimal binding stays exact through cancellation-sensitive cube",
                     "{ (5x)^3 | x = 128064.000000000120974 }",
@@ -701,15 +701,15 @@ static void test_from_string_arithmetic(void)
                     "{ (x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 | x\xe2\x82\x80 = 2, x\xe2\x82\x81 = 3 }", 25.0,
                     __LINE__);
     check_parse_simplified_expr("parenthesised exponent can itself be powered", "{ a^(ix)\xc2\xb2 | x = NAN; a = NAN }",
-                                "{ a^(2ix) | x = NAN; a = NAN }", __LINE__);
+                                "{ a^(2ix) | x = ?; a = ? }", __LINE__);
     check_parse_simplified_expr("ASCII parenthesised exponent can itself be powered", "{ a^(ix)^2 | x = NAN; a = NAN }",
-                                "{ a^(2ix) | x = NAN; a = NAN }", __LINE__);
+                                "{ a^(2ix) | x = ?; a = ? }", __LINE__);
     check_parse_simplified_expr("unparenthesised chained powers are left associative", "{ a^x^2 | x = NAN; a = NAN }",
-                                "{ a^(2x) | x = NAN; a = NAN }", __LINE__);
+                                "{ a^(2x) | x = ?; a = ? }", __LINE__);
     check_parse_simplified_expr("explicit exponent power stays inside exponent", "{ a^((ix)^2) | x = NAN; a = NAN }",
-                                "{ a^(-x\xc2\xb2) | x = NAN; a = NAN }", __LINE__);
+                                "{ a^(-x\xc2\xb2) | x = ?; a = ? }", __LINE__);
     check_parse_simplified_expr("power of symbolic power folds integer exponent",
-                                "{ (a^(-x))\xc2\xb2 | x = NAN; a = NAN }", "{ a^(-2x) | x = NAN; a = NAN }", __LINE__);
+                                "{ (a^(-x))\xc2\xb2 | x = NAN; a = NAN }", "{ a^(-2x) | x = ?; a = ? }", __LINE__);
     /* Chained addition */
     check_parse_val(
         "x\xe2\x82\x80 + x\xe2\x82\x81 + x\xe2\x82\x82 = 6",
@@ -783,7 +783,7 @@ static void test_from_string_series_ellipsis(void)
         weighted_function = expr_to_string(weighted, style_FUNCTION);
         ASSERT_NOT_NULL(weighted_text);
         ASSERT_NOT_NULL(weighted_function);
-        TEST_ASSERT_STR_EQ(weighted_text, "{ Σ_(k=1)^n sinh(kx)/k + C | x = π/12; n = 100, C = NAN }");
+        TEST_ASSERT_STR_EQ(weighted_text, "{ Σ_(k=1)^n sinh(kx)/k + C | x = π/12; n = 100, C = ? }");
         ASSERT_NOT_NULL(strstr(weighted_function, "return sum(k, 1, n, sinh(k.x)/k) + C."));
         ASSERT_NULL(expr_bindings_get(weighted_bindings, "k"));
         {
@@ -1475,7 +1475,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text,
-                       "{ a/(r - 1)·(r^(n + 1) - 1) | r = NAN; a = NAN, n = NAN }");
+                       "{ a/(r - 1)·(r^(n + 1) - 1) | r = ?; a = ?, n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return a.(r^(n + 1) - 1)/(r - 1)."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}a\\mkern-2mu r^{k}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
@@ -1518,7 +1518,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ ψ⁽⁰⁾(N + 1) + γ | N = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ ψ⁽⁰⁾(N + 1) + γ | N = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return digamma(N + 1) + @eulermascheroni."));
     free(function_text);
     free(expression_text);
@@ -1536,7 +1536,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(N + 1)/2 | N = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(N + 1)/2 | N = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return zeta(3) + polygamma(2, N + 1)/2."));
     free(function_text);
     free(expression_text);
@@ -1556,7 +1556,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(n + 1)/2 | ; n = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(3) + ψ⁽²⁾(n + 1)/2 | ; n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return zeta(3) + polygamma(2, n + 1)/2."));
     free(function_text);
     free(expression_text);
@@ -1590,7 +1590,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(p) - ζ(p, n + 1) | p = NAN; n = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(p) - ζ(p, n + 1) | p = ?; n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return zeta(p) - zetah(p, n + 1)."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}\\frac{1}{k^{p}}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\begin{cases}"));
@@ -1616,7 +1616,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(-p) - ζ(-p, n + 1) | p = NAN; n = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ ζ(-p) - ζ(-p, n + 1) | p = ?; n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "zeta(-p) - zetah(-p, n + 1)"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=1}^{n}k^{p}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\zeta(-p) - \\zeta(-p, n + 1)"));
@@ -1638,7 +1638,7 @@ static void test_from_string_series_ellipsis(void)
     function_text = expr_to_string(expression, style_FUNCTION);
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
-    TEST_ASSERT_STR_EQ(expression_text, "{ (3^n - 1)/2 | ; n = NAN }");
+    TEST_ASSERT_STR_EQ(expression_text, "{ (3^n - 1)/2 | ; n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return (3^n - 1)/2."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n - 1}3^{k}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{3^{n} - 1}{2}"));
@@ -1747,9 +1747,9 @@ static void test_from_string_functions(void)
     check_parse_val("cubrt(x) at 27", "{ cubrt(x) | x = 27 }", 3.0, __LINE__);
     check_parse_val("root(x,n) at 81,4", "{ root(x,n) | x = 81, n = 4 }", 3.0, __LINE__);
     check_parse_TeX("cubrt uses an indexed radical in TeX", "cubrt(x)",
-                    "\\left\\{ \\sqrt[3]{x} \\;\\middle|\\; x = NAN \\right\\}", __LINE__);
+                    "\\left\\{ \\sqrt[3]{x} \\;\\middle|\\; x = ? \\right\\}", __LINE__);
     check_parse_TeX("root uses its order as the TeX radical index", "root(x, n)",
-                    "\\left\\{ \\sqrt[n]{x} \\;\\middle|\\; x = NAN; n = NAN \\right\\}", __LINE__);
+                    "\\left\\{ \\sqrt[n]{x} \\;\\middle|\\; x = ?; n = ? \\right\\}", __LINE__);
     check_parse_val("floor(x) at 1.75", "{ floor(x) | x = 1.75 }", 1.0, __LINE__);
     check_parse_val("ceil(x) at 1.25", "{ ceil(x) | x = 1.25 }", 2.0, __LINE__);
     check_parse_num("10! lowers to gamma(11)", "{ 10! }", "3628800", __LINE__);
@@ -1759,7 +1759,7 @@ static void test_from_string_functions(void)
     check_parse_expr("pi/2 stays symbolic", "{ pi/2 }", "π/2", __LINE__);
     check_parse_expr("i^i stays symbolic", "{ i^i }", "i^i", __LINE__);
     check_parse_expr("i^(1+i) parses", "{ i^(1+i) }", "i^(1 + i)", __LINE__);
-    check_parse_simplified_expr("W0 identity keeps unbound argument", "{ W_0(x)*exp(W_0(x)) }", "{ x | x = NAN }",
+    check_parse_simplified_expr("W0 identity keeps unbound argument", "{ W_0(x)*exp(W_0(x)) }", "{ x | x = ? }",
                                 __LINE__);
     check_parse_simplified_expr("W0 identity resolves bound pi", "{ W_0(x)*exp(W_0(x)) | x = pi }", "π", __LINE__);
     check_parse_simplified_expr("W-1 identity resolves bound e", "{ W-1(x)*exp(W-1(x)) | x = e }", "e", __LINE__);
@@ -1789,7 +1789,7 @@ static void test_from_string_functions(void)
     check_parse_val("Greek aliases in ordinary expressions parse", "{ sin(@alpha) + @beta | @alpha = 0, @beta = 1 }",
                     1.0, __LINE__);
     check_parse_expr("plain Greek aliases use the perfect hash", "{ cos(theta) + i*sin(theta) }",
-                     "{ cos(θ) + i·sin(θ) | θ = NAN }", __LINE__);
+                     "{ cos(θ) + i·sin(θ) | θ = ? }", __LINE__);
     check_parse_val("sqrt(exp(x)) at 0 = 1", "{ sqrt(exp(x)) | x = 0 }", 1.0, __LINE__);
     /* Function applied to parenthesised expression */
     check_parse_val("sin(x\xe2\x82\x80 + x\xe2\x82\x81) = sin(π/2) = 1",
@@ -1843,11 +1843,11 @@ static void test_from_string_special_functions(void)
                     __LINE__);
     check_parse_val("ψ⁽³⁾(2) = pi^4/15 - 6", "{ ψ⁽³⁾(x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
     check_parse_expr("polygamma expression uses standard symbol", "{ polygamma(2, x) | x = ? }",
-                     "{ ψ⁽²⁾(x) | x = NAN }", __LINE__);
+                     "{ ψ⁽²⁾(x) | x = ? }", __LINE__);
     check_parse_expr("symbolic polygamma order uses the base psi symbol", "{ polygamma(n, x) | n = ?; x = ? }",
-                     "{ ψ(n, x) | n = NAN; x = NAN }", __LINE__);
+                     "{ ψ(n, x) | n = ?; x = ? }", __LINE__);
     check_parse_expr("base psi symbol round-trips symbolic polygamma", "{ ψ(n, x) | n = ?; x = ? }",
-                     "{ ψ(n, x) | n = NAN; x = NAN }", __LINE__);
+                     "{ ψ(n, x) | n = ?; x = ? }", __LINE__);
     check_parse_val("dilog(1/2) = pi^2/12 - log(2)^2/2", "{ dilog(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("Li2(1/2) aliases dilog", "{ Li2(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("polylog(2, 1/2) = dilog(1/2)", "{ polylog(2, x) | x = 0.5 }", 0.5822405264650125, __LINE__);
@@ -1874,13 +1874,13 @@ static void test_from_string_special_functions(void)
     check_parse_val("W₀(0) = 0 via W", "{ W(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via W0", "{ W0(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via W_0", "{ W_0(x) | x = 0 }", 0.0, __LINE__);
-    check_parse_expr("W(x) infers x binding", "{ W(x) }", "{ W(x) | x = NAN }", __LINE__);
-    check_parse_expr("W_0(x) infers x binding", "{ W_0(x) }", "{ W₀(x) | x = NAN }", __LINE__);
+    check_parse_expr("W(x) infers x binding", "{ W(x) }", "{ W(x) | x = ? }", __LINE__);
+    check_parse_expr("W_0(x) infers x binding", "{ W_0(x) }", "{ W₀(x) | x = ? }", __LINE__);
     check_parse_expr("lambert_wn parses branch-aware Lambert W", "{ lambert_wn(2, x) | x = ? }",
-                     "{ Wₙ(2, x) | x = NAN }", __LINE__);
-    check_parse_expr("Wn parses branch-aware Lambert W", "{ Wn(2, x) | x = ? }", "{ Wₙ(2, x) | x = NAN }", __LINE__);
-    check_parse_expr("W_n parses branch-aware Lambert W", "{ W_n(2, x) | x = ? }", "{ Wₙ(2, x) | x = NAN }", __LINE__);
-    check_parse_expr("Wₙ parses branch-aware Lambert W", "{ Wₙ(2, x) | x = ? }", "{ Wₙ(2, x) | x = NAN }", __LINE__);
+                     "{ Wₙ(2, x) | x = ? }", __LINE__);
+    check_parse_expr("Wn parses branch-aware Lambert W", "{ Wn(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
+    check_parse_expr("W_n parses branch-aware Lambert W", "{ W_n(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
+    check_parse_expr("Wₙ parses branch-aware Lambert W", "{ Wₙ(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
     check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2)", "{ W₋₁(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2) via W-1", "{ W-1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
@@ -2056,7 +2056,7 @@ static void test_from_string_array_bindings(void)
          "output(expr(x, c))."},
         {"specified array constant binding",
          "{ x^2 + c | x = ?; c = [1, 2, 3] }",
-         "{ x² + c | x = NAN; c = [1, 2, 3] }",
+         "{ x² + c | x = ?; c = [1, 2, 3] }",
          "expression expr(x, array const c) {\n"
          "    return x^2 + c.\n"
          "}\n\n"
@@ -2153,11 +2153,11 @@ static void test_from_string_name_normalisation(void)
         to_string_fail(__FILE__, __LINE__, 1, "normalise @pi_2", pi2s ? pi2s : "(null)", "{ π₂ | π₂ = 1 }");
     }
 
-    if (parsed_pi1s && str_eq(parsed_pi1s, "{ π₁ | π₁ = NAN }")) {
-        to_string_pass("implicit @pi1 stays variable", parsed_pi1s, "{ π₁ | π₁ = NAN }");
+    if (parsed_pi1s && str_eq(parsed_pi1s, "{ π₁ | π₁ = ? }")) {
+        to_string_pass("implicit @pi1 stays variable", parsed_pi1s, "{ π₁ | π₁ = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @pi1 stays variable", parsed_pi1s ? parsed_pi1s : "(null)",
-                       "{ π₁ | π₁ = NAN }");
+                       "{ π₁ | π₁ = ? }");
     }
 
     if (parsed_pi1 && qf_isnan(expr_eval_qf(parsed_pi1))) {
@@ -2215,17 +2215,17 @@ static void test_from_string_implicit_symbolic_bindings(void)
         plain_integral_constant ? expr_to_string(plain_integral_constant, style_EXPRESSION) : NULL;
     char *integral_family_s = integral_family ? expr_to_string(integral_family, style_EXPRESSION) : NULL;
 
-    if (x && xs && str_eq(xs, "{ x | x = NAN }")) {
-        to_string_pass("implicit symbolic var inference", xs, "{ x | x = NAN }");
+    if (x && xs && str_eq(xs, "{ x | x = ? }")) {
+        to_string_pass("implicit symbolic var inference", xs, "{ x | x = ? }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "implicit symbolic var inference", xs ? xs : "(null)", "{ x | x = NAN }");
+        to_string_fail(__FILE__, __LINE__, 1, "implicit symbolic var inference", xs ? xs : "(null)", "{ x | x = ? }");
     }
 
-    if (x_pow_n && x_pow_ns && str_eq(x_pow_ns, "{ x^n | x = NAN; n = NAN }")) {
-        to_string_pass("implicit symbolic constant inference", x_pow_ns, "{ x^n | x = NAN; n = NAN }");
+    if (x_pow_n && x_pow_ns && str_eq(x_pow_ns, "{ x^n | x = ?; n = ? }")) {
+        to_string_pass("implicit symbolic constant inference", x_pow_ns, "{ x^n | x = ?; n = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit symbolic constant inference", x_pow_ns ? x_pow_ns : "(null)",
-                       "{ x^n | x = NAN; n = NAN }");
+                       "{ x^n | x = ?; n = ? }");
     }
 
     if (e && es && str_eq(es, "e")) {
@@ -2265,11 +2265,11 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        "γ");
     }
 
-    if (tau && taus && str_eq(taus, "{ τ | τ = NAN }")) {
-        to_string_pass("implicit tau variable inference", taus, "{ τ | τ = NAN }");
+    if (tau && taus && str_eq(taus, "{ τ | τ = ? }")) {
+        to_string_pass("implicit tau variable inference", taus, "{ τ | τ = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit tau variable inference", taus ? taus : "(null)",
-                       "{ τ | τ = NAN }");
+                       "{ τ | τ = ? }");
     }
 
     if (phi_alias && phi_as && str_eq(phi_as, "φ")) {
@@ -2285,39 +2285,39 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        "γ");
     }
 
-    if (tau_alias && tau_as && str_eq(tau_as, "{ τ | τ = NAN }")) {
-        to_string_pass("implicit @tau variable inference", tau_as, "{ τ | τ = NAN }");
+    if (tau_alias && tau_as && str_eq(tau_as, "{ τ | τ = ? }")) {
+        to_string_pass("implicit @tau variable inference", tau_as, "{ τ | τ = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @tau variable inference", tau_as ? tau_as : "(null)",
-                       "{ τ | τ = NAN }");
+                       "{ τ | τ = ? }");
     }
 
-    if (f && fs && str_eq(fs, "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }")) {
+    if (f && fs && str_eq(fs, "{ [radius]² + c₁ + π + e | [radius] = ?; c₁ = ? }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = ?; c₁ = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference", fs ? fs : "(null)",
-                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = ?; c₁ = ? }");
     }
 
     if (integral_family && integral_family_s &&
-        str_eq(integral_family_s, "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }")) {
+        str_eq(integral_family_s, "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = ?; C₁ = ?, C₀ = ? }")) {
         to_string_pass("implicit integration constants stay constant", integral_family_s,
-                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = ?; C₁ = ?, C₀ = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit integration constants stay constant",
                        integral_family_s ? integral_family_s : "(null)",
-                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = NAN; C₁ = NAN, C₀ = NAN }");
+                       "{ C₁ + C₀x + cos(x)·exp(sin(x)) | x = ?; C₁ = ?, C₀ = ? }");
     }
 
     if (plain_integral_constant && plain_integral_constant_s &&
-        str_eq(plain_integral_constant_s, "{ x + C | x = NAN; C = NAN }")) {
+        str_eq(plain_integral_constant_s, "{ x + C | x = ?; C = ? }")) {
         to_string_pass("implicit plain integration constant stays constant", plain_integral_constant_s,
-                       "{ x + C | x = NAN; C = NAN }");
+                       "{ x + C | x = ?; C = ? }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit plain integration constant stays constant",
                        plain_integral_constant_s ? plain_integral_constant_s : "(null)",
-                       "{ x + C | x = NAN; C = NAN }");
+                       "{ x + C | x = ?; C = ? }");
     }
 
     if (x && qf_isnan(expr_eval_qf(x))) {
@@ -2838,7 +2838,7 @@ static void test_from_string_number_literals(void)
     check_parse_TeX("stacked unicode rational atom renders TeX", "{ ²³¹⁄₂₃₁₀ }", "\\frac{1}{10}", __LINE__);
     check_parse_expr("NAN is a numeric placeholder, not a variable name", "{ NAN }", "NAN", __LINE__);
     check_parse_expr("lowercase nan is a numeric placeholder", "{ nan }", "NAN", __LINE__);
-    check_parse_expr("repeated unary signs simplify", "{ --2x | x = ? }", "{ 2x | x = NAN }", __LINE__);
+    check_parse_expr("repeated unary signs simplify", "{ --2x | x = ? }", "{ 2x | x = ? }", __LINE__);
     check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
@@ -2883,19 +2883,19 @@ static void test_from_string_deriv(void)
     check_parse_val("(x^2 + 1)^2 at x=2 = 25", "{ (x^2 + 1)^2 | x = 2 }", 25.0, __LINE__);
 
     check_parse_simplified_expr("Dx(...) parses as expression derivative", "{ Dx(exp(x^2)) | x = ? }",
-                                "{ 2x·exp(x²) | x = NAN }", __LINE__);
+                                "{ 2x·exp(x²) | x = ? }", __LINE__);
     check_parse_simplified_expr("Dx(...) infers only its derivative variable", "{ Dx(exp(x^2)) }",
-                                "{ 2x·exp(x²) | x = NAN }", __LINE__);
+                                "{ 2x·exp(x²) | x = ? }", __LINE__);
     check_parse_simplified_expr("Dxx(...) parses as repeated expression derivative", "{ Dxx(x^3) | x = ? }",
-                                "{ 6x | x = NAN }", __LINE__);
+                                "{ 6x | x = ? }", __LINE__);
     check_parse_simplified_expr("Dxy(...) parses as mixed expression derivative", "{ Dxy(x^2*y^3) | x = ?, y = ? }",
-                                "{ 6xy² | x = NAN, y = NAN }", __LINE__);
+                                "{ 6xy² | x = ?, y = ? }", __LINE__);
     check_parse_simplified_expr("D[x^5](...) parses as compact high-order derivative", "{ D[x^5](x^7) }",
-                                "{ 2520x² | x = NAN }", __LINE__);
+                                "{ 2520x² | x = ? }", __LINE__);
     check_parse_simplified_expr("D[x^2y^3](...) preserves mixed derivative order", "{ D[x^2y^3](x^3*y^4) }",
-                                "{ 144xy | x = NAN, y = NAN }", __LINE__);
+                                "{ 144xy | x = ?, y = ? }", __LINE__);
     check_parse_simplified_expr("canonical superscript derivative input round trips", "{ Dx²(x^3) }",
-                                "{ 6x | x = NAN }", __LINE__);
+                                "{ 6x | x = ? }", __LINE__);
     {
         expr_bindings_t *bindings = NULL;
         expr_t *parsed = expr_from_string("{ Dxxxxx((x + 1)/(x^2 + 3*x + 5)) | x = ? }", &bindings);
@@ -3325,31 +3325,31 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ -x + φ | x = ½·(1 + √(5)) }", __LINE__);
     check_parse_expr("binding value simplifies numeric magnitude and preserves symbolic functions",
                      "{ x | x = abs(-3)+floor(pi)+ceil(phi) }", "3 + ⌊π⌋ + ⌈φ⌉", __LINE__);
-    check_parse_expr("binding value accepts unknown marker", "{ sinh(x) | x = ? }", "{ sinh(x) | x = NAN }", __LINE__);
+    check_parse_expr("binding value accepts unknown marker", "{ sinh(x) | x = ? }", "{ sinh(x) | x = ? }", __LINE__);
     check_parse_expr("user-bound e remains symbolic", "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
-                     "{ E - M - e·sin(E) | E = NAN; M = π/1.234, e = 0.0167 }", __LINE__);
+                     "{ E - M - e·sin(E) | E = ?; M = π/1.234, e = 0.0167 }", __LINE__);
     check_parse_expr("constant binding simplifies Lambert e power",
                      "{ polygamma(9, x*y*c) | x = 7, y = 1; c = W(2e^2) }", "{ ψ⁽⁹⁾(cxy) | x = 7, y = 1; c = 2 }",
                      __LINE__);
     check_parse_expr("simplified constants keep bindings",
                      "{ ax + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x=1, y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }", __LINE__);
+                     "{ ax + by + cz - 8 | a = ?, b = ?, c = ?; x = 1, y = 2, z = 3 }", __LINE__);
     check_parse_expr("constant bindings accept semicolon separators",
                      "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }", __LINE__);
+                     "{ ax + by + cz - 8 | a = ?, b = ?, c = ?; x = 1, y = 2, z = 3 }", __LINE__);
     check_parse_expr("const-only binding preserves leading semicolon", "{ exp(π·√H) | ;H = 163 }",
                      "{ exp(π·√H) | ; H = 163 }", __LINE__);
     check_parse_expr("const-only binding accepts trailing digit subscript", "{ exp(π·√(H8)) | ; H8 = 163 }",
                      "{ exp(π·√(H₈)) | ; H₈ = 163 }", __LINE__);
     check_parse_expr("minus after factor remains subtraction", "{ exp(π·√(H8))-(5x)^3 | H8 = 163, x = NAN }",
-                     "{ exp(π·√(H₈)) - (5x)³ | H₈ = 163, x = NAN }", __LINE__);
+                     "{ exp(π·√(H₈)) - (5x)³ | H₈ = 163, x = ? }", __LINE__);
     check_parse_expr("absolute-value bars omit inner spaces", "{ exp(pi*sqrt(x)) - | exp(pi*sqrt(x)) | | x = NAN }",
-                     "{ exp(π·√x) - |exp(π·√x)| | x = NAN }", __LINE__);
+                     "{ exp(π·√x) - |exp(π·√x)| | x = ? }", __LINE__);
     check_parse_expr("symbolic pi quotient cancels powers", "{ pi/pi^2 }", "π/π²", __LINE__);
     check_parse_simplified_expr(
         "generated derivative with NaN bindings simplifies explicitly",
         "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
-        "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = NAN, z = NAN, x = NAN }", __LINE__);
+        "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = ?, z = ?, x = ? }", __LINE__);
     check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
                                 "{ (-2π·exp(π·√x) + 2·π²·√x·exp(π·√x))/(2·√x)/(2·√x)² | x = 163 }",
                                 "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }", __LINE__);
@@ -3361,7 +3361,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     check_parse_simplified_expr("higher rational derivative numerator canonicalizes",
                                 "{ (24*(x^2 + 3*x + 5)*(6*x - x^3 - 3*x^2 + 11) - 24*(2*x + 3)*(12*x^2 + 44*x - x^4 - "
                                 "4*x^3 + 23))/(x^2 + 3*x + 5)^5 | x = ? }",
-                                "{ 24/(x² + 3x + 5)⁵·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14) | x = NAN }", __LINE__);
+                                "{ 24/(x² + 3x + 5)⁵·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14) | x = ? }", __LINE__);
     bindings = NULL;
     expr = expr_from_string(
         "{ 720*(x^7 + 7*x^6 - 42*x^5 - 385*x^4 - 805*x^3 - 294*x^2 + 511*x + 289)/(x^2 + 3*x + 5)^7 | x = ? }",
@@ -3371,7 +3371,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     if (deriv_text && strcmp(deriv_text, "{ (-5040x⁸ - 40320x⁷ + 282240x⁶ + 3104640x⁵ + "
                                          "8114400x⁴ + 3951360x³ - 10301760x² - 11652480x - 2530080)"
-                                         "/(x² + 3x + 5)⁸ | x = NAN }") == 0) {
+                                         "/(x² + 3x + 5)⁸ | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational quadratic-power derivative uses polynomial fast path\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -3399,7 +3399,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     if (deriv_text &&
         strcmp(deriv_text, "{ (40320x⁹ + 362880x⁸ - 2903040x⁷ - 37255680x⁶ - 116847360x⁵ - "
                            "71124480x⁴ + 247242240x³ + 419489280x² + 182165760x + 2459520)"
-                           "/(x² + 3x + 5)⁹ | x = NAN }") == 0) {
+                           "/(x² + 3x + 5)⁹ | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " rational derivative polynomial storage follows degree\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -3731,7 +3731,7 @@ static void test_from_string_unevaluated_integral(void)
     char *func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral pretty form parses\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -3766,7 +3766,7 @@ static void test_from_string_unevaluated_integral(void)
         TEST_FAIL();
     }
 
-    if (deriv_text && strcmp(deriv_text, "{ exp(cosh(x)) | x = NAN }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ exp(cosh(x)) | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral derivative restores upper variable\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", deriv_text);
     } else {
@@ -3795,7 +3795,7 @@ static void test_from_string_unevaluated_integral(void)
 
     expr = expr_from_string("{ integral(exp(cosh(t)), t, x) }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral ASCII function form parses\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -3812,7 +3812,7 @@ static void test_from_string_unevaluated_integral(void)
 
     expr = expr_from_string("{ @S^x exp(cosh(t)) dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral @S form parses\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -3958,7 +3958,7 @@ static void test_from_string_unevaluated_integral(void)
 
     expr = expr_from_string("{ @S^x exp(cosh(t))dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral @S form parses without space before dt\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4007,7 +4007,7 @@ static void test_from_string_unevaluated_integral(void)
 
     expr = expr_from_string("{ @S^x exp(cosh(t))·dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral @S form parses with dotted differential\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4023,7 +4023,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^x exp(u)du + x }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ exp(x) + x | x = NAN }") == 0 && bindings && expr_bindings_count(bindings) == 1u &&
+    if (text && strcmp(text, "{ exp(x) + x | x = ? }") == 0 && bindings && expr_bindings_count(bindings) == 1u &&
         expr_bindings_get(bindings, "x") && !expr_bindings_get(bindings, "d") && !expr_bindings_get(bindings, "u")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " completed @S does not expose its local dummy\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
@@ -4058,7 +4058,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^z exp(sin(x))*(cos(x)^2 - sin(x)) + C_0 dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "z = NAN") && strstr(text, "C₀ = NAN") && !expr_bindings_get(bindings, "x")) {
+    if (text && strstr(text, "z = ?") && strstr(text, "C₀ = ?") && !expr_bindings_get(bindings, "x")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " completed @S hides a dummy used only in its integrand\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4074,7 +4074,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ exp(x)*@S^z exp(sin(x))*(cos(x)^2 - sin(x)) + C_0 dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "x = NAN") && expr_bindings_get(bindings, "x")) {
+    if (text && strstr(text, "x = ?") && expr_bindings_get(bindings, "x")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET
                               " completed @S retains a free dummy-name occurrence outside the integral\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
@@ -4092,7 +4092,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^x exp(c)dc + c }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ exp(x) + c | x = NAN; c = NAN }") == 0 && bindings &&
+    if (text && strcmp(text, "{ exp(x) + c | x = ?; c = ? }") == 0 && bindings &&
         expr_bindings_count(bindings) == 2u && expr_bindings_get(bindings, "x") && expr_bindings_get(bindings, "c") &&
         expr_bindings_is_constant_at(bindings, 1u) && !expr_bindings_get(bindings, "d")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " integral dummy scope ends at dc before a free c\n");
@@ -4158,7 +4158,7 @@ static void test_from_string_unevaluated_integral(void)
         char *display_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
 
         if (display_text && strstr(display_text, "x²") && strstr(display_text, "+ C") && !strstr(display_text, "C₀") &&
-            strstr(display_text, "x = NAN") && strstr(display_text, "C = NAN") && expr_bindings_get(bindings, "C") &&
+            strstr(display_text, "x = ?") && strstr(display_text, "C = ?") && expr_bindings_get(bindings, "C") &&
             expr_bindings_has_symbolic_integral(bindings)) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " @S without an upper substitution returns an indefinite family\n");
             printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
@@ -4177,8 +4177,8 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S(x^2)dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strstr(text, "⅓x³") && strstr(text, "+ C") && !strstr(text, "C₀") && strstr(text, "x = NAN") &&
-        strstr(text, "C = NAN") && expr_bindings_get(bindings, "C") && expr_bindings_has_symbolic_integral(bindings)) {
+    if (text && strstr(text, "⅓x³") && strstr(text, "+ C") && !strstr(text, "C₀") && strstr(text, "x = ?") &&
+        strstr(text, "C = ?") && expr_bindings_get(bindings, "C") && expr_bindings_has_symbolic_integral(bindings)) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " parenthesized @S without whitespace returns an indefinite family\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4195,7 +4195,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S x^2 dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && expr_bindings_get(bindings, "x") && strstr(text, "x = NAN")) {
+    if (text && expr_bindings_get(bindings, "x") && strstr(text, "x = ?")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " indefinite @S exposes its result variable as a binding\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4211,7 +4211,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S_0^1 x^2 dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && (!bindings || !expr_bindings_get(bindings, "x")) && !strstr(text, "x = NAN")) {
+    if (text && (!bindings || !expr_bindings_get(bindings, "x")) && !strstr(text, "x = ?")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " definite @S does not expose its bound variable\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4272,7 +4272,7 @@ static void test_from_string_unevaluated_integral(void)
         char *display_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
 
         if (display_text && strstr(display_text, "C₀x") && strstr(display_text, "C₁") &&
-            strstr(display_text, "C₁ = NAN") && expr_bindings_get(bindings, "C_0") &&
+            strstr(display_text, "C₁ = ?") && expr_bindings_get(bindings, "C_0") &&
             expr_bindings_get(bindings, "C_1")) {
             printf(C_BOLD C_GREEN "PASS" C_RESET " indefinite integral chooses the next unused family constant\n");
             printf(C_BOLD "  expr   " C_RESET "%s\n\n", display_text);
@@ -4291,7 +4291,7 @@ static void test_from_string_unevaluated_integral(void)
     expr = expr_from_string("{ @S^z exp(-x^2)dx }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
     func_text = expr ? expr_to_string(expr, style_FUNCTION) : NULL;
-    if (text && strstr(text, "√π·erf(z)") && strstr(text, "z = NAN")) {
+    if (text && strstr(text, "√π·erf(z)") && strstr(text, "z = ?")) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S substitutes its explicit upper variable in the antiderivative\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4333,7 +4333,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^xexp(cosh(t))*dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral @S form parses with starred differential\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4349,7 +4349,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^xexp(cosh(t)).dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral @S form parses with full-stop differential\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4365,7 +4365,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ ∫^xexp(cosh(t))*dt }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = NAN }") == 0) {
+    if (text && strcmp(text, "{ ∫^x exp(cosh(t))·dt | x = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " unevaluated integral Unicode form parses with starred differential\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {
@@ -4382,7 +4382,7 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = expr_from_string("{ @S^@lambdasin(@alpha)d@alpha }", &bindings);
     text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-    if (text && strcmp(text, "{ -cos(λ) | λ = NAN }") == 0) {
+    if (text && strcmp(text, "{ -cos(λ) | λ = ? }") == 0) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " @S completes with Greek aliases\n");
         printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
     } else {

@@ -12,6 +12,9 @@
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_csv_internal.h"
 
@@ -99,6 +102,9 @@ bool sqlite_export_csv(sqlite_t *db, const string_t *query, csv_t *writer, bool 
     if (!ok)
         sqlite_csv_fail(&c, EINVAL, "CSV export requires a database and writer");
     if (ok)
+        ok = computation_step_current("sqlite.csv.export") ||
+             sqlite_csv_fail(&c, errno, "CSV export stopped");
+    if (ok)
         ok = sqlite_csv_query(&c, query, &stmt);
     size_t count = ok ? (size_t)sqlite3_column_count(stmt) : 0;
     string_t **fields = ok ? calloc(count, sizeof(*fields)) : NULL;
@@ -125,6 +131,10 @@ bool sqlite_export_csv(sqlite_t *db, const string_t *query, csv_t *writer, bool 
     }
     int rc = SQLITE_DONE;
     while (ok && (rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (!computation_step_current("sqlite.csv.export")) {
+            ok = sqlite_csv_fail(&c, errno, "CSV export stopped");
+            break;
+        }
         report->record = report->rows + (header ? 2 : 1);
         for (size_t i = 0; ok && i < count; ++i) {
             report->column = i + 1;

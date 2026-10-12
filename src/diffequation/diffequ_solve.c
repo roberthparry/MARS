@@ -14,6 +14,9 @@
 #include <string.h>
 
 #include "diffequation-t.h"
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
@@ -525,7 +528,7 @@ cleanup:
     return attempt;
 }
 
-diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options)
+static diffequ_solve_result_t *de_solve_with_options_impl(const diffequ_t *de, unsigned int options)
 {
     const bool include_steps = (options & DE_SOLVE_OPTION_STEPS) != 0u;
     const expr_t *independent;
@@ -652,6 +655,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
     }
 
     if (second_derivative) {
+        if (!computation_step_current("diffequation.method"))
+            goto cleanup;
         linear_transformation = de_attempt_modified_emden_linearization(
             de, independent, dependent, first_derivative, second_derivative, residual, modified_emden_solutions,
             &modified_emden_count, &modified_emden_scale);
@@ -708,6 +713,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
             goto cleanup;
         }
 
+        if (!computation_step_current("diffequation.method"))
+            goto cleanup;
         sturm_liouville = de_attempt_sturm_liouville(de, independent, dependent, second_derivative, first_derivative,
                                                      residual, &solution, &second_order_solver);
         if (sturm_liouville == DE_ATTEMPT_SOLVED) {
@@ -749,6 +756,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     derivative_quadratic = de_attempt_derivative_quadratic(de, independent, dependent, first_derivative, residual,
                                                            derivative_quadratic_solutions, &derivative_quadratic_count);
     if (derivative_quadratic == DE_ATTEMPT_SOLVED) {
@@ -772,6 +781,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     exact_first_order = de_attempt_exact_first_order(de, independent, dependent, first_derivative, residual,
                                                      exact_first_order_solutions, &exact_first_order_count);
     if (exact_first_order == DE_ATTEMPT_SOLVED) {
@@ -828,6 +839,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     separable = de_attempt_separable(de, independent, dependent, derivative_right, &solution);
     if (separable == DE_ATTEMPT_SOLVED) {
         result =
@@ -835,12 +848,16 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto append;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     linear = de_attempt_linear(de, independent, dependent, derivative_right, &solution);
     if (linear == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LINEAR, "solved as a first-order linear ODE");
         goto append;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     bernoulli = de_attempt_bernoulli_square(de, independent, dependent, derivative_right, &solution);
     if (bernoulli == DE_ATTEMPT_SOLVED) {
         result =
@@ -866,6 +883,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto cleanup;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     linear_substitution = de_attempt_linear_substitution(de, independent, dependent, derivative_right, &solution);
     if (linear_substitution == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LINEAR_SUBSTITUTION,
@@ -873,6 +892,8 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         goto append;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
     linear_transformation = de_attempt_linear_transformation(de, independent, dependent, derivative_right, &solution);
     if (linear_transformation == DE_ATTEMPT_SOLVED) {
         result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_LINEAR_TRANSFORMATION,
@@ -922,12 +943,29 @@ cleanup:
     expr_free(remainder);
     expr_free(derivative_coefficient);
     expr_free(residual);
+    if (!computation_poll_current()) {
+        de_solve_result_free(result);
+        result = NULL;
+    }
     if (include_steps && result && de_solve_result_ensure_rule_steps(de, result) != 0) {
         de_solve_result_free(result);
         result = NULL;
     }
     return result;
 }
+/* Share the caller's control without publishing a stopped solve result. */
+diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int options)
+{
+    if (!computation_step_current("diffequation.solve"))
+        return NULL;
+    diffequ_solve_result_t *result = de_solve_with_options_impl(de, options);
+    if (!computation_poll_current()) {
+        de_solve_result_free(result);
+        return NULL;
+    }
+    return result;
+}
+
 
 diffequ_solve_result_t *de_solve(const diffequ_t *de)
 {

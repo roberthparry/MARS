@@ -7,6 +7,15 @@ modules; there is no additional library dependency.
 
 Use [http](http.md) to call services; use this module to implement them.
 
+`websrv_request_input_closed(request)` performs a non-blocking socket poll during
+a handler, without consuming data or transferring descriptor ownership. It reports
+input half-close, hang-up or transport errors. NULL returns true with `EINVAL`.
+A sending half-close can be perfectly valid HTTP: the peer may still receive the
+response. Only use this as cancellation when the application's client contract
+forbids half-closing while awaiting work. A reverse proxy can retain its upstream
+connection after a browser abort, so closure is not a universal cancellation signal.
+The request remains borrowed and may only be inspected during its active handler.
+
 ## Lifetime and routing
 
 Create a server with `websrv_new()`, register routes with `websrv_route()`,

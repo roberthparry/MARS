@@ -15,6 +15,9 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
+#include "internal/computation_internal.h"
+
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 #include "jurisdiction-t.h"
@@ -361,6 +364,8 @@ bool almanac_body_rise_set(almanac_t *almanac, jurisdiction_t *jurisdiction, alm
             almanac_find_body_horizon_crossing(almanac, body_id, observer, day.start_jd, day.end_jd, false, &set_jd);
     }
 
+    if (!computation_poll_current())
+        return false;
     if (!has_rise || !has_set) {
         if (body_id != ALMANAC_BODY_ID_SUN && (has_rise || has_set)) {
             missing_status = ALMANAC_RISE_SET_NOT_ON_DATE;
@@ -369,10 +374,10 @@ bool almanac_body_rise_set(almanac_t *almanac, jurisdiction_t *jurisdiction, alm
         }
     }
 
-    return almanac_fill_rise_set_event(almanac, jurisdiction, body_id, observer, has_rise ? rise_jd : NAN,
+    return computation_poll_current() && almanac_fill_rise_set_event(almanac, jurisdiction, body_id, observer, has_rise ? rise_jd : NAN,
                                        day.offset_guess_hours, missing_status, &out->rise) &&
            almanac_fill_rise_set_event(almanac, jurisdiction, body_id, observer, has_set ? set_jd : NAN,
-                                       day.offset_guess_hours, missing_status, &out->set);
+                                       day.offset_guess_hours, missing_status, &out->set) && computation_poll_current();
 }
 
 /* Find accurate local sunrise and sunset for one observer and day. */

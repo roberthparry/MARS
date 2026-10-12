@@ -6077,7 +6077,7 @@ static bool expr_simplify_is_current(const expr_t *expr)
 
 static expr_t *expr_simplify_mark_current(expr_t *expr)
 {
-    if (expr) {
+    if (expr && expr_computation_active()) {
         expr->simplified = true;
         expr->simplify_epoch = expr_simplify_subtree_epoch(expr);
     }
@@ -6103,6 +6103,11 @@ static expr_t *expr_simplify_once(const expr_t *expr)
 
     expr_t *a = expr->a ? expr_simplify(expr->a) : NULL;
     expr_t *b = expr->b ? expr_simplify(expr->b) : NULL;
+    if (!expr_computation_active()) {
+        expr_free(a);
+        expr_free(b);
+        return expr_retain_expr(expr);
+    }
 
     /* Arithmetic requires both operands: their restrictions govern the whole result,
      * including cancellations such as zero times a restricted expression. Do not
@@ -6178,6 +6183,11 @@ static expr_t *expr_simplify_impl(const expr_t *expr)
     for (pass = 0u; pass < MAX_SIMPLIFY_PASSES; ++pass) {
         expr_t *next;
 
+        if (!expr_computation_step("expression.simplify")) {
+            expr_free(cur);
+            return expr_retain_expr(expr);
+        }
+
         if (expr_simplify_is_current(cur))
             return cur;
 
@@ -6212,6 +6222,8 @@ expr_t *expr_simplify(const expr_t *expr)
 
     if (!expr)
         return NULL;
+    if (!expr_computation_step("expression.simplify"))
+        return expr_retain_expr(expr);
     if (expr_is_unnamed_const(expr) && expr->binding_expr && expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
         expr->binding_expr->u.unary_op.ops == &ops_sqrt) {
         number_t exact_sqrt_seed = num_new();

@@ -159,6 +159,10 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
     if (!wrt)
         return 1;
     original = expr_eval(wrt);
+    if (!equ_computation_active()) {
+        num_destroy(&original);
+        return -1;
+    }
     residual = equ_residual(equation);
     if (residual) {
         const expr_t *series = equ_find_zeta_term(residual, NULL, wrt, 0u);
@@ -200,6 +204,10 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
     rc = 0;
     /* Explore uniformly spaced seeds, then refine distinct candidates at the requested precision. */
     for (long height = zero_target ? 2L : 0L; height <= height_limit; height += zero_target ? 1L : 3L) {
+        if (!equ_computation_step("equation.zeta_seed")) {
+            rc = -1;
+            break;
+        }
         char text[32];
         number_t seed;
         number_t candidate = NUM_NAN;
@@ -253,5 +261,9 @@ cleanup:
     num_destroy(&original);
     expr_free(verification_residual);
     expr_free(residual);
+    if (!equ_computation_active()) {
+        equ_solutions_clear(solutions);
+        return -1;
+    }
     return rc;
 }

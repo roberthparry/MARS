@@ -1468,7 +1468,7 @@ void test_multi_3d_exp_square_product(void)
         ASSERT_TRUE(s == 0 || s == 1);
         ASSERT_TRUE(exact != NULL);
         ASSERT_TRUE(exact_text != NULL);
-        ASSERT_TRUE(strcmp(string_c_str(exact_text), "2erf(1)·√(π) - γ + (2·exp(-1) - 2) - E1(1)") == 0);
+        TEST_ASSERT_STR_EQ(string_c_str(exact_text), "2erf(1)·√π - γ + (2·exp(-1) - 2) - E1(1)");
         TEST_ASSERT_INTEGRATOR_NUMBER_CLOSE_TOL(result, want, "1e-27");
         string_free(exact_text);
     }

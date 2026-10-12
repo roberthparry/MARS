@@ -62,7 +62,7 @@ static int mat_text_equal(const string_t *a, const string_t *b)
     return a && b && string_compare(a, b) == 0;
 }
 
-static int mat_value_is_nan(const string_t *value)
+static int mat_binding_value_is_unset(const string_t *value)
 {
     string_t *compact;
     string_cursor_t *cursor;
@@ -95,7 +95,8 @@ static int mat_value_is_nan(const string_t *value)
             goto done;
     }
 
-    result = string_view_equals_literal(string_view_all(compact), "nan") ||
+    result = string_view_equals_literal(string_view_all(compact), "?") ||
+             string_view_equals_literal(string_view_all(compact), "nan") ||
              string_view_equals_literal(string_view_all(compact), "nan+0i") ||
              string_view_equals_literal(string_view_all(compact), "nan-0i") ||
              string_view_equals_literal(string_view_all(compact), "nan+0.0i") ||
@@ -225,7 +226,7 @@ static void mat_append_binding(string_t ***bindings, size_t *nbindings, size_t *
             if (mat_parse_binding_token((*bindings)[i], &existing) != 0)
                 continue;
             if (mat_text_equal(existing.name, incoming.name)) {
-                if (mat_value_is_nan(existing.value) && !mat_value_is_nan(incoming.value)) {
+                if (mat_binding_value_is_unset(existing.value) && !mat_binding_value_is_unset(incoming.value)) {
                     string_free((*bindings)[i]);
                     (*bindings)[i] = token;
                     token = NULL;
@@ -375,7 +376,7 @@ static string_t *mat_join_binding_list_for_card(string_t **bindings, size_t nbin
             goto token_fail;
         if (string_append_string(out, token.name) != 0 || string_append_cstr(out, " = ") != 0)
             goto token_fail;
-        if (mat_value_is_nan(token.value)) {
+        if (mat_binding_value_is_unset(token.value)) {
             if (string_append_char(out, '?') != 0)
                 goto token_fail;
         } else if (string_append_string(out, token.value) != 0) {
@@ -443,15 +444,15 @@ static int mat_has_long_binding(string_t **bindings, size_t nbindings, size_t th
     return 0;
 }
 
-static int mat_all_bindings_are_nan(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
-                                   size_t nconst_bindings)
+static int mat_all_bindings_are_unset(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
+                                     size_t nconst_bindings)
 {
     for (size_t i = 0; i < nvar_bindings; ++i) {
         mat_binding_token_t token = {0};
 
         if (mat_parse_binding_token(var_bindings[i], &token) != 0)
             return 0;
-        if (!mat_value_is_nan(token.value)) {
+        if (!mat_binding_value_is_unset(token.value)) {
             mat_free_binding_token(&token);
             return 0;
         }
@@ -463,7 +464,7 @@ static int mat_all_bindings_are_nan(string_t **var_bindings, size_t nvar_binding
 
         if (mat_parse_binding_token(const_bindings[i], &token) != 0)
             return 0;
-        if (!mat_value_is_nan(token.value)) {
+        if (!mat_binding_value_is_unset(token.value)) {
             mat_free_binding_token(&token);
             return 0;
         }
@@ -1274,7 +1275,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
         string_free(out.text);
         out.text = string_new_with("<expr matrix>");
     } else if (tex) {
-        omit_wrapper = !include_bindings || mat_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        omit_wrapper = !include_bindings ||
+                       mat_all_bindings_are_unset(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         string_t *joined = mat_join_bindings_TeX(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         if (!omit_wrapper)
             mb_puts(&out, "\\left\\{ ");
@@ -1299,8 +1301,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
 
         omit_wrapper = !include_bindings ||
                        (expression_style ? nvar_bindings + nconst_bindings == 0u
-                                         : mat_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings,
-                                                                   nconst_bindings));
+                                         : mat_all_bindings_are_unset(var_bindings, nvar_bindings, const_bindings,
+                                                                     nconst_bindings));
         if (expression_style) {
             string_t *vars = mat_join_binding_list_for_card(var_bindings, nvar_bindings);
             string_t *consts = mat_join_binding_list_for_card(const_bindings, nconst_bindings);
@@ -1342,7 +1344,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             mb_puts(&out, " }");
         string_free(joined);
     } else {
-        omit_wrapper = !include_bindings || mat_all_bindings_are_nan(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
+        omit_wrapper = !include_bindings ||
+                       mat_all_bindings_are_unset(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
         string_t *joined = mat_join_bindings(var_bindings, nvar_bindings, const_bindings, nconst_bindings, scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
