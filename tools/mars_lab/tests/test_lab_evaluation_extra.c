@@ -306,6 +306,17 @@ static void test_lab_extra_plot_ranges(void)
                     422u, "error", "bounds");
 }
 
+static size_t surface_facets(const string_t *svg)
+{
+    size_t count = 0;
+    const char *cursor = svg ? string_c_str(svg) : "";
+    while ((cursor = strstr(cursor, "<path fill="))) {
+        ++count;
+        ++cursor;
+    }
+    return count;
+}
+
 static void test_lab_extra_plot_preview(void)
 {
     unsigned status = 0;
@@ -315,11 +326,12 @@ static void test_lab_extra_plot_preview(void)
     const string_t *a = json_string_value(lab_eval_get(full, "plot_svg"));
     const string_t *b = json_string_value(lab_eval_get(preview, "plot_svg"));
     bool ok = test_lab_ok(full, true) && test_lab_ok(preview, true) && a && b &&
+              surface_facets(a) == 2 * 69 * 69 && surface_facets(b) == 2 * 12 * 12 &&
               strlen(string_c_str(b)) < strlen(string_c_str(a)) / 3 &&
               contains(preview, "plot_svg", "data-plot-title") && contains(preview, "plot_svg", "data-axis-arrow");
     json_free(preview);
     json_free(full);
-    TEST_ASSERT_TRUE(ok, "drag previews reduce tessellation while retaining native titles and axes");
+    TEST_ASSERT_TRUE(ok, "70-by-70 full grids and 13-by-13 drag previews retain native titles and axes");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_quality\":\"unknown\"}",
                     422u, "error", "plotting quality");
 }
@@ -428,6 +440,50 @@ static void test_lab_extra_plot_precision(void)
     TEST_ASSERT_TRUE(restored, "failed private parses restore worksheet precision");
 }
 
+static void test_lab_extra_surface_names(void)
+{
+    const struct {
+        const char *source, *first, *second, *name, *prefix;
+    } cases[] = {
+        {"exp(-x^2-y^2)", "x", "y", "u", "u(x,y) = "},
+        {"u^2+x^2", "x", "u", "v", "v(x,u) = "},
+        {"{x+y+u | x=?, y=?; u=2}", "x", "y", "v", "v(x,y) = "},
+        {"{x+y+u+v | x=?, y=?; u=2, v=3}", "x", "y", "w", "w(x,y) = "},
+        {"{x+y+u+v+w+u1 | x=?, y=?; u=2, v=3, w=4, u1=5}", "x", "y", "u₂", "u_{2}(x,y) = "},
+        {"x^2+@mu^2", "x", "@mu", "u", "u(x,\\mu) = "},
+        {"x^2+y^2", "y", "x", "u", "u(y,x) = "},
+        {"{x^2+y^2 | x=9, y=8}", "x", "y", "u", "u(x,y) = "}
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        json_t *payload = json_new_object();
+        lab_eval_set(payload, "expression", cases[i].source);
+        lab_eval_set(payload, "action", "plot");
+        lab_eval_set(payload, "wrt", cases[i].first);
+        lab_eval_set(payload, "plot_second", cases[i].second);
+        lab_eval_set(payload, "plot_lower", "-2");
+        lab_eval_set(payload, "plot_upper", "2");
+        lab_eval_set(payload, "plot_second_lower", "-2");
+        lab_eval_set(payload, "plot_second_upper", "2");
+        lab_eval_set(payload, "plot_quality", i & 1 ? "preview" : "full");
+        string_t *route = string_new_with("/eval");
+        unsigned status = 0;
+        json_t *fields = lab_eval_request(route, payload, &status);
+        string_t *label = string_sprintf(">%s</text>", cases[i].name);
+        bool ok = status == 200 && test_lab_ok(fields, true) &&
+                  !strncmp(lab_eval_text(fields, "plot_title_TeX"), cases[i].prefix, strlen(cases[i].prefix)) &&
+                  !strncmp(lab_eval_text(fields, "plot_title"), cases[i].name, strlen(cases[i].name)) &&
+                  contains(fields, "plot_svg", string_c_str(label)) &&
+                  !contains(fields, "plot_svg", ">f</text>") && !*lab_eval_text(fields, "plot_title_render_error");
+        if (!ok)
+            show_failure(fields);
+        string_free(label);
+        json_free(fields);
+        string_free(route);
+        json_free(payload);
+        TEST_ASSERT_TRUE(ok, "surface title and height axis share a fresh name and preserve selected axis order");
+    }
+}
+
 static void test_lab_extra_plot_title_fallback(void)
 {
     json_t *fields = json_new_object();
@@ -468,6 +524,7 @@ static void test_lab_surface_readme(void)
                             "\"plot_second_upper\":\"2\",\"plot_kind\":\"auto\","
                             "\"plot_azimuth\":\"120\",\"plot_elevation\":\"40\"}", &status);
     bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+              contains(fields, "plot_title_TeX", "u(x,y) = ") && contains(fields, "plot_svg", ">u</text>") &&
               contains(fields, "plot_title_TeX", "x^{2}") && contains(fields, "plot_title_TeX", "y^{2}") &&
               contains(fields, "plot_svg", "data-azimuth=\"120.000\"") &&
               contains(fields, "plot_svg", "data-elevation=\"40.000\"");
@@ -475,7 +532,7 @@ static void test_lab_surface_readme(void)
         show_failure(fields);
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README two-variable expression produces a shaded paraboloid with its TeX title");
-    string_printf("Surface plot ready: x^2 + y^2\n");
+    string_printf("Surface plot ready: u(x,y) = x^2 + y^2; height axis: u\n");
 }
 
 static void test_lab_auto_range_readme(void)
@@ -1096,6 +1153,7 @@ void test_lab_evaluation_extra_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);

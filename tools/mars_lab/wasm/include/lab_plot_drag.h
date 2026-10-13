@@ -16,8 +16,8 @@
 void lab_plot_drag_install(int document, int window);
 
 /** @brief Process a gesture and publish deferred host calls after releasing scoped handles.
- * @param action Start 0, move 1, release 2, cancel 3, Escape 4, camera wheel 5.
- * @param event Scoped browser MouseEvent, WheelEvent, KeyboardEvent or cancellation event.
+ * @param action Start 0, move 1, release 2, cancel 3, Escape 4, camera wheel 5, wheel inactivity 6.
+ * @param event Scoped browser event, or the scheduled revision number for wheel inactivity.
  * @param state Browser-owned gesture record retained by the event subscriptions.
  */
 void lab_plot_drag_dispatch(unsigned action, int event, int state);

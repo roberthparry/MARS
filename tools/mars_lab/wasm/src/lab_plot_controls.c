@@ -34,6 +34,7 @@ static int automatic_value(unsigned index)
 void lab_plot_controls_sync(void)
 {
     int first = value("plotFirst"), second = value("plotSecond");
+    lab_dom_write(lab_dom_id("expressionPlot"), 3, "variable", first);
     if (lab_dom_length(first) && lab_dom_equal(first, second)) {
         second = lab_dom_string("");
         lab_dom_write(lab_dom_id("plotSecond"), 5, "", second);
@@ -108,7 +109,7 @@ void lab_plot_controls_variables(int names, int labels)
     lab_plot_controls_sync();
 }
 
-/* Direct variable plot buttons and the card's radio selection share one first-axis value. */
+/* The Plot action and the card's radio selection share one first-axis value. */
 void lab_plot_controls_prepare(int variable)
 {
     lab_dom_write(lab_dom_id("plotFirst"), 5, "", variable);

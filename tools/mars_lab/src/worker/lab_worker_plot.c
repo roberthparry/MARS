@@ -61,7 +61,7 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     int saved = errno;
     num_set_default_prec_bits(worksheet_precision);
-    int result = lab_worker_plot_output(source, expression, svg, saved);
+    int result = lab_worker_plot_output(source, expression, svg, saved, NULL, NULL, NULL);
     string_free(svg);
     plot_free(plot);
     sampler_free(samples);
@@ -73,15 +73,42 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     return result;
 }
 
-/* Curves and surfaces use the same native formula title and worksheet representation. */
-int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int saved)
+static string_t *surface_title(const string_t *body, const expr_t *function, const expr_t *first,
+                               const expr_t *second, bool TeX)
+{
+    /* Title arguments are names, not the worksheet values carried by bound axis nodes. */
+    expr_t *x_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(first));
+    expr_t *y_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(second));
+    char *name = TeX ? expr_to_TeX_body(function) : expr_to_string(function, style_UNBOUND);
+    char *x = x_symbol ? (TeX ? expr_to_TeX_body(x_symbol) : expr_to_string(x_symbol, style_UNBOUND)) : NULL;
+    char *y = y_symbol ? (TeX ? expr_to_TeX_body(y_symbol) : expr_to_string(y_symbol, style_UNBOUND)) : NULL;
+    string_t *title = name && x && y ? string_sprintf("%s(%s,%s) = %s", name, x, y, string_c_str(body)) : NULL;
+    free(y);
+    free(x);
+    free(name);
+    expr_free(y_symbol);
+    expr_free(x_symbol);
+    return title;
+}
+
+/* Surface titles name the function and its selected axes without altering the worksheet formula. */
+int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int saved,
+                           const expr_t *function, const expr_t *first, const expr_t *second)
 {
     char *text = svg ? expr_to_string(expression, style_EXPRESSION) : NULL;
-    char *title = svg ? expr_to_string(expression, style_UNBOUND) : NULL;
+    string_t *title = svg ? expr_to_text(expression, style_UNBOUND) : NULL;
     string_t *title_TeX = svg ? expr_source_TeX_internal(source) : NULL;
+    if (function && title && title_TeX) {
+        string_t *named = surface_title(title, function, first, second, false);
+        string_t *named_TeX = surface_title(title_TeX, function, first, second, true);
+        string_free(title);
+        string_free(title_TeX);
+        title = named;
+        title_TeX = named_TeX;
+    }
     if (svg && text && title && title_TeX) {
         printf("expression  %s\n", text);
-        printf("plot_title  %s\n", title);
+        printf("plot_title  %s\n", string_c_str(title));
         printf("plot_title_TeX %s\n", string_c_str(title_TeX));
         printf("plot_svg    %s\n", string_c_str(svg));
         printf("differentiable  yes\n");
@@ -98,7 +125,7 @@ int lab_worker_plot_output(const char *source, const expr_t *expression, const s
     }
     bool ok = svg && text && title && title_TeX;
     string_free(title_TeX);
-    free(title);
+    string_free(title);
     free(text);
     return ok ? 0 : 1;
 }

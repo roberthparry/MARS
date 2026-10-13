@@ -147,7 +147,8 @@ bool test_lab_isolated(bool (*callback)(const char *directory))
     if (!ok)
         string_fprintf(stderr, "Lab isolated fixture: child=%ld, waited=%ld, wait status=%d\n", (long)child,
                        (long)waited, status);
-    size_t remaining = 1024;
+    /* Browser profiles and cached plot assets can exceed a thousand entries during integration tests. */
+    size_t remaining = 4096;
     bool removed = root && remove_fixture_tree(root, 0, &remaining);
     if (!removed)
         string_fprintf(stderr, "Lab private fixture cleanup failed: %s, errno=%d\n", directory, errno);

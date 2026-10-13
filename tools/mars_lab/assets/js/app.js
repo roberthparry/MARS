@@ -71,6 +71,7 @@ function labStartEventBindings() {
         normaliseWorksheetControl,
         takePlot,
         redrawPlotDrag,
+        schedulePlotWheelEnd,
         startGoalSeekFromEvent,
         changeWorksheetPrecision,
         toggleTextDigits,

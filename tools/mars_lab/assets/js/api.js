@@ -243,6 +243,19 @@ async function takePlot(wrt, actionButton = null) {
     return takeCalculus(wrt, 'plot', actionButton);
 }
 
+/** Keep only the newest browser timer for each native camera gesture. */
+const plotWheelTimers = new WeakMap();
+
+/** Supply the browser timer; native code owns the delay, stale-event checks and final redraw. */
+function schedulePlotWheelEnd(state, revision, delay) {
+    clearTimeout(plotWheelTimers.get(state));
+    plotWheelTimers.set(state, setTimeout(() => {
+        plotWheelTimers.delete(state);
+        const plan = labDOM.call('lab_plot_drag_dispatch', 6, revision, state);
+        labDOM.services(plan, {redrawPlotDrag});
+    }, delay));
+}
+
 /** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
 async function redrawPlotDrag(state, variable, preview) {
     let next = [state, variable, preview];

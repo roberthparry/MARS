@@ -928,20 +928,31 @@ it draws a curve. Ambiguous additional variables require an explicit
 Explicit 3-D mode can sample two variables even when their worksheet values
 are already supplied. Constant bindings remain parameters, never automatic axes.
 
-For example, enter `x^2 + y^2`, leave both variables unset, and press **x plot**.
+For example, enter `x^2 + y^2`, leave both variables unset, and press **Plot**.
 With **From** −2 and **To** 2 in each variable group, the output is a shaded
-paraboloid titled \(x^2+y^2\). At the default view, the rightward base axis is
+paraboloid titled \(u(x,y)=x^2+y^2\). At the default view, the rightward base axis is
 the first variable, the leftward base axis is the second, and height is the formula value.
 Arrows at the positive ends identify the two variable axes by name and the
-height axis by `f` (the formula value). They follow the camera; their text stays
+height axis by `u` (the formula value). The native renderer chooses an unused
+name: `u`, then `v`, then `w`, then numbered `u` names, avoiding all existing
+variable and constant bindings. The title uses the selected first and second
+variables in that order; the height axis uses the same function name.
+They follow the camera; their text stays
 upright. No surrounding box is drawn. The formula title, expansion and copying
 work as for curves.
+
+The accompanying README test prints:
+
+```text
+Surface plot ready: u(x,y) = x^2 + y^2; height axis: u
+```
 
 Plot type, variables, ranges, Y scale and camera controls live inside the
 **Plot** card, below the image, including when the card is expanded. Press
 **Update plot** to apply changed ranges or plot type without leaving the card.
 Choose variables using the compact radio buttons populated from native binding
-metadata. The first variable starts with the variable whose plot button was pressed;
+metadata. A single **Plot** button uses the selected first variable, initially the
+first available variable in the native catalogue;
 the second is chosen automatically unless an explicit radio choice is selected. The same variable
 cannot occupy both axes. Each variable keeps its **From/To** pair together.
 Only the applicable 2-D vertical or 3-D camera controls are displayed.
@@ -967,7 +978,7 @@ position, so stale movements cannot build up a queue. Dragging uses a 13×13
 preview mesh, retaining the normal numerical precision checks and domain gaps.
 No spline smoothing is applied across discontinuities. Releasing the mouse,
 including outside the plot, retains the final position and requests one full
-41×41 redraw, even when the last preview already reached that angle. Escape, losing browser
+70×70 redraw, even when the last preview already reached that angle. Escape, losing browser
 focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. Preview and final redraws resample the native surface.
 This also works when expanded. Right-click and 2-D plots keep their normal
@@ -975,13 +986,16 @@ behaviour; Ctrl+wheel zoom remains available.
 Over a 3-D plot, **Shift+wheel** adjusts elevation like a vertical drag and
 **Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
 angle; wheel up decreases it, in 5° steps with the same limits as dragging.
-Sliders and readouts follow the camera. Wheel redraws retain full detail and
-coalesce rapid movements. Ctrl takes precedence for zoom; Shift+Alt together
+Sliders and readouts follow the camera. Wheel rotation uses the same 13×13 preview
+and coalesced redraws as dragging, then restores the full 70×70 mesh after
+300 ms without further wheel movement. Escape or losing browser focus restores
+the starting camera. Ctrl takes precedence for zoom; Shift+Alt together
 does not rotate. Wheel rotation is inactive during a drag.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
-Surfaces use 41×41 uniformly sampled vertices and an adjustable oblique view, with
+Surfaces use 70×70 uniformly sampled vertices (9,522 triangles for a complete grid)
+and an adjustable oblique view, with
 blue/teal/gold height shading. They fit all finite heights; **2-D Y scale** and
 its manual limits apply only to curves. Missing real values leave holes. Coarse
 7×7 higher-precision checks increase the working precision when needed; the
@@ -990,7 +1004,7 @@ Neither sampled binding is changed in the worksheet. This surface view
 does not adaptively refine its mesh or guarantee detection of every
 pole or narrow feature. See [surface rendering limitations](plot.md#height-surfaces).
 
-Evaluate an expression with a variable, then use its **plot** button beside the
+Evaluate an expression with a variable, then use the single **Plot** button beside the
 derivative and integral actions. **From** and **To** select the parameter
 range; bounds accept native mathematical text, including
 `-@pi` and `@pi`. Other parameters must have numerical bindings. The chosen
@@ -1006,7 +1020,7 @@ or distant features; when no useful window is found it asks for explicit bounds
 and any missing parameter bindings. Explicit ranges bypass this range search.
 Plots retain gaps inside the chosen window.
 
-For example, enter `asin(x)`, leave both bounds blank, and press **x plot**.
+For example, enter `asin(x)`, leave both bounds blank, and press **Plot**.
 The output is the inverse-sine curve over its real interval:
 
 ```text

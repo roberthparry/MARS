@@ -469,12 +469,12 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
     lab_workspace_dom_text(panel, 0, "", "");
     if (!panel)
         return;
-    static const char *const suffixes[] = {" derivative", " integral", " plot"};
+    static const char *const suffixes[] = {" derivative", " integral"};
     int plots = !lab_dom_has_class(lab_dom_query(0, "#plotRange"), "hidden");
     if (plots)
         lab_plot_controls_variables(names, labels);
-    for (unsigned action = 0; action < (plots ? 3u : 2u); ++action) {
-        if (action < 2 && !differentiable)
+    for (unsigned action = 0; action < 2; ++action) {
+        if (!differentiable)
             continue;
         for (unsigned i = 0; i < lab_dom_count(names); ++i) {
             unsigned mark = lab_dom_mark();
@@ -490,6 +490,16 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
             lab_dom_append(panel, button);
             lab_dom_release(mark);
         }
+    }
+    if (plots && lab_dom_count(names)) {
+        int button = lab_dom_create("button");
+        lab_dom_class(button, "secondary", 1);
+        lab_workspace_dom_text(button, 2, "type", "button");
+        lab_workspace_dom_text(button, 2, "id", "expressionPlot");
+        lab_workspace_dom_text(button, 3, "calculusAction", "2");
+        lab_workspace_dom_text(button, 0, "", "Plot");
+        lab_dom_append(panel, button);
+        lab_plot_controls_sync();
     }
 }
 

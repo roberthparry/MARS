@@ -100,7 +100,26 @@
             }
         }
     }
+    function checkPlotRangeAlignment() {
+        const groups = [...document.querySelectorAll('.plot-ranges > .plot-group')]
+            .filter(group => group.getClientRects().length);
+        const bounds = groups.map(group => group.getBoundingClientRect());
+        for (const selector of ['.plot-bound-pair label', '.plot-bound-pair input']) {
+            const rows = groups.map(group => [...group.querySelectorAll(selector)]
+                .map(node => node.getBoundingClientRect()));
+            for (const row of rows)
+                check(row.length === 2 && Math.abs(row[0].top - row[1].top) < 1,
+                      'Each range must keep its From and To labels and inputs aligned');
+            if (bounds.length === 2 && Math.abs(bounds[0].top - bounds[1].top) < 1)
+                check(Math.abs(rows[0][0].top - rows[1][0].top) < 1,
+                      'Side-by-side variable ranges must align despite different hint and choice heights');
+            else if (bounds.length === 2)
+                check(bounds[1].top >= bounds[0].bottom,
+                      'Narrow cards must stack variable ranges without overlap');
+        }
+    }
     function checkPlotControls(surface) {
+        checkPlotRangeAlignment();
         const visible = id => document.getElementById(id).getClientRects().length > 0;
         check(visible('plotCamera') === surface && visible('plotVertical') !== surface,
               'Only the applicable dimension controls should be visible');
@@ -148,16 +167,21 @@
         });
         const pending = [];
         let requests = 0;
+        let wheelEnd;
         const registry = {redrawPlotDrag: (state, variable, preview) => {
             ++requests;
             pending.push({state, variable, preview});
-        }};
+        }, schedulePlotWheelEnd: (state, revision, delay) => wheelEnd = {state, revision, delay}};
         const previous = labDOM.bindEvents({});
         labDOM.bindEvents({...previous, ...registry});
         const complete = (accepted = true) => {
             const request = pending.shift();
             check(!!request, 'Drag completion must belong to an outstanding request');
             labDOM.services(labDOM.call('lab_plot_drag_complete', request.state, Number(accepted)), registry);
+        };
+        const idle = (end = wheelEnd) => {
+            check(end.delay === 300, 'Wheel bursts should settle after 300 ms without further movement');
+            labDOM.services(labDOM.call('lab_plot_drag_dispatch', 6, end.revision, end.state), registry);
         };
         const surface = rendered.querySelector('[data-surface]');
         const path = surface.querySelector('[data-series] path');
@@ -245,17 +269,27 @@
             seed();
             const card = rendered.closest('.result-card'), zoom = resultZoomIndex(card);
             check(!wheel(path, 100, {shiftKey: true}) && values() === '45,35,0' &&
-                  pending.length === 1 && !pending[0].preview,
-                  'Shift+wheel down must increase elevation and request a full-detail redraw');
+                  pending.length === 1 && pending[0].preview,
+                  'Shift+wheel down must increase elevation and request the same coarse preview as dragging');
+            const staleWheelEnd = wheelEnd;
             check(!wheel(path, -1, {shiftKey: true, deltaMode: 1}) && values() === '45,30,0',
                   'Shift+wheel up must decrease elevation, including line-mode events');
             for (let i = 0; i < 30; ++i)
                 wheel(path, 1, {altKey: true, deltaMode: 2});
             check(values() === '195,30,0' && pending.length === 1 && resultZoomIndex(card) === zoom,
                   'Alt+wheel down must turn right without zooming or building a request queue');
+            idle(staleWheelEnd);
+            check(rendered.marsPlotDrag.wheel, 'A stale inactivity callback must not end a newer wheel movement');
             complete();
-            check(pending.length === 1 && !pending[0].preview, 'Wheel completion must draw the latest camera');
+            check(pending.length === 1 && pending[0].preview, 'Wheel completion must preview the latest camera');
             complete();
+            check(pending.length === 0 && rendered.marsPlotDrag.wheel,
+                  'A preview finishing before inactivity must keep the wheel gesture alive');
+            idle();
+            check(pending.length === 1 && !pending[0].preview, 'Wheel inactivity must restore full detail');
+            complete();
+            idle();
+            check(pending.length === 0, 'Repeated inactivity callbacks must not duplicate the final redraw');
             seed();
             for (let i = 0; i < 10; ++i)
                 wheel(path, -100, {altKey: true});
@@ -264,6 +298,8 @@
                 wheel(path, -100, {shiftKey: true});
             check(values() === '355,5,0', 'Shift+wheel must respect the lower elevation limit');
             complete();
+            complete();
+            idle();
             complete();
             const atLimit = requests;
             check(!wheel(path, -100, {shiftKey: true}) && requests === atLimit,
@@ -274,6 +310,7 @@
             check(controls.every(control => document.getElementById(control.id + 'Value').textContent ===
                                            control.value + '°'), 'Wheel rotation must synchronise degree readouts');
             complete(false);
+            idle();
             check(pending.length === 0, 'Superseding a wheel redraw must discard queued camera changes');
             for (const modifiers of [{shiftKey: true}, {altKey: true}]) {
                 check(wheel(path, 0, {...modifiers, deltaX: 100}) &&
@@ -285,6 +322,24 @@
             }
             check(wheel(path, 100, {shiftKey: true, altKey: true}) && pending.length === 0,
                   'Combined Shift+Alt must not choose an ambiguous rotation axis');
+            seed();
+            wheel(path, 100, {altKey: true});
+            idle();
+            check(pending.length === 1 && pending[0].preview,
+                  'Inactivity during an in-flight preview must not start a parallel redraw');
+            complete();
+            check(pending.length === 1 && !pending[0].preview,
+                  'An in-flight preview must be followed by full detail after inactivity');
+            complete();
+            seed();
+            wheel(path, 100, {shiftKey: true});
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+            check(values() === '45,30,0' && !rendered.marsPlotDrag.wheel,
+                  'Escape must cancel wheel rotation using the same camera restoration as dragging');
+            idle();
+            complete();
+            check(pending.length === 1 && !pending[0].preview, 'Cancellation must restore full detail');
+            complete();
         } finally {
             window.dispatchEvent(new Event('blur'));
             while (pending.length)
@@ -330,12 +385,16 @@
             const angle = Number(before.dataset[axis]) - 5;
             wheel(before.querySelector('[data-series] path'), -100, {[modifier]: true});
             const deadline = performance.now() + 15000;
-            while (rendered.marsPlotDrag.busy && performance.now() < deadline)
+            let sawPreview = false;
+            while ((rendered.marsPlotDrag.busy || rendered.marsPlotDrag.wheel) && performance.now() < deadline) {
+                sawPreview ||= rendered.querySelectorAll('[data-series] path').length === 2 * 12 * 12;
                 await new Promise(resolve => setTimeout(resolve, 25));
+            }
             const after = rendered.querySelector('[data-surface]');
-            check(!rendered.marsPlotDrag.busy && after !== before && Number(after.dataset[axis]) === angle &&
-                  rendered.querySelectorAll('[data-series] path').length > 1000,
-                  'Modified wheel motion must redraw native full-detail geometry at the selected angle');
+            check(sawPreview && !rendered.marsPlotDrag.busy && !rendered.marsPlotDrag.wheel &&
+                  after !== before && Number(after.dataset[axis]) === angle &&
+                  rendered.querySelectorAll('[data-series] path').length === 2 * 69 * 69,
+                  'Both wheel rotations must show a coarse native preview then restore the full 70-by-70 mesh');
         }
     }
     function checkPlotWheelZoom() {
@@ -1101,15 +1160,16 @@
                   plotControls.scrollWidth <= plotControls.clientWidth + 1 &&
                   document.getElementById('plotAzimuth').getBoundingClientRect().width > 60,
                   'Narrow plot cards must stack controls and retain a usable slider without overflow');
+            checkPlotRangeAlignment();
             await checkPlotChoices();
             plotCard.style.width = savedCardWidth;
             checkPlotControls(true);
             const facets = [...rendered.querySelectorAll('[data-surface] [data-series] path')];
-            check(facets.length > 1000 && new Set(facets.map(path => path.getAttribute('fill'))).size > 4,
-                  'Surface must contain a shaded mesh rather than a curve');
+            check(facets.length === 2 * 69 * 69 && new Set(facets.map(path => path.getAttribute('fill'))).size > 4,
+                  'Full surface must contain the shaded 70-by-70 mesh');
             check(!!rendered.querySelector('[data-plot-title] use'), 'Surface must retain its rendered formula title');
             checkPlotLabelSpacing();
-            for (const [axis, name] of [[0, 'x'], [1, 'y'], [2, 'f']]) {
+            for (const [axis, name] of [[0, 'x'], [1, 'y'], [2, 'u']]) {
                 check(!!rendered.querySelector(`[data-axis-arrow="${axis}"]`) &&
                       rendered.querySelector(`[data-axis-name="${axis}"]`).textContent.trim() === name,
                       'Surface axes must identify their variables at increasing-value arrowheads');
@@ -1164,6 +1224,15 @@
             check(plotControls.getBoundingClientRect().width > 0 &&
                   rendered.closest('.expanded-card').contains(plotControls),
                   'Expanded plot must retain its controls');
+            checkPlotRangeAlignment();
+            const secondHint = document.querySelector('#plotSecondGroup .plot-hint');
+            const savedHintWidth = secondHint.style.maxWidth;
+            try {
+                secondHint.style.maxWidth = '12ch';
+                checkPlotRangeAlignment();
+            } finally {
+                secondHint.style.maxWidth = savedHintWidth;
+            }
             checkPlotWheelZoom();
             await checkPlotDrag();
             document.getElementById('plotAzimuth').value = '75';

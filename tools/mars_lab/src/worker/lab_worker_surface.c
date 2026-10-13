@@ -19,9 +19,11 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
+enum { SURFACE_SIDE = 70, SURFACE_PREVIEW_SIDE = 13 };
+
 typedef struct {
     size_t side;
-    number_t x[41], y[41], z[41 * 41];
+    number_t x[SURFACE_SIDE], y[SURFACE_SIDE], z[SURFACE_SIDE * SURFACE_SIDE];
 } surface_grid_t;
 
 typedef struct {
@@ -132,7 +134,7 @@ static bool grid_agrees(const surface_grid_t *low, const surface_grid_t *high)
 }
 
 static string_t *surface_svg(const char *source, const char *first, const char *second, const char *const limits[4],
-                             double azimuth, double elevation, double roll, bool preview)
+                             double azimuth, double elevation, double roll, bool preview, const char *height)
 {
     size_t saved_precision = num_get_default_prec_bits();
     number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
@@ -162,7 +164,7 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         grid_free(high);
         grid_free(low);
         if (ok && agree) {
-            grid = grid_sample(source, first, second, bounds, preview ? 13 : 41, bits);
+            grid = grid_sample(source, first, second, bounds, preview ? SURFACE_PREVIEW_SIDE : SURFACE_SIDE, bits);
             break;
         }
         bits *= 2;
@@ -171,6 +173,7 @@ static string_t *surface_svg(const char *source, const char *first, const char *
     options.title = "";
     options.x_label = first;
     options.y_label = second;
+    options.z_label = height;
     options.axis_colour = 0x94b8b1;
     options.label_colour = 0xb8ccc5;
     options.legend = false;
@@ -244,9 +247,22 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             return 1;
         }
     }
-    string_t *svg = surface_svg(source, expr_symbol_name(variable), expr_symbol_name(second), limits,
-                                view[0], view[1], view[2], !strcmp(quality, "preview"));
-    int result = lab_worker_plot_output(source, expression, svg, errno);
+    /* Each candidate uses a binding-table lookup; at most count + 1 candidates can be occupied. */
+    char name[64] = "u";
+    const char *const preferred[] = {"v", "w"};
+    for (size_t i = 0; expr_bindings_get(bindings, name); ++i) {
+        if (i < sizeof(preferred) / sizeof(*preferred))
+            snprintf(name, sizeof(name), "%s", preferred[i]);
+        else
+            snprintf(name, sizeof(name), "u%zu", i - 1);
+    }
+    expr_t *function = expr_new_named_var(NUM_NAN, name);
+    char *height = function ? expr_to_string(function, style_UNBOUND) : NULL;
+    string_t *svg = height ? surface_svg(source, expr_symbol_name(variable), expr_symbol_name(second), limits,
+                                         view[0], view[1], view[2], !strcmp(quality, "preview"), height) : NULL;
+    int result = lab_worker_plot_output(source, expression, svg, errno, function, variable, second);
     string_free(svg);
+    free(height);
+    expr_free(function);
     return result;
 }

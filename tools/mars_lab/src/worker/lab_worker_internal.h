@@ -33,8 +33,9 @@ size_t lab_worker_plot_range_precision(number_t lower, number_t upper);
 /** @brief Choose validation precision for cancellation on a tiny range. */
 size_t lab_worker_plot_check_precision(number_t lower, number_t upper);
 
-/** @brief Emit common plot records from a borrowed SVG, or a clean calculation diagnostic. */
-int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int error);
+/** @brief Emit plot records from a borrowed SVG; optional function and axis symbols name a surface title. */
+int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int error,
+                           const expr_t *function, const expr_t *first, const expr_t *second);
 
 /** @brief Dispatch a curve or surface request using explicit axes or native unset-variable metadata. */
 int lab_worker_plot_request(const char *source, const expr_t *expression, expr_bindings_t *bindings,
