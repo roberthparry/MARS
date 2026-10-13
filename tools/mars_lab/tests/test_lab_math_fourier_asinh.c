@@ -78,7 +78,7 @@ static void test_copied_spectra_both_directions(void)
                 lab_math_contains(math_fourier_text(result, "function"), "fourier(", false);
                 lab_math_contains(math_fourier_text(result, "function"), "x != 0", false);
                 for (size_t p = 0; p < 3; ++p) {
-                    const char *bound = lab_math_replace(math_fourier_text(result, "expression"), "x = NAN",
+                    const char *bound = lab_math_replace(math_fourier_text(result, "expression"), "x = ?",
                                                         lab_math_format("x = %.17g", points[p]));
                     const json_t *expected = math_fourier_fields(lab_math_format("{asinh(%s) | x=%.17g}", arguments[a],
                         points[p]), "x");
@@ -99,9 +99,9 @@ static void test_symbolic_affine_pair(void)
     lab_math_contains(math_fourier_text(restored, "function"), "fourier(", false);
     const double rates[] = {-2, 0.5, 2};
     for (size_t i = 0; i < 3; ++i) {
-        const char *copy = lab_math_replace(math_fourier_text(restored, "expression"), "x = NAN", "x = 0.3");
-        copy = lab_math_replace(copy, "a = NAN", lab_math_format("a = %.17g", rates[i]));
-        copy = lab_math_replace(copy, "b = NAN", "b = 0.2");
+        const char *copy = lab_math_replace(math_fourier_text(restored, "expression"), "x = ?", "x = 0.3");
+        copy = lab_math_replace(copy, "a = ?", lab_math_format("a = %.17g", rates[i]));
+        copy = lab_math_replace(copy, "b = ?", "b = 0.2");
         lab_math_close(math_fourier_number(math_fourier_fields(copy, "x")), asinh(rates[i]*0.3+0.2), 2e-12);
     }
 }
@@ -211,7 +211,7 @@ static void test_aliases_derivative_integral_and_sum(void)
         lab_math_contains(math_fourier_text(primitive, "integral_function"), "return integral(besselk(", true);
         const char *expression = lab_math_after(math_fourier_text(primitive, "integral"), " = ");
         lab_math_contains(expression, "∫", false);
-        const json_t *result = lab_math_fields(lab_math_replace(expression, "x = NAN", "x = 1"),
+        const json_t *result = lab_math_fields(lab_math_replace(expression, "x = ?", "x = 1"),
                                                "x", "derivative", 40);
         lab_math_close(lab_math_number(result, "derivative_value"), math_fourier_k_integral(n, 1), 2e-11);
     }

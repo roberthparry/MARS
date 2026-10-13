@@ -12,6 +12,7 @@ lab_dom_create
 lab_dom_css
 lab_dom_delete
 lab_dom_disabled
+lab_dom_checked
 lab_dom_effect
 lab_dom_equal
 lab_dom_format

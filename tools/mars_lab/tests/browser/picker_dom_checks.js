@@ -124,6 +124,14 @@ window.checkLabPickerDom = function checkLabPickerDom() {
         equal(marsDatePickerState.year, 2026, 'noncommitting navigation updates native view');
         setMarsDatePickerMonthYear(2024, 2, {commit: true});
         equal(first.input.value, '2024-02-28', 'committing month/year preserves current input day');
+        document.getElementById('marsDatePickerYearUp').click();
+        equal(first.input.value, '2025-02-28', 'year plus button commits through its event handler');
+        marsDatePickerYear.value = '2030';
+        marsDatePickerYear.dispatchEvent(new Event('change', {bubbles: true}));
+        equal(first.input.value, '2030-02-28', 'typed year commits through its event handler');
+        document.getElementById('marsDatePickerYearDown').click();
+        equal(first.input.value, '2029-02-28', 'year minus button commits through its event handler');
+        setMarsDatePickerMonthYear(2024, 2, {commit: true});
 
         second.input.value = '';
         openMarsDatePicker(second.input, second.button);

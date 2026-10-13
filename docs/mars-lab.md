@@ -259,6 +259,58 @@ The styles are divided into:
 - `results.css` and `help.css`: result rendering, help cards and visibility utilities.
 - `responsive.css`: tablet and phone overrides, loaded last.
 
+On phones the seven mode tabs form a compact, fully visible three-column grid
+with equal-width tabs. Precision controls sit at the top left beside Expression
+on the right, with the other six modes in two rows below. On phones these use a compact Precision −/+ group with
+28-pixel buttons and explicit accessible labels; wider screens retain the full
+Less precision/More precision wording. The header and decorative background are reduced, editors
+use a 16-pixel font and phone card action buttons use a compact 36-pixel minimum height
+with rounded rectangular styling. Worksheet actions use a smaller 32-pixel minimum
+height with reduced horizontal padding and wrap at their natural widths,
+and binding actions sit beside the value rather than adding a full-width row.
+Date-picker buttons use a clear vector calendar icon and flat styling, integrated
+with the date field on narrow screens; they and editable fields retain their
+larger touch targets. Result cards
+are never removed merely because the screen is narrow: Expression, Function,
+Run output, numerical values, diagnostics and calendar cards remain available
+when their native result state calls for them. Copy, zoom and expansion controls
+wrap inside each card. Wide mathematical content and almanac tables scroll
+within their own containers rather than widening the entire page.
+
+Phone layouts omit the introductory Equation and Differential Equation paragraphs;
+their notation, binding and starting-value guidance remains available in Help.
+Larger screens retain the inline hints. Phones also omit the Integrator's
+Bound/Free explanatory paragraph and inline examples without hiding its variable
+rows or work budget.
+
+Datetime starts with the selected date, followed by the holiday jurisdiction,
+date range and observer. Its short introduction replaces the decorative banner;
+on narrow screens, lightly separated field groups and rectangular controls avoid
+nested panels and oversized pill-shaped selectors. Julian Day Number and calendar
+year share a row on tablets; phones hide these secondary inputs and their labels,
+retaining the selected date and every calendar result. Larger screens retain both fields.
+Phone layouts also omit the introductory sentence and GMT offset explanation,
+while keeping the offset control. They use quieter sentence-case labels
+and compact From/To rows. Date inputs incorporate a vector calendar button with
+an accessible name. Touch layouts suppress lingering hover tooltips while
+retaining hints for keyboard-focused buttons.
+On phones the calendar popup places the month and its navigation arrows on the
+first row, with an editable year and year-step buttons on a separate second row
+so neither button is clipped. The wider-screen popup layout is unchanged.
+Phone navigation, calendar group headings and field labels share a 12-pixel type
+size; non-editable calendar selector buttons use 14 pixels. Editable fields stay
+at 16 pixels to avoid focus-triggered zoom on iPhone.
+Almanac uses the same compact field styling, with GMT time and zone on one row
+and latitude and longitude on another. On phones its repeated introduction and
+ephemeris coverage/accuracy note are omitted; all input fields and result cards
+remain available. Larger screens retain the coverage/accuracy note.
+
+The browser regression suite inventories live worksheet and help cards at
+320, 390, 430, 768 and 844 pixels, including portrait and landscape dimensions,
+and checks visibility, page overflow and control geometry across all modes.
+These responsive checks complement, rather than replace, testing on a real
+iPhone, particularly for Safari's keyboard, safe areas and touch gestures.
+
 `js/app.js` loads the C browser module, bootstrap configuration, database catalogue
 and definition scripts, then loads `workspace.js` to initialise browser references
 and views of native state. Native modules register controls through the generic
@@ -955,7 +1007,8 @@ metadata. A single **Plot** button uses the selected first variable, initially t
 first available variable in the native catalogue;
 the second is chosen automatically unless an explicit radio choice is selected. The same variable
 cannot occupy both axes. Each variable keeps its **From/To** pair together.
-Only the applicable 2-D vertical or 3-D camera controls are displayed.
+The vertical-range controls are available for both curves and surfaces; the
+3-D camera controls are displayed only for surfaces.
 Plot settings use inline radio buttons, not dropdowns. **Reset** beside an
 optional group clears its override and restores automatic behaviour; there is
 no separate Automatic option. Resetting a choice preserves entered range bounds.
@@ -963,8 +1016,11 @@ no separate Automatic option. Resetting a choice preserves entered range bounds.
 The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
 **Roll** turns the view clockwise in the screen plane. All three support mouse,
 touch and keyboard adjustment, with live degree readouts.
-The defaults are 45°, 30° and 0°, respectively. Azimuth and roll span a full turn; elevation
-accepts 5° to 85°. For the example above, set azimuth to 120° and elevation to
+The defaults are 315°, 30° and 0°, respectively: both horizontal axes initially
+increase from left to right, and the height axis increases from bottom to top.
+Rotating the view changes their screen directions without reversing the values.
+Azimuth and roll span a full turn; elevation accepts 5° to 85°.
+For the example above, set azimuth to 120° and elevation to
 40°: the output is the same paraboloid viewed from the other side, with its
 three ticked axes and formula title retained. Releasing a slider or committing
 a keyboard adjustment requests the new view automatically.
@@ -996,8 +1052,14 @@ rotation; crowded numbers may be omitted while their tick marks remain visible.
 
 Surfaces use 70×70 uniformly sampled vertices (9,522 triangles for a complete grid)
 and an adjustable oblique view, with
-blue/teal/gold height shading. They fit all finite heights; **2-D Y scale** and
-its manual limits apply only to curves. Missing real values leave holes. Coarse
+blue/teal/gold height shading. Automatic height scaling crops extreme spikes near
+poles so they do not flatten the rest of the surface. **Height range** in the Plot
+card offers **Fit all** or **Manual limits**; enter a finite **Minimum** and
+**Maximum**, then press **Update plot**. **Reset** restores automatic cropping.
+The range applies to the height axis named in the formula title (usually `u`),
+not either independent variable. Rotation previews and animation use the same
+selected policy; manual limits remain fixed. Clipped facets stop at the chosen
+heights rather than creating flat caps. Missing real values leave holes. Coarse
 7×7 higher-precision checks increase the working precision when needed; the
 normal starting mantissa is 53 bits, independent of worksheet precision.
 Neither sampled binding is changed in the worksheet. This surface view
@@ -1027,12 +1089,13 @@ The output is the inverse-sine curve over its real interval:
 Automatic curve: asin(x), x from -1 to 1
 ```
 
-The **2-D vertical range** offers **Fit all** and **Manual limits** radio overrides.
+The **Vertical range** (curves) or **Height range** (surfaces) offers **Fit all** and **Manual limits** radio overrides.
 With neither selected, the range is automatic. Automatic scaling
-uses a horizontally distributed range estimate to keep extreme values near
-poles from flattening the rest of the curve. Cropping adds no visible annotation.
+uses a horizontally distributed range estimate for curves, or finite grid heights
+for surfaces, to keep extreme values near poles from flattening the rest of the plot.
+It is a viewing heuristic, not a proof of divergence. Cropping adds no visible annotation.
 Fit all includes every finite sampled value.
-For Manual limits, supply finite **Y minimum** and **Y maximum**, with minimum
+For Manual limits, supply finite **Minimum** and **Maximum**, with minimum
 strictly below maximum. Press **Update plot** after changing these controls.
 Tick labels use rounded decimal steps, never fractions; very
 large or small labels use `×10` with superscript exponents.
@@ -2236,7 +2299,13 @@ bodies.
 Wide worksheet tables scroll within their own keyboard-focusable areas rather
 than overflowing the result card. Event contacts show compact times; their full
 dates and GMT offsets remain in tooltips and copied worksheet text. On mobile,
-events use stacked, labelled fields instead of tightly squeezed columns.
+events use stacked, labelled fields instead of tightly squeezed columns. At phone
+widths (up to 560 pixels), each navigational body has a compact heading with its
+symbol, name and visibility indicator, followed by all seven measurements in two
+labelled columns. No measurement is dropped or rounded by the browser. The native
+table retains its accessible row/column roles and clipboard text; desktop and
+tablet layouts continue to use a horizontally scrollable table. Both All and
+Visible filters use the same responsive presentation.
 
 In both **All** and **Visible** views, the Sun and planets carry their conventional
 astronomical symbols beside their names: ☉ Sun, ☿ Mercury, ♀ Venus, ♂ Mars,

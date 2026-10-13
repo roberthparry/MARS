@@ -54,7 +54,7 @@ static void test_copied_formulas_round_trip(void)
                 lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
                 lab_math_contains(math_fourier_text(r, "expression"), "k =", false);
                 for (size_t p = 0; p < 3; ++p) {
-                    const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN",
+                    const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?",
                                                         lab_math_format("x = %.17g", points[p]));
                     lab_math_close(math_fourier_number(math_fourier_fields(bound, "x")),
                         math_fourier_number(math_fourier_fields(lab_math_format("{atan(%s) | x=%.17g}", arguments[a],
@@ -80,9 +80,9 @@ static void test_symbolic_real_scale_and_shift(void)
         const json_t *value = math_fourier_fields(lab_math_format(
             "{Fourier(atan(a*x+b),x,k) | k=0.7; a=%.17g; b=%.17g}", a, b), "k");
         lab_math_close(math_fourier_number(value), -I*M_PI*copysign(1, a)*cexp(-0.7/fabs(a)+I*0.7*b/a)/0.7, 1e-12);
-        const char *copy = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN", "x = 0.7");
-        copy = lab_math_replace(copy, "a = NAN", lab_math_format("a = %.17g", a));
-        copy = lab_math_replace(copy, "b = NAN", lab_math_format("b = %.17g", b));
+        const char *copy = lab_math_replace(math_fourier_text(r, "expression"), "x = ?", "x = 0.7");
+        copy = lab_math_replace(copy, "a = ?", lab_math_format("a = %.17g", a));
+        copy = lab_math_replace(copy, "b = ?", lab_math_format("b = %.17g", b));
         lab_math_close(math_fourier_number(math_fourier_fields(copy, "x")), atan(a*0.7+b), 1e-12);
     }
 }

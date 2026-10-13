@@ -36,8 +36,8 @@ static void test_lab_almanac_variants(void)
     const json_t *all_rows = test_lab_member(all, "rows"), *visible_rows = test_lab_member(visible, "rows");
     bool all_column = false, visible_column = true, shown = false;
     ok = ok && json_array_size(all_rows) == 2u && json_array_size(visible_rows) == 1u &&
-         strstr(test_lab_text(all, "html"), "<th>Visible</th>") &&
-         !strstr(test_lab_text(visible, "html"), "<th>Visible</th>") &&
+         strstr(test_lab_text(all, "html"), "role=\"columnheader\">Visible</th>") &&
+         !strstr(test_lab_text(visible, "html"), "role=\"columnheader\">Visible</th>") &&
          strstr(test_lab_text(visible, "html"), "data-almanac-visibility=\"visible\" aria-pressed=\"true\"") &&
          strstr(test_lab_text(all, "html"), "aria-label=\"Navigational bodies\" tabindex=\"0\"") &&
          json_bool_value(test_lab_member(all, "show_visible"), &all_column) && all_column &&
@@ -52,6 +52,17 @@ static void test_lab_almanac_variants(void)
                  "First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality\n"
                  "No events found.") &&
          !strcmp(test_lab_text(json_array_get(test_lab_member(response, "all_rows"), 0u), "visible"), " yes ");
+    static const char *const labelled_cells[] = {
+        "data-field=\"declination\" data-label=\"Declination\"", "data-field=\"gha\" data-label=\"GHA\"",
+        "data-field=\"right_ascension\" data-label=\"RA\"", "data-field=\"altitude\" data-label=\"Altitude\"",
+        "data-field=\"azimuth\" data-label=\"Azimuth\"", "data-field=\"semi_diameter\" data-label=\"s.d.\"",
+        "data-field=\"magnitude\" data-label=\"Vmag.\""
+    };
+    for (size_t i = 0; ok && i < sizeof labelled_cells / sizeof *labelled_cells; ++i)
+        ok = strstr(test_lab_text(all, "html"), labelled_cells[i]) &&
+             strstr(test_lab_text(visible, "html"), labelled_cells[i]);
+    ok = ok && strstr(test_lab_text(all, "html"), "role=\"table\"") &&
+         strstr(test_lab_text(all, "html"), "role=\"rowheader\"");
     json_free(response);
     TEST_ASSERT_TRUE(ok, "both local visibility variants and exact clipboard text retain original rows");
 }

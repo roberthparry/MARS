@@ -239,7 +239,7 @@ static void test_bound_spectrum_retains_inverse_information(void)
     const int points[] = {1, 0, -1};
     const double complex expected[] = {0, 0.5*I*M_PI, I*M_PI};
     for (size_t p = 0; p < 3; ++p)
-        lab_math_close(math_fourier_number(math_fourier_fields(lab_math_replace(math_fourier_text(r, "expression"), "x = NAN",
+        lab_math_close(math_fourier_number(math_fourier_fields(lab_math_replace(math_fourier_text(r, "expression"), "x = ?",
             lab_math_format("x = %d", points[p])), "x")), expected[p], 2e-12);
 }
 

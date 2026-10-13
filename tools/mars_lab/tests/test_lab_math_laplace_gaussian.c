@@ -24,11 +24,11 @@ static void test_laplace_gaussian_antiderivatives(void)
         string_free(integral);
         lab_math_contains(lab_math_text(result, "integral"), "Re(s)", true);
         lab_math_contains(lab_math_text(result, "integral"), "C", true);
-        const char *copy = lab_math_replace(lab_math_after(lab_math_text(result, "integral"), " = "), "s = NAN", "s = 2");
+        const char *copy = lab_math_replace(lab_math_after(lab_math_text(result, "integral"), " = "), "s = ?", "s = 2");
         const json_t *derivative = lab_math_gaussian_fields(copy, "derivative");
         const json_t *expected = lab_math_gaussian_fields(lab_math_format("{%s | s=2}", sources[i]), "evaluate");
         lab_math_places(lab_math_number(derivative, "derivative_value"), lab_math_number(expected, "value"), 13);
-        copy = lab_math_replace(lab_math_replace(copy, "s = 2", "s = -2"), "C = NAN", "C = 0");
+        copy = lab_math_replace(lab_math_replace(copy, "s = 2", "s = -2"), "C = ?", "C = 0");
         lab_math_equal(lab_math_text(lab_math_gaussian_fields(copy, "evaluate"), "value"), "NAN");
     }
 }

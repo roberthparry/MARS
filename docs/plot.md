@@ -14,6 +14,7 @@ external process, browser mathematics or JavaScript renderer is required.
 | `plot_add_points(plot, points, count, name, style, colour)` | Atomically copy a non-empty measured series. |
 | `plot_add_sampler(plot, samples, name, style, colour)` | Copy sample coordinates and explicit gap markers. |
 | `plot_set_surface(plot, x, columns, y, rows, z)` | Copy one row-major height grid into an empty scene. |
+| `plot_set_height_bounds(plot, minimum, maximum)` | Clip a surface to an explicit height interval. |
 | `plot_set_bounds(plot, xmin, xmax, ymin, ymax)` | Copy an explicit finite real increasing viewport. |
 | `plot_auto_bounds(plot)` | Restore bounds derived from finite data. |
 | `plot_series_count(plot)` | Inspect the number of copied series. |
@@ -53,7 +54,8 @@ bounds. Robust scaling takes at most one representative per horizontal bin
 (129 bins per series), so dense adaptive clusters near poles do not dominate
 the estimate. If the full Y span exceeds four times the 5th–95th percentile
 span, it trims the tails to that central span plus 25 per cent padding.
-Fewer than 20 representatives or a zero central span retain the full range.
+Fewer than 20 representatives retain the full range. For a constant central
+span, a small magnitude-based reference span permits isolated outliers to be cropped.
 This viewing heuristic may crop genuine peaks, not just singularities.
 Clipping adds no visible annotation.
 Explicit `plot_set_bounds()` overrides robust selection; recreating a scene
@@ -105,8 +107,11 @@ strictly increasing, with at least two elements. Heights are row-major:
 cells touching a missing vertex are not drawn. A surface counts as one series
 and cannot be mixed with curves, replaced, or given explicit 2-D bounds.
 
-The vertex count is subject to `max_points`. Automatic bounds fit every finite
-height; `smart_y` does not apply. Constant heights receive a padded vertical
+The vertex count is subject to `max_points`. Library defaults fit every finite
+height. Set `options.smart_y = true` before creating the scene to crop extreme
+height tails automatically, using the same padded 5th–95th percentile policy
+as curves, with equal weight for each finite grid sample. This is a viewing
+heuristic, not a determination of where the function diverges. Constant heights receive a padded vertical
 range. Normalisation retains `number_t` precision before the configurable oblique
 projection. Faces are depth-ordered and shaded blue, teal and gold by height.
 Three open axes have tick strokes, decimal labels and no enclosing box. Native
@@ -117,12 +122,22 @@ Margins account for long scientific labels. On grids of at least
 17×17, cells spanning more than 60% of the total height range are omitted to
 reduce false walls at discontinuities. This heuristic can omit genuine steep
 features, and sampling can miss small holes or poles; it is not a continuity
-guarantee. No drawable cells gives `ENODATA`.
+guarantee. No drawable cells gives `ENODATA`, except when a manual height interval
+excludes all facets: that viewport still displays its axes.
+
+`plot_set_height_bounds(plot, minimum, maximum)` sets an existing surface's height
+viewport. Both bounds must be finite and real, with minimum strictly below maximum;
+invalid arguments give `EINVAL` without changing the previous interval. Manual limits
+override `smart_y`. Facets are geometrically intersected with the interval in native
+precision before drawing conversion; out-of-range heights are not flattened into
+artificial plateaus. Missing values remain holes. `plot_auto_bounds(plot)` restores
+the scene's automatic policy without resampling or changing any data.
 
 `plot_set_view(plot, azimuth, elevation)` changes the surface camera in degrees,
-without changing or resampling the copied grid. Defaults are 45° around the
-surface and 30° above it. Finite azimuths wrap into [0,360); elevation accepts
-5° to 85°, keeping the axes readable. Invalid arguments give `EINVAL` without
+without changing or resampling the copied grid. Defaults are 315° around the
+surface and 30° above it, with both horizontal axes increasing from left to right
+and the height axis increasing from bottom to top. Finite azimuths wrap into
+[0,360); elevation accepts 5° to 85°, keeping the axes readable. Invalid arguments give `EINVAL` without
 changing the previous view. Call `plot_to_svg()` again to obtain the rotated
 image. Projection, depth ordering, exposed axes and tick positions all follow
 the camera. `plot_set_roll(plot, roll)` adds clockwise screen-plane rotation,
@@ -134,7 +149,7 @@ Each surface axis ends in an arrow pointing towards increasing values, labelled
 with the copied `x_label`, `y_label` or `z_label` option (defaults `x`, `y`, `f`).
 An empty label suppresses its name, not its arrow. Endpoint names take priority
 over nearby tick numbers in the collision layout. The example below uses
-120° azimuth, 40° elevation and 20° roll.
+120° azimuth, 40° elevation and 20° roll, with manual heights from 0 to 1.
 
 ```c
 #include <stdbool.h>
@@ -151,12 +166,13 @@ int main(void)
         for (size_t c = 0; c < 3; ++c)
             heights[r * 3 + c] = num_create_from_long((long)((r != 1) + (c != 1)));
     bool added = plot_set_surface(plot, axis, 3, axis, 3, heights) &&
+                 plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE) &&
                  plot_set_view(plot, 120, 40) && plot_set_roll(plot, 20);
     for (size_t i = 0; i < 9; ++i)
         num_destroy(&heights[i]);
     string_t *svg = added ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("Surface SVG ready; series: %zu\n", plot_series_count(plot));
+        printf("Surface SVG ready; series: %zu; height: 0 to 1\n", plot_series_count(plot));
     bool ok = svg != NULL;
     string_free(svg);
     plot_free(plot);
@@ -167,7 +183,7 @@ int main(void)
 Output:
 
 ```text
-Surface SVG ready; series: 1
+Surface SVG ready; series: 1; height: 0 to 1
 ```
 
 This small paraboloid is mirrored as `example_plot_surface` in

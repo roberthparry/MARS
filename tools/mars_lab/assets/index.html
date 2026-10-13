@@ -61,8 +61,8 @@
       </div>
       <div class="precision-toolbar" aria-label="Precision controls">
         <span class="precision-label">Precision</span>
-        <button class="card-action" id="lessPrecision" type="button">Less precision</button>
-        <button class="card-action" id="morePrecision" type="button">More precision</button>
+        <button class="card-action" id="lessPrecision" type="button" aria-label="Less precision"><span class="precision-full-label">Less precision</span><span class="precision-short-label" aria-hidden="true">−</span></button>
+        <button class="card-action" id="morePrecision" type="button" aria-label="More precision"><span class="precision-full-label">More precision</span><span class="precision-short-label" aria-hidden="true">+</span></button>
       </div>
     </div>
     <section id="workspacePanel">
@@ -97,7 +97,7 @@
       </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
-        <div class="integrator-bound-actions">
+        <div class="integrator-bound-actions integrator-bound-guidance">
           <span class="integrator-bound-summary">Use <code>Bound</code> rows for variables you actually want to integrate. Use <code>Free</code> only for symbols that appear in the integrand but should stay as parameters.</span>
         </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
@@ -108,29 +108,11 @@
           <option value="50000">Up to 50,000</option>
           <option value="100000">Up to 100,000</option>
         </select>
-        <p class="mode-hint">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
+        <p class="mode-hint integrator-examples">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
       </div>
       <div class="mode-panel hidden datetime-controls" id="datetimeControls">
-        <div class="datetime-briefing" aria-hidden="true">
-          <div class="datetime-orbit"></div>
-          <div>
-            <div class="datetime-briefing-kicker">Sol calendar uplink</div>
-            <div class="datetime-briefing-title">Plan an Earth date from the observer location.</div>
-            <div class="datetime-briefing-copy">Choose a civil date, a range, and an observation point. The core datetime module handles the calendar and solar calculations; this panel is only the flight deck.</div>
-          </div>
-        </div>
+        <p class="mode-hint datetime-intro">Calendar, holidays and solar times for your date and location.</p>
         <div class="datetime-field-groups">
-          <div class="datetime-field-group">
-            <div class="datetime-field-group-title">Holiday calendar</div>
-            <div class="datetime-grid">
-              <div class="integrator-bound-field">
-                <label for="datetimeJurisdiction">Holiday country or jurisdiction</label>
-                <select id="datetimeJurisdiction">
-__HOLIDAY_JURISDICTION_OPTIONS__
-                </select>
-              </div>
-            </div>
-          </div>
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Selected date</div>
             <div class="datetime-grid selected-date-grid">
@@ -152,17 +134,28 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
           <div class="datetime-field-group">
+            <div class="datetime-field-group-title">Holiday calendar</div>
+            <div class="datetime-grid">
+              <div class="integrator-bound-field">
+                <label for="datetimeJurisdiction">Country or jurisdiction</label>
+                <select id="datetimeJurisdiction">
+__HOLIDAY_JURISDICTION_OPTIONS__
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="datetime-field-group">
             <div class="datetime-field-group-title">Date range</div>
             <div class="datetime-grid two-up">
               <div class="integrator-bound-field">
-                <label for="datetimeStart">Start date</label>
+                <label for="datetimeStart">From</label>
                 <div class="mars-date-shell">
                   <input id="datetimeStart" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
                   <button class="mars-date-button" type="button" data-date-target="datetimeStart" aria-label="Open date picker for start date"></button>
                 </div>
               </div>
               <div class="integrator-bound-field">
-                <label for="datetimeEnd">End date</label>
+                <label for="datetimeEnd">To</label>
                 <div class="mars-date-shell">
                   <input id="datetimeEnd" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off">
                   <button class="mars-date-button" type="button" data-date-target="datetimeEnd" aria-label="Open date picker for end date"></button>
@@ -198,7 +191,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
         </div>
-        <p class="mode-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
+        <p class="mode-hint datetime-offset-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
@@ -215,7 +208,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="datetime-field-groups">
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Set the moment</div>
-            <div class="datetime-grid">
+            <div class="datetime-grid almanac-moment-grid">
               <div class="integrator-bound-field">
                 <label for="almanacDate">Date</label>
                 <div class="mars-date-shell">
@@ -263,7 +256,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
         </div>
-        <p class="mode-hint">__ALMANAC_ACCURACY_NOTE__</p>
+        <p class="mode-hint almanac-accuracy-note">__ALMANAC_ACCURACY_NOTE__</p>
       </div>
       <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
         <div class="mars-date-picker-head">
@@ -350,19 +343,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               </fieldset>
             </div>
             <fieldset class="plot-group" id="plotCamera"><legend>3-D view</legend>
-              <div class="plot-field"><label for="plotAzimuth">Azimuth</label><div class="plot-angle"><input id="plotAzimuth" type="range" min="0" max="360" value="45" step="1" title="Rotate around the surface"><output id="plotAzimuthValue" for="plotAzimuth">45°</output></div></div>
+              <div class="plot-field"><label for="plotAzimuth">Azimuth</label><div class="plot-angle"><input id="plotAzimuth" type="range" min="0" max="360" value="315" step="1" title="Rotate around the surface"><output id="plotAzimuthValue" for="plotAzimuth">315°</output></div></div>
               <div class="plot-field"><label for="plotElevation">Elevation</label><div class="plot-angle"><input id="plotElevation" type="range" min="5" max="85" value="30" step="1" title="Tilt the surface view"><output id="plotElevationValue" for="plotElevation">30°</output></div></div>
               <div class="plot-field"><label for="plotRoll">Roll</label><div class="plot-angle"><input id="plotRoll" type="range" min="0" max="360" value="0" step="1" title="Turn the view clockwise"><output id="plotRollValue" for="plotRoll">0°</output></div></div>
               <p class="plot-hint">Drag to rotate · Shift-drag to roll · Shift-wheel to tilt · Alt-wheel to turn · Ctrl-wheel to zoom</p>
             </fieldset>
-            <fieldset class="plot-group" id="plotVertical"><legend>2-D vertical range</legend>
+            <fieldset class="plot-group" id="plotVertical"><legend id="plotVerticalTitle">Vertical range</legend>
               <input type="hidden" id="plotScale" value="auto">
               <div class="plot-choices" id="plotScaleChoices">
                 <label><input type="radio" name="plotScale" value="all"><span>Fit all</span></label>
                 <label><input type="radio" name="plotScale" value="manual"><span>Manual limits</span></label>
                 <button class="card-action plot-reset" type="button" data-plot-reset="plotScale" aria-label="Reset vertical range to automatic">Reset</button>
               </div>
-              <p class="plot-hint">Unselected: choose the vertical range from the sampled curve.</p>
+              <p class="plot-hint">Unselected: automatic scaling reduces the effect of extreme spikes.</p>
               <div class="plot-bound-pair" id="plotManual">
                 <div class="plot-field"><label for="plotYLower">Minimum</label><input id="plotYLower" placeholder="Required" size="10" spellcheck="false"></div>
                 <div class="plot-field"><label for="plotYUpper">Maximum</label><input id="plotYUpper" placeholder="Required" size="10" spellcheck="false"></div>
@@ -371,7 +364,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <button class="secondary plot-update" id="plotUpdate" type="button">Update plot</button>
           </div>
         </div>
-        <div class="card result-card mobile-result-extra">
+        <div class="card result-card">
           <div class="card-title expandable-title">
             <span id="parsedTitle">Expression</span>
             <span class="card-actions digit-actions">
@@ -387,7 +380,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <pre id="parsed"></pre>
         </div>
-        <div class="card result-card mobile-result-extra" id="functionCard">
+        <div class="card result-card" id="functionCard">
           <div class="card-title expandable-title">
             <span id="functionTitle">Function</span>
             <span class="card-actions digit-actions">
@@ -481,8 +474,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Plot settings use radio buttons rather than dropdowns. Leave <code>Plot type</code> unselected to choose from the expression: a 3-D height surface when exactly one other non-constant variable is unset, otherwise a curve. Choose <code>2-D curve</code> or <code>3-D surface</code> to override this. The second variable is also automatic when no radio is selected. <code>Reset</code> clears an override without changing entered bounds. Bind any remaining parameters. Only the applicable camera or vertical-range controls are shown.</li>
             <li>Surface dragging uses a coarser native preview for responsiveness, then restores full detail on release. Both retain precision checks; no spline smoothing is applied across discontinuities.</li>
             <li>Over a 3-D plot, Shift-wheel changes elevation like a vertical drag; Alt-wheel changes azimuth like a horizontal drag. Wheel down increases the angle and wheel up decreases it in 5° steps. Sliders and readouts follow the camera; wheel rotation uses the same coarse preview as dragging and coalesces rapid movements. After 300 ms without further movement, the full 70×70 mesh returns. Escape or losing browser focus restores the starting camera. Ctrl takes precedence for zoom. Shift+Alt together does not rotate; wheel rotation is inactive during a drag.</li>
-            <li>Surfaces use blue-to-teal-to-gold height shading and three ticked axes, with positive-end arrows labelled by variable name (height uses the title's function name, preferably <code>u</code>). In the default view, the first variable runs along the rightward base axis, the second along the leftward base axis; height is the formula value. All plot controls are inside the Plot card, including when expanded. Use <strong>Update plot</strong> after changing ranges or plot type. Drag the <strong>Azimuth</strong> slider to rotate around the surface and <strong>Elevation</strong> to tilt it (5°–85°); <strong>Roll</strong> turns the view clockwise in the screen plane (0°–360°). The TeX title names the function, for example <code>u(x,y) = x²+y²</code>, choosing a name unused by existing variable or constant bindings. Labels remain upright. Degree readouts update while sliding; releasing the slider redraws the surface. Keyboard and touch adjustment work too. Left-drag the 3-D plot to turn and tilt it: dragging down increases elevation; dragging up decreases it. Hold Shift when starting a left-drag to roll. Sliders, readouts and the surface update while dragging; only the latest camera position is queued while a redraw is in flight. Escape or losing browser focus cancels. Right-click is unchanged. The full 70×70 mesh leaves holes at missing real values. Surfaces fit all finite heights; 2-D Y controls do not apply.</li>
-            <li>Leave the <code>2-D vertical range</code> radio buttons unselected for automatic scaling, which avoids letting extreme samples flatten the curve. <code>Fit all</code> includes all finite samples; <code>Manual limits</code> uses Minimum and Maximum. <code>Reset</code> clears the selection. Press <code>Update plot</code> to apply changes. Rounded decimal ticks and superscript scientific exponents keep axes readable.</li>
+            <li>Surfaces use blue-to-teal-to-gold height shading and three ticked axes, with positive-end arrows labelled by variable name (height uses the title's function name, preferably <code>u</code>). In the default view, both horizontal axes increase left to right; height is the formula value. All plot controls are inside the Plot card, including when expanded. Use <strong>Update plot</strong> after changing ranges or plot type. Drag the <strong>Azimuth</strong> slider to rotate around the surface and <strong>Elevation</strong> to tilt it (5°–85°); <strong>Roll</strong> turns the view clockwise in the screen plane (0°–360°). The TeX title names the function, for example <code>u(x,y) = x²+y²</code>, choosing a name unused by existing variable or constant bindings. Labels remain upright. Degree readouts update while sliding; releasing the slider redraws the surface. Keyboard and touch adjustment work too. Left-drag the 3-D plot to turn and tilt it: dragging down increases elevation; dragging up decreases it. Hold Shift when starting a left-drag to roll. Sliders, readouts and the surface update while dragging; only the latest camera position is queued while a redraw is in flight. Escape or losing browser focus cancels. Right-click is unchanged. The full 70×70 mesh leaves holes at missing real values. Height range is automatic by default, cropping extreme spikes near poles. Choose Fit all to include all finite heights, or Manual limits to enter a height Minimum and Maximum. Update plot applies the limits; Reset restores automatic cropping. Out-of-range facets are clipped, not flattened.</li>
+            <li>Leave the <code>Vertical range</code> or <code>Height range</code> radio buttons unselected for automatic scaling, which avoids letting extreme samples flatten the plot. <code>Fit all</code> includes all finite samples; <code>Manual limits</code> uses Minimum and Maximum. <code>Reset</code> clears the selection. Press <code>Update plot</code> to apply changes. Rounded decimal ticks and superscript scientific exponents keep axes readable.</li>
             <li>Sampling normally uses a 53-bit mantissa, increasing precision for narrow ranges or failed higher-precision checks. It does not change either variable's worksheet value. Plot titles use the native TeX formula; recognised ellipsis series retain sigma notation.</li>
             <li>The <code>Plot</code> card displays a native SVG generated in memory and delivered through Protobuf. The Expression card retains the formula; a plot has no separate numerical Value or Function programme.</li>
             <li>Detected gaps are not joined. Adaptive sampling cannot guarantee finding every narrow feature or discontinuity; use a smaller range when necessary.</li>

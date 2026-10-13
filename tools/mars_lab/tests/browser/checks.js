@@ -92,8 +92,13 @@
                           'Radio options must stay inside normal, expanded and narrow plot cards');
                 }
                 reset.click();
-                check(control.value === 'auto' && radios.every(radio => !radio.checked) && reset.disabled,
+                check(control.value === 'auto' && radios.every(radio => !radio.checked && !radio.matches(':checked')) &&
+                      reset.disabled,
                       'Reset must return to automatic without a separate Automatic option');
+                radios[1].click();
+                check(control.value === radios[1].value && radios[1].matches(':checked') &&
+                      !Object.hasOwn(radios[1], 'checked'),
+                      'An override must be selectable again after Reset using the real browser checked state');
             } finally {
                 control.value = saved;
                 control.dispatchEvent(new Event('change', {bubbles: true}));
@@ -121,8 +126,9 @@
     function checkPlotControls(surface) {
         checkPlotRangeAlignment();
         const visible = id => document.getElementById(id).getClientRects().length > 0;
-        check(visible('plotCamera') === surface && visible('plotVertical') !== surface,
-              'Only the applicable dimension controls should be visible');
+        check(visible('plotCamera') === surface && visible('plotVertical') &&
+              document.getElementById('plotVerticalTitle').textContent === (surface ? 'Height range' : 'Vertical range'),
+              'Vertical limits must remain available for curves and surfaces with a clear dimension label');
         const first = [...document.querySelectorAll('#plotFirstChoices input')];
         const second = [...document.querySelectorAll('#plotSecondChoices input')];
         check(first.length > 0 && first.every(radio => radio.type === 'radio'), 'Variables must be radio choices');
@@ -442,6 +448,7 @@
     async function checkFunctionRun() {
         await runFunctionCard();
         check(functionRunOutput.textContent.trim() === '5', 'Native Function RUN did not evaluate the full card');
+        await window.checkLabMobileLayout('function run output');
         const originalFetch = window.fetch;
         const originalText = functionStyle.textContent;
         const fullSource = functionStyle.dataset.fullText.trim();
@@ -823,7 +830,7 @@
                 table.querySelector('.event-time[title]').textContent === '09:06:00',
                 'Contact still includes the full date');
             check(table.querySelector('.event-time[title]').title.endsWith('GMT+1'), 'Full contact time was lost');
-            for (const [viewport, card] of [[1920, 860], [1920, 1700], [390, 390]]) {
+            for (const [viewport, card] of [[1920, 860], [1920, 1700], [320, 290], [390, 350], [430, 390]]) {
                 frame.style.width = `${viewport}px`;
                 target.style.width = `${card}px`;
                 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -838,9 +845,34 @@
                     const labelBox = text.getBoundingClientRect(), iconBox = icon.getBoundingClientRect();
                     check(Math.abs(iconBox.y + iconBox.height / 2 - labelBox.y - labelBox.height / 2) < 5,
                           'An astronomical icon is above its name instead of beside it');
-                    if (icon.classList.contains('almanac-body-symbol'))
-                        check(icon.closest('tr').getBoundingClientRect().height < 65,
-                              'Body symbols inflated the table row height');
+                    if (icon.classList.contains('almanac-body-symbol')) {
+                        const height = viewport > 560 ? icon.closest('tr').getBoundingClientRect().height :
+                            cell.getBoundingClientRect().height;
+                        check(height < 65, 'Body symbols inflated the name row height');
+                    }
+                }
+                const bodies = target.querySelector('.almanac-body-table');
+                if (viewport <= 560) {
+                    check(bodies.scrollWidth <= bodies.clientWidth + 1,
+                          'Phone body entries must not require horizontal scrolling');
+                    for (const row of bodies.tBodies[0].rows) {
+                        check(frame.contentWindow.getComputedStyle(row).display === 'grid',
+                              'Phone bodies must use labelled entries');
+                        const metrics = row.querySelectorAll('td.number');
+                        check(metrics.length === 7, 'A body measurement was lost on mobile');
+                        for (const cell of metrics) {
+                            const label = frame.contentWindow.getComputedStyle(cell, '::before');
+                            check(cell.dataset.label && label.content.includes(cell.dataset.label),
+                                  'Mobile body measurement has no visible label');
+                            check(cell.scrollWidth <= cell.clientWidth + 1, 'Body measurement is clipped');
+                        }
+                    }
+                    check(bodies.querySelector('[data-field="declination"]').textContent === 'S 008° 00.12' &&
+                          bodies.querySelector('[data-field="magnitude"]').textContent === '-26.7',
+                          'Responsive body layout changed native values');
+                } else {
+                    check(frame.contentWindow.getComputedStyle(bodies.tBodies[0].rows[0]).display === 'table-row',
+                          'Desktop body table was replaced by mobile entries');
                 }
                 check(region.clientWidth <= card && target.scrollWidth <= card + 1, 'Almanac spills outside its card');
                 for (const cell of table.querySelectorAll('tbody td')) {
@@ -870,6 +902,10 @@
                     target.textContent.includes('visible bodies only'),
                 'Visible variant text was not used verbatim');
             renderAlmanacWorksheet(target, pending);
+            const emptyBody = target.querySelector('.almanac-body-table td[colspan]');
+            check(emptyBody?.textContent.includes('No bodies found') &&
+                  emptyBody.scrollWidth <= emptyBody.clientWidth + 1,
+                  'Empty body filter must retain a readable full-width message');
             check(
                 target.querySelector('[data-almanac-land-totality]')?.dataset.almanacLandTotality === '2461619.9' &&
                     target.querySelector('.event-time[title]').textContent === 'Unavailable',
@@ -1011,6 +1047,7 @@
             check(currentMode() === 'expression', 'Initial expression mode not restored');
             await checkAlmanacLayout();
             await checkHelpLayout();
+            await window.checkLabMobileLayout('expression result');
             check(document.styleSheets.length > 0, 'External stylesheet not loaded');
             const stylesheet = Array.from(document.styleSheets).find(sheet => sheet.href?.endsWith('/index.css'));
             const styleNames = [
@@ -1088,6 +1125,7 @@
             checkPlotWheelZoom();
             await checkPlotChoices();
             checkPlotControls(false);
+            await window.checkLabMobileLayout('curve plot');
             const curveDragTarget = rendered.querySelector('[data-series] path');
             check(curveDragTarget.dispatchEvent(new MouseEvent('mousedown',
                   {button: 0, buttons: 1, bubbles: true, cancelable: true})) &&
@@ -1212,6 +1250,7 @@
             check(rendered.classList.contains('error') && rendered.textContent.includes('No finite real points') &&
                   !rendered.textContent.includes('NAN') && !rendered.textContent.includes('binding variable'),
                   'Wholly divergent range must show a clean calculation diagnostic');
+            await window.checkLabMobileLayout('plot error');
             document.getElementById('plotLower').value = '-10';
             document.getElementById('plotUpper').value = '10';
             setExpressionEditor('x^2 + y^2');
@@ -1225,7 +1264,39 @@
             await takePlot('x');
             check(!rendered.classList.contains('error') && !!rendered.querySelector('[data-surface]'),
                   'Automatic two-variable plot must display a surface');
+            check(document.getElementById('plotAzimuth').value === '315' &&
+                  document.getElementById('plotAzimuthValue').textContent === '315°' &&
+                  !!rendered.querySelector('[data-surface][data-azimuth="315.000"]'),
+                  'Initial surface and camera controls must share the ascending-axis default');
+            for (let axis = 0; axis < 3; ++axis) {
+                const positions = [...rendered.querySelectorAll(`[data-plot-tick="${axis}"] path`)].map(path => {
+                    const point = path.getPointAtLength(0);
+                    return axis === 2 ? -point.y : point.x;
+                });
+                check(positions.length > 1 && positions.every((value, i) => !i || value > positions[i - 1]),
+                      'Initial horizontal ticks must increase left to right and height ticks bottom to top');
+            }
             const plotControls = document.getElementById('plotRange');
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const manualRadio = document.querySelector('#plotScaleChoices input[value="manual"]');
+            manualRadio.click();
+            check(document.getElementById('plotVertical').getClientRects().length > 0 &&
+                  document.getElementById('plotManual').getClientRects().length > 0 &&
+                  document.getElementById('plotVerticalTitle').textContent === 'Height range',
+                  'Surface height controls must expose editable manual limits inside the plot card');
+            document.getElementById('plotYLower').value = '0';
+            document.getElementById('plotYUpper').value = '1/2';
+            await takePlot('x');
+            const heightLabels = [...rendered.querySelectorAll('[data-plot-label="2"]')]
+                .map(label => Number(label.textContent));
+            check(heightLabels.length > 1 && Math.max(...heightLabels) === 0.5 && Math.min(...heightLabels) >= 0 &&
+                  !!rendered.querySelector('[data-series] path'),
+                  'Manual height bounds must crop the rendered surface without losing its axes');
+            document.querySelector('[data-plot-reset="plotScale"]').click();
+            await takePlot('x');
+            check(document.getElementById('plotScale').value === 'auto' &&
+                  document.getElementById('plotManual').getClientRects().length === 0,
+                  'Reset must restore automatic surface scaling');
             check(plotControls.closest('.result-card') === rendered.closest('.result-card') &&
                   !document.getElementById('workspacePanel').contains(plotControls) &&
                   getComputedStyle(plotControls).display !== 'none',
@@ -1242,6 +1313,7 @@
             await checkPlotChoices();
             plotCard.style.width = savedCardWidth;
             checkPlotControls(true);
+            await window.checkLabMobileLayout('surface plot and height controls');
             const facets = [...rendered.querySelectorAll('[data-surface] [data-series] path')];
             check(facets.length === 2 * 69 * 69 && new Set(facets.map(path => path.getAttribute('fill'))).size > 4,
                   'Full surface must contain the shaded 70-by-70 mesh');
@@ -1361,6 +1433,7 @@
                     document.querySelector(`[data-mode="${mode}"]`).classList.contains('active'),
                     `Mode ${mode} tab inactive`);
                 const sourceBeforeHelp = expr.value;
+                await window.checkLabMobileLayout(mode + ' worksheet');
                 help.click();
                 const helpClose = document.getElementById('helpClose');
                 const workspace = document.getElementById('workspacePanel');
@@ -1374,6 +1447,7 @@
                     const selected = card.dataset.helpModes.split(',').includes(mode);
                     check(card.classList.contains('hidden') !== selected, `${mode} Help topic filtering`);
                 }
+                await window.checkLabMobileLayout(mode + ' help');
                 helpClose.click();
                 check(!document.getElementById('labWorkspace').classList.contains('help-open'),
                       `${mode} Help return restores the workspace`);
@@ -1388,6 +1462,7 @@
             matrixOperation.value = 'eval';
             await evaluateMatrix();
             check(!rendered.classList.contains('error'), 'Shared matrix renderer failed');
+            await window.checkLabMobileLayout('matrix result');
             await takeDerivative('x');
             check(!rendered.classList.contains('error'), 'Native matrix derivative construction failed');
             check(parsed.dataset.fullText.length > 0, 'Matrix derivative result missing');
@@ -1419,6 +1494,7 @@
             const calendarData = await calendarResponse.labData();
             check(calendarResponse.ok && calendarData.ok, 'Native DateTime evaluation failed');
             await installEvaluationResult(5, calendarData);
+            await window.checkLabMobileLayout('all calendar result cards');
             for (const [element, name] of [
                      [rendered, 'overview'], [parsed, 'range'], [functionStyle, 'calendar'], [value, 'solar'],
                      [datetimeLocalBody, 'local']]) {
@@ -1457,6 +1533,7 @@
                             4,
                     'Successful Almanac evaluation did not install a visible worksheet');
                 rendered.querySelector('[data-almanac-visibility="visible"]').click();
+                await window.checkLabMobileLayout('almanac result');
                 check(
                     rendered.querySelectorAll('.almanac-grid-table:not(.almanac-event-table) tbody tr').length === 1 &&
                         rendered.dataset.copyText === almanacFixture.almanac_presentation.visible.copy_text,

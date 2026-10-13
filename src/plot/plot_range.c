@@ -3,8 +3,9 @@
  * @brief Robust vertical viewports without weighting adaptive clusters as extra evidence.
  *
  * One representative per horizontal bin and series supplies a bounded percentile
- * estimate. Only unusually extended tails are cropped; the renderer labels any
- * clipping. This is a viewing heuristic, never a claim about the function's range.
+ * estimate. The same tail policy serves rectangular height grids. Only unusually
+ * extended tails are cropped, without a visible annotation. This is a viewing
+ * heuristic, never a claim about the function's range.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -18,6 +19,46 @@ static int compare_value(const void *left, const void *right)
 {
     number_t a = *(const number_t *)left, b = *(const number_t *)right;
     return num_lt(a, b) ? -1 : num_gt(a, b) ? 1 : 0;
+}
+
+void plot_trim_range(number_t *values, size_t count, number_t bounds[2])
+{
+    if (count < 20)
+        return;
+    qsort(values, count, sizeof(*values), compare_value);
+    number_t lo = values[(count - 1) / 20], hi = values[((count - 1) * 19) / 20];
+    number_t core = num_sub(hi, lo), full = num_sub(bounds[1], bounds[0]);
+    number_t four = num_create_from_long(4);
+    if (num_is_zero(core)) {
+        number_t magnitude = num_abs(lo), twenty = num_create_from_long(20);
+        num_destroy(&core);
+        core = num_div(magnitude, twenty);
+        num_destroy(&magnitude);
+        num_destroy(&twenty);
+        if (num_lt(core, NUM_ONE)) {
+            num_destroy(&core);
+            core = num_clone(NUM_ONE);
+        }
+    }
+    number_t threshold = num_mul(core, four);
+    if (num_gt(core, NUM_ZERO) && num_gt(full, threshold)) {
+        number_t padding = num_div(core, four), lower = num_sub(lo, padding), upper = num_add(hi, padding);
+        if (num_gt(lower, bounds[0])) {
+            num_destroy(&bounds[0]);
+            bounds[0] = num_clone(lower);
+        }
+        if (num_lt(upper, bounds[1])) {
+            num_destroy(&bounds[1]);
+            bounds[1] = num_clone(upper);
+        }
+        num_destroy(&padding);
+        num_destroy(&lower);
+        num_destroy(&upper);
+    }
+    num_destroy(&threshold);
+    num_destroy(&core);
+    num_destroy(&full);
+    num_destroy(&four);
 }
 
 bool plot_smart_range(const plot_t *plot, number_t bounds[4])
@@ -57,30 +98,8 @@ bool plot_smart_range(const plot_t *plot, number_t bounds[4])
                 values[count++] = bins[i]->y;
     }
     num_destroy(&span);
-    if (ok && count >= 20) {
-        qsort(values, count, sizeof(*values), compare_value);
-        number_t lo = values[(count - 1) / 20], hi = values[((count - 1) * 19) / 20];
-        number_t core = num_sub(hi, lo), full = num_sub(bounds[3], bounds[2]);
-        number_t four = num_create_from_long(4), threshold = num_mul(core, four);
-        if (num_gt(core, NUM_ZERO) && num_gt(full, threshold)) {
-            number_t padding = num_div(core, four), lower = num_sub(lo, padding), upper = num_add(hi, padding);
-            if (num_gt(lower, bounds[2])) {
-                num_destroy(&bounds[2]);
-                bounds[2] = num_clone(lower);
-            }
-            if (num_lt(upper, bounds[3])) {
-                num_destroy(&bounds[3]);
-                bounds[3] = num_clone(upper);
-            }
-            num_destroy(&upper);
-            num_destroy(&lower);
-            num_destroy(&padding);
-        }
-        num_destroy(&threshold);
-        num_destroy(&four);
-        num_destroy(&full);
-        num_destroy(&core);
-    }
+    if (ok)
+        plot_trim_range(values, count, bounds + 2);
     free(values);
     return ok;
 }

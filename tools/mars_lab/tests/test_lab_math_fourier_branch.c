@@ -44,10 +44,10 @@ static void test_copied_branch_round_trips(void)
                     lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
                     lab_math_contains(math_fourier_text(r, "expression"), "k =", false);
                     for (size_t p = 0; p < 7; ++p) {
-                        const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN",
+                        const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?",
                                                             lab_math_format("x = %.17g", points[p]));
-                        bound = lab_math_replace(bound, "a = NAN", "a = -2");
-                        bound = lab_math_replace(bound, "b = NAN", "b = 0.3");
+                        bound = lab_math_replace(bound, "a = ?", "a = -2");
+                        bound = lab_math_replace(bound, "b = ?", "b = 0.3");
                         const json_t *expected = math_fourier_fields(lab_math_format("{%s | x=%.17g; a=-2; b=0.3}",
                             source, points[p]), "x");
                         const json_t *actual = math_fourier_fields(bound, "x");
@@ -97,7 +97,7 @@ static void test_direct_spectra_and_zero_frequency_constants(void)
         const json_t *r = math_fourier_fields(lab_math_format("InverseFourier(%s,k,x)", spectra[i]), "x");
         lab_math_equal(lab_math_algebra(r), originals[i]);
         const json_t *altered = math_fourier_fields(lab_math_format("InverseFourier((%s)+delta(k),k,x)", spectra[i]), "x");
-        const json_t *actual = math_fourier_fields(lab_math_replace(math_fourier_text(altered, "expression"), "x = NAN",
+        const json_t *actual = math_fourier_fields(lab_math_replace(math_fourier_text(altered, "expression"), "x = ?",
             "x = 0"), "x");
         double complex expected = math_fourier_number(math_fourier_fields(lab_math_format("{%s | x=0}", originals[i]),
             "x"))+1/(2*M_PI);
@@ -116,7 +116,7 @@ static void test_legacy_derivative_spectra(void)
         const json_t *r = math_fourier_fields(lab_math_format("InverseFourier(%s,k,x)", spectrum), "x");
         lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
         for (size_t p = 0; p < 3; ++p) {
-            const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN", lab_math_format(
+            const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?", lab_math_format(
                 "x = %.17g", points[p]));
             lab_math_close(math_fourier_number(math_fourier_fields(bound, "x")),
                            math_fourier_number(math_fourier_fields(lab_math_format("asin(%d*(%.17g))", rates[a],
@@ -239,9 +239,9 @@ static void test_gamma_pairs_and_round_trips(void)
                 const json_t *r = math_fourier_fields(lab_math_format("%s(%s,k,x)", operators[1-d], copies[c]), "x");
                 lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
                 for (size_t p = 0; p < 3; ++p) {
-                    const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN",
+                    const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?",
                                                         lab_math_format("x = %.17g", points[p]));
-                    bound = lab_math_replace(bound, "a = NAN", "a = 2");
+                    bound = lab_math_replace(bound, "a = ?", "a = 2");
                     const json_t *expected = math_fourier_fields(lab_math_format("{gamma(%s) | x=%.17g; a=2}",
                         arguments[a], points[p]), "x");
                     lab_math_close(math_fourier_number(math_fourier_fields(bound, "x")), math_fourier_number(expected), 2e-12);

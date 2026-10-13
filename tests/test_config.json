@@ -2006,6 +2006,7 @@
     "test_plot_sampler_ownership": true,
     "test_plot_smart_range": true,
     "test_plot_surface": true,
+    "test_plot_surface_height": true,
     "test_plot_surface_view": true,
     "test_plot_svg": true
   },
@@ -3035,6 +3036,7 @@
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_repeated_gaussian_integral": true,
       "test_lab_extra_surface": true,
+      "test_lab_extra_surface_height": true,
       "test_lab_extra_surface_names": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,

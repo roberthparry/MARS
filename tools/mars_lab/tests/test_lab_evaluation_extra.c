@@ -8,6 +8,8 @@
  * TeX success coverage requires latex/dvisvgm; rejection cases need no renderer.
  * No standalone main, conditional test build or Python runtime is used.
  */
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "lab_presentation.h"
@@ -207,6 +209,56 @@ static void test_lab_extra_plot_series_domain(void)
     TEST_ASSERT_TRUE(ok, "wholly divergent range reports a clean diagnostic without internal worker records");
 }
 
+static double surface_maximum_tick(const json_t *fields)
+{
+    const char *p = lab_eval_text(fields, "plot_svg");
+    double maximum = -INFINITY;
+    while ((p = strstr(p, "<text data-plot-label=\"2\""))) {
+        p = strchr(p, '>');
+        if (!p)
+            return NAN;
+        double value = strtod(++p, NULL);
+        maximum = fmax(maximum, value);
+    }
+    return maximum;
+}
+
+static void test_lab_extra_surface_height(void)
+{
+    const char *scales[] = {"auto", "all", "manual"};
+    double maxima[3] = {0};
+    bool ok = true;
+    for (unsigned i = 0; i < 3; ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"(exp(-x^2-y^2)*tan(x-y))^2\",\"action\":\"plot\","
+            "\"plot_lower\":\"-1\",\"plot_upper\":\"1\",\"plot_second_lower\":\"-1\",\"plot_second_upper\":\"1\","
+            "\"plot_scale\":\"%s\",\"plot_y_lower\":\"0\",\"plot_y_upper\":\"1/2\"}", scales[i]);
+        unsigned status = 0;
+        json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        bool rendered = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "<path fill=");
+        maxima[i] = fields ? surface_maximum_tick(fields) : NAN;
+        ok = ok && rendered && isfinite(maxima[i]);
+        if (!rendered)
+            show_failure(fields);
+        json_free(fields);
+        string_free(payload);
+    }
+    TEST_ASSERT_TRUE(ok && maxima[0] < 100 && maxima[1] > 1000 && maxima[2] == 0.5,
+                     "tangent poles are cropped automatically; fit-all and exact manual height bounds remain available");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_scale\":\"manual\","
+                              "\"plot_y_lower\":\"2\",\"plot_y_upper\":\"1\"}", 422u, "error", "height scale");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_scale\":\"manual\"}",
+                    422u, "error", "height scale");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_scale\":\"invalid\"}",
+                    422u, "error", "height scale");
+    unsigned status = 0;
+    json_t *preview = request("/eval", "{\"expression\":\"x^2+y^2\",\"action\":\"plot\",\"plot_scale\":\"manual\","
+        "\"plot_y_lower\":\"0\",\"plot_y_upper\":\"1/2\",\"plot_quality\":\"preview\",\"plot_azimuth\":\"120\"}", &status);
+    ok = status == 200 && test_lab_ok(preview, true) && surface_maximum_tick(preview) == 0.5 &&
+         contains(preview, "plot_svg", "data-azimuth=\"120.000\"");
+    json_free(preview);
+    TEST_ASSERT_TRUE(ok, "coarse rotation previews preserve manual height limits");
+}
+
 static void test_lab_extra_surface(void)
 {
     const char *cases[] = {
@@ -231,6 +283,10 @@ static void test_lab_extra_surface(void)
             ok = ok && contains(fields, "expression", "x = 9") && contains(fields, "expression", "y = 8");
         if (i == 5)
             ok = ok && contains(fields, "plot_svg", ">μ</text>");
+        if (i != 6)
+            ok = ok && contains(fields, "plot_svg", "data-azimuth=\"315.000\"") &&
+                 contains(fields, "plot_svg", "data-elevation=\"30.000\"") &&
+                 contains(fields, "plot_svg", "data-roll=\"0.000\"");
         if (i == 6)
             ok = ok && contains(fields, "plot_svg", "data-azimuth=\"120.000\"") &&
                  contains(fields, "plot_svg", "data-elevation=\"40.000\"") &&
@@ -1153,6 +1209,7 @@ void test_lab_evaluation_extra_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_height, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);

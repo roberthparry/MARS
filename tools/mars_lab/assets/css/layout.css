@@ -84,6 +84,10 @@ main {
   text-transform: uppercase;
 }
 
+.precision-short-label {
+  display: none;
+}
+
 .mode-tab {
   border: 1px solid rgba(233, 244, 239, 0.24);
   border-radius: 999px;

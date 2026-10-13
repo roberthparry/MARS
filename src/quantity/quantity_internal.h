@@ -6,11 +6,12 @@
  * Eight dimension axes and one symbolic pi exponent share bounded rational
  * arithmetic; registry lookup is a collision-free, checked hash lookup.
  */
-#ifndef MARS_QUANTITY_INTERNAL_ACCESS
-#error "Define MARS_QUANTITY_INTERNAL_ACCESS immediately before including this header"
-#endif
 #ifndef MARS_QUANTITY_INTERNAL_H
 #define MARS_QUANTITY_INTERNAL_H
+#if !defined(MARS_QUANTITY_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_QUANTITY_INTERNAL_ACCESS."
+#endif
 
 #include <stdint.h>
 

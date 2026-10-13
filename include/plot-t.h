@@ -6,7 +6,7 @@
  * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
  * are rendered in C, with independent RGB colours for curves, axes, grid and labels.
  * Rectangular height grids have azimuth, elevation and roll controls, named positive-end
- * axis arrows, coloured facets and holes at missing values; they cannot be mixed
+ * axis arrows, automatic or manual height limits, coloured facets and holes at missing values; they cannot be mixed
  * with curve series in the same scene. Endpoint names stay upright during rotation.
  * Axis ticks use decimal labels, never fractions, with superscript
  * scientific exponents when needed. Crowded labels are spaced or thinned without
@@ -47,7 +47,7 @@ typedef struct {
     const char *title, *x_label, *y_label; /**< Optional copied UTF-8 plain text, never markup. */
     const char *z_label; /**< Surface height-axis endpoint name; default "f". Copied UTF-8 plain text. */
     bool grid, legend; /**< Draw grid and series legend. */
-    bool smart_y; /**< Opt-in robust vertical range; clipping does not add a visible annotation. */
+    bool smart_y; /**< Opt-in robust curve Y or surface height range; no visible clipping annotation. */
     uint32_t axis_colour, grid_colour, label_colour; /**< 24-bit RGB colours for axes, grid and tick/axis labels. */
 } plot_options_t;
 
@@ -78,14 +78,23 @@ bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, 
  * leave holes. Limits count all vertices. Inputs remain caller-owned. A scene owns
  * at most one surface; explicit 2-D bounds cannot be applied to it.
  * Rendering uses a configurable oblique view and a blue/teal/gold
- * height palette. Surface ranges fit all finite heights; smart_y has no effect.
+ * height palette. Heights fit all finite data unless smart_y or manual height bounds are selected.
  */
 bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,
                       const number_t *z);
 
 /**
+ * @brief Atomically copy finite real minimum < maximum for an existing surface's height axis.
+ * Invalid input or a scene without a surface gives EINVAL and leaves the previous bounds unchanged.
+ * Facets are intersected with the height interval, never flattened onto its boundaries.
+ * plot_auto_bounds() restores the configured automatic height policy without resampling.
+ */
+bool plot_set_height_bounds(plot_t *plot, number_t minimum, number_t maximum);
+
+/**
  * @brief Set the surface view in degrees without changing or resampling its copied grid.
- * Defaults are azimuth 45 and elevation 30. Finite azimuths wrap into [0,360);
+ * Defaults are azimuth 315 and elevation 30: horizontal ticks increase left to right.
+ * Finite azimuths wrap into [0,360);
  * elevation must be finite and within [5,85] to keep the three axes readable.
  * Invalid input gives EINVAL and leaves the view unchanged. This has no effect on curves.
  */

@@ -7,8 +7,9 @@
  */
 #ifndef MARS_EXECUTOR_INTERNAL_H
 #define MARS_EXECUTOR_INTERNAL_H
-#if !defined(MARS_EXECUTOR_INTERNAL_ACCESS) && !(defined(__INTELLISENSE__) && __INCLUDE_LEVEL__ == 0)
-#error "Define MARS_EXECUTOR_INTERNAL_ACCESS before including executor_internal.h"
+#if !defined(MARS_EXECUTOR_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_EXECUTOR_INTERNAL_ACCESS."
 #endif
 
 #include <stdatomic.h>

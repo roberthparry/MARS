@@ -82,7 +82,7 @@ static void test_copied_formulas_round_trip(void)
                     lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "k\\to x", true);
                     lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "NAN", false);
                     for (size_t p = 0; p < 2; ++p) {
-                        const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN",
+                        const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?",
                                                             lab_math_format("x = %.17g", points[p]));
                         const json_t *expected = math_fourier_fields(lab_math_format("{%s(%s) | x=%.17g}",
                                                                         functions[f], arguments[a], points[p]), "x");
@@ -130,9 +130,9 @@ static void test_symbolic_scale_shift_and_copied_inverse(void)
             const json_t *value = math_fourier_fields(lab_math_format("{Fourier(%s(a*x+b),x,k) | k=0.7; a=%.17g; b=%.17g}",
                                                         functions[f], a, b), "k");
             lab_math_close(math_fourier_number(value), -I*M_PI/fabs(a)*cexp(I*0.7*b/a)*dual, 1e-12);
-            const char *copy = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN", "x = 0.7");
-            copy = lab_math_replace(copy, "a = NAN", lab_math_format("a = %.17g", a));
-            copy = lab_math_replace(copy, "b = NAN", lab_math_format("b = %.17g", b));
+            const char *copy = lab_math_replace(math_fourier_text(r, "expression"), "x = ?", "x = 0.7");
+            copy = lab_math_replace(copy, "a = ?", lab_math_format("a = %.17g", a));
+            copy = lab_math_replace(copy, "b = ?", lab_math_format("b = %.17g", b));
             z = a*0.7+b;
             double original = f == 0 ? tanh(z) : f == 1 ? 1/sinh(z) : 1/tanh(z);
             lab_math_close(math_fourier_number(math_fourier_fields(copy, "x")), original, 1e-12);
@@ -202,7 +202,7 @@ static void test_coth_aliases_poles_and_conditional(void)
     const json_t *restored = math_fourier_fields(lab_math_format("InverseFourier(%s,k,x)", math_fourier_text(shifted,
         "expression")), "x");
     lab_math_equal(math_fourier_text(math_fourier_fields(lab_math_replace(math_fourier_text(restored, "expression"),
-        "x = NAN", "x = -1/2"), "x"), "value"), "NAN");
+        "x = ?", "x = -1/2"), "x"), "value"), "NAN");
     const char *reciprocals[] = {"1/coth(x)", "coth(x)^(-1)", "sinh(x)/cosh(x)"};
     for (size_t i = 0; i < 3; ++i)
         lab_math_equal(math_fourier_text(math_fourier_fields(lab_math_format("@F{%s}", reciprocals[i]), "k"), "tex"),
@@ -211,10 +211,20 @@ static void test_coth_aliases_poles_and_conditional(void)
 
 static void test_unrelated_domains_and_nonreal_rates_are_not_accepted(void)
 {
-    const char *sources[] = {"Fourier(csch(x) where (x-1 ≠ 0),x,k)", "@F{tanh(i*x)}", "@F{csch(x+i)}",
-        "Fourier(coth(x) where (x-1 ≠ 0),x,k)", "@F{coth(i*x)}", "@F{coth(x+i)}"};
+    const char *sources[] = {"Fourier(csch(x) where (x-1 ≠ 0),x,k)", "@F{tanh((1+i)*x)}", "@F{csch(x+i)}",
+        "Fourier(coth(x) where (x-1 ≠ 0),x,k)", "@F{coth((1+i)*x)}", "@F{coth(x+i)}"};
     for (size_t i = 0; i < 6; ++i)
         lab_math_contains(math_fourier_text(math_fourier_fields(sources[i], "k"), "function"), "fourier(", true);
+    /* Pure imaginary rates reduce to circular functions with valid periodic transforms. */
+    const char *imaginary[] = {"@F{tanh(i*x)}", "@F{coth(i*x)}"};
+    const char *circular[] = {"@F{i*tan(x)}", "@F{-i*cot(x)}"};
+    for (size_t i = 0; i < 2; ++i) {
+        const json_t *actual = math_fourier_fields(imaginary[i], "k");
+        const json_t *expected = math_fourier_fields(circular[i], "k");
+        lab_math_equal(math_fourier_text(actual, "unbound"), math_fourier_text(expected, "unbound"));
+        lab_math_contains(math_fourier_text(actual, "function"), "fourier(", false);
+        lab_math_contains(math_fourier_text(actual, "tex"), "\\sum", true);
+    }
 }
 
 static void test_zero_rate_is_a_constant_transform(void)

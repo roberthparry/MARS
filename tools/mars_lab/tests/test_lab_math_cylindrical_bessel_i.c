@@ -150,7 +150,7 @@ static void test_bessel_i_primitives_differentiate_back(void)
         lab_math_contains(lab_math_text(result, "integral_function"), "return integral(besseli(", true);
         const char *primitive = lab_math_after(lab_math_text(result, "integral"), " = ");
         lab_math_contains(primitive, "∫", false);
-        primitive = lab_math_replace(primitive, "x = NAN", "x = 1");
+        primitive = lab_math_replace(primitive, "x = ?", "x = 1");
         const json_t *derivative = lab_math_fields(primitive, "x", "derivative", 40);
         lab_math_close(lab_math_number(derivative, "derivative_value"), lab_math_bessel_i_reference(orders[i], 3), 2e-10);
     }

@@ -19,13 +19,25 @@
   }
 
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     padding: 0.5rem 0.75rem 1.25rem;
   }
 
   .lab-topbar {
     align-items: stretch;
+  }
+
+  .mode-tab {
+    min-height: 2.75rem;
+  }
+
+  main > *,
+  .output-grid > *,
+  .card-title > *,
+  .mode-panel,
+  .select-shell {
+    min-width: 0;
   }
 
   .precision-toolbar {
@@ -47,7 +59,7 @@
   textarea {
     min-height: 8.5rem;
     padding: 0.85rem;
-    font-size: 0.96rem;
+    font-size: 1rem;
     line-height: 1.45;
   }
 
@@ -91,6 +103,111 @@
 
   .datetime-field-group {
     padding: 0.75rem;
+  }
+
+  /* Calendar inputs are a worksheet, not a stack of decorative cards. */
+  :is(.datetime-controls, .almanac-controls) {
+    gap: 0.65rem;
+    padding: 0.75rem;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .datetime-field-groups {
+    gap: 0.8rem;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .datetime-field-group {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    gap: 0.65rem;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .datetime-field-group + .datetime-field-group {
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(233, 244, 239, 0.14);
+  }
+
+  :is(.datetime-controls, .almanac-controls) .datetime-field-group-title {
+    font: 600 0.85rem/1.3 system-ui, sans-serif;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  :is(.datetime-controls, .almanac-controls) label {
+    text-transform: none;
+    letter-spacing: 0;
+    font: 0.8rem/1.3 system-ui, sans-serif;
+  }
+
+  .datetime-controls .selected-date-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .datetime-controls .selected-date-field {
+    grid-column: 1 / -1;
+  }
+
+  .datetime-controls .selected-jdn-field,
+  .datetime-controls .selected-year-field {
+    align-self: end;
+  }
+
+  .almanac-controls .almanac-moment-grid,
+  .almanac-controls .location-coordinate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .almanac-moment-grid > .integrator-bound-field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  :is(.datetime-controls, .almanac-controls) :is(input, select, .select-button) {
+    border-radius: 10px;
+    padding-inline: 0.65rem;
+    box-shadow: none;
+    font-family: system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mars-date-button {
+    border-radius: 10px;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    box-shadow: none;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mode-hint {
+    font-size: 0.82rem;
+    margin: 0;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mars-date-shell {
+    gap: 0;
+    border: 1px solid rgba(233, 244, 239, 0.28);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.14);
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mars-date-shell:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(113, 198, 180, 0.14);
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mars-date-shell input,
+  :is(.datetime-controls, .almanac-controls) .mars-date-shell input:focus {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .mars-date-shell .mars-date-button {
+    border: 0;
+    border-left: 1px solid rgba(233, 244, 239, 0.14);
+    border-radius: 0 9px 9px 0;
+    background: transparent;
   }
 
   .target-row {
@@ -137,14 +254,11 @@
   }
 
   .variable-value-actions button {
-    min-height: 2.5rem;
-  }
-
-  .variable-copy {
-    display: none;
+    min-height: 2.75rem;
   }
 
   .output-grid {
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     padding: 0.75rem;
   }
@@ -161,20 +275,8 @@
     --render-margin-bottom: 2rem;
   }
 
-  .mobile-result-extra {
-    display: none;
-  }
-
-  body.diffequation-mode #functionCard {
-    display: block;
-  }
-
   #functionStyle.equation-function {
     --solver-tex-scale: 1.1;
-  }
-
-  #resultPane .copy-result {
-    display: none;
   }
 
   .card-title {
@@ -185,8 +287,40 @@
   }
 
   .card-action {
-    min-height: 2.25rem;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
     padding: 0.45rem 0.55rem;
+  }
+
+  /* Keep all actions inside the card, including Run, Copy and extra digits. */
+  .expandable-title,
+  .value-title {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .digit-actions,
+  .precision-actions,
+  .top-card-actions,
+  .value-card-actions {
+    grid-column: 1;
+    justify-self: stretch;
+    justify-content: flex-start;
+    gap: 0.25rem;
+  }
+
+  .digit-actions:not(:has(button:not(.hidden))),
+  .precision-actions:empty {
+    display: none;
+  }
+
+  :is(.mode-panel, .target-row, .variable-value-box) input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+  .mode-panel select,
+  .target-row select,
+  .select-button,
+  .select-search {
+    font-size: 1rem;
+    min-height: 2.75rem;
+    min-width: 0;
   }
 
   pre {
@@ -295,8 +429,132 @@
 }
 
 @media (max-width: 560px) {
+  /* Preserve the native table and every value, but lay out each body as an
+     individually labelled entry instead of a nine-column horizontal strip. */
+  .almanac-body-table {
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .almanac-body-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .almanac-body-table tbody {
+    display: grid;
+    gap: 0.6rem;
+    width: 100%;
+  }
+
+  .almanac-body-table tbody tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 0.65rem;
+    padding: 0.65rem;
+    border: 1px solid rgba(233, 244, 239, 0.14);
+    border-radius: 12px;
+    background: rgba(8, 24, 19, 0.46);
+  }
+
+  .almanac-body-table tbody td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .almanac-body-table :is(.body-name, .reference-name) {
+    grid-column: 1 / -1;
+    min-height: 1.75rem;
+    padding-right: 4.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(233, 244, 239, 0.1);
+    font: 600 0.9rem/1.5 system-ui, sans-serif;
+  }
+
+  .almanac-body-table:not(.almanac-event-table) td.body-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .almanac-body-table td.number {
+    font-size: 0.72rem;
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .almanac-body-table td.number::before {
+    display: block;
+    content: attr(data-label);
+    margin-bottom: 0.1rem;
+    color: var(--muted);
+    font: 0.68rem/1.3 system-ui, sans-serif;
+  }
+
+  .almanac-body-table td.visible-cell {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.65rem;
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+  }
+
+  .almanac-body-table td.visible-cell::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font: 0.65rem/1.3 system-ui, sans-serif;
+  }
+
+  .almanac-body-table .almanac-visible-icon {
+    width: 1.25rem;
+    height: 1.5rem;
+    font-size: 1.1rem;
+  }
+
+  .almanac-body-table td[colspan] {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+  }
+
+  /* A quieter backdrop keeps the small-screen worksheet legible. */
+  body::before {
+    opacity: 0.2;
+  }
+
+  body::after,
+  .celtic-backdrop {
+    display: none;
+  }
+
+  header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0.85rem max(0.65rem, env(safe-area-inset-right)) 0.25rem max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .header-side {
+    display: contents;
+  }
+
   h1 {
-    font-size: 2rem;
+    font-size: 1.7rem;
+  }
+
+  .status {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    font-size: 0.78rem;
   }
 
   .subtitle {
@@ -304,12 +562,25 @@
   }
 
   .mobile-card {
-    width: 100%;
+    position: static;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    width: auto;
   }
 
   .mobile-card summary {
+    min-height: 2.25rem;
+    border-radius: 10px;
     padding: 0.38rem 0.68rem;
     font-size: 0.7rem;
+  }
+
+  .mobile-panel {
+    position: absolute;
+    top: 100%;
+    right: 0.5rem;
+    width: calc(100% - 1rem);
+    margin-top: 0;
   }
 
   .mobile-copy code {
@@ -326,12 +597,190 @@
   }
 
   main {
-    padding: 0.45rem 0.5rem 1rem;
+    padding: 0.45rem max(0.5rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+  }
+
+  .lab-topbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.3rem;
+    padding: 0;
+  }
+
+  .lab-tabs {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.3rem;
+    align-items: stretch;
+  }
+
+  .mode-tab {
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.2rem;
+    border-radius: 12px;
+    font: 500 0.75rem/1.35 system-ui, sans-serif;
+    letter-spacing: 0;
+    box-shadow: none;
+  }
+
+  .precision-toolbar {
+    grid-column: 1 / 3;
+    grid-row: 1;
+    align-self: start;
+    justify-self: start;
+    min-height: 2.25rem;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    padding: 0;
+  }
+
+  .mode-tab:first-child {
+    grid-column: 3;
+  }
+
+  .precision-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+  }
+
+  .precision-toolbar .card-action {
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0;
+    border-radius: 7px;
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  .precision-full-label {
+    display: none;
+  }
+
+  .precision-short-label {
+    display: inline;
+  }
+
+  section {
+    background: rgba(8, 29, 22, 0.94);
+    border-width: 1px;
+  }
+
+  .panel-head {
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+  }
+
+  .card-action,
+  .variable-value-actions button {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0.3rem 0.55rem;
+    border-width: 1px;
+    border-radius: 9px;
+    box-shadow: none;
+  }
+
+  .panel-head h2 {
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
   }
 
   textarea {
     min-height: 7rem;
-    font-size: 0.9rem;
+    padding: 0.75rem;
+  }
+
+  #equationControls,
+  #diffequationControls,
+  .integrator-bound-guidance,
+  .integrator-examples,
+  .datetime-controls .selected-jdn-field,
+  .datetime-controls .selected-year-field,
+  .datetime-controls .datetime-offset-hint,
+  .datetime-controls .datetime-intro {
+    display: none;
+  }
+
+  .almanac-controls .almanac-briefing,
+  .almanac-controls .almanac-accuracy-note {
+    display: none;
+  }
+
+  .datetime-controls .datetime-grid {
+    gap: 0.6rem;
+  }
+
+  .mars-date-picker-head {
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    gap: 0.4rem;
+  }
+
+  .mars-date-picker-title {
+    display: contents;
+  }
+
+  #marsDatePickerPrev {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #marsDatePickerMonth {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  #marsDatePickerNext {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .mars-date-picker-year-group {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    gap: 0.4rem;
+  }
+
+  .mars-date-picker-head :is(button, input, select) {
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0.35rem;
+    border-radius: 9px;
+    box-shadow: none;
+  }
+
+  .mars-date-picker-title :is(input, select) {
+    font-size: 1rem;
+  }
+
+  .mars-date-picker-title select {
+    padding-right: 1.8rem;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .datetime-field-group-title,
+  :is(.datetime-controls, .almanac-controls) label {
+    font-size: 0.75rem;
+  }
+
+  :is(.datetime-controls, .almanac-controls) .select-button {
+    font-size: 0.875rem;
+  }
+
+  .datetime-controls .two-up > .integrator-bound-field {
+    grid-template-columns: 3rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .datetime-controls .two-up > .integrator-bound-field label {
+    max-width: 3rem;
   }
 
   .target-row {
@@ -346,36 +795,69 @@
   }
 
   .controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0 0.6rem 0.5rem;
   }
 
-  .expandable-title,
-  .value-title {
-    grid-template-columns: 1fr;
+  .controls button {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    min-height: 2rem;
+    padding: 0.25rem 0.45rem;
+    border-width: 1px;
+    border-radius: 7px;
+    box-shadow: none;
+    font: 600 0.75rem/1.2 system-ui, sans-serif;
   }
 
-  .digit-actions,
-  .precision-actions,
-  .top-card-copy,
-  .value-copy {
-    grid-column: auto;
-    justify-self: stretch;
-    justify-content: center;
+  .variable-value-box {
+    grid-template-columns: minmax(1.75rem, auto) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem;
+    border-radius: 10px;
+    box-shadow: none;
   }
 
-  .digit-actions,
-  .precision-actions {
-    order: 3;
+  .variable-value-name {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
   }
 
-  .top-card-copy,
-  .value-copy {
-    order: 2;
+  .variable-value-actions {
+    grid-column: 3;
+    grid-row: 1;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
-  .precision-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .variable-value-actions button {
+    font-size: 0.62rem;
+    letter-spacing: 0;
+    padding-inline: 0.4rem;
+  }
+
+  .output-grid {
+    padding: 0.4rem;
+    gap: 0.6rem;
+  }
+
+  .card {
+    border-width: 1px;
+    border-radius: 12px;
+  }
+
+  .card-title {
+    letter-spacing: 0.04em;
+  }
+
+  .card-actions .card-action {
+    font-size: 0.62rem;
+    letter-spacing: 0;
+    padding-inline: 0.4rem;
   }
 
   .rendered {

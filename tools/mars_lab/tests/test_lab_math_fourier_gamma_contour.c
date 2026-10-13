@@ -31,7 +31,8 @@ static void test_default_coordinate_and_conditions(void)
 {
     const json_t *r = math_fourier_fields("@F{gamma(x)}", "k");
     lab_math_equal(lab_math_algebra(r), "2π·exp(k·Re(x) - exp(k))");
-    lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "\\mathfrak{Im}\\left\\{x\\right\\}\\to k", true);
+    lab_math_contains(math_fourier_text(r, "transform_identity_TeX"),
+                      "\\mathfrak{Im}\\mathopen{}\\left\\{x\\right\\}\\to k", true);
     lab_math_contains(math_fourier_text(r, "expression"), "Re(x) > 0", true);
     lab_math_contains(math_fourier_text(r, "expression"), "k ∈ ℝ", true);
     lab_math_contains(math_fourier_text(r, "function"), "realpart(x) > 0", true);
@@ -53,7 +54,7 @@ static void test_copied_spectra_restore_complex_argument(void)
             lab_math_contains(math_fourier_text(r, "expression"), lab_math_format("Re(%s) > 0", x), true);
             lab_math_contains(math_fourier_text(r, "expression"), lab_math_format("%s ∈ ℝ", x), false);
             for (size_t p = 0; p < 2; ++p) {
-                const char *bound = lab_math_replace(math_fourier_text(r, "expression"), lab_math_format("%s = NAN", x),
+                const char *bound = lab_math_replace(math_fourier_text(r, "expression"), lab_math_format("%s = ?", x),
                                                      lab_math_format("%s = %s", x, points[p]));
                 lab_math_close(math_fourier_number(math_fourier_fields(bound, x)), math_fourier_number(
                     math_fourier_fields(lab_math_format("gamma(%s)", points[p]), x)), 1e-12);
@@ -74,7 +75,7 @@ static void test_both_directions_and_affine_arguments(void)
                 "expression")), "x");
             lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
             for (size_t p = 0; p < 2; ++p) {
-                const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = NAN", lab_math_format(
+                const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "x = ?", lab_math_format(
                     "x = %s", points[p]));
                 lab_math_close(math_fourier_number(math_fourier_fields(bound, "x")),
                     math_fourier_number(math_fourier_fields(lab_math_format("{gamma(%s) | x=%s}", arguments[a],
@@ -112,7 +113,7 @@ static void test_independent_inverse_integral(void)
         double complex integral = lab_math_simpson(math_fourier_gamma_integrand, &points[p], -40, 6, 12000);
         const json_t *r = math_fourier_fields("@Finv{2*@pi*exp(k*Re(x)-exp(k))}", "x");
         lab_math_close(math_fourier_number(math_fourier_fields(lab_math_replace(math_fourier_text(r, "expression"),
-            "x = NAN", bindings[p]), "x")), integral, 2e-11);
+            "x = ?", bindings[p]), "x")), integral, 2e-11);
     }
 }
 

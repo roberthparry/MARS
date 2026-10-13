@@ -22,6 +22,29 @@ static bool coordinates(const number_t *values, size_t count)
     return true;
 }
 
+/* Copy height limits only after validation; sampled data remains untouched. */
+bool plot_set_height_bounds(plot_t *plot, number_t minimum, number_t maximum)
+{
+    number_t supplied[] = {minimum, maximum};
+    if (!plot || !plot->surface_z || !coordinates(supplied, 2)) {
+        errno = EINVAL;
+        return false;
+    }
+    number_t copy[] = {num_clone(minimum), num_clone(maximum)};
+    if (!coordinates(copy, 2)) {
+        num_destroy(&copy[0]);
+        num_destroy(&copy[1]);
+        errno = ENOMEM;
+        return false;
+    }
+    for (unsigned i = 0; i < 2; ++i) {
+        num_destroy(&plot->height_bounds[i]);
+        plot->height_bounds[i] = copy[i];
+    }
+    plot->height_fixed = true;
+    return true;
+}
+
 /* Copy a complete grid before publishing it in the caller's empty scene. */
 bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,
                       const number_t *z)

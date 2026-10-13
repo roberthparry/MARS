@@ -60,12 +60,19 @@ static void test_copied_periodic_pairs_both_directions(void)
                 const char *source = lab_math_format("%s(%s)", functions[f], arguments[a]);
                 const json_t *r = math_fourier_copied_inverse(source, operators[d], operators[1-d], &s);
                 lab_math_contains(math_fourier_text(r, "expression"), lab_math_format("%s(", functions[f]), true);
-                lab_math_equal(math_fourier_text(r, "tex"), math_fourier_text(math_fourier_fields(math_fourier_text(r,
-                    "expression"), "t"), "tex"));
+                const json_t *copy = math_fourier_fields(math_fourier_text(r, "expression"), "t");
+                /* A copied decimal may render as an exact fraction; retain its value and pole guards. */
+                if (a < 3)
+                    lab_math_equal(math_fourier_text(r, "tex"), math_fourier_text(copy, "tex"));
+                lab_math_contains(math_fourier_text(copy, "expression"), "t ∈ ℝ", true);
+                lab_math_contains(math_fourier_text(copy, "expression"), f ? "sin(" : "cos(", true);
+                lab_math_contains(math_fourier_text(copy, "expression"), "≠ 0", true);
                 for (size_t p = 0; p < 2; ++p) {
                     double complex expected = math_fourier_numerical(source, points[p], "");
                     lab_math_close(math_fourier_numerical(lab_math_algebra(r), points[p], ""), expected, 1e-12*(1+cabs(
                         expected)));
+                    lab_math_close(math_fourier_numerical(lab_math_algebra(copy), points[p], ""), expected,
+                                   1e-12*(1+cabs(expected)));
                 }
                 const json_t *repeated = math_fourier_fields(lab_math_format("%s(%s,t,ω)", operators[d],
                     math_fourier_text(r, "expression")), "ω");
@@ -122,13 +129,13 @@ static void test_native_pole_conditions_and_values(void)
         lab_math_contains(math_fourier_text(r, "function"), lab_math_format("return %s(t).", functions[f]), true);
         lab_math_contains(math_fourier_text(r, "tex"), "\\ne 0", true);
         for (size_t p = 0; p < 2; ++p) {
-            const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "t = NAN", lab_math_format(
+            const char *bound = lab_math_replace(math_fourier_text(r, "expression"), "t = ?", lab_math_format(
                 "t = %.17g", points[p]));
             lab_math_places(math_fourier_number(math_fourier_fields(bound, "t")), f ? 1/tan(points[p]) : tan(points[p]), 12);
         }
         if (f)
             lab_math_equal(math_fourier_text(math_fourier_fields(lab_math_replace(math_fourier_text(r, "expression"),
-                "t = NAN", "t = 0"), "t"), "value"), "NAN");
+                "t = ?", "t = 0"), "t"), "value"), "NAN");
     }
 }
 
@@ -243,12 +250,18 @@ static void test_principal_value_diagnostic(void)
 
 static void test_nonreal_rates_do_not_use_real_pole_prescription(void)
 {
-    const char *sources[] = {"tan(i*t)", "cot(t+i)"};
+    const char *sources[] = {"tan((1+i)*t)", "cot(t+i)"};
     for (size_t i = 0; i < 2; ++i) {
         const json_t *r = math_fourier_fields(lab_math_format("Fourier(%s,t,ω)", sources[i]), "ω");
         lab_math_contains(math_fourier_text(r, "function"), "fourier(", true);
         lab_math_contains(math_fourier_text(r, "tex"), "\\sum", false);
     }
+    /* tan(i*t) = i*tanh(t) has a valid non-periodic Fourier transform. */
+    const json_t *imaginary = math_fourier_fields("Fourier(tan(i*t),t,ω)", "ω");
+    const json_t *hyperbolic = math_fourier_fields("Fourier(i*tanh(t),t,ω)", "ω");
+    lab_math_equal(math_fourier_text(imaginary, "unbound"), math_fourier_text(hyperbolic, "unbound"));
+    lab_math_contains(math_fourier_text(imaginary, "function"), "fourier(", false);
+    lab_math_contains(math_fourier_text(imaginary, "tex"), "\\sum", false);
 }
 
 static void test_readme_tangent_pair(void)

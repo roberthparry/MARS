@@ -51,6 +51,8 @@ struct _plot_t {
     size_t count, capacity, points;
     number_t bounds[4];
     bool fixed;
+    number_t height_bounds[2];
+    bool height_fixed;
     number_t *surface_x, *surface_y, *surface_z;
     size_t surface_columns, surface_rows;
 };
@@ -66,6 +68,12 @@ bool plot_ranges(const plot_t *plot, number_t bounds[4]);
 
 /** @brief Select a robust vertical viewport using horizontally distributed finite representatives. */
 bool plot_smart_range(const plot_t *plot, number_t bounds[4]);
+
+/** @brief Trim extreme tails of borrowed finite samples in place, updating owned bounds. Sorts samples. */
+void plot_trim_range(number_t *values, size_t count, number_t bounds[2]);
+
+/** @brief Find finite surface heights and apply the configured manual or robust automatic viewport. */
+bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2]);
 
 /** @brief Generate up to twelve owned, evenly spaced decimal ticks inside an axis range. */
 size_t plot_ticks(number_t low, number_t high, number_t values[12]);

@@ -53,11 +53,13 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         equal(value.textContent, '1', 'binding-independent value reaches numerical card');
         equal(valueNote.textContent, 'native note', 'note installed after value clearing');
         check(!valueCard.classList.contains('hidden'), 'non-empty numerical value shown');
+        await window.checkLabMobileLayout('numerical value and evaluation note');
         cards = plan(0, {...data, value: '  ', root_value: true});
         installEvaluationTextCards(cards);
         labDOM.call('lab_evaluation_cards_present', 0, {...data, root_value: true});
         equal(valueTitle.textContent, 'Values', 'root metadata controls numerical title');
         check(valueCard.classList.contains('hidden'), 'blank numerical output hidden');
+        await window.checkLabMobileLayout('no numerical value');
         setRenderedError('native partial error');
         installEvaluationTextCards(plan(0, data));
         equal(rendered.textContent, 'native partial error', 'text installation preserves partial rendered error');

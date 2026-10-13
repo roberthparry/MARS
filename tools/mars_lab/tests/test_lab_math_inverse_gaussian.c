@@ -256,8 +256,6 @@ static void test_symbolic_gaussian_retains_parameter_restrictions(void)
     const char *names[] = {"t", "a", "b", "d"};
     const char *values[] = {"0.4", "-1", "0", "0"};
     for (size_t i = 0; i < 4; ++i) {
-        copied = lab_math_replace(copied, lab_math_format("%s = NAN", names[i]),
-                                 lab_math_format("%s = %s", names[i], values[i]));
         copied = lab_math_replace(copied, lab_math_format("%s = ?", names[i]),
                                  lab_math_format("%s = %s", names[i], values[i]));
     }

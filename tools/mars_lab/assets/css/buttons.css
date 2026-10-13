@@ -101,3 +101,11 @@ button:disabled {
   visibility: visible;
   transform: translateY(0);
 }
+
+/* Touch browsers can retain emulated hover after a tap. Keep keyboard hints,
+   but do not leave a tooltip covering the next control on a touch worksheet. */
+@media (hover: none), (pointer: coarse) {
+  body:not(:has(button:focus-visible)) .mars-button-tooltip {
+    display: none;
+  }
+}

@@ -85,7 +85,7 @@ static void test_absolute_half_power_spellings_and_run(void)
         const json_t *r = math_fourier_fields(lab_math_format("{@F{1/sqrt(|t|)} | ω=%s}", frequencies[i]), "ω");
         const char *output = lab_math_programme(math_fourier_text(r, "operation_function"), 40);
         if (!i) {
-            lab_math_contains(output, "ω = NAN", true);
+            lab_math_contains(output, "ω = ?", true);
             lab_math_contains(output, "ℱ", false);
         } else {
             lab_math_places(math_fourier_number(math_fourier_fields(output, "ω")), sqrt(M_PI/2), 12);
@@ -111,7 +111,7 @@ static void test_absolute_power_inverse_and_copied_spectrum(void)
 static void test_radical_quotient_simplification_preserves_branches(void)
 {
     const char *cases[][2] = {{"sqrt(2*pi)/sqrt(abs(x))", "√(2π/|x|)"}, {"sqrt(2*x)", "√(2x)"},
-        {"sqrt(4*x)", "2·√(x)"}, {"sqrt(x)/sqrt(abs(y))", "√(x/|y|)"}, {"sqrt(x)/sqrt(y)", "√(x)/√(y)"}};
+        {"sqrt(4*x)", "2·√x"}, {"sqrt(x)/sqrt(abs(y))", "√(x/|y|)"}, {"sqrt(x)/sqrt(y)", "√x/√(y)"}};
     for (size_t i = 0; i < 5; ++i)
         lab_math_equal(math_fourier_text(math_fourier_fields(cases[i][0], "x"), "unbound"), cases[i][1]);
     const int points[][2] = {{-1, -1}, {1, -1}, {-1, 1}};
@@ -120,7 +120,8 @@ static void test_radical_quotient_simplification_preserves_branches(void)
             points[i][0], points[i][1]), "x")),
                        csqrt(CMPLX(points[i][0], 0))/csqrt(CMPLX(points[i][1], 0)), 1e-12);
     const json_t *r = math_fourier_fields("{sqrt(x)/sqrt(abs(y)) | x=-1; y=4}", "x");
-    lab_math_equal(math_fourier_text(r, "unbound"), "√(x)/2");
+    /* Symbolic cards retain free bindings; only Value substitutes x and y. */
+    lab_math_equal(math_fourier_text(r, "unbound"), "√(x/|y|)");
     lab_math_check(math_fourier_number(r) == 0.5*I, "principal radical quotient");
 }
 

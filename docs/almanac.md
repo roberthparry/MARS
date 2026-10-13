@@ -278,23 +278,27 @@ For example, retrieve the geometry and local tilt for a London solar-eclipse pre
 
 #include "almanac-t.h"
 
-almanac_t *almanac = almanac_open();
-almanac_observer_t observer = {51.5074, -0.1278, 11.0};
-datetime_t *start = datetime_from_string("2026-08-10");
-datetime_t *end = datetime_from_string("2026-08-15");
-array_t *events = almanac_find_solar_eclipses(almanac, &observer, start, end);
-const almanac_solar_eclipse_t *event = events && array_size(events) ? array_get(events, 0) : NULL;
-double disc = almanac_solar_eclipse_sun_semi_diameter_degrees(event);
-double cover = almanac_solar_eclipse_moon_semi_diameter_degrees(event);
-double separation = almanac_solar_eclipse_separation_degrees(event);
-double orientation = almanac_solar_eclipse_orientation_degrees(event);
-bool geometry = disc > 0 && cover > 0 && isfinite(separation);
-printf("Solar preview geometry: %s\nLocal orientation: %s\n",
-       geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
-array_destroy(events);
-datetime_dealloc(end);
-datetime_dealloc(start);
-almanac_close(almanac);
+int main(void)
+{
+    almanac_t *almanac = almanac_open();
+    almanac_observer_t observer = {51.5074, -0.1278, 11.0};
+    datetime_t *start = datetime_from_string("2026-08-10");
+    datetime_t *end = datetime_from_string("2026-08-15");
+    array_t *events = almanac_find_solar_eclipses(almanac, &observer, start, end);
+    const almanac_solar_eclipse_t *event = events && array_size(events) ? array_get(events, 0) : NULL;
+    double disc = almanac_solar_eclipse_sun_semi_diameter_degrees(event);
+    double cover = almanac_solar_eclipse_moon_semi_diameter_degrees(event);
+    double separation = almanac_solar_eclipse_separation_degrees(event);
+    double orientation = almanac_solar_eclipse_orientation_degrees(event);
+    bool geometry = disc > 0 && cover > 0 && isfinite(separation);
+    printf("Solar preview geometry: %s\nLocal orientation: %s\n",
+           geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
+    array_destroy(events);
+    datetime_dealloc(end);
+    datetime_dealloc(start);
+    almanac_close(almanac);
+    return 0;
+}
 ```
 
 Output:

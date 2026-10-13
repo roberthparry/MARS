@@ -253,6 +253,9 @@ int lab_dom_has_class(int node, const char *name);
 /** @brief Set disabled state. @param node Control. @param disabled Desired state. */
 void lab_dom_disabled(int node, int disabled);
 
+/** @brief Set a radio or checkbox's live checked state through its browser setter, not an own property. */
+void lab_dom_checked(int node, int checked);
+
 /** @brief Measure browser geometry. @param node Node. @param kind Client width 0, SVG absolute width/height 1/2,
  * rectangle width/height 3/4, SVG view-box width/height 5/6, rectangle left/top/bottom 7/8/9,
  * client height 10, scroll height 11, connected and visible layout flag 12.

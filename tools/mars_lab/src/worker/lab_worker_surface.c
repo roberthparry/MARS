@@ -134,7 +134,8 @@ static bool grid_agrees(const surface_grid_t *low, const surface_grid_t *high)
 }
 
 static string_t *surface_svg(const char *source, const char *first, const char *second, const char *const limits[4],
-                             double azimuth, double elevation, double roll, bool preview, const char *height)
+                             double azimuth, double elevation, double roll, bool preview, const char *height,
+                             const char *scale, const number_t height_bounds[2])
 {
     size_t saved_precision = num_get_default_prec_bits();
     number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
@@ -143,6 +144,12 @@ static string_t *surface_svg(const char *source, const char *first, const char *
     size_t other = ok ? lab_worker_plot_range_precision(bounds[2], bounds[3]) : 0;
     if (other > bits)
         bits = other;
+    bool manual = !strcmp(scale, "manual");
+    if (manual) {
+        other = lab_worker_plot_range_precision(height_bounds[0], height_bounds[1]);
+        if (other > bits)
+            bits = other;
+    }
     size_t guard = ok ? lab_worker_plot_check_precision(bounds[0], bounds[1]) : 128;
     other = ok ? lab_worker_plot_check_precision(bounds[2], bounds[3]) : 128;
     if (other > guard)
@@ -177,9 +184,12 @@ static string_t *surface_svg(const char *source, const char *first, const char *
     options.axis_colour = 0x94b8b1;
     options.label_colour = 0xb8ccc5;
     options.legend = false;
+    options.smart_y = !strcmp(scale, "auto");
     plot_t *plot = grid ? plot_new(&options) : NULL;
     ok = plot && plot_set_view(plot, azimuth, elevation) && plot_set_roll(plot, roll) &&
          plot_set_surface(plot, grid->x, grid->side, grid->y, grid->side, grid->z);
+    if (ok && manual)
+        ok = plot_set_height_bounds(plot, height_bounds[0], height_bounds[1]);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     int saved = errno;
     plot_free(plot);
@@ -234,15 +244,28 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
     if (!second)
         return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "");
+    const char *scale = argc > 7 ? argv[7] : "auto";
+    number_t height_bounds[] = {NUM_NAN, NUM_NAN};
+    bool manual = !strcmp(scale, "manual");
+    if ((strcmp(scale, "auto") && strcmp(scale, "all") && !manual) ||
+        (manual && !lab_worker_plot_bounds(argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
+                                           &height_bounds[0], &height_bounds[1]))) {
+        num_destroy(&height_bounds[0]);
+        num_destroy(&height_bounds[1]);
+        printf("error       Select a valid height scale and finite manual bounds with minimum < maximum.\n");
+        return 1;
+    }
     const char *limits[] = {argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                             argc > 12 ? argv[12] : "", argc > 13 ? argv[13] : ""};
-    const char *angles[] = {argc > 14 ? argv[14] : "45", argc > 15 ? argv[15] : "30", argc > 16 ? argv[16] : "0"};
+    const char *angles[] = {argc > 14 ? argv[14] : "315", argc > 15 ? argv[15] : "30", argc > 16 ? argv[16] : "0"};
     double view[3];
     for (unsigned i = 0; i < 3; ++i) {
         char *end = NULL;
         errno = 0;
         view[i] = strtod(angles[i], &end);
         if (errno || end == angles[i] || *end || !isfinite(view[i]) || (i == 1 && (view[i] < 5 || view[i] > 85))) {
+            num_destroy(&height_bounds[0]);
+            num_destroy(&height_bounds[1]);
             printf("error       Use a finite azimuth and roll, and an elevation from 5 to 85 degrees.\n");
             return 1;
         }
@@ -259,10 +282,13 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
     expr_t *function = expr_new_named_var(NUM_NAN, name);
     char *height = function ? expr_to_string(function, style_UNBOUND) : NULL;
     string_t *svg = height ? surface_svg(source, expr_symbol_name(variable), expr_symbol_name(second), limits,
-                                         view[0], view[1], view[2], !strcmp(quality, "preview"), height) : NULL;
+                                         view[0], view[1], view[2], !strcmp(quality, "preview"), height,
+                                         scale, height_bounds) : NULL;
     int result = lab_worker_plot_output(source, expression, svg, errno, function, variable, second);
     string_free(svg);
     free(height);
     expr_free(function);
+    num_destroy(&height_bounds[0]);
+    num_destroy(&height_bounds[1]);
     return result;
 }

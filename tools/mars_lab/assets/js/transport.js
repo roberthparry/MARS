@@ -302,6 +302,10 @@ const labDOM = (() => {
                 if (values[node])
                     values[node].disabled = !!disabled;
             },
+            lab_dom_checked: (node, checked) => {
+                if (values[node])
+                    values[node].checked = !!checked;
+            },
             lab_dom_measure: (node, kind) => values[node] ? measures[kind](values[node]) : 0,
             lab_dom_css: (node, key) =>
                 Number.parseFloat(getComputedStyle(values[node]).getPropertyValue(literal(key))) || 0,

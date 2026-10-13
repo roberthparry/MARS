@@ -19,6 +19,7 @@
 
 typedef struct {
     double u, v, z, x, y, depth;
+    number_t height; /* Borrowed sample or viewport boundary, never a temporary result. */
     bool valid;
 } vertex_t;
 
@@ -79,6 +80,61 @@ static double fraction(number_t value, number_t lower, number_t span)
 {
     NUM_SCOPE(numbers);
     return num_to_double(num_div(num_sub(value, lower), span));
+}
+
+static vertex_t intersection(vertex_t a, vertex_t b, number_t boundary)
+{
+    NUM_SCOPE(numbers);
+    number_t da = num_sub(boundary, a.height), db = num_sub(boundary, b.height);
+    if (num_gt(num_abs(da), num_abs(db))) {
+        vertex_t swap = a;
+        a = b;
+        b = swap;
+    }
+    double t = fraction(boundary, a.height, num_sub(b.height, a.height));
+    return (vertex_t){.u = a.u + t * (b.u - a.u), .v = a.v + t * (b.v - a.v), .height = boundary};
+}
+
+static size_t clip_plane(const vertex_t *input, size_t count, vertex_t *output, number_t boundary, bool upper)
+{
+    size_t used = 0;
+    if (!count)
+        return 0;
+    vertex_t previous = input[count - 1];
+    bool inside = upper ? num_le(previous.height, boundary) : num_ge(previous.height, boundary);
+    for (size_t i = 0; i < count; ++i) {
+        vertex_t next = input[i];
+        bool keep = upper ? num_le(next.height, boundary) : num_ge(next.height, boundary);
+        if (keep != inside)
+            output[used++] = intersection(previous, next, boundary);
+        if (keep)
+            output[used++] = next;
+        previous = next;
+        inside = keep;
+    }
+    return used;
+}
+
+/* Parallel height planes cut a triangle into at most five vertices; no plateau is added. */
+static int clip_facet(const vertex_t *vertices, const facet_t *facet, const camera_t *view,
+                      const number_t bounds[2], number_t span, vertex_t output[5], double *depth)
+{
+    vertex_t triangle[] = {vertices[facet->a], vertices[facet->b], vertices[facet->c]}, lower[4];
+    size_t count = clip_plane(triangle, 3, lower, bounds[0], false);
+    count = clip_plane(lower, count, output, bounds[1], true);
+    *depth = 0;
+    for (size_t i = 0; i < count; ++i) {
+        output[i].z = fraction(output[i].height, bounds[0], span);
+        project(view, &output[i]);
+        if (!isfinite(output[i].x) || !isfinite(output[i].y) || !isfinite(output[i].depth)) {
+            errno = ERANGE;
+            return -1;
+        }
+        *depth += output[i].depth;
+    }
+    if (count)
+        *depth /= count;
+    return (int)count;
 }
 
 static int far_first(const void *a, const void *b)
@@ -194,29 +250,12 @@ string_t *plot_surface_svg(const plot_t *plot)
 {
     NUM_SCOPE(numbers);
     size_t columns = plot->surface_columns, rows = plot->surface_rows, count = columns * rows;
-    number_t lo = NUM_NAN, hi = NUM_NAN;
-    for (size_t i = 0; i < count; ++i) {
-        if (!computation_step_current("plot.surface.range"))
-            return NULL;
-        number_t value = plot->surface_z[i];
-        if (finite_real(value)) {
-            if (num_is_nan(lo) || num_lt(value, lo))
-                lo = num_clone(value);
-            if (num_is_nan(hi) || num_gt(value, hi))
-                hi = num_clone(value);
-        }
-    }
-    if (num_is_nan(lo)) {
-        errno = ENODATA;
+    number_t height_bounds[] = {NUM_NAN, NUM_NAN}, full[] = {NUM_NAN, NUM_NAN};
+    if (!plot_surface_range(plot, height_bounds, full))
         return NULL;
-    }
-    if (num_eq(lo, hi)) {
-        number_t padding = num_div(num_abs(lo), num_create_from_long(20));
-        if (num_lt(padding, NUM_ONE))
-            padding = num_clone(NUM_ONE);
-        lo = num_sub(lo, padding);
-        hi = num_add(hi, padding);
-    }
+    number_t lo = height_bounds[0], hi = height_bounds[1], full_span = num_sub(full[1], full[0]);
+    if (num_is_zero(full_span))
+        full_span = num_clone(NUM_ONE);
     number_t bounds[] = {plot->surface_x[0], plot->surface_x[columns - 1],
                          plot->surface_y[0], plot->surface_y[rows - 1], lo, hi};
     double label_width = 0;
@@ -245,9 +284,9 @@ string_t *plot_surface_svg(const plot_t *plot)
                 continue;
             at->u = fraction(plot->surface_x[c], bounds[0], spans[0]);
             at->v = fraction(plot->surface_y[r], bounds[2], spans[1]);
-            at->z = fraction(value, lo, spans[2]);
+            at->height = value;
+            at->z = fraction(value, full[0], full_span);
             at->valid = isfinite(at->u) && isfinite(at->v) && isfinite(at->z);
-            project(&view, at);
         }
     }
     size_t faces = 0;
@@ -266,14 +305,18 @@ string_t *plot_surface_svg(const plot_t *plot)
             }
             if (!valid || (columns >= 17 && rows >= 17 && high - low > 0.6))
                 continue;
-            for (unsigned j = 1; j < 3; ++j) {
+            for (unsigned j = 1; ok && j < 3; ++j) {
                 size_t a = indices[0], b = indices[j], d = indices[j + 1];
-                double depth = vertices[a].depth + vertices[b].depth + vertices[d].depth;
-                facets[faces++] = (facet_t){a, b, d, depth};
+                facet_t facet = {.a = a, .b = b, .c = d};
+                vertex_t polygon[5];
+                int clipped = clip_facet(vertices, &facet, &view, height_bounds, spans[2], polygon, &facet.depth);
+                ok = clipped >= 0;
+                if (clipped >= 3)
+                    facets[faces++] = facet;
             }
         }
     }
-    if (ok && !faces) {
+    if (ok && !faces && !plot->height_fixed) {
         errno = ENODATA;
         ok = false;
     }
@@ -292,10 +335,18 @@ string_t *plot_surface_svg(const plot_t *plot)
     }
     for (size_t i = 0; ok && i < faces; ++i) {
         const facet_t *f = &facets[i];
-        const vertex_t *a = &vertices[f->a], *b = &vertices[f->b], *c = &vertices[f->c];
-        ok = computation_step_current("plot.surface.draw") && string_append_format(svg,
-            "<path fill=\"#%06x\" d=\"M %.3f %.3f L %.3f %.3f L %.3f %.3f Z\"/>\n",
-            colour((a->z + b->z + c->z) / 3), a->x, a->y, b->x, b->y, c->x, c->y) >= 0;
+        vertex_t polygon[5];
+        double depth, height = 0;
+        int clipped = clip_facet(vertices, f, &view, height_bounds, spans[2], polygon, &depth);
+        ok = computation_step_current("plot.surface.draw") && clipped >= 3;
+        for (int j = 0; j < clipped; ++j)
+            height += polygon[j].z;
+        if (ok)
+            ok = string_append_format(svg, "<path fill=\"#%06x\" d=\"M %.3f %.3f", colour(height / clipped),
+                                       polygon[0].x, polygon[0].y) >= 0;
+        for (int j = 1; ok && j < clipped; ++j)
+            ok = string_append_format(svg, " L %.3f %.3f", polygon[j].x, polygon[j].y) >= 0;
+        ok = ok && string_append_cstr(svg, " Z\"/>\n") == 0;
     }
     ok = ok && string_append_cstr(svg, "</g>\n") == 0 && axes(svg, plot, &view, bounds) &&
          string_append_cstr(svg, "</svg>\n") == 0;

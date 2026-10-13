@@ -365,6 +365,28 @@ static void test_plot_smart_range(void)
     TEST_ASSERT_TRUE(ok, "robust Y view crops silently, Fit all retains outliers and manual bounds override it");
 }
 
+static bool ascending_surface_ticks(const string_t *svg)
+{
+    double previous[3] = {0};
+    size_t counts[3] = {0};
+    const char *p = svg ? string_c_str(svg) : "";
+    while ((p = strstr(p, "<g data-plot-tick="))) {
+        unsigned axis;
+        double x, y;
+        const char *path = strstr(p, "<path d=");
+        if (sscanf(p, "<g data-plot-tick=\"%u\"", &axis) != 1 || axis > 2 || !path ||
+            sscanf(path, "<path d=\"M %lf %lf", &x, &y) != 2)
+            return false;
+        double position = axis == 2 ? -y : x;
+        if (counts[axis] && position <= previous[axis])
+            return false;
+        previous[axis] = position;
+        ++counts[axis];
+        ++p;
+    }
+    return counts[0] > 1 && counts[1] > 1 && counts[2] > 1;
+}
+
 static void test_plot_surface(void)
 {
     plot_t *plot = plot_new(NULL);
@@ -389,6 +411,8 @@ static void test_plot_surface(void)
         ++faces;
     ok = ok && document && faces == 16 && strstr(string_c_str(svg), "data-surface=\"true\"") &&
          !strstr(string_c_str(svg), "nan") && !strstr(string_c_str(svg), "<rect");
+    TEST_ASSERT_TRUE(svg && strstr(string_c_str(svg), "data-azimuth=\"315.000\"") && ascending_surface_ticks(svg),
+                     "default surface ticks increase left to right on both horizontal axes and upwards in height");
     xml_free(document);
     string_free(svg);
     computation_options_t limits = {.work_limit = 1};
@@ -410,6 +434,104 @@ static void test_plot_surface(void)
          plot_set_surface(plot, coords, 2, coords, 2, missing) && !plot_to_svg(plot) && errno == ENODATA;
     plot_free(plot);
     TEST_ASSERT_TRUE(ok, "invalid, oversized and empty surfaces report explicit errors");
+}
+
+static bool height_ticks_between(const string_t *svg, double minimum, double maximum)
+{
+    const char *p = svg ? string_c_str(svg) : "";
+    size_t count = 0;
+    while ((p = strstr(p, "<text data-plot-label=\"2\""))) {
+        p = strchr(p, '>');
+        double value;
+        if (!p || sscanf(++p, "%lf", &value) != 1 || value < minimum || value > maximum)
+            return false;
+        ++count;
+    }
+    return count >= 2;
+}
+
+static void test_plot_surface_height(void)
+{
+    plot_options_t options = plot_options_default();
+    options.smart_y = true;
+    plot_t *plot = plot_new(&options);
+    number_t axis[5], heights[25];
+    for (unsigned i = 0; i < 5; ++i)
+        axis[i] = num_create_from_long(i);
+    for (unsigned i = 0; i < 25; ++i)
+        heights[i] = num_create_from_long(i == 12 ? 10000 : i % 5);
+    bool ok = plot && !plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE) && errno == EINVAL &&
+              plot_set_surface(plot, axis, 5, axis, 5, heights);
+    string_t *automatic = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && height_ticks_between(automatic, 0, 5) && plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE);
+    string_t *manual = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && height_ticks_between(manual, 0, 1) && strstr(string_c_str(manual), "<path fill=") &&
+         !plot_set_height_bounds(plot, NUM_ONE, NUM_ZERO) && errno == EINVAL &&
+         !plot_set_height_bounds(plot, NUM_NAN, NUM_ONE) && !plot_set_height_bounds(NULL, NUM_ZERO, NUM_ONE);
+    string_t *unchanged = plot_to_svg(plot);
+    ok = ok && unchanged && !strcmp(string_c_str(manual), string_c_str(unchanged));
+    plot_auto_bounds(plot);
+    string_t *restored = plot_to_svg(plot);
+    ok = ok && restored && !strcmp(string_c_str(automatic), string_c_str(restored));
+    string_free(restored);
+    string_free(unchanged);
+    string_free(manual);
+    string_free(automatic);
+    plot_free(plot);
+    options.smart_y = false;
+    plot = plot_new(&options);
+    ok = ok && plot_set_surface(plot, axis, 5, axis, 5, heights);
+    string_t *all = plot_to_svg(plot);
+    ok = ok && all && strstr(string_c_str(all), ">10000</text>");
+    string_free(all);
+    plot_free(plot);
+    for (unsigned i = 0; i < 25; ++i)
+        num_destroy(&heights[i]);
+    for (unsigned i = 0; i < 5; ++i)
+        num_destroy(&axis[i]);
+    TEST_ASSERT_TRUE(ok, "surface automatic cropping, fit-all, manual height bounds and atomic reset");
+
+    number_t level[25];
+    for (unsigned i = 0; i < 5; ++i)
+        axis[i] = num_create_from_long(i);
+    for (unsigned i = 0; i < 25; ++i)
+        level[i] = i == 12 ? num_create_from_long(10000) : NUM_ZERO;
+    options.smart_y = true;
+    plot = plot_new(&options);
+    ok = plot && plot_set_surface(plot, axis, 5, axis, 5, level);
+    automatic = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && height_ticks_between(automatic, 0, 0.25);
+    string_free(automatic);
+    plot_free(plot);
+    for (unsigned i = 0; i < 5; ++i)
+        num_destroy(&axis[i]);
+    for (unsigned i = 0; i < 25; ++i)
+        num_destroy(&level[i]);
+    TEST_ASSERT_TRUE(ok, "an isolated spike cannot dominate an otherwise constant surface");
+
+    number_t huge = num_create_from_string("1e1000"), negative = num_neg(huge);
+    number_t coordinates[] = {NUM_ZERO, NUM_ONE}, crossing[] = {negative, huge, negative, huge};
+    plot = plot_new(NULL);
+    ok = plot && plot_set_surface(plot, coordinates, 2, coordinates, 2, crossing) &&
+         plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE);
+    manual = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && height_ticks_between(manual, 0, 1) && strstr(string_c_str(manual), "<path fill=") &&
+         !strstr(string_c_str(manual), "nan") && !strstr(string_c_str(manual), "inf");
+    string_free(manual);
+    plot_free(plot);
+    num_destroy(&negative);
+    num_destroy(&huge);
+    TEST_ASSERT_TRUE(ok, "huge finite heights are intersected before conversion to drawing doubles");
+
+    number_t flat[] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
+    plot = plot_new(NULL);
+    ok = plot && plot_set_surface(plot, coordinates, 2, coordinates, 2, flat) &&
+         plot_set_height_bounds(plot, NUM_HALF, NUM_ONE);
+    manual = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && height_ticks_between(manual, 0.5, 1) && !strstr(string_c_str(manual), "<path fill=");
+    string_free(manual);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "manual viewport excluding the surface shows axes without invented plateaus");
 }
 
 static bool separated_tick_labels(const string_t *svg, double font_size, size_t *visible)
@@ -536,7 +658,7 @@ static void test_plot_surface_view(void)
         xml_free(document);
         string_free(svg);
     }
-    ok = ok && plot_set_view(plot, -315, 30) && !plot_set_view(plot, NAN, 30) && errno == EINVAL &&
+    ok = ok && plot_set_view(plot, -45, 30) && !plot_set_view(plot, NAN, 30) && errno == EINVAL &&
          !plot_set_view(plot, 45, INFINITY) && !plot_set_view(plot, 0, 4) && !plot_set_view(plot, 0, 86) &&
          !plot_set_view(NULL, 0, 30) && plot_set_roll(plot, -360) && !plot_set_roll(plot, NAN) &&
          errno == EINVAL && !plot_set_roll(plot, INFINITY) && !plot_set_roll(NULL, 0);
@@ -609,12 +731,13 @@ static void example_plot_surface(void)
         for (size_t c = 0; c < 3; ++c)
             heights[r * 3 + c] = num_create_from_long((long)((r != 1) + (c != 1)));
     bool added = plot_set_surface(plot, axis, 3, axis, 3, heights) &&
+                 plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE) &&
                  plot_set_view(plot, 120, 40) && plot_set_roll(plot, 20);
     for (size_t i = 0; i < 9; ++i)
         num_destroy(&heights[i]);
     string_t *svg = added ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("Surface SVG ready; series: %zu\n", plot_series_count(plot));
+        printf("Surface SVG ready; series: %zu; height: 0 to 1\n", plot_series_count(plot));
     TEST_ASSERT_TRUE(svg != NULL, "README native height-surface SVG");
     string_free(svg);
     plot_free(plot);
@@ -636,6 +759,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_extreme_clipping, NULL);
     TEST_RUN_CASE(test_plot_smart_range, NULL);
     TEST_RUN_CASE(test_plot_surface, NULL);
+    TEST_RUN_CASE(test_plot_surface_height, NULL);
     TEST_RUN_CASE(test_plot_surface_view, NULL);
     TEST_RUN_CASE(test_plot_label_spacing, NULL);
     TEST_SECTION("README examples");

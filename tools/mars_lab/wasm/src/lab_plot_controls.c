@@ -45,7 +45,7 @@ void lab_plot_controls_sync(void)
         int radio = lab_dom_item(choices, i), name = lab_dom_read(radio, 5, "");
         int index = control_index(lab_dom_get(radio, "name"));
         if (index >= 0) {
-            lab_dom_set(radio, "checked", lab_dom_scalar(1, lab_dom_equal(name, value(controls[index]))));
+            lab_dom_checked(radio, lab_dom_equal(name, value(controls[index])));
             lab_dom_disabled(radio, index == 1 && lab_dom_equal(name, first));
         }
         lab_dom_release(mark);
@@ -68,7 +68,9 @@ void lab_plot_controls_sync(void)
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
     lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", curve || (!surface && !multiple));
     lab_dom_class(lab_dom_id("plotCamera"), "hidden", !surface);
-    lab_dom_class(lab_dom_id("plotVertical"), "hidden", surface);
+    lab_dom_class(lab_dom_id("plotVertical"), "hidden", 0);
+    lab_dom_write(lab_dom_id("plotVerticalTitle"), 0, "",
+                  lab_dom_string(surface ? "Height range" : "Vertical range"));
     lab_dom_class(lab_dom_id("plotManual"), "hidden", !lab_dom_equal(value("plotScale"), lab_dom_string("manual")));
 }
 

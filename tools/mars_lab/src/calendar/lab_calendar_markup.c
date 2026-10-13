@@ -117,31 +117,39 @@ static bool lab_cal_markup_bodies(string_t *out, const json_t *rows, const json_
             break;
         }
     }
+    static const struct {
+        const char *field, *label;
+    } fields[] = {{"declination", "Declination"}, {"gha", "GHA"}, {"right_ascension", "RA"},
+                   {"altitude", "Altitude"}, {"azimuth", "Azimuth"}, {"semi_diameter", "s.d."},
+                   {"magnitude", "Vmag."}};
     bool ok =
         !string_append_cstr(
             out, "<div class=\"almanac-table-scroll\" role=\"region\" "
-                 "aria-label=\"Navigational bodies\" tabindex=\"0\"><table class=\"almanac-grid-table\"><thead><tr>"
-                 "<th>Body</th><th>Declination</th><th>GHA</th><th>RA</th><th>Altitude</th><th>Azimuth</th><th>s.d.</"
-                 "th><th>Vmag.</th>") &&
-        (visible || !string_append_cstr(out, "<th>Visible</th>")) && !string_append_cstr(out, "</tr></thead><tbody>");
-    static const char *const fields[] = {"declination", "gha",           "right_ascension", "altitude",
-                                         "azimuth",     "semi_diameter", "magnitude"};
+                 "aria-label=\"Navigational bodies\" tabindex=\"0\"><table class=\"almanac-grid-table almanac-body-table\" "
+                 "role=\"table\"><thead role=\"rowgroup\"><tr role=\"row\">"
+                 "<th scope=\"col\" role=\"columnheader\">Body</th>");
+    for (size_t j = 0; ok && j < sizeof fields / sizeof *fields; ++j)
+        ok = string_append_format(out, "<th scope=\"col\" role=\"columnheader\">%s</th>", fields[j].label) >= 0;
+    ok = ok && (visible || !string_append_cstr(out, "<th scope=\"col\" role=\"columnheader\">Visible</th>")) &&
+         !string_append_cstr(out, "</tr></thead><tbody role=\"rowgroup\">");
     for (size_t i = 0; ok && i < json_array_size(rows); ++i) {
         const json_t *row = json_array_get(rows, i);
         bool reference = !strcmp(lab_cal_text(row, "kind"), "reference");
         const char *name = lab_cal_text(row, "name");
         if (!*name)
             name = lab_cal_text(row, "code");
-        ok = string_append_format(out, "<tr class=\"%s\"><td class=\"%s\">", reference ? "reference" : "",
+        ok = string_append_format(out, "<tr role=\"row\" class=\"%s\"><td role=\"rowheader\" class=\"%s\">",
+                                  reference ? "reference" : "",
                                   reference ? "reference-name" : "body-name") >= 0 &&
              lab_cal_body_symbol(out, row, sun, observer) && lab_cal_markup_text(out, name) &&
              !string_append_cstr(out, "</td>");
         for (size_t j = 0; ok && j < sizeof fields / sizeof *fields; ++j)
-            ok = !string_append_cstr(out, "<td class=\"number\">") &&
-                 lab_cal_markup_text(out, lab_cal_text(row, fields[j])) && !string_append_cstr(out, "</td>");
+            ok = string_append_format(out, "<td role=\"cell\" class=\"number\" data-field=\"%s\" data-label=\"%s\">",
+                                      fields[j].field, fields[j].label) >= 0 &&
+                 lab_cal_markup_text(out, lab_cal_text(row, fields[j].field)) && !string_append_cstr(out, "</td>");
         if (!visible)
             ok = ok &&
-                 string_append_format(out, "<td class=\"visible-cell %s\" title=\"",
+                 string_append_format(out, "<td role=\"cell\" data-label=\"Visible\" class=\"visible-cell %s\" title=\"",
                                       lab_cal_markup_flag(row, "is_visible") ? "yes" : "no") >= 0 &&
                  lab_cal_markup_text(out, lab_cal_text(row, "visible_label")) &&
                  !string_append_cstr(out, "\"><span class=\"almanac-visible-icon\" role=\"img\" aria-label=\"") &&
@@ -152,7 +160,8 @@ static bool lab_cal_markup_bodies(string_t *out, const json_t *rows, const json_
     }
     if (!json_array_size(rows))
         ok = ok && string_append_format(
-                       out, "<tr><td colspan=\"%u\">No bodies found for the current visibility filter.</td></tr>",
+                       out, "<tr role=\"row\"><td role=\"cell\" colspan=\"%u\">"
+                            "No bodies found for the current visibility filter.</td></tr>",
                        visible ? 8u : 9u) >= 0;
     return ok && !string_append_cstr(out, "</tbody></table></div>");
 }

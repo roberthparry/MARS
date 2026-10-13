@@ -37,7 +37,7 @@ plot_t *plot_new(const plot_options_t *options)
     if (!plot)
         return NULL;
     plot->options = settings;
-    plot->azimuth = 45;
+    plot->azimuth = 315;
     plot->elevation = 30;
     plot->options.title = plot->options.x_label = plot->options.y_label = plot->options.z_label = NULL;
     plot->title = string_new_with(settings.title ? settings.title : "");
@@ -46,6 +46,7 @@ plot_t *plot_new(const plot_options_t *options)
     plot->z_label = string_new_with(settings.z_label ? settings.z_label : "");
     for (size_t i = 0; i < 4; ++i)
         plot->bounds[i] = NUM_NAN;
+    plot->height_bounds[0] = plot->height_bounds[1] = NUM_NAN;
     if (!plot->title || !plot->x_label || !plot->y_label || !plot->z_label) {
         plot_free(plot);
         return NULL;
@@ -107,6 +108,8 @@ void plot_free(plot_t *plot)
         free(plot->surface_x);
         free(plot->surface_y);
         free(plot->surface_z);
+        num_destroy(&plot->height_bounds[0]);
+        num_destroy(&plot->height_bounds[1]);
         for (size_t i = 0; i < 4; ++i)
             num_destroy(&plot->bounds[i]);
         string_free(plot->title);
@@ -229,8 +232,10 @@ bool plot_set_bounds(plot_t *plot, number_t xmin, number_t xmax, number_t ymin, 
 /* Select automatic bounds without throwing away existing series. */
 void plot_auto_bounds(plot_t *plot)
 {
-    if (plot)
+    if (plot) {
         plot->fixed = false;
+        plot->height_fixed = false;
+    }
 }
 
 /* Inspect the scene in constant time. */
