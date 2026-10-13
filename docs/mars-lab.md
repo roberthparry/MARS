@@ -959,7 +959,7 @@ three ticked axes and formula title retained. Releasing a slider or committing
 a keyboard adjustment requests the new view automatically.
 
 Alternatively, **left-button drag** directly over a 3-D plot: horizontal movement
-changes azimuth and vertical movement changes elevation. Hold **Shift** when
+changes azimuth; dragging down increases elevation and dragging up decreases it. Hold **Shift** when
 starting the drag to change roll instead. Sliders and degree readouts update
 during the gesture and the surface redraws while the button is held. Only one
 native redraw is in flight; subsequent movements replace the pending camera
@@ -972,6 +972,12 @@ focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. Preview and final redraws resample the native surface.
 This also works when expanded. Right-click and 2-D plots keep their normal
 behaviour; Shift+wheel zoom remains available.
+Over a 3-D plot, **Ctrl+wheel** adjusts elevation like a vertical drag and
+**Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
+angle; wheel up decreases it, in 5° steps with the same limits as dragging.
+Sliders and readouts follow the camera. Wheel redraws retain full detail and
+coalesce rapid movements. Shift takes precedence for zoom; Ctrl+Alt together
+does not rotate. Wheel rotation is inactive during a drag.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
@@ -1048,8 +1054,9 @@ headings, including **Plot** when returning to a saved plot, rather than carryin
 a plotting heading into another mode.
 
 Hold **Shift** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
-or out (down). Without Shift, wheel events retain their normal browser behaviour
-and do not change plot zoom. This uses the same bounded zoom levels as the
+or out (down). Ctrl+wheel and Alt+wheel rotate 3-D plots as described above;
+otherwise, without Shift, wheel events retain their normal browser behaviour
+and do not change plot zoom. Zoom uses the same bounded levels as the
 card's **−**, **+** and percentage-reset controls, including when expanded.
 It scales the existing SVG without resampling or changing the chosen ranges.
 Scrolling outside the plot image, including over its controls, behaves normally;

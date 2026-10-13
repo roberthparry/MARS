@@ -3,6 +3,8 @@
  * @brief Left-button surface rotation with native angle policy and coalesced live redraws.
  *
  * Dragging adjusts azimuth/elevation, or roll when Shift was held at the start.
+ * Downward dragging increases elevation; upward dragging decreases it.
+ * Ctrl+wheel adjusts elevation and Alt+wheel adjusts azimuth in the same direction.
  * Sliders and degree readouts update together. Only one native SVG request runs
  * at a time; further movements replace the pending camera position. Cancellation
  * restores the original camera. Superseding requests and mode changes stop the gesture.
@@ -108,6 +110,40 @@ static double wrapped(double value)
     return value == 0 ? 0 : value;
 }
 
+static double limited(unsigned axis, double value)
+{
+    return axis == 1 ? (value < 5 ? 5 : value > 85 ? 85 : value) : wrapped(value);
+}
+
+static int wheel(int event, int state, int calls)
+{
+    int rendered = lab_dom_id("rendered"), surface = lab_dom_query(rendered, "[data-surface]");
+    int target = lab_dom_get(event, "target");
+    int ctrl = lab_dom_truth(lab_dom_get(event, "ctrlKey"));
+    int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
+    double delta = read_number(event, "deltaY");
+    if (lab_workspace_mode() || !surface || ctrl == alt || lab_dom_truth(lab_dom_get(event, "shiftKey")) ||
+        lab_dom_truth(lab_dom_get(event, "metaKey")) || lab_dom_truth(lab_dom_get(state, "active")) ||
+        !__builtin_isfinite(delta) || delta == 0 || !lab_dom_closest(target, "svg") ||
+        !lab_dom_node_contains(rendered, target))
+        return 0;
+    if (lab_dom_truth(lab_dom_get(state, "busy")) && !current(state))
+        return 0;
+    unsigned axis = ctrl ? 1 : 0;
+    double initial = lab_dom_to_number(lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
+    /* Use a bounded angular step independent of pixel, line or page wheel units. */
+    double value = limited(axis, initial + (delta > 0 ? 5 : -5));
+    if (value == initial)
+        return 1;
+    lab_dom_set(state, "surface", surface);
+    lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotRange"), 3, "rotationVariable"));
+    lab_dom_set(state, "active", lab_dom_scalar(1, 0));
+    set_angle(axis, value);
+    lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
+    queue(state, calls);
+    return 1;
+}
+
 static void move(int event, int state)
 {
     double dx = read_number(event, "clientX") - read_number(state, "x");
@@ -118,9 +154,9 @@ static void move(int event, int state)
     for (unsigned axis = 0; axis < 3; ++axis) {
         double initial = read_number(state, angles[axis]), value = initial;
         if (axis == 2 ? roll : !roll) {
-            double delta = axis == 1 ? -dy : dx;
+            double delta = axis == 1 ? dy : dx;
             value = __builtin_floor(initial + delta * 0.5 + 0.5);
-            value = axis == 1 ? (value < 5 ? 5 : value > 85 ? 85 : value) : wrapped(value);
+            value = limited(axis, value);
         }
         changed |= value != lab_dom_to_number(lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
         set_angle(axis, value);
@@ -137,8 +173,13 @@ void lab_plot_drag_dispatch(unsigned action, int event, int state)
     int plan = lab_dom_object(5), calls = lab_dom_object(4);
     lab_dom_set(plan, "calls", calls);
     lab_dom_return(plan);
-    if (!state || action > 4)
+    if (!state || action > 5)
         return;
+    if (action == 5) {
+        if (wheel(event, state, calls))
+            lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
+        return;
+    }
     if (!action) {
         if (start(event, state))
             lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
@@ -204,6 +245,7 @@ void lab_plot_drag_install(int document, int window)
         lab_dom_set(rendered, "marsPlotDrag", state);
     }
     lab_dom_subscribe(rendered, "mousedown", "lab_plot_drag_dispatch", 0, state, 0);
+    lab_dom_subscribe(rendered, "wheel", "lab_plot_drag_dispatch", 5, state, 0);
     lab_dom_subscribe(window, "mousemove", "lab_plot_drag_dispatch", 1, state, 0);
     lab_dom_subscribe(window, "mouseup", "lab_plot_drag_dispatch", 2, state, 0);
     lab_dom_subscribe(window, "blur", "lab_plot_drag_dispatch", 3, state, 0);
