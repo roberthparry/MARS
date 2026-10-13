@@ -279,18 +279,24 @@
         const card = rendered.closest('.result-card'), svg = rendered.querySelector('svg');
         const path = svg.querySelector('[data-series] path'), saved = resultZoomIndex(card);
         const initial = labWire.exports().lab_view_zoom_index(NaN);
-        const wheel = (target, deltaY, deltaX = 0) => target.dispatchEvent(new WheelEvent(
-            'wheel', {deltaY, deltaX, bubbles: true, cancelable: true}));
+        const wheel = (target, deltaY, deltaX = 0, modifiers = {shiftKey: true}) =>
+            target.dispatchEvent(new WheelEvent('wheel', {deltaY, deltaX, bubbles: true, cancelable: true, ...modifiers}));
         try {
             setResultZoom(card, initial);
+            for (const modifiers of [{}, {ctrlKey: true}, {metaKey: true}, {altKey: true}]) {
+                check(wheel(path, -100, 0, modifiers) && wheel(svg, 100, 0, modifiers) &&
+                      wheel(card.querySelector('.card-title'), -100, 0, modifiers) &&
+                      resultZoomIndex(card) === initial,
+                      'Plot wheel events without Shift must remain unhandled and must not change zoom');
+            }
             const width = svg.getBoundingClientRect().width;
             check(!wheel(path, -100) && resultZoomIndex(card) === initial + 1 &&
                   svg.getBoundingClientRect().width > width,
-                  'Plain wheel over a plotted path must zoom in and prevent page scrolling');
+                  'Shift+wheel over a plotted path must zoom in and prevent page scrolling');
             const zoomedWidth = svg.getBoundingClientRect().width;
             check(!wheel(svg, 100) && resultZoomIndex(card) === initial &&
                   svg.getBoundingClientRect().width < zoomedWidth,
-                  'Wheel over the plot background must zoom out');
+                  'Shift+wheel over the plot background must zoom out');
             check(wheel(svg, 0) && wheel(svg, 0, 100) && resultZoomIndex(card) === initial,
                   'Zero or horizontal-only wheel motion must not change plot zoom');
             check(wheel(card.querySelector('.card-title'), -100) &&

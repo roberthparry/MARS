@@ -353,7 +353,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               <div class="plot-field"><label for="plotAzimuth">Azimuth</label><div class="plot-angle"><input id="plotAzimuth" type="range" min="0" max="360" value="45" step="1" title="Rotate around the surface"><output id="plotAzimuthValue" for="plotAzimuth">45°</output></div></div>
               <div class="plot-field"><label for="plotElevation">Elevation</label><div class="plot-angle"><input id="plotElevation" type="range" min="5" max="85" value="30" step="1" title="Tilt the surface view"><output id="plotElevationValue" for="plotElevation">30°</output></div></div>
               <div class="plot-field"><label for="plotRoll">Roll</label><div class="plot-angle"><input id="plotRoll" type="range" min="0" max="360" value="0" step="1" title="Turn the view clockwise"><output id="plotRollValue" for="plotRoll">0°</output></div></div>
-              <p class="plot-hint">Drag to rotate · Shift-drag to roll · Wheel to zoom</p>
+              <p class="plot-hint">Drag to rotate · Shift-drag to roll · Shift-wheel to zoom</p>
             </fieldset>
             <fieldset class="plot-group" id="plotVertical"><legend>2-D vertical range</legend>
               <input type="hidden" id="plotScale" value="auto">
@@ -449,7 +449,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Back</code> and <code>Forward</code> navigate the current mode's worksheet history. Switching modes does not discard your other worksheets; edits and controls are saved between sessions.</li>
             <li><code>Copy</code> on the editor copies its input; each result card has its own copy action. Mathematical display can differ from reusable source notation.</li>
             <li>Use a card's zoom controls where available, or <code>Expand</code> for a long result. Expanding a shortened mathematical result reveals its full source; copying does not truncate it.</li>
-            <li>Use the mouse wheel over a 2-D or 3-D plot to zoom in or out, including when expanded. No modifier key is needed. The percentage button resets zoom; scrolling outside the plot image works normally.</li>
+            <li>Hold Shift and use the mouse wheel over a 2-D or 3-D plot to zoom in or out, including when expanded. Without Shift, the wheel keeps its normal scrolling behaviour. The percentage button resets zoom; scrolling outside the plot image works normally.</li>
             <li><code>Use as input</code>, when shown, returns a reusable result to the editor. It is not the same as copying the rendered TeX.</li>
             <li>Read the status and any error diagnostic before treating a result as complete. A failed calculation or timeout is not a numerical answer.</li>
           </ul>

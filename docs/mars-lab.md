@@ -971,7 +971,7 @@ including outside the plot, retains the final position and requests one full
 focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. Preview and final redraws resample the native surface.
 This also works when expanded. Right-click and 2-D plots keep their normal
-behaviour; wheel zoom remains available.
+behaviour; Shift+wheel zoom remains available.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
@@ -1047,8 +1047,9 @@ restores the two-column workspace. Mode switches restore that mode's own result
 headings, including **Plot** when returning to a saved plot, rather than carrying
 a plotting heading into another mode.
 
-Use the mouse wheel over a 2-D or 3-D plot to zoom in (up) or out (down),
-without holding a modifier key. This uses the same bounded zoom levels as the
+Hold **Shift** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
+or out (down). Without Shift, wheel events retain their normal browser behaviour
+and do not change plot zoom. This uses the same bounded zoom levels as the
 card's **−**, **+** and percentage-reset controls, including when expanded.
 It scales the existing SVG without resampling or changing the chosen ranges.
 Scrolling outside the plot image, including over its controls, behaves normally;
