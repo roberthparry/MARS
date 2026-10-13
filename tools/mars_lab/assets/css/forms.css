@@ -1,9 +1,14 @@
 /* Input states and searchable rounded selection menus. */
-.integrator-bound-field input:-webkit-autofill,
-.integrator-bound-field input:-webkit-autofill:hover,
-.integrator-bound-field input:-webkit-autofill:focus {
+:is(.target-row, .integrator-bound-field) input {
+  color-scheme: dark;
+  caret-color: var(--code);
+}
+
+/* An opaque inset covers the browser's autofill paint; translucent fills let it show through. */
+:is(.target-row, .integrator-bound-field) input:is(:autofill, :-webkit-autofill) {
+  color: var(--code);
   -webkit-text-fill-color: var(--code);
-  box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.14) inset;
+  box-shadow: 0 0 0 1000px var(--panel) inset;
 }
 
 .mode-panel input:focus {
@@ -11,12 +16,14 @@
   box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
 }
 
-.mode-panel input::placeholder {
+.mode-panel input::placeholder,
+.target-row input::placeholder {
   color: rgba(233, 244, 239, 0.14);
   opacity: 1;
 }
 
-.mode-panel input::-webkit-input-placeholder {
+.mode-panel input::-webkit-input-placeholder,
+.target-row input::-webkit-input-placeholder {
   color: rgba(233, 244, 239, 0.14);
 }
 
@@ -40,13 +47,14 @@
   -webkit-text-fill-color: var(--code);
 }
 
-.integrator-bound-field input:-webkit-autofill:focus {
+:is(.target-row, .integrator-bound-field) input:is(:autofill, :-webkit-autofill):focus {
   box-shadow:
-    0 0 0 1000px rgba(0, 0, 0, 0.14) inset,
+    0 0 0 1000px var(--panel) inset,
     0 0 0 3px rgba(113, 198, 180, 0.18);
 }
 
-.mode-panel select {
+.mode-panel select,
+.target-row select {
   width: 100%;
   border: 1px solid rgba(233, 244, 239, 0.28);
   border-radius: 999px;
@@ -74,21 +82,25 @@
   padding-right: 2.4rem;
 }
 
-.mode-panel select:hover {
+.mode-panel select:hover,
+.target-row select:hover {
   border-color: rgba(233, 244, 239, 0.42);
 }
 
-.mode-panel select:focus {
+.mode-panel select:focus,
+.target-row select:focus {
   border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
   box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
 }
 
-.mode-panel select option {
+.mode-panel select option,
+.target-row select option {
   color: var(--code);
   background: #071913;
 }
 
-.mode-panel select option:checked {
+.mode-panel select option:checked,
+.target-row select option:checked {
   color: #10190f;
   background: #cfa052;
 }

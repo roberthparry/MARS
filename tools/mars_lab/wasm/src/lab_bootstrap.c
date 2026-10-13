@@ -12,22 +12,26 @@
 #include "lab_flow.h"
 #include "lab_bootstrap.h"
 
-/* Four fixed controls share native labels and option policy, rather than browser business logic. */
+/* Fixed controls share themed menus and native option policy rather than browser business logic. */
 void lab_bootstrap_widgets(void)
 {
     static const struct {
         const char *id;
         unsigned town;
-    } controls[] = {{"datetimeJurisdiction", 0}, {"almanacJurisdiction", 0}, {"datetimeTown", 1}, {"almanacTown", 1}};
+        unsigned searchable;
+    } controls[] = {{"datetimeJurisdiction", 0, 1}, {"almanacJurisdiction", 0, 1},
+                    {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}, {"plotScale", 0, 0}};
     int result = lab_dom_object(5), calls = lab_dom_object(4);
     lab_dom_set(result, "calls", calls);
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
         int options = lab_dom_object(5), args = lab_dom_object(4), call = lab_dom_object(5);
-        lab_dom_set(options, "searchable", lab_dom_scalar(1, 1));
-        lab_dom_set(options, "searchPlaceholder",
-                    lab_dom_string(controls[i].town ? "Search towns" : "Search jurisdictions"));
-        lab_dom_set(options, "emptyText",
-                    lab_dom_string(controls[i].town ? "No towns for this jurisdiction" : "No matching jurisdiction"));
+        lab_dom_set(options, "searchable", lab_dom_scalar(1, controls[i].searchable));
+        if (controls[i].searchable) {
+            lab_dom_set(options, "searchPlaceholder",
+                        lab_dom_string(controls[i].town ? "Search towns" : "Search jurisdictions"));
+            lab_dom_set(options, "emptyText",
+                        lab_dom_string(controls[i].town ? "No towns for this jurisdiction" : "No matching jurisdiction"));
+        }
         if (controls[i].town) {
             lab_dom_set(options, "placeholder", lab_dom_string("Custom location"));
             lab_dom_set(options, "details", lab_dom_scalar(1, 1));

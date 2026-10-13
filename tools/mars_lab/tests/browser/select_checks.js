@@ -6,6 +6,87 @@ window.checkLabSelects = async function checkLabSelects() {
     };
     check(!labDefinitionScripts.includes('controls'), 'retired control script remains in the loader');
     check((await fetch('/js/controls.js')).status === 404, 'retired control route remains available');
+    const scale = document.getElementById('plotScale');
+    const reference = document.getElementById('integratorIntervalCap');
+    const scaleStyle = getComputedStyle(scale), referenceStyle = getComputedStyle(reference);
+    for (const property of ['colorScheme', 'appearance', 'backgroundImage', 'color', 'borderRadius', 'paddingRight'])
+        check(scaleStyle[property] === referenceStyle[property], 'plot scale theme mismatch: ' + property);
+    check(scaleStyle.colorScheme === 'dark', 'plot scale popup must use the dark theme');
+    const scaleShell = scale.closest('.select-shell');
+    const themedShell = document.getElementById('datetimeJurisdiction').closest('.select-shell');
+    check(scaleShell && themedShell, 'plot scale must use the shared themed menu, not an operating-system popup');
+    const scaleButton = scaleShell.querySelector('.select-button');
+    const scaleMenu = scaleShell.querySelector('.select-menu');
+    const savedScale = scale.value;
+    try {
+        for (const selector of ['.select-button', '.select-menu', '.select-option.selected']) {
+            const actual = getComputedStyle(scaleShell.querySelector(selector));
+            const expected = getComputedStyle(themedShell.querySelector(selector));
+            for (const property of ['backgroundImage', 'backgroundColor', 'color', 'borderRadius'])
+                check(actual[property] === expected[property], 'visible plot menu theme: ' + selector + ' ' + property);
+        }
+        scaleButton.click();
+        check(!scaleMenu.classList.contains('hidden') && scaleButton.getAttribute('aria-expanded') === 'true',
+              'plot menu opens as themed DOM content');
+        const choices = [...scaleShell.querySelectorAll('.select-option')];
+        check(choices.length === 3, 'plot menu retains all scale policies');
+        choices.find(option => option.textContent === 'Fit all').click();
+        check(scale.value === 'all' && scaleButton.textContent === 'Fit all' &&
+                  scaleMenu.classList.contains('hidden'), 'themed scale selection updates the native input');
+        scaleButton.click();
+        scaleButton.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+        check(scaleMenu.classList.contains('hidden'), 'plot menu supports keyboard dismissal');
+    } finally {
+        scale.value = savedScale;
+        labDOM.call('lab_select_sync', scale);
+        labDOM.call('lab_select_event', scale, 3, 0, null);
+    }
+    const inputIds = ['plotLower', 'plotUpper', 'plotYLower', 'plotYUpper'];
+    const inputReference = getComputedStyle(document.getElementById('plotLower'));
+    for (const id of inputIds) {
+        const inputStyle = getComputedStyle(document.getElementById(id));
+        for (const property of ['color', 'backgroundColor', 'borderRadius', 'fontFamily'])
+            check(inputStyle[property] === inputReference[property], id + ' input theme mismatch: ' + property);
+        check(inputStyle.colorScheme === 'dark', id + ' must request dark native input states');
+    }
+    const placeholder = getComputedStyle(document.getElementById('plotYLower'), '::placeholder');
+    check(placeholder.color === 'rgba(233, 244, 239, 0.14)', 'manual limit placeholder theme');
+    // Autofill cannot be triggered by assigning .value. Exercise the shipped declarations
+    // through a test-only selector, without claiming to trigger the browser's autofill service.
+    const entry = Array.from(document.styleSheets).find(sheet => sheet.href?.endsWith('/index.css'));
+    const forms = Array.from(entry.cssRules).find(rule => rule.href?.endsWith('/css/forms.css')).styleSheet;
+    const autofillRules = Array.from(forms.cssRules).filter(rule => rule.selectorText?.includes(':autofill'));
+    check(autofillRules.length === 2, 'normal and focused autofill safeguards must exist');
+    const autofillStyle = document.createElement('style');
+    autofillStyle.textContent = autofillRules.map(rule =>
+        rule.selectorText.replace(/:-webkit-autofill|:autofill/g, '[data-test-autofill]') +
+        '{' + rule.style.cssText + '}').join('\n');
+    document.head.appendChild(autofillStyle);
+    const active = document.activeElement;
+    try {
+        for (const id of inputIds) {
+            const input = document.getElementById(id);
+            input.setAttribute('data-test-autofill', '');
+            const normal = getComputedStyle(input);
+            check(normal.boxShadow.includes('rgb(9, 31, 23)') && normal.boxShadow.includes('1000px'),
+                  id + ' must cover autofill paint with opaque panel colour');
+            check(normal.webkitTextFillColor === inputReference.color, id + ' autofill text must stay light');
+            input.focus();
+            check(getComputedStyle(input).boxShadow.includes('1000px'), id + ' focus removed autofill protection');
+            input.removeAttribute('data-test-autofill');
+        }
+    } finally {
+        for (const id of inputIds)
+            document.getElementById(id).removeAttribute('data-test-autofill');
+        autofillStyle.remove();
+        active?.focus();
+    }
+    for (const selector of ['option:not(:checked)', 'option:checked']) {
+        const actual = getComputedStyle(scale.querySelector(selector));
+        const expected = getComputedStyle(reference.querySelector(selector));
+        check(actual.color === expected.color && actual.backgroundColor === expected.backgroundColor,
+              'plot scale option theme mismatch: ' + selector);
+    }
     const root = document.createElement('div');
     root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:400px';
     document.body.appendChild(root);

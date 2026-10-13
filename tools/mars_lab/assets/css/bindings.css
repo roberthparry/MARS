@@ -24,8 +24,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
 }
 
-.target-row input,
-.plot-range select {
+.target-row input {
   width: 100%;
   border: 1px solid rgba(233, 244, 239, 0.28);
   border-radius: 999px;
@@ -36,8 +35,7 @@
   font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
 }
 
-.target-row input:focus,
-.plot-range select:focus {
+.target-row input:focus {
   border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
   box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
 }
