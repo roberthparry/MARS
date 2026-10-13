@@ -132,8 +132,8 @@ static void lab_event_zoom(unsigned action, int event, int plan, int calls)
         int area = lab_dom_closest(lab_dom_get(event, "target"), ".rendered");
         int card = lab_dom_closest(lab_dom_get(event, "currentTarget"), ".result-card");
         int plot = lab_dom_query(card, ".rendered svg [data-series]");
-        /* Plots reserve Shift+wheel inside the image; other result cards retain Ctrl/Command zoom. */
-        if (plot ? (!area || !lab_dom_truth(lab_dom_get(event, "shiftKey"))) : !lab_event_modifier(event))
+        /* Plots reserve Ctrl+wheel inside the image; other result cards retain Ctrl/Command zoom. */
+        if (plot ? (!area || !lab_dom_truth(lab_dom_get(event, "ctrlKey"))) : !lab_event_modifier(event))
             return;
         delta = lab_dom_to_number(lab_dom_get(event, "deltaY"));
         if (!(delta < 0 || delta > 0))

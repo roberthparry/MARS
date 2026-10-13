@@ -244,11 +244,11 @@
                   'A superseded request must discard queued movement without another request');
             seed();
             const card = rendered.closest('.result-card'), zoom = resultZoomIndex(card);
-            check(!wheel(path, 100, {ctrlKey: true}) && values() === '45,35,0' &&
+            check(!wheel(path, 100, {shiftKey: true}) && values() === '45,35,0' &&
                   pending.length === 1 && !pending[0].preview,
-                  'Ctrl+wheel down must increase elevation and request a full-detail redraw');
-            check(!wheel(path, -1, {ctrlKey: true, deltaMode: 1}) && values() === '45,30,0',
-                  'Ctrl+wheel up must decrease elevation, including line-mode events');
+                  'Shift+wheel down must increase elevation and request a full-detail redraw');
+            check(!wheel(path, -1, {shiftKey: true, deltaMode: 1}) && values() === '45,30,0',
+                  'Shift+wheel up must decrease elevation, including line-mode events');
             for (let i = 0; i < 30; ++i)
                 wheel(path, 1, {altKey: true, deltaMode: 2});
             check(values() === '195,30,0' && pending.length === 1 && resultZoomIndex(card) === zoom,
@@ -261,30 +261,30 @@
                 wheel(path, -100, {altKey: true});
             check(values() === '355,30,0', 'Alt+wheel up must turn left and wrap azimuth');
             for (let i = 0; i < 20; ++i)
-                wheel(path, -100, {ctrlKey: true});
-            check(values() === '355,5,0', 'Ctrl+wheel must respect the lower elevation limit');
+                wheel(path, -100, {shiftKey: true});
+            check(values() === '355,5,0', 'Shift+wheel must respect the lower elevation limit');
             complete();
             complete();
             const atLimit = requests;
-            check(!wheel(path, -100, {ctrlKey: true}) && requests === atLimit,
+            check(!wheel(path, -100, {shiftKey: true}) && requests === atLimit,
                   'An outward wheel event at the elevation limit must not request another redraw');
             for (let i = 0; i < 20; ++i)
-                wheel(path, 100, {ctrlKey: true});
-            check(values() === '355,85,0', 'Ctrl+wheel must respect the upper elevation limit');
+                wheel(path, 100, {shiftKey: true});
+            check(values() === '355,85,0', 'Shift+wheel must respect the upper elevation limit');
             check(controls.every(control => document.getElementById(control.id + 'Value').textContent ===
                                            control.value + '°'), 'Wheel rotation must synchronise degree readouts');
             complete(false);
             check(pending.length === 0, 'Superseding a wheel redraw must discard queued camera changes');
-            for (const modifiers of [{ctrlKey: true}, {altKey: true}]) {
+            for (const modifiers of [{shiftKey: true}, {altKey: true}]) {
                 check(wheel(path, 0, {...modifiers, deltaX: 100}) &&
                       wheel(card.querySelector('.card-title'), 100, modifiers) &&
                       wheel(controls[0], 100, modifiers), 'Rotation must require vertical wheel motion over the image');
-                check(!wheel(path, -100, {...modifiers, shiftKey: true}) && pending.length === 0 &&
-                      values() === '355,85,0', 'Shift+wheel must take zoom precedence over camera rotation');
+                check(!wheel(path, -100, {...modifiers, ctrlKey: true}) && pending.length === 0 &&
+                      values() === '355,85,0', 'Ctrl+wheel must take zoom precedence over camera rotation');
                 setResultZoom(card, zoom);
             }
-            check(wheel(path, 100, {ctrlKey: true, altKey: true}) && pending.length === 0,
-                  'Combined Ctrl+Alt must not choose an ambiguous rotation axis');
+            check(wheel(path, 100, {shiftKey: true, altKey: true}) && pending.length === 0,
+                  'Combined Shift+Alt must not choose an ambiguous rotation axis');
         } finally {
             window.dispatchEvent(new Event('blur'));
             while (pending.length)
@@ -325,7 +325,7 @@
             await new Promise(resolve => setTimeout(resolve, 25));
         check(rendered.querySelectorAll('[data-series] path').length > 1000 && !rendered.marsPlotDrag.busy,
               'Release must restore the full native mesh, even without a final movement');
-        for (const [modifier, axis] of [['ctrlKey', 'elevation'], ['altKey', 'azimuth']]) {
+        for (const [modifier, axis] of [['shiftKey', 'elevation'], ['altKey', 'azimuth']]) {
             const before = rendered.querySelector('[data-surface]');
             const angle = Number(before.dataset[axis]) - 5;
             wheel(before.querySelector('[data-series] path'), -100, {[modifier]: true});
@@ -342,13 +342,13 @@
         const card = rendered.closest('.result-card'), svg = rendered.querySelector('svg');
         const path = svg.querySelector('[data-series] path'), saved = resultZoomIndex(card);
         const initial = labWire.exports().lab_view_zoom_index(NaN);
-        const wheel = (target, deltaY, deltaX = 0, modifiers = {shiftKey: true}) =>
+        const wheel = (target, deltaY, deltaX = 0, modifiers = {ctrlKey: true}) =>
             target.dispatchEvent(new WheelEvent('wheel', {deltaY, deltaX, bubbles: true, cancelable: true, ...modifiers}));
         try {
             setResultZoom(card, initial);
             const unhandled = [{}, {metaKey: true}];
             if (!rendered.querySelector('[data-surface]'))
-                unhandled.push({ctrlKey: true}, {altKey: true});
+                unhandled.push({shiftKey: true}, {altKey: true});
             for (const modifiers of unhandled) {
                 check(wheel(path, -100, 0, modifiers) && wheel(svg, 100, 0, modifiers) &&
                       wheel(card.querySelector('.card-title'), -100, 0, modifiers) &&
@@ -358,11 +358,11 @@
             const width = svg.getBoundingClientRect().width;
             check(!wheel(path, -100) && resultZoomIndex(card) === initial + 1 &&
                   svg.getBoundingClientRect().width > width,
-                  'Shift+wheel over a plotted path must zoom in and prevent page scrolling');
+                  'Ctrl+wheel over a plotted path must zoom in and prevent page scrolling');
             const zoomedWidth = svg.getBoundingClientRect().width;
             check(!wheel(svg, 100) && resultZoomIndex(card) === initial &&
                   svg.getBoundingClientRect().width < zoomedWidth,
-                  'Shift+wheel over the plot background must zoom out');
+                  'Ctrl+wheel over the plot background must zoom out');
             check(wheel(svg, 0) && wheel(svg, 0, 100) && resultZoomIndex(card) === initial,
                   'Zero or horizontal-only wheel motion must not change plot zoom');
             check(wheel(card.querySelector('.card-title'), -100) &&

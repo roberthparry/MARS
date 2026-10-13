@@ -4,7 +4,7 @@
  *
  * Dragging adjusts azimuth/elevation, or roll when Shift was held at the start.
  * Downward dragging increases elevation; upward dragging decreases it.
- * Ctrl+wheel adjusts elevation and Alt+wheel adjusts azimuth in the same direction.
+ * Shift+wheel adjusts elevation and Alt+wheel adjusts azimuth in the same direction.
  * Sliders and degree readouts update together. Only one native SVG request runs
  * at a time; further movements replace the pending camera position. Cancellation
  * restores the original camera. Superseding requests and mode changes stop the gesture.
@@ -119,17 +119,17 @@ static int wheel(int event, int state, int calls)
 {
     int rendered = lab_dom_id("rendered"), surface = lab_dom_query(rendered, "[data-surface]");
     int target = lab_dom_get(event, "target");
-    int ctrl = lab_dom_truth(lab_dom_get(event, "ctrlKey"));
+    int shift = lab_dom_truth(lab_dom_get(event, "shiftKey"));
     int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
     double delta = read_number(event, "deltaY");
-    if (lab_workspace_mode() || !surface || ctrl == alt || lab_dom_truth(lab_dom_get(event, "shiftKey")) ||
+    if (lab_workspace_mode() || !surface || shift == alt || lab_dom_truth(lab_dom_get(event, "ctrlKey")) ||
         lab_dom_truth(lab_dom_get(event, "metaKey")) || lab_dom_truth(lab_dom_get(state, "active")) ||
         !__builtin_isfinite(delta) || delta == 0 || !lab_dom_closest(target, "svg") ||
         !lab_dom_node_contains(rendered, target))
         return 0;
     if (lab_dom_truth(lab_dom_get(state, "busy")) && !current(state))
         return 0;
-    unsigned axis = ctrl ? 1 : 0;
+    unsigned axis = shift ? 1 : 0;
     double initial = lab_dom_to_number(lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
     /* Use a bounded angular step independent of pixel, line or page wheel units. */
     double value = limited(axis, initial + (delta > 0 ? 5 : -5));
