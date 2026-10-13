@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 
 #include "almanac-t.h"
+#include "jurisdiction-t.h"
 #include "sqlite-t.h"
 
 #define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
@@ -42,13 +43,9 @@ typedef struct almanac_event_lab_options_t {
     almanac_event_lab_kind_t kind;
 } almanac_event_lab_options_t;
 
-#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v20"
+#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v22"
 #define ALMANAC_EVENT_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_EVENT_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
-#define JURISDICTION_DB_PATH_ENV "MARS_JURISDICTION_DB_PATH"
-#define JURISDICTION_DB_KEY_ENV "MARS_JURISDICTION_DB_KEY"
-#define LEGACY_HOLIDAY_DB_PATH_ENV "MARS_HOLIDAY_DB_PATH"
-#define LEGACY_HOLIDAY_DB_KEY_ENV "MARS_HOLIDAY_DB_KEY"
 #define TOTALITY_TOWN_SCORE_LIMIT 1024u
 
 typedef struct almanac_totality_town_t {
@@ -59,7 +56,6 @@ typedef struct almanac_totality_town_t {
     double longitude_degrees;
     double elevation_metres;
     double distance_km;
-    double path_distance_km;
 } almanac_totality_town_t;
 
 static bool parse_date_text(const char *text, short *year, month_t *month, uint8_t *day)
@@ -127,38 +123,6 @@ static sqlite_t *open_lab_object_store(void)
         sqlite_close(db);
         db = NULL;
     }
-
-done:
-    string_free(key_text);
-    string_free(path_text);
-    return db;
-}
-
-static const char *first_nonempty_env(const char *primary, const char *fallback)
-{
-    const char *value = getenv(primary);
-
-    if (value && *value)
-        return value;
-    value = getenv(fallback);
-    return value && *value ? value : NULL;
-}
-
-static sqlite_t *open_jurisdiction_db(void)
-{
-    const char *path = first_nonempty_env(JURISDICTION_DB_PATH_ENV, LEGACY_HOLIDAY_DB_PATH_ENV);
-    const char *key = first_nonempty_env(JURISDICTION_DB_KEY_ENV, LEGACY_HOLIDAY_DB_KEY_ENV);
-    string_t *path_text = NULL;
-    string_t *key_text = NULL;
-    sqlite_t *db = NULL;
-
-    if (!path || !key)
-        return NULL;
-    path_text = string_new_with(path);
-    key_text = string_new_with(key);
-    if (!path_text || !key_text)
-        goto done;
-    db = sqlite_open_encrypted(path_text, key_text);
 
 done:
     string_free(key_text);
@@ -340,10 +304,6 @@ static int totality_town_compare(const void *lhs, const void *rhs)
     const almanac_totality_town_t *left = lhs;
     const almanac_totality_town_t *right = rhs;
 
-    if (left->path_distance_km < right->path_distance_km)
-        return -1;
-    if (left->path_distance_km > right->path_distance_km)
-        return 1;
     if (left->distance_km < right->distance_km)
         return -1;
     if (left->distance_km > right->distance_km)
@@ -379,95 +339,54 @@ static bool append_totality_town(almanac_totality_town_t **towns, size_t *count,
     return true;
 }
 
-static almanac_totality_town_t *load_totality_towns(const almanac_observer_t *observer,
-                                                    const almanac_solar_totality_location_t *path_reference,
-                                                    size_t *out_count)
+typedef struct almanac_totality_towns_t {
+    const almanac_observer_t *observer;
+    almanac_totality_town_t *towns;
+    size_t count;
+    size_t capacity;
+    bool failed;
+} almanac_totality_towns_t;
+
+static bool collect_totality_town(const jurisdict_place_t *place, void *context)
 {
-    static const char *sql =
-        "select town_jurisdiction.jurisdiction_id, "
-        "       town_name.town_name, "
-        "       town_latitude.latitude, "
-        "       town_longitude.longitude, "
-        "       coalesce(timezone_canonical.canonical_timezone_name, timezone_code.timezone_name, ''), "
-        "       coalesce(town_elevation.elevation_metres, 0) "
-        "from jurisdiction_town_entity as town "
-        "join jurisdiction_town_jurisdiction_id as town_jurisdiction "
-        "  on town_jurisdiction.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_name as town_name "
-        "  on town_name.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_latitude as town_latitude "
-        "  on town_latitude.jurisdiction_town_id = town.jurisdiction_town_id "
-        "join jurisdiction_town_longitude as town_longitude "
-        "  on town_longitude.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join jurisdiction_town_elevation as town_elevation "
-        "  on town_elevation.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join jurisdiction_town_timezone as town_timezone "
-        "  on town_timezone.jurisdiction_town_id = town.jurisdiction_town_id "
-        "left join timezone_code "
-        "  on timezone_code.timezone_code = town_timezone.timezone_code "
-        "left join timezone_canonical "
-        "  on timezone_canonical.timezone_name = timezone_code.timezone_name";
-    sqlite_t *db = NULL;
-    sqlite_stmt_t *stmt = NULL;
-    sqlite_step_result_t rc;
-    almanac_totality_town_t *towns = NULL;
-    size_t count = 0u;
-    size_t capacity = 0u;
+    almanac_totality_towns_t *collection = context;
+    almanac_totality_town_t town = {0};
+    if (!place->jurisdiction_code || !place->name ||
+        !parse_double_text(place->latitude, &town.latitude_degrees) ||
+        !parse_double_text(place->longitude, &town.longitude_degrees) ||
+        !parse_double_text(place->elevation, &town.elevation_metres) ||
+        !isfinite(town.latitude_degrees) || !isfinite(town.longitude_degrees) || !isfinite(town.elevation_metres) ||
+        fabs(town.latitude_degrees) > 90 || fabs(town.longitude_degrees) > 180 ||
+        town.elevation_metres < -500 || town.elevation_metres > 9000)
+        return true;
+    copy_text_field(town.jurisdiction_id, sizeof(town.jurisdiction_id), place->jurisdiction_code);
+    copy_text_field(town.town_name, sizeof(town.town_name), place->name);
+    copy_text_field(town.timezone_name, sizeof(town.timezone_name), place->timezone);
+    town.distance_km = surface_distance_km(collection->observer->latitude_degrees,
+                                           collection->observer->longitude_degrees,
+                                           town.latitude_degrees, town.longitude_degrees);
+    collection->failed = !append_totality_town(&collection->towns, &collection->count, &collection->capacity, &town);
+    return !collection->failed;
+}
 
-    if (out_count)
-        *out_count = 0u;
-    if (!observer || !out_count)
-        return NULL;
-    db = open_jurisdiction_db();
-    if (!db)
-        return NULL;
-    stmt = sqlite_stmt_prepare(db, sql);
-    if (!stmt)
-        goto done;
-    while ((rc = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
-        almanac_totality_town_t town;
-        const char *jurisdiction_id = sqlite_stmt_column_text(stmt, 0);
-        const char *town_name = sqlite_stmt_column_text(stmt, 1);
-        const char *latitude_text = sqlite_stmt_column_text(stmt, 2);
-        const char *longitude_text = sqlite_stmt_column_text(stmt, 3);
-        const char *timezone_name = sqlite_stmt_column_text(stmt, 4);
-        const char *elevation_text = sqlite_stmt_column_text(stmt, 5);
-        double latitude;
-        double longitude;
-        double elevation = 0.0;
-
-        if (!jurisdiction_id || !town_name || !latitude_text || !longitude_text)
-            continue;
-        if (!parse_double_text(latitude_text, &latitude) || !parse_double_text(longitude_text, &longitude) ||
-            (elevation_text && !parse_double_text(elevation_text, &elevation)) || latitude < -90.0 || latitude > 90.0 ||
-            longitude < -180.0 || longitude > 180.0 || elevation < -500.0 || elevation > 9000.0) {
-            continue;
-        }
-        memset(&town, 0, sizeof(town));
-        copy_text_field(town.jurisdiction_id, sizeof(town.jurisdiction_id), jurisdiction_id);
-        copy_text_field(town.town_name, sizeof(town.town_name), town_name);
-        copy_text_field(town.timezone_name, sizeof(town.timezone_name), timezone_name);
-        town.latitude_degrees = latitude;
-        town.longitude_degrees = longitude;
-        town.elevation_metres = elevation;
-        town.distance_km =
-            surface_distance_km(observer->latitude_degrees, observer->longitude_degrees, latitude, longitude);
-        if (path_reference && path_reference->found) {
-            town.path_distance_km = surface_distance_km(path_reference->latitude_degrees,
-                                                        path_reference->longitude_degrees, latitude, longitude);
-        } else {
-            town.path_distance_km = town.distance_km;
-        }
-        if (!append_totality_town(&towns, &count, &capacity, &town))
-            goto done;
+static bool load_totality_towns(const almanac_observer_t *observer, almanac_totality_town_t **out, size_t *count)
+{
+    almanac_totality_towns_t collection = {.observer = observer};
+    jurisdiction_t *catalogue = jurisdict_open(NULL);
+    bool ok = catalogue && jurisdict_each_town(catalogue, collect_totality_town, &collection) && !collection.failed;
+    jurisdict_close(catalogue);
+    *out = NULL;
+    *count = 0;
+    if (!ok) {
+        free(collection.towns);
+        return false;
     }
-    qsort(towns, count, sizeof(*towns), totality_town_compare);
-    *out_count = count;
-
-done:
-    sqlite_stmt_finalize(stmt);
-    sqlite_close(db);
-    return towns;
+    /* Enumerate once, then score the bounded nearest-town shortlist in distance order. */
+    if (collection.count > 1)
+        qsort(collection.towns, collection.count, sizeof(*collection.towns), totality_town_compare);
+    *out = collection.towns;
+    *count = collection.count;
+    return true;
 }
 
 static bool town_seeds_total_solar_eclipse(almanac_t *almanac, const almanac_observer_t *origin,
@@ -485,8 +404,7 @@ static bool town_seeds_total_solar_eclipse(almanac_t *almanac, const almanac_obs
 }
 
 static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *almanac,
-                                       const almanac_observer_t *observer, const almanac_solar_eclipse_t *event,
-                                       const almanac_solar_totality_location_t *path_reference)
+                                       const almanac_observer_t *observer, const almanac_solar_eclipse_t *event)
 {
     almanac_totality_town_t *towns = NULL;
     size_t town_count = 0u;
@@ -501,8 +419,7 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
     out[0] = '\0';
     if (!almanac || !observer || !event)
         return false;
-    towns = load_totality_towns(observer, path_reference, &town_count);
-    if (!towns || town_count == 0u)
+    if (!load_totality_towns(observer, &towns, &town_count))
         return false;
     score_limit = town_count < TOTALITY_TOWN_SCORE_LIMIT ? town_count : TOTALITY_TOWN_SCORE_LIMIT;
     memset(&best_location, 0, sizeof(best_location));
@@ -533,23 +450,22 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
                  best_town->elevation_metres);
     }
     free(towns);
-    return found;
+    return true;
 }
 
-static void append_solar_events(string_t *out, almanac_t *almanac, const almanac_observer_t *observer,
+static bool append_solar_events(string_t *out, almanac_t *almanac, const almanac_observer_t *observer,
                                 bool totality_land, const array_t *events)
 {
     size_t i;
 
     if (!out)
-        return;
+        return false;
     for (i = 0u; events && i < array_size(events); ++i) {
         const almanac_solar_eclipse_t *event = array_get(events, i);
         almanac_event_time_t greatest;
         almanac_event_time_t first;
         almanac_event_time_t fourth;
         char nearest_totality_text[512];
-        bool have_named_totality = false;
 
         if (!event)
             continue;
@@ -557,18 +473,22 @@ static void append_solar_events(string_t *out, almanac_t *almanac, const almanac
         (void)almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FIRST_CONTACT, &first);
         (void)almanac_solar_eclipse_time(event, ALMANAC_EVENT_TIME_FOURTH_CONTACT, &fourth);
         nearest_totality_text[0] = '\0';
-        if (totality_land) {
-            have_named_totality = nearest_totality_town_text(nearest_totality_text, sizeof(nearest_totality_text),
-                                                             almanac, observer, event, NULL);
+        if (totality_land && !nearest_totality_town_text(nearest_totality_text, sizeof(nearest_totality_text),
+                                                         almanac, observer, event)) {
+            fprintf(stderr, "Land-totality town catalogue is unavailable; cannot search for named locations\n");
+            return false;
         }
-        if (totality_land && have_named_totality) {
-            /* The town search emits an already named land location. */
-        }
-        (void)string_append_format(out, "event Solar|Solar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f|%s\n",
+        (void)string_append_format(out, "event Solar|Solar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f|%s|"
+                                       "%.12f|%.12f|%.12f|0|%.9f\n",
                                    solar_kind_text(almanac_solar_eclipse_kind(event)), greatest.jd, first.jd, fourth.jd,
                                    almanac_solar_eclipse_magnitude(event),
-                                   almanac_solar_eclipse_totality_percent(event), nearest_totality_text);
+                                   almanac_solar_eclipse_totality_percent(event), nearest_totality_text,
+                                   almanac_solar_eclipse_sun_semi_diameter_degrees(event),
+                                   almanac_solar_eclipse_moon_semi_diameter_degrees(event),
+                                   almanac_solar_eclipse_separation_degrees(event),
+                                   almanac_solar_eclipse_orientation_degrees(event));
     }
+    return true;
 }
 
 static void append_lunar_events(string_t *out, const array_t *events)
@@ -588,10 +508,16 @@ static void append_lunar_events(string_t *out, const array_t *events)
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest);
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_P1_CONTACT, &p1);
         (void)almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_P4_CONTACT, &p4);
-        (void)string_append_format(out, "event Lunar|Lunar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f\n",
+        (void)string_append_format(out, "event Lunar|Lunar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f||"
+                                       "%.12f|%.12f|%.12f|%.12f|%.9f\n",
                                    lunar_kind_text(almanac_lunar_eclipse_kind(event)), greatest.jd, p1.jd, p4.jd,
                                    almanac_lunar_eclipse_umbral_magnitude(event),
-                                   almanac_lunar_eclipse_totality_percent(event));
+                                   almanac_lunar_eclipse_totality_percent(event),
+                                   almanac_lunar_eclipse_moon_semi_diameter_degrees(event),
+                                   almanac_lunar_eclipse_umbral_radius_degrees(event),
+                                   almanac_lunar_eclipse_opposition_error_degrees(event),
+                                   almanac_lunar_eclipse_penumbral_radius_degrees(event),
+                                   almanac_lunar_eclipse_orientation_degrees(event));
     }
 }
 
@@ -651,7 +577,8 @@ int lab_worker_almanac_event(int argc, char **argv)
             goto done;
     }
 
-    append_solar_events(output, almanac, &observer, options.totality_land, solar_events);
+    if (!append_solar_events(output, almanac, &observer, options.totality_land, solar_events))
+        goto done;
     append_lunar_events(output, lunar_events);
     store_cached_output(&options, output);
     fputs(string_c_str(output), stdout);

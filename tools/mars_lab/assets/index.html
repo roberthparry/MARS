@@ -665,16 +665,20 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Reading The Body Table</div>
           <ul>
+            <li>Coloured SVG symbols identify ☉ Sun (gold), ☿ Mercury (purple), ♀ Venus (yellow), ♂ Mars (red), ♃ Jupiter (coral), ♄ Saturn (amber), ⛢ Uranus (cyan) and ♆ Neptune (violet) beside their names. The Moon's phase disc uses muted blue-grey illumination with grey shadow and outline.</li>
+            <li>The Moon's shaded disc shows its phase and tilt for the selected GMT instant and location, with the local zenith upwards. This accounts for both hemispheres and the equator. Hover for illumination and orientation; unavailable local orientation is explicitly labelled, and a plain ☾ means phase data is unavailable.</li>
             <li><code>Declination</code>, <code>RA</code>, and <code>GHA</code> are apparent body coordinates for the selected GMT moment.</li>
             <li><code>Altitude</code> and <code>Azimuth</code> are observer-relative horizon coordinates for the selected latitude, longitude, and altitude.</li>
             <li><code>s.d.</code> is the apparent semi-diameter in arcminutes where the body has a visible disc.</li>
             <li><code>Vmag.</code> is visual magnitude. Lower numbers are brighter; negative values are very bright.</li>
+            <li>Stars have SVG star shapes: brighter stars are larger, with size limits to keep every symbol readable. Hover for the magnitude. Missing magnitudes use a medium-sized symbol labelled unavailable; size does not represent the star's physical diameter.</li>
             <li><code>Visible</code> means the body is above the usable local horizon and passes the daylight/eclipse visibility checks.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Eclipses And Transits</div>
           <ul>
+            <li>Eclipse names have SVG previews at greatest eclipse, tilted for the selected observer with the local zenith upwards. Solar overlaps use the local disc geometry; lunar previews show penumbral shading and the umbra. Colours are schematic, not a brightness forecast. Missing geometry suppresses the preview; undefined tilt is labelled.</li>
             <li>The event table starts at the selected GMT moment and covers one year ahead.
               An event already in progress remains listed until its final contact.</li>
             <li><code>Date</code> gives the local civil date of greatest eclipse or transit, so the row remains meaningful even if nearest totality cannot be found.</li>

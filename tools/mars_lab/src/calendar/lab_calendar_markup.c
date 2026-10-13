@@ -9,9 +9,9 @@
  */
 #include <string.h>
 
+#include "string-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
-#include "string-t.h"
 
 static bool lab_cal_markup_text(string_t *out, const char *value)
 {
@@ -105,8 +105,18 @@ string_t *lab_cal_totality_markup(const char *text, const json_t *action)
     return out;
 }
 
-static bool lab_cal_markup_bodies(string_t *out, const json_t *rows, bool visible)
+static bool lab_cal_markup_bodies(string_t *out, const json_t *rows, const json_t *source,
+                                  const json_t *observer, bool visible)
 {
+    /* One bounded pass finds the orientation reference for this worksheet. */
+    const json_t *sun = NULL;
+    for (size_t i = 0; i < json_array_size(source) && i < 256u; ++i) {
+        const json_t *row = json_array_get(source, i);
+        if (!strcmp(lab_cal_text(row, "code"), "SUN")) {
+            sun = row;
+            break;
+        }
+    }
     bool ok =
         !string_append_cstr(
             out, "<div class=\"almanac-table-scroll\" role=\"region\" "
@@ -124,7 +134,8 @@ static bool lab_cal_markup_bodies(string_t *out, const json_t *rows, bool visibl
             name = lab_cal_text(row, "code");
         ok = string_append_format(out, "<tr class=\"%s\"><td class=\"%s\">", reference ? "reference" : "",
                                   reference ? "reference-name" : "body-name") >= 0 &&
-             lab_cal_markup_text(out, name) && !string_append_cstr(out, "</td>");
+             lab_cal_body_symbol(out, row, sun, observer) && lab_cal_markup_text(out, name) &&
+             !string_append_cstr(out, "</td>");
         for (size_t j = 0; ok && j < sizeof fields / sizeof *fields; ++j)
             ok = !string_append_cstr(out, "<td class=\"number\">") &&
                  lab_cal_markup_text(out, lab_cal_text(row, fields[j])) && !string_append_cstr(out, "</td>");
@@ -178,6 +189,16 @@ static bool lab_cal_markup_events(string_t *out, const json_t *events)
              lab_cal_markup_text(out, lab_cal_text(event, "jd")) && !string_append_cstr(out, "\">");
         for (size_t j = 0; ok && j < sizeof cells / sizeof *cells; ++j) {
             ok = string_append_format(out, "<td class=\"%s\" data-label=\"%s\"", cells[j].css, cells[j].label) >= 0;
+            if (j == 3u || j == 4u) {
+                bool lunar = !strcmp(lab_cal_text(event, "category"), "Lunar");
+                const char *measure = j == 3u
+                    ? (lunar ? "Umbral magnitude; negative means the Moon misses the dark umbra"
+                             : "Fraction of the Sun's diameter covered at greatest eclipse")
+                    : (lunar ? "Moon area inside the dark umbra; excludes penumbral dimming"
+                             : "Sun area covered by the Moon at greatest eclipse");
+                ok = ok && !string_append_cstr(out, " title=\"") && lab_cal_markup_text(out, measure) &&
+                     !string_append_char(out, '"');
+            }
             if (cells[j].title) {
                 const char *title = lab_cal_text(event, cells[j].title);
                 if (j == 7u && !*title)
@@ -185,7 +206,13 @@ static bool lab_cal_markup_events(string_t *out, const json_t *events)
                 ok = ok && !string_append_cstr(out, " title=\"") && lab_cal_markup_text(out, title) &&
                      !string_append_char(out, '"');
             }
-            ok = ok && !string_append_char(out, '>') && lab_cal_markup_text(out, lab_cal_text(event, cells[j].field)) &&
+            ok = ok && !string_append_char(out, '>');
+            if (j == 1u)
+                ok = ok && !string_append_cstr(out, "<span class=\"almanac-event-name\">") &&
+                     lab_cal_eclipse_symbol(out, event) &&
+                     !string_append_cstr(out, "<span class=\"almanac-event-label\">");
+            ok = ok && lab_cal_markup_text(out, lab_cal_text(event, cells[j].field)) &&
+                 (j != 1u || !string_append_cstr(out, "</span></span>")) &&
                  !string_append_cstr(out, "</td>");
         }
         ok = ok && !string_append_cstr(out, "<td class=\"event-details\" data-label=\"Nearest totality\"");
@@ -236,7 +263,11 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
                                   "aria-pressed=\"%s\">%s</button>",
                                   active ? "active" : "", modes[i], active ? "true" : "false", labels[i]) >= 0;
     }
-    ok = ok && !string_append_cstr(out, "</span></div></div>") && lab_cal_markup_bodies(out, rows, visible) &&
+    const json_t *source = lab_cal_get(response, "all_rows");
+    if (!source)
+        source = lab_cal_get(response, "rows");
+    ok = ok && !string_append_cstr(out, "</span></div></div>") &&
+         lab_cal_markup_bodies(out, rows, source ? source : rows, response, visible) &&
          !string_append_cstr(out, "<div class=\"almanac-events-title\">") &&
          lab_cal_markup_text(out, lab_cal_text(response, "event_title")) && !string_append_cstr(out, "</div>") &&
          lab_cal_markup_events(out, events) && !string_append_cstr(out, "</div>");

@@ -90,6 +90,167 @@ static void test_lab_almanac_times(void)
     TEST_ASSERT_TRUE(ok, "compact times preserve supported offsets, date precedence and unavailable/malformed text");
 }
 
+static void test_lab_almanac_symbols(void)
+{
+    static const char *const codes[] = {"SUN", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE"};
+    static const char *const glyphs[] = {"☉", "☿", "♀", "♂", "♃", "♄", "⛢", "♆"};
+    json_t *row = json_new_object();
+    bool ok = row != NULL;
+    for (size_t i = 0; ok && i < sizeof(codes) / sizeof(*codes); ++i) {
+        lab_cal_set(row, "code", codes[i]);
+        string_t *html = string_new(), *body = string_sprintf("data-body=\"%s\"", codes[i]);
+        ok = html && lab_cal_body_symbol(html, row, NULL, NULL) && strstr(string_c_str(html), glyphs[i]) &&
+             strstr(string_c_str(html), "<svg") && strstr(string_c_str(html), "<g fill=\"none\"") &&
+             !strstr(string_c_str(html), "<text") && !strstr(string_c_str(html), "<image") &&
+             strstr(string_c_str(html), "aria-hidden=\"true\"") && strstr(string_c_str(html), string_c_str(body));
+        string_free(body);
+        string_free(html);
+    }
+    static const char *const plain[] = {"ARIES", "", "<script>"};
+    for (size_t i = 0; ok && i < sizeof(plain) / sizeof(*plain); ++i) {
+        lab_cal_set(row, "code", plain[i]);
+        string_t *html = string_new();
+        ok = html && lab_cal_body_symbol(html, row, NULL, NULL) && !string_byte_length(html);
+        string_free(html);
+    }
+    json_free(row);
+    TEST_ASSERT_TRUE(ok, "catalogue identifiers select traditional symbols; reference and unknown bodies stay plain");
+}
+
+static void test_lab_almanac_star_sizes(void)
+{
+    json_t *row = test_lab_json("{\"code\":\"SIRIUS\",\"magnitude\":\"-1.5\"}");
+    static const struct {
+        const char *magnitude, *scale;
+    } cases[] = {
+        {"-1.46", "0.946000"}, {"0", "0.800000"}, {"2", "0.600000"},
+        {"4", "0.400000"}, {"6", "0.300000"}, {"-100", "1.000000"},
+        {"100", "0.300000"}, {"", "0.600000"}, {"nan", "0.600000"},
+        {"inf", "0.600000"}, {"<script>", "0.600000"}
+    };
+    bool ok = row != NULL;
+    for (size_t i = 0; ok && i < sizeof(cases) / sizeof(*cases); ++i) {
+        lab_cal_set(row, "visual_magnitude", cases[i].magnitude);
+        string_t *html = string_new(), *scale = string_sprintf("scale(%s)", cases[i].scale);
+        ok = html && scale && lab_cal_body_symbol(html, row, NULL, NULL) &&
+             strstr(string_c_str(html), "almanac-star-symbol") && strstr(string_c_str(html), string_c_str(scale)) &&
+             !strstr(string_c_str(html), "<script>") && !strstr(string_c_str(html), "<image") &&
+             (i < 7 || strstr(string_c_str(html), "unavailable; default size"));
+        string_free(scale);
+        string_free(html);
+    }
+    json_free(row);
+    row = test_lab_json("{\"code\":\"POLARIS\",\"magnitude\":\"2\"}");
+    string_t *html = string_new();
+    ok = ok && lab_cal_body_symbol(html, row, NULL, NULL) && strstr(string_c_str(html), "scale(0.600000)");
+    string_free(html);
+    json_free(row);
+    TEST_ASSERT_TRUE(ok, "star sizes follow unrounded magnitude, clamp extremes and label unknown brightness");
+}
+
+static void test_lab_almanac_moon_disc(void)
+{
+    json_t *sun = test_lab_json("{\"right_ascension_hours\":\"0\",\"declination_degrees\":\"0\"}");
+    json_t *moon = test_lab_json("{\"code\":\"MOON\",\"right_ascension_hours\":\"6\","
+                                 "\"declination_degrees\":\"0\"}");
+    static const struct {
+        const char *phase, *percentage, *arc;
+    } phases[] = {
+        {"180", "0.0%", "A10.000000 10 0 0 0"},
+        {"120", "25.0%", "A5.000000 10 0 0 0"},
+        {"90", "50.0%", "A0.000000 10 0 0 1"},
+        {"60", "75.0%", "A5.000000 10 0 0 1"},
+        {"0", "100.0%", "A10.000000 10 0 0 1"}
+    };
+    bool ok = sun && moon;
+    for (size_t i = 0; ok && i < sizeof(phases) / sizeof(*phases); ++i) {
+        lab_cal_set(moon, "phase", phases[i].phase);
+        string_t *html = string_new();
+        ok = html && lab_cal_body_symbol(html, moon, sun, NULL) && strstr(string_c_str(html), phases[i].percentage) &&
+             strstr(string_c_str(html), phases[i].arc) && strstr(string_c_str(html), "rotate(0.000000 12 12)");
+        string_free(html);
+    }
+    lab_cal_set(moon, "right_ascension_hours", "18");
+    lab_cal_set(moon, "phase", "90");
+    string_t *html = string_new();
+    ok = ok && lab_cal_body_symbol(html, moon, sun, NULL) && strstr(string_c_str(html), "rotate(-180.000000 12 12)");
+    string_free(html);
+    static const char *const invalid[] = {"", "nan", "inf", "-1", "181", "<script>"};
+    for (size_t i = 0; ok && i < sizeof(invalid) / sizeof(*invalid); ++i) {
+        lab_cal_set(moon, "phase", invalid[i]);
+        html = string_new();
+        ok = html && lab_cal_body_symbol(html, moon, sun, NULL) && strstr(string_c_str(html), "☾") &&
+             strstr(string_c_str(html), "<svg") && !strstr(string_c_str(html), "almanac-moon-phase");
+        string_free(html);
+    }
+    lab_cal_set(moon, "phase", "90");
+    html = string_new();
+    ok = ok && lab_cal_body_symbol(html, moon, NULL, NULL) && strstr(string_c_str(html), "☾");
+    string_free(html);
+    json_free(moon);
+    json_free(sun);
+
+    json_t *response = test_lab_json(
+        "{\"all_rows\":[{\"code\":\"SUN\",\"name\":\"Sun\",\"visible\":\"NO\","
+        "\"right_ascension_hours\":\"0\",\"declination_degrees\":\"0\"},"
+        "{\"code\":\"MOON\",\"name\":\"Moon\",\"visible\":\"YES\",\"phase\":\"90\","
+        "\"right_ascension_hours\":\"6\",\"declination_degrees\":\"0\"}]}");
+    ok = ok && response && lab_cal_almanac_presentation(response);
+    const json_t *visible = test_lab_member(almanac_metadata(response), "visible");
+    ok = ok && json_array_size(test_lab_member(visible, "rows")) == 1 &&
+         strstr(test_lab_text(visible, "html"), "Moon: 50.0% illuminated") &&
+         !strstr(test_lab_text(visible, "html"), "☉");
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "lunar fraction, opposite limbs, fallbacks and filtered-out Sun remain correct");
+}
+
+static void test_lab_almanac_moon_location(void)
+{
+    json_t *sun = test_lab_json("{\"right_ascension_hours\":\"0\",\"declination_degrees\":\"0\"}");
+    json_t *moon = test_lab_json("{\"code\":\"MOON\",\"phase\":\"120\",\"right_ascension_hours\":\"6\","
+                                 "\"declination_degrees\":\"0\",\"gha_degrees\":\"0\"}");
+    json_t *observer = json_new_object();
+    static const struct {
+        const char *latitude, *longitude, *gha, *rotation;
+    } locations[] = {
+        {"45", "0", "0", "0.000000"},
+        {"-45", "0", "0", "180.000000"},
+        {"0", "0", "60", "90.000000"},
+        {"0", "0", "300", "-90.000000"},
+        {"0", "60", "0", "90.000000"},
+        {"0", "-60", "0", "-90.000000"},
+        {"90", "0", "0", "0.000000"},
+        {"-90", "0", "0", "180.000000"}
+    };
+    bool ok = sun && moon && observer;
+    for (size_t i = 0; ok && i < sizeof(locations) / sizeof(*locations); ++i) {
+        lab_cal_set(observer, "observer_latitude", locations[i].latitude);
+        lab_cal_set(observer, "observer_longitude", locations[i].longitude);
+        lab_cal_set(moon, "gha_degrees", locations[i].gha);
+        string_t *html = string_new(), *rotation = string_sprintf("rotate(%s 12 12)", locations[i].rotation);
+        ok = html && rotation && lab_cal_body_symbol(html, moon, sun, observer) &&
+             strstr(string_c_str(html), string_c_str(rotation)) &&
+             strstr(string_c_str(html), "25.0% illuminated; local zenith up");
+        string_free(rotation);
+        string_free(html);
+    }
+    /* At the equatorial zenith no local vertical can be assigned to the disc. */
+    lab_cal_set(observer, "observer_latitude", "0");
+    string_t *html = string_new();
+    ok = ok && lab_cal_body_symbol(html, moon, sun, observer) &&
+         strstr(string_c_str(html), "celestial north up; local orientation unavailable");
+    string_free(html);
+    lab_cal_set(observer, "observer_latitude", "91");
+    html = string_new();
+    ok = ok && lab_cal_body_symbol(html, moon, sun, observer) &&
+         strstr(string_c_str(html), "local orientation unavailable") && !strstr(string_c_str(html), "nan");
+    string_free(html);
+    json_free(observer);
+    json_free(moon);
+    json_free(sun);
+    TEST_ASSERT_TRUE(ok, "local lunar tilt follows hemisphere, equator, longitude and time without changing phase");
+}
+
 static void test_lab_almanac_land_policy(void)
 {
     json_t *response = test_lab_json(
@@ -174,12 +335,72 @@ static void test_lab_almanac_presentation_bound(void)
     TEST_ASSERT_TRUE(ok, "oversized variants fail before replacing existing presentation metadata");
 }
 
+static void test_lab_eclipse_previews(void)
+{
+    json_t *event = test_lab_json("{\"category\":\"Solar\",\"name\":\"Solar eclipse\",\"disc_radius\":\"1\","
+                                  "\"cover_radius\":\"1\",\"centre_separation\":\"1\","
+                                  "\"orientation_degrees\":\"45\"}");
+    string_t *html = string_new();
+    bool ok = event && html && lab_cal_eclipse_symbol(html, event) &&
+              strstr(string_c_str(html), "r=\"10\" fill=\"#efc36a\"") &&
+              strstr(string_c_str(html), "rotate(-45.000000000)") &&
+              strstr(string_c_str(html), "M5.000000000 -8.660254038 A10 10") &&
+              strstr(string_c_str(html), "local zenith up") && !strstr(string_c_str(html), "<image");
+    string_free(html);
+    lab_cal_set(event, "cover_radius", ".8");
+    lab_cal_set(event, "centre_separation", ".1");
+    html = string_new();
+    ok = ok && lab_cal_eclipse_symbol(html, event) &&
+         strstr(string_c_str(html), "cx=\"1.000000000\" r=\"8.000000000\"");
+    string_free(html);
+    lab_cal_set(event, "cover_radius", "1.1");
+    lab_cal_set(event, "centre_separation", "0");
+    html = string_new();
+    ok = ok && lab_cal_eclipse_symbol(html, event) && strstr(string_c_str(html), "r=\"10\" fill=\"#19232a\"");
+    string_free(html);
+    lab_cal_set(event, "category", "Lunar");
+    lab_cal_set(event, "name", "Lunar eclipse");
+    lab_cal_set(event, "cover_radius", "2");
+    lab_cal_set(event, "penumbra_radius", "3");
+    lab_cal_set(event, "centre_separation", "3.5");
+    lab_cal_set(event, "orientation_degrees", "-90");
+    html = string_new();
+    ok = ok && lab_cal_eclipse_symbol(html, event) && strstr(string_c_str(html), "#747a80") &&
+         !strstr(string_c_str(html), "#844e48") && strstr(string_c_str(html), "rotate(-180.000000000)");
+    string_free(html);
+    lab_cal_set(event, "centre_separation", "2.5");
+    html = string_new();
+    ok = ok && lab_cal_eclipse_symbol(html, event) && strstr(string_c_str(html), "#747a80") &&
+         strstr(string_c_str(html), "#844e48");
+    string_free(html);
+    lab_cal_set(event, "centre_separation", "0");
+    lab_cal_set(event, "orientation_degrees", "nan");
+    html = string_new();
+    ok = ok && lab_cal_eclipse_symbol(html, event) && strstr(string_c_str(html), "r=\"10\" fill=\"#844e48\"") &&
+         strstr(string_c_str(html), "orientation unavailable");
+    string_free(html);
+    static const char *const invalid[] = {"", "nan", "inf", "0", "-1", "<script>"};
+    for (size_t i = 0; ok && i < sizeof(invalid) / sizeof(*invalid); ++i) {
+        lab_cal_set(event, "disc_radius", invalid[i]);
+        html = string_new();
+        ok = html && lab_cal_eclipse_symbol(html, event) && !string_byte_length(html);
+        string_free(html);
+    }
+    json_free(event);
+    TEST_ASSERT_TRUE(ok, "solar/lunar overlap geometry, observer tilt and missing-data handling remain native SVG");
+}
+
 /* Register bounded almanac presentation checks before README examples. */
 void test_lab_almanac_presentation_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_almanac_variants, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_almanac_symbols, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_almanac_star_sizes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_almanac_moon_disc, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_almanac_moon_location, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_land_policy, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_calendar_markup_escaping, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_presentation_bound, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_eclipse_previews, tests, NULL);
 }

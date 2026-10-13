@@ -94,6 +94,12 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
  */
 bool lab_cal_almanac_presentation(json_t *response);
 
+/** @brief Append a body glyph or phase disc using borrowed Sun and worksheet observer data for orientation. */
+bool lab_cal_body_symbol(string_t *out, const json_t *row, const json_t *sun, const json_t *observer);
+
+/** @brief Append a maximum-eclipse SVG from native event geometry; omit it if geometry is unavailable. */
+bool lab_cal_eclipse_symbol(string_t *out, const json_t *event);
+
 /**
  * @brief Render a prepared visibility variant as escaped accessible HTML.
  * @param response Borrowed worksheet headings.

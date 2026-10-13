@@ -74,7 +74,8 @@ static json_t *lab_cal_event_rows(const json_t *fields)
     string_t **lines = lab_cal_split(text, "\n", &count);
     json_t *rows = json_new_array();
     static const char *keys[] = {"category",        "name", "kind", "jd", "first_jd", "last_jd", "magnitude", "percent",
-                                 "nearest_totality"};
+                                 "nearest_totality", "disc_radius", "cover_radius", "centre_separation",
+                                 "penumbra_radius", "orientation_degrees"};
     for (size_t i = 0; i < count; ++i) {
         if (!string_length(lines[i]))
             continue;
@@ -154,6 +155,10 @@ static json_t *lab_cal_body_rows(const json_t *fields, string_t **error)
             json_t *row = json_new_object();
             for (size_t j = 0; j < sizeof(keys) / sizeof(*keys); ++j)
                 lab_cal_set(row, keys[j], lab_cal_part(parts, columns, columns_for_key[j]));
+            lab_cal_set(row, "declination_degrees", lab_cal_part(parts, columns, 3));
+            lab_cal_set(row, "right_ascension_hours", lab_cal_part(parts, columns, 4));
+            lab_cal_set(row, "gha_degrees", lab_cal_part(parts, columns, 5));
+            lab_cal_set(row, "visual_magnitude", lab_cal_part(parts, columns, 10));
             double magnitude;
             if (lab_cal_number(lab_cal_part(parts, columns, 10), &magnitude)) {
                 double rounded = round(magnitude * 10) / 10;
@@ -196,6 +201,8 @@ static json_t *lab_cal_present_event(const json_t *raw, const json_t *options)
     string_t *mag = string_sprintf("%.3f", magnitude);
     bool near_total = strcmp(lab_cal_text(raw, "kind"), "total") && percent < 100 && round(percent * 10) >= 1000;
     string_t *obscuration = string_sprintf(near_total ? "%.3f%%" : "%.1f%%", percent);
+    if (!strcmp(lab_cal_text(raw, "category"), "Lunar"))
+        string_append_cstr(obscuration, " umbral");
     lab_cal_set(event, "time", string_c_str(greatest));
     lab_cal_set(event, "greatest", string_c_str(greatest));
     lab_cal_set(event, "first_contact", string_c_str(begin));
@@ -377,6 +384,8 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
                                       string_c_str(normal_clock), string_c_str(end_date), string_c_str(normal_clock));
     lab_cal_set(response, "moment_text", string_c_str(moment));
     lab_cal_set(response, "observer_text", string_c_str(observer));
+    lab_cal_set(response, "observer_latitude", lab_cal_text(options, "lat"));
+    lab_cal_set(response, "observer_longitude", lab_cal_text(options, "lon"));
     lab_cal_set(response, "body_text",
                 visible_only ? "Location of Navigational Bodies; visible bodies only"
                              : "Location of Navigational Bodies; all bodies shown");

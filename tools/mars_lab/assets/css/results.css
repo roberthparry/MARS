@@ -423,7 +423,7 @@ pre {
   min-height: 1px;
 }
 
-.rendered svg {
+.rendered svg:where(:not(.almanac-body-symbol):not(.almanac-eclipse-symbol)) {
   display: block;
   max-width: none;
   height: auto;

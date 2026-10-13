@@ -2,6 +2,7 @@
   "tests/almanac/test_almanac.c": {
     "readme_examples": {
       "enabled": true,
+      "example_almanac_eclipse_preview": true,
       "example_almanac_shrewsbury_eclipse_watch": true
     },
     "tests": {
@@ -9,6 +10,7 @@
       "test_almanac_2027_totality_seed_uses_the_towns_local_maximum": true,
       "test_almanac_body_geographical_position_resolves_gp": true,
       "test_almanac_configuration_file_io": true,
+      "test_almanac_eclipse_horizon_bearings": true,
       "test_almanac_find_lunar_eclipses_matches_july_2028_partial_event": true,
       "test_almanac_find_lunar_eclipses_returns_events_in_2025": true,
       "test_almanac_find_solar_eclipses_returns_august_2026_event": true,
@@ -2934,10 +2936,15 @@
     "tests": {
       "enabled": true,
       "test_lab_almanac_land_policy": true,
+      "test_lab_almanac_moon_disc": true,
+      "test_lab_almanac_moon_location": true,
       "test_lab_almanac_presentation_bound": true,
+      "test_lab_almanac_star_sizes": true,
+      "test_lab_almanac_symbols": true,
       "test_lab_almanac_times": true,
       "test_lab_almanac_variants": true,
-      "test_lab_calendar_markup_escaping": true
+      "test_lab_calendar_markup_escaping": true,
+      "test_lab_eclipse_previews": true
     }
   },
   "tools/mars_lab/tests/test_lab_calendar_extra.c": {
@@ -2954,6 +2961,12 @@
       "enabled": true,
       "test_lab_process_diagnostics": true,
       "test_lab_request_diagnostics": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_eclipse_worker.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_eclipse_worker_geometry": true
     }
   },
   "tools/mars_lab/tests/test_lab_evaluation.c": {

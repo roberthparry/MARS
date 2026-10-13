@@ -5,7 +5,7 @@
  * The opaque almanac_t engine combines configured ephemeris data with MARS date
  * and numerical types to calculate apparent celestial positions. Facilities cover
  * body catalogues, navigation coordinates, observer geometry, rise and set events,
- * transits, phases and eclipse searches.
+ * transits, phases and eclipse searches, including observer-relative eclipse diagram orientations.
  *
  * Use this module for astronomical almanacs, sky-position queries and navigation
  * calculations that need catalogue-backed results. Available bodies and date
@@ -596,6 +596,14 @@ double almanac_solar_eclipse_sun_semi_diameter_degrees(const almanac_solar_eclip
 /** @brief Return the Moon's apparent semi-diameter in degrees at greatest eclipse. */
 double almanac_solar_eclipse_moon_semi_diameter_degrees(const almanac_solar_eclipse_t *event);
 
+/**
+ * @brief Return the Moon's bearing from the Sun at local greatest eclipse, clockwise from the observer's zenith.
+ * @return Degrees in [-180, 180], or NAN for a missing event or undefined orientation (concentric discs or zenith).
+ * @details Uses topocentric geometry for the observer supplied to the event search. This is a horizon-relative
+ * diagram angle, not a celestial north position angle; no atmospheric distortion or telescope inversion is applied.
+ */
+double almanac_solar_eclipse_orientation_degrees(const almanac_solar_eclipse_t *event);
+
 /** @brief Report whether the solar eclipse is central at the observer's location. */
 bool almanac_solar_eclipse_is_central(const almanac_solar_eclipse_t *event);
 
@@ -664,6 +672,14 @@ double almanac_lunar_eclipse_penumbral_radius_degrees(const almanac_lunar_eclips
 
 /** @brief Return the Moon's apparent semi-diameter in degrees at greatest eclipse. */
 double almanac_lunar_eclipse_moon_semi_diameter_degrees(const almanac_lunar_eclipse_t *event);
+
+/**
+ * @brief Return the Earth's shadow bearing from the Moon at greatest eclipse, clockwise from the local zenith.
+ * @return Degrees in [-180, 180], or NAN for a missing event or undefined orientation.
+ * @details Projects the antisolar shadow centre at lunar distance into the selected observer's topocentric view.
+ * Shadow sizes and contact times retain their geocentric convention. Atmospheric brightness and colour are not predicted.
+ */
+double almanac_lunar_eclipse_orientation_degrees(const almanac_lunar_eclipse_t *event);
 
 /**
  * @brief Find Mercury or Venus transits of the Sun by enum id.

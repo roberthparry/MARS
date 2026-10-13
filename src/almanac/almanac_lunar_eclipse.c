@@ -45,6 +45,7 @@ struct _almanac_lunar_eclipse_t {
     double umbral_radius_degrees;
     double penumbral_radius_degrees;
     double moon_semi_diameter_degrees;
+    double orientation_degrees;
 };
 
 static bool almanac_lunar_eclipse_geometry(almanac_t *almanac, double jd, const almanac_observer_t *observer,
@@ -154,6 +155,7 @@ static bool almanac_fill_lunar_eclipse(almanac_t *almanac, double jd, const alma
     totality_percent = fmax(0.0, fmin(100.0, totality_percent));
 
     memset(out, 0, sizeof(*out));
+    out->orientation_degrees = almanac_eclipse_orientation(almanac, observer, jd, true);
     almanac_event_time_from_jd(almanac_find_contact_jd(almanac, almanac_lunar_eclipse_contact_residual, &contact, jd,
                                                        -1.0, 1.0, contact_step_days),
                                &out->p1_contact);
@@ -197,6 +199,12 @@ static bool almanac_fill_lunar_eclipse(almanac_t *almanac, double jd, const alma
                                    &out->u3_contact);
     }
     return true;
+}
+
+/* Return the local zenith-relative shadow bearing calculated at greatest eclipse. */
+double almanac_lunar_eclipse_orientation_degrees(const almanac_lunar_eclipse_t *event)
+{
+    return event ? event->orientation_degrees : NAN;
 }
 
 /* Return the classification for a lunar eclipse event. */

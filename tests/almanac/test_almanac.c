@@ -18,10 +18,12 @@
 #include "file-t.h"
 #include "sqlite-t.h"
 #include "almanac-t.h"
-#define MARS_ALMANAC_INTERNAL_ACCESS
-#include "almanac/almanac_internal.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
+#include "almanac/almanac_internal.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
+#include "almanac/almanac_engine_internal.h"
 #include "spice_oracle.h"
 #include "test_harness.h"
 
@@ -644,6 +646,9 @@ static void assert_solar_eclipse_search_case(void)
                          kind == ALMANAC_SOLAR_ECLIPSE_PARTIAL,
                      "solar eclipse kind is classified");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_magnitude(event) > 0.0, "solar eclipse magnitude is positive");
+    TEST_ASSERT_TRUE(isfinite(almanac_solar_eclipse_orientation_degrees(event)) &&
+                         fabs(almanac_solar_eclipse_orientation_degrees(event)) <= 180,
+                     "local solar orientation is available at the event's greatest eclipse");
     TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_percent(event) > 0.0 &&
                          almanac_solar_eclipse_totality_percent(event) <= 100.0,
                      "solar eclipse totality percentage is bounded");
@@ -676,6 +681,21 @@ static void assert_solar_eclipse_search_case(void)
 static void test_almanac_find_solar_eclipses_returns_august_2026_event(void)
 {
     assert_solar_eclipse_search_case();
+}
+
+static void test_almanac_eclipse_horizon_bearings(void)
+{
+    const cartesian3_t target = {1, 0, 0}, covering = {1, 0, .1};
+    const cartesian3_t verticals[] = {{0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+    const double expected[] = {0, 180, 90, -90};
+    for (size_t i = 0; i < sizeof(expected) / sizeof(*expected); ++i)
+        TEST_ASSERT_TRUE(fabs(angular_delta_degrees(almanac_horizon_bearing(&target, &covering, &verticals[i]),
+                                                   expected[i])) < 1e-10,
+                         "horizon bearing follows northern, southern and equatorial verticals");
+    TEST_ASSERT_TRUE(isnan(almanac_horizon_bearing(&target, &target, &verticals[0])), "concentric discs have no bearing");
+    TEST_ASSERT_TRUE(isnan(almanac_horizon_bearing(&target, &covering, &target)), "zenith has no bearing");
+    TEST_ASSERT_TRUE(isnan(almanac_solar_eclipse_orientation_degrees(NULL)), "absent solar event has no bearing");
+    TEST_ASSERT_TRUE(isnan(almanac_lunar_eclipse_orientation_degrees(NULL)), "absent lunar event has no bearing");
 }
 
 static void test_almanac_2027_totality_seed_uses_the_towns_local_maximum(void)
@@ -747,6 +767,9 @@ static void assert_lunar_eclipse_search_case(void)
     event = array_get(events, 0u);
     TEST_ASSERT_NOT_NULL(event);
     kind = almanac_lunar_eclipse_kind(event);
+    TEST_ASSERT_TRUE(isfinite(almanac_lunar_eclipse_orientation_degrees(event)) &&
+                         fabs(almanac_lunar_eclipse_orientation_degrees(event)) <= 180,
+                     "local lunar shadow orientation is available at greatest eclipse");
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_P1_CONTACT, &p1_contact),
                      "lunar eclipse P1 local time is valid");
     TEST_ASSERT_TRUE(almanac_lunar_eclipse_time(event, ALMANAC_EVENT_TIME_GREATEST, &greatest_eclipse),
@@ -1152,6 +1175,29 @@ static void test_almanac_configuration_file_io(void)
     TEST_ASSERT_TRUE(opened, "configuration preserves decomposed paths and exact quoted Unicode keys beyond 4 KiB");
 }
 
+/* README example: obtain the native geometry and observer-relative tilt for a solar preview. */
+static void example_almanac_eclipse_preview(void)
+{
+    almanac_t *almanac = almanac_open();
+    almanac_observer_t observer = {51.5074, -0.1278, 11.0};
+    datetime_t *start = datetime_from_string("2026-08-10");
+    datetime_t *end = datetime_from_string("2026-08-15");
+    array_t *events = almanac_find_solar_eclipses(almanac, &observer, start, end);
+    const almanac_solar_eclipse_t *event = events && array_size(events) ? array_get(events, 0) : NULL;
+    double disc = almanac_solar_eclipse_sun_semi_diameter_degrees(event);
+    double cover = almanac_solar_eclipse_moon_semi_diameter_degrees(event);
+    double separation = almanac_solar_eclipse_separation_degrees(event);
+    double orientation = almanac_solar_eclipse_orientation_degrees(event);
+    bool geometry = disc > 0 && cover > 0 && isfinite(separation);
+    printf("Solar preview geometry: %s\nLocal orientation: %s\n",
+           geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
+    TEST_ASSERT_TRUE(geometry && isfinite(orientation), "README example supplies geometry and local tilt");
+    array_destroy(events);
+    datetime_dealloc(end);
+    datetime_dealloc(start);
+    almanac_close(almanac);
+}
+
 int tests_main(void)
 {
     TEST_RUN_IN_GROUP(test_almanac_configuration_file_io, tests, NULL);
@@ -1169,6 +1215,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_almanac_sunrise_sunset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_moonrise_moonset_returns_local_day_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_solar_eclipses_returns_august_2026_event, tests, NULL);
+    TEST_RUN_IN_GROUP(test_almanac_eclipse_horizon_bearings, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_2027_totality_seed_uses_the_towns_local_maximum, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_returns_events_in_2025, tests, NULL);
     TEST_RUN_IN_GROUP(test_almanac_find_lunar_eclipses_matches_july_2028_partial_event, tests, NULL);
@@ -1179,5 +1226,6 @@ int tests_main(void)
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_shrewsbury_eclipse_watch, readme_examples, "almanac,readme");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_eclipse_preview, readme_examples, "almanac,readme");
     return TEST_EXIT_CODE();
 }

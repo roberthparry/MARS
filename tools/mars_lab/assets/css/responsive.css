@@ -200,7 +200,7 @@
     font-size: var(--render-font-size);
   }
 
-  .rendered svg {
+  .rendered svg:where(:not(.almanac-body-symbol):not(.almanac-eclipse-symbol)) {
     margin-bottom: var(--render-margin-bottom);
   }
 
@@ -384,7 +384,7 @@
     font-size: var(--render-font-size);
   }
 
-  .rendered svg {
+  .rendered svg:where(:not(.almanac-body-symbol):not(.almanac-eclipse-symbol)) {
     transform: scale(var(--render-zoom));
     margin-bottom: var(--render-margin-bottom);
   }

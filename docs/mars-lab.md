@@ -2238,6 +2238,61 @@ than overflowing the result card. Event contacts show compact times; their full
 dates and GMT offsets remain in tooltips and copied worksheet text. On mobile,
 events use stacked, labelled fields instead of tightly squeezed columns.
 
+In both **All** and **Visible** views, the Sun and planets carry their conventional
+astronomical symbols beside their names: ☉ Sun, ☿ Mercury, ♀ Venus, ♂ Mars,
+♃ Jupiter, ♄ Saturn, ⛢ Uranus and ♆ Neptune.
+Stars have warm pale-gold SVG star shapes sized by apparent visual magnitude: brighter
+(lower-magnitude) stars are larger. The native renderer uses the unrounded
+magnitude, mapping the radius to `8 − magnitude` SVG units, limited to 3–10
+within a fixed-width slot so names remain aligned. This is a schematic scale,
+not stellar angular diameter or proportional light flux. Missing or invalid
+magnitudes use a neutral radius of 6 and an explicit unavailable tooltip.
+Tooltips and accessible labels identify the magnitude used.
+All body symbols are native-generated inline SVG geometry, not bitmap images
+or font glyphs, so they remain crisp at any zoom. The symbols use gold for the
+Sun, purple for Mercury, yellow for Venus, red
+for Mars, coral for Jupiter, amber for Saturn, cyan for Uranus and violet for
+Neptune; the Moon uses muted blue-grey illumination with a dark grey shadow and
+grey outline. Uranus uses the circle-and-upward-arrow symbol.
+These inline icons retain their own colours and compact spacing inside the result
+card; formula-only SVG recolouring, scaling and bottom margins do not apply to them.
+The Moon has an in-memory SVG phase disc calculated from the selected instant's
+native phase angle. Its bright limb points towards the Sun, rotated for the
+selected latitude, longitude and time with the local zenith upwards. This varies
+continuously across both hemispheres and the equator, including tilted crescents;
+it is not a fixed northern/southern flip. Its tooltip and accessible label give
+the illuminated percentage and orientation. This is a schematic disc, without
+lunar terrain, topocentric parallax or atmospheric refraction. At the zenith or
+nadir, where horizon-relative orientation is undefined, or if observer data is
+missing, it explicitly falls back to celestial north up (east to the left).
+The Sun's coordinates remain available for this diagram even when the Sun is
+excluded by the visibility filter. Missing phase or coordinate data falls back
+to ☾, not a guessed phase. Copied worksheet text retains the ordinary body names.
+
+Solar and lunar eclipse names also have inline SVG previews at the event's
+**greatest eclipse** time. Native angular radii and separation determine the
+overlap: solar previews distinguish partial, annular and total coverage; lunar
+previews show the penumbra in grey and umbra in muted reddish brown. The solar
+disc uses the same gold as the Sun's body symbol. Colours
+and sharp shadow edges are schematic, not a prediction of atmospheric colour,
+brightness or lunar surface detail. Magnitude is not substituted for area coverage.
+Solar obscuration measures the covered area of the Sun, not its covered diameter.
+Lunar obscuration is explicitly labelled **umbral**: a penumbral eclipse can have
+zero umbral coverage and negative umbral magnitude while still showing grey
+penumbral shading in its preview. Cell tooltips explain both measurements.
+The named-totality search uses `jurisdict_each_town()` and the jurisdiction
+module's installed configuration, including database-backed town coordinates and
+timezones. Catalogue failures are reported as failures, not as an absence of
+totality. The distance-ordered search checks at most 1,024 candidate towns;
+it is a named-location search, not an exhaustive search of all land.
+The preview is rotated for the selected observer at the event time, with the
+local zenith upwards, including hemisphere, longitude and time-dependent tilt.
+Solar geometry is topocentric; lunar shadow sizes use the engine's geocentric
+convention, with the shadow direction projected into the observer's local view.
+Undefined orientations are explicitly labelled; missing geometry omits the
+preview rather than inventing a shape. Changing to a nearest-totality location
+requires a new evaluation, just as the contact times do.
+
 The captured request is for London at `2026-08-08 09:02:43` GMT. The output is
 the navigational-body table headed by the Sun, Moon, Mercury, Venus, Mars,
 Jupiter and Saturn.

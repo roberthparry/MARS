@@ -18,9 +18,16 @@ bool lab_browser_almanac_fixture(string_t *script)
 {
     json_t *fixture = test_lab_json(
         "{\"visibility\":\"all\",\"worksheet_title\":\"Layout regression\","
+        "\"observer_latitude\":\"-45\",\"observer_longitude\":\"0\","
         "\"event_title\":\"Upcoming eclipses and inner planetary transits\","
-        "\"all_rows\":[{\"name\":\"Sun\",\"visible\":\"YES\"},{\"name\":\"Moon\",\"visible\":\"NO\"}],"
+        "\"all_rows\":[{\"code\":\"SUN\",\"name\":\"Sun\",\"visible\":\"YES\","
+        "\"right_ascension_hours\":\"0\",\"declination_degrees\":\"0\"},"
+        "{\"code\":\"MOON\",\"name\":\"Moon\",\"visible\":\"NO\",\"phase\":\"90\","
+        "\"right_ascension_hours\":\"6\",\"declination_degrees\":\"0\",\"gha_degrees\":\"0\"},"
+        "{\"code\":\"SIRIUS\",\"name\":\"Sirius\",\"visible\":\"NO\",\"visual_magnitude\":\"-1.46\"},"
+        "{\"code\":\"POLARIS\",\"name\":\"Polaris\",\"visible\":\"NO\",\"visual_magnitude\":\"2\"}],"
         "\"events\":[{\"category\":\"Solar\",\"name\":\"Solar eclipse\",\"kind\":\"partial\",\"magnitude\":\"0.482\","
+        "\"disc_radius\":\"1\",\"cover_radius\":\"1\",\"centre_separation\":\"1\",\"orientation_degrees\":\"45\","
         "\"obscuration\":\"37.9%\",\"first_contact\":\"2027-08-02 09:06:00 GMT+1\","
         "\"greatest\":\"2027-08-02 10:08:00 GMT+1\",\"fourth_contact\":\"2027-08-02 11:13:00 GMT+1\","
         "\"gmt_time\":\"2027-08-02 09:08:00 GMT+0\","

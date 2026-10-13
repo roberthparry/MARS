@@ -11,6 +11,9 @@
 
 #include "json-t.h"
 
+/** Register native eclipse worker geometry and orientation regressions. */
+void test_lab_eclipse_worker_cases(void);
+
 /** Parse literal JSON into a caller-owned tree. */
 json_t *test_lab_json(const char *text);
 

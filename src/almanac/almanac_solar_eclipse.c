@@ -145,6 +145,7 @@ static bool almanac_fill_solar_eclipse(almanac_t *almanac, double jd, const alma
     out->totality_percent = circumstance.totality_percent;
     out->sun_semi_diameter_degrees = geometry.sun_sd;
     out->moon_semi_diameter_degrees = geometry.moon_sd;
+    out->orientation_degrees = almanac_eclipse_orientation(almanac, observer, jd, false);
     out->central = circumstance.central;
     out->kind = circumstance.kind;
     if (out->kind == ALMANAC_SOLAR_ECLIPSE_TOTAL || out->kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR) {
@@ -198,6 +199,12 @@ bool almanac_solar_eclipse_time(const almanac_solar_eclipse_t *event, almanac_ev
     }
     *out = *time;
     return time->valid;
+}
+
+/* Return the local zenith-relative bearing calculated at greatest eclipse. */
+double almanac_solar_eclipse_orientation_degrees(const almanac_solar_eclipse_t *event)
+{
+    return event ? event->orientation_degrees : NAN;
 }
 
 /* Return the Sun-Moon angular separation in degrees at greatest eclipse. */

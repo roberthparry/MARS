@@ -341,6 +341,46 @@ double almanac_topocentric_altitude_degrees(almanac_t *almanac, const cartesian3
     return almanac_radians_to_degrees(asin(almanac_clamp_unit(cartesian_dot(&direction, &zenith))));
 }
 
+double almanac_horizon_bearing(const cartesian3_t *target, const cartesian3_t *towards, const cartesian3_t *zenith)
+{
+    cartesian3_t direction = *target, covering = *towards;
+    if (!cartesian_normalize_in_place(&direction) || !cartesian_normalize_in_place(&covering))
+        return NAN;
+    cartesian3_t right = cartesian_cross(&direction, zenith);
+    if (cartesian_length(&right) < 1e-12 || !cartesian_normalize_in_place(&right))
+        return NAN;
+    cartesian3_t up = cartesian_cross(&right, &direction);
+    double x = cartesian_dot(&covering, &right), y = cartesian_dot(&covering, &up);
+    return hypot(x, y) < 1e-12 ? NAN : almanac_radians_to_degrees(atan2(x, y));
+}
+
+double almanac_eclipse_orientation(almanac_t *almanac, const almanac_observer_t *observer, double jd, bool lunar)
+{
+    almanac_state_t sun, moon;
+    cartesian3_t target, covering;
+    if (!almanac_state_for_body_at_jd(almanac, ALMANAC_BODY_ID_SUN, jd, &sun) ||
+        !almanac_state_for_body_at_jd(almanac, ALMANAC_BODY_ID_MOON, jd, &moon))
+        return NAN;
+    cartesian3_t centre = lunar ? moon.geocentric_equatorial_au : sun.geocentric_equatorial_au;
+    cartesian3_t cover = moon.geocentric_equatorial_au;
+    if (lunar) {
+        cover = sun.geocentric_equatorial_au;
+        if (!cartesian_normalize_in_place(&cover))
+            return NAN;
+        cover = cartesian_scale(&cover, -cartesian_length(&moon.geocentric_equatorial_au));
+    }
+    if (!almanac_topocentric_vector(almanac, &centre, observer, jd, &target) ||
+        !almanac_topocentric_vector(almanac, &cover, observer, jd, &covering))
+        return NAN;
+    double gha = almanac_apparent_gha_aries_for_jd(almanac, jd);
+    if (gha == DBL_MAX || !isfinite(gha))
+        return NAN;
+    double latitude = almanac_degrees_to_radians(observer->latitude_degrees);
+    double sidereal = almanac_degrees_to_radians(gha + observer->longitude_degrees);
+    cartesian3_t zenith = {cos(latitude) * cos(sidereal), cos(latitude) * sin(sidereal), sin(latitude)};
+    return almanac_horizon_bearing(&target, &covering, &zenith);
+}
+
 static bool almanac_topocentric_horizontal_degrees(almanac_t *almanac, const cartesian3_t *topocentric_equatorial_au,
     const almanac_observer_t *observer, double jd, double *out_altitude_degrees, double *out_azimuth_degrees)
 {

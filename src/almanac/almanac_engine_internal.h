@@ -222,6 +222,12 @@ double almanac_topocentric_altitude_degrees(almanac_t *almanac, const cartesian3
 bool almanac_body_horizon_geometry(almanac_t *almanac, almanac_body_id_t body_id, const almanac_observer_t *observer,
     double jd, almanac_horizon_geometry_t *out);
 
+/** @brief Project a direction into a target's tangent plane, clockwise from the supplied zenith; NAN if undefined. */
+double almanac_horizon_bearing(const cartesian3_t *target, const cartesian3_t *towards, const cartesian3_t *zenith);
+
+/** @brief Calculate observer-relative eclipse orientation at an event instant; lunar selects the shadow geometry. */
+double almanac_eclipse_orientation(almanac_t *almanac, const almanac_observer_t *observer, double jd, bool lunar);
+
 /* Private events state and interfaces for the almanac implementation. */
 typedef double (*almanac_event_residual_fn)(almanac_t *almanac, double jd, void *context);
 typedef double (*almanac_event_metric_fn)(almanac_t *almanac, double jd, void *context);
@@ -281,6 +287,7 @@ struct _almanac_solar_eclipse_t {
     double totality_percent;
     double sun_semi_diameter_degrees;
     double moon_semi_diameter_degrees;
+    double orientation_degrees;
     bool central;
 };
 

@@ -277,6 +277,48 @@
   font-weight: 700;
 }
 
+.almanac-grid-table:not(.almanac-event-table) td.body-name {
+  white-space: nowrap;
+}
+
+.almanac-event-name {
+  display: inline-flex;
+  align-items: center;
+}
+
+.almanac-event-name svg {
+  flex: none;
+}
+
+.almanac-body-symbol {
+  display: inline-block;
+  width: 1.35em;
+  height: 1.35em;
+  margin-right: .4em;
+  vertical-align: middle;
+  font-size: 1.15em;
+  color: var(--accent, #e7c977);
+}
+
+.almanac-body-symbol[data-body="SUN"] { color: #efc36a; }
+.almanac-body-symbol[data-body="MOON"] { color: #b7c3cc; }
+.almanac-body-symbol[data-body="MERCURY"] { color: #b844c5; }
+.almanac-body-symbol[data-body="VENUS"] { color: #c4b64d; }
+.almanac-body-symbol[data-body="MARS"] { color: #d94d4c; }
+.almanac-body-symbol[data-body="JUPITER"] { color: #e87578; }
+.almanac-body-symbol[data-body="SATURN"] { color: #d99a39; }
+.almanac-body-symbol[data-body="URANUS"] { color: #48bed0; }
+.almanac-body-symbol[data-body="NEPTUNE"] { color: #8065e9; }
+.almanac-star-symbol { color: #f3e4b3; }
+
+.almanac-eclipse-symbol {
+  display: inline-block;
+  width: 2em;
+  height: 2em;
+  margin-right: .4em;
+  vertical-align: middle;
+}
+
 .almanac-grid-table td.reference-name {
   color: #cde3d5;
 }

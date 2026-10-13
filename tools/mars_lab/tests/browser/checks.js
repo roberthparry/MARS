@@ -709,7 +709,8 @@
                 frame.onload = resolve;
             });
             frame.srcdoc = '<!doctype html><html><head><link rel="stylesheet" href="/index.css"></head>' +
-                '<body><div id="fixture"></div></body></html>';
+                '<body><div id="fixture" class="rendered" style="padding:0;' +
+                '--render-zoom:1.5;--render-margin-bottom:40px"></div></body></html>';
             document.body.appendChild(frame);
             await loaded;
             const target = frame.contentDocument.getElementById('fixture');
@@ -737,8 +738,60 @@
             fixture.events = [];
             renderAlmanacWorksheet(target, fixture);
             check(
-                target.querySelectorAll('.almanac-grid-table:not(.almanac-event-table) tbody tr').length === 2,
+                target.querySelectorAll('.almanac-grid-table:not(.almanac-event-table) tbody tr').length === 4,
                 'Native all-body rows were not used');
+            check(
+                target.querySelector('.almanac-body-symbol').textContent === '☉' &&
+                    target.querySelector('.almanac-moon-phase')?.getAttribute('aria-label') ===
+                        'Moon: 50.0% illuminated; local zenith up',
+                'Native astronomical symbols or the accessible lunar phase were lost');
+            check(
+                target.querySelector('[data-body="SUN"]').namespaceURI === 'http://www.w3.org/2000/svg' &&
+                    target.querySelector('[data-body="SUN"] circle') &&
+                    !target.querySelector('.almanac-body-symbol image, .almanac-body-symbol text'),
+                'Body symbols must be vector geometry, not bitmap images or font glyphs');
+            const brightStar = target.querySelector('[data-body="SIRIUS"]');
+            const faintStar = target.querySelector('[data-body="POLARIS"]');
+            check(
+                brightStar?.classList.contains('almanac-star-symbol') &&
+                    faintStar?.classList.contains('almanac-star-symbol') &&
+                    brightStar.querySelector('path').getBoundingClientRect().width >
+                        faintStar.querySelector('path').getBoundingClientRect().width &&
+                    brightStar.getBoundingClientRect().width === faintStar.getBoundingClientRect().width &&
+                    brightStar.getAttribute('aria-label').includes('visual magnitude -1.46'),
+                'Star geometry must scale with brightness without changing the aligned icon slots');
+            for (const star of [brightStar, faintStar]) {
+                check(frame.contentWindow.getComputedStyle(star.querySelector('path')).fill ===
+                          'rgb(243, 228, 179)',
+                      'Stars must retain their warm pale-gold colour at every brightness-based size');
+            }
+            const moonIcon = target.querySelector('.almanac-moon-phase');
+            check(
+                frame.contentWindow.getComputedStyle(target.querySelector('[data-body="SUN"]')).color ===
+                    'rgb(239, 195, 106)' &&
+                    frame.contentWindow.getComputedStyle(moonIcon).color === 'rgb(183, 195, 204)' &&
+                    frame.contentWindow.getComputedStyle(moonIcon.querySelector('.almanac-moon-shadow')).fill ===
+                        'rgb(65, 73, 79)' &&
+                    frame.contentWindow.getComputedStyle(moonIcon.querySelector('.almanac-moon-rim')).stroke ===
+                        'rgb(126, 139, 148)',
+                'The Sun and phase-aware Moon lost their individual reference colours');
+            const colourProbe = frame.contentDocument.createElement('span');
+            colourProbe.className = 'almanac-body-symbol';
+            target.appendChild(colourProbe);
+            for (const [body, colour] of [
+                     ['MERCURY', 'rgb(184, 68, 197)'], ['VENUS', 'rgb(196, 182, 77)'],
+                     ['MARS', 'rgb(217, 77, 76)'], ['JUPITER', 'rgb(232, 117, 120)'],
+                     ['SATURN', 'rgb(217, 154, 57)'], ['URANUS', 'rgb(72, 190, 208)'],
+                     ['NEPTUNE', 'rgb(128, 101, 233)']]) {
+                colourProbe.dataset.body = body;
+                check(frame.contentWindow.getComputedStyle(colourProbe).color === colour, `${body} symbol colour`);
+            }
+            colourProbe.remove();
+            check(
+                moonIcon.getBoundingClientRect().width > 10 &&
+                    moonIcon.getBoundingClientRect().width < 40 &&
+                    moonIcon.querySelector('path')?.getAttribute('transform') === 'rotate(180.000000 12 12)',
+                'Lunar SVG is missing or is not sized as an inline symbol');
             check(
                 target.querySelector('.visible-cell.yes').textContent.trim() === '✓',
                 'Client recomputed visibility from the raw row instead of native metadata');
@@ -752,6 +805,16 @@
                 action?.dataset.date === '2027-08-02' && action.dataset.town === 'Málaga|36.7204|-4.4203|0',
                 'Native totality action payload was lost');
             const table = target.querySelector('.almanac-event-table');
+            const eclipseIcon = table.querySelector('.almanac-eclipse-symbol');
+            check(
+                eclipseIcon?.getAttribute('aria-label').includes('greatest eclipse; local zenith up') &&
+                    eclipseIcon.querySelector('g').getAttribute('transform') ===
+                        'translate(12 12) rotate(-45.000000000)' &&
+                    eclipseIcon.querySelector('path') && !eclipseIcon.querySelector('image'),
+                'The observer-oriented maximum-eclipse SVG was not installed beside the event name');
+            check(frame.contentWindow.getComputedStyle(eclipseIcon.querySelector('circle')).fill ===
+                      'rgb(239, 195, 106)',
+                  'The solar-eclipse disc must use the same gold as the Sun symbol');
             const region = table.parentElement;
             check(
                 region.tabIndex === 0 && region.getAttribute('role') === 'region',
@@ -764,6 +827,21 @@
                 frame.style.width = `${viewport}px`;
                 target.style.width = `${card}px`;
                 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                for (const icon of target.querySelectorAll('.almanac-body-symbol, .almanac-eclipse-symbol')) {
+                    const style = frame.contentWindow.getComputedStyle(icon);
+                    check(style.filter === 'none' && style.transform === 'none',
+                          'Formula recolouring or zoom leaked into an astronomical SVG');
+                    check(parseFloat(style.marginBottom) === 0,
+                          `Astronomical symbol has formula spacing: ${style.marginBottom}`);
+                    const cell = icon.closest('td'), text = frame.contentDocument.createRange();
+                    text.selectNodeContents(cell.querySelector('.almanac-event-label') || cell.lastChild);
+                    const labelBox = text.getBoundingClientRect(), iconBox = icon.getBoundingClientRect();
+                    check(Math.abs(iconBox.y + iconBox.height / 2 - labelBox.y - labelBox.height / 2) < 5,
+                          'An astronomical icon is above its name instead of beside it');
+                    if (icon.classList.contains('almanac-body-symbol'))
+                        check(icon.closest('tr').getBoundingClientRect().height < 65,
+                              'Body symbols inflated the table row height');
+                }
                 check(region.clientWidth <= card && target.scrollWidth <= card + 1, 'Almanac spills outside its card');
                 for (const cell of table.querySelectorAll('tbody td')) {
                     check(
@@ -785,7 +863,7 @@
             renderAlmanacWorksheet(target, {...fixture, visibility: 'visible'});
             check(
                 target.querySelectorAll('.almanac-grid-table:not(.almanac-event-table) tbody tr').length === 1 &&
-                    target.querySelector('.body-name').textContent === 'Sun' && !target.querySelector('.visible-cell'),
+                    target.querySelector('.body-name').textContent === '☉Sun' && !target.querySelector('.visible-cell'),
                 'Local visible variant was filtered again or retained the visibility column');
             check(
                 target.dataset.copyText === fixture.almanac_presentation.visible.copy_text &&
@@ -1376,7 +1454,7 @@
                     !rendered.classList.contains('error') &&
                         document.getElementById('status').textContent.startsWith('Ready') &&
                         rendered.querySelectorAll('.almanac-grid-table:not(.almanac-event-table) tbody tr').length ===
-                            2,
+                            4,
                     'Successful Almanac evaluation did not install a visible worksheet');
                 rendered.querySelector('[data-almanac-visibility="visible"]').click();
                 check(

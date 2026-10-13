@@ -247,7 +247,8 @@ against the packaged almanac ephemeris:
 - exact Moon phases start from a mean lunation estimate and are refined from the almanac geometry
 - solar eclipses are detected with observer-local topocentric geometry
 - solar eclipse `totality_percent` is the approximate percentage of the Sun's apparent disc covered by the Moon at greatest eclipse
-- lunar eclipse contacts, greatest eclipse, and magnitudes use *ESAA* geocentric shadow-cone geometry; the observer is used only to decide local visibility
+- lunar eclipse contacts, greatest eclipse, and magnitudes use *ESAA* geocentric shadow-cone geometry;
+  the observer determines local visibility and the orientation of preview diagrams
 - lunar eclipse `totality_percent` is the approximate percentage of the Moon's apparent disc inside Earth's umbra
 - solar transits use the Mercury or Venus synodic cycle to estimate inferior conjunctions before ephemeris refinement
 - contact times use bracketed inverse interpolation and greatest-event times use parabolic interpolation of squared separation
@@ -256,6 +257,52 @@ against the packaged almanac ephemeris:
   modelling are not yet exposed
 
 ## Quick Example
+
+The event accessors `almanac_solar_eclipse_orientation_degrees()` and
+`almanac_lunar_eclipse_orientation_degrees()` return the covering Moon or shadow
+bearing at greatest eclipse, in degrees clockwise from the local zenith. They
+use the observer supplied to the search, including longitude and elevation,
+and return `NAN` for missing events, concentric directions or an undefined
+zenith/nadir frame. Solar bearings use topocentric Sun and Moon vectors. Lunar
+bearings project the antisolar shadow centre at lunar distance into the
+observer's topocentric view; shadow sizes retain their geocentric convention.
+Pair these accessors with the event's semi-diameters, separation and shadow
+radii to draw a correctly tilted overlap. No atmospheric colour, refraction,
+surface detail or telescope image inversion is predicted.
+
+For example, retrieve the geometry and local tilt for a London solar-eclipse preview:
+
+```c
+#include <math.h>
+#include <stdio.h>
+
+#include "almanac-t.h"
+
+almanac_t *almanac = almanac_open();
+almanac_observer_t observer = {51.5074, -0.1278, 11.0};
+datetime_t *start = datetime_from_string("2026-08-10");
+datetime_t *end = datetime_from_string("2026-08-15");
+array_t *events = almanac_find_solar_eclipses(almanac, &observer, start, end);
+const almanac_solar_eclipse_t *event = events && array_size(events) ? array_get(events, 0) : NULL;
+double disc = almanac_solar_eclipse_sun_semi_diameter_degrees(event);
+double cover = almanac_solar_eclipse_moon_semi_diameter_degrees(event);
+double separation = almanac_solar_eclipse_separation_degrees(event);
+double orientation = almanac_solar_eclipse_orientation_degrees(event);
+bool geometry = disc > 0 && cover > 0 && isfinite(separation);
+printf("Solar preview geometry: %s\nLocal orientation: %s\n",
+       geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
+array_destroy(events);
+datetime_dealloc(end);
+datetime_dealloc(start);
+almanac_close(almanac);
+```
+
+Output:
+
+```text
+Solar preview geometry: available
+Local orientation: available
+```
 
 Use `almanac_new_body_entry(almanac, ALMANAC_BODY_ID_SUN, ...)` or
 `almanac_new_body_entry(almanac, ALMANAC_BODY_ID_MOON, ...)` when you need a
