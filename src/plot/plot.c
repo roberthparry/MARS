@@ -1,11 +1,12 @@
 /**
  * @file plot.c
- * @brief Plot scene ownership, bounded series insertion and numeric viewport selection.
+ * @brief Plot scene ownership, bounded insertion, numeric viewport and surface camera selection.
  *
  * All inputs are copied before publication. A linear bounds pass is necessary
  * to visit each coordinate once; no key lookup or repeated series search is used.
  */
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 
 #define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
@@ -16,7 +17,9 @@
 /* Default linear scene with explicit resource limits. */
 plot_options_t plot_options_default(void)
 {
-    return (plot_options_t){800, 500, 1000000, 32, "", "x", "y", true, true, false};
+    return (plot_options_t){.width = 800, .height = 500, .max_points = 1000000, .max_series = 32,
+                            .title = "", .x_label = "x", .y_label = "y", .z_label = "f", .grid = true, .legend = true,
+                            .axis_colour = 0x64748b, .grid_colour = 0x94a3b8, .label_colour = 0x64748b};
 }
 
 /* Capture plain text and immutable settings without borrowing caller storage. */
@@ -25,7 +28,8 @@ plot_t *plot_new(const plot_options_t *options)
     plot_options_t settings = options ? *options : plot_options_default();
     if (settings.width < 320 || settings.width > 8192 || settings.height < 240 || settings.height > 8192 ||
         !settings.max_points || !settings.max_series || settings.max_points > SIZE_MAX / sizeof(plot_point_t) ||
-        settings.max_series > SIZE_MAX / sizeof(plot_series_t)) {
+        settings.max_series > SIZE_MAX / sizeof(plot_series_t) || settings.axis_colour > 0xffffffu ||
+        settings.grid_colour > 0xffffffu || settings.label_colour > 0xffffffu) {
         errno = EINVAL;
         return NULL;
     }
@@ -33,17 +37,47 @@ plot_t *plot_new(const plot_options_t *options)
     if (!plot)
         return NULL;
     plot->options = settings;
-    plot->options.title = plot->options.x_label = plot->options.y_label = NULL;
+    plot->azimuth = 45;
+    plot->elevation = 30;
+    plot->options.title = plot->options.x_label = plot->options.y_label = plot->options.z_label = NULL;
     plot->title = string_new_with(settings.title ? settings.title : "");
     plot->x_label = string_new_with(settings.x_label ? settings.x_label : "");
     plot->y_label = string_new_with(settings.y_label ? settings.y_label : "");
+    plot->z_label = string_new_with(settings.z_label ? settings.z_label : "");
     for (size_t i = 0; i < 4; ++i)
         plot->bounds[i] = NUM_NAN;
-    if (!plot->title || !plot->x_label || !plot->y_label) {
+    if (!plot->title || !plot->x_label || !plot->y_label || !plot->z_label) {
         plot_free(plot);
         return NULL;
     }
     return plot;
+}
+
+/* Change only the camera; retained surface samples are not evaluated again. */
+bool plot_set_view(plot_t *plot, double azimuth, double elevation)
+{
+    if (!plot || !isfinite(azimuth) || !isfinite(elevation) || elevation < 5 || elevation > 85) {
+        errno = EINVAL;
+        return false;
+    }
+    plot->azimuth = fmod(azimuth, 360);
+    if (plot->azimuth < 0)
+        plot->azimuth += 360;
+    plot->elevation = elevation;
+    return true;
+}
+
+/* Rotate the projected view clockwise while retaining its samples and depth order. */
+bool plot_set_roll(plot_t *plot, double roll)
+{
+    if (!plot || !isfinite(roll)) {
+        errno = EINVAL;
+        return false;
+    }
+    plot->roll = fmod(roll, 360) + 0.0;
+    if (plot->roll < 0)
+        plot->roll += 360;
+    return true;
 }
 
 static void series_clear(plot_series_t *series)
@@ -64,11 +98,21 @@ void plot_free(plot_t *plot)
         for (size_t i = 0; i < plot->count; ++i)
             series_clear(&plot->series[i]);
         free(plot->series);
+        for (size_t i = 0; i < plot->surface_columns; ++i)
+            num_destroy(&plot->surface_x[i]);
+        for (size_t i = 0; i < plot->surface_rows; ++i)
+            num_destroy(&plot->surface_y[i]);
+        for (size_t i = 0; i < plot->surface_columns * plot->surface_rows; ++i)
+            num_destroy(&plot->surface_z[i]);
+        free(plot->surface_x);
+        free(plot->surface_y);
+        free(plot->surface_z);
         for (size_t i = 0; i < 4; ++i)
             num_destroy(&plot->bounds[i]);
         string_free(plot->title);
         string_free(plot->x_label);
         string_free(plot->y_label);
+        string_free(plot->z_label);
         free(plot);
     }
     errno = saved;
@@ -83,7 +127,7 @@ static bool valid_coordinate(number_t value)
 bool plot_add_points(plot_t *plot, const plot_point_t *points, size_t count, const char *name,
                      plot_style_t style, uint32_t colour)
 {
-    if (!plot || !points || !count || style < PLOT_LINES || style > PLOT_POINTS || colour > 0xffffffu) {
+    if (!plot || plot->surface_z || !points || !count || style < PLOT_LINES || style > PLOT_POINTS || colour > 0xffffffu) {
         errno = EINVAL;
         return false;
     }
@@ -159,7 +203,7 @@ bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, 
 /* Replace an explicit viewport only after every bound is copied successfully. */
 bool plot_set_bounds(plot_t *plot, number_t xmin, number_t xmax, number_t ymin, number_t ymax)
 {
-    if (!plot || !valid_coordinate(xmin) || !valid_coordinate(xmax) || !valid_coordinate(ymin) ||
+    if (!plot || plot->surface_z || !valid_coordinate(xmin) || !valid_coordinate(xmax) || !valid_coordinate(ymin) ||
         !valid_coordinate(ymax) || !num_lt(xmin, xmax) || !num_lt(ymin, ymax)) {
         errno = EINVAL;
         return false;
@@ -194,7 +238,7 @@ size_t plot_series_count(const plot_t *plot)
 {
     if (!plot)
         errno = EINVAL;
-    return plot ? plot->count : 0;
+    return plot ? (plot->surface_z ? 1 : plot->count) : 0;
 }
 
 static bool update_range(number_t bounds[2], number_t value)

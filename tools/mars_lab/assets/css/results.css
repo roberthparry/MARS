@@ -42,6 +42,15 @@
   min-height: 0;
 }
 
+.rendered:has([data-surface]) svg {
+  cursor: grab;
+  user-select: none;
+}
+
+.rendered.plot-dragging svg {
+  cursor: grabbing;
+}
+
 .card-title {
   display: flex;
   align-items: center;
@@ -423,6 +432,10 @@ pre {
   transform-origin: left top;
   margin-bottom: var(--render-margin-bottom);
   filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
+}
+
+.rendered svg[data-plot-figure] {
+  filter: none;
 }
 
 .error,

@@ -5731,6 +5731,21 @@ expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)
     return expr_from_string_with_derivation_TeX(s, bnd_out, NULL);
 }
 
+/* Retain the native series notation for source-labelled figures, without a derivation or binding envelope. */
+string_t *expr_source_TeX_internal(const char *source)
+{
+    string_t *text = source ? string_new_with(source) : NULL, *series = NULL;
+    expr_t *expression = text ? expr_from_text_internal(text, NULL, &series, NULL, EXPR_PARSE_EXPRESSION_SYNTAX) : NULL;
+    char *body = expression && !series ? expr_to_TeX_body(expression) : NULL;
+    string_t *result = expression ? (series ? series : body ? string_new_with(body) : NULL) : NULL;
+    if (!expression)
+        string_free(series);
+    free(body);
+    expr_free(expression);
+    string_free(text);
+    return result;
+}
+
 /* Retain authored calculus nodes for executable Function cards without changing ordinary parsing. */
 expr_t *expr_from_string_preserving_calculus_internal(const char *source)
 {

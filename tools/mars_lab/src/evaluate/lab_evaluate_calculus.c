@@ -6,7 +6,7 @@
  * the browser's shared calculus renderer. Uses string_t for line extraction;
  * no expression is evaluated or rewritten here. Missing worker results remain
  * empty so the request controller can distinguish failure from a valid result.
- * Plot cards carry the worker's in-memory SVG without invoking the TeX renderer.
+ * Plot cards carry the native composite SVG, including its rendered formula title.
  */
 #include "lab_presentation.h"
 #define MARS_LAB_EVALUATE_INTERNAL_ACCESS
@@ -77,6 +77,7 @@ bool lab_pres_calculus_cards(json_t *metadata, const json_t *fields, json_t *lin
     if (ok && *lab_eval_text(fields, "plot_svg")) {
         json_t *plot = json_new_object();
         ok = plot && lab_eval_set(plot, "expression", lab_eval_text(fields, "expression")) &&
+             lab_eval_set(plot, "TeX", lab_eval_text(fields, "plot_title_TeX")) &&
              lab_eval_set(plot, "svg", lab_eval_text(fields, "plot_svg")) &&
              lab_eval_set(plot, "render_title", "Plot");
         if (ok)

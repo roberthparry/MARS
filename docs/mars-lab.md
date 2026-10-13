@@ -920,32 +920,162 @@ requires it.
 
 ### Native function plots
 
+**Plot type** has two radio overrides: **2-D curve** and **3-D surface**.
+Leaving both unselected chooses the type automatically. Automatic selection draws
+a surface when exactly one other non-constant variable is unset; otherwise
+it draws a curve. Ambiguous additional variables require an explicit
+**Second variable** and numerical bindings for any remaining parameters.
+Explicit 3-D mode can sample two variables even when their worksheet values
+are already supplied. Constant bindings remain parameters, never automatic axes.
+
+For example, enter `x^2 + y^2`, leave both variables unset, and press **x plot**.
+With **From** −2 and **To** 2 in each variable group, the output is a shaded
+paraboloid titled \(x^2+y^2\). At the default view, the rightward base axis is
+the first variable, the leftward base axis is the second, and height is the formula value.
+Arrows at the positive ends identify the two variable axes by name and the
+height axis by `f` (the formula value). They follow the camera; their text stays
+upright. No surrounding box is drawn. The formula title, expansion and copying
+work as for curves.
+
+Plot type, variables, ranges, Y scale and camera controls live inside the
+**Plot** card, below the image, including when the card is expanded. Press
+**Update plot** to apply changed ranges or plot type without leaving the card.
+Choose variables using the compact radio buttons populated from native binding
+metadata. The first variable starts with the variable whose plot button was pressed;
+the second is chosen automatically unless an explicit radio choice is selected. The same variable
+cannot occupy both axes. Each variable keeps its **From/To** pair together.
+Only the applicable 2-D vertical or 3-D camera controls are displayed.
+Plot settings use inline radio buttons, not dropdowns. **Reset** beside an
+optional group clears its override and restores automatic behaviour; there is
+no separate Automatic option. Resetting a choice preserves entered range bounds.
+
+The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
+**Roll** turns the view clockwise in the screen plane. All three support mouse,
+touch and keyboard adjustment, with live degree readouts.
+The defaults are 45°, 30° and 0°, respectively. Azimuth and roll span a full turn; elevation
+accepts 5° to 85°. For the example above, set azimuth to 120° and elevation to
+40°: the output is the same paraboloid viewed from the other side, with its
+three ticked axes and formula title retained. Releasing a slider or committing
+a keyboard adjustment requests the new view automatically.
+
+Alternatively, **left-button drag** directly over a 3-D plot: horizontal movement
+changes azimuth and vertical movement changes elevation. Hold **Shift** when
+starting the drag to change roll instead. Sliders and degree readouts update
+during the gesture and the surface redraws while the button is held. Only one
+native redraw is in flight; subsequent movements replace the pending camera
+position, so stale movements cannot build up a queue. Dragging uses a 13×13
+preview mesh, retaining the normal numerical precision checks and domain gaps.
+No spline smoothing is applied across discontinuities. Releasing the mouse,
+including outside the plot, retains the final position and requests one full
+41×41 redraw, even when the last preview already reached that angle. Escape, losing browser
+focus or a lost release restores the original camera. A superseding request
+invalidates an unfinished drag. Preview and final redraws resample the native surface.
+This also works when expanded. Right-click and 2-D plots keep their normal
+behaviour; wheel zoom remains available.
+Axis numbers are spaced to avoid collisions at shared corners and during
+rotation; crowded numbers may be omitted while their tick marks remain visible.
+
+Surfaces use 41×41 uniformly sampled vertices and an adjustable oblique view, with
+blue/teal/gold height shading. They fit all finite heights; **2-D Y scale** and
+its manual limits apply only to curves. Missing real values leave holes. Coarse
+7×7 higher-precision checks increase the working precision when needed; the
+normal starting mantissa is 53 bits, independent of worksheet precision.
+Neither sampled binding is changed in the worksheet. This surface view
+does not adaptively refine its mesh or guarantee detection of every
+pole or narrow feature. See [surface rendering limitations](plot.md#height-surfaces).
+
 Evaluate an expression with a variable, then use its **plot** button beside the
-derivative and integral actions. **Plot from** and **to** select the parameter
-range (initially −10 to 10); bounds accept native mathematical text, including
+derivative and integral actions. **From** and **To** select the parameter
+range; bounds accept native mathematical text, including
 `-@pi` and `@pi`. Other parameters must have numerical bindings. The chosen
 variable is sampled independently of its worksheet value, which is preserved.
 
-**Y scale** offers **Automatic**, **Fit all**, and **Manual limits**. Automatic
+Blank horizontal bounds mean **Automatic**, independently for each endpoint and
+each surface variable. The native worker probes the expression at bounded
+coordinate scales, looking for enough finite real values and visible variation;
+it trims invalid outer margins only where no bound was supplied. An entered
+endpoint is never moved. This is an expression-dependent viewing heuristic, not
+a fixed −10-to-10 range or a proof of the complete real domain. It can miss narrow
+or distant features; when no useful window is found it asks for explicit bounds
+and any missing parameter bindings. Explicit ranges bypass this range search.
+Plots retain gaps inside the chosen window.
+
+For example, enter `asin(x)`, leave both bounds blank, and press **x plot**.
+The output is the inverse-sine curve over its real interval:
+
+```text
+Automatic curve: asin(x), x from -1 to 1
+```
+
+The **2-D vertical range** offers **Fit all** and **Manual limits** radio overrides.
+With neither selected, the range is automatic. Automatic scaling
 uses a horizontally distributed range estimate to keep extreme values near
-poles from flattening the rest of the curve. Cropped values are explicitly
-labelled **Vertical range clipped**. Fit all includes every finite sampled value.
+poles from flattening the rest of the curve. Cropping adds no visible annotation.
+Fit all includes every finite sampled value.
 For Manual limits, supply finite **Y minimum** and **Y maximum**, with minimum
-strictly below maximum. Press the variable's plot button again after changing
-these controls. Tick labels use rounded decimal steps, never fractions; very
+strictly below maximum. Press **Update plot** after changing these controls.
+Tick labels use rounded decimal steps, never fractions; very
 large or small labels use `×10` with superscript exponents.
+Solid bottom and left axes sit beside the numerical tick labels, with the top
+and right edges open and no axis titles. Interior zero guides remain visible.
+Teal curves, muted green-grey axes and tick labels, and a faint dashed grid
+complement the gold TeX heading. These native SVG colours are preserved when
+the plot is expanded or copied.
 
 The result card is labelled **Plot** and displays an SVG generated dynamically
-in memory by [`sampler_t`](sampler.md) and [`plot_t`](plot.md). The image travels
-in the existing Protobuf response. No scratch file, TeX subprocess, external
-plotting programme or browser-side mathematical evaluation is involved.
+in memory by [`sampler_t`](sampler.md) and [`plot_t`](plot.md). Its title is the
+entered formula rendered in TeX, without numerical binding substitutions.
+Recognised ellipsis series use sigma notation: entering
+`1/1^x + 1/2^x + 1/3^x + ...` gives the title
+\(\sum_{n=1}^{\infty}\frac{1}{n^x}\), not just the closed-form function name.
+With X bounds −5 and 5, this example draws only the convergent part, where
+\(x>1\); the rest is blank. It does not draw the analytic continuation of zeta.
+If no finite real samples exist, the error asks you to check the domain,
+convergence and unset parameters, without displaying internal worker records.
+The existing restricted TeX renderer supplies the title glyphs, using its bounded
+temporary-file workflow; native code combines title and curve into one in-memory
+SVG. If title rendering is unavailable, an escaped plain-text formula remains
+alongside a rendering diagnostic. The image travels in the existing Protobuf
+response. No external plotting programme or browser-side mathematical evaluation
+is involved.
 The Expression card retains the plotted formula and bindings. Plot results
 do not supply a Function or numerical Value card.
 
-Sampling uses the selected precision, 64 initial intervals, at most 8,193
-evaluations and eight adaptive subdivision levels. Detected domain gaps and
+**Expand** uses both workspace columns, temporarily hiding the editor and the
+other result cards. At 100% zoom the plot fits the available width; **Collapse**
+restores the two-column workspace. Mode switches restore that mode's own result
+headings, including **Plot** when returning to a saved plot, rather than carrying
+a plotting heading into another mode.
+
+Use the mouse wheel over a 2-D or 3-D plot to zoom in (up) or out (down),
+without holding a modifier key. This uses the same bounded zoom levels as the
+card's **−**, **+** and percentage-reset controls, including when expanded.
+It scales the existing SVG without resampling or changing the chosen ranges.
+Scrolling outside the plot image, including over its controls, behaves normally;
+other result cards still require Ctrl or Command with the wheel to zoom.
+
+Plotting normally uses a **53-bit mantissa** (roughly 16 decimal digits),
+independently of the worksheet precision. It retains `number_t`'s exponent range,
+not the restricted exponent range of a hardware double. X bounds and manual Y
+bounds are parsed with guard precision first; narrow ranges at large offsets
+automatically request more bits. A private copy of the authored formula and
+bindings is parsed at the plotting precision, leaving worksheet output unchanged.
+
+Before the full sample, 17 distributed points are compared with higher-precision
+evaluations. Disagreement triggers a higher-precision retry, including when
+cancellation would otherwise erase a small result. These checks are heuristic,
+not a guarantee of numerical accuracy everywhere. They include additional guard
+precision for very small ranges and up to 4,096 bits of the worksheet precision.
+The plotting limit is 32,768 working bits, with bounds and reference checks
+limited to 65,536 bits; unresolved precision requirements produce an error.
+
+The final sampling pass uses 64 initial intervals, at most 8,193 evaluations and
+eight adaptive subdivision levels. Validation probes additionally consume the
+request's shared calculation budget. Detected domain gaps and
 unresolved edges are not joined. Detection is heuristic: narrow features and
-oscillations can still be missed. Narrow the range for difficult curves; a
+oscillations can still be missed. Finite samples near poles are clipped in native
+precision before conversion to drawing coordinates, so large off-screen values
+do not abort a manually bounded plot. Narrow the range for difficult curves; a
 budget failure is reported rather than publishing a partial image. The current
 Lab control draws one real-valued curve with selectable vertical bounds; the
 library also supports multiple series, measured points and explicit viewports.

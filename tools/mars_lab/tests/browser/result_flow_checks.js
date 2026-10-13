@@ -28,10 +28,8 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
     const scripts = boot({stage: 8, valid: true}).calls[0].args[0];
     check(scripts.join(',') === labDefinitionScripts.join(','), 'loaded definitions come from the native catalogue');
     const widgets = labDOM.call('lab_bootstrap_widgets');
-    check(widgets.calls.length === 5, 'native configuration includes location and plot scale controls');
-    check(widgets.calls[4].args[0] === document.getElementById('plotScale') &&
-              widgets.calls[4].args[1].searchable === false,
-          'plot scale uses the shared themed menu without a search field');
+    check(widgets.calls.length === 4 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
+          'only location dropdowns need native menu enhancement; plot settings are radio buttons');
     check(
         widgets.calls[0].args[1].searchPlaceholder === 'Search jurisdictions' &&
             widgets.calls[2].args[1].placeholder === 'Custom location',

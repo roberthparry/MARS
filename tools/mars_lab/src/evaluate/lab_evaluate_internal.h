@@ -87,4 +87,7 @@ void lab_eval_render_fields(json_t *fields, const lab_eval_render_spec_t *specs,
 /** @brief Render one native TeX field, retaining a diagnostic on failure. */
 void lab_eval_render_field(json_t *fields, const char *source, const char *destination, const char *error_key);
 
+/** @brief Render the native formula title and compose it with its curve into one self-contained SVG. */
+void lab_eval_plot_title(json_t *fields);
+
 #endif

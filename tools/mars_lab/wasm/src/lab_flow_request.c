@@ -564,8 +564,9 @@ static int lab_flow_request_calculus(int frame)
                 return lab_flow_call(frame, PREPARED_CURRENT, "requestPresentation", "prepared", 1, 2, payload,
                                      request);
             }
-            return lab_flow_call(frame, OUTCOME, "fetchCalculus", "result", 1, 4, lab_dom_get(frame, "source"), wrt,
-                                 lab_dom_string(plot ? "plot" : integral ? "integral" : ""), request);
+            return lab_flow_call(frame, OUTCOME, "fetchCalculus", "result", 1, 5, lab_dom_get(frame, "source"), wrt,
+                                 lab_dom_string(plot ? "plot" : integral ? "integral" : ""), request,
+                                 lab_dom_get(frame, "preview"));
         }
         case PREPARED_CURRENT:
             return lab_flow_request_current(frame, MATRIX_FETCH);

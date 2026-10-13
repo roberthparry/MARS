@@ -11,6 +11,7 @@
 #include "lab_dom.h"
 #include "lab_result.h"
 #include "lab_view.h"
+#include "lab_plot_controls.h"
 #include "lab_layout.h"
 
 static int lab_layout_read(int node, const char *key)
@@ -82,11 +83,24 @@ static void lab_layout_frame(int card, double scale, double zoom)
     int matrix = lab_dom_closest(frame, "#value.matrix-tex-value");
     if (matrix)
         scale = lab_view_matrix_scale(scale / zoom, zoom, lab_layout_width(matrix), width);
+    /* Native plot series identify graphics which fit the viewport at 100% zoom. */
+    int plot = lab_dom_query(svg, "[data-series]");
+    if (plot)
+        lab_plot_controls_sync();
+    if (lab_dom_query(card, "#plotRange"))
+        lab_dom_class(card, "plot-card", !!plot);
+    if (plot) {
+        double available = lab_layout_width(lab_dom_closest(frame, ".rendered"));
+        if (available > 0)
+            scale = available / width * zoom;
+    }
     lab_layout_number(frame, 4, "width", width * scale, "px");
     lab_layout_number(frame, 4, "height", height * scale, "px");
-    lab_layout_number(svg, 4, "width", width, "px");
-    lab_layout_number(svg, 4, "height", height, "px");
-    lab_dom_write(svg, 4, "transform", lab_dom_format(scale, "scale(", ")"));
+    lab_layout_number(svg, 4, "width", plot ? width * scale : width, "px");
+    lab_layout_number(svg, 4, "height", plot ? height * scale : height, "px");
+    lab_dom_write(svg, 4, "transform", plot ? lab_dom_string("none") : lab_dom_format(scale, "scale(", ")"));
+    if (plot)
+        lab_layout_text(svg, 4, "margin-bottom", "0");
 }
 
 /* Project a card's C-owned zoom to CSS, SVG geometry and accessible controls. */
@@ -176,6 +190,7 @@ void lab_layout_content(int svg, int fallback)
         lab_dom_write(rendered, 0, "", fallback);
     }
     int card = lab_dom_closest(rendered, ".result-card");
+    lab_dom_class(card, "plot-card", !!lab_dom_query(rendered, "[data-series]"));
     if (card)
         lab_dom_schedule(1, card);
 }
@@ -184,6 +199,10 @@ void lab_layout_content(int svg, int fallback)
 void lab_layout_fit(void)
 {
     int rendered = lab_dom_query(0, "#rendered");
+    if (lab_dom_query(rendered, "svg [data-series]")) {
+        lab_layout_zoom(lab_dom_closest(rendered, ".result-card"));
+        return;
+    }
     if (!lab_dom_equal(lab_layout_read(rendered, "responsiveFit"), lab_dom_string("true")))
         return;
     int compact = lab_layout_read(rendered, "compactSvg"), wrapped = lab_layout_read(rendered, "wrappedSvg");

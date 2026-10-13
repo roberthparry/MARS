@@ -13,6 +13,7 @@
  */
 #include "lab_dom.h"
 #include "lab_layout.h"
+#include "lab_plot_controls.h"
 #include "lab_result.h"
 #include "lab_view.h"
 #include "lab_workspace.h"
@@ -259,6 +260,8 @@ void lab_workspace_dom_mode(unsigned mode, int coverage)
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
     lab_workspace_dom_hidden("#plotRange", mode != 0);
     lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), 0, "", lab_view_text(mode, 0));
+    int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");
+    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing_help ? "Help" : "Result");
     int subtitle = lab_dom_string(lab_view_text(mode, 1));
     lab_dom_write(lab_dom_query(0, "#subtitle"), 0, "", mode == 6 ? lab_dom_join(subtitle, coverage, ".") : subtitle);
     lab_workspace_dom_titles(lab_dom_string(lab_view_text(mode, 2)), lab_dom_string(lab_view_text(mode, 3)),
@@ -468,6 +471,8 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
         return;
     static const char *const suffixes[] = {" derivative", " integral", " plot"};
     int plots = !lab_dom_has_class(lab_dom_query(0, "#plotRange"), "hidden");
+    if (plots)
+        lab_plot_controls_variables(names, labels);
     for (unsigned action = 0; action < (plots ? 3u : 2u); ++action) {
         if (action < 2 && !differentiable)
             continue;
@@ -566,6 +571,9 @@ static const struct {
                                        {"renderedMore", "#renderedMore", 1},   {"parsedMore", "#parsedMore", 1},
                                        {"functionMore", "#functionMore", 1},   {"valueMore", "#valueMore", 1}};
 
+static const char *const lab_workspace_dom_result_titles[] = {
+    "#rightPaneTitle", "#renderedTitle", "#parsedTitle", "#functionTitle", "#valueTitle"};
+
 /* Share the exact metadata defaults between snapshot capture and legacy snapshot restoration. */
 static int lab_workspace_dom_result_metadata(int source)
 {
@@ -608,6 +616,14 @@ void lab_workspace_dom_result_save(int metadata)
         return;
     }
     int state = lab_workspace_dom_result_metadata(metadata);
+    int titles = lab_dom_object(4);
+    for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
+        int text = lab_dom_read(lab_dom_query(0, lab_workspace_dom_result_titles[i]), 0, "");
+        if (!i && lab_dom_equal(text, lab_dom_string("Help")))
+            text = lab_dom_string("Result");
+        lab_dom_push(titles, text);
+    }
+    lab_dom_set(state, "titles", titles);
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_fields / sizeof *lab_workspace_dom_result_fields; ++i) {
         unsigned mark = lab_dom_mark();
         int node = lab_dom_query(0, lab_workspace_dom_result_fields[i].selector);
@@ -624,11 +640,19 @@ void lab_workspace_dom_result_restore(int state)
 {
     lab_result_render_invalidate();
     lab_result_solver_invalidate();
+    lab_layout_expand(0, 2);
+    int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");
+    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing_help ? "Help" : "Result");
     if (!lab_dom_truth(state)) {
         lab_dom_return(0);
         return;
     }
-    lab_layout_expand(0, 2);
+    int titles = lab_dom_get(state, "titles");
+    for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
+        int text = lab_dom_item(titles, i);
+        if (lab_dom_truth(text) && (i || !showing_help))
+            lab_dom_write(lab_dom_query(0, lab_workspace_dom_result_titles[i]), 0, "", text);
+    }
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_fields / sizeof *lab_workspace_dom_result_fields; ++i) {
         unsigned mark = lab_dom_mark();
         int node = lab_dom_query(0, lab_workspace_dom_result_fields[i].selector);

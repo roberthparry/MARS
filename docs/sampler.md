@@ -5,6 +5,11 @@ ordered set of numerical points for ordinary or parametric curves. Use
 [`plot_t`](plot.md) to render the result, or inspect individual points directly.
 Neither module starts threads or invokes an external plotting programme.
 
+For MARS Lab height surfaces, bounded uniform `sampler_new()` rows sample the
+first variable while a private expression binding fixes the second variable
+for each row. The resulting grid is copied into `plot_set_surface()`; no new
+surface ownership or threading model is added to `sampler_t`.
+
 ## API
 
 | API | Behaviour |
@@ -23,6 +28,13 @@ grid. It does not change the default precision. Choose the required precision
 before constructing numerical inputs and running the sampler. Extremely small
 steps can still collapse at the chosen input precision; uniform sampling then
 fails with `ERANGE`, rather than publishing duplicate parameter values.
+
+MARS Lab adds a separate [plotting precision policy](mars-lab.md#native-function-plots)
+around this API: ordinary plots start at 53 bits, while close bounds or failed
+higher-precision spot checks raise that precision. The Lab reparses a private
+formula for each precision pass and restores the worksheet setting afterwards.
+The general-purpose sampler itself still respects its caller's numerical inputs
+and does not lower their precision automatically.
 
 `SAMPLER_UNIFORM` evaluates the endpoints of each requested interval.
 `SAMPLER_ADAPTIVE` additionally evaluates midpoints and refines intervals when

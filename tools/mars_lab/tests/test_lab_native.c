@@ -598,5 +598,6 @@ int tests_main(void)
     test_lab_function_readme_cases();
     test_lab_math_readme_cases();
     test_lab_wasm_build_readme_cases();
+    test_lab_plot_readme_cases();
     return TEST_EXIT_CODE();
 }

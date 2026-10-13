@@ -191,11 +191,12 @@ function runFunctionCard() {
     return labFlowContinue(6, {});
 }
 
-async function fetchEvaluation(text, wrt = '', action = '', bindingSource = '', bindingValue = '', request = null) {
+async function fetchEvaluation(text, wrt = '', action = '', bindingSource = '', bindingValue = '', request = null,
+                               preview = false) {
     return labRequests.post(
         request,
         labDOM.call(
-            'lab_payload_build', 0, [text, bindingSource, bindingValue, wrt, action, currentMode()], request,
+            'lab_payload_build', 0, [text, bindingSource, bindingValue, wrt, action, currentMode(), preview], request,
             requestedValuePrecision(), lastExpressionUpdatedAt),
         '/eval');
 }
@@ -226,8 +227,8 @@ async function fetchDatetimeWeather(state, signal, request = null) {
 }
 
 // Native continuations own calculus decisions; browser callbacks expose atomic capabilities.
-function takeCalculus(wrt, action, actionButton = null) {
-    return labFlowContinue(7, {wrt, action, actionButton});
+function takeCalculus(wrt, action, actionButton = null, preview = false) {
+    return labFlowContinue(7, {wrt, action, actionButton, preview});
 }
 
 async function takeDerivative(wrt, actionButton = null) {
@@ -240,6 +241,25 @@ async function takeIntegral(wrt, actionButton = null) {
 
 async function takePlot(wrt, actionButton = null) {
     return takeCalculus(wrt, 'plot', actionButton);
+}
+
+/** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
+async function redrawPlotDrag(state, variable, preview) {
+    let next = [state, variable, preview];
+    while (next) {
+        const [record, wrt, coarse] = next;
+        next = null;
+        let accepted = false;
+        try {
+            const pending = takeCalculus(wrt, 'plot', null, coarse);
+            const token = labRequests.latestMain();
+            await pending;
+            accepted = token !== 0 && labRequests.latestMain() === token;
+        } finally {
+            const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
+            labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
+        }
+    }
 }
 
 function fetchAlmanacEvaluation(request = null) {
@@ -338,7 +358,7 @@ function labRequestFlowServices() {
         calculusTitle: text => rightPaneTitle.textContent = text,
         valueTitle: text => valueTitle.textContent = text,
         requestPresentation: (...args) => requestLabPresentation(...args),
-        fetchCalculus: (text, wrt, action, request) => fetchEvaluation(text, wrt, action, '', '', request),
+        fetchCalculus: (text, wrt, action, request, preview) => fetchEvaluation(text, wrt, action, '', '', request, preview),
         fetchMatrixOptions: options => fetchMatrixEvaluation(options),
         displayCalculusResult: result => displayCalculusResult(result),
         setMatrixPrettyResult: (...args) => setMatrixPrettyResult(...args),

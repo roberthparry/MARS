@@ -204,11 +204,19 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
     if (!strcmp(action, "binding-edit"))
         return lab_eval_argument_member(args, payload, "binding_value", "", false);
     if (!strcmp(action, "plot"))
-        return lab_eval_argument_member(args, payload, "plot_lower", "-10", false) &&
-               lab_eval_argument_member(args, payload, "plot_upper", "10", false) &&
+        return lab_eval_argument_member(args, payload, "plot_lower", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_upper", "", false) &&
                lab_eval_argument_member(args, payload, "plot_scale", "auto", false) &&
                lab_eval_argument_member(args, payload, "plot_y_lower", "", false) &&
-               lab_eval_argument_member(args, payload, "plot_y_upper", "", false);
+               lab_eval_argument_member(args, payload, "plot_y_upper", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_kind", "auto", false) &&
+               lab_eval_argument_member(args, payload, "plot_second", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_second_lower", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_second_upper", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_azimuth", "45", false) &&
+               lab_eval_argument_member(args, payload, "plot_elevation", "30", false) &&
+               lab_eval_argument_member(args, payload, "plot_roll", "0", false) &&
+               lab_eval_argument_member(args, payload, "plot_quality", "full", false);
     return true;
 }
 
@@ -459,7 +467,18 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
                 if (exit_status) {
                     const char *raw = output && string_byte_length(output) ? string_c_str(output) :
                                          worker_error ? diagnostic_message(worker_error) : "Native evaluation failed";
-                    lab_eval_set(result, "error", raw);
+                    const char *message = lab_eval_text(result, "error");
+                    if (*message) {
+                        /* Keep the labelled calculation failure separate from protocol/debug records. */
+                        diagnostic_t *detail = diagnostic_new(DIAGNOSTIC_ERROR, "lab.worker", exit_status,
+                                                              message, NULL, worker_error);
+                        if (detail) {
+                            diagnostic_free(worker_error);
+                            worker_error = detail;
+                        }
+                    } else {
+                        lab_eval_set(result, "error", raw);
+                    }
                     lab_eval_set(result, "raw", raw);
                     lab_eval_set(result, "raw_error", raw);
                     string_t *code = string_sprintf("%d", exit_status);

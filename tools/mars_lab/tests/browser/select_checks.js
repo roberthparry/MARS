@@ -6,40 +6,15 @@ window.checkLabSelects = async function checkLabSelects() {
     };
     check(!labDefinitionScripts.includes('controls'), 'retired control script remains in the loader');
     check((await fetch('/js/controls.js')).status === 404, 'retired control route remains available');
-    const scale = document.getElementById('plotScale');
-    const reference = document.getElementById('integratorIntervalCap');
-    const scaleStyle = getComputedStyle(scale), referenceStyle = getComputedStyle(reference);
-    for (const property of ['colorScheme', 'appearance', 'backgroundImage', 'color', 'borderRadius', 'paddingRight'])
-        check(scaleStyle[property] === referenceStyle[property], 'plot scale theme mismatch: ' + property);
-    check(scaleStyle.colorScheme === 'dark', 'plot scale popup must use the dark theme');
-    const scaleShell = scale.closest('.select-shell');
-    const themedShell = document.getElementById('datetimeJurisdiction').closest('.select-shell');
-    check(scaleShell && themedShell, 'plot scale must use the shared themed menu, not an operating-system popup');
-    const scaleButton = scaleShell.querySelector('.select-button');
-    const scaleMenu = scaleShell.querySelector('.select-menu');
-    const savedScale = scale.value;
-    try {
-        for (const selector of ['.select-button', '.select-menu', '.select-option.selected']) {
-            const actual = getComputedStyle(scaleShell.querySelector(selector));
-            const expected = getComputedStyle(themedShell.querySelector(selector));
-            for (const property of ['backgroundImage', 'backgroundColor', 'color', 'borderRadius'])
-                check(actual[property] === expected[property], 'visible plot menu theme: ' + selector + ' ' + property);
+    check(!document.querySelector('#plotRange select'), 'plot settings use inline choices, not selection menus');
+    for (const id of ['plotKindChoices', 'plotScaleChoices']) {
+        const radios = [...document.getElementById(id).querySelectorAll('input[type="radio"]')];
+        check(radios.length === 2, 'plot override groups contain only the two explicit choices');
+        for (const radio of radios) {
+            const style = getComputedStyle(radio);
+            check(style.colorScheme === 'dark' && style.accentColor !== 'auto',
+                  'plot radio controls must use the dark theme and explicit accent colour');
         }
-        scaleButton.click();
-        check(!scaleMenu.classList.contains('hidden') && scaleButton.getAttribute('aria-expanded') === 'true',
-              'plot menu opens as themed DOM content');
-        const choices = [...scaleShell.querySelectorAll('.select-option')];
-        check(choices.length === 3, 'plot menu retains all scale policies');
-        choices.find(option => option.textContent === 'Fit all').click();
-        check(scale.value === 'all' && scaleButton.textContent === 'Fit all' &&
-                  scaleMenu.classList.contains('hidden'), 'themed scale selection updates the native input');
-        scaleButton.click();
-        scaleButton.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
-        check(scaleMenu.classList.contains('hidden'), 'plot menu supports keyboard dismissal');
-    } finally {
-        scale.value = savedScale;
-        labDOM.call('lab_select_sync', scale);
-        labDOM.call('lab_select_event', scale, 3, 0, null);
     }
     const inputIds = ['plotLower', 'plotUpper', 'plotYLower', 'plotYUpper'];
     const inputReference = getComputedStyle(document.getElementById('plotLower'));
@@ -80,12 +55,6 @@ window.checkLabSelects = async function checkLabSelects() {
             document.getElementById(id).removeAttribute('data-test-autofill');
         autofillStyle.remove();
         active?.focus();
-    }
-    for (const selector of ['option:not(:checked)', 'option:checked']) {
-        const actual = getComputedStyle(scale.querySelector(selector));
-        const expected = getComputedStyle(reference.querySelector(selector));
-        check(actual.color === expected.color && actual.backgroundColor === expected.backgroundColor,
-              'plot scale option theme mismatch: ' + selector);
     }
     const root = document.createElement('div');
     root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:400px';

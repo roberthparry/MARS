@@ -2038,8 +2038,7 @@ int lab_worker_expression(int argc, char **argv)
     if (!strcmp(action, "plot")) {
         printf("input       %s\n", raw_input);
         print_bindings("binding", bindings, precision);
-        rc = lab_worker_plot(expr, wrt, argc > 5 ? argv[5] : "-10", argc > 6 ? argv[6] : "10",
-                             argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "");
+        rc = lab_worker_plot_request(raw_input, expr, bindings, wrt, argc, argv);
         goto cleanup;
     }
     progression_closed_form = expr_finite_progression_closed_form(expr);

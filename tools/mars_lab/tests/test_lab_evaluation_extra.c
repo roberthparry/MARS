@@ -13,6 +13,8 @@
 #include "lab_presentation.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
+#include "worker/lab_worker_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -114,6 +116,8 @@ static void test_lab_extra_plot(void)
     const json_t *plot = lab_eval_get(cards, "plot");
     bool ok = adapted && status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "<svg") &&
               contains(plot, "svg", "data-series") && contains(plot, "render_title", "Plot") &&
+              contains(fields, "plot_svg", "data-plot-title") && contains(fields, "plot_title_TeX", "\\sin") &&
+              !contains(fields, "plot_svg", "Function plot") && !contains(fields, "plot_title_TeX", "=7") &&
               json_array_size(lab_eval_get(fields, "binding_values")) == 2;
     if (!ok)
         show_failure(fields);
@@ -123,16 +127,20 @@ static void test_lab_extra_plot(void)
     ok = !test_lab_ok(fields, true) && contains(fields, "error", "bounds");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "reversed plot ranges produce a useful error");
-    fields = request("/eval", "{\"expression\":\"x+a\",\"action\":\"plot\"}", &status);
-    ok = !test_lab_ok(fields, true) && contains(fields, "error", "No finite real points");
+    fields = request("/eval", "{\"expression\":\"x+a\",\"action\":\"plot\",\"plot_kind\":\"curve\"}", &status);
+    ok = !test_lab_ok(fields, true) && contains(fields, "error", "bind any remaining parameters");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "unset parameters never become invented plotted values");
     fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"precision\":40}", &status);
-    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "Vertical range clipped");
+    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
+         !contains(fields, "plot_svg", "Vertical range clipped") && !contains(fields, "plot_svg", "<rect") &&
+         contains(fields, "plot_svg", "#78d8cb") && contains(fields, "plot_svg", "#94b8b1") &&
+         contains(fields, "plot_svg", "#b8ccc5") && !contains(fields, "plot_svg", ">x</text>") &&
+         !contains(fields, "plot_svg", ">f</text>");
     if (!ok)
         show_failure(fields);
     json_free(fields);
-    TEST_ASSERT_TRUE(ok, "automatic zeta view labels excluded extreme values");
+    TEST_ASSERT_TRUE(ok, "automatic zeta view has themed colours without a frame, clipping label or axis titles");
     fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"plot_scale\":\"all\",\"precision\":40}", &status);
     ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "<svg") &&
          !contains(fields, "plot_svg", "Vertical range clipped");
@@ -140,7 +148,7 @@ static void test_lab_extra_plot(void)
     TEST_ASSERT_TRUE(ok, "Fit all preserves the complete sampled vertical range");
     fields = request("/eval", "{\"expression\":\"sin(x)\",\"action\":\"plot\",\"plot_scale\":\"manual\","
                              "\"plot_y_lower\":\"-1/2\",\"plot_y_upper\":\"1/2\",\"precision\":40}", &status);
-    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "Vertical range clipped") &&
+    ok = test_lab_ok(fields, true) && !contains(fields, "plot_svg", "Vertical range clipped") &&
          contains(fields, "plot_svg", ">0.2</text>");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "manual mathematical bounds control the native viewport");
@@ -149,6 +157,351 @@ static void test_lab_extra_plot(void)
     ok = !test_lab_ok(fields, true) && contains(fields, "error", "manual bounds");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "invalid vertical bounds are rejected before sampling");
+}
+
+static void test_lab_extra_plot_series_domain(void)
+{
+    unsigned status = 0;
+    const char *source = "{ 1/1^x + 1/2^x + 1/3^x + ... | x = ? }";
+    string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\",\"wrt\":\"x\","
+                                     "\"plot_lower\":\"-5\",\"plot_upper\":\"5\",\"precision\":155}", source);
+    json_t *fields = request("/eval", string_c_str(payload), &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
+              contains(fields, "plot_title_TeX", "\\sum_{n=1}");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    string_free(payload);
+    TEST_ASSERT_TRUE(ok, "reciprocal series plots its convergent portion across a partly divergent range");
+
+    size_t saved_precision = num_get_default_prec_bits(), bits = 0;
+    number_t lower = num_create_from_long(-5), upper = num_create_from_long(5);
+    sampler_t *samples = lab_worker_plot_samples(source, "x", lower, upper, NUM_NAN, NUM_NAN, &bits);
+    size_t valid = 0, gaps = 0;
+    ok = samples != NULL;
+    for (size_t i = 0; i < sampler_count(samples); ++i) {
+        const sampler_point_t *point = sampler_point(samples, i);
+        if (num_le(point->x, NUM_ONE)) {
+            ok = ok && !point->valid;
+            ++gaps;
+        } else if (point->valid) {
+            ++valid;
+            ok = ok && num_gt(point->y, NUM_ONE);
+        }
+    }
+    sampler_free(samples);
+    num_destroy(&upper);
+    num_destroy(&lower);
+    num_set_default_prec_bits(saved_precision);
+    TEST_ASSERT_TRUE(ok && valid > 10 && gaps > 10, "series samples preserve divergence instead of analytic continuation");
+
+    fields = request("/eval", "{\"expression\":\"{1/1^x + 1/2^x + 1/3^x + ... | x=?}\","
+                             "\"action\":\"plot\",\"wrt\":\"x\",\"plot_lower\":\"-5\",\"plot_upper\":\"1\"}", &status);
+    ok = status == 422 && !test_lab_ok(fields, true) && contains(fields, "error", "No finite real points") &&
+         !contains(fields, "error", "binding") && !contains(fields, "error", "NAN") &&
+         contains(fields, "raw_error", "binding") && contains(fields, "error", "convergence") &&
+         !strcmp(lab_eval_text(fields, "error"), lab_eval_text(lab_eval_get(fields, "failure_diagnostic"), "message"));
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "wholly divergent range reports a clean diagnostic without internal worker records");
+}
+
+static void test_lab_extra_surface(void)
+{
+    const char *cases[] = {
+        "{\"expression\":\"x^2+y^2\",\"action\":\"plot\",\"precision\":155}",
+        "{\"expression\":\"{x^2+y^2+a | x=9, y=8; a=2}\",\"action\":\"plot\",\"plot_kind\":\"surface\","
+        "\"plot_second\":\"y\"}",
+        "{\"expression\":\"sqrt(x+y)\",\"action\":\"plot\",\"plot_lower\":\"-1\",\"plot_upper\":\"1\","
+        "\"plot_second_lower\":\"-1\",\"plot_second_upper\":\"1\"}",
+        "{\"expression\":\"(exp(x)-1)/x+y\",\"action\":\"plot\",\"plot_lower\":\"1e-100\",\"plot_upper\":\"2e-100\","
+        "\"plot_second_lower\":\"0\",\"plot_second_upper\":\"1\"}",
+        "{\"expression\":\"x-10^30+y\",\"action\":\"plot\",\"plot_lower\":\"10^30+1/10\",\"plot_upper\":\"10^30+1/5\"}",
+        "{\"expression\":\"x^2+@mu^2\",\"action\":\"plot\",\"plot_second\":\"@mu\"}",
+        "{\"expression\":\"atan2(y,x)\",\"action\":\"plot\",\"plot_azimuth\":\"-240\",\"plot_elevation\":\"40\","
+        "\"plot_roll\":\"-270\"}"
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        unsigned status = 0;
+        json_t *fields = request("/eval", cases[i], &status);
+        bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+                  contains(fields, "plot_svg", "<path fill=") && contains(fields, "plot_svg", "data-plot-title");
+        if (i == 1)
+            ok = ok && contains(fields, "expression", "x = 9") && contains(fields, "expression", "y = 8");
+        if (i == 5)
+            ok = ok && contains(fields, "plot_svg", ">μ</text>");
+        if (i == 6)
+            ok = ok && contains(fields, "plot_svg", "data-azimuth=\"120.000\"") &&
+                 contains(fields, "plot_svg", "data-elevation=\"40.000\"") &&
+                 contains(fields, "plot_svg", "data-roll=\"90.000\"") &&
+                 contains(fields, "plot_svg", "data-axis-arrow=\"2\"") &&
+                 contains(fields, "plot_svg", "data-plot-tick=\"2\"");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        TEST_ASSERT_TRUE(ok, "native surfaces preserve bindings, holes and range-aware numerical precision");
+    }
+    expect_response("/eval", "{\"expression\":\"x+y+z\",\"action\":\"plot\"}", 422u, "error", "second variable");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"wrt\":\"q\"}",
+                    422u, "error", "Select a variable");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_second\":\"x\"}",
+                    422u, "error", "second variable");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_second_lower\":\"2\","
+                              "\"plot_second_upper\":\"1\"}", 422u, "error", "bounds");
+    expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2-y^2)\",\"action\":\"plot\"}",
+                    422u, "error", "Unable to infer");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_azimuth\":\"nan\"}",
+                    422u, "error", "finite azimuth");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_elevation\":\"90\"}",
+                    422u, "error", "5 to 85");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_azimuth\":\"45junk\"}",
+                    422u, "error", "finite azimuth");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_roll\":\"inf\"}",
+                    422u, "error", "roll");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_roll\":\"20junk\"}",
+                    422u, "error", "roll");
+}
+
+static void test_lab_extra_plot_ranges(void)
+{
+    static const struct {
+        const char *source, *lower, *upper;
+        double expected_lower, expected_upper;
+    } cases[] = {
+        {"asin(x)", "", "", -1, 1},
+        {"asin(100*x)", " ", "", -0.01, 0.01},
+        {"sqrt(x)", "", "", 0, 10},
+        {"log(x)", "", "", 0.625, 10},
+        {"log(x-100)", "", "", 125, 1000},
+        {"x^2", "2", "", 2, 22},
+        {"x^2", "", "-2", -22, -2},
+        {"x^2", "2", "3", 2, 3}
+    };
+    size_t precision = num_get_default_prec_bits();
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        const char *limits[] = {cases[i].lower, cases[i].upper, "", ""};
+        number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
+        bool ok = lab_worker_plot_ranges(cases[i].source, "x", NULL, limits, bounds);
+        ok = ok && num_to_double(bounds[0]) == cases[i].expected_lower &&
+             num_to_double(bounds[1]) == cases[i].expected_upper && num_get_default_prec_bits() == precision;
+        num_destroy(&bounds[0]);
+        num_destroy(&bounds[1]);
+        TEST_ASSERT_TRUE(ok, "automatic ranges follow sampled domain and scale while preserving explicit bounds");
+    }
+    expect_response("/eval", "{\"expression\":\"asin(x)\",\"action\":\"plot\","
+                              "\"plot_lower\":\"\",\"plot_upper\":\" \"}", 200u, "plot_svg", "data-series");
+    const char *narrow[] = {"pi", "pi+1e-50", "", ""};
+    number_t rectangle[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
+    bool guarded = lab_worker_plot_ranges("x+y", "x", "y", narrow, rectangle) &&
+                   num_lt(rectangle[0], rectangle[1]) && num_get_default_prec_bits() == precision;
+    for (unsigned i = 0; i < 4; ++i)
+        num_destroy(&rectangle[i]);
+    TEST_ASSERT_TRUE(guarded, "an automatic second range preserves close explicit first-axis bounds");
+    expect_response("/eval", "{\"expression\":\"sqrt(1-x^2-y^2)\",\"action\":\"plot\","
+                              "\"plot_lower\":\"\",\"plot_upper\":\"\","
+                              "\"plot_second_lower\":\"\",\"plot_second_upper\":\"\"}", 200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2)\",\"action\":\"plot\"}", 422u, "error", "Supply bounds");
+    expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_lower\":\"bad(\"}",
+                    422u, "error", "bounds");
+}
+
+static void test_lab_extra_plot_preview(void)
+{
+    unsigned status = 0;
+    json_t *full = request("/eval", "{\"expression\":\"x^2+y^2\",\"action\":\"plot\"}", &status);
+    json_t *preview = request("/eval", "{\"expression\":\"x^2+y^2\",\"action\":\"plot\","
+                                      "\"plot_quality\":\"preview\"}", &status);
+    const string_t *a = json_string_value(lab_eval_get(full, "plot_svg"));
+    const string_t *b = json_string_value(lab_eval_get(preview, "plot_svg"));
+    bool ok = test_lab_ok(full, true) && test_lab_ok(preview, true) && a && b &&
+              strlen(string_c_str(b)) < strlen(string_c_str(a)) / 3 &&
+              contains(preview, "plot_svg", "data-plot-title") && contains(preview, "plot_svg", "data-axis-arrow");
+    json_free(preview);
+    json_free(full);
+    TEST_ASSERT_TRUE(ok, "drag previews reduce tessellation while retaining native titles and axes");
+    expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_quality\":\"unknown\"}",
+                    422u, "error", "plotting quality");
+}
+
+static void test_lab_extra_plot_tangent_bounds(void)
+{
+    /* The native request field is decimal digits, not the browser's bit count. */
+    const unsigned precisions[] = {17, 116, 386};
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(precisions) / sizeof(*precisions); ++i) {
+        unsigned status = 0;
+        string_t *payload = string_sprintf("{\"expression\":\"tan(x)\",\"action\":\"plot\",\"plot_scale\":\"manual\","
+                            "\"plot_lower\":\"-2pi\",\"plot_upper\":\"2pi\",\"plot_y_lower\":\"-12\","
+                            "\"plot_y_upper\":\"12\",\"precision\":%u}", precisions[i]);
+        json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        bool rendered = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
+                        !contains(fields, "plot_svg", "Vertical range clipped");
+        if (!rendered)
+            show_failure(fields);
+        ok = ok && rendered;
+        json_free(fields);
+        string_free(payload);
+    }
+    TEST_ASSERT_TRUE(ok, "tangent over multiples of pi renders with manual limits at double and high precision");
+}
+
+static void test_lab_extra_plot_precision(void)
+{
+    size_t saved = num_get_default_prec_bits(), bits = 0;
+    num_set_default_prec_bits(1536);
+    number_t lo = num_create_from_long(-2), hi = num_create_from_long(2);
+    sampler_t *samples = lab_worker_plot_samples("{sin(x)+a | x=7; a=1.23456789123456789123456789}", "x",
+                                                 lo, hi, NUM_NAN, NUM_NAN, &bits);
+    bool ordinary = samples && bits == 53 && num_get_default_prec_bits() == 1536;
+    if (samples) {
+        const sampler_point_t *point = sampler_point(samples, 1);
+        ordinary = ordinary && point->valid && num_get_effective_prec_bits(point->parameter) == 53 &&
+                   num_get_effective_prec_bits(point->y) == 53;
+    }
+    sampler_free(samples);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    num_set_default_prec_bits(53);
+    bool parsed = lab_worker_plot_bounds("1000000000000000000000000000000.1",
+                                         "1000000000000000000000000000000.2", &lo, &hi);
+    samples = parsed ? lab_worker_plot_samples("x", "x", lo, hi, NUM_NAN, NUM_NAN, &bits) : NULL;
+    bool narrow = parsed && samples && bits > 100 && num_get_default_prec_bits() == 53;
+    if (samples)
+        narrow = narrow && num_lt(sampler_point(samples, 0)->x, sampler_point(samples, sampler_count(samples) - 1)->x);
+    sampler_free(samples);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    parsed = lab_worker_plot_bounds("1e-100", "2e-100", &lo, &hi);
+    samples = parsed ? lab_worker_plot_samples("exp(x)-1", "x", lo, hi, NUM_NAN, NUM_NAN, &bits) : NULL;
+    bool cancellation = samples && bits > 53 && num_get_default_prec_bits() == 53;
+    if (samples) {
+        number_t ratio = num_div(sampler_point(samples, 0)->y, lo);
+        number_t tolerance = num_create_from_double(0.999999);
+        number_t ceiling = num_create_from_double(1.000001);
+        cancellation = cancellation && num_gt(ratio, tolerance) && num_lt(ratio, ceiling);
+        num_destroy(&ceiling);
+        num_destroy(&tolerance);
+        num_destroy(&ratio);
+    }
+    sampler_free(samples);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    number_t ymin = NUM_NAN, ymax = NUM_NAN;
+    parsed = lab_worker_plot_bounds("1e30-2", "1e30+2", &ymin, &ymax) &&
+             lab_worker_plot_bounds("-1", "1", &lo, &hi);
+    samples = parsed ? lab_worker_plot_samples("1e30+sin(x)", "x", lo, hi, ymin, ymax, &bits) : NULL;
+    bool vertical = samples && bits > 100 && num_get_default_prec_bits() == 53;
+    sampler_free(samples);
+    num_destroy(&ymax);
+    num_destroy(&ymin);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    parsed = lab_worker_plot_bounds("0", "2", &lo, &hi);
+    samples = parsed ? lab_worker_plot_samples("{sum(n,1,inf,a/n^x) | a=2; x=?}", "x",
+                                                lo, hi, NUM_NAN, NUM_NAN, &bits) : NULL;
+    bool scoped = samples && !sampler_point(samples, 0)->valid;
+    if (samples) {
+        const sampler_point_t *last = sampler_point(samples, sampler_count(samples) - 1);
+        number_t minimum = num_create_from_double(3.2898681), maximum = num_create_from_double(3.2898682);
+        scoped = scoped && last->valid && num_gt(last->y, minimum) && num_lt(last->y, maximum);
+        num_destroy(&maximum);
+        num_destroy(&minimum);
+    }
+    sampler_free(samples);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    parsed = lab_worker_plot_bounds("pi", "pi+1e-50", &lo, &hi);
+    bool close_symbolic = parsed && num_lt(lo, hi) && num_get_default_prec_bits() == 53;
+    sampler_t *invalid = lab_worker_plot_samples("(", "x", lo, hi, NUM_NAN, NUM_NAN, &bits);
+    bool restored = !invalid && num_get_default_prec_bits() == 53;
+    sampler_free(invalid);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ordinary, "ordinary samples use 53 bits even with a 1536-bit worksheet and bindings");
+    TEST_ASSERT_TRUE(narrow, "narrow decimal ranges are parsed accurately and raise sampling precision");
+    TEST_ASSERT_TRUE(cancellation, "higher-precision probes detect cancellation and retry the formula");
+    TEST_ASSERT_TRUE(vertical, "a narrow manual vertical viewport also raises working precision");
+    TEST_ASSERT_TRUE(scoped, "private plot bindings reach summand parameters without removing convergence gaps");
+    TEST_ASSERT_TRUE(close_symbolic, "symbolic bounds closer than worksheet resolution remain distinct");
+    TEST_ASSERT_TRUE(restored, "failed private parses restore worksheet precision");
+}
+
+static void test_lab_extra_plot_title_fallback(void)
+{
+    json_t *fields = json_new_object();
+    lab_eval_set(fields, "plot_svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 500\">"
+                                    "<g data-series=\"0\"><path d=\"M 0 0 L 1 1\"/></g></svg>");
+    lab_eval_set(fields, "plot_title", "<formula>&");
+    lab_eval_set(fields, "plot_title_TeX", "\\input{not-permitted}");
+    lab_eval_plot_title(fields);
+    bool ok = contains(fields, "plot_svg", "data-plot-chart") && contains(fields, "plot_svg", "&lt;formula&gt;&amp;") &&
+              !contains(fields, "plot_svg", "<formula>") && *lab_eval_text(fields, "plot_title_render_error");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "failed title rendering preserves the curve, escapes the formula and records a diagnostic");
+}
+
+static void test_lab_plot_title_readme(void)
+{
+    /* README example in docs/mars-lab.md: authored reciprocal series retains its sigma title. */
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"1/1^x + 1/2^x + 1/3^x + ...\",\"action\":\"plot\","
+                            "\"wrt\":\"x\",\"plot_lower\":\"-5\",\"plot_upper\":\"5\",\"precision\":17}", &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_title_TeX", "\\sum_{n=1}") &&
+              contains(fields, "plot_title_TeX", "\\infty") && contains(fields, "plot_title_TeX", "\\frac{1}{n^{x}}") &&
+              !contains(fields, "plot_title_TeX", "\\begin{aligned}") &&
+              contains(fields, "plot_svg", "data-plot-title") && contains(fields, "plot_svg", "data-series");
+    if (!ok)
+        show_failure(fields);
+    string_printf("README plot title: %s\n", lab_eval_text(fields, "plot_title_TeX"));
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "README reciprocal-series plot displays the documented sigma title");
+}
+
+static void test_lab_surface_readme(void)
+{
+    /* README example in docs/mars-lab.md: Automatic selects the two unset variables. */
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"x^2 + y^2\",\"action\":\"plot\",\"wrt\":\"x\","
+                            "\"plot_lower\":\"-2\",\"plot_upper\":\"2\",\"plot_second_lower\":\"-2\","
+                            "\"plot_second_upper\":\"2\",\"plot_kind\":\"auto\","
+                            "\"plot_azimuth\":\"120\",\"plot_elevation\":\"40\"}", &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+              contains(fields, "plot_title_TeX", "x^{2}") && contains(fields, "plot_title_TeX", "y^{2}") &&
+              contains(fields, "plot_svg", "data-azimuth=\"120.000\"") &&
+              contains(fields, "plot_svg", "data-elevation=\"40.000\"");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "README two-variable expression produces a shaded paraboloid with its TeX title");
+    string_printf("Surface plot ready: x^2 + y^2\n");
+}
+
+static void test_lab_auto_range_readme(void)
+{
+    /* README example in docs/mars-lab.md: blank bounds choose the inverse sine's real interval. */
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"asin(x)\",\"action\":\"plot\",\"wrt\":\"x\","
+                                     "\"plot_lower\":\"\",\"plot_upper\":\"\"}", &status);
+    const char *limits[] = {"", "", "", ""};
+    number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
+              lab_worker_plot_ranges("asin(x)", "x", NULL, limits, bounds) &&
+              num_to_double(bounds[0]) == -1 && num_to_double(bounds[1]) == 1;
+    num_destroy(&bounds[0]);
+    num_destroy(&bounds[1]);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "README blank bounds plot inverse sine over its real interval");
+    string_printf("Automatic curve: asin(x), x from -1 to 1\n");
+}
+
+/* Run the documented plot inputs after the ordinary Lab regressions. */
+void test_lab_plot_readme_cases(void)
+{
+    TEST_RUN_IN_GROUP(test_lab_plot_title_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_surface_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_auto_range_readme, readme, NULL);
 }
 
 static void test_lab_extra_help_examples(void)
@@ -742,6 +1095,13 @@ static void test_lab_extra_equation_greek_binding(void)
 void test_lab_evaluation_extra_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_tangent_bounds, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_editor_and_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_expression, tests, NULL);

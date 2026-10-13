@@ -298,7 +298,7 @@ window.checkLabEvents = function checkLabEvents() {
         check(retained.calls[0].args[0] === button, 'returned arguments are nodes, not recycled handle numbers');
         check(expect(13, {key: 'Enter'}, 'startGoalSeekFromEvent').prevent, 'goal Enter is cancelled');
         check(!expect(13, {key: 'Tab'}, '').prevent, 'goal Tab is untouched');
-        for (const action of [32, 255, 256, (4 << 8), (5 << 8) | 255, (6 << 8) | 255, (7 << 8)])
+        for (const action of [35, 255, 256, (4 << 8), (5 << 8) | 255, (6 << 8) | 255, (7 << 8)])
             check(!expect(action, {}, '').prevent, 'unknown action or calendar field is harmless');
 
         const routes = [

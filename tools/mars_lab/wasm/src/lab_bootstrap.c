@@ -20,7 +20,7 @@ void lab_bootstrap_widgets(void)
         unsigned town;
         unsigned searchable;
     } controls[] = {{"datetimeJurisdiction", 0, 1}, {"almanacJurisdiction", 0, 1},
-                    {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}, {"plotScale", 0, 0}};
+                    {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}};
     int result = lab_dom_object(5), calls = lab_dom_object(4);
     lab_dom_set(result, "calls", calls);
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {

@@ -1988,17 +1988,23 @@
     }
   },
   "tests/plot/test_plot.c": {
+    "example_plot_surface": true,
     "example_plot_svg": true,
     "test_plot_control": true,
     "test_plot_decimal_ticks": true,
+    "test_plot_edge_axes": true,
     "test_plot_escaping": true,
+    "test_plot_extreme_clipping": true,
     "test_plot_extreme_ticks": true,
     "test_plot_gaps": true,
     "test_plot_label_notation": true,
+    "test_plot_label_spacing": true,
     "test_plot_limits": true,
     "test_plot_precision_and_clip": true,
     "test_plot_sampler_ownership": true,
     "test_plot_smart_range": true,
+    "test_plot_surface": true,
+    "test_plot_surface_view": true,
     "test_plot_svg": true
   },
   "tests/protobuf/test_protobuf.c": {
@@ -2964,6 +2970,12 @@
     }
   },
   "tools/mars_lab/tests/test_lab_evaluation_extra.c": {
+    "readme": {
+      "enabled": true,
+      "test_lab_auto_range_readme": true,
+      "test_lab_plot_title_readme": true,
+      "test_lab_surface_readme": true
+    },
     "tests": {
       "enabled": true,
       "test_lab_extra_binding_edit": true,
@@ -3000,9 +3012,16 @@
       "test_lab_extra_native_records": true,
       "test_lab_extra_number_card_markup": true,
       "test_lab_extra_plot": true,
+      "test_lab_extra_plot_precision": true,
+      "test_lab_extra_plot_preview": true,
+      "test_lab_extra_plot_ranges": true,
+      "test_lab_extra_plot_series_domain": true,
+      "test_lab_extra_plot_tangent_bounds": true,
+      "test_lab_extra_plot_title_fallback": true,
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_repeated_gaussian_integral": true,
+      "test_lab_extra_surface": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
       "test_lab_extra_unsafe_TeX_input": true

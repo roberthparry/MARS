@@ -1,11 +1,16 @@
 /**
  * @file plot-t.h
- * @brief Owned two-dimensional plot scenes and in-memory SVG rendering.
+ * @brief Owned curve and height-surface scenes with in-memory SVG rendering.
  *
  * plot_t copies sampled or measured number_t coordinates, labels and styles.
- * Linear axes, automatic or explicit bounds, ticks, a grid and a legend are
- * rendered in C. Axis ticks use decimal labels, never fractions, with superscript
- * scientific exponents when needed. Coordinate normalisation precedes conversion to drawing doubles,
+ * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
+ * are rendered in C, with independent RGB colours for curves, axes, grid and labels.
+ * Rectangular height grids have azimuth, elevation and roll controls, named positive-end
+ * axis arrows, coloured facets and holes at missing values; they cannot be mixed
+ * with curve series in the same scene. Endpoint names stay upright during rotation.
+ * Axis ticks use decimal labels, never fractions, with superscript
+ * scientific exponents when needed. Crowded labels are spaced or thinned without
+ * removing tick strokes. Coordinate normalisation precedes conversion to drawing doubles,
  * preserving small differences at large offsets. SVG contains no scripts,
  * external resources or caller-supplied markup. The file module may save the
  * returned string; no files or subprocesses are used here. Scene mutation and
@@ -40,8 +45,10 @@ typedef struct {
     unsigned width, height; /**< SVG dimensions: 320..8192 by 240..8192. */
     size_t max_points, max_series; /**< Positive hard scene limits, including gap records. */
     const char *title, *x_label, *y_label; /**< Optional copied UTF-8 plain text, never markup. */
+    const char *z_label; /**< Surface height-axis endpoint name; default "f". Copied UTF-8 plain text. */
     bool grid, legend; /**< Draw grid and series legend. */
-    bool smart_y; /**< Opt-in robust vertical range; clipped samples are explicitly labelled in the SVG. */
+    bool smart_y; /**< Opt-in robust vertical range; clipping does not add a visible annotation. */
+    uint32_t axis_colour, grid_colour, label_colour; /**< 24-bit RGB colours for axes, grid and tick/axis labels. */
 } plot_options_t;
 
 /** @brief Default 800x500 scene, one million points, 32 series, grid and legend enabled. */
@@ -64,6 +71,33 @@ bool plot_add_points(plot_t *plot, const plot_point_t *points, size_t count, con
 /** @brief Copy a sampler's points and gap flags with the same contract as plot_add_points(). */
 bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, plot_style_t style, uint32_t colour);
 
+/**
+ * @brief Copy a rectangular height surface into an empty scene, excluding line/point series.
+ * x and y contain strictly increasing finite real coordinates (at least two each).
+ * z contains rows*columns heights in row-major order; non-real/non-finite heights
+ * leave holes. Limits count all vertices. Inputs remain caller-owned. A scene owns
+ * at most one surface; explicit 2-D bounds cannot be applied to it.
+ * Rendering uses a configurable oblique view and a blue/teal/gold
+ * height palette. Surface ranges fit all finite heights; smart_y has no effect.
+ */
+bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,
+                      const number_t *z);
+
+/**
+ * @brief Set the surface view in degrees without changing or resampling its copied grid.
+ * Defaults are azimuth 45 and elevation 30. Finite azimuths wrap into [0,360);
+ * elevation must be finite and within [5,85] to keep the three axes readable.
+ * Invalid input gives EINVAL and leaves the view unchanged. This has no effect on curves.
+ */
+bool plot_set_view(plot_t *plot, double azimuth, double elevation);
+
+/**
+ * @brief Set clockwise screen-plane rotation in degrees, without resampling a surface.
+ * Defaults to zero. Finite angles wrap into [0,360); invalid input returns false
+ * with EINVAL and leaves the camera unchanged. Curve rendering ignores roll.
+ */
+bool plot_set_roll(plot_t *plot, double roll);
+
 /** @brief Atomically copy finite real xmin < xmax and ymin < ymax; invalid bounds give EINVAL. */
 bool plot_set_bounds(plot_t *plot, number_t xmin, number_t xmax, number_t ymin, number_t ymax);
 
@@ -78,7 +112,8 @@ size_t plot_series_count(const plot_t *plot);
  * No finite data gives ENODATA. Unrepresentable drawing coordinates give ERANGE;
  * allocation/scoped stopping errors preserve errno. Labels are XML-escaped and
  * colours are numeric, so user data cannot inject SVG. Data outside explicit
- * bounds is geometrically clipped; a gap is never joined. This is a static SVG,
+ * bounds is geometrically clipped in native precision before drawing conversion;
+ * huge finite off-screen samples do not abort rendering. A gap is never joined. This is a static SVG,
  * not a raster image, DOM widget or mathematical discontinuity detector.
  */
 string_t *plot_to_svg(const plot_t *plot);

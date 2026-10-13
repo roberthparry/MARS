@@ -101,6 +101,11 @@
     min-height: 2.75rem;
   }
 
+  .plot-range {
+    grid-template-columns: 1fr;
+    padding-top: 0.75rem;
+  }
+
   .controls {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

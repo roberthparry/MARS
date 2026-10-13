@@ -14,6 +14,7 @@
 #include "lab_view.h"
 #include "lab_workspace_dom.h"
 #include "lab_workspace.h"
+#include "lab_plot_drag.h"
 #include "lab_event_dom.h"
 
 static void lab_event_emit(int calls, const char *service, int first, int second, unsigned count)
@@ -126,14 +127,22 @@ static void lab_event_copy(unsigned action, int event, int plan, int calls)
 static void lab_event_zoom(unsigned action, int event, int plan, int calls)
 {
     (void)calls;
-    if (action == 25 && !lab_event_modifier(event))
-        return;
+    double delta = 0;
+    if (action == 25) {
+        int area = lab_dom_closest(lab_dom_get(event, "target"), ".rendered");
+        int plot = area && lab_dom_query(area, "svg [data-series]");
+        if (!plot && !lab_event_modifier(event))
+            return;
+        delta = lab_dom_to_number(lab_dom_get(event, "deltaY"));
+        if (!(delta < 0 || delta > 0))
+            return;
+    }
     lab_event_prevent(plan, action == 24);
     int target = lab_dom_get(event, "currentTarget"), card = lab_dom_closest(target, ".result-card");
     if (!card)
         return;
     int reset = action == 24 && lab_dom_has(target, "data-zoom-reset");
-    double direction = action == 25 ? (lab_dom_to_number(lab_dom_get(event, "deltaY")) < 0 ? 1 : -1)
+    double direction = action == 25 ? (delta < 0 ? 1 : -1)
                                     : lab_dom_to_number(lab_dom_read(target, 3, "zoomStep"));
     if (!direction)
         direction = 1;
@@ -174,6 +183,25 @@ static void lab_event_expand(unsigned action, int event, int plan, int calls)
     lab_layout_expand(lab_dom_closest(lab_dom_get(event, "currentTarget"), ".result-card"), 1);
 }
 
+static void lab_event_rotate(unsigned action, int event, int plan, int calls)
+{
+    (void)plan;
+    if (action != 33) {
+        int control = lab_dom_get(event, "currentTarget");
+        int output = lab_dom_query(lab_dom_closest(control, ".plot-angle"), "output");
+        lab_dom_write(output, 0, "", lab_dom_join(lab_dom_read(control, 5, ""), lab_dom_string("°"), ""));
+    }
+    /* Input updates the readout; commit/release redraws once through the normal request owner. */
+    if (action == 34 || lab_workspace_mode() ||
+        (action != 33 && !lab_dom_query(0, "#rendered [data-surface]")))
+        return;
+    int variable = lab_dom_read(lab_dom_query(0, "#plotRange"), 3, "rotationVariable");
+    if (action == 33 && lab_dom_length(lab_dom_read(lab_dom_id("plotFirst"), 5, "")))
+        variable = lab_dom_read(lab_dom_id("plotFirst"), 5, "");
+    if (lab_dom_length(variable))
+        lab_event_emit(calls, "takePlot", variable, 0, 1);
+}
+
 static void lab_event_calendar(unsigned action, int event, int plan, int calls)
 {
     unsigned mode = action >> 8, field = action & 255;
@@ -211,7 +239,7 @@ static void lab_event_calendar(unsigned action, int event, int plan, int calls)
 void lab_events_dispatch(unsigned action, int event)
 {
     typedef void (*lab_event_handler_t)(unsigned, int, int, int);
-    static const lab_event_handler_t handlers[32] = {
+    static const lab_event_handler_t handlers[35] = {
         [0] = lab_event_run,
         [1] = lab_event_history,
         [2] = lab_event_history,
@@ -232,8 +260,11 @@ void lab_events_dispatch(unsigned action, int event)
         [27] = lab_event_visibility,
         [28] = lab_event_resize,
         [31] = lab_event_expand,
+        [32] = lab_event_rotate,
+        [33] = lab_event_rotate,
+        [34] = lab_event_rotate,
     };
-    static const char *const services[32] = {
+    static const char *const services[35] = {
         [4] = "refreshWorksheetFromInput",
         [5] = "clearWorksheetFromEvent",
         [6] = "toggleHelp",
@@ -251,7 +282,7 @@ void lab_events_dispatch(unsigned action, int event)
     lab_dom_set(plan, "calls", calls);
     if (action >= 256)
         lab_event_calendar(action, event, plan, calls);
-    else if (action < 32) {
+    else if (action < 35) {
         if (handlers[action])
             handlers[action](action, event, plan, calls);
         else if (services[action])
@@ -294,7 +325,10 @@ void lab_events_install(int document, int window)
                     {"[data-zoom-step], [data-zoom-reset]", "click", 24},
                     {".result-card", "wheel", 25},
                     {"textarea", "input", 30},
-                    {"[data-expand-card]", "click", 31}};
+                    {"[data-expand-card]", "click", 31},
+                    {"#plotAzimuth, #plotElevation, #plotRoll", "change", 32},
+                    {"#plotUpdate", "click", 33},
+                    {"#plotAzimuth, #plotElevation, #plotRoll", "input", 34}};
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
         int nodes = lab_dom_all(0, controls[i].selector);
@@ -321,6 +355,7 @@ void lab_events_install(int document, int window)
     lab_dom_listen(document, "visibilitychange", 27, 0);
     lab_dom_listen(window, "resize", 28, 0);
     lab_dom_listen(window, "scroll", 29, 1);
+    lab_plot_drag_install(document, window);
     int cards = lab_dom_all(0, ".result-card");
     for (unsigned i = 0; i < lab_dom_count(cards); ++i)
         lab_layout_zoom(lab_dom_item(cards, i));

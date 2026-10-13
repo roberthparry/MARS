@@ -44,6 +44,9 @@ void test_lab_function_cases(void);
 /** Run documented Function-card programmes after the ordinary tests. */
 void test_lab_function_readme_cases(void);
 
+/** @brief Run documented plot-title examples after the ordinary Lab tests. */
+void test_lab_plot_readme_cases(void);
+
 /** Register and run the additional evaluation regressions owned by the evaluator test helper. */
 void test_lab_evaluation_extra_cases(void);
 

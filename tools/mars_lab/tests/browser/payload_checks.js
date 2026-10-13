@@ -41,7 +41,18 @@ window.checkLabPayload = async function checkLabPayload() {
         const plot = build(0, ['sin(x)', '', '', 'x', 'plot', 'expression']);
         equal(plot.plot_lower, document.getElementById('plotLower').value, 'plot lower bound remains opaque text');
         equal(plot.plot_upper, document.getElementById('plotUpper').value, 'plot upper bound remains opaque text');
+        for (const [key, id] of [['plot_kind', 'plotKind'], ['plot_second', 'plotSecond'],
+                                ['plot_second_lower', 'plotSecondLower'], ['plot_second_upper', 'plotSecondUpper'],
+                                ['plot_azimuth', 'plotAzimuth'], ['plot_elevation', 'plotElevation'],
+                                ['plot_roll', 'plotRoll']]) {
+            equal(plot[key], document.getElementById(id).value, 'surface control remains opaque');
+            equal(labWire.decode(labWire.encode(plot))[key], plot[key], 'surface control survives Protobuf');
+        }
         equal(plot.plot_scale, document.getElementById('plotScale').value, 'plot scale policy retained');
+        equal(plot.plot_quality, 'full', 'ordinary plots always request full detail');
+        const preview = build(0, ['x+y', '', '', 'x', 'plot', 'expression', true]);
+        equal(preview.plot_quality, 'preview', 'native gesture selects reduced preview detail');
+        equal(labWire.decode(labWire.encode(preview)).plot_quality, 'preview', 'preview quality survives Protobuf');
         equal(plot.plot_y_lower, document.getElementById('plotYLower').value, 'manual Y minimum remains opaque');
         equal(plot.plot_y_upper, document.getElementById('plotYUpper').value, 'manual Y maximum remains opaque');
         equal(labWire.decode(labWire.encode(plot)).action, 'plot', 'plot request uses Protobuf');

@@ -18,9 +18,38 @@
 #include "number-t.h"
 #include "string-t.h"
 #include "expression-t.h"
+#include "sampler-t.h"
+
+/** @brief Parse a plotting range with guard precision; return owning bounds without changing worksheet precision. */
+bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, number_t *hi);
+
+/** @brief Choose omitted curve or surface bounds with bounded real-domain probes; preserve explicit endpoints. */
+bool lab_worker_plot_ranges(const char *source, const char *first, const char *second,
+                            const char *const limits[4], number_t bounds[4]);
+
+/** @brief Determine guarded coordinate precision for a finite range; zero denotes invalid bounds. */
+size_t lab_worker_plot_range_precision(number_t lower, number_t upper);
+
+/** @brief Choose validation precision for cancellation on a tiny range. */
+size_t lab_worker_plot_check_precision(number_t lower, number_t upper);
+
+/** @brief Emit common plot records from a borrowed SVG, or a clean calculation diagnostic. */
+int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int error);
+
+/** @brief Dispatch a curve or surface request using explicit axes or native unset-variable metadata. */
+int lab_worker_plot_request(const char *source, const expr_t *expression, expr_bindings_t *bindings,
+                            const expr_t *variable, int argc, char **argv);
+
+/**
+ * @brief Sample a privately reparsed formula at spot-checked precision, returned through precision_bits on success.
+ * Bounds are borrowed; pass NUM_NAN for both vertical bounds when not using a manual viewport.
+ * Returns an owning sampler, or NULL on failure. Worksheet precision is restored on every exit.
+ */
+sampler_t *lab_worker_plot_samples(const char *source, const char *variable, number_t lower, number_t upper,
+                                  number_t ymin, number_t ymax, size_t *precision_bits);
 
 /** @brief Emit an in-memory real curve SVG for a selected variable and mathematical bound texts. */
-int lab_worker_plot(const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
+int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper);
 
 /**

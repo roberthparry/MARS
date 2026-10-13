@@ -45,7 +45,9 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                 check(tab.getAttribute('aria-selected') === String(selected), 'tab accessibility selection');
                 check(tab.tabIndex === (selected ? 0 : -1), 'only selected tab is in the tab order');
             }
+            rightPaneTitle.textContent = 'x plot RESULT';
             labDOM.call('lab_workspace_dom_mode', mode, 'fixture coverage');
+            check(rightPaneTitle.textContent === 'Result', 'mode projection clears the previous operation heading');
             for (let index = 1; index < panels.length; ++index)
                 check(hidden(panels[index]) === (index !== mode), 'only selected mode panel is shown');
             for (const name of classes)
@@ -66,6 +68,10 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                 check(subtitle.textContent.endsWith('fixture coverage.'), 'almanac coverage suffix');
         }
         native.lab_workspace_select(0);
+        labDOM.call('lab_workspace_dom_help', 1);
+        labDOM.call('lab_workspace_dom_mode', 0, '');
+        check(rightPaneTitle.textContent === 'Help', 'mode projection retains the heading of visible Help');
+        labDOM.call('lab_workspace_dom_help', 0);
         targetRow.classList.remove('hidden');
         value.textContent = '1';
         labDOM.call('lab_workspace_dom_mode', 0, '');
@@ -228,6 +234,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
 
         rendered.textContent = 'rendered fixture';
         parsed.textContent = 'parsed fixture';
+        rightPaneTitle.textContent = 'x plot RESULT';
+        renderedTitle.textContent = 'Plot';
         resultUseInput.dataset.inputText = 'saved input';
         const variables = ['μ', 'x'];
         const saved = labDOM.call('lab_workspace_dom_result_save', {
@@ -241,11 +249,20 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             saved.currentVariables.length === 2 && saved.resultInputText === 'saved input',
             'result snapshot owns metadata copy');
         rendered.textContent = 'changed result';
+        rightPaneTitle.textContent = 'Result';
+        renderedTitle.textContent = 'Rendered TeX';
         parsed.dataset.stale = 'stale';
         const restored = labDOM.call('lab_workspace_dom_result_restore', saved);
         check(
             rendered.textContent === 'rendered fixture' && parsed.textContent === 'parsed fixture',
             'result snapshot restores cards');
+        check(rightPaneTitle.textContent === 'x plot RESULT' && renderedTitle.textContent === 'Plot',
+              'mode snapshot restores its own result and card headings');
+        labDOM.call('lab_workspace_dom_help', 1);
+        labDOM.call('lab_workspace_dom_result_restore', saved);
+        check(rightPaneTitle.textContent === 'Help', 'saved plot heading does not overwrite visible Help');
+        labDOM.call('lab_workspace_dom_help', 0);
+        labDOM.call('lab_workspace_dom_result_restore', saved);
         check(!('stale' in parsed.dataset), 'result snapshot removes stale presentation');
         check(
             restored.lastTex === 'native TeX' && restored.lastDerivativeExpression === 'native expression' &&
@@ -344,6 +361,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             modeResultState[currentMode()] = null;
             restoreModeResultState();
             check(lifecycle.join(',') === 'cancel,clear', 'absent snapshot clears without scheduling either fit');
+            check(rightPaneTitle.textContent === 'Result', 'absent mode snapshot cannot retain a plot heading');
         } finally {
             ({
                 clearFunctionRun,
@@ -400,6 +418,10 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         currentDifferentiable = true;
         const names = ['μ', '<literal & name>'];
         renderDerivativeButtons(names);
+        const radioNames = [...document.querySelectorAll('#plotFirstChoices input')];
+        check(radioNames.length === 2 && radioNames[0].value === 'μ' && radioNames[1].value === names[1] &&
+              !document.getElementById('plotFirstChoices').querySelector('literal'),
+              'radio variables preserve native Unicode names and escape opaque display text');
         const buttons = [...derivativeButtons.querySelectorAll('button')];
         check(buttons.length === 6, 'each expression variable has derivative, integral and plot actions');
         check(

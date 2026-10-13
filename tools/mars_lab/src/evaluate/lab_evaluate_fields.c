@@ -71,6 +71,8 @@ static const field_t field_table[] = {
     {"operation", "operation", false},
     {"operation_function", "operation_function", true},
     {"plot_svg", "plot_svg", true},
+    {"plot_title", "plot_title", true},
+    {"plot_title_TeX", "plot_title_TeX", true},
     {"pretty", "pretty", true},
     {"problem", "problem", false},
     {"problem_TeX", "problem_TeX", true},
@@ -372,6 +374,7 @@ static void lab_eval_expression_fields(json_t *fields)
         {"integral_TeX", "integral_svg", "integral_render_error"},
     };
     lab_eval_render_fields(fields, cards, sizeof(cards) / sizeof(*cards));
+    lab_eval_plot_title(fields);
 }
 
 static void lab_eval_matrix_fields(json_t *fields)

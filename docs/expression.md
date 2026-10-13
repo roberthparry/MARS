@@ -2798,6 +2798,11 @@ that the written terminal term agrees with `P(N)`, and lowers the series to
 simplified sum and final value. If an endpoint is already named `n`, the dummy
 index changes to `k`, `j`, `m`, or `l` so that the two bindings cannot collide.
 
+[MARS Lab plot titles](mars-lab.md#native-function-plots) retain this source sigma
+notation without appending the derivation or replacing it with a closed-form
+function name. Recognition and TeX generation remain in the native expression
+module; the browser does not interpret the series.
+
 For the inverse-power family `Σ(k=1..n) 1/k^p`, the generic finite expression
 is `ζ(p) - ζ(p, n + 1)` away from `p = 1`. At `p = 1`, both zeta terms have a
 pole and only their combined removable-singularity limit is finite; that limit

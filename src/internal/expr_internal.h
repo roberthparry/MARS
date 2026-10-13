@@ -464,6 +464,9 @@ expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindin
 /** @brief Parse authored calculus operations without replacing them with their results. */
 expr_t *expr_from_string_preserving_calculus_internal(const char *source);
 
+/** @brief Return owning source TeX, preferring the recognised sigma notation over a series' closed form. */
+string_t *expr_source_TeX_internal(const char *source);
+
 /** @brief Describe a context-eligible symbol: variable identity or borrowed named-constant name. */
 bool expr_context_symbol_identity(const expr_t *symbol, uint64_t *identity, const char **name);
 

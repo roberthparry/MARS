@@ -69,6 +69,8 @@ function labStartEventBindings() {
         evaluateFromKeyboard,
         selectWorksheetMode,
         normaliseWorksheetControl,
+        takePlot,
+        redrawPlotDrag,
         startGoalSeekFromEvent,
         changeWorksheetPrecision,
         toggleTextDigits,
