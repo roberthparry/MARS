@@ -497,6 +497,7 @@ static int lab_flow_request_calculus(int frame)
     int request = lab_dom_get(frame, "request"), action = lab_dom_get(frame, "action"), wrt = lab_dom_get(frame, "wrt");
     int matrix = lab_flow_request_truth(frame, "matrix"), scalar = lab_flow_request_truth(frame, "scalar");
     int integral = lab_dom_equal(action, lab_dom_string("integral"));
+    int plot = lab_dom_equal(action, lab_dom_string("plot"));
     int data = lab_flow_request_data(frame), result = lab_dom_get(frame, "calculus");
     switch (lab_flow_request_stage(frame)) {
         case START:
@@ -549,7 +550,8 @@ static int lab_flow_request_calculus(int frame)
         case STATUS:
             return lab_flow_call(
                 frame, FETCH, "setStatus", 0, 0, 1,
-                lab_dom_join(lab_dom_string(integral ? "Integrating with respect to " : "Differentiating d/d"),
+                lab_dom_join(lab_dom_string(plot ? "Plotting against " :
+                                            integral ? "Integrating with respect to " : "Differentiating d/d"),
                              lab_dom_text(wrt), "..."));
         case FETCH: {
             if (matrix && !scalar) {
@@ -563,7 +565,7 @@ static int lab_flow_request_calculus(int frame)
                                      request);
             }
             return lab_flow_call(frame, OUTCOME, "fetchCalculus", "result", 1, 4, lab_dom_get(frame, "source"), wrt,
-                                 lab_dom_string(integral ? "integral" : ""), request);
+                                 lab_dom_string(plot ? "plot" : integral ? "integral" : ""), request);
         }
         case PREPARED_CURRENT:
             return lab_flow_request_current(frame, MATRIX_FETCH);

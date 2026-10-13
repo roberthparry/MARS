@@ -17,7 +17,7 @@ window.checkLabRequests = async function checkLabRequests() {
             native.memory.buffer, native.lab_request_text(kind, index), native.lab_request_text_length(kind, index)));
         const names = [
             'evaluate', 'derivative', 'integral', 'function', 'weather', 'goal', 'bindings', 'land', 'datetimeLocation',
-            'almanacLocation', 'bindingCommit', 'holidays', 'solverRender', 'solverRestoreRender'
+            'almanacLocation', 'bindingCommit', 'holidays', 'solverRender', 'solverRestoreRender', 'plot'
         ];
         const paths = [
             '', '/eval', '/matrix-eval', '/equation-eval', '/diffequation-eval', '/integrator-eval', '/datetime-eval',
@@ -25,7 +25,7 @@ window.checkLabRequests = async function checkLabRequests() {
             '/datetime-jurisdiction-location', '/datetime-jurisdiction-location', '/render_TeX'
         ];
         check(native.lab_request_operation_count() === names.length, 'operation catalogue count');
-        [names, paths, ['', 'integral', 'bindings']].forEach((entries, kind) => {
+        [names, paths, ['', 'integral', 'bindings', 'plot']].forEach((entries, kind) => {
             entries.forEach((expected, index) => check(label(kind, index) === expected, 'native catalogue label'));
             check(label(kind, entries.length) === '' && label(kind, -1) === '', 'catalogue index bounds');
         });
@@ -33,8 +33,8 @@ window.checkLabRequests = async function checkLabRequests() {
         check(!labRequests.begin('unknown') && !labRequests.begin('toString'), 'unknown host operation fails closed');
 
         // Cover every permitted mode/operation/scalar route, including all fixed background endpoints.
-        const masks = [127, 9, 9, 127, 32, 1, 1, 64, 32, 64, 31, 32, 4, 4];
-        const fixed = [0, 0, 0, 8, 9, 10, 0, 11, 12, 13, 0, 6, 14, 14];
+        const masks = [127, 9, 9, 127, 32, 1, 1, 64, 32, 64, 31, 32, 4, 4, 1];
+        const fixed = [0, 0, 0, 8, 9, 10, 0, 11, 12, 13, 0, 6, 14, 14, 1];
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_request_set_mode(mode);
             for (let operation = 0; operation < names.length; ++operation) {
@@ -50,7 +50,8 @@ window.checkLabRequests = async function checkLabRequests() {
                                                        fixed[operation] || (mode === 3 && !scalar ? 2 : 1);
                     check(native.lab_request_endpoint(channel, token) === expected, 'table-driven endpoint');
                     check(label(1, expected) === paths[expected], 'endpoint wire path');
-                    const action = operation === 2 ? 'integral' : [6, 10].includes(operation) ? 'bindings' : '';
+                    const action = operation === 14 ? 'plot' : operation === 2 ? 'integral' :
+                        [6, 10].includes(operation) ? 'bindings' : '';
                     check(label(2, native.lab_request_action(channel, token)) === action, 'table-driven action');
                     native.lab_request_finish(channel, token);
                     check(label(1, native.lab_request_endpoint(channel, token)) === '', 'finished request has no path');

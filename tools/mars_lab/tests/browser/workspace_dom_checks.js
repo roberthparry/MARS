@@ -9,7 +9,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
     const savedMode = native.lab_workspace_mode();
     const savedPrecision = native.lab_workspace_precision(savedMode);
     const savedExpansion = native.lab_view_card_expanded();
-    const savedDerivative = takeDerivative, savedIntegral = takeIntegral;
+    const savedDerivative = takeDerivative, savedIntegral = takeIntegral, savedPlot = takePlot;
     const savedDifferentiable = currentDifferentiable;
     const savedMetadata = {lastTex, lastDerivativeExpression, currentVariables, resultInputBindings};
     const savedFocus = document.activeElement;
@@ -395,11 +395,13 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         const calls = [];
         takeDerivative = (name, button) => calls.push(['derivative', name, button]);
         takeIntegral = (name, button) => calls.push(['integral', name, button]);
+        takePlot = (name, button) => calls.push(['plot', name, button]);
+        document.getElementById('plotRange').classList.remove('hidden');
         currentDifferentiable = true;
         const names = ['μ', '<literal & name>'];
         renderDerivativeButtons(names);
         const buttons = [...derivativeButtons.querySelectorAll('button')];
-        check(buttons.length === 4, 'each variable has derivative and integral actions');
+        check(buttons.length === 6, 'each expression variable has derivative, integral and plot actions');
         check(
             buttons[0].textContent.endsWith(' derivative') && buttons[2].textContent.endsWith(' integral'),
             'calculus ordering');
@@ -407,21 +409,27 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             buttons[1].dataset.variable === names[1] && !buttons[1].querySelector('literal'), 'names stay opaque text');
         buttons.forEach(button => button.click());
         check(
-            calls.length === 4 && calls[0][0] === 'derivative' && calls[0][1] === names[0] &&
-                calls[3][0] === 'integral' && calls[3][1] === names[1] && calls[3][2] === buttons[3],
+            calls.length === 6 && calls[0][0] === 'derivative' && calls[0][1] === names[0] &&
+                calls[3][0] === 'integral' && calls[3][1] === names[1] && calls[3][2] === buttons[3] &&
+                calls[5][0] === 'plot' && calls[5][1] === names[1],
             'browser callbacks forward C action metadata and actual button');
         renderDerivativeButtons(['x']);
         derivativeButtons.querySelector('button').click();
-        check(calls.length === 5, 'rerender does not duplicate event callbacks');
+        check(calls.length === 7, 'rerender does not duplicate event callbacks');
         currentDifferentiable = false;
         renderDerivativeButtons(names);
-        check(!derivativeButtons.children.length, 'non-differentiable results clear all calculus buttons');
+        check(derivativeButtons.children.length === 2 && derivativeButtons.textContent.includes('plot'),
+            'non-differentiable expression results still permit plotting');
         const manyNames = Array.from({length: 600}, (_, index) => `v${index}`);
         labDOM.call('lab_workspace_dom_derivatives', manyNames, manyNames, 1);
-        check(derivativeButtons.children.length === 1200, 'large action list stays within scoped handle budget');
+        check(derivativeButtons.children.length === 1800, 'large action list stays within scoped handle budget');
+        document.getElementById('plotRange').classList.add('hidden');
+        labDOM.call('lab_workspace_dom_derivatives', ['x'], ['x'], 1);
+        check(derivativeButtons.children.length === 2, 'other modes retain only calculus actions');
     } finally {
         takeDerivative = savedDerivative;
         takeIntegral = savedIntegral;
+        takePlot = savedPlot;
         currentDifferentiable = savedDifferentiable;
         ({lastTex, lastDerivativeExpression, currentVariables, resultInputBindings} = savedMetadata);
         native.lab_workspace_select(savedMode);

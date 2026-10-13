@@ -302,6 +302,8 @@ void lab_result_solver_owner(void)
 static int lab_result_render(int caches, int data, unsigned kind)
 {
     int node = lab_dom_query(0, "#rendered"), button = lab_dom_query(0, "#renderedMore");
+    lab_dom_write(lab_dom_query(0, "#renderedTitle"), 0, "",
+                  lab_result_or(lab_dom_get(data, "render_title"), lab_dom_string("Rendered TeX")));
     int source = lab_result_field(data, kind == 2 ? "TeX" : "tex");
     int display = source, full = source;
     if (!kind) {

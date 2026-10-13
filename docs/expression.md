@@ -4,6 +4,10 @@
 
 ## Cooperative calculation control
 
+For numerical curves, [`sampler_expression()`](sampler.md) evaluates private
+graph and binding snapshots over a real interval; it never overwrites the source
+variable's binding. [`plot_t`](plot.md) can render these samples directly as SVG.
+
 Use [`computation_run()`](computation.md#scoped-native-calculations) to place native
 work under a shared cancellation flag, deadline and work allowance without changing
 expression ownership. Evaluation, differentiation (including reverse derivatives),

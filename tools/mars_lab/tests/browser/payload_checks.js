@@ -38,6 +38,13 @@ window.checkLabPayload = async function checkLabPayload() {
         const roundTrip = labWire.decode(labWire.encode(expression));
         equal(roundTrip.persist_expression, true, 'persistence retains Boolean wire type');
         equal(roundTrip.expression_updated_at, expression.expression_updated_at, 'wire timestamp unchanged');
+        const plot = build(0, ['sin(x)', '', '', 'x', 'plot', 'expression']);
+        equal(plot.plot_lower, document.getElementById('plotLower').value, 'plot lower bound remains opaque text');
+        equal(plot.plot_upper, document.getElementById('plotUpper').value, 'plot upper bound remains opaque text');
+        equal(plot.plot_scale, document.getElementById('plotScale').value, 'plot scale policy retained');
+        equal(plot.plot_y_lower, document.getElementById('plotYLower').value, 'manual Y minimum remains opaque');
+        equal(plot.plot_y_upper, document.getElementById('plotYUpper').value, 'manual Y maximum remains opaque');
+        equal(labWire.decode(labWire.encode(plot)).action, 'plot', 'plot request uses Protobuf');
 
         expr.value = '  [x, y]  ';
         matrixOperation.value = 'eval';

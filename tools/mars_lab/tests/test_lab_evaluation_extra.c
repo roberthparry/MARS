@@ -104,6 +104,53 @@ static void test_lab_extra_expression(void)
     expect_response("/eval", "{\"expression\":\"{ x^(1/3) | x=8 }\",\"precision\":40}", 200u, "value", "[2,");
 }
 
+static void test_lab_extra_plot(void)
+{
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"{sin(x)+a | x=7; a=2}\",\"action\":\"plot\","
+                            "\"wrt\":\"x\",\"plot_lower\":\"-@pi\",\"plot_upper\":\"@pi\",\"precision\":40}", &status);
+    bool adapted = fields && lab_presentation_adapt(fields);
+    const json_t *cards = lab_eval_get(lab_eval_get(fields, "presentation"), "calculus");
+    const json_t *plot = lab_eval_get(cards, "plot");
+    bool ok = adapted && status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "<svg") &&
+              contains(plot, "svg", "data-series") && contains(plot, "render_title", "Plot") &&
+              json_array_size(lab_eval_get(fields, "binding_values")) == 2;
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "native curve and presentation metadata preserve worksheet bindings");
+    fields = request("/eval", "{\"expression\":\"x^2\",\"action\":\"plot\",\"plot_lower\":\"2\",\"plot_upper\":\"1\"}", &status);
+    ok = !test_lab_ok(fields, true) && contains(fields, "error", "bounds");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "reversed plot ranges produce a useful error");
+    fields = request("/eval", "{\"expression\":\"x+a\",\"action\":\"plot\"}", &status);
+    ok = !test_lab_ok(fields, true) && contains(fields, "error", "No finite real points");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "unset parameters never become invented plotted values");
+    fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"precision\":40}", &status);
+    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "Vertical range clipped");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "automatic zeta view labels excluded extreme values");
+    fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"plot_scale\":\"all\",\"precision\":40}", &status);
+    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "<svg") &&
+         !contains(fields, "plot_svg", "Vertical range clipped");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "Fit all preserves the complete sampled vertical range");
+    fields = request("/eval", "{\"expression\":\"sin(x)\",\"action\":\"plot\",\"plot_scale\":\"manual\","
+                             "\"plot_y_lower\":\"-1/2\",\"plot_y_upper\":\"1/2\",\"precision\":40}", &status);
+    ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "Vertical range clipped") &&
+         contains(fields, "plot_svg", ">0.2</text>");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "manual mathematical bounds control the native viewport");
+    fields = request("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_scale\":\"manual\","
+                             "\"plot_y_lower\":\"1\",\"plot_y_upper\":\"-1\"}", &status);
+    ok = !test_lab_ok(fields, true) && contains(fields, "error", "manual bounds");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "invalid vertical bounds are rejected before sampling");
+}
+
 static void test_lab_extra_help_examples(void)
 {
     /* Help-card examples in assets/index.html: execute the public adapter paths, not browser arithmetic. */
@@ -694,6 +741,7 @@ static void test_lab_extra_equation_greek_binding(void)
 /* Register each case independently so test_config can select or suppress it. */
 void test_lab_evaluation_extra_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_editor_and_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_expression, tests, NULL);

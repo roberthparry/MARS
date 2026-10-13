@@ -19,7 +19,7 @@
  * @brief Add a presentation object to an existing native evaluation response.
  * @param fields Borrowed mutable response; existing mathematical fields are retained.
  * @return True on success, false on invalid input or allocation failure.
- * @details Contains normalised calculus cards, calculus_lines, solution_lines, editors, expansions,
+ * @details Contains normalised calculus/plot cards, calculus_lines, solution_lines, editors, expansions,
  * responsive_fit, Function lexical spans and solver metadata. Function highlighting
  * is bounded to 1024 spans per variant and 64 KiB of source; larger input retains
  * its exact text without highlighting. A browser

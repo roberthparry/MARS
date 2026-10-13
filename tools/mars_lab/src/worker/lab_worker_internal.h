@@ -17,6 +17,11 @@
 
 #include "number-t.h"
 #include "string-t.h"
+#include "expression-t.h"
+
+/** @brief Emit an in-memory real curve SVG for a selected variable and mathematical bound texts. */
+int lab_worker_plot(const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
+                    const char *scale, const char *y_lower, const char *y_upper);
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

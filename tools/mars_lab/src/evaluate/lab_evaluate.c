@@ -187,7 +187,7 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
     if (!*action)
         action = *wrt ? "derivative" : "evaluate";
     if (strcmp(action, "evaluate") && strcmp(action, "bindings") && strcmp(action, "binding-edit") &&
-        strcmp(action, "derivative") && strcmp(action, "integral"))
+        strcmp(action, "derivative") && strcmp(action, "integral") && strcmp(action, "plot"))
         return false;
     if (!lab_eval_argument_member(args, payload, "wrt", "x", false) || !lab_eval_argument(args, precision) ||
         !lab_eval_argument(args, action))
@@ -203,6 +203,12 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
         return lab_eval_argument_member(args, payload, "binding_source", "", false);
     if (!strcmp(action, "binding-edit"))
         return lab_eval_argument_member(args, payload, "binding_value", "", false);
+    if (!strcmp(action, "plot"))
+        return lab_eval_argument_member(args, payload, "plot_lower", "-10", false) &&
+               lab_eval_argument_member(args, payload, "plot_upper", "10", false) &&
+               lab_eval_argument_member(args, payload, "plot_scale", "auto", false) &&
+               lab_eval_argument_member(args, payload, "plot_y_lower", "", false) &&
+               lab_eval_argument_member(args, payload, "plot_y_upper", "", false);
     return true;
 }
 

@@ -1,15 +1,16 @@
 /**
  * @file lab_evaluate_calculus.c
- * @brief Native derivative and integral result-card projection for MARS Lab.
+ * @brief Native calculus and curve result-card projection for MARS Lab.
  *
  * Selects exact worker results, function fallbacks and compact/wrapped TeX for
  * the browser's shared calculus renderer. Uses string_t for line extraction;
  * no expression is evaluated or rewritten here. Missing worker results remain
  * empty so the request controller can distinguish failure from a valid result.
+ * Plot cards carry the worker's in-memory SVG without invoking the TeX renderer.
  */
+#include "lab_presentation.h"
 #define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
-#include "lab_presentation.h"
 #define MARS_LAB_PRESENTATION_INTERNAL_ACCESS
 #include "lab_presentation_internal.h"
 
@@ -67,12 +68,22 @@ static bool lab_pres_calculus_card(json_t *cards, json_t *lines, const json_t *f
     return ok;
 }
 
-/* Project both worker result kinds through the same native fallback policy. */
+/* Project calculus renderings and native plot images into the shared result-card envelope. */
 bool lab_pres_calculus_cards(json_t *metadata, const json_t *fields, json_t *lines)
 {
     json_t *cards = json_new_object();
     bool ok = cards && lab_pres_calculus_card(cards, lines, fields, "derivative", "d/d") &&
               lab_pres_calculus_card(cards, lines, fields, "integral", "∫d");
+    if (ok && *lab_eval_text(fields, "plot_svg")) {
+        json_t *plot = json_new_object();
+        ok = plot && lab_eval_set(plot, "expression", lab_eval_text(fields, "expression")) &&
+             lab_eval_set(plot, "svg", lab_eval_text(fields, "plot_svg")) &&
+             lab_eval_set(plot, "render_title", "Plot");
+        if (ok)
+            ok = lab_eval_put(cards, "plot", plot);
+        else
+            json_free(plot);
+    }
     if (ok)
         return lab_eval_put(metadata, "calculus", cards);
     json_free(cards);

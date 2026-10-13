@@ -257,6 +257,7 @@ void lab_workspace_dom_mode(unsigned mode, int coverage)
         lab_workspace_dom_hidden("#targetRow", 1);
     lab_workspace_dom_hidden("#derivativeButtons", !(flags & 8));
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
+    lab_workspace_dom_hidden("#plotRange", mode != 0);
     lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), 0, "", lab_view_text(mode, 0));
     int subtitle = lab_dom_string(lab_view_text(mode, 1));
     lab_dom_write(lab_dom_query(0, "#subtitle"), 0, "", mode == 6 ? lab_dom_join(subtitle, coverage, ".") : subtitle);
@@ -458,15 +459,18 @@ void lab_workspace_dom_editor_resize(int editors, double viewport)
     }
 }
 
-/* Build ordered derivative/integral actions from opaque names and native display labels. */
+/* Build ordered calculus and expression-plot actions from opaque names and native display labels. */
 void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
 {
     int panel = lab_dom_query(0, "#derivativeButtons");
     lab_workspace_dom_text(panel, 0, "", "");
-    if (!differentiable || !panel)
+    if (!panel)
         return;
-    static const char *const suffixes[] = {" derivative", " integral"};
-    for (unsigned action = 0; action < 2; ++action) {
+    static const char *const suffixes[] = {" derivative", " integral", " plot"};
+    int plots = !lab_dom_has_class(lab_dom_query(0, "#plotRange"), "hidden");
+    for (unsigned action = 0; action < (plots ? 3u : 2u); ++action) {
+        if (action < 2 && !differentiable)
+            continue;
         for (unsigned i = 0; i < lab_dom_count(names); ++i) {
             unsigned mark = lab_dom_mark();
             int button = lab_dom_create("button"), label = lab_dom_create("i"), suffix = lab_dom_create("span");

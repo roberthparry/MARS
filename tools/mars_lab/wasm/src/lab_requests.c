@@ -12,7 +12,7 @@
 
 #include "lab_requests.h"
 
-enum { lab_request_modes = 7, lab_request_channels = 9, lab_request_operations = 14 };
+enum { lab_request_modes = 7, lab_request_channels = 9, lab_request_operations = 15 };
 enum {
     lab_request_main,
     lab_request_function,
@@ -38,7 +38,8 @@ enum {
     lab_request_binding_commit,
     lab_request_local_holidays,
     lab_request_solver_render,
-    lab_request_solver_restore_render
+    lab_request_solver_restore_render,
+    lab_request_plot
 };
 
 typedef struct {
@@ -61,7 +62,8 @@ static const lab_request_policy_t lab_request_policy[lab_request_operations] = {
     [lab_request_binding_commit] = {31, lab_request_binding, 1, 0, 1, 0, "bindingCommit", 0, 2},
     [lab_request_local_holidays] = {32, lab_request_holidays, 0, 0, 0, 0, "holidays", 6, 0},
     [lab_request_solver_render] = {4, lab_request_solver, 1, 0, 0, 0, "solverRender", 14, 0},
-    [lab_request_solver_restore_render] = {4, lab_request_solver, 1, 0, 0, 45000, "solverRestoreRender", 14, 0}};
+    [lab_request_solver_restore_render] = {4, lab_request_solver, 1, 0, 0, 45000, "solverRestoreRender", 14, 0},
+    [lab_request_plot] = {1, lab_request_main, 1, 1, 1, 0, "plot", 1, 3}};
 
 static const char *const lab_request_paths[] = {"",
                                                 "/eval",
@@ -78,7 +80,7 @@ static const char *const lab_request_paths[] = {"",
                                                 "/datetime-jurisdiction-location",
                                                 "/datetime-jurisdiction-location",
                                                 "/render_TeX"};
-static const char *const lab_request_actions[] = {"", "integral", "bindings"};
+static const char *const lab_request_actions[] = {"", "integral", "bindings", "plot"};
 
 /* The host builds its exact-name index once from the native operation catalogue. */
 unsigned lab_request_operation_count(void)
@@ -292,7 +294,8 @@ unsigned lab_request_accept(unsigned channel, uint32_t token, unsigned http_ok, 
     if (!lab_request_live(channel, token))
         return 0;
     const lab_request_slot_t *slot = &lab_request_slots[channel];
-    unsigned calculus = slot->operation == lab_request_derivative || slot->operation == lab_request_integral;
+    unsigned calculus = slot->operation == lab_request_derivative || slot->operation == lab_request_integral ||
+                        slot->operation == lab_request_plot;
     if (slot->expired || !http_ok || !native_ok ||
         (calculus && lab_request_endpoint(channel, token) == 1 && !has_result))
         return 1;

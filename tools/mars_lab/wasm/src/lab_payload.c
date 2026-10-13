@@ -45,6 +45,13 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         action = lab_dom_string(lab_request_text(2, lab_request_action(channel, token)));
     }
     lab_dom_set(payload, "action", action);
+    if (lab_dom_equal(action, lab_dom_string("plot"))) {
+        lab_dom_set(payload, "plot_lower", lab_payload_control("#plotLower"));
+        lab_dom_set(payload, "plot_upper", lab_payload_control("#plotUpper"));
+        lab_dom_set(payload, "plot_scale", lab_payload_control("#plotScale"));
+        lab_dom_set(payload, "plot_y_lower", lab_payload_control("#plotYLower"));
+        lab_dom_set(payload, "plot_y_upper", lab_payload_control("#plotYUpper"));
+    }
     lab_dom_set(payload, "expression_updated_at", lab_dom_numeric(updated_at));
     int persist = request ? (lab_payload_request_flags(request) & 1) != 0
                           : lab_dom_equal(lab_dom_item(inputs, 5), lab_dom_string("expression"));

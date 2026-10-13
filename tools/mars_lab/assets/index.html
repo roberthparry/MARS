@@ -298,6 +298,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <button class="secondary" id="clear">Clear</button>
       </div>
       <div class="controls derivative-controls" id="derivativeButtons"></div>
+      <div class="target-row plot-range" id="plotRange">
+        <label for="plotLower">Plot from</label><input id="plotLower" value="-10" size="10" spellcheck="false">
+        <label for="plotUpper">to</label><input id="plotUpper" value="10" size="10" spellcheck="false">
+        <label for="plotScale">Y scale</label>
+        <select id="plotScale"><option value="auto">Automatic</option><option value="all">Fit all</option><option value="manual">Manual limits</option></select>
+        <span></span><span></span>
+        <label for="plotYLower">Y minimum</label><input id="plotYLower" placeholder="Manual minimum" size="10" spellcheck="false">
+        <label for="plotYUpper">Y maximum</label><input id="plotYUpper" placeholder="Manual maximum" size="10" spellcheck="false">
+      </div>
       <div class="variable-values hidden" id="variableValues"></div>
     </section>
 
@@ -424,6 +433,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Function</code> expresses the same calculation as reusable MARS source, followed by binding declarations and initialisations.</li>
             <li><code>Value</code> is separate: it appears when a numerical answer exists. Simplification can make a value independent of an unset symbol; for example, <code>sin(x)^2 + cos(x)^2</code> has value <code>1</code>.</li>
             <li>Entering binding values normally changes Value, not the symbolic algebra in the other cards. For integral transforms, supplied constant parameters are specialised consistently and any remaining domain conditions are retained.</li>
+          </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression">
+          <h3>Plotting A Function</h3>
+          <ul>
+            <li>Evaluate a formula with a variable, set <code>Plot from</code> and <code>to</code>, then press that variable's <code>plot</code> button. The initial range is −10 to 10; mathematical bounds such as <code>-@pi</code> and <code>@pi</code> are accepted.</li>
+            <li><code>Y scale</code> selects Automatic, Fit all, or Manual limits. Automatic avoids letting extreme samples flatten the curve and labels any clipping. Fit all includes all finite samples. Manual limits use Y minimum and Y maximum. Press the plot button again to apply changes. Rounded decimal ticks and superscript scientific exponents keep axes readable.</li>
+            <li>Bind the other parameters first. Sampling uses the selected precision and does not change the chosen variable's worksheet value.</li>
+            <li>The <code>Plot</code> card displays a native SVG generated in memory and delivered through Protobuf. The Expression card retains the formula; a plot has no separate numerical Value or Function programme.</li>
+            <li>Detected gaps are not joined. Adaptive sampling cannot guarantee finding every narrow feature or discontinuity; use a smaller range when necessary.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="expression,equation,matrix">

@@ -70,6 +70,7 @@ static const field_t field_table[] = {
     {"operand", "operand", false},
     {"operation", "operation", false},
     {"operation_function", "operation_function", true},
+    {"plot_svg", "plot_svg", true},
     {"pretty", "pretty", true},
     {"problem", "problem", false},
     {"problem_TeX", "problem_TeX", true},

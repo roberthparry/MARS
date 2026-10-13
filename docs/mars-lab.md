@@ -918,6 +918,38 @@ requires it.
 
 ## Expression mode
 
+### Native function plots
+
+Evaluate an expression with a variable, then use its **plot** button beside the
+derivative and integral actions. **Plot from** and **to** select the parameter
+range (initially −10 to 10); bounds accept native mathematical text, including
+`-@pi` and `@pi`. Other parameters must have numerical bindings. The chosen
+variable is sampled independently of its worksheet value, which is preserved.
+
+**Y scale** offers **Automatic**, **Fit all**, and **Manual limits**. Automatic
+uses a horizontally distributed range estimate to keep extreme values near
+poles from flattening the rest of the curve. Cropped values are explicitly
+labelled **Vertical range clipped**. Fit all includes every finite sampled value.
+For Manual limits, supply finite **Y minimum** and **Y maximum**, with minimum
+strictly below maximum. Press the variable's plot button again after changing
+these controls. Tick labels use rounded decimal steps, never fractions; very
+large or small labels use `×10` with superscript exponents.
+
+The result card is labelled **Plot** and displays an SVG generated dynamically
+in memory by [`sampler_t`](sampler.md) and [`plot_t`](plot.md). The image travels
+in the existing Protobuf response. No scratch file, TeX subprocess, external
+plotting programme or browser-side mathematical evaluation is involved.
+The Expression card retains the plotted formula and bindings. Plot results
+do not supply a Function or numerical Value card.
+
+Sampling uses the selected precision, 64 initial intervals, at most 8,193
+evaluations and eight adaptive subdivision levels. Detected domain gaps and
+unresolved edges are not joined. Detection is heuristic: narrow features and
+oscillations can still be missed. Narrow the range for difficult curves; a
+budget failure is reported rather than publishing a partial image. The current
+Lab control draws one real-valued curve with selectable vertical bounds; the
+library also supports multiple series, measured points and explicit viewports.
+
 Expression mode parses, simplifies and evaluates scalar or matrix-valued
 expressions. When variables are present, the buttons beneath the editor can
 differentiate or integrate with respect to each variable. **Goal seek** finds a

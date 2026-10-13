@@ -235,6 +235,12 @@ Stopped: 1; graph reusable: 1
 
 ## Native module adoption
 
+`sampler_t` reserves one unit per callback evaluation and reports progress at
+those boundaries. Its expression adapter also inherits expression work charges.
+`plot_t` reserves work while copying points, finding bounds and drawing curves.
+Both discard partial outputs on stopping and leave completion to the caller.
+See [curve sampling](sampler.md) and [native plots](plot.md).
+
 The scope is also inherited by [Equation](equation.md), [Matrix](matrix.md),
 [Differential Equation](diffequation.md), [Almanac](almanac.md),
 [Time Series](timeseries.md), [CSV](csv.md) and [SQLite CSV ingestion](sqlite.md).

@@ -238,6 +238,10 @@ async function takeIntegral(wrt, actionButton = null) {
     return takeCalculus(wrt, 'integral', actionButton);
 }
 
+async function takePlot(wrt, actionButton = null) {
+    return takeCalculus(wrt, 'plot', actionButton);
+}
+
 function fetchAlmanacEvaluation(request = null) {
     return labFlowContinue(15, {mode: 4, request});
 }

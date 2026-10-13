@@ -358,7 +358,7 @@ function renderDerivativeButtons(variables) {
         'lab_workspace_dom_derivatives', variables, variables.map(bindingDisplayName), Number(!!currentDifferentiable));
     for (const button of derivativeButtons.querySelectorAll('button'))
         button.addEventListener('click', () => {
-            [takeDerivative, takeIntegral][Number(button.dataset.calculusAction)](button.dataset.variable, button);
+            [takeDerivative, takeIntegral, takePlot][Number(button.dataset.calculusAction)](button.dataset.variable, button);
         });
 }
 
