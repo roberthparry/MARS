@@ -80,6 +80,10 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     equal(service(plan(0, 1), 'installEvaluationTextCards').args[0], cards, 'card record identity retained');
     equal(service(plan(0, 1), 'variables').args[0].join(','), 'x,__proto__', 'constants excluded without special keys');
     equal(service(plan(1, 0), 'render').args[2], true, 'equation expansion is retained');
+    for (const mode of [1, 2]) {
+        equal(service(plan(mode, 1), 'variables').args[0].join(','), 'x,__proto__', 'solver axes retain native metadata');
+        equal(service(plan(mode, 1), 'variables').args[1], false, 'solver plots do not enable expression calculus');
+    }
     equal(service(plan(2, 1), 'setValueCardVisible').args[0], true, 'solver value card is explicitly visible');
     equal(plan(5, 0).calls[3].args[0], cards.calendar[3], 'calendar card records retain identity');
 

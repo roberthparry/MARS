@@ -152,6 +152,10 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     expr_bindings_t *bindings = NULL;
     expr_t *expression = expr_from_string(source, &bindings);
     expr_t *axis = bindings ? expr_bindings_get(bindings, variable) : NULL;
+    /* Constant equation sides still need a parameter for their horizontal curve. */
+    bool detached_axis = !axis;
+    if (detached_axis)
+        axis = expr_new_named_var(NUM_NAN, variable);
     number_t lo = num_as_inexact_real_prec(lower, bits), hi = num_as_inexact_real_prec(upper, bits);
     sampler_options_t options = sampler_options_default();
     options.intervals = probes ? 16 : 64;
@@ -169,6 +173,8 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
             sampler_new_with_derivatives(evaluate_plot_derivatives, &evaluation, lo, hi, &options);
     int saved_error = samples ? 0 : (errno ? errno : EINVAL);
     expr_free(evaluation.second_derivative);
+    if (detached_axis)
+        expr_free(axis);
     num_destroy(&hi);
     num_destroy(&lo);
     expr_free(expression);

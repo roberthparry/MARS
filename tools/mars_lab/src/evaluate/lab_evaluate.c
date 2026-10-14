@@ -216,7 +216,8 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
                lab_eval_argument_member(args, payload, "plot_azimuth", "315", false) &&
                lab_eval_argument_member(args, payload, "plot_elevation", "30", false) &&
                lab_eval_argument_member(args, payload, "plot_roll", "0", false) &&
-               lab_eval_argument_member(args, payload, "plot_quality", "full", false);
+               lab_eval_argument_member(args, payload, "plot_quality", "full", false) &&
+               lab_eval_argument_member(args, payload, "plot_source_mode", "expression", false);
     return true;
 }
 

@@ -1186,6 +1186,26 @@ precision for very small ranges and up to 4,096 bits of the worksheet precision.
 The plotting limit is 32,768 working bits, with bounds and reference checks
 limited to 65,536 bits; unresolved precision requirements produce an error.
 
+Equation mode also offers **Plot** after evaluation. It draws the left and right
+sides as separately coloured, labelled curves on common axes; their intersections
+represent real solutions within the plotted range. Select one equation variable
+and bind any remaining parameters. The equation in the editor is unchanged.
+
+Differential Equation mode offers **Plot** for explicit ordinary differential-equation
+solutions, using the declared independent variable and the problem's initial
+conditions. All returned explicit branches are drawn (up to sixteen). Unset
+integration constants, implicit solutions and series-only results
+are not guessed or silently replaced: supply sufficient conditions or use an
+explicit expression in Expression mode. A PDE with two independent variables and
+one explicit solution is plotted as a 70×70 surface, including solutions constant
+along either coordinate. The surface retains the usual camera controls, touch
+gestures, previews and automatic/manual height limits. Higher-dimensional problems
+and multiple PDE branches currently require selecting a concrete expression or
+slice in Expression mode; no branch is silently chosen. Both solver modes share
+native sampling and SVG rendering with Expression mode. Plot requests use `/eval` with
+`action: "plot"` and `plot_source_mode: "equation"` or `"diffequation"`; the
+unchanged mathematical source remains in `expression`.
+
 Adaptive curves use native first derivatives and repeated differentiation for
 second derivatives. Tangent/secant and curvature checks supplement the value
 probes; bounded bisection investigates first-derivative sign changes. Located
@@ -2416,6 +2436,9 @@ Jupiter and Saturn.
 [![MARS Lab almanac mode showing the navigational-body worksheet](images/mars-lab/almanac.png)](images/mars-lab/almanac.png)
 
 ## Mobile and private remote access
+
+The access card is available on desktop and hidden in the mobile layout (viewports
+up to 900 pixels wide), including its URL, QR code and copy button.
 
 When MARS Lab listens on a wildcard address (as the desktop launcher does), its **Mobile** control
 shows the best private access route currently available:

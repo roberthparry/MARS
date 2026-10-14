@@ -7,6 +7,7 @@
  * Blank range text is sent unchanged to the native worker's automatic-range policy.
  */
 #include "lab_dom.h"
+#include "lab_workspace.h"
 #include "lab_plot_controls.h"
 
 static int value(const char *id)
@@ -33,6 +34,8 @@ static int automatic_value(unsigned index)
 /* Project a bounded UI catalogue, not a symbol lookup or mathematical rewrite. */
 void lab_plot_controls_sync(void)
 {
+    int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2;
+    lab_dom_class(lab_dom_closest(lab_dom_id("plotKindChoices"), "fieldset"), "hidden", solver);
     int first = value("plotFirst"), second = value("plotSecond");
     lab_dom_write(lab_dom_id("expressionPlot"), 3, "variable", first);
     if (lab_dom_length(first) && lab_dom_equal(first, second)) {
@@ -58,7 +61,9 @@ void lab_plot_controls_sync(void)
             lab_dom_disabled(button, lab_dom_equal(value(controls[index]), automatic_value((unsigned)index)));
         lab_dom_release(mark);
     }
-    int kind = value("plotKind"), range = lab_dom_id("plotRange");
+    int range = lab_dom_id("plotRange");
+    int pde = lab_workspace_mode() == 2 && lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) == 2;
+    int kind = solver ? lab_dom_string(pde ? "surface" : "curve") : value("plotKind");
     int curve = lab_dom_equal(kind, lab_dom_string("curve"));
     int surface = lab_dom_equal(kind, lab_dom_string("surface"));
     if (lab_dom_query(0, "#rendered [data-series]"))

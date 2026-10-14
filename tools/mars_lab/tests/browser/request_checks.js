@@ -33,7 +33,7 @@ window.checkLabRequests = async function checkLabRequests() {
         check(!labRequests.begin('unknown') && !labRequests.begin('toString'), 'unknown host operation fails closed');
 
         // Cover every permitted mode/operation/scalar route, including all fixed background endpoints.
-        const masks = [127, 9, 9, 127, 32, 1, 1, 64, 32, 64, 31, 32, 4, 4, 1];
+        const masks = [127, 9, 9, 127, 32, 1, 1, 64, 32, 64, 31, 32, 4, 4, 7];
         const fixed = [0, 0, 0, 8, 9, 10, 0, 11, 12, 13, 0, 6, 14, 14, 1];
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_request_set_mode(mode);

@@ -21,6 +21,13 @@
 #include "sampler-t.h"
 #include "plot-t.h"
 
+/** @brief Plot both equation sides or explicit differential-equation solutions as native curves or surfaces. */
+int lab_worker_solver_plot(int argc, char **argv);
+
+/** @brief Plot a native solution surface with two declared axes and a named dependent variable. */
+int lab_worker_plot_surface(const char *source, const expr_t *expression, const expr_t *first,
+                            const expr_t *second, const expr_t *function, int argc, char **argv);
+
 /** @brief Refine bounded surface-extremum candidates with gradients and Hessians for automatic height limits. */
 bool lab_worker_surface_extrema(plot_t *plot, const char *source, const char *first, const char *second,
                                 const number_t *x, const number_t *y, const number_t *z, size_t side);

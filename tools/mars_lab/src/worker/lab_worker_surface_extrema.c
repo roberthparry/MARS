@@ -49,6 +49,12 @@ bool lab_worker_surface_extrema(plot_t *plot, const char *source, const char *fi
     expr_t *formula = expr_from_string(source, &bindings);
     expr_t *axes[] = {bindings ? expr_bindings_get(bindings, first) : NULL,
                      bindings ? expr_bindings_get(bindings, second) : NULL};
+    /* A surface constant along a declared axis has no isolated definite-Hessian extremum. */
+    if (formula && (!axes[0] || !axes[1])) {
+        expr_free(formula);
+        expr_bindings_free(bindings);
+        return computation_poll_current();
+    }
     expr_t *hessian[3] = {NULL, NULL, NULL};
     bool ok = formula && axes[0] && axes[1];
     unsigned candidates = 0;

@@ -31,7 +31,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             null, equationControls, diffequationControls, matrixControls, integratorControls, datetimeControls,
             almanacControls
         ];
-        const calculus = [true, false, false, true, false, false, false];
+        const calculus = [true, true, true, true, false, false, false];
         const valueVisible = [false, true, true, false, true, true, false];
         const classes = ['datetime', 'almanac', 'diffequation', 'matrix'];
         value.textContent = ' \n\t ';

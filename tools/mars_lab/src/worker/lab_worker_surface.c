@@ -60,6 +60,11 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
     expr_t *formula = expr_from_string(source, &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, first) : NULL;
     expr_t *y = bindings ? expr_bindings_get(bindings, second) : NULL;
+    bool own_x = !x, own_y = !y;
+    if (own_x)
+        x = expr_new_named_var(NUM_NAN, first);
+    if (own_y)
+        y = expr_new_named_var(NUM_NAN, second);
     surface_grid_t *grid = calloc(1, sizeof(*grid));
     if (grid)
         grid->side = side;
@@ -100,6 +105,10 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
     num_destroy(&hi);
     num_destroy(&lo);
     expr_free(formula);
+    if (own_x)
+        expr_free(x);
+    if (own_y)
+        expr_free(y);
     expr_bindings_free(bindings);
     if (!ok) {
         grid_free(grid);
@@ -246,6 +255,26 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
     if (!second)
         return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "");
+    /* At most count + 1 candidates can be occupied; each lookup uses the native binding index. */
+    char name[64] = "u";
+    const char *const preferred[] = {"v", "w"};
+    for (size_t i = 0; expr_bindings_get(bindings, name); ++i) {
+        if (i < sizeof(preferred) / sizeof(*preferred))
+            snprintf(name, sizeof(name), "%s", preferred[i]);
+        else
+            snprintf(name, sizeof(name), "u%zu", i - 1);
+    }
+    expr_t *function = expr_new_named_var(NUM_NAN, name);
+    int result = lab_worker_plot_surface(source, expression, variable, second, function, argc, argv);
+    expr_free(function);
+    return result;
+}
+
+/* Share sampling, viewport and camera policy between expression and solved PDE surfaces. */
+int lab_worker_plot_surface(const char *source, const expr_t *expression, const expr_t *variable,
+                            const expr_t *second, const expr_t *function, int argc, char **argv)
+{
+    const char *quality = argc > 17 ? argv[17] : "full";
     const char *scale = argc > 7 ? argv[7] : "auto";
     number_t height_bounds[] = {NUM_NAN, NUM_NAN};
     bool manual = !strcmp(scale, "manual");
@@ -272,16 +301,6 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             return 1;
         }
     }
-    /* Each candidate uses a binding-table lookup; at most count + 1 candidates can be occupied. */
-    char name[64] = "u";
-    const char *const preferred[] = {"v", "w"};
-    for (size_t i = 0; expr_bindings_get(bindings, name); ++i) {
-        if (i < sizeof(preferred) / sizeof(*preferred))
-            snprintf(name, sizeof(name), "%s", preferred[i]);
-        else
-            snprintf(name, sizeof(name), "u%zu", i - 1);
-    }
-    expr_t *function = expr_new_named_var(NUM_NAN, name);
     char *height = function ? expr_to_string(function, style_UNBOUND) : NULL;
     string_t *svg = height ? surface_svg(source, expr_symbol_name(variable), expr_symbol_name(second), limits,
                                          view[0], view[1], view[2], !strcmp(quality, "preview"), height,
@@ -289,7 +308,6 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
     int result = lab_worker_plot_output(source, expression, svg, errno, function, variable, second);
     string_free(svg);
     free(height);
-    expr_free(function);
     num_destroy(&height_bounds[0]);
     num_destroy(&height_bounds[1]);
     return result;

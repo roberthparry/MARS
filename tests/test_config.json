@@ -3043,6 +3043,7 @@
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_repeated_gaussian_integral": true,
+      "test_lab_extra_solver_plots": true,
       "test_lab_extra_surface": true,
       "test_lab_extra_surface_height": true,
       "test_lab_extra_surface_names": true,

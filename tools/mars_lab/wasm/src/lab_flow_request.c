@@ -508,6 +508,9 @@ static int lab_flow_request_calculus(int frame)
             scalar = matrix && lab_dom_truth(lab_dom_get(initial, "scalar"));
             lab_dom_set(frame, "matrix", lab_dom_scalar(1, matrix));
             lab_dom_set(frame, "scalar", lab_dom_scalar(1, scalar));
+            lab_dom_set(frame, "solverPlot", lab_dom_scalar(1, plot &&
+                (lab_dom_equal(mode, lab_dom_string("equation")) ||
+                 lab_dom_equal(mode, lab_dom_string("diffequation")))));
             int options = lab_dom_object(5);
             lab_dom_set(options, "button", lab_dom_get(frame, "actionButton"));
             lab_dom_set(options, "variable", lab_dom_scalar(1, lab_dom_truth(wrt)));
@@ -527,6 +530,8 @@ static int lab_flow_request_calculus(int frame)
                 return lab_flow_done(0);
             return lab_flow_call(frame, ASSEMBLED, scalar ? "matrixScalar" : "expressionText", "source", 0, 0);
         case ASSEMBLED:
+            if (lab_flow_request_truth(frame, "solverPlot"))
+                return lab_flow_request_current(frame, INPUT_ACCEPT);
             if (!matrix)
                 return lab_flow_call(frame, INPUT, "expressionWithVisibleBindings", "source", 1, 2,
                                      lab_dom_get(frame, "source"),
@@ -633,7 +638,7 @@ static int lab_flow_request_calculus(int frame)
                                         : lab_dom_get(data, "binding_values"));
         case DIFFERENTIABLE: {
             int enabled =
-                matrix
+                lab_flow_request_truth(frame, "solverPlot") ? lab_dom_scalar(1, 0) : matrix
                     ? lab_dom_get(lab_dom_get(frame, "snapshot"), "differentiable")
                     : lab_dom_scalar(1, !lab_dom_equal(lab_dom_clean(lab_dom_text(lab_flow_request_fallback(
                                                                          lab_dom_get(data, "differentiable"), "yes")),

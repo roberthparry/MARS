@@ -169,7 +169,9 @@ static void lab_evaluation_install_solver_end(const lab_evaluation_install_t *st
     lab_evaluation_install_emit(state->calls, "modeSource", 2, lab_dom_string(mode),
                                 lab_dom_get(state->context, "text"));
     lab_evaluation_install_emit(state->calls, "saveWorksheetState", 1, lab_dom_string(mode));
-    lab_evaluation_install_clear(state);
+    lab_evaluation_install_emit(state->calls, "variables", 2,
+                                lab_evaluation_install_variables(lab_dom_get(state->data, "binding_values")),
+                                lab_dom_scalar(1, 0));
 }
 
 static void lab_evaluation_install_diffequation_begin(const lab_evaluation_install_t *state)

@@ -1,5 +1,9 @@
 /* Tablet and phone overrides; must follow the component styles. */
 @media (max-width: 900px) {
+  .mobile-card {
+    display: none;
+  }
+
   body {
     font-size: 15px;
   }

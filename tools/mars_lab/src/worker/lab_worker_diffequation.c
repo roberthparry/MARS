@@ -159,6 +159,14 @@ int lab_worker_diffequation(int argc, char **argv)
     diagnostic = de_solve_result_diagnostic(result);
 
     printf("input %s\n", source);
+    for (size_t i = 0; i < de_independent_count(de); ++i) {
+        expr_t *axis = expr_new_named_var(NUM_NAN, expr_symbol_name(de_independent_at(de, i)));
+        char *name = axis ? expr_to_string(axis, style_UNBOUND) : NULL;
+        if (name)
+            printf("binding variable\t%s\tNAN\n", name);
+        free(name);
+        expr_free(axis);
+    }
     printf("problem %s\n", problem ? problem : "");
     printf("problem_TeX %s\n", problem_TeX ? problem_TeX : "");
     printf("status %s\n", solve_status_name(de_solve_result_status(result)));

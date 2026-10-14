@@ -47,6 +47,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
     }
     lab_dom_set(payload, "action", action);
     if (lab_dom_equal(action, lab_dom_string("plot"))) {
+        lab_dom_set(payload, "plot_source_mode", lab_dom_item(inputs, 5));
         lab_plot_controls_prepare(lab_dom_item(inputs, 3));
         lab_dom_class(lab_dom_closest(lab_dom_query(0, "#rendered"), ".result-card"), "plot-card", 1);
         lab_dom_set(payload, "plot_lower", lab_payload_control("#plotLower"));
@@ -63,6 +64,14 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_scale", lab_payload_control("#plotScale"));
         lab_dom_set(payload, "plot_y_lower", lab_payload_control("#plotYLower"));
         lab_dom_set(payload, "plot_y_upper", lab_payload_control("#plotYUpper"));
+        int mode = lab_dom_item(inputs, 5);
+        if (lab_dom_equal(mode, lab_dom_string("equation")) || lab_dom_equal(mode, lab_dom_string("diffequation"))) {
+            int pde = lab_dom_equal(mode, lab_dom_string("diffequation")) &&
+                      lab_dom_to_number(lab_dom_get(lab_dom_id("plotRange"), "marsPlotVariables")) == 2;
+            lab_dom_set(payload, "plot_kind", lab_dom_string(pde ? "surface" : "curve"));
+            if (!pde)
+                lab_dom_set(payload, "plot_second", lab_dom_string(""));
+        }
     }
     lab_dom_set(payload, "expression_updated_at", lab_dom_numeric(updated_at));
     int persist = request ? (lab_payload_request_flags(request) & 1) != 0

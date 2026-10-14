@@ -2005,6 +2005,9 @@ int lab_worker_expression(int argc, char **argv)
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
+    if (!strcmp(action, "plot") && argc > 18 && strcmp(argv[18], "expression"))
+        return lab_worker_solver_plot(argc, argv);
+
     expr = expr_from_string_with_derivation_TeX_internal(raw_input, &bindings, &derivation_TeX,
                                                         &domain_specialised);
 

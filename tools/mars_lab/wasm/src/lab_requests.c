@@ -63,7 +63,7 @@ static const lab_request_policy_t lab_request_policy[lab_request_operations] = {
     [lab_request_local_holidays] = {32, lab_request_holidays, 0, 0, 0, 0, "holidays", 6, 0},
     [lab_request_solver_render] = {4, lab_request_solver, 1, 0, 0, 0, "solverRender", 14, 0},
     [lab_request_solver_restore_render] = {4, lab_request_solver, 1, 0, 0, 45000, "solverRestoreRender", 14, 0},
-    [lab_request_plot] = {1, lab_request_main, 1, 1, 1, 0, "plot", 1, 3}};
+    [lab_request_plot] = {7, lab_request_main, 1, 1, 1, 0, "plot", 1, 3}};
 
 static const char *const lab_request_paths[] = {"",
                                                 "/eval",

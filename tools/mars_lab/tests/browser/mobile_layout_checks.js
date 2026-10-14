@@ -279,11 +279,11 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state) {
                 }
             }
             const mobile = doc.getElementById('mobileAccess');
-            if (visible(mobile)) {
-                mobile.open = true;
-                inside(mobile.querySelector('.mobile-panel'), 'mobile access disclosure');
-                mobile.open = false;
-            }
+            check(!visible(mobile), `${width}px: Wi-Fi access card should be hidden on mobile`);
+            mobile.open = true;
+            check(!visible(mobile.querySelector('.mobile-panel')),
+                  `${width}px: an open Wi-Fi access card should remain hidden on mobile`);
+            mobile.open = false;
         }
         if (state === 'all calendar result cards') {
             // Exercise the production touch rule even when the runner has a mouse.

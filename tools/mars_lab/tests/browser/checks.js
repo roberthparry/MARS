@@ -1498,6 +1498,38 @@
             setExpressionEditor('3+4');
             await evaluateExpression();
             check(getComputedStyle(plotControls).display === 'none', 'Ordinary results must hide plot controls');
+            for (const [mode, source, series, surface] of [
+                ['equation', 'x^2=1', 2, false], ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
+                ['diffequation', '{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=x^2}', 1, true]
+            ]) {
+                setMode(mode);
+                syncModeUI();
+                setExpressionEditor(source);
+                await evaluateCurrentMode();
+                await commitVisibleBindingInputs();
+                const button = document.getElementById('expressionPlot');
+                const authored = currentExpressionText();
+                check(button && button.getClientRects().length > 0, mode + ' exposes Plot after evaluation: ' +
+                      JSON.stringify({variables: currentVariables, buttons: derivativeButtons.outerHTML,
+                                      status: statusEl.textContent, error: rendered.textContent.slice(0, 200)}));
+                document.getElementById('plotLower').value = '-2';
+                document.getElementById('plotUpper').value = '2';
+                await takePlot(button.dataset.variable);
+                check(rendered.querySelectorAll('[data-series]').length === series, mode + ' plots all native curves: ' +
+                      JSON.stringify({source, variables: currentVariables, status: statusEl.textContent,
+                                      error: rendered.textContent.slice(0, 400)}));
+                check(!!rendered.querySelector('[data-surface]') === surface, mode + ' selects native dimensionality');
+                check((document.getElementById('plotCamera').getClientRects().length > 0) === surface,
+                      mode + ' shows camera controls only for PDE surfaces');
+                check(currentMode() === mode && currentExpressionText() === authored, mode + ' retains the authored problem: ' +
+                      JSON.stringify({mode: currentMode(), before: authored, after: currentExpressionText()}));
+                check(!currentDifferentiable, mode + ' does not expose expression derivative buttons');
+                await window.checkLabMobileLayout(mode + ' plot');
+            }
+            setMode('expression');
+            syncModeUI();
+            setExpressionEditor('3+4');
+            await evaluateExpression();
             const ordinaryZoom = resultZoomIndex(rendered.closest('.result-card'));
             check(rendered.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, bubbles: true, cancelable: true})) &&
                   resultZoomIndex(rendered.closest('.result-card')) === ordinaryZoom,

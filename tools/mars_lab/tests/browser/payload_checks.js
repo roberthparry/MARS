@@ -39,6 +39,12 @@ window.checkLabPayload = async function checkLabPayload() {
         equal(roundTrip.persist_expression, true, 'persistence retains Boolean wire type');
         equal(roundTrip.expression_updated_at, expression.expression_updated_at, 'wire timestamp unchanged');
         const plot = build(0, ['sin(x)', '', '', 'x', 'plot', 'expression']);
+        equal(plot.plot_source_mode, 'expression', 'plot source mode remains explicit');
+        for (const mode of ['equation', 'diffequation']) {
+            const solver = build(0, ['opaque mathematical source', '', '', 'x', 'plot', mode]);
+            equal(solver.plot_source_mode, mode, 'solver plot mode reaches the native parser');
+            equal(labWire.decode(labWire.encode(solver)).plot_source_mode, mode, 'solver mode survives Protobuf');
+        }
         equal(plot.plot_lower, document.getElementById('plotLower').value, 'plot lower bound remains opaque text');
         equal(plot.plot_upper, document.getElementById('plotUpper').value, 'plot upper bound remains opaque text');
         for (const [key, id] of [['plot_kind', 'plotKind'], ['plot_second', 'plotSecond'],

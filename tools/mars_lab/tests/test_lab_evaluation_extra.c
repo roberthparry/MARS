@@ -393,6 +393,49 @@ static void test_lab_extra_plot_preview(void)
                     422u, "error", "plotting quality");
 }
 
+static void test_lab_extra_solver_plots(void)
+{
+    unsigned status = 0;
+    json_t *result = request("/eval", "{\"expression\":\"x^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                                     "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
+    bool ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"1\"") &&
+              contains(result, "plot_svg", "Left side") && contains(result, "plot_svg", "Right side");
+    if (!ok)
+        show_failure(result);
+    json_free(result);
+    result = request("/eval", "{\"expression\":\"Dx(y)=x*y; y(0)=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                              "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
+    bool de_ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"0\"") &&
+                 contains(result, "plot_svg", "Solution 1");
+    if (!de_ok)
+        show_failure(result);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok && de_ok, "native equation sides and initial-value solution share the plot-card protocol");
+    expect_response("/eval", "{\"expression\":\"{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=x^2}\","
+                             "\"wrt\":\"x\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
+                             "\"plot_lower\":\"-2\",\"plot_upper\":\"2\",\"plot_second_lower\":\"-2\","
+                             "\"plot_second_upper\":\"2\"}", 200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=0}\","
+                             "\"wrt\":\"y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\"}",
+                    200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"x^2=x+2\",\"action\":\"plot\",\"plot_source_mode\":\"equation\"}",
+                    200u, "plot_svg", "Right side");
+    expect_response("/eval", "{\"expression\":\"Dx(y)=0; y(0)=1\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
+                    200u, "plot_svg", "Solution 1");
+    expect_response("/eval", "{\"expression\":\"{x=a | x=?; a=?}\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
+                    422u, "error", "parameters");
+    expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
+                             "\"plot_lower\":\"2\",\"plot_upper\":\"-2\"}", 422u, "error", "bounds");
+    expect_response("/eval", "{\"expression\":\"Dx(y)=y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
+                             "\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", 422u, "error", "initial conditions");
+    expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
+                             "\"plot_kind\":\"surface\"}", 422u, "error", "2-D curves");
+    expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_source_mode\":\"unknown\"}",
+                    422u, "error", "source mode");
+}
+
 static void test_lab_extra_plot_turning_points(void)
 {
     unsigned status = 0;
@@ -1017,7 +1060,15 @@ static void test_lab_extra_number_card_markup(void)
 
 static void test_lab_extra_diffequation(void)
 {
-    expect_response("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", 200u, "solutions", "y");
+    unsigned status = 0;
+    json_t *response = request("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", &status);
+    const json_t *bindings = test_lab_member(response, "binding_values");
+    bool ok = status == 200 && contains(response, "solutions", "y") && json_array_size(bindings) == 1 &&
+              !strcmp(test_lab_text(json_array_get(bindings, 0), "name"), "x");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "ODE results identify the independent coordinate by name, not its unset value");
 }
 
 static void test_lab_extra_context_results(void)
@@ -1288,6 +1339,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_tangent_bounds, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_turning_points, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_solver_plots, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);

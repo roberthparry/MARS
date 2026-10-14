@@ -39,7 +39,7 @@ static number_t coordinate(number_t lo, number_t hi, unsigned index, unsigned co
 }
 
 static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimensions,
-                      number_t bounds[4], const bool automatic[4])
+                      number_t bounds[4], const bool automatic[4], bool constant)
 {
     unsigned side = dimensions == 2 ? 7 : 33, rows = dimensions == 2 ? side : 1;
     unsigned minimum[] = {side, side}, maximum[] = {0, 0}, finite = 0;
@@ -67,19 +67,21 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
                 maximum[1] = row;
         }
     }
-    if (finite < (side * rows + 3) / 4 || !peak)
+    if (finite < (side * rows + 3) / 4 || (!peak && !constant))
         return false;
+    if (!peak)
+        peak = 1;
     double low = 1, high = -1;
     for (unsigned i = 0; i < finite; ++i) {
         values[i] /= peak;
         low = fmin(low, values[i]);
         high = fmax(high, values[i]);
     }
-    if (high - low < 1e-10)
+    if (high - low < 1e-10 && !constant)
         return false;
     unsigned interior = 0;
     for (unsigned i = 0; i < finite; ++i) {
-        double fraction = (values[i] - low) / (high - low);
+        double fraction = constant ? 0.5 : (values[i] - low) / (high - low);
         interior += fraction > 0.001 && fraction < 0.999;
     }
     /* A solitary spike or an almost entirely underflowed tail is not a useful automatic view. */
@@ -152,7 +154,19 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
     expr_t *formula = ok ? expr_from_string(source, &bindings) : NULL;
     expr_t *axes[] = {bindings ? expr_bindings_get(bindings, first) : NULL,
                      second && bindings ? expr_bindings_get(bindings, second) : NULL};
+    bool owned[] = {!axes[0], second && !axes[1]};
+    for (unsigned i = 0; i < dimensions; ++i)
+        if (owned[i])
+            axes[i] = expr_new_named_var(NUM_NAN, i ? second : first);
     ok = ok && formula && axes[0] && (!second || axes[1]);
+    bool constant = false;
+    if (ok && dimensions == 2) {
+        expr_set_val(axes[0], NUM_NAN);
+        expr_set_val(axes[1], NUM_NAN);
+        number_t value = expr_eval(formula);
+        constant = num_is_real(value) && num_is_finite(value);
+        num_destroy(&value);
+    }
     /* A finite work budget, not a key search: stop at the first informative real window. */
     static const char *const scales[] = {"10", "1", "0.1", "0.01", "0.001", "100", "1000", "10000"};
     for (unsigned attempt = 0; ok && !found && attempt < sizeof scales / sizeof *scales; ++attempt) {
@@ -184,12 +198,15 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
                 bounds[i + 1] = num_scope_detach(num_clone(hi));
             }
         }
-        found = candidate(formula, axes, dimensions, bounds, automatic);
+        found = candidate(formula, axes, dimensions, bounds, automatic, constant);
         /* Candidate may replace endpoints while the local number scope is active. */
         for (unsigned i = 0; i < 2 * dimensions; ++i)
             bounds[i] = num_scope_detach(bounds[i]);
     }
     expr_free(formula);
+    for (unsigned i = 0; i < dimensions; ++i)
+        if (owned[i])
+            expr_free(axes[i]);
     expr_bindings_free(bindings);
     num_set_default_prec_bits(saved);
     if (!found)
