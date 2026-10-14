@@ -113,7 +113,7 @@ static bool antiderivative_terms_equal(const expr_t *actual, const expr_t *expec
     bool equal = difference && expr_is_exact_zero(difference);
 
     if (!equal && difference) {
-        expr_t *expanded = simplify_owned(expr_display_expanded(difference));
+        expr_t *expanded = simplify_owned(expr_expand_products_internal(difference));
 
         equal = expanded && expr_is_exact_zero(expanded);
         if (!equal && expanded && expr_is_addsub(expanded)) {

@@ -3171,7 +3171,9 @@ expr_t *expr_deserialise(const void *data, size_t len, const string_t *type, con
 
 ### `expr_display_expanded()`
 
-Returns the public result described by display expanded.
+Expands products for display while retaining symbolic coefficients. Preserved
+constant expressions such as π²/3 must not become decimal scale factors when
+distributing a product over a sum. Numerical evaluation remains separate.
 
 ```c
 expr_t *expr_display_expanded(const expr_t *expr);

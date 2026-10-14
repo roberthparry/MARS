@@ -121,8 +121,10 @@ expr_t *equ_residual(const equation_t *equation);
  * @brief Build an owning display equation with polynomial sides expanded in
  *        descending powers of @p wrt.
  *
- * Non-polynomial sides fall back to the general display expansion. Inputs are
- * borrowed; release the returned equation with equ_free().
+ * Coefficients remain symbolic expressions, including exact constants and bound
+ * parameters. Sides outside the symbolic polynomial collector fall back to the
+ * general display expansion. Inputs are borrowed; release the returned equation
+ * with equ_free().
  *
  * @param[in] equation Borrowed equation to inspect or operate on; ownership is unchanged.
  * @param[in] wrt Borrowed polynomial variable; NULL selects general display expansion.

@@ -456,7 +456,9 @@ replacing its binding.
   native derivation metadata such as a finite sigma step retained while the
   solver uses its expanded value
 - `equ_display_expanded(...)` builds a display equation whose polynomial sides
-  are collected and written in descending powers of the selected variable
+  are collected and written in descending powers of the selected variable.
+  Coefficients retain exact symbolic constants, radicals and parameter bindings;
+  display expansion does not replace them with numerical approximations.
 - `equ_residual(...)` builds the simplified residual `lhs - rhs`
 - `equ_print(...)` prints the `style_EXPRESSION` form to `stdout`
 

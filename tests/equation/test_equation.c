@@ -789,6 +789,52 @@ static void test_equation_display_expansion_distributes_sum_products(void)
     equ_free(equation);
 }
 
+static void test_equation_display_preserves_symbolic_coefficients(void)
+{
+    const char *sources[] = {"pi^2*x/3 = 0", "(sqrt(2)/3)*(x+1) = 0", "log(2)*(x+1) = 0",
+                             "{y*x = 0 | x=2, y=3}"};
+    const char *symbols[] = {"π", "√", "lg", "y"};
+    const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    const char *pi_symbols[] = {"π", "@pi", "\\pi"};
+    for (size_t i = 0; i < 4; ++i) {
+        equation_t *equation = equ_from_string(sources[i]);
+        ASSERT_NOT_NULL(equation);
+        expr_t *x = equ_binding(equation, "x");
+        ASSERT_NOT_NULL(x);
+        number_t two = num_create_from_long(2);
+        expr_set_val(x, two);
+        equation_t *expanded = equ_display_expanded(equation, x);
+        ASSERT_NOT_NULL(expanded);
+        string_t *text = equ_to_text(expanded, style_UNBOUND);
+        ASSERT_NOT_NULL(text);
+        if (!strstr(string_c_str(text), symbols[i]))
+            string_printf("Symbolic coefficient lost in %s: %S\n", sources[i], text);
+        ASSERT_TRUE(strstr(string_c_str(text), symbols[i]) != NULL);
+        string_free(text);
+        if (!i) {
+            for (size_t style = 0; style < 3; ++style) {
+                text = equ_to_text(expanded, styles[style]);
+                ASSERT_NOT_NULL(text);
+                ASSERT_TRUE(strstr(string_c_str(text), pi_symbols[style]) != NULL);
+                ASSERT_TRUE(strstr(string_c_str(text), "3.289868") == NULL);
+                string_free(text);
+            }
+        }
+        number_t original = expr_eval(equ_lhs(equation)), displayed = expr_eval(equ_lhs(expanded));
+        number_t delta = num_sub(original, displayed), error = num_abs(delta);
+        number_t tolerance = num_create_from_double(1e-12);
+        ASSERT_TRUE(num_lt(error, tolerance));
+        num_destroy(&tolerance);
+        num_destroy(&error);
+        num_destroy(&delta);
+        num_destroy(&displayed);
+        num_destroy(&original);
+        num_destroy(&two);
+        equ_free(expanded);
+        equ_free(equation);
+    }
+}
+
 static void test_equation_expands_conjugate_factors_and_solves_all_roots(void)
 {
     equation_t *equation = equ_from_string("(x-(1+i))(x-(1-i))(x-(1+5i))(x-(1-5i))"
@@ -2297,6 +2343,7 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_to_text_round_trips_through_parser, NULL);
     TEST_RUN_SUBTEST(test_equation_function_style_preserves_both_sides, NULL);
     TEST_RUN_SUBTEST(test_equation_display_expansion_distributes_sum_products, NULL);
+    TEST_RUN_SUBTEST(test_equation_display_preserves_symbolic_coefficients, NULL);
     TEST_RUN_SUBTEST(test_equation_expands_conjugate_factors_and_solves_all_roots, NULL);
     TEST_RUN_SUBTEST(test_equation_detects_already_solved_form, NULL);
     TEST_RUN_SUBTEST(test_equation_rejects_rhs_containing_solve_variable, NULL);

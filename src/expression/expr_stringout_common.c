@@ -432,8 +432,10 @@ bool additive_const_needs_visible_parens(const expr_t *constant)
 
 int add_rhs_needs_visible_parens(const expr_t *rhs)
 {
-    if (additive_const_needs_visible_parens(rhs) ||
-        (expr_is_neg(rhs) && additive_const_needs_visible_parens(rhs->a)))
+    if (expr_is_neg(rhs))
+        return add_rhs_needs_visible_parens(rhs->a);
+
+    if (additive_const_needs_visible_parens(rhs))
         return 1;
 
     if (rhs && expr_is_const(rhs) && expr_tostring_should_emit_binding_expr(rhs) && rhs->binding_expr) {
@@ -441,16 +443,6 @@ int add_rhs_needs_visible_parens(const expr_t *rhs)
             return 1;
         if (rhs->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
             rhs->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP || rhs->binding_expr->kind == EXPR_BINDING_EXPR_POWI)
-            return 0;
-    }
-
-    if (expr_is_neg(rhs) && rhs->a && expr_is_const(rhs->a) && expr_tostring_should_emit_binding_expr(rhs->a) &&
-        rhs->a->binding_expr) {
-        if (rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_ADD || rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_SUB)
-            return 1;
-        if (rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP ||
-            rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_BINARY_OP ||
-            rhs->a->binding_expr->kind == EXPR_BINDING_EXPR_POWI)
             return 0;
     }
 

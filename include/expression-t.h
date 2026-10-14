@@ -527,7 +527,8 @@ expr_t *expr_display_simplified(const expr_t *expr);
  *
  * Unlike expr_display_simplified(), this explicitly distributes products when
  * both factors are sums. It is intended for callers that request expanded
- * polynomial or algebraic output.
+ * polynomial or algebraic output. Preserved symbolic coefficients are not
+ * replaced by their approximate numerical values during distribution.
  *
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.

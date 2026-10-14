@@ -1901,7 +1901,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ tan(x - floor(pi*(1.5+3.2i))) | x = ? }",
-            "{ tan(x - 4 + 10i) | x = ? }",
+            "{ tan(x - (4 + 10i)) | x = ? }",
             "floor of complex const folds inside tan argument",
         },
         {

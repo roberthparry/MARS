@@ -754,9 +754,10 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
     return NULL;
 }
 
-static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products);
+static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products, bool preserve_symbolic);
 
-static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *right, bool expand_sum_products)
+static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *right, bool expand_sum_products,
+                                           bool preserve_symbolic)
 {
     expr_t *left_expr;
     expr_t *right_expr;
@@ -769,19 +770,19 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
         return NULL;
 
     if (expr_is_op(left, &ops_neg) && left->a) {
-        expr_t *inner = expr_display_expanded_product(left->a, right, expand_sum_products);
+        expr_t *inner = expr_display_expanded_product(left->a, right, expand_sum_products, preserve_symbolic);
         expr_t *negated = inner ? expr_neg(inner) : NULL;
 
         expr_free(inner);
         return negated;
     }
     if (expr_is_op(right, &ops_neg) && right->a)
-        return expr_display_expanded_product(right, left, expand_sum_products);
+        return expr_display_expanded_product(right, left, expand_sum_products, preserve_symbolic);
 
     if (!expand_sum_products && expr_match_add_sub_expr(left, &child_left, &child_right, &is_sub) &&
         expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub)) {
-        left_expr = expr_display_expanded_expr_mode(left, false);
-        right_expr = expr_display_expanded_expr_mode(right, false);
+        left_expr = expr_display_expanded_expr_mode(left, false, preserve_symbolic);
+        right_expr = expr_display_expanded_expr_mode(right, false, preserve_symbolic);
         if (!left_expr || !right_expr) {
             expr_free(left_expr);
             expr_free(right_expr);
@@ -795,8 +796,8 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
     }
 
     if (expr_match_add_expr(left, &child_left, &child_right)) {
-        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products);
-        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products);
+        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products, preserve_symbolic);
+        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products, preserve_symbolic);
 
         if (!first || !second) {
             expr_free(first);
@@ -811,8 +812,8 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
     }
 
     if (expr_match_sub_expr(left, &child_left, &child_right)) {
-        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products);
-        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products);
+        expr_t *first = expr_display_expanded_product(child_left, right, expand_sum_products, preserve_symbolic);
+        expr_t *second = expr_display_expanded_product(child_right, right, expand_sum_products, preserve_symbolic);
 
         if (!first || !second) {
             expr_free(first);
@@ -827,10 +828,10 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
     }
 
     if (expr_match_add_sub_expr(right, &child_left, &child_right, &is_sub))
-        return expr_display_expanded_product(right, left, expand_sum_products);
+        return expr_display_expanded_product(right, left, expand_sum_products, preserve_symbolic);
 
-    left_expr = expr_display_expanded_expr_mode(left, expand_sum_products);
-    right_expr = expr_display_expanded_expr_mode(right, expand_sum_products);
+    left_expr = expr_display_expanded_expr_mode(left, expand_sum_products, preserve_symbolic);
+    right_expr = expr_display_expanded_expr_mode(right, expand_sum_products, preserve_symbolic);
     if (!left_expr || !right_expr) {
         expr_free(left_expr);
         expr_free(right_expr);
@@ -838,7 +839,7 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
     }
 
     if (expand_sum_products && (expr_is_addsub(left_expr) || expr_is_addsub(right_expr))) {
-        out = expr_display_expanded_product(left_expr, right_expr, expand_sum_products);
+        out = expr_display_expanded_product(left_expr, right_expr, expand_sum_products, preserve_symbolic);
     } else {
         out = expr_mul(left_expr, right_expr);
     }
@@ -847,7 +848,7 @@ static expr_t *expr_display_expanded_product(const expr_t *left, const expr_t *r
     return out;
 }
 
-static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products)
+static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_sum_products, bool preserve_symbolic)
 {
     expr_t *left;
     expr_t *right;
@@ -862,20 +863,25 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_s
         return NULL;
     }
 
+    /* Rebuild the coefficient from its tree, preserving algebra such as pi^2/3. */
     if (expand_sum_products && expr_match_scaled_expr(expr, &scale, &scaled_base) && scaled_base &&
         scaled_base != expr && expr_is_addsub(scaled_base)) {
-        expr_t *scale_expr = expr_new_const(scale);
+        expr_t *one = expr_new_const(NUM_ONE);
+        expr_t *scale_expr = preserve_symbolic ? (one ? expr_substitute(expr, scaled_base, one) : NULL)
+                                              : expr_new_const(scale);
 
-        out = scale_expr ? expr_display_expanded_product(scale_expr, scaled_base, expand_sum_products) : NULL;
+        out = scale_expr ? expr_display_expanded_product(scale_expr, scaled_base, expand_sum_products, preserve_symbolic)
+                         : NULL;
         expr_free(scale_expr);
+        expr_free(one);
         num_destroy(&scale);
         return out;
     }
     num_destroy(&scale);
 
     if (expr_match_add_expr(expr, &child_left, &child_right)) {
-        left = expr_display_expanded_expr_mode(child_left, expand_sum_products);
-        right = expr_display_expanded_expr_mode(child_right, expand_sum_products);
+        left = expr_display_expanded_expr_mode(child_left, expand_sum_products, preserve_symbolic);
+        right = expr_display_expanded_expr_mode(child_right, expand_sum_products, preserve_symbolic);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -888,8 +894,8 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_s
     }
 
     if (expr_match_sub_expr(expr, &child_left, &child_right)) {
-        left = expr_display_expanded_expr_mode(child_left, expand_sum_products);
-        right = expr_display_expanded_expr_mode(child_right, expand_sum_products);
+        left = expr_display_expanded_expr_mode(child_left, expand_sum_products, preserve_symbolic);
+        right = expr_display_expanded_expr_mode(child_right, expand_sum_products, preserve_symbolic);
         if (!left || !right) {
             expr_free(left);
             expr_free(right);
@@ -902,14 +908,14 @@ static expr_t *expr_display_expanded_expr_mode(const expr_t *expr, bool expand_s
     }
 
     if (expr_is_op(expr, &ops_neg) && expr->a) {
-        left = expr_display_expanded_expr_mode(expr->a, expand_sum_products);
+        left = expr_display_expanded_expr_mode(expr->a, expand_sum_products, preserve_symbolic);
         out = left ? expr_neg(left) : NULL;
         expr_free(left);
         return out;
     }
 
     if (expr_match_mul_expr(expr, &child_left, &child_right))
-        return expr_display_expanded_product(child_left, child_right, expand_sum_products);
+        return expr_display_expanded_product(child_left, child_right, expand_sum_products, preserve_symbolic);
 
     expr_retain(expr);
     return (expr_t *)expr;
@@ -1054,7 +1060,7 @@ expr_t *expr_display_simplified(const expr_t *expr)
     if (expr_is_op(expr, &ops_integral))
         return expr_display_clone_integral(expr);
 
-    expanded = expr_display_expanded_expr_mode(expr, false);
+    expanded = expr_display_expanded_expr_mode(expr, false, true);
     if (!expanded)
         return expr_simplify(expr);
 
@@ -1123,7 +1129,7 @@ expr_t *expr_display_expanded(const expr_t *expr)
     if (!expr)
         return NULL;
 
-    expanded = expr_display_expanded_expr_mode(expr, true);
+    expanded = expr_display_expanded_expr_mode(expr, true, true);
     if (!expanded)
         return expr_simplify(expr);
 
@@ -1145,7 +1151,7 @@ expr_t *expr_display_expanded(const expr_t *expr)
 
 expr_t *expr_expand_products_internal(const expr_t *expr)
 {
-    return expr_display_expanded_expr_mode(expr, true);
+    return expr_display_expanded_expr_mode(expr, true, false);
 }
 
 expr_t *expr_canonicalize_known_radicals_internal(const expr_t *expr)

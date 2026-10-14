@@ -146,9 +146,11 @@ static void test_imaginary_shifts_do_not_keep_factor_parentheses(void)
 
 static void test_required_complex_grouping_preserves_values(void)
 {
-    const char *bodies[] = {"x-(2+3*i)", "x*(-2*i)", "x/(2*i)", "(-2*i)^2*x", "x+(-2*i)", "x-(-2*i)"};
-    const double complex expected[] = {-1-3*I, -2*I, -0.5*I, -4, 1-2*I, 1+2*I};
-    for (size_t i = 0; i < 6; ++i) {
+    const char *bodies[] = {"x-(2+3*i)", "x*(-2*i)", "x/(2*i)", "(-2*i)^2*x", "x+(-2*i)", "x-(-2*i)",
+                            "x-(2-3*i)", "x+(2+3*i)", "x-(sqrt(2)+pi)", "tan(x-floor(pi*(1.5+3.2*i)))"};
+    const double complex expected[] = {-1-3*I, -2*I, -0.5*I, -4, 1-2*I, 1+2*I, -1+3*I, 3+3*I,
+                                       1-sqrt(2)-acos(-1), ctan(-3-10*I)};
+    for (size_t i = 0; i < sizeof(bodies) / sizeof(bodies[0]); ++i) {
         const json_t *r = math_fourier_fields(lab_math_format("{%s | x=1}", bodies[i]), "x");
         lab_math_close(math_fourier_number(r), expected[i], 1e-14);
         lab_math_close(math_fourier_number(math_fourier_fields(math_fourier_text(r, "expression"), "x")), expected[i], 1e-14);

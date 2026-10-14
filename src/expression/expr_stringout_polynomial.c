@@ -598,7 +598,7 @@ bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_
     for (size_t i = 0u; i < count; ++i) {
         bool term_negative = expr_renders_negative(terms[i].expr);
         bool effective_negative = terms[i].subtract != term_negative;
-        bool term_needs_parens = expr_is_addsub(terms[i].expr);
+        bool term_needs_parens = add_rhs_needs_visible_parens(terms[i].expr);
 
         if (i == 0u) {
             if (effective_negative)
@@ -638,7 +638,7 @@ bool emit_TeX_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_p
     for (size_t i = 0u; i < count; ++i) {
         bool term_negative = expr_renders_negative(terms[i].expr);
         bool effective_negative = terms[i].subtract != term_negative;
-        bool term_needs_parens = expr_is_addsub(terms[i].expr);
+        bool term_needs_parens = add_rhs_needs_visible_parens(terms[i].expr);
 
         if (i == 0u) {
             if (effective_negative)
@@ -677,7 +677,7 @@ bool emit_func_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_
     for (size_t i = 0u; i < count; ++i) {
         bool term_negative = expr_renders_negative(terms[i].expr);
         bool effective_negative = terms[i].subtract != term_negative;
-        bool term_needs_parens = expr_is_addsub(terms[i].expr);
+        bool term_needs_parens = add_rhs_needs_visible_parens(terms[i].expr);
 
         if (i == 0u) {
             if (effective_negative)

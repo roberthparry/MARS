@@ -502,57 +502,32 @@ bool equ_match_polynomial_alloc(const expr_t *expr, const expr_t *wrt, number_t 
     return true;
 }
 
-static expr_t *equ_polynomial_expression_from_coefficients(const number_t *coeffs, size_t degree, const expr_t *wrt)
+static expr_t *equ_polynomial_expression_from_coefficients(expr_t *const *coeffs, size_t degree, const expr_t *wrt)
 {
     expr_t *sum = NULL;
 
-    if (!coeffs || !wrt)
-        return NULL;
-
     for (size_t power = degree + 1u; power-- > 0u;) {
-        expr_t *base = NULL;
+        number_t value = num_new();
+        bool zero = expr_match_const_value(coeffs[power], &value) && num_is_zero(value);
+        num_destroy(&value);
+        if (zero)
+            continue;
+
         expr_t *term = NULL;
-        expr_t *next;
-
-        if (num_is_zero(coeffs[power]))
-            continue;
-
-        if (power == 0u) {
-            term = expr_new_const(coeffs[power]);
+        if (!power) {
+            term = expr_clone(coeffs[power]);
         } else {
-            if (power == 1u) {
-                base = expr_clone(wrt);
-            } else {
-                number_t exponent = num_create_from_long((long)power);
-
-                base = expr_pow(wrt, &exponent);
-                num_destroy(&exponent);
-            }
-            if (!base)
-                goto fail;
-
-            if (num_is_one(coeffs[power])) {
-                term = base;
-                base = NULL;
-            } else if (num_eq(coeffs[power], NUM_NEG_ONE)) {
-                term = expr_neg(base);
-            } else {
-                expr_t *coefficient = expr_new_const(coeffs[power]);
-
-                term = coefficient ? expr_mul(coefficient, base) : NULL;
-                expr_free(coefficient);
-            }
+            number_t exponent = num_create_from_long((long)power);
+            expr_t *base = power == 1u ? expr_clone(wrt) : expr_pow(wrt, &exponent);
+            term = base ? expr_mul(coeffs[power], base) : NULL;
             expr_free(base);
+            num_destroy(&exponent);
         }
-
-        if (!term)
-            goto fail;
-        if (!sum) {
-            sum = term;
-            continue;
+        if (!term) {
+            expr_free(sum);
+            return NULL;
         }
-
-        next = expr_add(sum, term);
+        expr_t *next = sum ? expr_add(sum, term) : expr_clone(term);
         expr_free(term);
         expr_free(sum);
         if (!next)
@@ -560,30 +535,28 @@ static expr_t *equ_polynomial_expression_from_coefficients(const number_t *coeff
         sum = next;
     }
 
-    return sum ? sum : expr_new_const(NUM_ZERO);
-
-fail:
-    expr_free(sum);
-    return NULL;
+    return sum ? expr_simplify_owned(sum) : expr_new_const(NUM_ZERO);
 }
 
 static expr_t *equ_display_expanded_side(const expr_t *expr, const expr_t *wrt)
 {
-    number_t *coeffs = NULL;
+    expr_t **coeffs = NULL;
     size_t degree = 0u;
     expr_t *expanded = NULL;
 
-    if (expr && wrt && equ_match_polynomial_alloc(expr, wrt, &coeffs, &degree)) {
+    /* Numerical extraction is for root finding, not for replacing exact display coefficients. */
+    if (expr && wrt && equ_collect_symbolic_polynomial_alloc(expr, wrt, &coeffs, &degree))
         expanded = equ_polynomial_expression_from_coefficients(coeffs, degree, wrt);
-    }
 
     if (coeffs) {
-        equ_poly_destroy(coeffs, degree + 1u);
+        for (size_t i = 0u; i <= degree; ++i)
+            expr_free(coeffs[i]);
         free(coeffs);
     }
     return expanded ? expanded : expr_display_expanded(expr);
 }
 
+/* Expand both equation sides without evaluating their symbolic coefficients. */
 equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt)
 {
     expr_t *lhs;
