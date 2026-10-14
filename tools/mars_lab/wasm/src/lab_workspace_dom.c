@@ -375,14 +375,23 @@ static void lab_workspace_dom_disable_list(int controls, int busy, int preserve)
 /* Repeated busy notifications preserve the initial disabled state of calendar and bounds controls. */
 void lab_workspace_dom_busy(int busy, int equation_variable, int copies, int digits)
 {
-    int retained = lab_dom_all(0, "#integratorBoundStack input, #integratorBoundStack button, "
-                                  "#integratorBoundStack select, #datetimeControls input, "
-                                  "#datetimeControls button, #datetimeControls select, "
-                                  "#almanacControls input, #almanacControls button, #almanacControls select");
-    lab_workspace_dom_disable_list(retained, busy, 1);
-    int direct = lab_dom_all(0, "#goalTarget, #integratorIntervalCap, #variableValues input, "
-                                "#variableValues button, #derivativeButtons button");
-    lab_workspace_dom_disable_list(direct, busy, 0);
+    static const char *const retained[] = {"#integratorBoundStack", "#datetimeControls", "#almanacControls"};
+    /* Scope each bounded control group so large result SVGs are never traversed. */
+    for (unsigned i = 0; i < sizeof retained / sizeof *retained; ++i) {
+        unsigned mark = lab_dom_mark();
+        int parent = lab_dom_query(0, retained[i]);
+        if (parent)
+            lab_workspace_dom_disable_list(lab_dom_all(parent, "input, button, select"), busy, 1);
+        lab_dom_release(mark);
+    }
+    lab_dom_disabled(lab_dom_query(0, "#goalTarget"), busy);
+    lab_dom_disabled(lab_dom_query(0, "#integratorIntervalCap"), busy);
+    int variables = lab_dom_query(0, "#variableValues");
+    if (variables)
+        lab_workspace_dom_disable_list(lab_dom_all(variables, "input, button"), busy, 0);
+    int derivatives = lab_dom_query(0, "#derivativeButtons");
+    if (derivatives)
+        lab_workspace_dom_disable_list(lab_dom_all(derivatives, "button"), busy, 0);
     lab_dom_disabled(equation_variable, busy);
     lab_workspace_dom_disable_list(copies, busy, 0);
     lab_workspace_dom_disable_list(digits, busy, 0);

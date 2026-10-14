@@ -112,15 +112,16 @@ void lab_layout_zoom(int card)
     if (index < 0)
         return;
     double zoom = lab_view_zoom(index);
+    /* Read inherited bases together before writes invalidate computed styles. */
     double scale = lab_layout_base(card, "--render-base-scale", 1.35) * zoom;
+    double font = lab_layout_base(card, "--result-base-font-rem", 0.92) * zoom;
+    double render_font = lab_layout_base(card, "--render-base-font-rem", 1.15) * zoom;
+    double margin = lab_layout_base(card, "--render-base-margin-rem", 3) * (zoom > 1 ? zoom : 1);
     lab_layout_number(card, 4, "--result-zoom", zoom, "");
-    lab_layout_number(card, 4, "--result-font-size", lab_layout_base(card, "--result-base-font-rem", 0.92) * zoom,
-                      "rem");
-    lab_layout_number(card, 4, "--render-font-size", lab_layout_base(card, "--render-base-font-rem", 1.15) * zoom,
-                      "rem");
+    lab_layout_number(card, 4, "--result-font-size", font, "rem");
+    lab_layout_number(card, 4, "--render-font-size", render_font, "rem");
     lab_layout_number(card, 4, "--render-zoom", scale, "");
-    lab_layout_number(card, 4, "--render-margin-bottom",
-                      lab_layout_base(card, "--render-base-margin-rem", 3) * (zoom > 1 ? zoom : 1), "rem");
+    lab_layout_number(card, 4, "--render-margin-bottom", margin, "rem");
     lab_layout_frame(card, scale, zoom);
     int buttons = lab_dom_all(card, "[data-zoom-reset]");
     for (unsigned i = 0; i < lab_dom_count(buttons); ++i) {

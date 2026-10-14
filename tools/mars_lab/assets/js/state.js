@@ -16,7 +16,7 @@ function saveLabLocalState(key, state) {
 function loadLabLocalState(key) {
     try {
         const text = localStorage.getItem(`${key}.protobuf`);
-        if (!text || text.length > 5592408)
+        if (!text || text.length > labWire.exports().lab_browser_base64_limit())
             return null;
         const bytes = Uint8Array.from(atob(text), character => character.charCodeAt(0));
         return labWire.decode(bytes.buffer);

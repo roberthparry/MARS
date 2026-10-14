@@ -14,7 +14,6 @@
 #include "lab_browser.h"
 
 enum {
-    lab_browser_limit = 4194304,
     lab_browser_nodes = 65536,
     lab_browser_depth = 32,
     lab_browser_scratch = lab_browser_limit + 512
@@ -290,7 +289,31 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 32;
+    return 34;
+}
+
+/* Share the codec's staging bound with browser stream and buffer admission. */
+unsigned lab_browser_message_limit(void)
+{
+    return lab_browser_limit;
+}
+
+/* Bound a host container before it snapshots members for native traversal. */
+unsigned lab_browser_member_limit(void)
+{
+    return lab_browser_nodes;
+}
+
+/* Retain the host table's existing allowance independently of traversal counting. */
+unsigned lab_browser_handle_capacity(void)
+{
+    return 2 * lab_browser_nodes + 1;
+}
+
+/* A padded base64 group carries three message bytes in four characters. */
+unsigned lab_browser_base64_limit(void)
+{
+    return ((lab_browser_limit + 2) / 3) * 4;
 }
 
 /* Borrow encoded output until the next call. */

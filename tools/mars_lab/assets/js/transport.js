@@ -30,7 +30,11 @@ const labDOM = (() => {
     const writes = [
         (node, key, text) => node.textContent = text, (node, key, text) => node.innerHTML = text,
         (node, key, text) => node.setAttribute(key, text), (node, key, text) => node.dataset[key] = text,
-        (node, key, text) => node.style.setProperty(key, text), (node, key, text) => node.value = text
+        (node, key, text) => {
+            if (node.style.getPropertyValue(key) !== text || node.style.getPropertyPriority(key))
+                node.style.setProperty(key, text);
+        },
+        (node, key, text) => node.value = text
     ];
     function svgLength(value) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -299,7 +303,7 @@ const labDOM = (() => {
             lab_dom_class: (node, name, enabled) => values[node]?.classList.toggle(literal(name), !!enabled),
             lab_dom_has_class: (node, name) => values[node]?.classList.contains(literal(name)) || false,
             lab_dom_disabled: (node, disabled) => {
-                if (values[node])
+                if (values[node] && values[node].disabled !== !!disabled)
                     values[node].disabled = !!disabled;
             },
             lab_dom_checked: (node, checked) => {
@@ -374,7 +378,7 @@ async function labFetch(url, options = {}) {
                     if (done)
                         break;
                     length += value.length;
-                    if (length > 4194304) {
+                    if (length > labWire.exports().lab_browser_message_limit()) {
                         await reader.cancel();
                         throw new Error('Lab Protobuf response exceeds 4 MiB');
                     }

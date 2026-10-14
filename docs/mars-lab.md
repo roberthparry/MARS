@@ -473,7 +473,17 @@ returned choices; it does not maintain a second field-policy table.
 Restoration retains authored DateTime whitespace while capture trims values.
 Clear preserves town selection and the almanac jurisdiction. Named-town offsets
 and manually edited DateTime offsets retain priority over jurisdiction replies.
-The browser ABI is version 32; mismatched assets require a rebuild/restart
+The codec and worker admission share a native 4 MiB message limit. The browser
+stream and buffer adapters obtain this bound through `lab_browser_message_limit()`;
+they still reject oversized input before copying it into WebAssembly memory.
+
+The codec also supplies host container and temporary-handle bounds through
+`lab_browser_member_limit()` and `lab_browser_handle_capacity()`. Saved-state
+admission uses `lab_browser_base64_limit()`, derived from the encoded message
+bound including base64 padding. Host checks remain before container copying and
+base64 decoding; the native codec independently validates the resulting message.
+
+The browser ABI is version 34; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -493,6 +503,10 @@ are used unchanged. Browser services measure CSS/SVG geometry; the browser's SVG
 parser still handles units and view boxes. The asynchronous wrapped-solver fetch
 remains in `api.js`, guarded by native request ownership and unchanged source
 identity, and completion rechecks current geometry before choosing a variant.
+Zoom projection reads inherited base settings before writing styles. The browser
+bridge skips unchanged inline-style and disabled-state assignments; it still clears
+stale CSS priorities. Busy-state queries stay within their owning control panels,
+avoiding traversal of large result SVGs while still finding newly inserted controls.
 `wasm/src/lab_solver_view.c` now owns request preparation, deduplication,
 snapshot comparison and publication. Its snapshot retains browser values for the
 card, source, parent and restored-result owner, never temporary integer handles.

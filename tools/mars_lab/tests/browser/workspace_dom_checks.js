@@ -157,7 +157,20 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         integratorBoundStack.append(enabled, disabled);
         const detachedCopy = document.createElement('button');
         labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
-        labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
+        const busy_mutations = new MutationObserver(() => {});
+        busy_mutations.observe(integratorBoundStack, {subtree: true, attributes: true, attributeFilter: ['disabled']});
+        busy_mutations.observe(detachedCopy, {attributes: true, attributeFilter: ['disabled']});
+        try {
+            labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
+            check(busy_mutations.takeRecords().length === 0, 'repeated busy projection avoids disabled mutations');
+            const inserted = document.createElement('input');
+            integratorBoundStack.append(inserted);
+            labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
+            check(inserted.disabled, 'unchanged busy state still disables newly inserted controls');
+            inserted.remove();
+        } finally {
+            busy_mutations.disconnect();
+        }
         check(enabled.disabled && disabled.disabled && detachedCopy.disabled, 'busy is idempotent for repeated starts');
         check(
             enabled.dataset.busyDisabled === '1' && !disabled.dataset.busyDisabled,

@@ -13,6 +13,21 @@
 
 #include <stdint.h>
 
+/** @brief Maximum encoded message size shared by the codec and worker admission. */
+enum { lab_browser_limit = 4 * 1024 * 1024 };
+
+/** @brief Return the maximum encoded message size in bytes for host-side admission. */
+unsigned lab_browser_message_limit(void);
+
+/** @brief Return the maximum member count admitted by a host container snapshot. */
+unsigned lab_browser_member_limit(void);
+
+/** @brief Return the capacity of the host's temporary codec-value table. */
+unsigned lab_browser_handle_capacity(void);
+
+/** @brief Return the maximum base64 character count for a saved encoded message. */
+unsigned lab_browser_base64_limit(void);
+
 /**
  * @brief Borrow the codec's fixed input staging buffer.
  * @return Writable region of 4 MiB, valid for the module lifetime.

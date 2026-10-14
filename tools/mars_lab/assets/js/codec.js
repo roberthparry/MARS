@@ -1,6 +1,5 @@
 /** Instance-local host-value bridge; all Protobuf parsing remains in the bounded C codec. */
 export function createCodec(environment = {}) {
-    const limit = 4194304;
     const encoder = new TextEncoder();
     const decoder = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true});
     const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
@@ -11,7 +10,7 @@ export function createCodec(environment = {}) {
     let types = [];
     let busy = false;
     function remember(value, type, names = null) {
-        if (values.length > 131072)
+        if (values.length >= wasm.lab_browser_handle_capacity())
             throw new Error('Lab message has too many values');
         values.push(value);
         keys.push(names);
@@ -33,7 +32,7 @@ export function createCodec(environment = {}) {
             const descriptors = Object.getOwnPropertyDescriptors(value);
             const length = type === 4 ? descriptors.length.value : 0;
             names = type === 4 ? null : Object.keys(descriptors).filter(key => descriptors[key].enumerable);
-            if ((type === 4 ? length : names.length) > 65536)
+            if ((type === 4 ? length : names.length) > wasm.lab_browser_member_limit())
                 throw new Error('Lab container has too many members');
             const copy = type === 4 ? [] : Object.create(null);
             const members = type === 4 ? Array.from({length}, (_, i) => String(i)) : names;
@@ -126,7 +125,7 @@ export function createCodec(environment = {}) {
         async start(bytes) {
             const result = await WebAssembly.instantiate(bytes, imports);
             wasm = (result.instance || result).exports;
-            if (typeof wasm.lab_browser_abi_version !== 'function' || wasm.lab_browser_abi_version() !== 32)
+            if (typeof wasm.lab_browser_abi_version !== 'function' || wasm.lab_browser_abi_version() !== 34)
                 throw new Error('The Lab codec ABI is incompatible; rebuild and restart');
         },
         bytes(buffer) {
@@ -138,7 +137,7 @@ export function createCodec(environment = {}) {
             }
             const bytes = ArrayBuffer.isView(buffer) ?
                 new Uint8Array(backing, buffer.byteOffset, buffer.byteLength) : new Uint8Array(backing);
-            if (bytes.length > limit)
+            if (bytes.length > this.exports().lab_browser_message_limit())
                 throw new Error('Lab Protobuf response exceeds 4 MiB');
             return bytes;
         },

@@ -65,6 +65,21 @@ async function labCheckWorkers(check) {
     const codec = createCodec();
     await codec.start(await (await fetch('/wasm/lab_codec.wasm')).arrayBuffer());
     const policy = codec.exports();
+    const message_limit = policy.lab_browser_message_limit();
+    check(message_limit === native.lab_browser_message_limit(), 'browser and worker codec bounds agree');
+    check(policy.lab_browser_member_limit() === native.lab_browser_member_limit() &&
+        policy.lab_browser_handle_capacity() === native.lab_browser_handle_capacity() &&
+        policy.lab_browser_base64_limit() === native.lab_browser_base64_limit(),
+        'browser and worker host admission policies agree');
+    check(codec.bytes(new Uint8Array(message_limit)).length === message_limit,
+        'host buffer admission accepts the exact native bound');
+    let oversized_rejected = false;
+    try {
+        codec.bytes(new Uint8Array(message_limit + 1));
+    } catch (error) {
+        oversized_rejected = error.message.includes('4 MiB');
+    }
+    check(oversized_rejected, 'host buffer admission rejects one byte above the native bound');
     check_lab_worker_policy(policy, worker_events, worker_actions, check);
     check(policy.memory.buffer instanceof ArrayBuffer, 'codec worker uses private memory');
     const url = path => new URL(path, location.href).href;

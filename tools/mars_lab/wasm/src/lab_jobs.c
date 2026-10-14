@@ -7,9 +7,10 @@
  * prevent a late worker reply from releasing a newer job. The host serialises
  * calls on the browser thread, so this module requires neither atomics nor locks.
  */
+#include "lab_browser.h"
 #include "lab_jobs.h"
 
-enum { lab_jobs_slots = 8, lab_jobs_budget = 8 * 1024 * 1024, lab_jobs_message = 4 * 1024 * 1024 };
+enum { lab_jobs_slots = 8, lab_jobs_budget = 8 * 1024 * 1024 };
 typedef struct {
     uint32_t token;
     unsigned bytes, running;
@@ -40,7 +41,7 @@ unsigned lab_jobs_timeout(void)
 /* Reserve before the host copies or transfers any retained message bytes. */
 uint32_t lab_jobs_submit(unsigned bytes)
 {
-    if (!bytes || bytes > lab_jobs_message || bytes > lab_jobs_budget - lab_jobs_size ||
+    if (!bytes || bytes > lab_browser_limit || bytes > lab_jobs_budget - lab_jobs_size ||
         lab_jobs_used == lab_jobs_slots || lab_jobs_serial == UINT32_MAX / lab_jobs_slots)
         return 0;
     /* At most eight slots: fixed admission cost, independent of input size. */

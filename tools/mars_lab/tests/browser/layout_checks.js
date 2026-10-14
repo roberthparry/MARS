@@ -169,6 +169,17 @@ window.checkLabLayout = async function checkLabLayout() {
         equal(resultZoomIndex(first), 6, 'DOM zoom adapter changes native state');
         equal(resultZoomIndex(second), 3, 'DOM zoom adapter preserves other cards');
         equal(first.style.getPropertyValue('--result-zoom'), '2', 'DOM applies native zoom');
+        const style_mutations = new MutationObserver(() => {});
+        style_mutations.observe(first, {attributes: true, attributeFilter: ['style']});
+        try {
+            applyResultZoom(first);
+            equal(style_mutations.takeRecords().length, 0, 'unchanged zoom avoids repeated card style writes');
+            first.style.setProperty('--result-zoom', '2', 'important');
+            applyResultZoom(first);
+            equal(first.style.getPropertyPriority('--result-zoom'), '', 'projection still clears stale CSS priority');
+        } finally {
+            style_mutations.disconnect();
+        }
         toggleResultCardExpansion(first.querySelector('[data-expand-card]'));
         check(resultCardExpanded(first) && first.classList.contains('expanded-card'), 'DOM expands selected card');
         toggleResultCardExpansion(second.querySelector('[data-expand-card]'));

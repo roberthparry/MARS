@@ -593,13 +593,25 @@
                 check(loadLabLocalState(storageKey) === null, 'damaged, JSON or oversized fallback was accepted');
             }
             const getStoredItem = Storage.prototype.getItem;
+            const decode_base64 = window.atob;
+            const storage_limit = labWire.exports().lab_browser_base64_limit();
+            let stored_length = storage_limit, decode_calls = 0;
             try {
                 Storage.prototype.getItem = function(key) {
-                    return key === `${storageKey}.protobuf` ? 'A'.repeat(5592409) : getStoredItem.call(this, key);
+                    return key === `${storageKey}.protobuf` ? 'A'.repeat(stored_length) : getStoredItem.call(this, key);
                 };
-                check(loadLabLocalState(storageKey) === null, 'oversized fallback was accepted');
+                window.atob = () => {
+                    ++decode_calls;
+                    throw new Error('Boundary probe reached base64 decoding');
+                };
+                check(loadLabLocalState(storageKey) === null && decode_calls === 1,
+                    'exact native storage bound reaches decoding and retains error recovery');
+                ++stored_length;
+                check(loadLabLocalState(storageKey) === null && decode_calls === 1,
+                    'oversized fallback was not rejected before decoding');
             } finally {
                 Storage.prototype.getItem = getStoredItem;
+                window.atob = decode_base64;
             }
             saveLabLocalState(storageKey, {town: 'Shrewsbury'});
             check(loadLabLocalState(storageKey).town === 'Shrewsbury', 'fallback did not recover after corruption');
@@ -672,6 +684,18 @@
                 'Malformed schema payload accepted');
         }
         check(rejects(() => labWire.encode({number: Infinity})), 'Infinite number accepted');
+        const member_limit = labWire.exports().lab_browser_member_limit();
+        for (const count of [member_limit, member_limit + 1]) {
+            let message = '';
+            try {
+                labWire.encode({list: new Array(count).fill(null)});
+            } catch (error) {
+                message = error.message;
+            }
+            check(message.includes(count === member_limit ? 'Invalid or oversized' : 'too many members'),
+                'host member admission preserves the exact native boundary');
+        }
+        check(labWire.decode(labWire.encode({valid: true})).valid, 'codec recovers after member rejection');
         check(rejects(() => labWire.encode({text: '\ud800'})), 'Invalid surrogate accepted');
         check(rejects(() => labWire.encode({text: 'x'.repeat(4194304)})), 'Oversized message accepted');
         let deep = {};
@@ -708,6 +732,24 @@
                 }
                 check(rejected, `Oversized ${type} response was not bounded`);
             }
+            let cancelled = false;
+            const message_limit = labWire.exports().lab_browser_message_limit();
+            window.fetch = async () => new Response(new ReadableStream({
+                start(controller) {
+                    controller.enqueue(new Uint8Array(message_limit));
+                    controller.enqueue(new Uint8Array(1));
+                },
+                cancel() {
+                    cancelled = true;
+                }
+            }), {headers: {'Content-Type': 'application/x-protobuf'}});
+            let rejected = false;
+            try {
+                await (await labFetch('/fixture')).labData();
+            } catch (error) {
+                rejected = error.message.includes('4 MiB');
+            }
+            check(rejected && cancelled, 'stream crossing the native bound is rejected and cancelled');
         } finally {
             window.fetch = originalFetch;
         }
