@@ -1020,6 +1020,9 @@ void expr_reverse_gammainc_Q(const expr_t *expr, const number_t *out_bar, number
 void expr_reverse_not_differentiable(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 
 bool expr_is_exact_zero(const expr_t *expr);
+
+/** @brief Recognise affine expressions suitable for guarded zero-surface continuation. */
+bool expr_is_affine_surface(const expr_t *expr);
 bool expr_is_named_const(const expr_t *expr);
 bool expr_is_summation(const expr_t *expr);
 expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *replacement);

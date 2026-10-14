@@ -218,6 +218,90 @@ static bool expr_find_single_var_local(const expr_t *expr, const expr_t **var_io
     return expr_find_single_var_local(expr->a, var_io) && expr_find_single_var_local(expr->b, var_io);
 }
 
+static const expr_t *expr_first_var_local(const expr_t *expr)
+{
+    if (!expr || expr_is_var(expr))
+        return expr;
+    const expr_t *left = expr_first_var_local(expr->a);
+    return left ? left : expr_first_var_local(expr->b);
+}
+
+/* Recognise affine zero surfaces without treating bound variables as constants. */
+bool expr_is_affine_surface(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_const(expr) || expr_is_var(expr))
+        return true;
+    if (expr_is_neg(expr))
+        return expr_is_affine_surface(expr->a);
+    if (expr_is_addsub(expr))
+        return expr_is_affine_surface(expr->a) && expr_is_affine_surface(expr->b);
+    if (expr_is_mul(expr)) {
+        if (expr_is_const(expr->a))
+            return expr_is_affine_surface(expr->b);
+        if (expr_is_const(expr->b))
+            return expr_is_affine_surface(expr->a);
+    }
+    return expr_is_op(expr, &ops_div) && expr_is_const(expr->b) && !num_is_zero(expr->b->c) &&
+           expr_is_affine_surface(expr->a);
+}
+
+/* Restrict multivariate continuation to powers of a single affine zero surface. */
+static expr_t *expr_affine_zero_surface_local(const expr_t *denominator, const expr_t **wrt)
+{
+    const expr_t *base = denominator, *inner = NULL;
+    number_t exponent = num_new();
+    for (;;) {
+        if (expr_is_mul(base) && expr_is_const(base->a) && num_is_finite(base->a->c) && !num_is_zero(base->a->c))
+            base = base->b;
+        else if (expr_is_mul(base) && expr_is_const(base->b) && num_is_finite(base->b->c) && !num_is_zero(base->b->c))
+            base = base->a;
+        else if (expr_match_pow_const(base, &inner, &exponent) && num_is_integer(exponent) && num_gt(exponent, NUM_ZERO))
+            base = inner;
+        else
+            break;
+    }
+    num_destroy(&exponent);
+    if (!expr_is_affine_surface(base))
+        return NULL;
+    *wrt = expr_first_var_local(base);
+    if (!*wrt)
+        return NULL;
+    expr_t *slope = expr_create_deriv(base, *wrt);
+    if (!slope || !expr_is_const(slope) || !num_is_finite(slope->c) || num_is_zero(slope->c)) {
+        expr_free(slope);
+        return NULL;
+    }
+    expr_t *zero = expr_new_const(NUM_ZERO);
+    expr_t *offset = expr_substitute(base, *wrt, zero);
+    expr_t *negative = offset ? expr_neg(offset) : NULL;
+    expr_t *root = negative ? expr_div(negative, slope) : NULL;
+    expr_t *check = root ? expr_substitute(base, *wrt, root) : NULL;
+    expr_t *simplified = check ? expr_simplify(check) : NULL;
+    if (!simplified || !expr_is_exact_zero(simplified)) {
+        expr_free(root);
+        root = NULL;
+    }
+    expr_free(simplified);
+    expr_free(check);
+    expr_free(negative);
+    expr_free(offset);
+    expr_free(zero);
+    expr_free(slope);
+    return root;
+}
+
+static bool expr_vanishes_on_surface_local(const expr_t *expr, const expr_t *wrt, const expr_t *root)
+{
+    expr_t *restricted = expr_substitute(expr, wrt, root);
+    expr_t *simplified = restricted ? expr_simplify(restricted) : NULL;
+    bool zero = simplified && expr_is_exact_zero(simplified);
+    expr_free(simplified);
+    expr_free(restricted);
+    return zero;
+}
+
 static number_t eval_div_removable_singularity(expr_t *expr)
 {
     static _Thread_local size_t removable_singularity_depth;
@@ -225,12 +309,18 @@ static number_t eval_div_removable_singularity(expr_t *expr)
     const expr_t *numer = expr->a;
     const expr_t *denom = expr->b;
     number_t result = num_clone(NUM_NAN);
+    expr_t *root = NULL;
+    expr_t *owned_numer = NULL;
+    expr_t *owned_denom = NULL;
 
-    if (!expr_find_single_var_local(expr, &wrt) || !wrt)
-        return num_div(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr->b));
     if (removable_singularity_depth >= 8u)
         return result;
     removable_singularity_depth++;
+    if (!expr_find_single_var_local(expr, &wrt) || !wrt) {
+        root = expr_affine_zero_surface_local(denom, &wrt);
+        if (!root)
+            goto cleanup;
+    }
 
     for (size_t depth = 0u; depth < 8u; ++depth) {
         number_t numer_value = expr_eval_num_internal(numer);
@@ -242,15 +332,30 @@ static number_t eval_div_removable_singularity(expr_t *expr)
             break;
         }
 
-        const expr_t *dnumer = expr_get_deriv(numer, wrt);
-        const expr_t *ddenom = expr_get_deriv(denom, wrt);
-
-        if (!dnumer || !ddenom)
+        /* A zero at one bound point is insufficient: the whole zero surface must cancel. */
+        if (root && !expr_vanishes_on_surface_local(numer, wrt, root))
             break;
+
+        expr_t *dnumer = expr_create_deriv(numer, wrt);
+        expr_t *ddenom = expr_create_deriv(denom, wrt);
+
+        if (!dnumer || !ddenom) {
+            expr_free(dnumer);
+            expr_free(ddenom);
+            break;
+        }
+        expr_free(owned_numer);
+        expr_free(owned_denom);
+        owned_numer = dnumer;
+        owned_denom = ddenom;
         numer = dnumer;
         denom = ddenom;
     }
 
+cleanup:
+    expr_free(owned_numer);
+    expr_free(owned_denom);
+    expr_free(root);
     removable_singularity_depth--;
     return result;
 }

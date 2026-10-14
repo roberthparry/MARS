@@ -9,9 +9,9 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_expr.h"
 #include "matrix-t.h"
 #include "qcomplex-t.h"
+#include "test_expr.h"
 
 static void test_modified_bessel_k_numeric_layers(void)
 {
@@ -158,6 +158,43 @@ static void test_signal_calculus_and_finite_sums(void)
     expr_free(derivative);
     expr_free(f);
     expr_free(x);
+
+    const char *sources[] = {"{sinc(x-y) | x=0.2, y=0.2}", "{sinc(x-y) | x=i, y=i}",
+                             "{sinc(2*x-3*y) | x=3, y=2}"};
+    for (size_t i = 0; i < sizeof(sources) / sizeof(sources[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        f = expr_from_string(sources[i], &bindings);
+        x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
+        derivative = f && x ? expr_create_deriv(f, x) : NULL;
+        second = f && x && y ? expr_create_2nd_deriv(f, x, y) : NULL;
+        ASSERT_TRUE(derivative && second);
+        double scale = i == 2 ? 6 : 1;
+        ASSERT_TRUE(num_is_zero(expr_eval(derivative)));
+        number_t error = num_sub(expr_eval(second), num_create_from_double(scale*M_PI*M_PI/3));
+        ASSERT_TRUE(num_to_double(num_abs(error)) < 1e-12);
+        char *text = expr_to_string(derivative, style_EXPRESSION);
+        ASSERT_TRUE(text && !strstr(text, "Hypergeometric"));
+        free(text);
+        expr_free(second);
+        expr_free(derivative);
+        expr_free(f);
+        expr_bindings_free(bindings);
+    }
+
+    const char *nonlinear[] = {"{sinc(x*y) | x=0, y=0}", "{sinc(x-y^2) | x=1, y=1}",
+                              "{sinc(x^2+y^2) | x=0, y=0}"};
+    for (size_t i = 0; i < sizeof(nonlinear) / sizeof(nonlinear[0]); ++i) {
+        expr_bindings_t *bindings = NULL;
+        f = expr_from_string(nonlinear[i], &bindings);
+        x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        derivative = f && x ? expr_create_deriv(f, x) : NULL;
+        ASSERT_NOT_NULL(derivative);
+        ASSERT_TRUE(num_is_zero(expr_eval(derivative)));
+        expr_free(derivative);
+        expr_free(f);
+        expr_bindings_free(bindings);
+    }
 }
 
 static void test_finite_part_distribution(void)

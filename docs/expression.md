@@ -1315,8 +1315,13 @@ evaluate their ordinary restrictions away from singularities. In particular,
 `u(t)` remains an arbitrary function and is never silently interpreted as a step.
 Differentiation, affine-argument primitives and finite numerical sums are
 available for the ordinary signal functions; step/pulse derivatives retain
-their boundary impulses. Sinc calculus uses entire representations that remain
-regular at zero. General principal-value integration remains symbolic.
+their boundary impulses. Normalised sinc derivatives with affine arguments use
+elementary sine and cosine expressions, with the chain rule. Removable
+zero-over-zero values are continued at zero, including when an affine argument
+such as `x-y` vanishes. Higher derivatives and matrix evaluation retain these
+regular values. Nonlinear arguments and sinc primitives retain entire
+hypergeometric representations.
+General principal-value integration remains symbolic.
 
 Numerical evaluation affects only the Value card. These examples leave the full
 symbolic spectrum intact, including the impulse at zero needed by the inverse:

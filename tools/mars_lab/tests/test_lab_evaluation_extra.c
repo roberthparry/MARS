@@ -711,14 +711,16 @@ static void test_lab_extra_exact_derivative_round_trip(void)
 {
     const unsigned precisions[] = {17u, 116u};
     const char *variables[] = {"x", "y"};
-    const double points[][2] = {{0.25, 0.1}, {0.2, 0.2}};
+    const double points[][2] = {{0.25, 0.1}, {0.2, 0.2}, {0, 0}, {-0.3, 0.2}, {0.200001, 0.2}};
     for (size_t p = 0; p < 2; ++p) {
         for (size_t v = 0; v < 2; ++v) {
-            for (size_t point = 0; point < 2; ++point) {
+            for (size_t point = 0; point < sizeof(points) / sizeof(points[0]); ++point) {
                 double x = points[point][0], y = points[point][1], difference = x - y;
                 double pi = acos(-1.0), angle = pi * difference;
                 double sinc = difference ? sin(angle) / angle : 1;
                 double slope = difference ? (angle * cos(angle) - sin(angle)) / (pi * difference * difference) : 0;
+                if (fabs(angle) < 0.01)
+                    slope = pi * angle * (-1.0/3 + angle*angle/30 - pow(angle, 4)/840);
                 double expected = exp(-x*x-y*y) * ((v ? -slope : slope) - 2 * (v ? y : x) * sinc);
                 const char *source = lab_math_format("{exp(-x^2-y^2)*sinc(x-y) | x=%.17g, y=%.17g}", x, y);
                 const json_t *derivative = lab_math_fields(source, variables[v], "derivative", precisions[p]);
@@ -726,18 +728,33 @@ static void test_lab_extra_exact_derivative_round_trip(void)
                 const char *copy = lab_math_after(lab_math_text(derivative, "derivative"), " = ");
                 for (unsigned pass = 0; pass < 2; ++pass) {
                     const json_t *result = lab_math_fields(copy, variables[v], "evaluate", precisions[p]);
-                    lab_math_contains(lab_math_text(result, "expression"), "⅓", true);
-                    lab_math_contains(lab_math_text(result, "expression"), "π²", true);
-                    lab_math_contains(lab_math_text(result, "function"), "(1/3)", true);
-                    lab_math_contains(lab_math_text(result, "function"), "@pi^2", true);
-                    lab_math_contains(lab_math_text(result, "tex"), "\\frac{1}{3}", true);
-                    lab_math_contains(lab_math_text(result, "tex"), "\\pi^{2}", true);
+                    lab_math_contains(lab_math_text(result, "expression"), "π", true);
+                    lab_math_contains(lab_math_text(result, "expression"), "Hypergeometric", false);
+                    lab_math_contains(lab_math_text(result, "function"), "@pi", true);
+                    lab_math_contains(lab_math_text(result, "function"), "hypergeometric", false);
+                    lab_math_contains(lab_math_text(result, "tex"), "\\cos", true);
+                    lab_math_contains(lab_math_text(result, "tex"), "\\sin", true);
+                    lab_math_contains(lab_math_text(result, "tex"), "F_{", false);
                     lab_math_close(lab_math_number(result, "value"), expected, 2e-12);
                     copy = lab_math_text(result, "expression");
                 }
                 lab_math_reset();
             }
         }
+        /* Preserve the exact-coefficient regression independently of the sinc derivative rule. */
+        const char *copy = "{exp(-x^2-y^2)*(pi^2*(y-x)*HypergeometricpFq(0,1,5/2,-pi^2*(x-y)^2/4)/3"
+                           "-2*x*sinc(x-y)) | x=0.25, y=0.1}";
+        for (unsigned pass = 0; pass < 2; ++pass) {
+            const json_t *result = lab_math_fields(copy, "x", "evaluate", precisions[p]);
+            lab_math_contains(lab_math_text(result, "expression"), "⅓", true);
+            lab_math_contains(lab_math_text(result, "expression"), "π²", true);
+            lab_math_contains(lab_math_text(result, "function"), "(1/3)", true);
+            lab_math_contains(lab_math_text(result, "function"), "@pi^2", true);
+            lab_math_contains(lab_math_text(result, "tex"), "\\frac{1}{3}", true);
+            lab_math_contains(lab_math_text(result, "tex"), "\\pi^{2}", true);
+            copy = lab_math_text(result, "expression");
+        }
+        lab_math_reset();
     }
 }
 

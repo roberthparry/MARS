@@ -539,6 +539,18 @@ static void test_unresolved_zero_over_zero_returns_nan_without_recursing(void)
     num_destroy(&value);
     expr_bindings_free(bindings);
     expr_free(expr);
+
+    const char *undefined[] = {"{x/y | x=0, y=0}", "{x*y/(x^2+y^2) | x=0, y=0}",
+                              "{x*y/(x-y)^2 | x=0, y=0}", "{abs(x-y)/(x-y) | x=0, y=0}"};
+    for (size_t i = 0; i < sizeof(undefined) / sizeof(undefined[0]); ++i) {
+        bindings = NULL;
+        expr = expr_from_string(undefined[i], &bindings);
+        value = expr ? expr_eval(expr) : num_clone(NUM_NAN);
+        ASSERT_TRUE(num_is_nan(value));
+        num_destroy(&value);
+        expr_bindings_free(bindings);
+        expr_free(expr);
+    }
 }
 
 static void check_unary_derivative_case(const unary_eval_case_t *tc)

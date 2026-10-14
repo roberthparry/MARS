@@ -122,7 +122,7 @@ static expr_t *signal_simplify(const expr_t *expr, expr_t *a, expr_t *b)
     return expr_simplify_passthrough(expr, a, b);
 }
 
-/* Entire hypergeometric forms keep sinc derivatives and primitives regular at zero. */
+/* Entire forms also cover primitives and arguments without certified elementary continuation. */
 static expr_t *sinc_entire(const expr_t *x, bool primitive)
 {
     expr_t *pi = expr_new_const(NUM_PI);
@@ -162,9 +162,31 @@ static expr_t *signal_deriv(expr_t *expr)
         return expr_new_formal_derivative(expr, 1u, &variable);
     }
     if (expr->ops == &ops_sinc) {
-        expr_t *entire = sinc_entire(expr->a, false);
-        expr_t *out = entire ? expr_create_deriv(entire, wrt) : NULL;
-        expr_free(entire);
+        if (!expr_is_affine_surface(expr->a)) {
+            expr_t *entire = sinc_entire(expr->a, false);
+            expr_t *out = entire ? expr_create_deriv(entire, wrt) : NULL;
+            expr_free(entire);
+            return out;
+        }
+        expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+        expr_t *angle = expr_mul(pi, expr->a);
+        expr_t *cosine = expr_cos(angle);
+        expr_t *sine = expr_sin(angle);
+        expr_t *product = expr_mul(angle, cosine);
+        expr_t *numerator = expr_sub(product, sine);
+        expr_t *denominator = expr_mul(angle, expr->a);
+        expr_t *local = expr_div(numerator, denominator);
+        expr_t *chain = expr_create_deriv(expr->a, wrt);
+        expr_t *out = local && chain ? expr_mul(local, chain) : NULL;
+        expr_free(chain);
+        expr_free(local);
+        expr_free(denominator);
+        expr_free(numerator);
+        expr_free(product);
+        expr_free(sine);
+        expr_free(cosine);
+        expr_free(angle);
+        expr_free(pi);
         return out;
     }
     expr_t *chain = expr_create_deriv(expr->a, wrt);
