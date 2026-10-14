@@ -422,55 +422,67 @@ static void qc_zeta_euler_maclaurin(qcomplex_t s, qcomplex_t *value_out, qcomple
     qcomplex_t derivative = QC_ZERO;
     qfloat_t log_endpoint = qf_log(qf_from_double((double)endpoint));
     qfloat_t factorial = QF_ONE;
+    qcomplex_t rising = QC_ONE;
+    qcomplex_t rising_derivative = QC_ZERO;
+    qcomplex_t power = QC_ONE;
+    qcomplex_t power_step = qc_make(qf_div(QF_ONE, qf_from_double((double)endpoint * endpoint)), QF_ZERO);
 
     for (unsigned int n = 1u; n < endpoint; ++n) {
         qfloat_t log_n = qf_log(qf_from_double((double)n));
         qcomplex_t term = qc_exp(qc_mul(qc_neg(s), qc_make(log_n, QF_ZERO)));
 
         sum = qc_add(sum, term);
-        derivative = qc_sub(derivative, qc_mul(qc_make(log_n, QF_ZERO), term));
+        if (derivative_out)
+            derivative = qc_sub(derivative, qc_mul(qc_make(log_n, QF_ZERO), term));
     }
 
     {
         qcomplex_t s_minus_one = qc_sub(s, QC_ONE);
         qcomplex_t endpoint_power = qc_exp(qc_mul(qc_sub(QC_ONE, s), qc_make(log_endpoint, QF_ZERO)));
         qcomplex_t tail = qc_div(endpoint_power, s_minus_one);
-        qcomplex_t tail_derivative = qc_mul(
-            endpoint_power,
-            qc_sub(qc_neg(qc_div(qc_make(log_endpoint, QF_ZERO), s_minus_one)),
-                   qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
         qcomplex_t half_power = qc_mul(QC_HALF, qc_exp(qc_mul(qc_neg(s), qc_make(log_endpoint, QF_ZERO))));
 
         sum = qc_add(sum, tail);
-        derivative = qc_add(derivative, tail_derivative);
+        if (derivative_out) {
+            qcomplex_t tail_derivative = qc_mul(
+                endpoint_power,
+                qc_sub(qc_neg(qc_div(qc_make(log_endpoint, QF_ZERO), s_minus_one)),
+                       qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
+
+            derivative = qc_add(derivative, tail_derivative);
+        }
         sum = qc_add(sum, half_power);
-        derivative = qc_sub(derivative, qc_mul(qc_make(log_endpoint, QF_ZERO), half_power));
+        if (derivative_out)
+            derivative = qc_sub(derivative, qc_mul(qc_make(log_endpoint, QF_ZERO), half_power));
     }
 
     for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
         unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
-        qcomplex_t rising = QC_ONE;
-        qcomplex_t rising_derivative = QC_ZERO;
         qfloat_t bernoulli = qc_bernoulli_even_term(k);
-        qcomplex_t power;
         qfloat_t coefficient;
 
         factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
         factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
-        for (unsigned int j = 0u; j < rising_count; ++j) {
+        /* Extend the previous rising factorial by two factors, without division. */
+        for (unsigned int j = k == 0u ? 0u : rising_count - 2u; j < rising_count; ++j) {
             qcomplex_t factor = qc_add(s, qc_make(qf_from_double((double)j), QF_ZERO));
 
-            rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
+            if (derivative_out)
+                rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
             rising = qc_mul(rising, factor);
         }
-        power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
+        if (k == 0u)
+            power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
                               qc_make(log_endpoint, QF_ZERO)));
+        else
+            power = qc_mul(power, power_step);
         coefficient = qf_div(bernoulli, factorial);
         sum = qc_add(sum, qc_mul(qc_make(coefficient, QF_ZERO), qc_mul(rising, power)));
-        derivative = qc_add(
-            derivative,
-            qc_mul(qc_make(coefficient, QF_ZERO),
-                   qc_mul(qc_sub(rising_derivative, qc_mul(rising, qc_make(log_endpoint, QF_ZERO))), power)));
+        if (derivative_out)
+            derivative = qc_add(
+                derivative,
+                qc_mul(qc_make(coefficient, QF_ZERO),
+                       qc_mul(qc_sub(rising_derivative, qc_mul(rising, qc_make(log_endpoint, QF_ZERO))), power)));
     }
 
     if (value_out)
@@ -488,6 +500,10 @@ static void qc_zetah_euler_maclaurin(qcomplex_t s, qcomplex_t a, qcomplex_t *val
     qcomplex_t endpoint = qc_add(a, qc_make(qf_from_double((double)term_count), QF_ZERO));
     qcomplex_t log_endpoint = qc_log(endpoint);
     qfloat_t factorial = QF_ONE;
+    qcomplex_t rising = QC_ONE;
+    qcomplex_t rising_derivative = QC_ZERO;
+    qcomplex_t power = QC_ONE;
+    qcomplex_t power_step = qc_div(QC_ONE, qc_mul(endpoint, endpoint));
 
     for (unsigned int n = 0u; n < term_count; ++n) {
         qcomplex_t base = qc_add(a, qc_make(qf_from_double((double)n), QF_ZERO));
@@ -495,48 +511,56 @@ static void qc_zetah_euler_maclaurin(qcomplex_t s, qcomplex_t a, qcomplex_t *val
         qcomplex_t term = qc_exp(qc_mul(qc_neg(s), log_base));
 
         sum = qc_add(sum, term);
-        derivative = qc_sub(derivative, qc_mul(log_base, term));
+        if (derivative_out)
+            derivative = qc_sub(derivative, qc_mul(log_base, term));
     }
 
     {
         qcomplex_t s_minus_one = qc_sub(s, QC_ONE);
         qcomplex_t endpoint_power = qc_exp(qc_mul(qc_sub(QC_ONE, s), log_endpoint));
         qcomplex_t tail = qc_div(endpoint_power, s_minus_one);
-        qcomplex_t tail_derivative = qc_mul(
-            endpoint_power,
-            qc_sub(qc_neg(qc_div(log_endpoint, s_minus_one)), qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
         qcomplex_t half_power = qc_mul(QC_HALF, qc_exp(qc_mul(qc_neg(s), log_endpoint)));
 
         sum = qc_add(sum, tail);
-        derivative = qc_add(derivative, tail_derivative);
+        if (derivative_out) {
+            qcomplex_t tail_derivative = qc_mul(
+                endpoint_power,
+                qc_sub(qc_neg(qc_div(log_endpoint, s_minus_one)), qc_div(QC_ONE, qc_mul(s_minus_one, s_minus_one))));
+
+            derivative = qc_add(derivative, tail_derivative);
+        }
         sum = qc_add(sum, half_power);
-        derivative = qc_sub(derivative, qc_mul(log_endpoint, half_power));
+        if (derivative_out)
+            derivative = qc_sub(derivative, qc_mul(log_endpoint, half_power));
     }
 
     for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
         unsigned int rising_count = (unsigned int)(2u * (k + 1u) - 1u);
-        qcomplex_t rising = QC_ONE;
-        qcomplex_t rising_derivative = QC_ZERO;
         qfloat_t bernoulli = qc_bernoulli_even_term(k);
-        qcomplex_t power;
         qfloat_t coefficient;
 
         factorial = qf_mul_double(factorial, (double)(2u * k + 1u));
         factorial = qf_mul_double(factorial, (double)(2u * k + 2u));
-        for (unsigned int j = 0u; j < rising_count; ++j) {
+        /* Extend the previous rising factorial by two factors, without division. */
+        for (unsigned int j = k == 0u ? 0u : rising_count - 2u; j < rising_count; ++j) {
             qcomplex_t factor = qc_add(s, qc_make(qf_from_double((double)j), QF_ZERO));
 
-            rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
+            if (derivative_out)
+                rising_derivative = qc_add(qc_mul(rising_derivative, factor), rising);
             rising = qc_mul(rising, factor);
         }
-        power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
+        if (k == 0u)
+            power = qc_exp(qc_mul(qc_neg(qc_add(s, qc_make(qf_from_double((double)rising_count), QF_ZERO))),
                               log_endpoint));
+        else
+            power = qc_mul(power, power_step);
         coefficient = qf_div(bernoulli, factorial);
         sum = qc_add(sum, qc_mul(qc_make(coefficient, QF_ZERO), qc_mul(rising, power)));
-        derivative = qc_add(
-            derivative,
-            qc_mul(qc_make(coefficient, QF_ZERO),
-                   qc_mul(qc_sub(rising_derivative, qc_mul(rising, log_endpoint)), power)));
+        if (derivative_out)
+            derivative = qc_add(
+                derivative,
+                qc_mul(qc_make(coefficient, QF_ZERO),
+                       qc_mul(qc_sub(rising_derivative, qc_mul(rising, log_endpoint)), power)));
     }
 
     if (value_out)

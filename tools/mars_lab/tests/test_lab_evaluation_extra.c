@@ -393,6 +393,26 @@ static void test_lab_extra_plot_preview(void)
                     422u, "error", "plotting quality");
 }
 
+static void test_lab_extra_plot_turning_points(void)
+{
+    unsigned status = 0;
+    json_t *curve = request("/eval", "{\"expression\":\"100/(1+10000*(x-0.371)^2)\",\"action\":\"plot\","
+                                      "\"plot_lower\":\"0\",\"plot_upper\":\"1\"}", &status);
+    bool ok = status == 200 && test_lab_ok(curve, true) && contains(curve, "plot_svg", ">80</text>");
+    if (!ok)
+        show_failure(curve);
+    json_free(curve);
+    json_t *surface = request("/eval", "{\"expression\":\"100*exp(-100*((x-0.13)^2+(y+0.07)^2))\","
+                                        "\"action\":\"plot\",\"plot_lower\":\"-1\",\"plot_upper\":\"1\","
+                                        "\"plot_second_lower\":\"-1\",\"plot_second_upper\":\"1\"}", &status);
+    bool surface_ok = status == 200 && test_lab_ok(surface, true) && contains(surface, "plot_svg", ">80</text>");
+    if (!surface_ok)
+        show_failure(surface);
+    ok = ok && surface_ok;
+    json_free(surface);
+    TEST_ASSERT_TRUE(ok, "curve and surface automatic height limits preserve derivative-located narrow peaks");
+}
+
 static void test_lab_extra_plot_tangent_bounds(void)
 {
     /* The native request field is decimal digits, not the browser's bit count. */
@@ -1267,6 +1287,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_tangent_bounds, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_turning_points, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);

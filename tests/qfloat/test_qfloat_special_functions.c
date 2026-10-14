@@ -901,6 +901,20 @@ void test_qf_polygamma(void)
         TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), recurrence, 1e-30);
     }
 
+    /* Zero factors in the rising product must not erase its derivative. */
+    for (int order = -2; order <= 2; ++order) {
+        qfloat_t s = qf_from_double((double)order);
+        qfloat_t a = qf_from_double(1.25);
+        qfloat_t next = qf_add(a, QF_ONE);
+        qfloat_t power = qf_pow(a, qf_neg(s));
+
+        if (order == 1)
+            continue;
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zetah(s, a), qf_add(power, qf_zetah(s, next)), 1e-25);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_zatahp(s, a),
+                                    qf_sub(qf_zatahp(s, next), qf_mul(qf_log(a), power)), 1e-25);
+    }
+
     printf("%s  OK: qf_polygamma aliases, ψ⁽³⁾ identities, and zeta functions%s\n\n", C_GREEN, C_RESET);
 }
 

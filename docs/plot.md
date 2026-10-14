@@ -15,6 +15,7 @@ external process, browser mathematics or JavaScript renderer is required.
 | `plot_add_sampler(plot, samples, name, style, colour)` | Copy sample coordinates and explicit gap markers. |
 | `plot_set_surface(plot, x, columns, y, rows, z)` | Copy one row-major height grid into an empty scene. |
 | `plot_set_height_bounds(plot, minimum, maximum)` | Clip a surface to an explicit height interval. |
+| `plot_include_height(plot, height)` | Include a located finite turning-point height in automatic surface bounds without changing the mesh. |
 | `plot_set_bounds(plot, xmin, xmax, ymin, ymax)` | Copy an explicit finite real increasing viewport. |
 | `plot_auto_bounds(plot)` | Restore bounds derived from finite data. |
 | `plot_series_count(plot)` | Inspect the number of copied series. |
@@ -56,7 +57,9 @@ the estimate. If the full Y span exceeds four times the 5th–95th percentile
 span, it trims the tails to that central span plus 25 per cent padding.
 Fewer than 20 representatives retain the full range. For a constant central
 span, a small magnitude-based reference span permits isolated outliers to be cropped.
-This viewing heuristic may crop genuine peaks, not just singularities.
+For derivative-assisted samplers, located stationary heights with resolved edges
+on both sides are retained after trimming. This viewing heuristic may still crop
+unresolved genuine peaks, not just singularities.
 Clipping adds no visible annotation.
 Explicit `plot_set_bounds()` overrides robust selection; recreating a scene
 with `smart_y = false` restores Fit all. No data is discarded or changed.
@@ -132,6 +135,11 @@ override `smart_y`. Facets are geometrically intersected with the interval in na
 precision before drawing conversion; out-of-range heights are not flattened into
 artificial plateaus. Missing values remain holes. `plot_auto_bounds(plot)` restores
 the scene's automatic policy without resampling or changing any data.
+
+`plot_include_height(plot, height)` copies a finite real height that an external
+native search has located. Repeated calls accumulate an advisory range included
+in both automatic policies; manual height bounds still win. The rectangular mesh
+is unchanged. Non-real/non-finite heights or a scene without a surface give `EINVAL`.
 
 `plot_set_view(plot, azimuth, elevation)` changes the surface camera in degrees,
 without changing or resampling the copied grid. Defaults are 315° around the

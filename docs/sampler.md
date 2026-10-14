@@ -16,6 +16,7 @@ surface ownership or threading model is added to `sampler_t`.
 | --- | --- |
 | `sampler_options_default()` | Adaptive defaults: 32 initial intervals, 65,537 evaluations, subdivision depth 12, absolute tolerance 0.000001 and relative tolerance 0.001. |
 | `sampler_new(callback, argument, lower, upper, options)` | Synchronously evaluate a callback over a finite real increasing parameter range. NULL options selects defaults. |
+| `sampler_new_with_derivatives(callback, argument, lower, upper, options)` | Sample coordinates with optional first and second parameter derivatives in the same callback. |
 | `sampler_expression(expression, variable, context, lower, upper, options)` | Sample a real-valued expression using private copies of its graph and bindings. NULL context captures the source bindings. |
 | `sampler_count(samples)` | Number of stored points, including gap records. |
 | `sampler_evaluations(samples)` | Number of callback evaluations, including refinement probes. |
@@ -43,6 +44,20 @@ either coordinate differs from its chord midpoint by more than
 Tolerances are finite non-negative doubles representing settings, not sampled
 coordinates. At least one adaptive tolerance must be positive.
 
+When derivatives are supplied, tangent/secant disagreement and sampled curvature
+also trigger subdivision. A sign change in the first vertical derivative prompts
+bounded bisection towards a stationary point; second derivatives expose curvature
+even when values and first derivatives alias. All probes share the evaluation and
+depth limits. Unavailable, complex or non-finite derivatives fall back to the
+remaining value/derivative checks rather than making a finite point invalid.
+The expression adapter constructs first and second native symbolic derivatives
+once for adaptive sampling; uniform sampling does not construct them.
+
+Borrowed points expose `dx`, `dy`, `ddx`, `ddy` and a heuristic `stationary` flag.
+`plot_add_sampler()` preserves located turning-point heights in automatic vertical
+limits when both adjacent edges are resolved. Derivatives of order three and above
+are not currently probed. No derivative evidence proves the complete range.
+
 This is a drawing heuristic, **not a mathematical error bound or proof of
 continuity**. Narrow features, rapidly oscillating functions and unsampled domain
 holes may be missed. Increase initial intervals and narrow the range when needed.
@@ -65,6 +80,12 @@ values to the output slots, at most once each. Return `SAMPLER_VALUE` for a poin
 outputs are destroyed by the sampler in all three cases. Do not destroy the
 borrowed parameter, and do not assign a borrowed heap-backed value without
 `num_clone()`. The callback and argument only need to survive the constructor.
+
+The derivative callback adds four equally owned outputs: first derivatives `dx`
+and `dy`, then second derivatives `ddx` and `ddy`, all with respect to the sampling
+parameter. Each starts as `NUM_NAN`; leave unavailable derivatives untouched.
+One combined callback invocation counts as one sampler evaluation. Uniform mode
+retains its exact requested grid even with this callback.
 
 Fatal callback errors preserve its `errno`, or use `EIO` if it supplied none.
 Invalid arguments give `EINVAL`, invalid point indices `ERANGE`, allocation
@@ -166,3 +187,48 @@ Curve endpoints: (1, -1) to (1, 1)
 ```
 
 Also mirrored as a README example in `tests/sampler/test_sampler.c`.
+
+## Supplying derivatives
+
+Return first and second derivatives with the sampled coordinates. Adaptive checks
+use both; all returned numbers belong to the sampler.
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+
+#include "sampler-t.h"
+
+static sampler_status_t square_derivatives(number_t t, number_t *x, number_t *y,
+                                           number_t *dx, number_t *dy, number_t *ddx, number_t *ddy, void *argument)
+{
+    (void)argument;
+    *x = num_clone(t);
+    *y = num_mul(t, t);
+    *dx = num_clone(NUM_ONE);
+    *dy = num_mul(NUM_TWO, t);
+    *ddx = num_clone(NUM_ZERO);
+    *ddy = num_clone(NUM_TWO);
+    return SAMPLER_VALUE;
+}
+
+int main(void)
+{
+    sampler_t *samples = sampler_new_with_derivatives(square_derivatives, NULL, NUM_ZERO, NUM_ONE, NULL);
+    if (samples) {
+        const sampler_point_t *last = sampler_point(samples, sampler_count(samples) - 1);
+        num_printf("Last slope: %n; curvature: %n\n", last->dy, last->ddy);
+    }
+    bool ok = samples != NULL;
+    sampler_free(samples);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Last slope: 2; curvature: 2
+```
+
+Mirrored as the final README example in `tests/sampler/test_sampler.c`.

@@ -56,6 +56,63 @@ static void test_sampler_adaptive(void)
     TEST_ASSERT_TRUE(ok, "adaptive refinement is ordered and unresolved edges are disconnected");
 }
 
+static void test_sampler_derivatives(void)
+{
+    const char *sources[] = {"cos(4*pi*x)", "100/(1+10000*(x-0.371)^2)", "-(x-0.3)^4"};
+    bool ok = true;
+    for (size_t i = 0; i < 3; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expression = expr_from_string(sources[i], &bindings);
+        sampler_options_t options = sampler_options_default();
+        options.intervals = 1;
+        options.max_depth = 16;
+        sampler_t *samples = sampler_expression(expression, expr_bindings_get(bindings, "x"), NULL,
+                                                 NUM_ZERO, NUM_ONE, &options);
+        bool low = false, high = false, stationary = false;
+        for (size_t j = 0; j < sampler_count(samples); ++j) {
+            const sampler_point_t *p = sampler_point(samples, j);
+            double y = num_to_double(p->y);
+            low |= p->valid && y < -0.9;
+            high |= p->valid && y > (i == 0 ? 0.9 : 99.9);
+            stationary |= p->stationary;
+            if (j)
+                ok = ok && num_lt(sampler_point(samples, j - 1)->parameter, p->parameter);
+        }
+        ok = ok && samples && sampler_count(samples) > 3 &&
+             (i == 0 ? low && high : i == 1 ? high && stationary : stationary);
+        sampler_free(samples);
+        expr_free(expression);
+        expr_bindings_free(bindings);
+    }
+    TEST_ASSERT_TRUE(ok, "curvature resolves aliased oscillations; derivative brackets locate narrow and flat peaks");
+}
+
+static sampler_status_t unavailable_derivatives(number_t t, number_t *x, number_t *y,
+                                                 number_t *dx, number_t *dy, number_t *ddx, number_t *ddy,
+                                                 void *argument)
+{
+    (void)dy;
+    (void)ddx;
+    *dx = num_clone(NUM_INF);
+    *ddy = num_clone(NUM_INF);
+    return square(t, x, y, argument);
+}
+
+static void test_sampler_derivative_fallback(void)
+{
+    sampler_options_t options = sampler_options_default();
+    options.intervals = 2;
+    sampler_t *plain = sampler_new(square, NULL, NUM_ZERO, NUM_ONE, &options);
+    sampler_t *fallback = sampler_new_with_derivatives(unavailable_derivatives, NULL, NUM_ZERO, NUM_ONE, &options);
+    bool ok = plain && fallback && sampler_count(plain) == sampler_count(fallback);
+    for (size_t i = 0; ok && i < sampler_count(plain); ++i)
+        ok = num_eq(sampler_point(plain, i)->y, sampler_point(fallback, i)->y) &&
+             sampler_point(plain, i)->break_before == sampler_point(fallback, i)->break_before;
+    sampler_free(plain);
+    sampler_free(fallback);
+    TEST_ASSERT_TRUE(ok, "unavailable first and second derivatives retain value-only behaviour");
+}
+
 static sampler_status_t reciprocal(number_t t, number_t *x, number_t *y, void *argument)
 {
     (void)argument;
@@ -188,6 +245,15 @@ static void test_sampler_expression(void)
     num_destroy(&four);
     num_destroy(&three);
     sampler_free(samples);
+    options.method = SAMPLER_ADAPTIVE;
+    samples = sampler_expression(expr, x, NULL, NUM_ZERO, NUM_ONE, &options);
+    number_t two = num_create_from_long(2), original = expr_get_val(x);
+    ok = ok && samples && num_eq(sampler_point(samples, 0)->dy, NUM_ZERO) &&
+         num_eq(sampler_point(samples, sampler_count(samples) - 1)->dy, two) &&
+         num_eq(sampler_point(samples, 0)->ddy, two) && num_to_double(original) == 7;
+    num_destroy(&original);
+    num_destroy(&two);
+    sampler_free(samples);
     expr_free(expr);
     expr_bindings_free(bindings);
     TEST_ASSERT_TRUE(ok, "expression samples use private variable bindings and preserve parameters");
@@ -259,10 +325,38 @@ static void example_sampler_callback(void)
     TEST_ASSERT_TRUE(ok, "README parametric callback");
 }
 
+static sampler_status_t square_derivatives(number_t t, number_t *x, number_t *y,
+                                           number_t *dx, number_t *dy, number_t *ddx, number_t *ddy, void *argument)
+{
+    (void)argument;
+    *x = num_clone(t);
+    *y = num_mul(t, t);
+    *dx = num_clone(NUM_ONE);
+    *dy = num_mul(NUM_TWO, t);
+    *ddx = num_clone(NUM_ZERO);
+    *ddy = num_clone(NUM_TWO);
+    return SAMPLER_VALUE;
+}
+
+/* README example: return first and repeated derivatives with the coordinates. */
+static void example_sampler_derivatives(void)
+{
+    sampler_t *samples = sampler_new_with_derivatives(square_derivatives, NULL, NUM_ZERO, NUM_ONE, NULL);
+    if (samples) {
+        const sampler_point_t *last = sampler_point(samples, sampler_count(samples) - 1);
+        num_printf("Last slope: %n; curvature: %n\n", last->dy, last->ddy);
+    }
+    bool ok = samples != NULL;
+    sampler_free(samples);
+    TEST_ASSERT_TRUE(ok, "README derivative callback");
+}
+
 int tests_main(void)
 {
     TEST_RUN_CASE(test_sampler_uniform, NULL);
     TEST_RUN_CASE(test_sampler_adaptive, NULL);
+    TEST_RUN_CASE(test_sampler_derivatives, NULL);
+    TEST_RUN_CASE(test_sampler_derivative_fallback, NULL);
     TEST_RUN_CASE(test_sampler_gaps, NULL);
     TEST_RUN_CASE(test_sampler_unsampled_poles, NULL);
     TEST_RUN_CASE(test_sampler_failures, NULL);
@@ -272,5 +366,6 @@ int tests_main(void)
     TEST_SECTION("README examples");
     TEST_RUN_OUTPUT(example_sampler_expression);
     TEST_RUN_OUTPUT(example_sampler_callback);
+    TEST_RUN_OUTPUT(example_sampler_derivatives);
     return TEST_EXIT_CODE();
 }

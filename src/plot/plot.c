@@ -89,6 +89,8 @@ static void series_clear(plot_series_t *series)
     }
     free(series->points);
     string_free(series->name);
+    num_destroy(&series->stationary_bounds[0]);
+    num_destroy(&series->stationary_bounds[1]);
 }
 
 /* Release scene ownership, never caller coordinates. */
@@ -108,6 +110,8 @@ void plot_free(plot_t *plot)
         free(plot->surface_x);
         free(plot->surface_y);
         free(plot->surface_z);
+        num_destroy(&plot->included_height[0]);
+        num_destroy(&plot->included_height[1]);
         num_destroy(&plot->height_bounds[0]);
         num_destroy(&plot->height_bounds[1]);
         for (size_t i = 0; i < 4; ++i)
@@ -197,6 +201,30 @@ bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, 
                                    sample->break_before};
     }
     bool ok = plot_add_points(plot, points, count, name, style, colour);
+    if (ok) {
+        plot_series_t *series = &plot->series[plot->count - 1];
+        /* Only preserve located extrema with resolved edges on both sides.
+         * An unresolved sign change near a pole must not defeat tail clipping. */
+        for (size_t i = 1; i + 1 < count; ++i) {
+            const sampler_point_t *p = sampler_point(sampler, i);
+            const sampler_point_t *left = sampler_point(sampler, i - 1), *right = sampler_point(sampler, i + 1);
+            bool zero_turn = num_is_real(p->dy) && num_is_zero(p->dy) &&
+                valid_coordinate(left->dy) && valid_coordinate(right->dy) &&
+                ((num_lt(left->dy, NUM_ZERO) && num_gt(right->dy, NUM_ZERO)) ||
+                 (num_gt(left->dy, NUM_ZERO) && num_lt(right->dy, NUM_ZERO)));
+            if ((!p->stationary && !zero_turn) || !p->valid || !left->valid || !right->valid ||
+                p->break_before || right->break_before)
+                continue;
+            for (unsigned end = 0; end < 2; ++end) {
+                if (!series->has_stationary || (end ? num_gt(p->y, series->stationary_bounds[end]) :
+                                                     num_lt(p->y, series->stationary_bounds[end]))) {
+                    num_destroy(&series->stationary_bounds[end]);
+                    series->stationary_bounds[end] = num_clone(p->y);
+                }
+            }
+            series->has_stationary = true;
+        }
+    }
     int saved = errno;
     free(points);
     errno = saved;

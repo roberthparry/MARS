@@ -45,6 +45,33 @@ bool plot_set_height_bounds(plot_t *plot, number_t minimum, number_t maximum)
     return true;
 }
 
+/* Preserve independently located heights without replacing the automatic range policy. */
+bool plot_include_height(plot_t *plot, number_t height)
+{
+    if (!plot || !plot->surface_z || !num_is_real(height) || !num_is_finite(height)) {
+        errno = EINVAL;
+        return false;
+    }
+    number_t copies[] = {num_clone(height), num_clone(height)};
+    if (!num_is_finite(copies[0]) || !num_is_finite(copies[1])) {
+        num_destroy(&copies[0]);
+        num_destroy(&copies[1]);
+        errno = ENOMEM;
+        return false;
+    }
+    for (unsigned end = 0; end < 2; ++end) {
+        if (!plot->has_included_height || (end ? num_gt(height, plot->included_height[end]) :
+                                               num_lt(height, plot->included_height[end]))) {
+            num_destroy(&plot->included_height[end]);
+            plot->included_height[end] = num_scope_detach(copies[end]);
+        } else {
+            num_destroy(&copies[end]);
+        }
+    }
+    plot->has_included_height = true;
+    return true;
+}
+
 /* Copy a complete grid before publishing it in the caller's empty scene. */
 bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,
                       const number_t *z)

@@ -1186,7 +1186,22 @@ precision for very small ranges and up to 4,096 bits of the worksheet precision.
 The plotting limit is 32,768 working bits, with bounds and reference checks
 limited to 65,536 bits; unresolved precision requirements produce an error.
 
-The final sampling pass uses 64 initial intervals, at most 8,193 evaluations and
+Adaptive curves use native first derivatives and repeated differentiation for
+second derivatives. Tangent/secant and curvature checks supplement the value
+probes; bounded bisection investigates first-derivative sign changes. Located
+stationary heights with resolved neighbouring edges expand the automatic vertical
+range, so they are not discarded merely as percentile outliers. Unsupported or
+undefined derivatives retain value-only checks, and explicit limits still win.
+
+Full automatic-height surfaces additionally inspect interior grid extrema. Up to
+eight candidates receive at most twelve local Newton steps using the gradient and
+Hessian (including mixed second derivatives), confined to neighbouring grid cells.
+Finite small-gradient candidates with a definite Hessian contribute height limits;
+saddles and unresolved or unsupported candidates do not. Preview and manual-height
+plots skip this search. The 70×70 mesh is unchanged: an improved height range does
+not add missing geometric detail, and flat or unsampled extrema can still be missed.
+
+The final curve sampling pass uses 64 initial intervals, at most 8,193 evaluations and
 eight adaptive subdivision levels. Validation probes additionally consume the
 request's shared calculation budget. Detected domain gaps and
 unresolved edges are not joined. Detection is heuristic: narrow features and

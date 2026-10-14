@@ -92,6 +92,14 @@ bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const num
 bool plot_set_height_bounds(plot_t *plot, number_t minimum, number_t maximum);
 
 /**
+ * @brief Include a located finite turning-point height in automatic surface limits.
+ * Copies the value without modifying grid geometry. Repeated calls accumulate an
+ * advisory range that smart cropping cannot remove; explicit height limits win.
+ * Returns false with EINVAL for a non-finite/non-real value or no surface.
+ */
+bool plot_include_height(plot_t *plot, number_t height);
+
+/**
  * @brief Set the surface view in degrees without changing or resampling its copied grid.
  * Defaults are azimuth 315 and elevation 30: horizontal ticks increase left to right.
  * Finite azimuths wrap into [0,360);

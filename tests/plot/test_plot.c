@@ -365,6 +365,47 @@ static void test_plot_smart_range(void)
     TEST_ASSERT_TRUE(ok, "robust Y view crops silently, Fit all retains outliers and manual bounds override it");
 }
 
+static void test_plot_stationary_range(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string("100/(1+10000*(x-0.371)^2)", &bindings);
+    sampler_options_t sampling = sampler_options_default();
+    sampling.intervals = 1;
+    sampling.max_depth = 16;
+    sampler_t *samples = sampler_expression(expression, expr_bindings_get(bindings, "x"), NULL,
+                                             NUM_ZERO, NUM_ONE, &sampling);
+    plot_options_t options = plot_options_default();
+    options.smart_y = true;
+    plot_t *plot = plot_new(&options);
+    bool ok = samples && plot && plot_add_sampler(plot, samples, "", PLOT_LINES, 0);
+    sampler_free(samples);
+    string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    ok = svg && strstr(string_c_str(svg), ">80</text>");
+    string_free(svg);
+    ok = ok && plot_set_bounds(plot, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ONE);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    ok = svg && strstr(string_c_str(svg), ">0.2</text>");
+    string_free(svg);
+    plot_free(plot);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+    plot = plot_new(&options);
+    number_t coordinates[] = {NUM_ZERO, NUM_ONE}, heights[] = {NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ZERO};
+    number_t peak = num_create_from_long(100);
+    ok = ok && plot && plot_set_surface(plot, coordinates, 2, coordinates, 2, heights) &&
+         plot_include_height(plot, peak) && !plot_include_height(plot, NUM_INF);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    ok = svg && strstr(string_c_str(svg), ">80</text>");
+    string_free(svg);
+    ok = ok && plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    ok = svg && !strstr(string_c_str(svg), ">80</text>");
+    string_free(svg);
+    num_destroy(&peak);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "smart viewport preserves a located finite peak; explicit limits still win");
+}
+
 static bool ascending_surface_ticks(const string_t *svg)
 {
     double previous[3] = {0};
@@ -758,6 +799,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_extreme_ticks, NULL);
     TEST_RUN_CASE(test_plot_extreme_clipping, NULL);
     TEST_RUN_CASE(test_plot_smart_range, NULL);
+    TEST_RUN_CASE(test_plot_stationary_range, NULL);
     TEST_RUN_CASE(test_plot_surface, NULL);
     TEST_RUN_CASE(test_plot_surface_height, NULL);
     TEST_RUN_CASE(test_plot_surface_view, NULL);

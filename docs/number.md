@@ -1080,6 +1080,17 @@ partial derivative with respect to `s`. The trailing `p` denotes a derivative.
 Dispatch preserves the active `number_t` backend, including qfloat, qcomplex,
 MPFR and MPC values.
 
+The native Euler–Maclaurin zeta paths reuse successive rising products and
+endpoint powers, and omit derivative work for value-only calls. This also
+applies to Hurwitz zeta. Precision and convergence criteria are unchanged;
+arbitrary-precision real Riemann zeta continues to use MPFR.
+
+Multiprecision real trigamma and tetragamma stop their Bernoulli corrections once
+the term is below a result-relative precision threshold with 16 guard bits. They
+retain the existing argument shift and maximum correction count; poles and numeric
+backend selection are unchanged. This avoids calculating all 260 corrections for
+ordinary precisions.
+
 ```c
 #include <stdio.h>
 #include "number-t.h"

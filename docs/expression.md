@@ -1771,6 +1771,11 @@ string. It preserves the expression shape while canonicalising notation, so
 simplified equivalent. For differentiation, hold an explicit variable pointer
 so you can pass it to the derivative API.
 
+Simplification recognises structurally unchanged rebuilt trees as fixed points
+before revisiting their children. This avoids redundant rewrite passes through
+long sums without changing the algebra, output styles or mutation-aware cache
+invalidation. Computation work limits still apply to simplification.
+
 The outer braces and binding footer are optional. A bare expression is
 shorthand for a wrapped expression with bindings inferred by MARS:
 

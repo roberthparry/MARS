@@ -100,6 +100,18 @@ bool plot_smart_range(const plot_t *plot, number_t bounds[4])
     num_destroy(&span);
     if (ok)
         plot_trim_range(values, count, bounds + 2);
+    for (size_t s = 0; ok && s < plot->count; ++s) {
+        const plot_series_t *series = &plot->series[s];
+        if (!series->has_stationary)
+            continue;
+        for (unsigned end = 0; end < 2; ++end) {
+            number_t value = series->stationary_bounds[end];
+            if (end ? num_gt(value, bounds[3]) : num_lt(value, bounds[2])) {
+                num_destroy(&bounds[2 + end]);
+                bounds[2 + end] = num_clone(value);
+            }
+        }
+    }
     free(values);
     return ok;
 }

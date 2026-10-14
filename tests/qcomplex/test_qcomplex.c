@@ -720,6 +720,20 @@ static void test_digamma(void)
         check_qc("Hurwitz real bridge", qc_zetah(qcr(2.5), qcr(101.0)),
                  qcrs("0.000661687499453171542062211501479711744239330816315948606222019329"), 1e-30);
     }
+
+    /* Exercise zero rising-product factors and the complex endpoint recurrence. */
+    for (int order = -2; order <= 2; ++order) {
+        qcomplex_t s = qcr((double)order);
+        qcomplex_t a = qcz(1.25, 0.25);
+        qcomplex_t next = qc_add(a, QC_ONE);
+        qcomplex_t power = qc_pow(a, qc_neg(s));
+
+        if (order == 1)
+            continue;
+        check_qc("Hurwitz integer recurrence", qc_zetah(s, a), qc_add(power, qc_zetah(s, next)), 1e-25);
+        check_qc("Hurwitz derivative integer recurrence", qc_zatahp(s, a),
+                 qc_sub(qc_zatahp(s, next), qc_mul(qc_log(a), power)), 1e-25);
+    }
 }
 
 static void test_polylog(void)

@@ -6156,7 +6156,9 @@ static expr_t *expr_simplify_once(const expr_t *expr)
         }
     }
 
-    if (out == expr)
+    /* Rebuilt but unchanged trees are already fixed points. Recognise them before
+     * revisiting fresh child chains, which otherwise repeat the same rewrites. */
+    if (out == expr || expr_struct_eq(out, expr))
         return expr_simplify_mark_current(out);
 
     return out;

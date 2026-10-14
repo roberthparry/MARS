@@ -1520,6 +1520,11 @@ static int number_mpfr_trigamma_mut(mpfr_t value)
         }
         mpfr_mul(term, term, power, MPFR_RNDN);
         mpfr_add(sum, sum, term, MPFR_RNDN);
+        /* Positive-argument asymptotic corrections alternate. Keep guard bits relative
+         * to the result, including very small tails at large arguments. */
+        if (!mpfr_zero_p(sum) && mpfr_number_p(sum) &&
+            (mpfr_zero_p(term) || mpfr_get_exp(term) <= mpfr_get_exp(sum) - mpfr_get_prec(value) - 16))
+            break;
         mpfr_mul(power, power, inv2, MPFR_RNDN);
     }
 
@@ -1570,6 +1575,9 @@ static int number_mpfr_tetragamma_mut(mpfr_t value)
         mpfr_mul_ui(term, term, (unsigned long)(2 * n + 1), MPFR_RNDN);
         mpfr_mul(term, term, power, MPFR_RNDN);
         mpfr_sub(sum, sum, term, MPFR_RNDN);
+        if (!mpfr_zero_p(sum) && mpfr_number_p(sum) &&
+            (mpfr_zero_p(term) || mpfr_get_exp(term) <= mpfr_get_exp(sum) - mpfr_get_prec(value) - 16))
+            break;
         mpfr_mul(power, power, inv2, MPFR_RNDN);
     }
 
@@ -1872,7 +1880,7 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpfr_prec_t target_prec = mpc_get_prec(out);
     mpfr_prec_t work_prec = target_prec + 128;
     unsigned long endpoint = 128ul;
-    mpc_t sum, derivative, term, factor, rising, rising_derivative, power, s_minus_one, temporary;
+    mpc_t sum, derivative, term, factor, rising, rising_derivative, power, power_step, s_minus_one, temporary;
     mpfr_t magnitude, log_n, log_endpoint, bernoulli, factorial;
     bool converged = false;
     int rc = 0;
@@ -1884,6 +1892,7 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpc_init2(rising, work_prec);
     mpc_init2(rising_derivative, work_prec);
     mpc_init2(power, work_prec);
+    mpc_init2(power_step, work_prec);
     mpc_init2(s_minus_one, work_prec);
     mpc_init2(temporary, work_prec);
     mpfr_inits2(work_prec, magnitude, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
@@ -1901,8 +1910,10 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
         mpc_neg(term, term, MPC_RNDNN);
         mpc_exp(term, term, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
-        mpc_mul_fr(temporary, term, log_n, MPC_RNDNN);
-        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+        if (want_derivative) {
+            mpc_mul_fr(temporary, term, log_n, MPC_RNDNN);
+            mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+        }
     }
 
     mpc_sub_ui(s_minus_one, s, 1u, MPC_RNDNN);
@@ -1918,21 +1929,31 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpc_div(term, power, s_minus_one, MPC_RNDNN);
     mpc_add(sum, sum, term, MPC_RNDNN);
 
-    mpc_fr_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
-    mpc_neg(temporary, temporary, MPC_RNDNN);
-    mpc_sqr(term, s_minus_one, MPC_RNDNN);
-    mpc_ui_div(term, 1u, term, MPC_RNDNN);
-    mpc_sub(temporary, temporary, term, MPC_RNDNN);
-    mpc_mul(temporary, temporary, power, MPC_RNDNN);
-    mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+    if (want_derivative) {
+        mpc_fr_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
+        mpc_neg(temporary, temporary, MPC_RNDNN);
+        mpc_sqr(term, s_minus_one, MPC_RNDNN);
+        mpc_ui_div(term, 1u, term, MPC_RNDNN);
+        mpc_sub(temporary, temporary, term, MPC_RNDNN);
+        mpc_mul(temporary, temporary, power, MPC_RNDNN);
+        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+    }
 
     mpc_mul_fr(term, s, log_endpoint, MPC_RNDNN);
     mpc_neg(term, term, MPC_RNDNN);
     mpc_exp(term, term, MPC_RNDNN);
     mpc_div_2ui(term, term, 1u, MPC_RNDNN);
     mpc_add(sum, sum, term, MPC_RNDNN);
-    mpc_mul_fr(temporary, term, log_endpoint, MPC_RNDNN);
-    mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+    if (want_derivative) {
+        mpc_mul_fr(temporary, term, log_endpoint, MPC_RNDNN);
+        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+    }
+
+    mpc_set_ui(rising, 1u, MPC_RNDNN);
+    mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
+    mpc_set_ui(power_step, endpoint, MPC_RNDNN);
+    mpc_sqr(power_step, power_step, MPC_RNDNN);
+    mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
 
     for (size_t k = 1u; k <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++k) {
         unsigned int rising_count = (unsigned int)(2u * k - 1u);
@@ -1943,27 +1964,34 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
         }
         mpfr_fac_ui(factorial, 2u * k, MPFR_RNDN);
         mpfr_div(bernoulli, bernoulli, factorial, MPFR_RNDN);
-        mpc_set_ui(rising, 1u, MPC_RNDNN);
-        mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
-        for (unsigned int j = 0u; j < rising_count; ++j) {
+        /* Extend the previous product; division would fail at non-positive integers. */
+        for (unsigned int j = k == 1u ? 0u : rising_count - 2u; j < rising_count; ++j) {
             mpc_add_ui(factor, s, j, MPC_RNDNN);
-            mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
-            mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
+            if (want_derivative) {
+                mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
+                mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
+            }
             mpc_mul(rising, rising, factor, MPC_RNDNN);
         }
-        mpc_add_ui(power, s, rising_count, MPC_RNDNN);
-        mpc_neg(power, power, MPC_RNDNN);
-        mpc_mul_fr(power, power, log_endpoint, MPC_RNDNN);
-        mpc_exp(power, power, MPC_RNDNN);
+        if (k == 1u) {
+            mpc_add_ui(power, s, rising_count, MPC_RNDNN);
+            mpc_neg(power, power, MPC_RNDNN);
+            mpc_mul_fr(power, power, log_endpoint, MPC_RNDNN);
+            mpc_exp(power, power, MPC_RNDNN);
+        } else {
+            mpc_mul(power, power, power_step, MPC_RNDNN);
+        }
         mpc_mul(term, rising, power, MPC_RNDNN);
         mpc_mul_fr(term, term, bernoulli, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
 
-        mpc_mul_fr(temporary, rising, log_endpoint, MPC_RNDNN);
-        mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
-        mpc_mul(temporary, temporary, power, MPC_RNDNN);
-        mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
-        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+        if (want_derivative) {
+            mpc_mul_fr(temporary, rising, log_endpoint, MPC_RNDNN);
+            mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
+            mpc_mul(temporary, temporary, power, MPC_RNDNN);
+            mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
+            mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+        }
         if (k >= 4u && number_mpc_term_below_target(want_derivative ? temporary : term, target_prec)) {
             converged = true;
             break;
@@ -1979,6 +2007,7 @@ done:
     mpfr_clears(magnitude, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
     mpc_clear(temporary);
     mpc_clear(s_minus_one);
+    mpc_clear(power_step);
     mpc_clear(power);
     mpc_clear(rising_derivative);
     mpc_clear(rising);
@@ -2006,7 +2035,7 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpfr_prec_t work_prec = target_prec + 128;
     const unsigned long term_count = 128ul;
     mpc_t sum, derivative, base, log_base, term, factor, rising, rising_derivative, power, s_minus_one;
-    mpc_t endpoint, log_endpoint, temporary;
+    mpc_t endpoint, log_endpoint, temporary, power_step;
     mpfr_t bernoulli, factorial;
     bool converged = false;
     int rc = 0;
@@ -2020,6 +2049,7 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpc_init2(rising, work_prec);
     mpc_init2(rising_derivative, work_prec);
     mpc_init2(power, work_prec);
+    mpc_init2(power_step, work_prec);
     mpc_init2(s_minus_one, work_prec);
     mpc_init2(endpoint, work_prec);
     mpc_init2(log_endpoint, work_prec);
@@ -2035,8 +2065,10 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
         mpc_neg(term, term, MPC_RNDNN);
         mpc_exp(term, term, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
-        mpc_mul(temporary, term, log_base, MPC_RNDNN);
-        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+        if (want_derivative) {
+            mpc_mul(temporary, term, log_base, MPC_RNDNN);
+            mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+        }
     }
 
     mpc_add_ui(endpoint, a, term_count, MPC_RNDNN);
@@ -2054,21 +2086,31 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpc_div(term, power, s_minus_one, MPC_RNDNN);
     mpc_add(sum, sum, term, MPC_RNDNN);
 
-    mpc_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
-    mpc_neg(temporary, temporary, MPC_RNDNN);
-    mpc_sqr(term, s_minus_one, MPC_RNDNN);
-    mpc_ui_div(term, 1u, term, MPC_RNDNN);
-    mpc_sub(temporary, temporary, term, MPC_RNDNN);
-    mpc_mul(temporary, temporary, power, MPC_RNDNN);
-    mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+    if (want_derivative) {
+        mpc_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
+        mpc_neg(temporary, temporary, MPC_RNDNN);
+        mpc_sqr(term, s_minus_one, MPC_RNDNN);
+        mpc_ui_div(term, 1u, term, MPC_RNDNN);
+        mpc_sub(temporary, temporary, term, MPC_RNDNN);
+        mpc_mul(temporary, temporary, power, MPC_RNDNN);
+        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+    }
 
     mpc_mul(term, s, log_endpoint, MPC_RNDNN);
     mpc_neg(term, term, MPC_RNDNN);
     mpc_exp(term, term, MPC_RNDNN);
     mpc_div_2ui(term, term, 1u, MPC_RNDNN);
     mpc_add(sum, sum, term, MPC_RNDNN);
-    mpc_mul(temporary, term, log_endpoint, MPC_RNDNN);
-    mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+    if (want_derivative) {
+        mpc_mul(temporary, term, log_endpoint, MPC_RNDNN);
+        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
+    }
+
+    mpc_set_ui(rising, 1u, MPC_RNDNN);
+    mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
+    mpc_set(power_step, endpoint, MPC_RNDNN);
+    mpc_sqr(power_step, power_step, MPC_RNDNN);
+    mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
 
     for (size_t k = 1u; k <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++k) {
         unsigned int rising_count = (unsigned int)(2u * k - 1u);
@@ -2079,27 +2121,34 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
         }
         mpfr_fac_ui(factorial, 2u * k, MPFR_RNDN);
         mpfr_div(bernoulli, bernoulli, factorial, MPFR_RNDN);
-        mpc_set_ui(rising, 1u, MPC_RNDNN);
-        mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
-        for (unsigned int j = 0u; j < rising_count; ++j) {
+        /* Extend the previous product; division would fail at non-positive integers. */
+        for (unsigned int j = k == 1u ? 0u : rising_count - 2u; j < rising_count; ++j) {
             mpc_add_ui(factor, s, j, MPC_RNDNN);
-            mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
-            mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
+            if (want_derivative) {
+                mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
+                mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
+            }
             mpc_mul(rising, rising, factor, MPC_RNDNN);
         }
-        mpc_add_ui(power, s, rising_count, MPC_RNDNN);
-        mpc_neg(power, power, MPC_RNDNN);
-        mpc_mul(power, power, log_endpoint, MPC_RNDNN);
-        mpc_exp(power, power, MPC_RNDNN);
+        if (k == 1u) {
+            mpc_add_ui(power, s, rising_count, MPC_RNDNN);
+            mpc_neg(power, power, MPC_RNDNN);
+            mpc_mul(power, power, log_endpoint, MPC_RNDNN);
+            mpc_exp(power, power, MPC_RNDNN);
+        } else {
+            mpc_mul(power, power, power_step, MPC_RNDNN);
+        }
         mpc_mul(term, rising, power, MPC_RNDNN);
         mpc_mul_fr(term, term, bernoulli, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
 
-        mpc_mul(temporary, rising, log_endpoint, MPC_RNDNN);
-        mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
-        mpc_mul(temporary, temporary, power, MPC_RNDNN);
-        mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
-        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+        if (want_derivative) {
+            mpc_mul(temporary, rising, log_endpoint, MPC_RNDNN);
+            mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
+            mpc_mul(temporary, temporary, power, MPC_RNDNN);
+            mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
+            mpc_add(derivative, derivative, temporary, MPC_RNDNN);
+        }
         if (k >= 4u && number_mpc_term_below_target(want_derivative ? temporary : term, target_prec)) {
             converged = true;
             break;
@@ -2117,6 +2166,7 @@ done:
     mpc_clear(log_endpoint);
     mpc_clear(endpoint);
     mpc_clear(s_minus_one);
+    mpc_clear(power_step);
     mpc_clear(power);
     mpc_clear(rising_derivative);
     mpc_clear(rising);

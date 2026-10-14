@@ -20,6 +20,7 @@ struct _sampler_t {
     sampler_options_t options;
     number_t absolute, relative;
     sampler_callback_t callback;
+    sampler_derivative_callback_t derivative_callback;
     void *argument;
 };
 
@@ -32,7 +33,7 @@ bool sampler_evaluate(sampler_t *sampler, number_t parameter, sampler_point_t *p
 /** @brief Append an independent copy, forcing a gap if requested; input remains borrowed. */
 bool sampler_append(sampler_t *sampler, const sampler_point_t *point, bool disconnect);
 
-/** @brief Destroy the three owned coordinates in a temporary point. */
+/** @brief Destroy the owned coordinates and optional tangents in a temporary point. */
 void sampler_point_clear(sampler_point_t *point);
 
 #endif

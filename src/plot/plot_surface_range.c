@@ -47,6 +47,15 @@ bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2]
             bounds[end] = num_clone(plot->height_fixed ? plot->height_bounds[end] : full[end]);
         if (smart)
             plot_trim_range(values, count, bounds);
+        if (!plot->height_fixed && plot->has_included_height) {
+            for (unsigned end = 0; end < 2; ++end) {
+                number_t value = plot->included_height[end];
+                if (end ? num_gt(value, bounds[end]) : num_lt(value, bounds[end])) {
+                    num_destroy(&bounds[end]);
+                    bounds[end] = num_clone(value);
+                }
+            }
+        }
         if (num_eq(bounds[0], bounds[1])) {
             number_t magnitude = num_abs(bounds[0]), twenty = num_create_from_long(20);
             number_t padding = num_div(magnitude, twenty);

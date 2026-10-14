@@ -12,10 +12,72 @@
 #include <math.h>
 
 #include "expr_context-t.h"
+#include "computation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
 #include "test_expr.h"
+
+struct simplify_budget_case {
+    expr_t *source;
+    expr_t *result;
+};
+
+static bool simplify_with_budget(void *argument)
+{
+    struct simplify_budget_case *test = argument;
+    test->result = expr_simplify(test->source);
+    return test->result != NULL;
+}
+
+static void test_simplify_rebuilt_sum_fixed_points(void)
+{
+    const unsigned counts[] = {12, 24, 40};
+    const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    for (size_t c = 0; c < sizeof counts / sizeof *counts; ++c) {
+        unsigned count = counts[c];
+        string_t *source = string_new(), *expected_source = string_new();
+        for (unsigned i = 1; i <= count; ++i)
+            string_append_format(source, "%sx^%u", i > 1 ? "+" : "", i);
+        string_append_cstr(expected_source, "x");
+        for (unsigned i = 2; i <= count; ++i)
+            string_append_format(expected_source, "+x^%u", i);
+        expr_bindings_t *bindings = NULL;
+        expr_t *raw = expr_from_string(string_c_str(source), &bindings);
+        expr_t *expected = expr_from_string(string_c_str(expected_source), NULL);
+        computation_options_t options = {.work_limit = 10000};
+        computation_t *control = computation_new(&options);
+        struct simplify_budget_case test = {.source = raw};
+        ASSERT_TRUE(raw && expected && control);
+        ASSERT_TRUE(computation_run(control, simplify_with_budget, &test));
+        ASSERT_TRUE(computation_status(control) == COMPUTATION_ACTIVE);
+        /* Independent parses own different variable identities; compare their renderings below. */
+        expr_t *again = expr_simplify(test.result);
+        ASSERT_TRUE(again == test.result);
+        for (size_t s = 0; s < sizeof styles / sizeof *styles; ++s) {
+            char *actual_text = expr_to_string(test.result, styles[s]);
+            char *expected_text = expr_to_string(expected, styles[s]);
+            if (actual_text && expected_text && strcmp(actual_text, expected_text))
+                fprintf(stderr, "style=%d actual=%s expected=%s\n", styles[s], actual_text, expected_text);
+            ASSERT_TRUE(actual_text && expected_text && strcmp(actual_text, expected_text) == 0);
+            free(actual_text);
+            free(expected_text);
+        }
+        expr_t *x = expr_bindings_get(bindings, "x");
+        test_expr_set_val_d(x, 1.0);
+        check_q_at(__FILE__, __LINE__, 1, "power sum at one", expr_eval_qf(test.result), qf_from_double(count));
+        test_expr_set_val_d(x, -1.0);
+        check_q_at(__FILE__, __LINE__, 1, "even power sum at minus one", expr_eval_qf(test.result), qf_from_double(0));
+        expr_free(again);
+        expr_free(test.result);
+        expr_free(expected);
+        expr_free(raw);
+        expr_bindings_free(bindings);
+        computation_free(control);
+        string_free(expected_source);
+        string_free(source);
+    }
+}
 
 static void test_unset_constant_clones_combine_symbolically(void)
 {
@@ -4848,6 +4910,7 @@ static void test_dilog_display_and_exponential_difference_signs(void)
 
 void test_runtime_regressions(void)
 {
+    TEST_RUN_SUBTEST(test_simplify_rebuilt_sum_fixed_points, NULL);
     TEST_RUN_SUBTEST(test_multivariable_arbitrary_function_derivatives, NULL);
     TEST_RUN_SUBTEST(test_unset_constant_clones_combine_symbolically, NULL);
     TEST_RUN_SUBTEST(test_cloned_formal_derivative_substitution, NULL);

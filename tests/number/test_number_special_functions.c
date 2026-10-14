@@ -682,6 +682,59 @@ static void test_number_incomplete_gamma_precision(void)
 
 void run_number_special_function_tests(void)
 {
+    {
+        size_t saved_precision = num_get_default_prec_bits();
+        const size_t precisions[] = {128, 384, 640};
+        for (size_t i = 0; i < 3; ++i) {
+            NUM_SCOPE(gamma_scope);
+            num_set_default_prec_bits(precisions[i]);
+            number_t half = num_create_from_string("0.5"), pi = num_const(NUM_PI);
+            number_t expected_first = num_mul(num_mul(pi, pi), NUM_HALF);
+            number_t expected_second = num_mul(num_create_from_long(-14), num_zeta(num_create_from_long(3)));
+            const char *tolerance = i == 0 ? "1e-35" : i == 1 ? "1e-108" : "1e-185";
+            assert_number_close_number("trigamma half precision", num_trigamma(half), expected_first, tolerance);
+            assert_number_close_number("tetragamma half precision", num_tetragamma(half), expected_second, tolerance);
+            number_t negative = num_create_from_string("-0.25"), shifted = num_add(negative, NUM_ONE);
+            number_t inverse_square = num_div(NUM_ONE, num_mul(negative, negative));
+            assert_number_close_number("trigamma negative recurrence", num_trigamma(negative),
+                                       num_add(num_trigamma(shifted), inverse_square), tolerance);
+            assert_number_close_number("tetragamma negative recurrence", num_tetragamma(negative),
+                                       num_sub(num_tetragamma(shifted),
+                                               num_div(num_mul(NUM_TWO, inverse_square), negative)), tolerance);
+        }
+        num_set_default_prec_bits(saved_precision);
+    }
+    {
+        NUM_SCOPE(zeta_scope);
+        size_t saved_precision = num_get_default_prec_bits();
+
+        num_set_default_prec_bits(384);
+        number_t s = num_create_from_string("2 + 3i");
+        number_t value = num_zeta(s);
+        /* Preserve the pre-optimisation multiprecision result, not just its double projection. */
+        assert_number_close_text("384-bit zeta recurrence regression", value,
+                                 "0.798021985146275720622294500724812686025220081608376128324805099782"
+                                 "689584803995067753498349442393373819616931273093"
+                                 " - 0.113744308052938500215913365857315075570137806399665088964724406992"
+                                 "3585325514128567603037164372547988361910186274418i",
+                                 "1e-105");
+        for (int order = -2; order <= 2; ++order) {
+            if (order == 1)
+                continue;
+            NUM_SCOPE(recurrence_scope);
+            number_t exponent = num_create_from_long(order);
+            number_t a = num_create_from_string("1.25 + 0.25i");
+            number_t next = num_add(a, NUM_ONE);
+            number_t power = num_pow(a, num_neg(exponent));
+            number_t expected = num_add(power, num_zetah(exponent, next));
+            number_t expected_derivative = num_sub(num_zatahp(exponent, next), num_mul(num_log(a), power));
+
+            assert_number_close_number("Hurwitz integer recurrence", num_zetah(exponent, a), expected, "1e-100");
+            assert_number_close_number("Hurwitz derivative integer recurrence", num_zatahp(exponent, a),
+                                       expected_derivative, "1e-100");
+        }
+        num_set_default_prec_bits(saved_precision);
+    }
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     test_number_clausen();

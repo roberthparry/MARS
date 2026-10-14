@@ -190,6 +190,8 @@ static string_t *surface_svg(const char *source, const char *first, const char *
          plot_set_surface(plot, grid->x, grid->side, grid->y, grid->side, grid->z);
     if (ok && manual)
         ok = plot_set_height_bounds(plot, height_bounds[0], height_bounds[1]);
+    if (ok && !manual && options.smart_y && !preview)
+        ok = lab_worker_surface_extrema(plot, source, first, second, grid->x, grid->y, grid->z, grid->side);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     int saved = errno;
     plot_free(plot);

@@ -12,9 +12,21 @@
 
 struct expression_sample {
     expr_t *expression;
+    expr_t *derivative;
+    expr_t *second_derivative;
     const expr_t *variable;
     expr_context_t *context;
 };
+
+static number_t sample_value(const struct expression_sample *sample, const expr_t *expression)
+{
+    /* Sampling needs fresh bindings, not a new symbolic beautification at every
+     * point. Retain the existing graph arrangement while applying the context. */
+    expr_t *snapshot = expr_context_refine(sample->context, expression);
+    number_t value = snapshot ? expr_eval(snapshot) : num_clone(NUM_NAN);
+    expr_free(snapshot);
+    return value;
+}
 
 static sampler_status_t evaluate_expression(number_t parameter, number_t *x, number_t *y, void *argument)
 {
@@ -22,8 +34,24 @@ static sampler_status_t evaluate_expression(number_t parameter, number_t *x, num
     if (!expr_context_set(sample->context, sample->variable, EXPR_CONTEXT_FREE, 0, parameter))
         return SAMPLER_ERROR;
     *x = num_clone(parameter);
-    *y = expr_context_evaluate(sample->context, sample->expression);
+    *y = sample_value(sample, sample->expression);
     return SAMPLER_VALUE;
+}
+
+static sampler_status_t evaluate_derivatives(number_t parameter, number_t *x, number_t *y,
+                                              number_t *dx, number_t *dy, number_t *ddx, number_t *ddy, void *argument)
+{
+    struct expression_sample *sample = argument;
+    sampler_status_t status = evaluate_expression(parameter, x, y, argument);
+    if (status == SAMPLER_VALUE) {
+        *dx = num_clone(NUM_ONE);
+        *ddx = num_clone(NUM_ZERO);
+        if (sample->derivative)
+            *dy = sample_value(sample, sample->derivative);
+        if (sample->second_derivative)
+            *ddy = sample_value(sample, sample->second_derivative);
+    }
+    return status;
 }
 
 /* Capture source state once; each point is evaluated under a private binding snapshot. */
@@ -36,11 +64,20 @@ sampler_t *sampler_expression(const expr_t *expression, const expr_t *variable, 
     }
     struct expression_sample sample = {.expression = expr_clone(expression), .variable = variable,
         .context = context ? expr_context_clone(context) : expr_context_from_expression(expression, variable)};
-    sampler_t *result = sample.expression && sample.context ?
-        sampler_new(evaluate_expression, &sample, lower, upper, options) : NULL;
+    bool adaptive = !options || options->method == SAMPLER_ADAPTIVE;
+    if (adaptive && sample.expression)
+        sample.derivative = expr_create_deriv(sample.expression, variable);
+    if (sample.derivative)
+        sample.second_derivative = expr_create_deriv(sample.derivative, variable);
+    sampler_t *result = NULL;
+    if (sample.expression && sample.context)
+        result = adaptive ? sampler_new_with_derivatives(evaluate_derivatives, &sample, lower, upper, options) :
+                            sampler_new(evaluate_expression, &sample, lower, upper, options);
     int saved = errno;
     expr_context_free(sample.context);
     expr_free(sample.expression);
+    expr_free(sample.derivative);
+    expr_free(sample.second_derivative);
     errno = saved;
     return result;
 }

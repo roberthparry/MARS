@@ -19,6 +19,11 @@
 #include "string-t.h"
 #include "expression-t.h"
 #include "sampler-t.h"
+#include "plot-t.h"
+
+/** @brief Refine bounded surface-extremum candidates with gradients and Hessians for automatic height limits. */
+bool lab_worker_surface_extrema(plot_t *plot, const char *source, const char *first, const char *second,
+                                const number_t *x, const number_t *y, const number_t *z, size_t side);
 
 /** @brief Parse a plotting range with guard precision; return owning bounds without changing worksheet precision. */
 bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, number_t *hi);

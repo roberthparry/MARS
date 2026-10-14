@@ -112,6 +112,7 @@ bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, 
 
 typedef struct {
     expr_t *expression, *axis;
+    expr_t *second_derivative;
 } plot_evaluation_t;
 
 static sampler_status_t evaluate_plot(number_t parameter, number_t *x, number_t *y, void *argument)
@@ -122,6 +123,25 @@ static sampler_status_t evaluate_plot(number_t parameter, number_t *x, number_t 
     expr_set_val(plot->axis, parameter);
     *x = num_clone(parameter);
     *y = expr_eval(plot->expression);
+    return SAMPLER_VALUE;
+}
+
+static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *x, number_t *y,
+                                                  number_t *dx, number_t *dy, number_t *ddx, number_t *ddy,
+                                                  void *argument)
+{
+    plot_evaluation_t *plot = argument;
+    expr_set_val(plot->axis, parameter);
+    *x = num_clone(parameter);
+    *dx = num_clone(NUM_ONE);
+    *ddx = num_clone(NUM_ZERO);
+    const expr_t *variables[] = {plot->axis};
+    /* Reverse mode uses this private graph's actual binding node. Unsupported
+     * pullbacks leave tangents unavailable; the ordinary value remains useful. */
+    if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0)
+        *y = expr_eval(plot->expression);
+    if (plot->second_derivative)
+        *ddy = expr_eval(plot->second_derivative);
     return SAMPLER_VALUE;
 }
 
@@ -141,8 +161,14 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     options.absolute_tolerance = 1e-5;
     options.relative_tolerance = 0.002;
     plot_evaluation_t evaluation = {.expression = expression, .axis = axis};
-    sampler_t *samples = expression && axis ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) : NULL;
+    if (!probes && expression && axis)
+        evaluation.second_derivative = expr_create_2nd_deriv(expression, axis, axis);
+    sampler_t *samples = NULL;
+    if (expression && axis)
+        samples = probes ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
+            sampler_new_with_derivatives(evaluate_plot_derivatives, &evaluation, lo, hi, &options);
     int saved_error = samples ? 0 : (errno ? errno : EINVAL);
+    expr_free(evaluation.second_derivative);
     num_destroy(&hi);
     num_destroy(&lo);
     expr_free(expression);

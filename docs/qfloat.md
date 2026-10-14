@@ -347,6 +347,11 @@ The trailing `p` consistently denotes differentiation with respect to the
 first argument. The real Hurwitz implementation requires a positive shift
 `a`; its meromorphic continuation in `s` retains the pole at `s = 1`.
 
+Euler–Maclaurin corrections reuse successive products and endpoint powers.
+Value-only calls omit derivative work; derivative calls retain the product
+derivative even when a rising-product factor is zero. These optimisations do
+not change the fixed truncation or supported domain.
+
 **Error functions**
 
 - `qfloat_t qf_erf(qfloat_t x)` — error function

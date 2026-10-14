@@ -5,7 +5,7 @@
  * sampler_t owns an immutable ordered sample set. Callbacks support ordinary or
  * parametric curves; the expression adapter evaluates independent binding
  * snapshots. Coordinates remain number_t values until a renderer maps them.
- * Adaptive midpoint tests are heuristics, not proofs of continuity or error
+ * Adaptive value and optional tangent tests are heuristics, not proofs of continuity or error
  * bounds: narrow features and oscillations can be missed. No threads are started.
  * Sampling inherits computation_run() cancellation and work limits. Results must
  * not be destroyed while borrowed points are in use; mathematical inputs and
@@ -38,6 +38,16 @@ typedef enum { SAMPLER_ERROR = -1, SAMPLER_GAP, SAMPLER_VALUE } sampler_status_t
  */
 typedef sampler_status_t (*sampler_callback_t)(number_t parameter, number_t *x, number_t *y, void *argument);
 
+/**
+ * @brief Return coordinates and optional first and second parameter derivatives in one call.
+ * The ownership and status rules match sampler_callback_t for all six outputs.
+ * Leave an unavailable derivative as NUM_NAN; it never invalidates a finite point.
+ * Derivatives are hints for adaptive refinement, not certified bounds.
+ */
+typedef sampler_status_t (*sampler_derivative_callback_t)(number_t parameter, number_t *x, number_t *y,
+                                                         number_t *dx, number_t *dy, number_t *ddx, number_t *ddy,
+                                                         void *argument);
+
 /** @brief Copied settings; use sampler_options_default() before overriding individual fields. */
 typedef struct {
     sampler_method_t method; /**< Uniform or midpoint-adaptive subdivision. */
@@ -55,6 +65,11 @@ typedef struct {
     number_t y; /**< Real coordinate when valid. */
     bool valid; /**< False for domain gaps, complex values and non-finite coordinates. */
     bool break_before; /**< Do not connect this point to its predecessor. */
+    number_t dx; /**< Optional real finite derivative dx/dt; otherwise NUM_NAN. */
+    number_t dy; /**< Optional real finite derivative dy/dt; otherwise NUM_NAN. */
+    number_t ddx; /**< Optional real finite second derivative d²x/dt²; otherwise NUM_NAN. */
+    number_t ddy; /**< Optional real finite second derivative d²y/dt²; otherwise NUM_NAN. */
+    bool stationary; /**< Sample near a bracketed y stationary point; a heuristic, not a proof. */
 } sampler_point_t;
 
 /** @brief Adaptive defaults: 32 intervals, 65537 evaluations, depth 12, tolerances 1e-6 and 1e-3. */
@@ -71,10 +86,21 @@ sampler_t *sampler_new(sampler_callback_t callback, void *argument, number_t low
                        const sampler_options_t *options);
 
 /**
+ * @brief Sample with optional tangents, preserving sampler_new() ownership and limits.
+ * Adaptive sampling checks tangents and curvature and probes bracketed y stationary
+ * points using bounded bisection. Missing tangents fall back to value tests.
+ * Uniform sampling keeps the requested grid; no derivative-driven probes are added.
+ */
+sampler_t *sampler_new_with_derivatives(sampler_derivative_callback_t callback, void *argument,
+                                       number_t lower, number_t upper, const sampler_options_t *options);
+
+/**
  * @brief Sample y=expression against a variable, preserving the original graph and context.
  * NULL context captures source bindings. Other unset symbols yield gaps; samples
  * replace the selected variable's binding without treating it as an assumption.
  * Both expression and variable must be non-NULL and variable must be a variable node.
+ * Adaptive sampling uses native first and second symbolic derivatives where evaluable, falling
+ * back to value-only tests when it is unavailable. Uniform sampling skips derivatives.
  * Return/error/ownership policy is the same as sampler_new().
  */
 sampler_t *sampler_expression(const expr_t *expression, const expr_t *variable, const expr_context_t *context,

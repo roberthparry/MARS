@@ -27,6 +27,10 @@ void sampler_point_clear(sampler_point_t *point)
     num_destroy(&point->parameter);
     num_destroy(&point->x);
     num_destroy(&point->y);
+    num_destroy(&point->dx);
+    num_destroy(&point->dy);
+    num_destroy(&point->ddx);
+    num_destroy(&point->ddy);
 }
 
 /* Release completed or partly constructed datasets without disturbing an error. */
@@ -46,7 +50,8 @@ void sampler_free(sampler_t *sampler)
 
 bool sampler_evaluate(sampler_t *sampler, number_t parameter, sampler_point_t *point)
 {
-    *point = (sampler_point_t){.parameter = num_clone(parameter), .x = NUM_NAN, .y = NUM_NAN};
+    *point = (sampler_point_t){.parameter = num_clone(parameter), .x = NUM_NAN, .y = NUM_NAN,
+                             .dx = NUM_NAN, .dy = NUM_NAN, .ddx = NUM_NAN, .ddy = NUM_NAN};
     if (!num_is_finite(point->parameter)) {
         errno = ERANGE;
         return false;
@@ -59,7 +64,10 @@ bool sampler_evaluate(sampler_t *sampler, number_t parameter, sampler_point_t *p
         return false;
     ++sampler->evaluations;
     errno = 0;
-    sampler_status_t status = sampler->callback(parameter, &point->x, &point->y, sampler->argument);
+    sampler_status_t status = sampler->derivative_callback ?
+        sampler->derivative_callback(parameter, &point->x, &point->y, &point->dx, &point->dy,
+                                     &point->ddx, &point->ddy, sampler->argument) :
+        sampler->callback(parameter, &point->x, &point->y, sampler->argument);
     int saved = errno;
     if (!computation_poll_current())
         return false;
@@ -92,22 +100,33 @@ bool sampler_append(sampler_t *sampler, const sampler_point_t *point, bool disco
     copy.parameter = num_clone(point->parameter);
     copy.x = num_clone(point->x);
     copy.y = num_clone(point->y);
+    copy.dx = num_clone(point->dx);
+    copy.dy = num_clone(point->dy);
+    copy.ddx = num_clone(point->ddx);
+    copy.ddy = num_clone(point->ddy);
     if (!num_is_finite(copy.parameter) || (point->valid && (!num_is_finite(copy.x) || !num_is_finite(copy.y)))) {
         sampler_point_clear(&copy);
         errno = ENOMEM;
         return false;
     }
+    copy.parameter = num_scope_detach(copy.parameter);
+    copy.x = num_scope_detach(copy.x);
+    copy.y = num_scope_detach(copy.y);
+    copy.dx = num_scope_detach(copy.dx);
+    copy.dy = num_scope_detach(copy.dy);
+    copy.ddx = num_scope_detach(copy.ddx);
+    copy.ddy = num_scope_detach(copy.ddy);
     copy.break_before = disconnect || !copy.valid || !sampler->count || !sampler->points[sampler->count - 1].valid;
     sampler->points[sampler->count++] = copy;
     return true;
 }
 
-/* Sample synchronously with exact interval fractions and no double coordinate conversion. */
-sampler_t *sampler_new(sampler_callback_t callback, void *argument, number_t lower, number_t upper,
-                       const sampler_options_t *options)
+static sampler_t *sample(sampler_callback_t callback, sampler_derivative_callback_t derivative_callback,
+                          void *argument, number_t lower, number_t upper, const sampler_options_t *options)
 {
     sampler_options_t settings = options ? *options : sampler_options_default();
-    if (!callback || !num_is_real(lower) || !num_is_finite(lower) || !num_is_real(upper) || !num_is_finite(upper) ||
+    if ((!callback && !derivative_callback) || !num_is_real(lower) || !num_is_finite(lower) ||
+        !num_is_real(upper) || !num_is_finite(upper) ||
         !num_lt(lower, upper) || settings.method < SAMPLER_UNIFORM || settings.method > SAMPLER_ADAPTIVE ||
         !settings.intervals || settings.intervals >= LONG_MAX || settings.max_evaluations <= settings.intervals ||
         settings.max_evaluations > SIZE_MAX / sizeof(sampler_point_t) || settings.max_depth > 24 ||
@@ -122,6 +141,7 @@ sampler_t *sampler_new(sampler_callback_t callback, void *argument, number_t low
         return NULL;
     sampler->options = settings;
     sampler->callback = callback;
+    sampler->derivative_callback = derivative_callback;
     sampler->argument = argument;
     sampler->absolute = num_create_from_double(settings.absolute_tolerance);
     sampler->relative = num_create_from_double(settings.relative_tolerance);
@@ -154,8 +174,23 @@ sampler_t *sampler_new(sampler_callback_t callback, void *argument, number_t low
         return NULL;
     }
     sampler->callback = NULL;
+    sampler->derivative_callback = NULL;
     sampler->argument = NULL;
     return sampler;
+}
+
+/* Sample synchronously with exact interval fractions and no double coordinate conversion. */
+sampler_t *sampler_new(sampler_callback_t callback, void *argument, number_t lower, number_t upper,
+                       const sampler_options_t *options)
+{
+    return sample(callback, NULL, argument, lower, upper, options);
+}
+
+/* Keep tangent evaluation within the same bounded callback and point ownership lifecycle. */
+sampler_t *sampler_new_with_derivatives(sampler_derivative_callback_t callback, void *argument,
+                                       number_t lower, number_t upper, const sampler_options_t *options)
+{
+    return sample(NULL, callback, argument, lower, upper, options);
 }
 
 /* Inspect completed data without traversing points. */

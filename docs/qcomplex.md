@@ -291,6 +291,11 @@ while `qc_acos(2)` is
 | `qc_lauricella_f(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
 | `qc_appell_f1(a, b1, b2, c, x, y)` | Appell F₁, implemented as the two-variable Lauricella F_D member |
 
+The Riemann and Hurwitz zeta Euler–Maclaurin paths reuse successive rising
+products and endpoint powers, and omit derivative work for value-only calls.
+The truncation and branch conventions are unchanged; real arguments still
+use the real implementation where applicable.
+
 #### Clausen functions
 
 `qc_clausen(order, z)` takes a positive integer order and an angle in radians.

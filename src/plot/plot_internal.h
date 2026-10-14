@@ -20,6 +20,8 @@ typedef struct {
     string_t *name;
     plot_style_t style;
     uint32_t colour;
+    number_t stationary_bounds[2];
+    bool has_stationary;
 } plot_series_t;
 
 typedef struct {
@@ -53,6 +55,8 @@ struct _plot_t {
     bool fixed;
     number_t height_bounds[2];
     bool height_fixed;
+    number_t included_height[2];
+    bool has_included_height;
     number_t *surface_x, *surface_y, *surface_z;
     size_t surface_columns, surface_rows;
 };
