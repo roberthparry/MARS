@@ -1025,20 +1025,24 @@ For the example above, set azimuth to 120° and elevation to
 three ticked axes and formula title retained. Releasing a slider or committing
 a keyboard adjustment requests the new view automatically.
 
-Alternatively, **left-button drag** directly over a 3-D plot: horizontal movement
+Alternatively, **left-button drag** or **drag with one finger** directly over a 3-D plot: horizontal movement
 changes azimuth; dragging down increases elevation and dragging up decreases it. Hold **Shift** when
 starting the drag to change roll instead. Sliders and degree readouts update
-during the gesture and the surface redraws while the button is held. Only one
+during the gesture and the surface redraws as you drag. Only one
 native redraw is in flight; subsequent movements replace the pending camera
 position, so stale movements cannot build up a queue. Dragging uses a 13×13
 preview mesh, retaining the normal numerical precision checks and domain gaps.
-No spline smoothing is applied across discontinuities. Releasing the mouse,
+No spline smoothing is applied across discontinuities. Releasing the mouse or lifting the finger,
 including outside the plot, retains the final position and requests one full
 70×70 redraw, even when the last preview already reached that angle. Escape, losing browser
 focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. Preview and final redraws resample the native surface.
 This also works when expanded. Right-click and 2-D plots keep their normal
 behaviour; Ctrl+wheel zoom remains available.
+Touch dragging also works with a pen. The finger that starts the gesture owns it;
+additional fingers cannot change or end that rotation. A browser-cancelled touch
+restores the original view. Touches over the 3-D plot rotate it instead of scrolling
+the page; scrolling and browser gestures elsewhere, including over 2-D plots, are unchanged.
 Over a 3-D plot, **Shift+wheel** adjusts elevation like a vertical drag and
 **Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
 angle; wheel up decreases it, in 5° steps with the same limits as dragging.

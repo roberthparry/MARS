@@ -45,6 +45,7 @@
 .rendered:has([data-surface]) svg {
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 
 .rendered.plot-dragging svg {

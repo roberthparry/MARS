@@ -191,9 +191,15 @@
         };
         const surface = rendered.querySelector('[data-surface]');
         const path = surface.querySelector('[data-series] path');
-        const mouse = (target, type, x, y, extras = {}) => target.dispatchEvent(new MouseEvent(
-            type, {clientX: x, clientY: y, button: 0, buttons: type === 'mouseup' ? 0 : 1,
+        const pointer = (target, type, x, y, extras = {}) => target.dispatchEvent(new PointerEvent(
+            type, {clientX: x, clientY: y, button: 0,
+                   buttons: type === 'pointerup' || type === 'pointercancel' ? 0 : 1,
+                   pointerId: 1, pointerType: 'mouse', isPrimary: true,
                    bubbles: true, cancelable: true, ...extras}));
+        const mouse = (target, type, x, y, extras = {}) =>
+            pointer(target, type.replace('mouse', 'pointer'), x, y, extras);
+        const touch = (target, type, x, y, extras = {}) =>
+            pointer(target, type, x, y, {pointerId: 11, pointerType: 'touch', ...extras});
         const wheel = (target, deltaY, extras = {}) => target.dispatchEvent(new WheelEvent(
             'wheel', {deltaY, bubbles: true, cancelable: true, ...extras}));
         try {
@@ -272,6 +278,47 @@
             complete(false);
             check(pending.length === 0 && !rendered.classList.contains('plot-dragging'),
                   'A superseded request must discard queued movement without another request');
+            seed();
+            check(getComputedStyle(rendered.querySelector('svg')).touchAction === 'none',
+                  'The surface must reserve finger movement for rotation rather than page scrolling');
+            check(getComputedStyle(document.body).touchAction !== 'none',
+                  'Touch scrolling must remain available outside the surface');
+            check(touch(document.body, 'pointerdown', 100, 100) && !rendered.marsPlotDrag.active,
+                  'Touching outside the plot must retain browser behaviour');
+            check(!touch(path, 'pointerdown', 100, 100), 'A primary finger must start surface rotation');
+            touch(path, 'pointerdown', 150, 150, {pointerId: 12, isPrimary: false});
+            touch(window, 'pointermove', 200, 200, {pointerId: 12, isPrimary: false});
+            touch(window, 'pointerup', 200, 200, {pointerId: 12, isPrimary: false});
+            touch(window, 'pointercancel', 200, 200, {pointerId: 12, isPrimary: false});
+            mouse(window, 'mousemove', 180, 180);
+            check(values() === '45,30,0' && pending.length === 0 && rendered.marsPlotDrag.active,
+                  'Another finger or mouse must not move, release or cancel the active finger');
+            check(!touch(window, 'pointermove', 140, 100) && values() === '65,30,0' && pending[0].preview,
+                  'Horizontal finger dragging must change azimuth and request a coarse preview');
+            touch(window, 'pointermove', 140, 140);
+            check(values() === '65,50,0' && pending.length === 1,
+                  'Vertical finger dragging must change elevation and coalesce pending previews');
+            touch(window, 'pointerup', 140, 140);
+            complete();
+            check(pending.length === 1 && !pending[0].preview,
+                  'Lifting the finger must queue a full-detail redraw');
+            complete();
+            seed();
+            touch(path, 'pointerdown', 100, 100);
+            touch(window, 'pointermove', 140, 80);
+            touch(window, 'pointercancel', 140, 80);
+            check(values() === '45,30,0' && !rendered.marsPlotDrag.active,
+                  'A browser-cancelled touch must restore the original camera');
+            complete();
+            complete();
+            check(touch(path, 'pointerdown', 100, 100, {isPrimary: false}) && !rendered.marsPlotDrag.active,
+                  'A secondary finger must not start a gesture');
+            pointer(path, 'pointerdown', 100, 100, {pointerId: 21, pointerType: 'pen'});
+            pointer(window, 'pointermove', 120, 100, {pointerId: 21, pointerType: 'pen'});
+            check(values() === '55,30,0', 'Pen dragging must share the surface camera controls');
+            pointer(window, 'pointerup', 120, 100, {pointerId: 21, pointerType: 'pen'});
+            complete();
+            complete();
             seed();
             const card = rendered.closest('.result-card'), zoom = resultZoomIndex(card);
             check(!wheel(path, 100, {shiftKey: true}) && values() === '45,35,0' &&
@@ -365,21 +412,21 @@
             check(!!rendered.querySelector(selector), 'Dragging must redraw native geometry before mouse release');
         };
         const initialMesh = rendered.querySelector('[data-series]').innerHTML;
-        mouse(path, 'mousedown', 100, 100);
-        mouse(window, 'mousemove', 140, 80);
+        touch(path, 'pointerdown', 100, 100);
+        touch(window, 'pointermove', 140, 80);
         await waitForAngle((initialAzimuth + 20) % 360);
         check(Number(rendered.querySelector('[data-surface]').dataset.elevation) ===
               Math.max(5, initialElevation - 10), 'An upward drag must render the decreased elevation');
         check(rendered.classList.contains('plot-dragging') &&
               rendered.querySelector('[data-series]').innerHTML !== initialMesh &&
               rendered.querySelectorAll('[data-series] path').length < 400,
-              'The actual surface must move while the left button is held');
-        mouse(window, 'mousemove', 180, 120);
+              'The actual surface must move while the finger is held');
+        touch(window, 'pointermove', 180, 120);
         await waitForAngle((initialAzimuth + 40) % 360);
         check(Number(rendered.querySelector('[data-surface]').dataset.elevation) ===
               Math.min(85, initialElevation + 10), 'A downward drag must render the increased elevation');
-        mouse(window, 'mouseup', 180, 120);
-        check(!rendered.classList.contains('plot-dragging'), 'Live rotation must end on mouse release');
+        touch(window, 'pointerup', 180, 120);
+        check(!rendered.classList.contains('plot-dragging'), 'Live rotation must end when the finger lifts');
         const fullDeadline = performance.now() + 15000;
         while ((rendered.querySelectorAll('[data-series] path').length < 1000 || rendered.marsPlotDrag.busy) &&
                performance.now() < fullDeadline)
@@ -1127,9 +1174,12 @@
             checkPlotControls(false);
             await window.checkLabMobileLayout('curve plot');
             const curveDragTarget = rendered.querySelector('[data-series] path');
-            check(curveDragTarget.dispatchEvent(new MouseEvent('mousedown',
-                  {button: 0, buttons: 1, bubbles: true, cancelable: true})) &&
+            check(curveDragTarget.dispatchEvent(new PointerEvent('pointerdown',
+                  {button: 0, buttons: 1, pointerId: 11, pointerType: 'touch', isPrimary: true,
+                   bubbles: true, cancelable: true})) &&
                   !rendered.classList.contains('plot-dragging'), 'Curve plots must not enable surface rotation');
+            check(getComputedStyle(rendered.querySelector('svg')).touchAction !== 'none',
+                  'Curve plots must retain normal touch scrolling');
             const formulaBox = rendered.querySelector('[data-plot-title]').getBoundingClientRect();
             const axesBox = rendered.querySelector('[data-plot-chart] [data-plot-axes]').getBoundingClientRect();
             check(formulaBox.width > 0 && formulaBox.height > 0 && formulaBox.bottom < axesBox.top,
