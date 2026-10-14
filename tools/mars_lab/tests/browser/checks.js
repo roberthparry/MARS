@@ -1035,6 +1035,7 @@
                 return;
             }
             await window.labReady;
+            initialise_lab_test_adapters();
             if (labProfile.enabled) {
                 await report('PASS: PROFILE ' + JSON.stringify(await labProfile.run()));
                 return;

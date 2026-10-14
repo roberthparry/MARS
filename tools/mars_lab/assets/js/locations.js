@@ -3,32 +3,12 @@
  * Definition-only client script; app.js loads it before shared worksheet state.
  */
 
-function validDateText(value, fallback = DEFAULT_DATETIME_DATE) {
-    return labDOM.call('lab_location_validate', 1, {value}, fallback, HOLIDAY_JURISDICTION_SET);
-}
-
 function formatAlmanacTimeInput(value) {
     return labFlowContinue(26, {action: 0, value});
 }
 
-function validDatetimeJurisdiction(value, fallback = DEFAULT_DATETIME_JURISDICTION) {
-    return labDOM.call('lab_location_validate', 2, {value}, fallback, HOLIDAY_JURISDICTION_SET);
-}
-
 function townsForJurisdiction(jurisdiction) {
     return labDOM.call('lab_location_towns', calendarLocationContext(), {value: jurisdiction});
-}
-
-function townValueParts(value) {
-    return labFlowContinue(26, {action: 1, value});
-}
-
-function townOptionMatchesValue(option, value) {
-    return labFlowContinue(26, {action: 2, option, value});
-}
-
-function numbersNearlyEqual(left, right, tolerance = 0.000001) {
-    return Boolean(labWire.exports().lab_forms_nearly_equal(marsFormNumber(left), marsFormNumber(right), tolerance));
 }
 
 function syncRoundedSelect(select) {
@@ -111,8 +91,6 @@ function syncTownSelectors({selectDefault = false} = {}) {
     return labFlowContinue(29, {selectDefault});
 }
 
-const calendarSchemas = new Map();
-
 function calendarLocationContext() {
     return {
         config: labConfig,
@@ -128,12 +106,6 @@ function acceptCalendarLocationContext(context) {
     almanacVisibilityMode = context.visibility;
     datetimeAutoGmtOffset = context.automaticOffset;
     datetimeGmtOffsetTouched = context.offsetTouched;
-}
-
-function calendarSchema(mode) {
-    if (!calendarSchemas.has(mode))
-        calendarSchemas.set(mode, labDOM.call('lab_location_schema', workspaceModeId(mode)));
-    return calendarSchemas.get(mode);
 }
 
 function readCalendarControls(mode) {
@@ -190,10 +162,6 @@ function currentCalendarState(mode) {
     const state = labDOM.call('lab_location_current', workspaceModeId(mode), context);
     acceptCalendarLocationContext(context);
     return state;
-}
-
-function validAlmanacVisibility(value, fallback = DEFAULT_ALMANAC_VISIBILITY) {
-    return labDOM.call('lab_location_validate', 3, {value}, fallback, HOLIDAY_JURISDICTION_SET);
 }
 
 function almanacSummaryText(state = currentAlmanacState()) {
@@ -367,10 +335,6 @@ function marsTodayIsoDateForInput(input) {
 
 function closeMarsDatePicker({restoreFocus = false} = {}) {
     labDOM.call('lab_widgets_picker_close', marsDatePickerState, Number(restoreFocus));
-}
-
-function marsDatePickerAnchorRect(shell) {
-    return labDOM.call('lab_widgets_picker_anchor', shell);
 }
 
 function placeMarsDatePicker(shell) {

@@ -43,7 +43,8 @@ static bool lab_browser_prepare(const char *directory)
     file_t *page = lab_browser_file(directory, "index.html");
     string_t *html = source ? file_read_all_text(source) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
-    static const char *const modules[] = {"profile_checks.js",        "workspace_checks.js",
+    static const char *const modules[] = {"native_adapters.js",
+                                          "profile_checks.js",        "workspace_checks.js",
                                           "request_checks.js",        "forms_checks.js",
                                           "layout_checks.js",         "syntax_checks.js",
                                           "calendar_checks.js",       "persist_checks.js",

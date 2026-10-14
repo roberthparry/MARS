@@ -126,7 +126,7 @@ export function createCodec(environment = {}) {
         async start(bytes) {
             const result = await WebAssembly.instantiate(bytes, imports);
             wasm = (result.instance || result).exports;
-            if (typeof wasm.lab_browser_abi_version !== 'function' || wasm.lab_browser_abi_version() !== 31)
+            if (typeof wasm.lab_browser_abi_version !== 'function' || wasm.lab_browser_abi_version() !== 32)
                 throw new Error('The Lab codec ABI is incompatible; rebuild and restart');
         },
         bytes(buffer) {

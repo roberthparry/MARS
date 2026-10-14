@@ -56,15 +56,8 @@ function expressionWithSortedConstants(text) {
 function canGoalSeek() {
     return currentVariables.length > 0;
 }
-function expressionForEvaluation(text) {
+function expression_text_or_empty(text) {
     return String(text || '');
-}
-function expressionForEditor(text) {
-    return String(text || '');
-}
-
-function restoreCompactBindingValues(text) {
-    return labDOM.call('lab_editor_metadata', 2, [text], labPresentationEditors);
 }
 
 // UTF-8 validation and buffer transfer only; safe to call from a scoped native view getter.

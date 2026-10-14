@@ -287,10 +287,6 @@ function refreshAlmanacLandTotality(data) {
     return labFlowContinue(9, {data});
 }
 
-function refreshDatetimeLocalHolidays() {
-    return labFlowContinue(10, {});
-}
-
 /** Browser resources and atomic application access; native continuations select their order. */
 function labRequestFlowServices() {
     const fetchPayloads = [
@@ -479,7 +475,7 @@ function labFlowCapabilities() {
         goalPrepare: (...args) => goalSeekExpressionAndStarts(...args),
         goalEditorBody: text => expressionBodyForEditor(text),
         expressionWithBindings: (...args) => expressionWithBindings(...args),
-        goalExpression: text => expressionForEvaluation(text),
+        goalExpression: text => expression_text_or_empty(text),
         precision: () => requestedValuePrecision(),
         fail: message => {
             throw new Error(message);

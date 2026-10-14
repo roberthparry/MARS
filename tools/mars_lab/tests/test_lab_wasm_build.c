@@ -55,7 +55,13 @@ static bool wasm_build_plans(const char *directory)
                             "DEBUG=0", "tools/mars_lab/build/release/wasm/lab_browser.wasm", NULL};
     output = ok ? wasm_make(normal) : NULL;
     ok = ok && output && string_find(output, " -S ") < 0 && string_find(output, " -c ") >= 0 &&
-         string_find(output, "--no-entry") >= 0;
+         string_find(output, "--no-entry") >= 0 && string_find(output, "lab_job_worker.o") >= 0;
+    string_free(output);
+    const char *codec[] = {"make", "--no-print-directory", "-j1", "-n", "-B", "-o", "check-lab-wasm-deps",
+                           "DEBUG=0", "tools/mars_lab/build/release/wasm/lab_codec.wasm", NULL};
+    output = ok ? wasm_make(codec) : NULL;
+    ok = ok && output && string_find(output, "lab_job_worker.o") >= 0 &&
+         string_find(output, "lab_codec.imports") >= 0 && string_find(output, "lab_dom.o") < 0;
     string_free(output);
     return ok;
 }

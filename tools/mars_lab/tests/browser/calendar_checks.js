@@ -18,7 +18,7 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         check(
             retired.status === 404 && !labDefinitionScripts.includes('almanac'),
             'retired almanac script remains served or loaded');
-        equal(native.lab_browser_abi_version(), 31, 'current browser ABI is required');
+        equal(native.lab_browser_abi_version(), 32, 'current browser ABI is required');
         equal(native.lab_profile_count(5), 11, 'DateTime field count');
         equal(native.lab_profile_count(6), 9, 'almanac field count');
         for (const mode of [0, 4, 7, -1]) {

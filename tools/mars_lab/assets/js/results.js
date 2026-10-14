@@ -16,18 +16,6 @@ function hideButtonTooltip() {
 
 // DOM capability adapters only; C owns layout and native card state.
 const resetMoreDigitsButton = (button, enabled) => labDOM.call('lab_layout_more', button, Number(!!enabled));
-const hasAbbreviatedValue = value => value === true;
-const resultZoomIndex = card => labWire.exports().lab_view_card_zoom(resultCardIds.get(card) ?? -1);
-const applyResultZoom = card => labDOM.call('lab_layout_zoom', card);
-const setResultZoom = (card, index) => labDOM.call('lab_layout_set_zoom', card, index, 0);
-const stepResultZoom = (card, direction) => labDOM.call('lab_layout_set_zoom', card, direction, 1);
-const renderResultCardExpansion = () => labDOM.call('lab_layout_expand', null, 0);
-const resultCardExpanded = card => labWire.exports().lab_view_card_expanded() === resultCardIds.get(card);
-const collapseResultCards = () => labDOM.call('lab_layout_expand', null, 2);
-const toggleResultCardExpansion = button => labDOM.call('lab_layout_expand', button.closest('.result-card'), 1);
-const setRenderedContent = (svg, fallback = '') => labDOM.call('lab_layout_content', svg, fallback);
-const svgMarkupIntrinsicWidth = markup => labDOM.call('lab_layout_markup_width', markup);
-const installSolverTexSvg = (markup, variant) => labDOM.call('lab_layout_solver_install', markup, variant);
 const clearRenderedError = () => labDOM.call('lab_layout_error', '', 0);
 const setRenderedError = message => labDOM.call('lab_layout_error', String(message || ''), 1);
 
@@ -111,10 +99,6 @@ function copyTextForTarget(target) {
     return labDOM.call('lab_result_copy', target, lastTex);
 }
 
-function parsedExpressionText() {
-    return labDOM.call('lab_result_copy', 'expression', lastTex);
-}
-
 function setResultInputText(text, bindings = null) {
     labDOM.call('lab_result_input_set', String(text || ''));
     resultInputBindings = labDOM.call('lab_result_binding_snapshot', bindings);
@@ -189,15 +173,6 @@ function clearResultDetails(options = {}) {
     labDOM.services(state, {clearVariableValues: () => clearVariableValues()});
 }
 
-function almanacPresentationVariant(data, visibility) {
-    const variant = labDOM.call('lab_result_almanac_variant', data, visibility);
-    if (!variant)
-        throw new Error(
-            'Almanac presentation is missing from the server response. ' +
-            'Run make mars-lab-restart, reload the page and evaluate again.');
-    return variant;
-}
-
 // Browser-owned live state; C owns visibility selection and event service ordering.
 const labAlmanacEventState = Object.freeze({
     get visibility() {
@@ -216,10 +191,6 @@ function bindAlmanacTotalityActions(root) {
     labDOM.call('lab_almanac_events_install', root, null);
 }
 
-function almanacWorksheetCopyText(data, visibility) {
-    return almanacPresentationVariant(data, visibility).copy_text;
-}
-
 function renderAlmanacWorksheet(target, data) {
     const visibility = labDOM.call('lab_almanac_events_render', target, data, labAlmanacEventState);
     if (visibility === null)
@@ -232,11 +203,6 @@ function renderAlmanacWorksheet(target, data) {
 /** Copy after outstanding binding commits, using the browser clipboard. */
 function copyInputFromEvent() {
     return labFlowContinue(59, {button: inputCopy});
-}
-
-// Browser projection capabilities consumed by native continuation plans.
-function evaluationLabel(mode, field) {
-    return labDOM.call('lab_evaluation_label', mode, field);
 }
 
 // Only browser-side effects live here; C selects their arguments and execution order.
@@ -356,7 +322,7 @@ const labGoalServices = Object.freeze({
     },
     renderDerivatives: () => renderDerivativeButtons(currentVariables),
     setSource: context => {
-        labEditorState.goalSource = expressionForEditor(context.seek.expression).trim();
+        labEditorState.goalSource = expression_text_or_empty(context.seek.expression).trim();
     },
     setTarget: context => {
         labEditorState.goalTarget = context.target;

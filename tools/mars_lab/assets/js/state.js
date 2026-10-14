@@ -26,10 +26,6 @@ function loadLabLocalState(key) {
     }
 }
 
-function validPrecisionBits(bits, fallback) {
-    return labDOM.call('lab_storage_precision', [bits, fallback]);
-}
-
 function validIntegratorIntervalCap(value) {
     return labDOM.call('lab_storage_intervals', [value], labConfig);
 }

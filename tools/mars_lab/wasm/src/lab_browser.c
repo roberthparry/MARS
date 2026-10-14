@@ -290,7 +290,7 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 31;
+    return 32;
 }
 
 /* Borrow encoded output until the next call. */

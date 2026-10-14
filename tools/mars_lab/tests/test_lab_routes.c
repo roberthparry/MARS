@@ -314,6 +314,9 @@ static bool route_contracts(const char *directory)
     response = route_request(HTTP_GET, "/js/missing.js", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
+    response = route_request(HTTP_GET, "/js/native_adapters.js", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
     response = route_request(HTTP_GET, "/favicon.svg", NULL, NULL, NULL, NULL);
     ok = route_check(response, 200, response_contains(response, "<svg"), "GET /favicon.svg") && ok;
     http_response_free(response);

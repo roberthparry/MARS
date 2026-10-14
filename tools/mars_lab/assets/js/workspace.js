@@ -13,11 +13,6 @@ function nextIntegratorFormsRevision() {
 }
 let integratorReferenceMetadata = null;
 
-// This copies structured DOM fields only. Native /forms owns all text interpretation.
-function sanitizeIntegratorRow(row, fallbackName = 'x') {
-    return labDOM.call('lab_binding_row_normalise', row, String(fallbackName));
-}
-
 function integratorFormsExpression() {
     return currentExpressionText() || expr.value || '';
 }
@@ -30,29 +25,11 @@ async function refreshIntegratorForms(rows = currentIntegratorRows(), expression
     return labFlowContinue(73, {rows, expression});
 }
 
-const integratorCandidateNames = Object.freeze(labDOM.call('lab_binding_row_names'));
-
-function integratorDefaultVariableName(rows = []) {
-    return labDOM.call('lab_binding_rows_name', rows);
-}
-
-function integratorRowText(row) {
-    return integratorBoundsTextFromRows([row]);
-}
-
 function integratorBoundsTextFromRows(rows) {
     const text = labDOM.call('lab_binding_rows_text', rows);
     if (text === null)
         throw new Error('Integrator rows exceed the native limits or contain invalid Unicode');
     return text;
-}
-
-async function parseIntegratorBoundsText(text) {
-    return labFlowContinue(74, {text});
-}
-
-function integratorFallbackRows() {
-    return labDOM.call('lab_binding_rows_default', 0);
 }
 
 function integratorBlankRows() {
@@ -209,10 +186,6 @@ function requestedPrecisionBits() {
     return native.lab_workspace_requested_precision(native.lab_workspace_mode());
 }
 
-function precisionStatusText() {
-    return labDOM.call('lab_workspace_dom_precision');
-}
-
 function setStatus(text) {
     labDOM.call('lab_workspace_dom_status', String(text));
 }
@@ -304,10 +277,6 @@ function showResults() {
     labDOM.call('lab_workspace_dom_help', 0);
 }
 
-function showHelp() {
-    labDOM.call('lab_workspace_dom_help', 1);
-}
-
 function toggleHelp() {
     labDOM.call('lab_workspace_dom_help', 2);
 }
@@ -319,10 +288,6 @@ function variableNamesFromBindings(bindings) {
 function visibleBindingsForCurrentMode(bindings) {
     const mode = workspaceModeId(currentMode());
     return labDOM.call('lab_binding_select', mode, bindings, mode === 4 ? currentIntegratorBoundNames() : null);
-}
-
-function showTargetEntry() {
-    labDOM.call('lab_workspace_dom_target', 1);
 }
 
 function hideTargetEntry() {
@@ -550,7 +515,6 @@ const modePrecisionBits = createWorkspaceModeView('precision');
 const DEFAULT_EXPRESSION_TEXT = labConfig.DEFAULT_EXPRESSION;
 const DEFAULT_EQUATION_TEXT = labConfig.DEFAULT_EQUATION;
 const DEFAULT_DIFFEQUATION_TEXT = labConfig.DEFAULT_DIFFEQUATION;
-const DEFAULT_EQUATION_VARIABLE_TEXT = labConfig.DEFAULT_EQUATION_VARIABLE;
 const DEFAULT_MATRIX_TEXT = labConfig.DEFAULT_MATRIX;
 const DEFAULT_INTEGRATOR_TEXT = labConfig.DEFAULT_INTEGRATOR;
 const DEFAULT_INTEGRATOR_BOUNDS_TEXT = labConfig.DEFAULT_INTEGRATOR_BOUNDS;
@@ -578,7 +542,6 @@ let almanacLastWorksheetData = null;
 const HOLIDAY_JURISDICTION_SET = new Set(labCatalogue.options.map(row => row[0]));
 const JURISDICTION_TOWN_OPTIONS = labCatalogue.towns;
 const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
-const EXPRESSION_TIMESTAMP_STORAGE_KEY = 'mars.exprLab.lastExpressionUpdatedAt';
 let lastExpressionUpdatedAt = 0;
 const modeEditorText = createWorkspaceModeView('editor');
 Object.assign(modeEditorText, {

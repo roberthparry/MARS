@@ -121,7 +121,8 @@ window.checkLabGoal = async function checkLabGoal() {
             return 'current authored α';
         });
         replace('goalSeekExpressionAndStarts', async (text, start) => ({expression: text, start}));
-        replace('expressionForEvaluation', text => text);
+        for (const input of [null, undefined, false, 0, '', '  opaque α\u0000β  '])
+            equal(expression_text_or_empty(input), String(input || ''), 'shared text conversion preserves authored text');
         replace('requestedValuePrecision', () => 53);
         replace('expressionBodyForEditor', text => {
             events.push(['body', text]);
@@ -137,10 +138,6 @@ window.checkLabGoal = async function checkLabGoal() {
         });
         replace('renderDerivativeButtons', variables => {
             events.push(['derivatives', variables, lastDerivativeExpression, currentDifferentiable]);
-        });
-        replace('expressionForEditor', text => {
-            events.push(['goalSource', text]);
-            return '  ' + text + '  ';
         });
         const bindings = [{name: 'μ', value: '1/3'}];
         data = {
@@ -171,7 +168,7 @@ window.checkLabGoal = async function checkLabGoal() {
         equal(
             events.slice(historyIndex - 1).map(event => event[0]).join(','),
             'currentText,pushExpressionHistory,setRenderedResult,bindings,ready,setExpressionEditor,' +
-                'installEvaluationTextCards,bindings,variables,differentiable,derivatives,goalSource,' +
+                'installEvaluationTextCards,bindings,variables,differentiable,derivatives,' +
                 'hideTargetEntry,unchanged,setStatus',
             'getter and effect timing preserved through native plan');
         equal(named('pushExpressionHistory')[0][1], 'current authored α', 'history reads current editor');

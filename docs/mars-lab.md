@@ -228,6 +228,15 @@ messages from a replaced worker cannot complete a newer request. Startup errors,
 decode errors and deadlines reject promises and release their admission budgets.
 
 The thin `js/jobs.js` adapter owns browser Workers, promises, timers and transfers.
+`wasm/src/lab_job_worker.c` selects startup, serial dispatch, completion,
+cancellation and closure through an opaque per-pool phase and explicit host
+effects. It rejects out-of-order replies, duplicate readiness announcements and
+non-matching tokens without truncating fractional or oversized identifiers.
+An invalid reply fails the running and queued jobs; cancelling just the running
+job preserves queued work and starts a replacement worker when needed. Closed
+controllers cannot be reopened by late events. JavaScript retains the Worker
+identity check so callbacks from a replaced browser object cannot enter the
+current controller.
 `js/codec.js` supplies the shared host-value bridge; all Protobuf validation remains
 in C. `js/codec_worker.js` loads the codec-only `wasm/lab_codec.wasm`, with fixed
 16 MiB private linear memory and no DOM imports. There is one lazily started worker
@@ -464,7 +473,7 @@ returned choices; it does not maintain a second field-policy table.
 Restoration retains authored DateTime whitespace while capture trims values.
 Clear preserves town selection and the almanac jurisdiction. Named-town offsets
 and manually edited DateTime offsets retain priority over jurisdiction replies.
-The browser ABI is version 31; mismatched assets require a rebuild/restart
+The browser ABI is version 32; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -764,6 +773,11 @@ JavaScript keeps
 DOM events, browser storage, fetch/abort resources, timezone API access, syntax
 highlight spans and the application of layout decisions; no mathematical engine is shipped
 to the browser.
+
+Convenience adapters used only by browser regression checks live in
+`tools/mars_lab/tests/browser/native_adapters.js`, not in the production scripts.
+The private browser fixture injects them and initialises their native-dependent
+values after startup; they have no public asset route.
 
 The native jurisdiction catalogue supplies each town's selection key and formatted
 coordinate detail directly. `lab_forms_town_presentation` shares the legacy town

@@ -1,13 +1,21 @@
-/** Browser capabilities for the C-owned bounded queue; one isolated worker, no UI-thread waits. */
+/** Browser resources for the C-owned queue and worker lifecycle; no UI-thread waits. */
+// Numeric event/effect identifiers mirror lab_jobs.h and are covered by the module ABI.
+export const worker_events = Object.freeze({pump: 0, ready: 1, result: 2, error: 3, failure: 4, cancel: 5, close: 6, unknown: 7});
+export const worker_actions = Object.freeze({wait: 0, start: 1, send: 2, finish: 3, fail: 4, invalid: 5, stop: 6});
+
 export function createJobs(native, codec, workerURL, wasmURL) {
     const jobs = new Map();
-    let worker = null, ready = false, active = 0, disposed = false;
+    let worker = null, active = 0, phase = 0;
     let started = 0, completed = 0;
+    function transition(event, token = 0) {
+        const plan = native.lab_jobs_worker_step(phase, event, token, active);
+        phase = plan & 255;
+        return plan >>> 8;
+    }
     function stop() {
         if (worker)
             worker.terminate();
         worker = null;
-        ready = false;
     }
     function retire(token, error, value) {
         const job = jobs.get(token);
@@ -27,16 +35,16 @@ export function createJobs(native, codec, workerURL, wasmURL) {
             job.resolve(value);
         }
     }
-    function fail(error) {
+    function fail(error, event = worker_events.failure) {
+        transition(event);
         stop();
         // Map iteration is bounded by the eight-job native admission limit.
         for (const token of jobs.keys())
             retire(token, error);
     }
     function pump() {
-        if (disposed || !jobs.size || active)
-            return;
-        if (!worker) {
+        const action = transition(worker_events.pump);
+        if (action === worker_actions.start) {
             try {
                 const instance = new Worker(workerURL, {type: 'module'});
                 worker = instance;
@@ -53,14 +61,19 @@ export function createJobs(native, codec, workerURL, wasmURL) {
                 instance.onmessage = ({data}) => {
                     if (worker !== instance)
                         return;
-                    if (data.type === 'ready') {
-                        ready = true;
-                    } else if (data.type === 'error' && !data.token) {
-                        fail(new Error(data.message));
+                    const message = data && typeof data === 'object' ? data : {};
+                    const event = message.type === 'ready' ? worker_events.ready :
+                        message.type === 'result' ? worker_events.result :
+                        message.type === 'error' ? worker_events.error : worker_events.unknown;
+                    const token = typeof message.token === 'number' ? message.token :
+                        message.token == null ? 0 : NaN;
+                    const effect = transition(event, token);
+                    if (effect === worker_actions.fail) {
+                        fail(new Error(message.message));
                         return;
-                    } else if (data.token === active && (data.type === 'result' || data.type === 'error')) {
-                        retire(data.token, data.type === 'error' ? new Error(data.message) : null, data.value);
-                    } else {
+                    } else if (effect === worker_actions.finish) {
+                        retire(active, event === worker_events.error ? new Error(message.message) : null, message.value);
+                    } else if (effect === worker_actions.invalid) {
                         fail(new Error('Unexpected codec worker response'));
                         return;
                     }
@@ -72,7 +85,11 @@ export function createJobs(native, codec, workerURL, wasmURL) {
             }
             return;
         }
-        if (!ready)
+        if (action === worker_actions.invalid) {
+            fail(new Error('Invalid codec worker state'));
+            return;
+        }
+        if (action !== worker_actions.send)
             return;
         const token = native.lab_jobs_take();
         const job = jobs.get(token);
@@ -88,7 +105,7 @@ export function createJobs(native, codec, workerURL, wasmURL) {
     }
     function decode(buffer, signal) {
         return new Promise((resolve, reject) => {
-            if (disposed)
+            if (!native.lab_jobs_worker_accepts(phase))
                 throw new Error('Codec queue is closed');
             if (signal?.aborted)
                 throw signal.reason || new DOMException('Cancelled', 'AbortError');
@@ -108,7 +125,7 @@ export function createJobs(native, codec, workerURL, wasmURL) {
                 throw error;
             }
             const abort = error => {
-                if (active === token)
+                if (transition(worker_events.cancel, token) === worker_actions.stop)
                     stop();
                 retire(token, error);
                 pump();
@@ -126,8 +143,7 @@ export function createJobs(native, codec, workerURL, wasmURL) {
         decode,
         status: () => ({count: native.lab_jobs_count(), bytes: native.lab_jobs_bytes(), active, started, completed}),
         close() {
-            disposed = true;
-            fail(new DOMException('Codec queue closed', 'AbortError'));
+            fail(new DOMException('Codec queue closed', 'AbortError'), worker_events.close);
         }
     };
 }
