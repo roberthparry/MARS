@@ -1203,9 +1203,9 @@ the card. **−** and **+** change the ranges around their centre, and **Reset**
 restores the range controls captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
 hover readings or gesture anchors. A vertical hover guide shows
-an approximate x coordinate, calculated from renderer-owned viewport metadata,
+approximate x and y pointer coordinates, calculated from renderer-owned viewport metadata,
 and includes the native integration-constant values when a solution-family curve is hovered.
-The coordinate and each constant appear on separate lines. The guide disappears
+Each coordinate and each constant appear on separate lines. The guide disappears
 outside the chart. It does not obscure curve-identity tooltips or
 appear in copied SVG output. Native SVG hover titles are suppressed in the interactive
 curve plot to avoid duplicate tooltips; their text remains accessible and is preserved

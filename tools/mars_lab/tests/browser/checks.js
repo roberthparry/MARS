@@ -648,9 +648,10 @@
         rendered.dispatchEvent(new PointerEvent('pointermove', {clientX, clientY, bubbles: true}));
         const tip = rendered.querySelector('.plot-pointer-tip'), line = rendered.querySelector('.plot-pointer-line');
         check(tip && line && !tip.classList.contains('hidden') &&
-              Math.abs(Number(tip.textContent.replace('x ≈ ', '')) - anchor) < 1e-8 &&
+              Math.abs(Number(tip.textContent.split('\n')[0].replace('x ≈ ', '')) - anchor) < 1e-8 &&
+              Math.abs(Number(tip.textContent.split('\n')[1].replace('y ≈ ', '')) - (y1 * 0.4 + y0 * 0.6)) < 1e-8 &&
               Math.abs(line.getBoundingClientRect().left - clientX) < 2,
-              'Hover guide follows the pointer and reads the native horizontal coordinate');
+              'Hover guide follows the pointer and shows both native coordinates on separate lines');
         check(getComputedStyle(line).pointerEvents === 'none' && getComputedStyle(tip).pointerEvents === 'none',
               'The hover guide must not intercept curve tooltips or gestures');
         // Check actual rendered tick anchors, independently of the range-to-screen calculation above.
@@ -666,7 +667,7 @@
                 continue;
             rendered.dispatchEvent(new PointerEvent('pointermove',
                 {clientX: position.x, clientY, bubbles: true}));
-            check(Math.abs(Number(tip.textContent.replace('x ≈ ', '')) - Number(tick.textContent)) < 0.002 * (x1 - x0),
+            check(Math.abs(Number(tip.textContent.split('\n')[0].replace('x ≈ ', '')) - Number(tick.textContent)) < 0.002 * (x1 - x0),
                   'Hover coordinates agree with the rendered tick ' + tick.textContent + ': ' + tip.textContent);
         }
         rendered.dispatchEvent(new PointerEvent('pointerleave'));
@@ -1992,15 +1993,15 @@
                         const lines = tooltip.textContent.split('\n');
                         const constants = active.querySelector('title').marsPlotLabel.split(', ');
                         check(!tooltip.classList.contains('hidden') && tooltip.textContent.includes('x ≈ ') &&
-                              lines.length === constants.length + 1 &&
-                              constants.every((value, i) => lines[i + 1] === value) &&
+                              lines[1].startsWith('y ≈ ') && lines.length === constants.length + 2 &&
+                              constants.every((value, i) => lines[i + 2] === value) &&
                               getComputedStyle(tooltip).whiteSpace === 'pre-line',
-                              'The visible hover tooltip puts x and each selected curve constant on separate lines');
+                              'The visible hover tooltip puts x, y and each selected curve constant on separate lines');
                     }
                     chart.dispatchEvent(new PointerEvent('pointermove', point));
                     check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
                           'Moving between curves restores the whole solution family');
-                    check(!plotRendered.querySelector('.plot-pointer-tip').textContent.includes('\n'),
+                    check(plotRendered.querySelector('.plot-pointer-tip').textContent.split('\n').length === 2,
                           'Moving off a curve removes stale constants from the coordinate tooltip');
                     curves[0].querySelector('path').dispatchEvent(new PointerEvent('pointermove', point));
                     plotRendered.dispatchEvent(new PointerEvent('pointerleave'));

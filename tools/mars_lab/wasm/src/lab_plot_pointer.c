@@ -169,6 +169,9 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     double value = bounds[0] * (1 - fraction) + bounds[1] * fraction;
     int name = lab_dom_read(lab_dom_id("plotFirst"), 5, "");
     int text = lab_dom_join(name, lab_dom_format(value, " ≈ ", ""), "");
+    double vertical_fraction = (y - box[1]) / box[3];
+    double vertical_value = bounds[3] * (1 - vertical_fraction) + bounds[2] * vertical_fraction;
+    text = lab_dom_join(text, lab_dom_format(vertical_value, "\ny ≈ ", ""), "");
     int label = lab_dom_query(chart, ".plot-curve-active > title");
     if (label) {
         int constants = label_text(label);
