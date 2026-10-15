@@ -17,12 +17,20 @@
 
 typedef struct {
     double coordinate[3], value;
+    size_t index;
 } mesh_vertex_t;
+
+typedef struct {
+    mesh_vertex_t vertex;
+    unsigned char state;
+} mesh_edge_t;
 
 typedef struct {
     expr_t *residual, *variables[3];
     number_t *coordinates[3];
     size_t count, capacity;
+    mesh_edge_t *edges;
+    unsigned side;
 } equation_mesh_t;
 
 static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
@@ -38,14 +46,17 @@ static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
     return result;
 }
 
-static bool edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
+static bool refine_edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
 {
     double scale = fmax(fabs(a.value), fabs(b.value));
     *out = fabs(a.value) < fabs(b.value) ? a : b;
-    for (unsigned step = 0; step < 14 && out->value != 0; ++step) {
+    for (unsigned step = 0; step < 14 && fabs(out->value) > scale * 0.0001; ++step) {
         mesh_vertex_t middle = {0};
+        double weight = a.value / (a.value - b.value);
+        if (!isfinite(weight) || weight < 0.1 || weight > 0.9)
+            weight = 0.5;
         for (unsigned axis = 0; axis < 3; ++axis)
-            middle.coordinate[axis] = (a.coordinate[axis] + b.coordinate[axis]) / 2;
+            middle.coordinate[axis] = a.coordinate[axis] + weight * (b.coordinate[axis] - a.coordinate[axis]);
         middle.value = evaluate(mesh, middle.coordinate);
         if (!isfinite(middle.value))
             return false;
@@ -57,6 +68,24 @@ static bool edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_v
             b = middle;
     }
     return fabs(out->value) <= scale * 0.001;
+}
+
+static bool edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
+{
+    if (a.index > b.index) {
+        mesh_vertex_t swap = a;
+        a = b;
+        b = swap;
+    }
+    /* This tetrahedral split uses the seven positive cube directions only. */
+    size_t delta = b.index - a.index;
+    size_t direction = delta % mesh->side + 2 * ((delta / mesh->side) % mesh->side) +
+                       4 * (delta / ((size_t)mesh->side * mesh->side));
+    mesh_edge_t *cached = &mesh->edges[a.index * 7 + direction - 1];
+    if (!cached->state)
+        cached->state = refine_edge(mesh, a, b, &cached->vertex) ? 1 : 2;
+    *out = cached->vertex;
+    return cached->state == 1;
 }
 
 static bool tetrahedron(equation_mesh_t *mesh, const mesh_vertex_t vertices[4])
@@ -97,13 +126,20 @@ static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
 {
     size_t count = (size_t)side * side * side;
     mesh_vertex_t *grid = calloc(count, sizeof(*grid));
-    if (!grid)
+    mesh->edges = calloc(count * 7, sizeof(*mesh->edges));
+    mesh->side = side;
+    if (!grid || !mesh->edges) {
+        free(grid);
+        free(mesh->edges);
+        mesh->edges = NULL;
         return false;
+    }
     for (unsigned z = 0; z < side; ++z)
         for (unsigned y = 0; y < side; ++y)
             for (unsigned x = 0; x < side; ++x) {
                 unsigned indices[] = {x, y, z};
                 mesh_vertex_t *v = &grid[((size_t)z * side + y) * side + x];
+                v->index = ((size_t)z * side + y) * side + x;
                 for (unsigned axis = 0; axis < 3; ++axis)
                     v->coordinate[axis] = bounds[2 * axis] +
                         (bounds[2 * axis + 1] - bounds[2 * axis]) * indices[axis] / (side - 1);
@@ -127,6 +163,8 @@ static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
                 }
             }
     free(grid);
+    free(mesh->edges);
+    mesh->edges = NULL;
     return ok;
 }
 
@@ -171,7 +209,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
              read_bound(supplied[2 * axis + 1], &bounds[2 * axis + 1]) && bounds[2 * axis] < bounds[2 * axis + 1];
     }
     if (ok)
-        ok = sample(&mesh, bounds, !strcmp(argv[17], "preview") ? 17 : 33) && mesh.count;
+        ok = sample(&mesh, bounds, !strcmp(argv[17], "preview") ? 13 : 25) && mesh.count;
     /* Frame the discovered surface, without replacing any authored coordinate interval. */
     for (unsigned axis = 0; ok && axis < 3; ++axis) {
         if (*supplied[2 * axis] || *supplied[2 * axis + 1])

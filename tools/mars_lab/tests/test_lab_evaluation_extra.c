@@ -501,6 +501,21 @@ static void test_lab_extra_solver_plots(void)
                     200u, "plot_svg", "data-series");
     expect_response("/eval", "{\"expression\":\"x^2+y^2+z^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\"}", 200u, "plot_svg", "data-surface");
+    json_t *sphere = request("/eval", "{\"expression\":\"x^2+y^2+z^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                                     "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\"}", &status);
+    bool sphere_ok = status == 200u && contains(sphere, "plot_svg", "data-mesh=\"true\"") &&
+                     contains(sphere, "plot_svg", "data-sample-z-min=\"-1\"") &&
+                     contains(sphere, "plot_svg", "data-sample-z-max=\"1\"");
+    if (!sphere_ok)
+        show_failure(sphere);
+    json_free(sphere);
+    TEST_ASSERT_TRUE(sphere_ok, "coarse cached sphere edges retain both hemispheres");
+    expect_response("/eval", "{\"expression\":\"(x-0.2)^2+2*(y+0.1)^2+3*z^2=1\",\"wrt\":\"x\","
+                             "\"action\":\"plot\",\"plot_source_mode\":\"equation\"}",
+                    200u, "plot_svg", "data-mesh=\"true\"");
+    expect_response("/eval", "{\"expression\":\"1/(x+y+z-0.123)=0\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\"}",
+                    422u, "error", "No real isosurface");
     expect_response("/eval", "{\"expression\":\"x+y+z=1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\"}",
                     200u, "plot_svg", "data-surface");

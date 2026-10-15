@@ -1267,6 +1267,11 @@ about −1.2 to 1.2. This is a curve, not a height surface. The first-axis choic
 selects the horizontal coordinate; the vertical limits control the other coordinate.
 Bound parameters stay fixed. Three free coordinates produce a triangular isosurface
 of the residual, with the existing camera controls; more than three require bindings.
+The isosurface sampler uses a 25-point grid per axis (13 during interaction), caches
+shared edge intersections, and stops safeguarded edge refinement once its residual
+is small enough for plotting. This limits repeated evaluations without extending
+the worker timeout. Coarse meshes can miss small features; narrower bounds improve
+their resolution.
 The volume search is bounded to the selected coordinate ranges (initially −2 to 2),
 then automatic bounds fit the discovered mesh with padding. Implicit meshes use
 equal coordinate units and a uniform camera scale, so a sphere remains spherical
