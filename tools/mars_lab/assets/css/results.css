@@ -461,6 +461,8 @@ pre {
 }
 
 .plot-pointer-line,
+.plot-pointer-horizontal,
+.plot-pointer-marker,
 .plot-pointer-tip {
   position: absolute;
   pointer-events: none;
@@ -474,6 +476,21 @@ pre {
 .plot-pointer-line {
   width: 0;
   border-left: 1px dashed #e6c778;
+}
+
+.plot-pointer-horizontal {
+  height: 0;
+  border-top: 1px dashed #e6c778;
+}
+
+.plot-pointer-marker {
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #e6c778;
+  border-radius: 50%;
+  background: #142921;
+  transform: translate(-50%, -50%);
 }
 
 .plot-pointer-tip {

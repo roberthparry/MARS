@@ -141,6 +141,48 @@ static void focus_curve(int rendered, int chart, int target)
         lab_dom_class(active, "plot-curve-active", 1);
 }
 
+/* Inspect only rendered line segments, never expressions or gaps. Multiple crossings
+ * require a bounded scan of the displayed samples; select the closest visible branch. */
+static int curve_height(int chart, double x, double pointer_y, double *height)
+{
+    int active = lab_dom_query(chart, ".plot-curve-active");
+    int paths = lab_dom_all(active ? active : chart, active ? ":scope > path" : "[data-series] > path");
+    double best = __builtin_inf();
+    int found = 0;
+    for (unsigned i = 0; i < lab_dom_count(paths); ++i) {
+        unsigned mark = lab_dom_mark();
+        int path = lab_dom_item(paths, i);
+        int parts = lab_dom_get(path, "marsHoverSegment");
+        if (!lab_dom_truth(parts)) {
+            parts = lab_dom_split(lab_dom_read(path, 2, "d"), " ");
+            lab_dom_set(path, "marsHoverSegment", parts);
+        }
+        if (lab_dom_count(parts) != 6 || !lab_dom_equal(lab_dom_item(parts, 0), lab_dom_string("M")) ||
+            !lab_dom_equal(lab_dom_item(parts, 3), lab_dom_string("L"))) {
+            lab_dom_release(mark);
+            continue;
+        }
+        double ax = lab_dom_to_number(lab_dom_item(parts, 1)), ay = lab_dom_to_number(lab_dom_item(parts, 2));
+        double bx = lab_dom_to_number(lab_dom_item(parts, 4)), by = lab_dom_to_number(lab_dom_item(parts, 5));
+        if (!finite(ax) || !finite(ay) || !finite(bx) || !finite(by) || x < (ax < bx ? ax : bx) ||
+            x > (ax > bx ? ax : bx)) {
+            lab_dom_release(mark);
+            continue;
+        }
+        double low = ay < by ? ay : by, high = ay > by ? ay : by;
+        double y = ax == bx ? (pointer_y < low ? low : pointer_y > high ? high : pointer_y) :
+                             ay + (x - ax) * (by - ay) / (bx - ax);
+        double distance = __builtin_fabs(y - pointer_y);
+        if (distance < best) {
+            best = distance;
+            *height = y;
+            found = 1;
+        }
+        lab_dom_release(mark);
+    }
+    return found;
+}
+
 /* The guide is transient UI and is not inserted into the copyable SVG. */
 void lab_plot_pointer_dispatch(unsigned action, int event, int context)
 {
@@ -149,10 +191,14 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     int rendered = lab_dom_id("plotRendered");
     int chart = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
     int line = lab_dom_query(rendered, ".plot-pointer-line"), tip = lab_dom_query(rendered, ".plot-pointer-tip");
+    int horizontal = lab_dom_query(rendered, ".plot-pointer-horizontal");
+    int marker = lab_dom_query(rendered, ".plot-pointer-marker");
     double box[4], bounds[4], x = number(event, "clientX"), y = number(event, "clientY");
     if (action || !chart || !frame(chart, box, bounds) || x < box[0] || x > box[0] + box[2] ||
         y < box[1] || y > box[1] + box[3]) {
         lab_dom_class(line, "hidden", 1);
+        lab_dom_class(horizontal, "hidden", 1);
+        lab_dom_class(marker, "hidden", 1);
         lab_dom_class(tip, "hidden", 1);
         focus_curve(rendered, 0, 0);
         return;
@@ -160,6 +206,10 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     focus_curve(rendered, chart, lab_dom_get(event, "target"));
     line = overlay(rendered, ".plot-pointer-line", "plot-pointer-line");
     tip = overlay(rendered, ".plot-pointer-tip", "plot-pointer-tip");
+    horizontal = overlay(rendered, ".plot-pointer-horizontal", "plot-pointer-horizontal");
+    marker = overlay(rendered, ".plot-pointer-marker", "plot-pointer-marker");
+    lab_dom_class(horizontal, "hidden", 1);
+    lab_dom_class(marker, "hidden", 1);
     double left = lab_dom_measure(rendered, 7) - number(rendered, "scrollLeft");
     double top = lab_dom_measure(rendered, 8) - number(rendered, "scrollTop");
     pixels(line, "left", x - left);
@@ -169,9 +219,21 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     double value = bounds[0] * (1 - fraction) + bounds[1] * fraction;
     int name = lab_dom_read(lab_dom_id("plotFirst"), 5, "");
     int text = lab_dom_join(name, lab_dom_format(value, " ≈ ", ""), "");
-    double vertical_fraction = (y - box[1]) / box[3];
-    double vertical_value = bounds[3] * (1 - vertical_fraction) + bounds[2] * vertical_fraction;
-    text = lab_dom_join(text, lab_dom_format(vertical_value, "\ny ≈ ", ""), "");
+    double height = 0;
+    double svg_x = data(chart, "plotLeft") + fraction * data(chart, "plotWidth");
+    double svg_y = data(chart, "plotTop") + (y - box[1]) / box[3] * data(chart, "plotHeight");
+    if (curve_height(chart, svg_x, svg_y, &height)) {
+        double vertical_fraction = (height - data(chart, "plotTop")) / data(chart, "plotHeight");
+        double vertical_value = bounds[3] * (1 - vertical_fraction) + bounds[2] * vertical_fraction;
+        text = lab_dom_join(text, lab_dom_format(vertical_value, "\ny ≈ ", ""), "");
+        pixels(horizontal, "left", box[0] - left);
+        pixels(horizontal, "top", box[1] - top + vertical_fraction * box[3]);
+        pixels(horizontal, "width", box[2]);
+        lab_dom_class(horizontal, "hidden", 0);
+        pixels(marker, "left", x - left);
+        pixels(marker, "top", box[1] - top + vertical_fraction * box[3]);
+        lab_dom_class(marker, "hidden", 0);
+    }
     int label = lab_dom_query(chart, ".plot-curve-active > title");
     if (label) {
         int constants = label_text(label);
@@ -397,6 +459,8 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     }
     lab_plot_controls_sync();
     lab_dom_class(lab_dom_query(card, ".plot-pointer-line"), "hidden", 1);
+    lab_dom_class(lab_dom_query(card, ".plot-pointer-horizontal"), "hidden", 1);
+    lab_dom_class(lab_dom_query(card, ".plot-pointer-marker"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-tip"), "hidden", 1);
     int call = lab_dom_object(5), args = lab_dom_object(4);
     lab_dom_set(call, "service", lab_dom_string("takePlot"));

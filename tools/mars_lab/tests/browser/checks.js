@@ -647,11 +647,40 @@
         const anchor = x0 * 0.75 + x1 * 0.25;
         rendered.dispatchEvent(new PointerEvent('pointermove', {clientX, clientY, bubbles: true}));
         const tip = rendered.querySelector('.plot-pointer-tip'), line = rendered.querySelector('.plot-pointer-line');
+        const hoverX = Number(before.dataset.plotLeft) + Number(before.dataset.plotWidth) * 0.25;
+        const crossings = [...before.querySelectorAll('[data-series] > path')].flatMap(path => {
+            const p = path.getAttribute('d').split(' ');
+            const ax = Number(p[1]), ay = Number(p[2]), bx = Number(p[4]), by = Number(p[5]);
+            if (p.length !== 6 || ax === bx || hoverX < Math.min(ax, bx) || hoverX > Math.max(ax, bx)) return [];
+            const height = ay + (hoverX - ax) * (by - ay) / (bx - ax);
+            return [y1 + (height - Number(before.dataset.plotTop)) / Number(before.dataset.plotHeight) * (y0 - y1)];
+        });
+        const reportedY = Number(tip.textContent.split('\n')[1]?.replace('y ≈ ', ''));
+        const horizontal = rendered.querySelector('.plot-pointer-horizontal');
+        check(horizontal && !horizontal.classList.contains('hidden') &&
+              Math.abs(horizontal.getBoundingClientRect().top - (top + (y1 - reportedY) / (y1 - y0) * plotHeight)) < 2 &&
+              Math.abs(horizontal.getBoundingClientRect().width - plotWidth) < 2 &&
+              getComputedStyle(horizontal).pointerEvents === 'none',
+              'Horizontal hover guide spans the chart at the reported curve value');
+        const marker = rendered.querySelector('.plot-pointer-marker');
+        const markerBox = marker?.getBoundingClientRect();
+        check(marker && !marker.classList.contains('hidden') &&
+              Math.abs(markerBox.left + markerBox.width / 2 - clientX) < 2 &&
+              Math.abs(markerBox.top + markerBox.height / 2 - horizontal.getBoundingClientRect().top) < 2 &&
+              getComputedStyle(marker).pointerEvents === 'none',
+              'Curve marker is centred at the crosshair intersection without intercepting pointer events');
         check(tip && line && !tip.classList.contains('hidden') &&
               Math.abs(Number(tip.textContent.split('\n')[0].replace('x ≈ ', '')) - anchor) < 1e-8 &&
-              Math.abs(Number(tip.textContent.split('\n')[1].replace('y ≈ ', '')) - (y1 * 0.4 + y0 * 0.6)) < 1e-8 &&
+              crossings.some(value => Math.abs(value - reportedY) < 1e-8) &&
               Math.abs(line.getBoundingClientRect().left - clientX) < 2,
-              'Hover guide follows the pointer and shows both native coordinates on separate lines');
+              'Hover guide shows x and a plotted curve value rather than the pointer height: ' +
+              JSON.stringify({text: tip?.textContent, crossings, anchor}));
+        if (crossings.length === 1) {
+            rendered.dispatchEvent(new PointerEvent('pointermove',
+                {clientX, clientY: top + plotHeight * 0.15, bubbles: true}));
+            check(Math.abs(Number(tip.textContent.split('\n')[1].replace('y ≈ ', '')) - reportedY) < 1e-8,
+                  'Moving vertically leaves the single curve value unchanged');
+        }
         check(getComputedStyle(line).pointerEvents === 'none' && getComputedStyle(tip).pointerEvents === 'none',
               'The hover guide must not intercept curve tooltips or gestures');
         // Check actual rendered tick anchors, independently of the range-to-screen calculation above.
@@ -671,7 +700,9 @@
                   'Hover coordinates agree with the rendered tick ' + tick.textContent + ': ' + tip.textContent);
         }
         rendered.dispatchEvent(new PointerEvent('pointerleave'));
-        check(tip.classList.contains('hidden') && line.classList.contains('hidden'), 'Leaving hides the hover guide');
+        check(tip.classList.contains('hidden') && line.classList.contains('hidden') &&
+              horizontal.classList.contains('hidden') && marker.classList.contains('hidden'),
+              'Leaving hides both hover guides and the curve marker');
         const waitChart = async previous => {
             const deadline = performance.now() + 15000;
             while ((!chart() || chart() === previous) && performance.now() < deadline)
@@ -1992,6 +2023,10 @@
                         const tooltip = plotRendered.querySelector('.plot-pointer-tip');
                         const lines = tooltip.textContent.split('\n');
                         const constants = active.querySelector('title').marsPlotLabel.split(', ');
+                        check(!plotRendered.querySelector('.plot-pointer-horizontal').classList.contains('hidden'),
+                              'Selected family curves display a horizontal guide as well as a vertical guide');
+                        check(!plotRendered.querySelector('.plot-pointer-marker').classList.contains('hidden'),
+                              'Selected family curves mark the point described by the tooltip');
                         check(!tooltip.classList.contains('hidden') && tooltip.textContent.includes('x ≈ ') &&
                               lines[1].startsWith('y ≈ ') && lines.length === constants.length + 2 &&
                               constants.every((value, i) => lines[i + 2] === value) &&

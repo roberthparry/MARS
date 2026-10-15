@@ -1202,8 +1202,15 @@ Both request fresh native samples; the image stays fitted to
 the card. **−** and **+** change the ranges around their centre, and **Reset**
 restores the range controls captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
-hover readings or gesture anchors. A vertical hover guide shows
-approximate x and y pointer coordinates, calculated from renderer-owned viewport metadata,
+hover readings or gesture anchors. Vertical and horizontal hover guides meet at
+the reported curve point, marked by a small outlined circle. The marker and
+horizontal guide are hidden when no visible curve
+crosses the pointer's x coordinate. The tooltip shows
+the pointer's x coordinate and the plotted curve's approximate y value at that x,
+interpolated from visible native line segments without bridging gaps. Where several
+branches cross that x, the selected DE curve is preferred; otherwise the crossing
+nearest the pointer is used. No y value is shown when there is no visible crossing.
+The tooltip uses renderer-owned viewport metadata
 and includes the native integration-constant values when a solution-family curve is hovered.
 Each coordinate and each constant appear on separate lines. The guide disappears
 outside the chart. It does not obscure curve-identity tooltips or
