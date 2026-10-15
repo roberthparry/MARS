@@ -10,6 +10,7 @@
 #include "lab_workspace.h"
 #include "lab_requests.h"
 #include "lab_plot_controls.h"
+#include "lab_plot_drag.h"
 
 static int value(const char *id)
 {
@@ -188,8 +189,11 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
     if (!lab_dom_closest(target, "input") || (lab_workspace_mode() > 2 && lab_workspace_mode() != 4))
         return;
     /* Authored bounds take precedence over the exact coordinate behind a rounded zoom label. */
+    lab_plot_wheel_stop();
     lab_dom_delete(target, "marsZoomText");
     lab_dom_delete(target, "marsZoomValue");
+    /* A range or axis edit starts a new viewport; pending wheel bounds no longer apply. */
+    lab_dom_delete(lab_dom_id("plotRange"), "marsZoomChart");
     if (lab_dom_closest(target, ".plot-choices")) {
         int index = control_index(lab_dom_get(target, "name"));
         if (index >= 0)

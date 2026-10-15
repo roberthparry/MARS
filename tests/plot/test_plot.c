@@ -481,6 +481,23 @@ static bool ascending_surface_ticks(const string_t *svg)
 static void test_plot_surface(void)
 {
     {
+        plot_t *empty = plot_new(NULL);
+        bool ok = empty && plot_set_mesh(empty, NULL, NULL, NULL, 0);
+        string_t *missing_bounds = ok ? plot_to_svg(empty) : NULL;
+        ok = ok && !missing_bounds && plot_set_bounds(empty, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ONE) &&
+             plot_set_height_bounds(empty, NUM_ZERO, NUM_ONE);
+        string_t *svg = ok ? plot_to_svg(empty) : NULL;
+        xml_t *document = svg ? xml_from_text(svg) : NULL;
+        ok = ok && document && strstr(string_c_str(svg), "data-empty=\"true\"") &&
+             strstr(string_c_str(svg), "data-axis-arrow") && !strstr(string_c_str(svg), "<path fill=") &&
+             !strstr(string_c_str(svg), "nan");
+        xml_free(document);
+        string_free(svg);
+        string_free(missing_bounds);
+        plot_free(empty);
+        TEST_ASSERT_TRUE(ok, "empty meshes require explicit bounds and retain valid axes without invented geometry");
+    }
+    {
         number_t x[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO};
         number_t y[] = {NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE};
         number_t z[] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ONE};
@@ -540,6 +557,8 @@ static void test_plot_surface(void)
     for (const char *p = svg ? strstr(string_c_str(svg), "<path fill=") : NULL; p; p = strstr(p + 10, "<path fill="))
         ++faces;
     ok = svg && faces == 512 && strstr(string_c_str(svg), "data-uv=") &&
+         strstr(string_c_str(svg), "data-vertices=") && strstr(string_c_str(svg), "data-units=") &&
+         strstr(string_c_str(svg), "data-tick-fraction=") &&
          strstr(string_c_str(svg), "data-x-min=\"0\" data-x-max=\"16\"") &&
          strstr(string_c_str(svg), "data-y-min=\"0\" data-y-max=\"16\"");
     string_free(svg);
@@ -763,6 +782,10 @@ static void test_plot_surface_view(void)
              strstr(string_c_str(svg), "data-axis-arrow=\"0\"") &&
              strstr(string_c_str(svg), "data-axis-arrow=\"1\"") &&
              strstr(string_c_str(svg), "data-axis-arrow=\"2\"") &&
+             strstr(string_c_str(svg), "data-axis-handle=\"0\"") &&
+             strstr(string_c_str(svg), "data-axis-handle=\"1\"") &&
+             strstr(string_c_str(svg), "data-axis-handle=\"2\"") &&
+             strstr(string_c_str(svg), "vector-effect=\"non-scaling-stroke\" pointer-events=\"stroke\"") &&
              strstr(string_c_str(svg), ">x</text>") && strstr(string_c_str(svg), ">y</text>") &&
              strstr(string_c_str(svg), ">f</text>") &&
              !strstr(string_c_str(svg), "nan") && !strstr(string_c_str(svg), "inf");

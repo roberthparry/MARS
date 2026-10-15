@@ -32,6 +32,7 @@ typedef struct {
     size_t count, capacity;
     mesh_edge_t *edges;
     unsigned side;
+    bool overflow, excessive_levels;
 } equation_mesh_t;
 
 static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
@@ -41,9 +42,14 @@ static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
 
 static bool refine_edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
 {
-    double scale = fmax(fabs(a.value), fabs(b.value));
+    /* Require improvement over the better endpoint: a large pole must not make
+     * the opposite endpoint look like an already-converged zero. */
+    double scale = fmin(fabs(a.value), fabs(b.value));
     *out = fabs(a.value) < fabs(b.value) ? a : b;
-    for (unsigned step = 0; step < 14 && fabs(out->value) > scale * 0.0001; ++step) {
+    /* Near an already-small endpoint, fourteen bisections can exhaust the budget
+     * before a smooth crossing converges. Keep the residual test, but allow enough
+     * bracket refinement for binary64 coordinates. Ordinary edges still exit early. */
+    for (unsigned step = 0; step < 52 && fabs(out->value) > scale * 0.0001; ++step) {
         mesh_vertex_t middle = {0};
         double weight = a.value / (a.value - b.value);
         if (!isfinite(weight) || weight < 0.1 || weight > 0.9)
@@ -102,8 +108,10 @@ static bool tetrahedron(equation_mesh_t *mesh, const mesh_vertex_t vertices[4])
         if (!edge(mesh, vertices[a], vertices[b], &polygon[i]))
             return true;
     }
-    if (mesh->count + 3 * (count - 2) > mesh->capacity)
+    if (mesh->count + 3 * (count - 2) > mesh->capacity) {
+        mesh->overflow = true;
         return false;
+    }
     for (unsigned triangle = 1; triangle + 1 < count; ++triangle) {
         unsigned indices[] = {0, triangle, triangle + 1};
         for (unsigned i = 0; i < 3; ++i) {
@@ -119,29 +127,8 @@ static bool tetrahedron(equation_mesh_t *mesh, const mesh_vertex_t vertices[4])
     return true;
 }
 
-static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
+static bool triangulate(equation_mesh_t *mesh, const mesh_vertex_t *grid, unsigned side)
 {
-    size_t count = (size_t)side * side * side;
-    mesh_vertex_t *grid = calloc(count, sizeof(*grid));
-    mesh->edges = calloc(count * 7, sizeof(*mesh->edges));
-    mesh->side = side;
-    if (!grid || !mesh->edges) {
-        free(grid);
-        free(mesh->edges);
-        mesh->edges = NULL;
-        return false;
-    }
-    for (unsigned z = 0; z < side; ++z)
-        for (unsigned y = 0; y < side; ++y)
-            for (unsigned x = 0; x < side; ++x) {
-                unsigned indices[] = {x, y, z};
-                mesh_vertex_t *v = &grid[((size_t)z * side + y) * side + x];
-                v->index = ((size_t)z * side + y) * side + x;
-                for (unsigned axis = 0; axis < 3; ++axis)
-                    v->coordinate[axis] = bounds[2 * axis] +
-                        (bounds[2 * axis + 1] - bounds[2 * axis]) * indices[axis] / (side - 1);
-                v->value = evaluate(mesh, v->coordinate);
-            }
     static const unsigned tetrahedra[][4] = {
         {0, 1, 3, 7}, {0, 3, 2, 7}, {0, 2, 6, 7}, {0, 6, 4, 7}, {0, 4, 5, 7}, {0, 5, 1, 7}
     };
@@ -159,10 +146,103 @@ static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
                     ok = tetrahedron(mesh, vertices);
                 }
             }
+    return ok;
+}
+
+static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
+{
+    size_t count = (size_t)side * side * side;
+    mesh_vertex_t *grid = calloc(count, sizeof(*grid));
+    double *values = calloc(count, sizeof(*values));
+    mesh->edges = calloc(count * 7, sizeof(*mesh->edges));
+    mesh->side = side;
+    bool ok = grid && values && mesh->edges;
+    unsigned layers = lab_worker_implicit_layers(mesh->sampling);
+    for (unsigned layer = 0; ok && layer < layers; ++layer) {
+        double spacing = lab_worker_implicit_layer(mesh->sampling, layer);
+        double minimum = INFINITY, maximum = -INFINITY;
+        for (unsigned z = 0; z < side; ++z)
+            for (unsigned y = 0; y < side; ++y)
+                for (unsigned x = 0; x < side; ++x) {
+                    unsigned indices[] = {x, y, z};
+                    size_t index = ((size_t)z * side + y) * side + x;
+                    mesh_vertex_t *v = &grid[index];
+                    v->index = index;
+                    for (unsigned axis = 0; axis < 3; ++axis)
+                        v->coordinate[axis] = bounds[2 * axis] +
+                            (bounds[2 * axis + 1] - bounds[2 * axis]) * indices[axis] / (side - 1);
+                    values[index] = evaluate(mesh, v->coordinate);
+                    if (isfinite(values[index])) {
+                        minimum = fmin(minimum, values[index]);
+                        maximum = fmax(maximum, values[index]);
+                    }
+                }
+        double first = spacing ? ceil(minimum / spacing) : 0;
+        double last = spacing ? floor(maximum / spacing) : 0;
+        /* Keep level enumeration bounded even for extremely oscillatory authored views. */
+        if (!isfinite(first) || !isfinite(last) || fabs(first) > 1e9 || fabs(last) > 1e9 || last - first > 256) {
+            mesh->excessive_levels = true;
+            ok = false;
+            break;
+        }
+        for (long level = (long)first; ok && level <= (long)last; ++level) {
+            double offset = level * spacing;
+            lab_worker_implicit_level(mesh->sampling, offset);
+            for (size_t i = 0; i < count; ++i)
+                grid[i].value = values[i] - offset;
+            memset(mesh->edges, 0, count * 7 * sizeof(*mesh->edges));
+            ok = triangulate(mesh, grid, side);
+        }
+    }
+    free(values);
     free(grid);
     free(mesh->edges);
     mesh->edges = NULL;
     return ok;
+}
+
+/* Expand only unauthored endpoints, about the current centre even in a local precision frame. */
+static bool expand_automatic(double bounds[6], const char *const supplied[6])
+{
+    bool changed = false;
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        unsigned lo = 2 * axis, hi = lo + 1;
+        double span = bounds[hi] - bounds[lo];
+        if (!*supplied[lo]) {
+            bounds[lo] -= span * 1.5;
+            changed = true;
+        }
+        if (!*supplied[hi]) {
+            bounds[hi] += span * 1.5;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+static void clear_mesh(equation_mesh_t *mesh)
+{
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        for (size_t i = 0; i < mesh->count; ++i)
+            num_destroy(&mesh->coordinates[axis][i]);
+        mesh->extent[2 * axis] = INFINITY;
+        mesh->extent[2 * axis + 1] = -INFINITY;
+    }
+    mesh->count = 0;
+    mesh->overflow = false;
+}
+
+/* Retry the complete volume, never a truncated prefix of its facets. */
+static bool sample_bounded(equation_mesh_t *mesh, const double bounds[6], unsigned *side)
+{
+    for (;;) {
+        if (sample(mesh, bounds, *side))
+            return true;
+        if (!mesh->overflow || *side <= 3)
+            return false;
+        clear_mesh(mesh);
+        *side = *side > 6 ? *side - 4 : 3;
+    }
 }
 
 /* Render an implicit three-coordinate residual without choosing a height-function branch. */
@@ -191,10 +271,28 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
         mesh.coordinates[axis] = calloc(mesh.capacity, sizeof(number_t));
         ok = ok && mesh.coordinates[axis];
     }
+    bool preview = !strcmp(argv[17], "preview");
+    unsigned side = preview ? 9 : 25;
+    unsigned requested_side = side;
     if (ok)
-        ok = sample(&mesh, bounds, !strcmp(argv[17], "preview") ? 13 : 25) && mesh.count;
+        ok = sample_bounded(&mesh, bounds, &side);
+    bool expanded = false;
+    for (unsigned attempt = 0; ok && !mesh.count && attempt < 8; ++attempt) {
+        if (!expand_automatic(bounds, supplied))
+            break;
+        expanded = true;
+        ok = sample(&mesh, bounds, 13);
+    }
+    if (ok && mesh.count && expanded && side != 13) {
+        clear_mesh(&mesh);
+        ok = sample_bounded(&mesh, bounds, &side);
+    }
+    bool explicit_volume = true;
+    for (unsigned i = 0; i < 6; ++i)
+        explicit_volume &= *supplied[i] != '\0';
+    ok = ok && (mesh.count || explicit_volume);
     /* Frame the discovered surface, without replacing any authored coordinate interval. */
-    for (unsigned axis = 0; ok && axis < 3; ++axis) {
+    for (unsigned axis = 0; ok && mesh.count && axis < 3; ++axis) {
         if (*supplied[2 * axis] || *supplied[2 * axis + 1])
             continue;
         double lower = mesh.extent[2 * axis], upper = mesh.extent[2 * axis + 1];
@@ -219,10 +317,35 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     ok = ok && plot_set_bounds(plot, limits[0], limits[1], limits[2], limits[3]) &&
          plot_set_height_bounds(plot, limits[4], limits[5]);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    while (svg && !lab_worker_plot_fits(svg) && side > 3) {
+        string_free(svg);
+        plot_free(plot);
+        plot = plot_new(&options);
+        clear_mesh(&mesh);
+        side = side > 6 ? side - 4 : 3;
+        ok = plot && sample_bounded(&mesh, bounds, &side) &&
+             plot_set_mesh(plot, mesh.coordinates[0], mesh.coordinates[1], mesh.coordinates[2], mesh.count) &&
+             plot_set_view(plot, view[0], view[1]) && plot_set_roll(plot, view[2]) &&
+             plot_set_bounds(plot, limits[0], limits[1], limits[2], limits[3]) &&
+             plot_set_height_bounds(plot, limits[4], limits[5]);
+        svg = ok ? plot_to_svg(plot) : NULL;
+    }
+    bool excessive_output = mesh.overflow || (svg && !lab_worker_plot_fits(svg));
+    if (svg && (!lab_worker_plot_fits(svg) ||
+                (side < requested_side && !lab_worker_plot_reduced(svg)))) {
+        string_free(svg);
+        svg = NULL;
+    }
+    if (svg && !lab_worker_plot_quality(svg, preview, side)) {
+        string_free(svg);
+        svg = NULL;
+    }
     char *title = equ_to_TeX_body_wrapped(equation, 110);
     if (svg)
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\ndifferentiable no\n",
                argv[1], argv[1], argv[1], title ? title : "", string_c_str(svg));
+    else if (mesh.excessive_levels || excessive_output)
+        printf("error Too many surface sheets in this view; zoom in or narrow the coordinate bounds.\n");
     else
         printf("error No real isosurface found in the sampled volume; supply finite ordered coordinate bounds.\n");
     int rc = svg ? 0 : 1;

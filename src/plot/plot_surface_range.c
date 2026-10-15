@@ -18,7 +18,7 @@
 bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2])
 {
     size_t size = plot->surface_columns * plot->surface_rows, count = 0;
-    bool smart = plot->options.smart_y && !plot->height_fixed;
+    bool smart = size && plot->options.smart_y && !plot->height_fixed;
     number_t *values = smart ? calloc(size, sizeof(*values)) : NULL;
     if (smart && !values)
         return false;
@@ -38,7 +38,10 @@ bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2]
             }
         }
     }
-    if (ok && !count) {
+    if (ok && !count && plot->mesh && !size && plot->fixed && plot->height_fixed) {
+        for (unsigned end = 0; end < 2; ++end)
+            full[end] = num_clone(plot->height_bounds[end]);
+    } else if (ok && !count) {
         errno = ENODATA;
         ok = false;
     }

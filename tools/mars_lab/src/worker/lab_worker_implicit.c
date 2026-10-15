@@ -7,6 +7,8 @@
  * coordinates. Bounds and emitted vertices remain native numbers. A freshly parsed
  * guarded-precision equation supplies fallback values rather than promoting values
  * which were already rounded by the worksheet or by a double conversion.
+ * Ordinary sine/cosine equalities expose independent periodic phase families to
+ * the mesh worker, so crossing sheets are not joined through their product residual.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -19,11 +21,71 @@
 struct _lab_worker_implicit_t {
     equation_t *equation;
     expr_t *residual, *axes[3];
+    expr_t *phases[2], *active;
+    double level;
     expr_real_sample_t *fast;
     number_t lower[3], span[3];
     size_t count, bits;
     bool local;
 };
+
+/* Convert either circular function to a cosine phase without changing its zeros. */
+static expr_t *cosine_phase(const expr_t *expression)
+{
+    const expr_t *argument = NULL;
+    bool negative = false;
+    while (expr_match_neg_expr(expression, &argument)) {
+        negative = !negative;
+        expression = argument;
+    }
+    bool cosine = expr_is_unary_pattern_kind(expression, EXPR_PATTERN_UNARY_COS);
+    if (!cosine && !expr_is_unary_pattern_kind(expression, EXPR_PATTERN_UNARY_SIN))
+        return NULL;
+    NUM_SCOPE(numbers);
+    expr_t *half_pi = expr_new_const(num_div(NUM_PI, NUM_TWO));
+    expr_t *phase = cosine ? expr_retain_expr(expr_first_child(expression)) :
+                            expr_sub(half_pi, expr_first_child(expression));
+    expr_free(half_pi);
+    if (phase && negative) {
+        expr_t *pi = expr_new_const(NUM_PI), *opposite = expr_sub(pi, phase);
+        expr_free(pi);
+        expr_free(phase);
+        phase = opposite;
+    }
+    return phase;
+}
+
+/* Equal circular functions form two independent periodic sheets. Meshing their
+ * oscillating difference joins crossing sheets incorrectly on a coarse grid. */
+static void periodic_phases(lab_worker_implicit_t *sample)
+{
+    if (sample->local || sample->count != 3)
+        return;
+    const expr_t *left = equ_lhs(sample->equation), *right = equ_rhs(sample->equation);
+    number_t constant = NUM_NAN;
+    bool zero_right = expr_match_const_value(right, &constant) && num_is_zero(constant);
+    num_destroy(&constant);
+    constant = NUM_NAN;
+    bool zero_left = expr_match_const_value(left, &constant) && num_is_zero(constant);
+    num_destroy(&constant);
+    bool subtract = true;
+    if ((zero_right || zero_left) &&
+        !expr_match_add_sub_expr(zero_right ? left : right, &left, &right, &subtract))
+        return;
+    expr_t *a = cosine_phase(left), *b = cosine_phase(right);
+    if (a && b && !subtract) {
+        expr_t *pi = expr_new_const(NUM_PI), *opposite = expr_sub(pi, b);
+        expr_free(pi);
+        expr_free(b);
+        b = opposite;
+    }
+    if (a && b) {
+        sample->phases[0] = expr_sub(a, b);
+        sample->phases[1] = expr_add(a, b);
+    }
+    expr_free(a);
+    expr_free(b);
+}
 
 /* Keep parsing, numerical evaluation and coordinate precision in one worker-owned policy. */
 lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *const *names,
@@ -97,9 +159,11 @@ lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *c
     }
     if (ok) {
         sample->residual = expr_sub(equ_lhs(sample->equation), equ_rhs(sample->equation));
+        sample->active = sample->residual;
         ok = sample->residual != NULL;
         if (!sample->local)
             sample->fast = expr_real_sample_new(sample->residual, inputs, count);
+        periodic_phases(sample);
     }
     num_set_default_prec_bits(saved);
     if (!ok) {
@@ -137,7 +201,7 @@ double lab_worker_implicit_eval(lab_worker_implicit_t *sample, const double *poi
         return NAN;
     double value;
     if (expr_real_sample_eval(sample->fast, point, &value))
-        return value;
+        return value - sample->level;
     size_t saved = num_get_default_prec_bits();
     num_set_default_prec_bits(sample->bits);
     for (size_t axis = 0; axis < sample->count; ++axis) {
@@ -147,11 +211,35 @@ double lab_worker_implicit_eval(lab_worker_implicit_t *sample, const double *poi
         num_destroy(&precise);
         num_destroy(&coordinate);
     }
-    number_t result = expr_eval(sample->residual);
+    number_t result = expr_eval(sample->active);
     value = num_is_real(result) && num_is_finite(result) ? num_to_double(result) : NAN;
     num_destroy(&result);
     num_set_default_prec_bits(saved);
-    return value;
+    return value - sample->level;
+}
+
+/* Ordinary and high-precision frames retain the original residual sampler. */
+unsigned lab_worker_implicit_layers(const lab_worker_implicit_t *sample)
+{
+    return sample && sample->phases[0] && sample->phases[1] ? 2 : 1;
+}
+
+/* The phase family is selected once per sampled grid, not once per vertex. */
+double lab_worker_implicit_layer(lab_worker_implicit_t *sample, unsigned layer)
+{
+    bool periodic = lab_worker_implicit_layers(sample) == 2;
+    sample->active = periodic ? sample->phases[layer] : sample->residual;
+    sample->level = 0;
+    expr_real_sample_free(sample->fast);
+    const expr_t *inputs[] = {sample->axes[0], sample->axes[1], sample->axes[2]};
+    sample->fast = sample->local ? NULL : expr_real_sample_new(sample->active, inputs, sample->count);
+    return periodic ? 2 * acos(-1.0) : 0;
+}
+
+/* Shift only the sampled level; authored expressions and bindings remain unchanged. */
+void lab_worker_implicit_level(lab_worker_implicit_t *sample, double level)
+{
+    sample->level = level;
 }
 
 /* Release all owning state; no worksheet bindings have been changed. */
@@ -161,6 +249,8 @@ void lab_worker_implicit_free(lab_worker_implicit_t *sample)
         return;
     expr_real_sample_free(sample->fast);
     expr_free(sample->residual);
+    expr_free(sample->phases[0]);
+    expr_free(sample->phases[1]);
     equ_free(sample->equation);
     for (size_t axis = 0; axis < sample->count; ++axis) {
         num_destroy(&sample->lower[axis]);

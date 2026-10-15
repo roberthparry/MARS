@@ -3,8 +3,8 @@
  * @brief Two-finger curve and surface domain zoom with bounded native redraw requests.
  *
  * Curve zoom follows the touch midpoint, including two-finger translation. Surface
- * zoom changes both independent ranges about their centre, preserving the camera
- * and height policy. This module edits only viewport controls; the drag controller
+ * zoom scales all three ranges about their centre, preserving the camera and
+ * restoring the original height policy on reset. This module edits only viewport controls; the drag controller
  * coalesces preview requests and restores full sampling on release.
  */
 #include "lab_dom.h"
@@ -20,7 +20,8 @@ static double value(int object, const char *key)
 static const char *control_id(unsigned i, int curve)
 {
     static const char *const curve_ids[] = {"plotLower", "plotUpper", "plotYLower", "plotYUpper", "plotScale"};
-    static const char *const surface_ids[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper", "plotScale"};
+    static const char *const surface_ids[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper",
+                                             "plotYLower", "plotYUpper", "plotScale"};
     return curve ? curve_ids[i] : surface_ids[i];
 }
 
@@ -55,7 +56,7 @@ int lab_plot_pinch_start(int state, int event)
         return 0;
     int geometry = lab_dom_object(4), snapshot = lab_dom_object(4);
     static const char *const keys[] = {"xMin", "xMax", "yMin", "yMax"};
-    for (unsigned i = 0; i < 5; ++i) {
+    for (unsigned i = 0; i < (curve ? 5u : 7u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
         int text = lab_dom_read(control, 5, ""), exact = lab_dom_get(control, "marsZoomValue");
         lab_dom_push(snapshot, text);
@@ -72,6 +73,10 @@ int lab_plot_pinch_start(int state, int event)
     lab_dom_push(geometry, lab_dom_numeric(fy));
     for (unsigned i = 0; i < 4; ++i)
         lab_dom_push(geometry, lab_dom_numeric(box[i]));
+    if (!curve) {
+        lab_dom_push(geometry, lab_dom_numeric(lab_dom_to_number(lab_dom_read(chart, 3, "zMin"))));
+        lab_dom_push(geometry, lab_dom_numeric(lab_dom_to_number(lab_dom_read(chart, 3, "zMax"))));
+    }
     lab_dom_set(state, "pinchGeometry", geometry);
     lab_dom_set(state, "pinchSnapshot", curve ? lab_dom_get(state, "panSnapshot") : snapshot);
     lab_dom_set(state, "pinchDistance", lab_dom_numeric(distance));
@@ -95,14 +100,17 @@ int lab_plot_pinch_move(int state, int event)
         return 0;
     double factor = value(state, "pinchDistance") / distance;
     int curve = lab_dom_truth(lab_dom_get(state, "pan")), geometry = lab_dom_get(state, "pinchGeometry");
-    double g[10], bounds[4];
-    for (unsigned i = 0; i < 10; ++i)
+    double g[12], bounds[6];
+    for (unsigned i = 0; i < (curve ? 10u : 12u); ++i)
         g[i] = lab_dom_to_number(lab_dom_item(geometry, i));
     double fractions[] = {curve ? ((value(state, "touchX") + value(state, "secondX")) / 2 - g[6]) / g[8] : 0.5,
-                          curve ? 1 - ((value(state, "touchY") + value(state, "secondY")) / 2 - g[7]) / g[9] : 0.5};
-    for (unsigned axis = 0; axis < 2; ++axis) {
-        double lo = g[axis * 2], hi = g[axis * 2 + 1], span = (hi - lo) * factor;
-        double anchor = lo * (1 - g[4 + axis]) + hi * g[4 + axis];
+                          curve ? 1 - ((value(state, "touchY") + value(state, "secondY")) / 2 - g[7]) / g[9] : 0.5,
+                          0.5};
+    for (unsigned axis = 0; axis < (curve ? 2u : 3u); ++axis) {
+        unsigned at = axis == 2 ? 10 : axis * 2;
+        double lo = g[at], hi = g[at + 1], span = (hi - lo) * factor;
+        double fraction = axis == 2 ? 0.5 : g[4 + axis];
+        double anchor = lo * (1 - fraction) + hi * fraction;
         bounds[axis * 2] = anchor - span * fractions[axis];
         bounds[axis * 2 + 1] = anchor + span * (1 - fractions[axis]);
         if (!__builtin_isfinite(bounds[axis * 2]) || !__builtin_isfinite(bounds[axis * 2 + 1]) ||
@@ -120,11 +128,11 @@ int lab_plot_pinch_move(int state, int event)
     }
     if (!lab_dom_get(range, "marsZoomOriginal")) {
         int original = lab_dom_object(4), snapshot = lab_dom_get(state, "pinchSnapshot");
-        for (unsigned i = 0; i < 5; ++i)
+        for (unsigned i = 0; i < (curve ? 5u : 7u); ++i)
             lab_dom_push(original, lab_dom_item(snapshot, i * 3));
         lab_dom_set(range, "marsZoomOriginal", original);
     }
-    for (unsigned i = 0; i < 4; ++i) {
+    for (unsigned i = 0; i < (curve ? 4u : 6u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
         unsigned lower = (i / 2) * 2;
         int text = lab_dom_precision(bounds[i], lab_plot_bound_digits(bounds[i], bounds[lower + 1] - bounds[lower]));
@@ -132,8 +140,7 @@ int lab_plot_pinch_move(int state, int event)
         lab_dom_set(control, "marsZoomText", text);
         lab_dom_set(control, "marsZoomValue", lab_dom_format(bounds[i], "", ""));
     }
-    if (curve)
-        lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
+    lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     lab_dom_delete(range, "marsZoomChart");
     lab_plot_controls_sync();
     return 1;
@@ -143,7 +150,7 @@ int lab_plot_pinch_move(int state, int event)
 void lab_plot_pinch_cancel(int state)
 {
     int curve = lab_dom_truth(lab_dom_get(state, "pan")), snapshot = lab_dom_get(state, "pinchSnapshot");
-    for (unsigned i = 0; i < 5; ++i) {
+    for (unsigned i = 0; i < (curve ? 5u : 7u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
         lab_dom_write(control, 5, "", lab_dom_item(snapshot, i * 3));
         lab_dom_set(control, "marsZoomText", lab_dom_item(snapshot, i * 3 + 1));

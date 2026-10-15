@@ -47,6 +47,15 @@ lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *c
 /** @brief Evaluate world coordinates, or local unit coordinates when the frame requires extra precision. */
 double lab_worker_implicit_eval(lab_worker_implicit_t *sample, const double *point);
 
+/** @brief Return independent periodic phase families, or one ordinary residual field. */
+unsigned lab_worker_implicit_layers(const lab_worker_implicit_t *sample);
+
+/** @brief Select a mesh field and return its level spacing; zero denotes the original residual. */
+double lab_worker_implicit_layer(lab_worker_implicit_t *sample, unsigned layer);
+
+/** @brief Set the current contour level within the selected mesh field. */
+void lab_worker_implicit_level(lab_worker_implicit_t *sample, double level);
+
 /** @brief Convert an algorithm coordinate back to an owning, precision-preserving world coordinate. */
 number_t lab_worker_implicit_coordinate(const lab_worker_implicit_t *sample, size_t axis, double value);
 
@@ -102,6 +111,15 @@ size_t lab_worker_plot_range_precision(number_t lower, number_t upper);
 
 /** @brief Choose validation precision for cancellation on a tiny range. */
 size_t lab_worker_plot_check_precision(number_t lower, number_t upper);
+
+/** @brief Check the chart byte budget, reserving transport space for titles and other result fields. */
+bool lab_worker_plot_fits(const string_t *svg);
+
+/** @brief Label a complete view resampled at lower detail to stay within the chart byte budget. */
+bool lab_worker_plot_reduced(string_t *svg);
+
+/** @brief Tag the sampled grid and visibly identify temporary gesture previews. */
+bool lab_worker_plot_quality(string_t *svg, bool preview, size_t side);
 
 /** @brief Emit plot records from a borrowed SVG; optional function and axis symbols name a surface title. */
 int lab_worker_plot_output(const char *source, const expr_t *expression, const string_t *svg, int error,

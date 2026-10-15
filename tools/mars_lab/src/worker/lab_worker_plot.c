@@ -16,6 +16,47 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
+/* Leave two MiB of the wire envelope for the mathematical title and other fields. */
+bool lab_worker_plot_fits(const string_t *svg)
+{
+    return svg && string_byte_length(svg) <= 6u * 1024u * 1024u;
+}
+
+/* Expose actual sampling quality, not merely the requested result-card mode. */
+bool lab_worker_plot_quality(string_t *svg, bool preview, size_t side)
+{
+    if (!svg || strncmp(string_c_str(svg), "<svg ", 5))
+        return false;
+    string_t *attributes = string_sprintf("data-plot-quality=\"%s\" data-sample-side=\"%zu\" ",
+                                         preview ? "preview" : "full", side);
+    bool ok = attributes && string_insert(svg, 5, string_c_str(attributes)) == 0;
+    string_free(attributes);
+    if (ok && preview) {
+        size_t length = string_byte_length(svg);
+        while (length && strchr(" \t\r\n", string_c_str(svg)[length - 1]))
+            --length;
+        ok = length >= 6 && !memcmp(string_c_str(svg) + length - 6, "</svg>", 6) &&
+            string_insert(svg, string_length(svg) - (string_byte_length(svg) - length) - 6,
+            "<text data-preview-notice=\"true\" x=\"50%\" y=\"95%\" text-anchor=\"middle\" "
+            "fill=\"#b8ccc5\" font-family=\"sans-serif\" font-size=\"11\">"
+            "Coarse preview — detail returns when the gesture ends</text>") == 0;
+    }
+    return ok;
+}
+
+/* Make reduced sampling visible without changing the requested coordinate volume. */
+bool lab_worker_plot_reduced(string_t *svg)
+{
+    size_t length = svg ? string_byte_length(svg) : 0;
+    while (length && strchr(" \t\r\n", string_c_str(svg)[length - 1]))
+        --length;
+    return length >= 6 && !memcmp(string_c_str(svg) + length - 6, "</svg>", 6) &&
+           string_insert(svg, string_length(svg) - (string_byte_length(svg) - length) - 6,
+                         "<text data-detail-reduced=\"true\" x=\"50%\" y=\"98%\" text-anchor=\"middle\" "
+                         "fill=\"#b8ccc5\" font-family=\"sans-serif\" font-size=\"11\">"
+                         "Detail reduced for this view; zoom in for finer sampling</text>") == 0;
+}
+
 /* Produce one real-valued curve while preserving the worksheet's original expression. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper, bool preview)

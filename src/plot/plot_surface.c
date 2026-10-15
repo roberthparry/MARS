@@ -26,7 +26,7 @@ static bool coordinates(const number_t *values, size_t count)
 /* Copy arbitrary facets atomically; the shared surface renderer supplies the camera and axes. */
 bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
 {
-    if (!plot || plot->count || plot->surface_z || plot->fixed || !x || !y || !z || !count || count % 3) {
+    if (!plot || plot->count || plot->surface_z || plot->fixed || (count && (!x || !y || !z)) || count % 3) {
         errno = EINVAL;
         return false;
     }
@@ -37,9 +37,9 @@ bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const num
     plot_t *copy = plot_new(&plot->options);
     if (!copy)
         return false;
-    copy->surface_x = calloc(count, sizeof(number_t));
-    copy->surface_y = calloc(count, sizeof(number_t));
-    copy->surface_z = calloc(count, sizeof(number_t));
+    copy->surface_x = calloc(count ? count : 1, sizeof(number_t));
+    copy->surface_y = calloc(count ? count : 1, sizeof(number_t));
+    copy->surface_z = calloc(count ? count : 1, sizeof(number_t));
     bool ok = copy->surface_x && copy->surface_y && copy->surface_z;
     if (ok) {
         copy->mesh = true;

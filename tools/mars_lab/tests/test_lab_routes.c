@@ -281,7 +281,7 @@ static bool route_contracts(const char *directory)
     response = route_request(HTTP_GET, "/js/evaluation.js", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
-    static const char *const scripts[] = {"api", "app", "bindings", "locations", "results", "state", "workspace"};
+    static const char *const scripts[] = {"api", "app", "bindings", "locations", "results", "state", "surface", "workspace"};
     for (size_t i = 0; i < sizeof scripts / sizeof *scripts; ++i) {
         string_t *url = string_sprintf("/js/%s.js", scripts[i]);
         string_t *path = string_sprintf("tools/mars_lab/assets/js/%s.js", scripts[i]);

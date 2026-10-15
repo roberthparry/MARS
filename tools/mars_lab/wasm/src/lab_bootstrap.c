@@ -119,7 +119,7 @@ int lab_bootstrap_step(int frame, int view)
             if (!lab_dom_truth(lab_dom_get(frame, "valid")))
                 return lab_flow_call(frame, 13, "fail", 0, 0, 1, lab_dom_string("The Lab catalogue is invalid"));
             int scripts = lab_dom_object(4);
-            static const char *const names[] = {"api", "bindings", "locations", "results", "state"};
+            static const char *const names[] = {"api", "bindings", "locations", "results", "state", "surface"};
             for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
                 lab_dom_push(scripts, lab_dom_string(names[i]));
             return lab_flow_call(frame, 9, "definitions", 0, 1, 1, scripts);

@@ -12,6 +12,7 @@
 #include "lab_workspace.h"
 #include "lab_plot_controls.h"
 #include "lab_plot_pointer.h"
+#include "lab_plot_drag.h"
 
 static double number(int node, const char *key)
 {
@@ -365,11 +366,14 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     int chart = lab_dom_query(card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
     if (!chart)
         return 0;
-    double box[4], bounds[4];
+    if (!wheel)
+        lab_plot_wheel_stop();
+    double box[4], bounds[6];
     int surface = lab_dom_has(chart, "data-surface");
+    unsigned coordinates = surface ? 6 : 4;
     if (surface) {
-        static const char *const keys[] = {"xMin", "xMax", "yMin", "yMax"};
-        for (unsigned i = 0; i < 4; ++i) {
+        static const char *const keys[] = {"xMin", "xMax", "yMin", "yMax", "zMin", "zMax"};
+        for (unsigned i = 0; i < coordinates; ++i) {
             bounds[i] = data(chart, keys[i]);
             if (!finite(bounds[i]))
                 return 1;
@@ -384,7 +388,8 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         return 1;
     int range = lab_dom_id("plotRange");
     const char *ids[] = {"plotLower", "plotUpper", surface ? "plotSecondLower" : "plotYLower",
-                        surface ? "plotSecondUpper" : "plotYUpper", "plotScale"};
+                        surface ? "plotSecondUpper" : "plotYUpper", surface ? "plotYLower" : "plotScale",
+                        "plotYUpper", "plotScale"};
     int original = lab_dom_get(range, "marsZoomOriginal");
     int title = lab_dom_join(label_text(lab_dom_query(card, "[data-plot-figure] > title")),
                             lab_dom_string(surface ? "surface" : "curve"), "");
@@ -397,7 +402,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     if (reset) {
         if (!original)
             return 1;
-        for (unsigned i = 0; i < 5; ++i) {
+        for (unsigned i = 0; i <= coordinates; ++i) {
             lab_dom_delete(lab_dom_id(ids[i]), "marsZoomText");
             lab_dom_delete(lab_dom_id(ids[i]), "marsZoomValue");
             lab_dom_write(lab_dom_id(ids[i]), 5, "", lab_dom_item(original, i));
@@ -407,6 +412,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     } else {
         double fx = wheel ? (number(event, "clientX") - box[0]) / box[2] : 0.5;
         double fy = wheel ? 1 - (number(event, "clientY") - box[1]) / box[3] : 0.5;
+        double fz = 0.5;
         if (fx < 0 || fx > 1 || fy < 0 || fy > 1)
             return 1;
         if (surface && wheel) {
@@ -420,22 +426,47 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
                      lab_dom_to_number(lab_dom_item(map, 2));
                 fy = lab_dom_to_number(lab_dom_item(map, 3)) * px + lab_dom_to_number(lab_dom_item(map, 4)) * py +
                      lab_dom_to_number(lab_dom_item(map, 5));
-                if (!finite(fx) || !finite(fy))
+                if (lab_dom_count(map) >= 9)
+                    fz = lab_dom_to_number(lab_dom_item(map, 6)) * px + lab_dom_to_number(lab_dom_item(map, 7)) * py +
+                         lab_dom_to_number(lab_dom_item(map, 8));
+                if (!finite(fx) || !finite(fy) || !finite(fz))
                     return 1;
                 fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
                 fy = fy < 0 ? 0 : fy > 1 ? 1 : fy;
+                fz = fz < 0 ? 0 : fz > 1 ? 1 : fz;
             }
         }
-        /* Repeated wheel events accumulate against pending bounds until the replacement SVG arrives. */
-        if (lab_dom_equal(chart, lab_dom_get(range, "marsZoomChart"))) {
+        double fractions[] = {fx, fy, fz}, anchors[3];
+        for (unsigned a = 0; a < coordinates / 2; ++a)
+            anchors[a] = bounds[a * 2] * (1 - fractions[a]) + bounds[a * 2 + 1] * fractions[a];
+        int previous = lab_dom_get(range, "marsZoomChart");
+        /* A replacement image must not roll back bounds already requested by newer wheel events. */
+        if (previous) {
             int pending = lab_dom_get(range, "marsZoomBounds");
-            for (unsigned i = 0; i < 4; ++i)
+            for (unsigned i = 0; i < coordinates; ++i)
                 bounds[i] = lab_dom_to_number(lab_dom_item(pending, i));
         }
-        double fractions[] = {fx, fy}, values[4], factor = direction > 0 ? 0.8 : 1.25;
-        for (unsigned a = 0; a < 2; ++a) {
+        int anchor_state = lab_dom_get(range, "marsZoomAnchor");
+        double px = number(event, "clientX"), py = number(event, "clientY");
+        /* Repainting an overlapping sheet is not a pointer movement. Keep the world
+         * anchor so reversing the wheel reverses the zoom instead of migrating sheets. */
+        int same_camera = !surface || (previous &&
+            data(previous, "azimuth") == data(chart, "azimuth") &&
+            data(previous, "elevation") == data(chart, "elevation") &&
+            data(previous, "roll") == data(chart, "roll"));
+        if (wheel && previous && anchor_state && same_camera &&
+            __builtin_fabs(px - lab_dom_to_number(lab_dom_item(anchor_state, 0))) <= 2 &&
+            __builtin_fabs(py - lab_dom_to_number(lab_dom_item(anchor_state, 1))) <= 2) {
+            for (unsigned a = 0; a < coordinates / 2; ++a)
+                anchors[a] = lab_dom_to_number(lab_dom_item(anchor_state, a + 2));
+        } else if (!wheel) {
+            for (unsigned a = 0; a < coordinates / 2; ++a)
+                anchors[a] = bounds[a * 2] * 0.5 + bounds[a * 2 + 1] * 0.5;
+        }
+        double values[6], factor = direction > 0 ? 0.8 : 1.25;
+        for (unsigned a = 0; a < coordinates / 2; ++a) {
             double lo = bounds[a * 2], hi = bounds[a * 2 + 1];
-            double anchor = lo * (1 - fractions[a]) + hi * fractions[a];
+            double anchor = anchors[a];
             values[a * 2] = anchor + (lo - anchor) * factor;
             values[a * 2 + 1] = anchor + (hi - anchor) * factor;
             if (!finite(values[a * 2]) || !finite(values[a * 2 + 1]) || values[a * 2] >= values[a * 2 + 1])
@@ -443,25 +474,37 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         }
         if (!original) {
             original = lab_dom_object(4);
-            for (unsigned i = 0; i < 5; ++i)
+            for (unsigned i = 0; i <= coordinates; ++i)
                 lab_dom_push(original, lab_dom_read(lab_dom_id(ids[i]), 5, ""));
             lab_dom_set(range, "marsZoomOriginal", original);
         }
-        for (unsigned i = 0; i < 4; ++i)
+        for (unsigned i = 0; i < coordinates; ++i)
             zoom_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
         int pending = lab_dom_object(4);
-        for (unsigned i = 0; i < 4; ++i)
+        for (unsigned i = 0; i < coordinates; ++i)
             lab_dom_push(pending, lab_dom_numeric(values[i]));
         lab_dom_set(range, "marsZoomChart", chart);
         lab_dom_set(range, "marsZoomBounds", pending);
-        if (!surface)
-            lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
+        lab_dom_delete(range, "marsZoomAnchor");
+        if (wheel) {
+            anchor_state = lab_dom_object(4);
+            lab_dom_push(anchor_state, lab_dom_numeric(px));
+            lab_dom_push(anchor_state, lab_dom_numeric(py));
+            for (unsigned a = 0; a < coordinates / 2; ++a)
+                lab_dom_push(anchor_state, lab_dom_numeric(anchors[a]));
+            lab_dom_set(range, "marsZoomAnchor", anchor_state);
+        }
+        lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     }
     lab_plot_controls_sync();
     lab_dom_class(lab_dom_query(card, ".plot-pointer-line"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-horizontal"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-marker"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-tip"), "hidden", 1);
+    if (wheel) {
+        lab_plot_wheel_zoom(chart, calls);
+        return 1;
+    }
     int call = lab_dom_object(5), args = lab_dom_object(4);
     lab_dom_set(call, "service", lab_dom_string("takePlot"));
     lab_dom_push(args, lab_dom_read(lab_dom_id("plotFirst"), 5, ""));

@@ -175,7 +175,9 @@ static void test_lab_extra_surface_continuity(void)
     const char *svg = lab_eval_text(fields, "plot_svg");
     for (const char *p = strstr(svg, "<path fill="); p; p = strstr(p + 11, "<path fill="))
         ++facets;
-    bool ok = status == 200 && test_lab_ok(fields, true) && facets == 2 * 138 * 138;
+    bool reduced = contains(fields, "plot_svg", "data-detail-reduced=\"true\"");
+    bool ok = status == 200 && test_lab_ok(fields, true) &&
+              facets == (reduced ? 2 * 69 * 69 : 2 * 138 * 138);
     bool failed = true;
     ok = ok && lab_presentation_adapt(fields);
     array_t *encoded = ok ? lab_wire_encode_response(fields, &failed) : NULL;
@@ -188,7 +190,86 @@ static void test_lab_extra_surface_continuity(void)
     if (!ok)
         show_failure(fields);
     json_free(fields);
-    TEST_ASSERT_TRUE(ok, "rapid bounded surface is refined without deleting finite steep facets");
+    TEST_ASSERT_TRUE(ok, "rapid bounded surface retains a complete grid within the transport budget");
+}
+
+static void test_lab_extra_mesh_crossings(void)
+{
+    /* Within this box exactly two separate phase sheets meet. Their union must
+     * retain both branches, rather than triangulating across the intersection. */
+    const char *equations[] = {"cos(z)-sin(2-xy)=0", "z-(x*y+pi/2-2)=0", "z+(x*y+pi/2-2)=0",
+                              "sin(2-xy)=cos(z)", "0=cos(z)-sin(2-xy)"};
+    const char *qualities[] = {"preview", "full"};
+    for (unsigned quality = 0; quality < 2; ++quality) {
+        size_t counts[5] = {0};
+        for (unsigned form = 0; form < 5; ++form) {
+            unsigned status = 0;
+            string_t *payload = string_sprintf(
+                "{\"expression\":\"%s\",\"wrt\":\"z\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
+                "\"plot_quality\":\"%s\",\"plot_scale\":\"manual\",\"plot_lower\":\"-1.2\",\"plot_upper\":\"1.2\","
+                "\"plot_second_lower\":\"-1.2\",\"plot_second_upper\":\"1.2\","
+                "\"plot_y_lower\":\"-1.2\",\"plot_y_upper\":\"1.2\"}", equations[form], qualities[quality]);
+            json_t *fields = request("/eval", string_c_str(payload), &status);
+            bool ok = status == 200 && test_lab_ok(fields, true);
+            const char *svg = lab_eval_text(fields, "plot_svg");
+            for (const char *p = strstr(svg, "data-uv="); p; p = strstr(p + 8, "data-uv="))
+                ++counts[form];
+            json_free(fields);
+            string_free(payload);
+            TEST_ASSERT_TRUE(ok, "each phase sheet and equivalent equation produces a bounded surface");
+        }
+        TEST_ASSERT_TRUE(counts[0] > 0 && counts[0] == counts[1] + counts[2],
+                         "periodic crossings retain the complete union of independently meshed sheets");
+        TEST_ASSERT_TRUE(counts[0] == counts[3] && counts[0] == counts[4],
+                         "reversing the equation preserves the periodic sheets");
+    }
+}
+
+static void test_lab_extra_mesh_budget(void)
+{
+    expect_response("/eval", "{\"expression\":\"cos(z)-sin(2-xy)=0\",\"wrt\":\"z\",\"action\":\"plot\","
+                              "\"plot_source_mode\":\"equation\",\"plot_scale\":\"manual\","
+                              "\"plot_lower\":\"-100\",\"plot_upper\":\"100\","
+                              "\"plot_second_lower\":\"-100\",\"plot_second_upper\":\"100\","
+                              "\"plot_y_lower\":\"-100\",\"plot_y_upper\":\"100\"}",
+                    422u, "error", "Too many surface sheets");
+    const char *ranges[][6] = {
+        {"-6.55", "5.17", "-4.04", "7.68", "-5.86", "5.86"},
+        {"-25", "25", "-25", "25", "-25", "25"},
+        {"-2", "2", "-2", "2", "-2", "2"}
+    };
+    for (size_t i = 0; i < sizeof(ranges) / sizeof(*ranges); ++i) {
+        unsigned status = 0;
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"cos(z)-sin(2-xy)=0\",\"wrt\":\"z\",\"action\":\"plot\","
+            "\"plot_source_mode\":\"equation\",\"plot_scale\":\"manual\","
+            "\"plot_lower\":\"%s\",\"plot_upper\":\"%s\",\"plot_second_lower\":\"%s\","
+            "\"plot_second_upper\":\"%s\",\"plot_y_lower\":\"%s\",\"plot_y_upper\":\"%s\"}",
+            ranges[i][0], ranges[i][1], ranges[i][2], ranges[i][3], ranges[i][4], ranges[i][5]);
+        json_t *fields = request("/eval", string_c_str(payload), &status);
+        const char *svg = lab_eval_text(fields, "plot_svg");
+        bool ok = status == 200 && test_lab_ok(fields, true) &&
+                  contains(fields, "plot_svg", "data-detail-reduced=\"true\"") == (i < 2) &&
+                  contains(fields, "plot_svg", "data-uv=") && strlen(svg) < 7u * 1024u * 1024u;
+        const char *attributes[] = {"x-min", "x-max", "y-min", "y-max", "z-min", "z-max"};
+        for (unsigned axis = 0; ok && axis < 6; ++axis) {
+            string_t *attribute = string_sprintf("data-%s=\"", attributes[axis]);
+            const char *value = strstr(svg, string_c_str(attribute));
+            ok = value && strtod(value + string_byte_length(attribute), NULL) == strtod(ranges[i][axis], NULL);
+            string_free(attribute);
+        }
+        bool failed = true;
+        ok = ok && lab_presentation_adapt(fields);
+        array_t *encoded = ok ? lab_wire_encode_response(fields, &failed) : NULL;
+        json_t *decoded = encoded ? lab_wire_decode(array_get(encoded, 0), array_size(encoded)) : NULL;
+        const json_t *card = lab_eval_get(lab_eval_get(lab_eval_get(decoded, "presentation"), "calculus"), "plot");
+        ok = ok && !failed && decoded && !strcmp(svg, lab_eval_text(card, "svg"));
+        json_free(decoded);
+        array_destroy(encoded);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "wide implicit views preserve all bounds and fit the encoded response without truncation");
+    }
 }
 
 static void test_lab_extra_plot_stepped_ranges(void)
@@ -539,6 +620,28 @@ static void test_lab_extra_solver_plots(void)
         show_failure(sphere);
     json_free(sphere);
     TEST_ASSERT_TRUE(sphere_ok, "coarse cached sphere edges retain both hemispheres");
+    const char *height_modes[] = {"auto", "all", "manual"};
+    const char *qualities[] = {"preview", "full"};
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        for (unsigned quality = 0; quality < 2; ++quality) {
+            string_t *payload = string_sprintf("{\"expression\":\"cos(z)-sin(2-x*y)=0\",\"wrt\":\"z\","
+                "\"action\":\"plot\",\"plot_source_mode\":\"equation\",\"plot_quality\":\"%s\","
+                "\"plot_lower\":\"-0.1\",\"plot_upper\":\"0.1\","
+                "\"plot_second_lower\":\"-0.1\",\"plot_second_upper\":\"0.1\","
+                "\"plot_scale\":\"%s\",\"plot_y_lower\":\"-2\",\"plot_y_upper\":\"2\"}",
+                qualities[quality], height_modes[mode]);
+            json_t *zoomed = request("/eval", string_c_str(payload), &status);
+            bool zoom_ok = status == 200 && contains(zoomed, "plot_svg", "data-mesh=\"true\"") &&
+                           contains(zoomed, "plot_svg", "data-x-min=\"-0.1") &&
+                           contains(zoomed, "plot_svg", "data-y-min=\"-0.1") &&
+                           contains(zoomed, "plot_svg", mode == 2 ? "data-empty=\"true\"" : "data-uv=");
+            if (!zoom_ok)
+                show_failure(zoomed);
+            json_free(zoomed);
+            string_free(payload);
+            TEST_ASSERT_TRUE(zoom_ok, "zoomed implicit views search automatic height but preserve explicit empty volumes");
+        }
+    }
     expect_response("/eval", "{\"expression\":\"(x-1e30)^2+y^2+z^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\","
                              "\"plot_lower\":\"1e30-2\",\"plot_upper\":\"1e30+2\"}",
@@ -1857,6 +1960,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_plot_tangent_bounds, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_turning_points, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_solver_plots, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_mesh_budget, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_mesh_crossings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_solution_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_frame, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);

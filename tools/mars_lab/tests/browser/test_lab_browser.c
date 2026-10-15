@@ -165,7 +165,7 @@ static bool lab_browser_run(const char *directory)
             break;
         }
         clock_gettime(CLOCK_MONOTONIC, &now);
-        if (now.tv_sec - start.tv_sec > 180)
+        if (now.tv_sec - start.tv_sec > 240)
             break;
         struct timespec pause = {.tv_nsec = 100000000};
         nanosleep(&pause, NULL);

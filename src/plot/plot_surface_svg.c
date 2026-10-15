@@ -82,7 +82,7 @@ static camera_t camera(const plot_t *plot, double label_width, const number_t bo
     return view;
 }
 
-/* Invert a projected triangle to its normalised independent coordinates for pointer zoom. */
+/* Invert a projected triangle to all three normalised viewport coordinates for pointer zoom. */
 static bool pointer_map(string_t *svg, const vertex_t p[3])
 {
     double x1 = p[1].x - p[0].x, y1 = p[1].y - p[0].y;
@@ -94,8 +94,11 @@ static bool pointer_map(string_t *svg, const vertex_t p[3])
     double uy = (x1 * (p[2].u - p[0].u) - x2 * (p[1].u - p[0].u)) / determinant;
     double vx = ((p[1].v - p[0].v) * y2 - (p[2].v - p[0].v) * y1) / determinant;
     double vy = (x1 * (p[2].v - p[0].v) - x2 * (p[1].v - p[0].v)) / determinant;
-    return string_append_format(svg, " data-uv=\"%.8g %.8g %.8g %.8g %.8g %.8g\"", ux, uy,
-        p[0].u - ux * p[0].x - uy * p[0].y, vx, vy, p[0].v - vx * p[0].x - vy * p[0].y) >= 0;
+    double zx = ((p[1].z - p[0].z) * y2 - (p[2].z - p[0].z) * y1) / determinant;
+    double zy = (x1 * (p[2].z - p[0].z) - x2 * (p[1].z - p[0].z)) / determinant;
+    return string_append_format(svg, " data-uv=\"%.8g %.8g %.8g %.8g %.8g %.8g %.8g %.8g %.8g\"", ux, uy,
+        p[0].u - ux * p[0].x - uy * p[0].y, vx, vy, p[0].v - vx * p[0].x - vy * p[0].y,
+        zx, zy, p[0].z - zx * p[0].x - zy * p[0].y) >= 0;
 }
 
 static bool finite_real(number_t value)
@@ -298,8 +301,9 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
             tip.y += ny * 6;
             int side = nx < -1e-9 ? -1 : nx > 1e-9;
             string_t *label = plot_tick_label(ticks[i]);
-            ok = ok && label && string_append_format(svg, "<g data-plot-tick=\"%u\" stroke=\"#%06x\" "
-                  "stroke-width=\"1.2\">", axis, (unsigned)plot->options.axis_colour) >= 0 && stroke(svg, at, tip) &&
+            ok = ok && label && string_append_format(svg, "<g data-plot-tick=\"%u\" data-tick-fraction=\"%.17g\" "
+                  "stroke=\"#%06x\" stroke-width=\"1.2\">", axis, t,
+                  (unsigned)plot->options.axis_colour) >= 0 && stroke(svg, at, tip) &&
                  string_append_cstr(svg, "</g>") == 0 &&
                  plot_tick_text(svg, &labels, label, axis, at.x + nx * 13 + side * 3,
                                 at.y + ny * 13 + 4, side, nx, ny);
@@ -308,7 +312,21 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
         }
         num_destroy(&span);
     }
-    return ok && string_append_cstr(svg, "</g>\n") == 0;
+    ok = ok && string_append_cstr(svg, "</g>\n") == 0;
+    /* Keep axis grab areas above facets and labels. Non-scaling strokes preserve
+     * a finger-sized target when a mobile client fits the SVG into a narrow card. */
+    for (unsigned axis = 0; ok && axis < 3; ++axis) {
+        vertex_t a = axis_vertex(view, axis, 0), b = axis_vertex(view, axis, 1);
+        double length = hypot(b.x - a.x, b.y - a.y);
+        b.x += (b.x - a.x) / length * 25;
+        b.y += (b.y - a.y) / length * 25;
+        ok = string_append_format(svg,
+            "<path data-axis-handle=\"%u\" d=\"M %.3f %.3f L %.3f %.3f\" "
+            "fill=\"none\" stroke=\"transparent\" stroke-width=\"44\" stroke-linecap=\"round\" "
+            "vector-effect=\"non-scaling-stroke\" pointer-events=\"stroke\"/>\n",
+            axis, a.x, a.y, b.x, b.y) >= 0;
+    }
+    return ok;
 }
 
 /* Render a normalised height field into an independently owned SVG string. */
@@ -322,8 +340,10 @@ string_t *plot_surface_svg(const plot_t *plot)
     number_t lo = height_bounds[0], hi = height_bounds[1], full_span = num_sub(full[1], full[0]);
     if (num_is_zero(full_span))
         full_span = num_clone(NUM_ONE);
-    number_t bounds[] = {plot->surface_x[0], plot->surface_x[columns - 1],
-                         plot->surface_y[0], plot->surface_y[rows - 1], lo, hi};
+    number_t bounds[] = {count ? plot->surface_x[0] : plot->bounds[0],
+                         count ? plot->surface_x[columns - 1] : plot->bounds[1],
+                         count ? plot->surface_y[0] : plot->bounds[2],
+                         count ? plot->surface_y[rows - 1] : plot->bounds[3], lo, hi};
     if (plot->mesh) {
         bounds[1] = bounds[0];
         bounds[3] = bounds[2];
@@ -357,8 +377,8 @@ string_t *plot_surface_svg(const plot_t *plot)
         errno = E2BIG;
         return NULL;
     }
-    vertex_t *vertices = calloc(count, sizeof(*vertices));
-    facet_t *facets = calloc(count * 2, sizeof(*facets));
+    vertex_t *vertices = calloc(count ? count : 1, sizeof(*vertices));
+    facet_t *facets = calloc(count ? count * 2 : 1, sizeof(*facets));
     string_t *svg = string_new();
     bool ok = vertices && facets && svg;
     for (size_t r = 0; ok && r < rows; ++r) {
@@ -425,12 +445,15 @@ string_t *plot_surface_svg(const plot_t *plot)
                  "viewBox=\"0 0 %u %u\" role=\"img\" data-surface=\"true\" "
                  "data-azimuth=\"%.3f\" data-elevation=\"%.3f\" data-roll=\"%.3f\" "
                  "data-x-min=\"%.17g\" data-x-max=\"%.17g\" data-y-min=\"%.17g\" data-y-max=\"%.17g\" "
-                 "data-z-min=\"%.17g\" data-z-max=\"%.17g\" data-mesh=\"%s\"",
+                 "data-z-min=\"%.17g\" data-z-max=\"%.17g\" data-mesh=\"%s\" "
+                 "data-units=\"%.17g %.17g %.17g\" data-label-width=\"%.17g\"",
                  plot->options.width, plot->options.height, plot->options.width, plot->options.height,
                  plot->azimuth, plot->elevation, plot->roll, num_to_double(bounds[0]), num_to_double(bounds[1]),
                  num_to_double(bounds[2]), num_to_double(bounds[3]), num_to_double(lo), num_to_double(hi),
-                 plot->mesh ? "true" : "false") >= 0;
-        if (ok && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))
+                 plot->mesh ? "true" : "false", view.units[0], view.units[1], view.units[2], label_width) >= 0;
+        if (ok && !faces)
+            ok = string_append_cstr(svg, " data-empty=\"true\"") == 0;
+        if (ok && count && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))
             ok = string_append_format(svg, " data-sample-z-min=\"%.17g\" data-sample-z-max=\"%.17g\"",
                                        num_to_double(full[0]), num_to_double(full[1])) >= 0;
         ok = ok && string_append_cstr(svg, "><title>") == 0 &&
@@ -453,9 +476,18 @@ string_t *plot_surface_svg(const plot_t *plot)
                                        polygon[0].x, polygon[0].y) >= 0;
         for (int j = 1; ok && j < clipped; ++j)
             ok = string_append_format(svg, " L %.3f %.3f", polygon[j].x, polygon[j].y) >= 0;
-        ok = ok && string_append_cstr(svg, " Z\"") == 0 && pointer_map(svg, polygon) &&
+        ok = ok && string_append_cstr(svg, " Z\" data-vertices=\"") == 0;
+        for (int j = 0; ok && j < clipped; ++j)
+            ok = string_append_format(svg, "%s%.9g %.9g %.9g", j ? " " : "",
+                                      polygon[j].u, polygon[j].v, polygon[j].z) >= 0;
+        ok = ok && string_append_cstr(svg, "\"") == 0 && pointer_map(svg, polygon) &&
              string_append_cstr(svg, "/>\n") == 0;
     }
+    if (ok && !faces)
+        ok = string_append_format(svg, "<text x=\"%u\" y=\"%u\" text-anchor=\"middle\" stroke=\"none\" "
+                    "fill=\"#%06x\" font-family=\"sans-serif\" font-size=\"14\">"
+                    "No surface found in this view</text>", plot->options.width / 2, plot->options.height / 2,
+                    (unsigned)plot->options.label_colour) >= 0;
     ok = ok && string_append_cstr(svg, "</g>\n") == 0 && axes(svg, plot, &view, bounds) &&
          string_append_cstr(svg, "</svg>\n") == 0;
     free(facets);

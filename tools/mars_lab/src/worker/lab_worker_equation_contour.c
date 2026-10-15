@@ -48,9 +48,10 @@ static bool crossing(contour_t *contour, contour_vertex_t a, contour_vertex_t b,
 {
     if (!isfinite(a.value) || !isfinite(b.value) || ((a.value > 0) == (b.value > 0)))
         return false;
-    double scale = fmax(fabs(a.value), fabs(b.value));
+    /* Measure convergence against the better endpoint, not an arbitrarily large pole. */
+    double scale = fmin(fabs(a.value), fabs(b.value));
     contour_vertex_t best = fabs(a.value) < fabs(b.value) ? a : b;
-    for (unsigned i = 0; i < 18 && best.value != 0; ++i) {
+    for (unsigned i = 0; i < 52 && fabs(best.value) > scale * 0.00001; ++i) {
         contour_vertex_t mid = {.x = (a.x + b.x) / 2, .y = (a.y + b.y) / 2};
         mid.value = evaluate(contour, mid.x, mid.y);
         if (!isfinite(mid.value))

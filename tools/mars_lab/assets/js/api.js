@@ -278,11 +278,36 @@ async function redrawPlotDrag(state, variable, preview) {
         next = null;
         let accepted = false;
         try {
-            const pending = takeCalculus(wrt, 'plot', null, coarse);
-            const token = labRequests.latestMain();
-            await pending;
-            accepted = token !== 0 && labRequests.latestMain() === token;
+            const generation = labRequests.latestMain();
+            const chart = document.querySelector('#plotRendered [data-surface]');
+            const bounds = record.pinch || record.rangeWheel ?
+                ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper']
+                    .map(id => Number(document.getElementById(id).value)) : null;
+            let local = false;
+            if (coarse && !record.pan) {
+                try {
+                    local = labSurfacePreview.draw(chart, ['plotAzimuth', 'plotElevation', 'plotRoll']
+                        .map(id => Number(document.getElementById(id).value)), bounds);
+                } catch (_) {
+                    labSurfacePreview.dispose();
+                }
+            }
+            if (local || (coarse && bounds && chart && !record.pan)) {
+                // Yield once per frame so the native controller coalesces pointer events.
+                // A deep/unavailable zoom preview retains the last view until release,
+                // rather than starting native sampling in the middle of the gesture.
+                await new Promise(resolve => requestAnimationFrame(resolve));
+                accepted = chart.isConnected && generation === labRequests.latestMain();
+            } else {
+                if (coarse) labSurfacePreview.clear();
+                const pending = takeCalculus(wrt, 'plot', null, coarse);
+                const token = labRequests.latestMain();
+                await pending;
+                accepted = token !== 0 && labRequests.latestMain() === token;
+                labSurfacePreview.clear();
+            }
         } finally {
+            if (!coarse || !accepted) labSurfacePreview.clear();
             const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
             labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
         }
@@ -386,7 +411,19 @@ function labRequestFlowServices() {
         matrixScalar: () => lastMatrixScalarExpression,
         expressionWithVisibleBindings: (...args) => expressionWithVisibleBindings(...args),
         calculusTitle: text => rightPaneTitle.textContent = text,
-        displayPlot: result => labDOM.call('lab_layout_plot', result, null),
+        displayPlot: result => {
+            labSurfacePreview.dispose();
+            const value = labDOM.call('lab_layout_plot', result, null);
+            const chart = document.querySelector('#plotRendered [data-surface]');
+            const prepare = () => {
+                if (!chart?.isConnected) return;
+                try { labSurfacePreview.prepare(chart); }
+                catch (_) { labSurfacePreview.dispose(); }
+            };
+            if (window.requestIdleCallback) requestIdleCallback(prepare, {timeout: 250});
+            else setTimeout(prepare, 0);
+            return value;
+        },
         plotError: error => labDOM.call('lab_layout_plot', null, error),
         automaticPlot: parent => scheduleAutomaticPlot(parent),
         valueTitle: text => valueTitle.textContent = text,

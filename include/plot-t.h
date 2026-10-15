@@ -98,7 +98,9 @@ bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const num
 /**
  * @brief Copy independent triangular facets into an empty three-dimensional scene.
  * The x, y and z arrays contain count finite real vertices, with each consecutive
- * triple describing one triangle. Count must be positive and divisible by three.
+ * triple describing one triangle. Count must be divisible by three. Zero permits
+ * NULL arrays and an empty scene, which requires explicit horizontal and height
+ * bounds before rendering; it retains axes and camera controls without facets.
  * Unlike a height grid, a mesh permits multiple heights at the same x and y.
  * Scene limits, camera controls and height clipping also apply to meshes.
  */

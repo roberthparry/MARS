@@ -321,6 +321,34 @@ static string_t *surface_svg(const char *source, const char *first, const char *
     if (ok && !manual && options.smart_y && !preview)
         ok = lab_worker_surface_extrema(plot, source, first, second, grid->x, grid->y, grid->z, grid->side);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    bool reduced = false;
+    while (svg && !lab_worker_plot_fits(svg) && grid->side > SURFACE_PREVIEW_SIDE) {
+        size_t side = (grid->side + 1) / 2;
+        if (side < SURFACE_PREVIEW_SIDE)
+            side = SURFACE_PREVIEW_SIDE;
+        string_free(svg);
+        plot_free(plot);
+        plot = plot_new(&options);
+        grid_free(grid);
+        grid = grid_sample(source, first, second, bounds, side, bits);
+        ok = plot && grid && grid_gaps(grid, source, first, second) &&
+             plot_set_surface(plot, grid->x, grid->side, grid->y, grid->side, grid->z) &&
+             plot_set_view(plot, azimuth, elevation) && plot_set_roll(plot, roll);
+        if (ok && manual)
+            ok = plot_set_height_bounds(plot, height_bounds[0], height_bounds[1]);
+        if (ok && !manual && options.smart_y && !preview)
+            ok = lab_worker_surface_extrema(plot, source, first, second, grid->x, grid->y, grid->z, grid->side);
+        svg = ok ? plot_to_svg(plot) : NULL;
+        reduced = true;
+    }
+    if (svg && (!lab_worker_plot_fits(svg) || (reduced && !lab_worker_plot_reduced(svg)))) {
+        string_free(svg);
+        svg = NULL;
+    }
+    if (svg && !lab_worker_plot_quality(svg, preview, grid->side)) {
+        string_free(svg);
+        svg = NULL;
+    }
     int saved = errno;
     plot_free(plot);
     grid_free(grid);

@@ -34,7 +34,7 @@ a line and is omitted as a marker. Numeric 24-bit RGB colours prevent CSS or
 markup injection. Styles use direct function dispatch. Series are traversed
 once per bounds, copying or rendering stage, rather than searched by name.
 
-`plot_set_mesh()` accepts finite real coordinate arrays whose length is a positive
+`plot_set_mesh()` accepts finite real coordinate arrays whose length is a non-negative
 multiple of three. Every consecutive triple forms an independent triangle; the
 scene copies all vertices, subject to its point limit. Meshes use the same camera,
 height clipping and depth ordering as height grids. Coordinate units
@@ -42,6 +42,9 @@ retain their proportions under a uniform camera scale rather than being
 stretched independently to fill the drawing rectangle. Explicit horizontal mesh
 bounds set the camera frame: supply facets already clipped to that horizontal
 domain. This permits volume samplers to preserve their chosen viewport.
+For a zero-length mesh, the arrays may be null. Set both horizontal bounds and
+height bounds before rendering. The empty viewport retains its axes and camera,
+and displays a “No surface found in this view” notice rather than fabricated facets.
 
 `plot_shade_interval()` adds signed shading and dashed interval markers to line
 series. Automatic vertical limits include zero. Explicit viewport bounds still
@@ -193,6 +196,17 @@ the camera. `plot_set_roll(plot, roll)` adds clockwise screen-plane rotation,
 defaulting to 0°. Finite rolls wrap into [0,360); invalid rolls leave the camera
 unchanged and give `EINVAL`. The rotated surface is fitted into the viewport,
 while text remains upright. Curve scenes ignore both camera settings.
+Surface SVGs include three transparent `data-axis-handle` paths over the coordinate
+axes and their endpoints. Their 44-pixel non-scaling strokes provide stable pointer
+and touch hit areas when a client fits the image into a smaller viewport; they do
+not change the visible geometry. Interactive clients can anchor rotation at the
+initial pointer position and retain that anchor when replacing preview images.
+Each surface facet also supplies its clipped, normalised three-dimensional
+`data-vertices`; `data-units` preserves the native axis proportions and
+`data-tick-fraction` locates native tick labels. Clients can retain these drawing
+coordinates for local camera projection without parsing mathematical expressions
+or converting large world-coordinate origins back to ordinary floats. These
+attributes do not change the standalone SVG rendering.
 
 Each surface axis ends in an arrow pointing towards increasing values, labelled
 with the copied `x_label`, `y_label` or `z_label` option (defaults `x`, `y`, `f`).

@@ -1049,6 +1049,17 @@ the second is chosen automatically unless an explicit radio choice is selected. 
 cannot occupy both axes. Each variable keeps its **From/To** pair together.
 The vertical-range controls are available for both curves and surfaces; the
 3-D camera controls are displayed only for surfaces.
+Complex 3-D views are automatically resampled at lower detail when their SVG
+would exceed a 6 MiB chart budget, leaving room within the 8 MiB response limit
+for the title and other fields. The complete requested coordinate range is
+retained; facets are not truncated. A note identifies reduced-detail views.
+Zoom in for finer sampling. This safeguard does not impose a fixed zoom-out limit.
+For equal sine/cosine expressions, the native ordinary-precision mesher separates
+the two periodic phase families before triangulation. This avoids joining the
+wrong sheets at crossings. Extremely crowded views that exceed the bounded sheet
+or output budget are rejected with a request to narrow the bounds, rather than
+silently omitting sheets. Other expressions and high-precision local frames retain
+residual sampling; finite sampling cannot guarantee discovery of every component.
 Plot settings use compact button-style radio choices, not dropdowns. Choosing
 **Auto** for the range clears explicit bounds and hides all bound-entry fields
 in Expression, Equation and Differential Equation plots. Axis choices remain
@@ -1058,6 +1069,9 @@ remain automatic. Manual vertical limits wait until both fields are filled.
 Delayed edits are discarded after a worksheet change or newer explicit request.
 Incomplete or invalid live bounds leave the last valid plot visible and show
 validation feedback beside the controls; correcting the bounds redraws the plot.
+Failed plot redraws also retain the previous coordinate-bearing view and show a
+separate diagnostic. Zoom out or use **Reset** to recover; the zoom buttons never
+switch to enlarging the diagnostic while a previous plot is available.
 
 The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
 **Roll** turns the view clockwise in the screen plane. All three support mouse,
@@ -1073,16 +1087,32 @@ a keyboard adjustment requests the new view automatically.
 
 Alternatively, **left-button drag** or **drag with one finger** directly over a 3-D plot: horizontal movement
 changes azimuth; dragging down increases elevation and dragging up decreases it. Hold **Shift** when
-starting the drag to change roll instead. Sliders and degree readouts update
-during the gesture and the surface redraws as you drag. Only one
-native redraw is in flight; subsequent movements replace the pending camera
-position, so stale movements cannot build up a queue. Dragging uses a 13×13
-preview mesh, retaining the normal numerical precision checks and domain gaps.
+starting the drag to change roll instead. Each coordinate axis, including its arrow and name, also has an
+invisible 44-pixel-wide grab area which stays finger-sized on mobile. Drag an axis
+to rotate the whole plot using the same controls: the initial finger position and
+camera angles remain the anchor throughout the gesture, including across redraws.
+No mouse wheel is needed. Axis drags rotate the retained native mesh locally,
+using WebGL depth testing when available and a depth-sorted canvas otherwise.
+The full current mesh stays visible rather than being replaced by sparse sampled
+figures. Sliders and degree readouts follow the gesture. Pointer movements are
+coalesced at animation-frame boundaries; rotation does not request new samples
+while the pointer is held. Geometry and labels come from native output, including
+normalised coordinates for narrow high-precision views; the client only projects
+them. If local rendering is unavailable, native coarse previews remain available.
 No spline smoothing is applied across discontinuities. Releasing the mouse or lifting the finger,
 including outside the plot, retains the final position and requests one
 full-quality redraw, even when the last preview already reached that angle. Escape, losing browser
 focus or a lost release restores the original camera. A superseding request
-invalidates an unfinished drag. Preview and final redraws resample the native surface.
+invalidates an unfinished drag. The final redraw supplies the authoritative SVG
+for copying and export. Changes to the sampled coordinate region still require
+native sampling and retain its precision checks and domain-gap handling.
+Ordinary 3-D wheel zoom and pinch gestures magnify the complete retained scene
+locally, including its native axis ticks. The camera fit stays fixed and triangles
+are not cut against a changing coordinate box during the gesture. Newly exposed
+regions remain unsampled until release or wheel inactivity; a notice identifies
+that temporary view. If an extremely narrow view cannot be represented locally,
+the last view remains visible until the native precision-preserving sampler runs
+at the end of the gesture. No intermediate sampling requests are made for zoom.
 This also works when expanded. Right-click keeps its normal behaviour;
 2-D dragging pans instead of rotating, and Ctrl+wheel zoom remains available.
 Touch dragging also works with a pen. The finger that starts the gesture owns it;
@@ -1093,7 +1123,7 @@ plot images are unchanged.
 Over a 3-D plot, **Shift+wheel** adjusts elevation like a vertical drag and
 **Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
 angle; wheel up decreases it, in 5° steps with the same limits as dragging.
-Sliders and readouts follow the camera. Wheel rotation uses the same 13×13 preview
+Sliders and readouts follow the camera. Wheel rotation uses the same retained mesh
 and coalesced redraws as dragging, then restores the full-quality mesh after
 300 ms without further wheel movement. Escape or losing browser focus restores
 the starting camera. Ctrl takes precedence for zoom; Shift+Alt together
@@ -1195,12 +1225,22 @@ Hold **Ctrl** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
 or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
 otherwise, without Ctrl, wheel events retain their normal browser behaviour
 and do not change plot zoom. For 2-D plots, Ctrl+wheel changes both axis ranges
-around the pointer. For 3-D surfaces it changes both independent-variable ranges
-around the point on the visible mesh facet, preserving camera orientation and
-the chosen height-scaling policy. Surface background zoom uses the domain centre.
+around the pointer. For 3-D surfaces it scales all three coordinate ranges by
+the same factor, preserving camera orientation. All three coordinates follow
+the visible facet under the pointer; height becomes manual so automatic framing
+cannot undo the zoom. Surface background zoom uses the domain centre.
+While the pointer stays still, wheel zoom retains its original coordinate anchor
+across redraws, even if a different sheet becomes visible underneath it. Reversing
+the wheel reverses the range change without drifting between sheets. Rapid wheel
+events accumulate against the latest requested bounds, not an older displayed image;
+editing a range or changing an axis starts a new viewport.
+Wheel zoom uses coarse samples while scrolling, coalescing movements into at most
+one in-flight redraw. After 300 ms without another wheel event, it resamples the
+latest ranges at normal detail, subject to the chart-size budget. No full-detail
+request is queued for each individual wheel notch.
 Both request fresh native samples; the image stays fitted to
 the card. **−** and **+** change the ranges around their centre, and **Reset**
-restores the range controls captured before zooming. Pointer coordinates use the
+restores all range controls and the height policy captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
 hover readings or gesture anchors. Vertical and horizontal hover guides meet at
 the reported curve point, marked by a small outlined circle. The marker and
@@ -1228,8 +1268,8 @@ finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
 Two-finger pinch zoom changes the plot ranges rather than magnifying the image.
 Spread fingers to zoom in and bring them together to zoom out. Curves track the
-finger midpoint, including two-finger panning; surfaces zoom both independent
-ranges about their centre without changing the camera or height policy. Pinching
+finger midpoint, including two-finger panning; surfaces scale all three ranges
+about their centre without changing the camera. Height becomes manual until reset. Pinching
 uses coarse previews and restores full sampling when either finger lifts. Further
 fingers are ignored. Lift the remaining finger before starting another drag.
 Pointer cancellation restores the pre-gesture controls, and Reset undoes the zoom.
@@ -1282,8 +1322,12 @@ shared edge intersections, and stops safeguarded edge refinement once its residu
 is small enough for plotting. This limits repeated evaluations without extending
 the worker timeout. Coarse meshes can miss small features; narrower bounds improve
 their resolution.
-The volume search is bounded to the selected coordinate ranges (initially −2 to 2),
-then automatic bounds fit the discovered mesh with padding. Implicit meshes use
+The volume search starts at −2 to 2 for omitted coordinate ranges. If no surface
+is found, it makes at most eight expanding 13-point-grid searches, changing only
+omitted endpoints. Once found, full-quality requests resample the expanded volume
+at the normal grid density, and automatic bounds fit the mesh with padding.
+Explicit endpoints are never expanded. An empty fully specified volume retains
+its axes and zoom controls with a “No surface found in this view” notice. Implicit meshes use
 equal coordinate units and a uniform camera scale, so a sphere remains spherical
 at every viewing angle; explicit ranges remain untouched.
 The contour search refines cells whose curvature could hide a closed component,

@@ -410,6 +410,30 @@
             check(pending.length === 1 && !pending[0].preview,
                   'Lifting the finger must queue a full-detail redraw');
             complete();
+            const handles = [...surface.querySelectorAll('[data-axis-handle]')];
+            check(handles.length === 3, 'All three surface axes provide rotation handles');
+            for (const handle of handles) {
+                seed();
+                const start = handle.getPointAtLength(handle.getTotalLength() * 0.65);
+                const at = new DOMPoint(start.x, start.y).matrixTransform(handle.getScreenCTM());
+                check(getComputedStyle(handle).pointerEvents === 'stroke' &&
+                      handle.getAttribute('vector-effect') === 'non-scaling-stroke' &&
+                      Number(handle.getAttribute('stroke-width')) === 44,
+                      'Axis grab areas stay finger-sized when the plot is fitted to a mobile card');
+                check(!touch(handle, 'pointerdown', at.x, at.y), 'Touching an axis anchors rotation');
+                touch(window, 'pointermove', at.x + 40, at.y - 20);
+                check(values() === '65,20,0' && pending.length === 1 && pending[0].preview,
+                      'Axis dragging rotates from the initial pointer and camera anchor');
+                complete();
+                touch(window, 'pointermove', at.x + 60, at.y + 20);
+                check(values() === '75,40,0' && pending.length === 1 && pending[0].preview,
+                      'A redraw must not reset the axis drag anchor');
+                touch(window, 'pointerup', at.x + 60, at.y + 20);
+                complete();
+                check(pending.length === 1 && !pending[0].preview,
+                      'Releasing an axis restores full detail');
+                complete();
+            }
             seed();
             touch(path, 'pointerdown', 100, 100);
             touch(window, 'pointermove', 140, 80);
@@ -512,25 +536,26 @@
         }
         const initialAzimuth = Number(controls[0].value), initialElevation = Number(controls[1].value);
         const waitForAngle = async angle => {
-            const selector = `[data-surface][data-azimuth="${angle.toFixed(3)}"]`;
+            const ready = () => Number(rendered.querySelector('[data-local-camera]')?.dataset.localCamera.split(',')[0]) === angle;
             const deadline = performance.now() + 15000;
-            while (!rendered.querySelector(selector) && performance.now() < deadline)
+            while (!ready() && performance.now() < deadline)
                 await new Promise(resolve => setTimeout(resolve, 25));
-            check(!!rendered.querySelector(selector), 'Dragging must redraw native geometry before mouse release');
+            check(ready(), 'Dragging must rotate retained geometry locally before mouse release');
         };
         const initialMesh = rendered.querySelector('[data-series]').innerHTML;
+        const initialRequest = labRequests.latestMain();
         touch(path, 'pointerdown', 100, 100);
         touch(window, 'pointermove', 140, 80);
         await waitForAngle((initialAzimuth + 20) % 360);
-        check(Number(rendered.querySelector('[data-surface]').dataset.elevation) ===
+        check(Number(rendered.querySelector('[data-surface]').dataset.localCamera.split(',')[1]) ===
               Math.max(5, initialElevation - 10), 'An upward drag must render the decreased elevation');
         check(rendered.classList.contains('plot-dragging') &&
-              rendered.querySelector('[data-series]').innerHTML !== initialMesh &&
-              rendered.querySelectorAll('[data-series] path').length < 400,
-              'The actual surface must move while the finger is held');
+              rendered.querySelector('[data-series]').innerHTML === initialMesh &&
+              labRequests.latestMain() === initialRequest && !!rendered.querySelector('[data-local-renderer]'),
+              'The complete retained surface moves without requests or replacement while the finger is held');
         touch(window, 'pointermove', 180, 120);
         await waitForAngle((initialAzimuth + 40) % 360);
-        check(Number(rendered.querySelector('[data-surface]').dataset.elevation) ===
+        check(Number(rendered.querySelector('[data-surface]').dataset.localCamera.split(',')[1]) ===
               Math.min(85, initialElevation + 10), 'A downward drag must render the increased elevation');
         touch(window, 'pointerup', 180, 120);
         check(!rendered.classList.contains('plot-dragging'), 'Live rotation must end when the finger lifts');
@@ -547,21 +572,71 @@
             const deadline = performance.now() + 15000;
             let sawPreview = false;
             while ((rendered.marsPlotDrag.busy || rendered.marsPlotDrag.wheel) && performance.now() < deadline) {
-                sawPreview ||= rendered.querySelectorAll('[data-series] path').length === 2 * 12 * 12;
+                sawPreview ||= !!rendered.querySelector('[data-local-renderer]');
                 await new Promise(resolve => setTimeout(resolve, 25));
             }
             const after = rendered.querySelector('[data-surface]');
             check(sawPreview && !rendered.marsPlotDrag.busy && !rendered.marsPlotDrag.wheel &&
                   after !== before && Number(after.dataset[axis]) === angle &&
                   rendered.querySelectorAll('[data-series] path').length === 2 * 69 * 69,
-                  'Both wheel rotations must show a coarse native preview then restore the full 70-by-70 mesh');
+                  'Both wheel rotations must use retained geometry then restore the final native SVG');
         }
+        const chart = rendered.querySelector('[data-surface]');
+        const angles = ['azimuth', 'elevation', 'roll'].map(key => Number(chart.dataset[key]));
+        check(labSurfacePreview.draw(chart, angles), 'Local surface renderer accepts native geometry');
+        const selected = chart.dataset.localRenderer;
+        sessionStorage.setItem('labSurfaceRenderer', selected);
+        const probe = document.createElement('canvas').getContext('webgl');
+        if (probe) {
+            check(selected === 'webgl', 'Available WebGL must use the GPU renderer rather than silently failing shaders');
+            probe.getExtension('WEBGL_lose_context')?.loseContext();
+        }
+        if (selected === 'webgl') {
+            const gl = chart.querySelector('canvas').getContext('webgl');
+            check(!gl.isContextLost() && gl.getError() === gl.NO_ERROR, 'GPU surface draw has no WebGL errors');
+            const program = gl.getParameter(gl.CURRENT_PROGRAM);
+            const camera = gl.getUniform(program, gl.getUniformLocation(program, 'camera'));
+            const keys = ['xMin', 'xMax', 'yMin', 'yMax', 'zMin', 'zMax'];
+            const bounds = keys.map(key => Number(chart.dataset[key]));
+            for (let axis = 0; axis < 3; axis++) {
+                const centre = (bounds[axis * 2] + bounds[axis * 2 + 1]) / 2;
+                bounds[axis * 2] = centre + (bounds[axis * 2] - centre) / 2;
+                bounds[axis * 2 + 1] = centre + (bounds[axis * 2 + 1] - centre) / 2;
+            }
+            check(labSurfacePreview.draw(chart, angles, bounds), 'WebGL magnifies the retained scene for zoom');
+            const zoomCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera'));
+            const scaling = gl.getUniform(program, gl.getUniformLocation(program, 'domainScale'));
+            check([0, 1, 4, 5, 8, 9, 12, 13].every(i => camera[i] === zoomCamera[i]) &&
+                  [...scaling].every(value => Math.abs(value - 2) < 1e-6),
+                  'Zoom doubles scene magnification without refitting the camera or clipping the coordinate box');
+        }
+        labSurfacePreview.dispose();
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        try {
+            HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+                return type === 'webgl' ? null : getContext.call(this, type, ...args);
+            };
+            check(labSurfacePreview.draw(chart, angles) && chart.dataset.localRenderer === 'canvas',
+                  'Unavailable WebGL uses a local canvas, not server sampling');
+            const canvas = chart.querySelector('canvas');
+            const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+            let painted = false;
+            for (let i = 3; i < pixels.length; i += 64) painted ||= pixels[i] !== 0;
+            check(painted, 'Canvas fallback actually paints the retained triangles');
+        } finally {
+            HTMLCanvasElement.prototype.getContext = getContext;
+            labSurfacePreview.dispose();
+        }
+        check(!chart.querySelector('foreignObject') && !chart.dataset.localRenderer,
+              'Local-renderer disposal restores SVG interaction and releases its overlay');
     }
     async function checkPlotPinch() {
         const rendered = document.getElementById('plotRendered');
         const chart = () => rendered.querySelector('[data-plot-chart][data-x-min]');
         const surface = chart().hasAttribute('data-surface');
-        const original = ['xMin', 'xMax', 'yMin', 'yMax'].map(key => Number(chart().dataset[key]));
+        const coordinateKeys = surface ? ['xMin', 'xMax', 'yMin', 'yMax', 'zMin', 'zMax'] :
+                                         ['xMin', 'xMax', 'yMin', 'yMax'];
+        const original = coordinateKeys.map(key => Number(chart().dataset[key]));
         const card = rendered.closest('.result-card');
         const wait = async previous => {
             const deadline = performance.now() + 20000;
@@ -591,9 +666,17 @@
             check(!rendered.marsPlotDrag.changed, 'A third finger does not alter pinch zoom');
             send(window, 'pointermove', 71, cx - 30 / factor);
             send(window, 'pointermove', 72, cx + 30 / factor);
+            if (surface) {
+                const generation = labRequests.latestMain();
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                check(chart() === before && !!before.dataset.localRenderer && labRequests.latestMain() === generation,
+                      'Held surface pinch projects retained geometry without a native sampling request');
+            }
             send(window, 'pointerup', 72, cx + 30 / factor);
             await wait(before);
-            for (const [lo, hi] of [['xMin', 'xMax'], ['yMin', 'yMax']])
+            const ranges = surface ? [['xMin', 'xMax'], ['yMin', 'yMax'], ['zMin', 'zMax']] :
+                                     [['xMin', 'xMax'], ['yMin', 'yMax']];
+            for (const [lo, hi] of ranges)
                 check(Math.abs((Number(chart().dataset[hi]) - Number(chart().dataset[lo])) /
                       (Number(before.dataset[hi]) - Number(before.dataset[lo])) - factor) < 1e-7,
                       'Pinch changes axis ranges rather than image dimensions');
@@ -605,8 +688,8 @@
             }
             if (surface)
                 check(['azimuth', 'elevation', 'roll'].every((key, i) => chart().dataset[key] === camera[i]) &&
-                      document.getElementById('plotScale').value === heightPolicy,
-                      'Surface pinch preserves the camera and height policy');
+                      document.getElementById('plotScale').value === 'manual',
+                      'Surface pinch preserves the camera and locks the scaled height viewport');
             check(!rendered.marsPlotDrag.active && !rendered.marsPlotDrag.pinch,
                   'Releasing either finger ends pinch and restores full-detail rendering');
             send(window, 'pointermove', 71, cx + 100);
@@ -615,8 +698,10 @@
             const zoomed = chart();
             card.querySelector('[data-zoom-reset]').click();
             await wait(zoomed);
-            check(['xMin', 'xMax', 'yMin', 'yMax'].every((key, i) =>
+            check(coordinateKeys.every((key, i) =>
                 Math.abs(Number(chart().dataset[key]) - original[i]) < 1e-7), 'Reset restores the pre-pinch viewport');
+            check(document.getElementById('plotScale').value === heightPolicy,
+                  'Reset restores the pre-pinch height policy');
             const restored = chart();
             send(restored, 'pointerdown', 71, cx - 30);
             send(restored, 'pointerdown', 72, cx + 30);
@@ -814,33 +899,41 @@
         const clamp = value => Math.max(0, Math.min(1, value));
         const fractions = [clamp(map[0] * px + map[1] * py + map[2]),
                            clamp(map[3] * px + map[4] * py + map[5])];
-        const original = [before.dataset.xMin, before.dataset.xMax, before.dataset.yMin, before.dataset.yMax].map(Number);
+        check(map.length === 9, 'Native facets supply all three coordinates for pointer-aligned zoom');
+        fractions.push(clamp(map[6] * px + map[7] * py + map[8]));
+        const original = [before.dataset.xMin, before.dataset.xMax, before.dataset.yMin, before.dataset.yMax,
+                          before.dataset.zMin, before.dataset.zMax].map(Number);
         const heightPolicy = document.getElementById('plotScale').value;
         const waitSurface = async previous => {
             const deadline = performance.now() + 20000;
-            while ((!surface() || surface() === previous) && performance.now() < deadline)
+            while ((!surface() || surface() === previous || rendered.marsPlotZoom?.wheel ||
+                    rendered.marsPlotZoom?.busy) && performance.now() < deadline)
                 await new Promise(resolve => setTimeout(resolve, 25));
             check(surface() && surface() !== previous, 'Surface zoom must resample the mathematical domain');
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         };
         check(path.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, bubbles: true, cancelable: true})),
               'Unmodified wheel retains normal scrolling');
+        const wheelGeneration = labRequests.latestMain();
         check(!path.dispatchEvent(event), 'Surface Ctrl+wheel prevents page scrolling');
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        check(surface() === before && !!before.dataset.localRenderer && labRequests.latestMain() === wheelGeneration,
+              'Wheel zoom stays in the local renderer until wheel inactivity');
         await waitSurface(before);
         const after = surface();
         check(document.getElementById('plotLower').value.length < 10 &&
               document.getElementById('plotSecondLower').value.length < 10,
               'Both surface axes must use short interval-aware zoom labels');
         check(['azimuth', 'elevation', 'roll'].every(key => after.dataset[key] === before.dataset[key]) &&
-              document.getElementById('plotScale').value === heightPolicy,
-              'Surface domain zoom preserves the camera and height-scaling policy');
-        for (let axis = 0; axis < 2; axis++) {
-            const keys = axis ? ['yMin', 'yMax'] : ['xMin', 'xMax'];
+              document.getElementById('plotScale').value === 'manual',
+              'Surface domain zoom preserves the camera and locks the scaled height range');
+        for (let axis = 0; axis < 3; axis++) {
+            const keys = [['xMin', 'xMax'], ['yMin', 'yMax'], ['zMin', 'zMax']][axis];
             const lo = original[axis * 2], hi = original[axis * 2 + 1];
             const anchor = lo * (1 - fractions[axis]) + hi * fractions[axis];
             check(Math.abs(Number(after.dataset[keys[0]]) - (anchor + (lo - anchor) * 0.8)) < 1e-6 * (hi - lo) &&
                   Math.abs(Number(after.dataset[keys[1]]) - Number(after.dataset[keys[0]]) - (hi - lo) * 0.8) < 1e-7,
-                  'Surface zoom is anchored at the hit facet and narrows both independent ranges: ' +
+                  'Surface zoom narrows all three coordinate ranges by the same factor: ' +
                   JSON.stringify({axis, lo, hi, anchor, fractions, px, py, bounds: {...after.dataset}}));
         }
         check(Math.abs(after.getBoundingClientRect().width - width) < 2,
@@ -850,11 +943,65 @@
         const centred = surface();
         check(Math.abs(Number(centred.dataset.xMax) - Number(centred.dataset.xMin) -
               (original[1] - original[0]) * 0.64) < 1e-7, 'Surface toolbar zoom narrows the domain');
+        check(Math.abs(Number(centred.dataset.zMax) - Number(centred.dataset.zMin) -
+              (original[5] - original[4]) * 0.64) < 1e-7, 'Surface toolbar zoom also scales height uniformly');
         card.querySelector('[data-zoom-reset]').click();
         await waitSurface(centred);
         check(Math.abs(Number(surface().dataset.xMin) - original[0]) < 1e-7 &&
-              Math.abs(Number(surface().dataset.yMax) - original[3]) < 1e-7,
+              Math.abs(Number(surface().dataset.yMax) - original[3]) < 1e-7 &&
+              Math.abs(Number(surface().dataset.zMin) - original[4]) < 1e-7 &&
+              Math.abs(Number(surface().dataset.zMax) - original[5]) < 1e-7 &&
+              document.getElementById('plotScale').value === heightPolicy,
               'Surface Reset restores the original domain');
+        const keys = ['xMin', 'xMax', 'yMin', 'yMax', 'zMin', 'zMax'];
+        const reversible = () => check(keys.every((key, i) =>
+            Math.abs(Number(surface().dataset[key]) - original[i]) < 1e-7),
+            'Reversing surface wheel zoom restores all six bounds without drifting between sheets');
+        const wheelAtPointer = deltaY => {
+            const target = document.elementFromPoint(event.clientX, event.clientY);
+            check(target && rendered.contains(target), 'Wheel reversal stays inside the plot');
+            target.dispatchEvent(new WheelEvent('wheel', {clientX: event.clientX, clientY: event.clientY,
+                deltaY, ctrlKey: true, bubbles: true, cancelable: true}));
+        };
+        for (const delta of [-100, 100]) {
+            const previous = surface();
+            wheelAtPointer(delta);
+            await waitSurface(previous);
+        }
+        reversible();
+        const pending = surface();
+        for (const delta of [-100, -100, 100, 100])
+            wheelAtPointer(delta);
+        await waitSurface(pending);
+        reversible();
+        const queue = [];
+        let end;
+        const registry = {
+            redrawPlotDrag: (state, variable, preview) => queue.push({state, variable, preview}),
+            schedulePlotWheelEnd: (state, revision, delay) => end = {state, revision, delay}
+        };
+        const services = labDOM.bindEvents({});
+        labDOM.bindEvents({...services, ...registry});
+        try {
+            for (const delta of [-100, -100, 100, 100])
+                wheelAtPointer(delta);
+            check(queue.length === 1 && queue[0].preview,
+                  'Range wheel bursts coalesce into one in-flight coarse preview');
+            check(end.delay === 300, 'Range wheel refinement waits for 300 ms of inactivity');
+            labDOM.services(labDOM.call('lab_plot_drag_dispatch', 6, end.revision, end.state), registry);
+            check(queue.length === 1, 'Inactivity must not race an outstanding range preview');
+            const preview = queue.shift();
+            labDOM.services(labDOM.call('lab_plot_drag_complete', preview.state, 1), registry);
+            check(queue.length === 1 && !queue[0].preview,
+                  'The final wheel bounds receive one full-detail redraw after the preview');
+            const final = queue.shift();
+            labDOM.services(labDOM.call('lab_plot_drag_complete', final.state, 1), registry);
+            check(queue.length === 0, 'Full-detail completion ends the wheel queue');
+        } finally {
+            labDOM.bindEvents(services);
+        }
+        card.querySelector('[data-zoom-reset]').click();
+        await waitSurface(surface());
         await checkPlotPinch();
     }
     async function checkFunctionRun() {
@@ -1120,6 +1267,8 @@
         }
     }
     async function report(message) {
+        if (message.startsWith('PASS:') && sessionStorage.getItem('labSurfaceRenderer'))
+            message += '; surface renderer: ' + sessionStorage.getItem('labSurfaceRenderer');
         await nativeFetch('/state', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-protobuf'},
@@ -1711,10 +1860,14 @@
                   'Reciprocal series must plot its convergent portion across -5 to 5');
             check(plotRendered.dataset.displayTex.includes('\\sum'), 'Reciprocal series must retain its sigma title');
             document.getElementById('plotUpper').value = '1';
+            const convergentView = plotRendered.querySelector('[data-series]');
             await takePlot('x');
-            check(plotRendered.classList.contains('error') && plotRendered.textContent.includes('No finite real points') &&
-                  !plotRendered.textContent.includes('NAN') && !plotRendered.textContent.includes('binding variable'),
-                  'Wholly divergent range must show a clean calculation diagnostic');
+            const diagnostic = document.getElementById('plotFeedback');
+            check(!plotRendered.classList.contains('error') &&
+                  plotRendered.querySelector('[data-series]') === convergentView &&
+                  !diagnostic.classList.contains('hidden') && diagnostic.textContent.includes('No finite real points') &&
+                  !diagnostic.textContent.includes('NAN') && !diagnostic.textContent.includes('binding variable'),
+                  'Wholly divergent range retains the previous view with a separate clean diagnostic');
             await window.checkLabMobileLayout('plot error');
             document.getElementById('plotLower').value = '-10';
             document.getElementById('plotUpper').value = '10';
@@ -1893,6 +2046,7 @@
                 ['equation', 'x^2=1', 2, false],
                 ['equation', 'x^2+y^2=1', 1, false],
                 ['equation', 'x^2+y^2+z^2=1', 1, true],
+                ['equation', 'cos(z)-sin(2-xy)=0', 1, true],
                 ['equation', 'cos(z)-sin(pi-xy)=0', 1, true],
                 ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
                 ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
@@ -1924,6 +2078,74 @@
                       JSON.stringify({source, variables: currentVariables, status: statusEl.textContent,
                                       error: plotRendered.textContent.slice(0, 400)}));
                 check(!!plotRendered.querySelector('[data-surface]') === surface, mode + ' selects native dimensionality');
+                if (source === 'cos(z)-sin(2-xy)=0') {
+                    document.getElementById('plotScale').value = 'manual';
+                    for (const id of ['plotLower', 'plotSecondLower', 'plotYLower'])
+                        document.getElementById(id).value = '-5';
+                    for (const id of ['plotUpper', 'plotSecondUpper', 'plotYUpper'])
+                        document.getElementById(id).value = '5';
+                    await takePlot('z');
+                    const initialChart = plotRendered.querySelector('[data-surface]');
+                    const initialRequest = labRequests.latestMain();
+                    const target = plotRendered.querySelector('[data-axis-handle]');
+                    const send = (node, type, x, y) => node.dispatchEvent(new PointerEvent(type, {
+                        clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+                        pointerId: 31, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true
+                    }));
+                    send(target, 'pointerdown', 100, 100);
+                    send(window, 'pointermove', 140, 110);
+                    const deadline = performance.now() + 20000;
+                    while (!plotRendered.querySelector('[data-local-renderer]') && performance.now() < deadline)
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    const preview = plotRendered.querySelector('[data-local-renderer]');
+                    check(preview === initialChart && labRequests.latestMain() === initialRequest &&
+                          plotRendered.marsPlotDrag.active && preview.querySelector('canvas'),
+                          'Wide implicit equations rotate the retained mesh without native sampling before release');
+                    send(window, 'pointerup', 140, 110);
+                    const finish = performance.now() + 20000;
+                    while ((plotRendered.marsPlotDrag.busy ||
+                            !plotRendered.querySelector('[data-plot-quality="full"]')) && performance.now() < finish)
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    const full = plotRendered.querySelector('[data-plot-quality="full"]');
+                    check(full && full !== initialChart && !plotRendered.querySelector('[data-local-renderer]') &&
+                          !plotRendered.querySelector('[data-preview-notice]'),
+                          'Releasing an implicit-equation axis restores the final budgeted SVG');
+                }
+                if (source === 'x^2+y^2+z^2=1') {
+                    const card = plotRendered.closest('.result-card');
+                    const changeZoom = async selector => {
+                        const before = plotRendered.querySelector('[data-surface]');
+                        card.querySelector(selector).click();
+                        const deadline = performance.now() + 20000;
+                        while (plotRendered.querySelector('[data-surface]') === before && performance.now() < deadline)
+                            await new Promise(resolve => setTimeout(resolve, 25));
+                        check(plotRendered.querySelector('[data-surface]') &&
+                              plotRendered.querySelector('[data-surface]') !== before,
+                              'Implicit zoom retains a rendered viewport');
+                    };
+                    for (let step = 0; step < 5; step++)
+                        await changeZoom('[data-zoom-step="1"]');
+                    check(plotRendered.querySelector('[data-empty="true"]') &&
+                          !plotRendered.classList.contains('error'),
+                          'Zooming inside a sphere leaves an empty navigable box, not a calculation error');
+                    const retained = plotRendered.querySelector('[data-surface]');
+                    labDOM.call('lab_layout_plot', null,
+                                'No real isosurface found in the sampled volume; supply finite ordered coordinate bounds.');
+                    check(plotRendered.querySelector('[data-surface]') === retained &&
+                          !plotRendered.classList.contains('error') &&
+                          !document.getElementById('plotFeedback').classList.contains('hidden') &&
+                          card.querySelector('[data-zoom-reset]').textContent === 'Reset',
+                          'A failed surface redraw retains its coordinate viewport and navigation, not text zoom');
+                    for (let step = 0; step < 5; step++)
+                        await changeZoom('[data-zoom-step="-1"]');
+                    check(plotRendered.querySelector('[data-uv]'), 'Zooming back out restores the sphere');
+                    check(document.getElementById('plotFeedback').classList.contains('hidden'),
+                          'Successful zoom recovery clears the surface diagnostic');
+                    labDOM.call('lab_layout_plot', null, 'Plot request timed out');
+                    await changeZoom('[data-zoom-reset]');
+                    check(document.getElementById('plotScale').value === 'auto',
+                          'Reset after a failed redraw restores automatic height');
+                }
                 if (document.getElementById('plotScale').value === 'auto')
                     check([...document.querySelectorAll('#plotRange .plot-bound-pair')]
                               .every(pair => pair.getClientRects().length === 0),

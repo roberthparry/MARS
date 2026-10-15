@@ -198,6 +198,8 @@ static void lab_layout_content_at(int rendered, int svg, int fallback)
     }
     int card = lab_dom_closest(rendered, ".result-card");
     lab_dom_class(card, "plot-card", !!lab_dom_query(rendered, "[data-series]"));
+    if (card && lab_dom_query(rendered, "[data-series]"))
+        lab_layout_zoom(card);
     if (card)
         lab_dom_schedule(1, card);
 }
@@ -212,6 +214,17 @@ void lab_layout_content(int svg, int fallback)
 void lab_layout_plot(int result, int error)
 {
     int node = lab_dom_id("plotRendered"), svg = lab_dom_get(result, "svg");
+    /* A failed navigation must not replace the coordinate-bearing chart with
+     * text: its bounds and hit targets are needed to zoom back out or reset. */
+    if (lab_dom_truth(error) && lab_dom_query(node, "[data-plot-chart][data-x-min], [data-surface][data-x-min]")) {
+        lab_dom_write(node, 2, "aria-busy", lab_dom_string("false"));
+        lab_dom_write(node, 3, "plotPending", lab_dom_string("false"));
+        int feedback = lab_dom_id("plotFeedback");
+        lab_dom_write(feedback, 0, "", lab_dom_join(lab_dom_string("Previous view retained. "), error, ""));
+        lab_dom_class(feedback, "hidden", 0);
+        lab_layout_zoom(lab_dom_id("plotCard"));
+        return;
+    }
     lab_dom_class(lab_dom_id("plotCard"), "hidden", 0);
     lab_dom_class(node, "error", lab_dom_truth(error));
     lab_dom_write(node, 2, "aria-busy", lab_dom_string(!result && !error ? "true" : "false"));
