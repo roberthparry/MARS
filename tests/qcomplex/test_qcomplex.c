@@ -1138,6 +1138,8 @@ static void test_utility(void)
     check_qc("ldexp(3+5i, -1) = 1.5+2.5i", qc_ldexp(z, -1), qcz(1.5, 2.5), 1e-30);
     check_qc("floor(3.7 - 2.1i) = 3 - 3i", qc_floor(qcz(3.7, -2.1)), qcz(3.0, -3.0), 1e-30);
     check_qc("round(2.5 - 1.5i) = 3 - 2i", qc_round(qcz(2.5, -1.5)), qcz(3.0, -2.0), 1e-30);
+    check_qc("roundn coordinates", qc_roundn(qcz(125.0, -15.0), -1), qcz(130.0, -20.0), 1e-30);
+    check_qc("rounds coordinates", qc_rounds(qcz(1250.0, -125.0), 2u), qcz(1300.0, -130.0), 1e-30);
     check_qc("round(2.49 - 1.49i) = 2 - i", qc_round(qcz(2.49, -1.49)), qcz(2.0, -1.0), 1e-30);
     check_qc("hypot(3, 4) = 5", qc_hypot(qcr(3.0), qcr(4.0)), qcr(5.0), 1e-30);
 

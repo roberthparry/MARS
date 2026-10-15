@@ -7,6 +7,11 @@ of two IEEE-754 `double` values.
 away from zero. It examines both double-double components, preserves signed
 zero and non-finite values, and does not first add one half to the input.
 
+`qf_roundn(x, int n)` rounds to decimal places, allowing negative places for powers
+of ten. `qf_rounds(x, unsigned int n)` rounds to significant decimal digits and
+returns NaN for zero digits. Both share the same halfway rule and use wider
+intermediate exponents before converting back to double-double precision.
+
 ## Implementation organisation
 
 

@@ -599,13 +599,14 @@ static void example_readme_examples(void)
 static void example_round(void)
 {
     /* README example: nearest-integer rounding in docs/expression.md. */
-    const char *inputs[] = {"round(2.49)", "round(2.5)", "round(-2.5)"};
-    const double expected[] = {2.0, 3.0, -3.0};
+    const char *inputs[] = {"round(2.49)", "round(2.5)", "round(-2.5)", "roundn(1234.567,2)",
+                            "roundn(1234,-2)", "rounds(1234.567,2)", "rounds(0.001234,2)"};
+    const double expected[] = {2.0, 3.0, -3.0, 1234.57, 1200.0, 1200.0, 0.0012};
     for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
         expr_t *expression = expr_from_string(inputs[i], NULL);
         ASSERT_NOT_NULL(expression);
         double value = qf_to_double(expr_eval_qf(expression));
-        printf("%.0f\n", value);
+        printf("%.10g\n", value);
         TEST_ASSERT_TRUE(value == expected[i], "README round output");
         expr_free(expression);
     }

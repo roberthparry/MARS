@@ -65,8 +65,34 @@ static expr_t *integrate_round_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+static expr_t *integrate_roundn_rule(const expr_t *expr, const expr_t *wrt)
+{
+    if (!expr_is_const(expr->b) || !num_is_real(expr->b->c) || !num_is_integer(expr->b->c))
+        return NULL;
+    double places = num_to_double(expr->b->c);
+    if (places < -4096.0 || places > 4096.0)
+        return NULL;
+    number_t ten_value = num_create_from_long(10L);
+    expr_t *ten = expr_new_const(ten_value);
+    num_destroy(&ten_value);
+    expr_t *power = expr_pow_xp(ten, expr->b);
+    expr_t *scale = expr_simplify(power);
+    expr_t *argument = expr_mul(expr->a, scale);
+    expr_t *rounded = expr_round(argument);
+    expr_t *primitive = expr_integrate(rounded, wrt);
+    expr_t *out = primitive ? expr_div(primitive, scale) : NULL;
+    expr_free(primitive);
+    expr_free(rounded);
+    expr_free(argument);
+    expr_free(scale);
+    expr_free(power);
+    expr_free(ten);
+    return out;
+}
+
 static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ROUND] = {.primitive = integrate_round_rule},
+    [EXPR_KIND_ROUNDN] = {.primitive = integrate_roundn_rule},
     [EXPR_KIND_CONST] = {.structural = integrate_constant_rule},
     [EXPR_KIND_VAR] = {.structural = integrate_var_rule},
     [EXPR_KIND_ADD] = {.structural = integrate_add_rule},

@@ -1078,6 +1078,12 @@ expr_t *expr_floor(const expr_t *expr);
  */
 expr_t *expr_round(const expr_t *expr);
 
+/** Construct decimal-place rounding; n must evaluate to a finite integer representable by int. */
+expr_t *expr_roundn(const expr_t *expr, const expr_t *n);
+
+/** Construct significant-digit rounding; n must evaluate to a positive integer representable by unsigned int. */
+expr_t *expr_rounds(const expr_t *expr, const expr_t *n);
+
 /**
  * @brief Construct the real signum, with values -1, 0 and +1; non-real inputs are undefined.
  *

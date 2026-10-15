@@ -320,6 +320,59 @@ matrix_t *mat_round(const matrix_t *a)
     return mat_apply_scalar_callbacks(a, number_round, expression_round);
 }
 
+typedef struct {
+    int places;
+    unsigned int digits;
+    bool significant;
+} matrix_rounding_context_t;
+
+static _Thread_local const matrix_rounding_context_t *rounding_context;
+
+static void number_round_digits(void *out, const void *in)
+{
+    number_t value = rounding_context->significant
+                         ? num_rounds(*(const number_t *)in, rounding_context->digits)
+                         : num_roundn(*(const number_t *)in, rounding_context->places);
+    num_destroy((number_t *)out);
+    *(number_t *)out = value;
+}
+
+static void expression_round_digits(void *out, const void *in)
+{
+    number_t n = rounding_context->significant ? num_create_from_double(rounding_context->digits)
+                                              : num_create_from_long(rounding_context->places);
+    expr_t *digits = expr_new_const(n);
+    expr_t *value = rounding_context->significant ? expr_rounds(*(expr_t *const *)in, digits)
+                                                 : expr_roundn(*(expr_t *const *)in, digits);
+    expr_free(digits);
+    num_destroy(&n);
+    expr_free(*(expr_t **)out);
+    *(expr_t **)out = value;
+}
+
+static matrix_t *matrix_round_digits(const matrix_t *a, const matrix_rounding_context_t *context)
+{
+    const matrix_rounding_context_t *previous = rounding_context;
+    rounding_context = context;
+    matrix_t *out = mat_apply_scalar_callbacks(a, number_round_digits, expression_round_digits);
+    rounding_context = previous;
+    return out;
+}
+
+/* Apply decimal-place rounding to the supported spectrum. */
+matrix_t *mat_roundn(const matrix_t *a, int n)
+{
+    const matrix_rounding_context_t context = {.places = n};
+    return matrix_round_digits(a, &context);
+}
+
+/* Apply significant-digit rounding independently to each supported eigenvalue. */
+matrix_t *mat_rounds(const matrix_t *a, unsigned int n)
+{
+    const matrix_rounding_context_t context = {.digits = n, .significant = true};
+    return n ? matrix_round_digits(a, &context) : NULL;
+}
+
 static void number_sgn(void *out, const void *in)
 {
     number_t value = num_sgn(*(const number_t *)in);

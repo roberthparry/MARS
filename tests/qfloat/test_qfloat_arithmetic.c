@@ -27,6 +27,11 @@ static int qf_close_value(qfloat_t got, qfloat_t want, double tol)
 
 static void test_round(void)
 {
+    TEST_ASSERT_TRUE(qf_eq(qf_roundn(qf_from_double(1.25), 1), qf_div(qf_from_double(13), qf_from_double(10))),
+                     "roundn decimal half");
+    TEST_ASSERT_TRUE(qf_eq(qf_roundn(qf_from_double(1234), -2), qf_from_double(1200)), "roundn hundreds");
+    TEST_ASSERT_TRUE(qf_eq(qf_rounds(qf_from_double(1250), 2u), qf_from_double(1300)), "rounds half");
+    TEST_ASSERT_TRUE(qf_isnan(qf_rounds(QF_ONE, 0u)), "rounds rejects zero digits");
     const double inputs[] = {0.0, -0.0, 0.49, -0.49, 0.5, -0.5, 1.5, -1.5, 2.49, -2.51};
     for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i)
         TEST_ASSERT_TRUE(qf_eq(qf_round(qf_from_double(inputs[i])), qf_from_double(round(inputs[i]))),

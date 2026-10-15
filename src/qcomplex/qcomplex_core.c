@@ -40,6 +40,18 @@ qcomplex_t qc_round(qcomplex_t z)
     return qc_make(qf_round(qc_real(z)), qf_round(qc_imag(z)));
 }
 
+/* Round each coordinate at the requested decimal position. */
+qcomplex_t qc_roundn(qcomplex_t z, int n)
+{
+    return qc_make(qf_roundn(qc_real(z), n), qf_roundn(qc_imag(z), n));
+}
+
+/* Significant digits are counted independently in each coordinate. */
+qcomplex_t qc_rounds(qcomplex_t z, unsigned int n)
+{
+    return qc_make(qf_rounds(qc_real(z), n), qf_rounds(qc_imag(z), n));
+}
+
 qcomplex_t qc_floor(qcomplex_t z)
 {
     return qc_make(qf_floor(qc_real(z)), qf_floor(qc_imag(z)));

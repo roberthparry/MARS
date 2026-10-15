@@ -6,6 +6,12 @@ away from zero; complex eigenvalues are rounded component-wise. This is not
 entry-wise rounding. Unsupported matrix classes return `NULL`; at a rounding
 discontinuity there is no analytic matrix derivative.
 
+`mat_roundn(A, int n)` and `mat_rounds(A, unsigned int n)` use the same spectral
+engine for decimal-place and significant-digit rounding respectively, including
+symbolic entries. Negative decimal places are allowed; zero significant digits
+returns `NULL`. Unsupported matrix classes retain the same limitations as
+`mat_round`. These operations do not round individual matrix entries.
+
 `matrix_t` is a generic high-precision matrix type with two public element
 families: `number_t` for numeric work and `expr_t *` for symbolic work.
 Numeric matrices can still hold exact rationals, floating-point values, and

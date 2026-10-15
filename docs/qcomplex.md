@@ -6,6 +6,11 @@
 nearest integers, with exact halves away from zero. This is component-wise
 rounding, not rounding the magnitude; each component follows `qf_round`.
 
+`qc_roundn(z, int n)` rounds each component to decimal places, and
+`qc_rounds(z, unsigned int n)` rounds each component to significant decimal digits.
+The latter rejects zero digits with NaN components. These follow the corresponding
+qfloat functions, not the magnitude or phase of the complex number.
+
 ## Implementation organisation
 
 

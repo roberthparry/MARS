@@ -52,6 +52,16 @@ static void test_mat_round(void)
     check_cylindrical_entry("positive half eigenvalue", rounded, 0u, 0u, num_create_from_long(3));
     check_cylindrical_entry("negative half eigenvalue", rounded, 1u, 1u, num_create_from_long(-3));
     mat_free(rounded);
+    rounded = mat_roundn(a, 1);
+    check_bool("decimal rounding produces a matrix", rounded != NULL);
+    check_cylindrical_entry("decimal eigenvalue retained", rounded, 0u, 0u, diagonal[0]);
+    mat_free(rounded);
+    rounded = mat_rounds(a, 1u);
+    check_bool("significant rounding produces a matrix", rounded != NULL);
+    check_cylindrical_entry("significant positive half", rounded, 0u, 0u, num_create_from_long(3));
+    check_cylindrical_entry("significant negative half", rounded, 1u, 1u, num_create_from_long(-3));
+    mat_free(rounded);
+    check_bool("zero significant digits rejected", mat_rounds(a, 0u) == NULL);
     mat_free(a);
 }
 

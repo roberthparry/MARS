@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,46 @@
 void run_number_public_api_tests(void)
 {
     printf(C_CYAN "Testing number_t as a standalone public API...\n" C_RESET);
+
+    {
+        const char *inputs[] = {"1234.567", "0.001234", "-1250", "9.99", "0", "999/1000", "1/3"};
+        const char *expected[] = {"1200", "0.0012", "-1300", "10", "0", "1", "0.33"};
+        for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+            number_t input = num_create_from_string(inputs[i]);
+            number_t result = num_rounds(input, 2u);
+            number_t wanted = num_create_from_string(expected[i]);
+            TEST_ASSERT_TRUE(num_eq(result, wanted), "significant decimal digits");
+            num_destroy(&wanted);
+            num_destroy(&result);
+            num_destroy(&input);
+        }
+        number_t input = num_create_from_frac(-125, 100);
+        number_t result = num_roundn(input, 1);
+        number_t wanted = num_create_from_frac(-13, 10);
+        TEST_ASSERT_TRUE(num_eq(result, wanted), "roundn retains exact decimal half");
+        num_destroy(&wanted);
+        num_destroy(&result);
+        num_destroy(&input);
+        result = num_rounds(NUM_ONE, 0u);
+        TEST_ASSERT_TRUE(num_is_nan(result), "zero significant digits rejected");
+        num_destroy(&result);
+        result = num_rounds(NUM_ONE, UINT_MAX);
+        TEST_ASSERT_TRUE(num_eq(result, NUM_ONE), "large unsigned count does not allocate an enormous exact power");
+        num_destroy(&result);
+        result = num_roundn(NUM_ONE, INT_MIN);
+        TEST_ASSERT_TRUE(num_is_zero(result), "extreme negative places");
+        num_destroy(&result);
+        result = num_roundn(NUM_ONE, INT_MAX);
+        TEST_ASSERT_TRUE(num_eq(result, NUM_ONE), "extreme positive places");
+        num_destroy(&result);
+        input = num_create_from_string("1.2345e-310");
+        wanted = num_create_from_string("1.23e-310");
+        result = num_rounds(input, 3u);
+        TEST_ASSERT_TRUE(num_eq(result, wanted), "small decimal exponents do not underflow during scaling");
+        num_destroy(&wanted);
+        num_destroy(&result);
+        num_destroy(&input);
+    }
 
     {
         const char *inputs[] = {"2.49", "2.5", "-2.5", "-2.49", "1/2", "-1/2",

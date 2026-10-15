@@ -769,6 +769,12 @@ number_t num_floor(const number_t number);
 /** @brief Round to the nearest integer, with exact halves away from zero; round complex components separately. */
 number_t num_round(const number_t number);
 
+/** Round to n decimal places (negative n rounds to powers of ten), with halves away from zero. */
+number_t num_roundn(const number_t number, int n);
+
+/** Round each real or complex component to n significant decimal digits; zero digits returns NaN. */
+number_t num_rounds(const number_t number, unsigned int n);
+
 number_t num_ceil(const number_t number);
 
 /**

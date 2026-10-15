@@ -494,6 +494,8 @@ owning `number_t`.
 | `num_arg(x)` | Returns the principal complex argument in radians. |
 | `num_floor(x)` | Returns the greatest integer not exceeding a real input. |
 | `num_round(x)` | Returns the nearest integer, with exact halves away from zero; complex components are rounded independently. Exact integers and rationals are not converted to double, and non-finite inputs are preserved. |
+| `num_roundn(x, n)` | Rounds to signed decimal places; negative n rounds to powers of ten. Exact halves round away from zero. |
+| `num_rounds(x, n)` | Rounds to an unsigned count of significant decimal digits; zero digits returns NaN. Complex components are rounded independently. |
 | `num_ceil(x)` | Returns the least integer not less than a real input. |
 | `num_hypot(x, y)` | Returns `sqrt(x² + y²)` with scaling that avoids needless overflow or underflow. |
 

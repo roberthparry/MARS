@@ -11,6 +11,8 @@
 
 #include <math.h>
 
+#include "number-t.h"
+
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
@@ -128,6 +130,34 @@ qfloat_t qf_round(qfloat_t x)
     if (qf_ge(qf_sub(magnitude, integer), QF_HALF))
         integer = qf_add(integer, QF_ONE);
     return x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0) ? qf_neg(integer) : integer;
+}
+
+/* Use the number layer's wider exponent range for intermediate decimal scaling. */
+qfloat_t qf_roundn(qfloat_t x, int n)
+{
+    if (n == 0 || !isfinite(x.hi) || (x.hi == 0.0 && x.lo == 0.0))
+        return qf_round(x);
+    number_t fixed = num_create_from_qfloat(x);
+    number_t value = num_const_prec(fixed, 160u);
+    num_destroy(&fixed);
+    number_t result = num_roundn(value, n);
+    qfloat_t out = num_to_qfloat(result);
+    num_destroy(&result);
+    num_destroy(&value);
+    return out;
+}
+
+/* Share the arbitrary-exponent significant-digit implementation. */
+qfloat_t qf_rounds(qfloat_t x, unsigned int n)
+{
+    number_t fixed = num_create_from_qfloat(x);
+    number_t value = num_const_prec(fixed, 160u);
+    num_destroy(&fixed);
+    number_t result = num_rounds(value, n);
+    qfloat_t out = num_to_qfloat(result);
+    num_destroy(&result);
+    num_destroy(&value);
+    return out;
 }
 
 /* Round qfloat_t to nearest integer (ties towards positive infinity). */

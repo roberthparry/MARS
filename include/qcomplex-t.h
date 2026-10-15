@@ -557,6 +557,12 @@ qcomplex_t qc_floor(qcomplex_t z);               /**< floor(z) */
 /** @brief Round each component to the nearest integer, with exact halves away from zero. */
 qcomplex_t qc_round(qcomplex_t z);
 
+/** Round each component to n decimal places, with halves away from zero. */
+qcomplex_t qc_roundn(qcomplex_t z, int n);
+
+/** Round each component to n significant decimal digits; zero digits returns NaN components. */
+qcomplex_t qc_rounds(qcomplex_t z, unsigned int n);
+
 /**
  * @brief Real signum restricted to purely real complex arguments.
  * @param argument Input with a zero imaginary component; either signed zero is accepted.

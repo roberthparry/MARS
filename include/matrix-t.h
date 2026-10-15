@@ -1380,6 +1380,12 @@ matrix_t *mat_sin(const matrix_t *A);
 /** @brief Round supported matrix spectra to nearest integers, with halves away from zero; not entry-wise rounding. */
 matrix_t *mat_round(const matrix_t *A);
 
+/** Round supported matrix spectra to n decimal places, with halves away from zero; not entry-wise. */
+matrix_t *mat_roundn(const matrix_t *A, int n);
+
+/** Round supported matrix spectra to n significant decimal digits; zero digits returns NULL. */
+matrix_t *mat_rounds(const matrix_t *A, unsigned int n);
+
 /**
  * @brief Apply real signum through spectral functional calculus on real spectra.
  * @param A Square matrix belonging to a class supported by the spectral engine, as for mat_step().

@@ -258,6 +258,20 @@ void test_sqrt(void)
 
 static void test_round(void)
 {
+    check_expr_string_qf("roundn decimal places", "roundn(1.25,1)", qf_div(qf_from_double(13), qf_from_double(10)));
+    check_expr_string_qf("roundn negative places", "roundn(1234,-2)", qf_from_double(1200));
+    check_expr_string_qf("rounds significant digits", "rounds(1234.567,2)", qf_from_double(1200));
+    check_expr_string_qf("rounds binding", "{ x | x = rounds(1250,2) }", qf_from_double(1300));
+    check_expr_string_qf("roundn binding", "{ x | x = roundn(125,-1) }", qf_from_double(130));
+    check_expr_string_qf("rounds sum", "sum(k,1,4,rounds(k/2,1))", qf_from_double(5.5));
+    check_expr_string_qf("roundn sum", "sum(k,1,4,roundn(k/2,0))", qf_from_double(6));
+    const char *invalid[] = {"rounds(1,0)", "rounds(1,-1)", "rounds(1,1.5)", "roundn(1,1.5)",
+                             "rounds(1,4294967296)", "roundn(1,2147483648)"};
+    for (size_t i = 0u; i < sizeof(invalid) / sizeof(*invalid); ++i) {
+        expr_t *bad = expr_from_string(invalid[i], NULL);
+        TEST_ASSERT_TRUE(bad && qf_isnan(expr_eval_qf(bad)), "invalid rounding count yields NaN");
+        expr_free(bad);
+    }
     check_expr_string_qf("round positive half", "round(2.5)", qf_from_double(3.0));
     check_expr_string_qf("round negative half", "round(-2.5)", qf_from_double(-3.0));
     check_expr_string_qf("round below half", "round(2.49)", QF_TWO);
@@ -287,6 +301,30 @@ static void test_round(void)
     }
     expr_free(primitive);
     expr_free(rounded);
+    expr_t *digits = expr_new_const(NUM_ONE);
+    rounded = expr_roundn(x, digits);
+    primitive = expr_integrate(rounded, x);
+    test_expr_set_val_d(x, 1.25);
+    check_q_at(__FILE__, __LINE__, 1, "roundn derivative", expr_eval_qf(expr_get_deriv(rounded, x)), QF_ZERO);
+    check_q_at(__FILE__, __LINE__, 1, "roundn primitive derivative",
+               expr_eval_qf(expr_get_deriv(primitive, x)), qf_div(qf_from_double(13), qf_from_double(10)));
+    expr_free(primitive);
+    expr_free(rounded);
+    rounded = expr_rounds(x, digits);
+    check_q_at(__FILE__, __LINE__, 1, "rounds derivative", expr_eval_qf(expr_get_deriv(rounded, x)), QF_ZERO);
+    const expr_t *variables[] = {x};
+    number_t gradient;
+    TEST_ASSERT_TRUE(expr_eval_derivatives(rounded, 1u, variables, NULL, &gradient) == 0,
+                     "rounds reverse-mode derivative is available");
+    TEST_ASSERT_TRUE(num_is_zero(gradient), "rounds reverse-mode derivative is zero away from jumps");
+    num_destroy(&gradient);
+    for (size_t i = 0u; i < sizeof(styles) / sizeof(*styles); ++i) {
+        char *text = expr_to_string(rounded, styles[i]);
+        TEST_ASSERT_TRUE(text && strstr(text, "rounds"), "significant rounding retained in every rendering");
+        free(text);
+    }
+    expr_free(rounded);
+    expr_free(digits);
     expr_free(x);
 }
 

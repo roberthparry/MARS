@@ -2008,9 +2008,9 @@ typedef struct {
 static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE] = {
     0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 0, 0,
-    0, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
+    0, 0, 4, 0, 2, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
     1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7, 0, 6, 0,
     1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2021,7 +2021,7 @@ static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE]
     0, 0, 1, 20, 0, 0, 0, 1, 1, 0, 2, 0, 0, 0, 2, 1,
     0, 0, 5, 0, 0, 2, 0, 0, 0, 0, 11, 0, 0, 1, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 9, 0, 0,
-    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 0,
+    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 1,
 };
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
@@ -2078,6 +2078,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [ 96] = { .kw = "gamma",                .is_binary = false,                      .ops = &ops_gamma },
     [ 97] = { .kw = "arccoversin",          .is_binary = false,                      .ops = &ops_arccoversin },
     [ 98] = { .kw = "bessel_j",             .is_binary = true,                       .ops = &ops_bessel_j },
+    [ 99] = { .kw = "roundn",               .is_binary = true,                       .ops = &ops_roundn },
     [100] = { .kw = "acsc",                 .is_binary = false,                      .ops = &ops_acosec },
     [101] = { .kw = "logpdf",               .is_binary = false,                      .ops = &ops_logpdf },
     [104] = { .kw = "arccot",               .is_binary = false,                      .ops = &ops_acot },
@@ -2158,7 +2159,8 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     [213] = { .kw = "Un",                   .is_binary = true,                       .ops = &ops_chebyshev_u },
     [214] = { .kw = "erfinv",               .is_binary = false,                      .ops = &ops_erfinv },
     [215] = { .kw = "coversin",             .is_binary = false,                      .ops = &ops_coversin },
-    [216] = { .kw = "gammainc_lower",       .is_binary = true,                       .ops = &ops_gammainc_lower },
+    [216] = { .kw = "rounds",               .is_binary = true,                       .ops = &ops_rounds },
+    [217] = { .kw = "gammainc_lower",       .is_binary = true,                       .ops = &ops_gammainc_lower },
     [219] = { .kw = "log10",                .is_binary = false,                      .ops = &ops_log10 },
     [220] = { .kw = "zeta",                 .is_binary = false,                      .ops = &ops_zeta },
     [221] = { .kw = "Wₙ",                   .is_binary = true,                       .ops = &ops_lambert_wn },

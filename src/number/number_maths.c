@@ -3665,6 +3665,72 @@ number_t num_round(const number_t number)
     return num_scope_detach(num_lt(number, NUM_ZERO) ? num_neg(rounded) : rounded);
 }
 
+/* Scale using native number arithmetic, retaining exact decimal fractions where supported. */
+number_t num_roundn(const number_t number, int n)
+{
+    NUM_SCOPE(scope);
+    if (n == 0 || !num_is_finite(number))
+        return num_scope_detach(num_round(number));
+    if (!num_is_real(number)) {
+        number_t real = num_roundn(num_real_part(number), n);
+        number_t imag = num_roundn(num_imag_part(number), n);
+        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+    }
+    size_t bits = num_get_effective_prec_bits(number);
+    number_t ten = num_create_from_long(10L);
+    /* Do not allocate an enormous exact power for an extreme digit count. */
+    if (n < -4096 || n > 4096) {
+        number_t wide_ten = num_as_inexact_real_prec(ten, bits + 64u);
+        num_destroy(&ten);
+        ten = wide_ten;
+    }
+    number_t scale = num_pow_int(ten, n);
+    if (!num_is_finite(scale))
+        return num_scope_detach(n > 0 ? num_clone(number) : num_clone(NUM_NAN));
+    if (num_is_zero(scale))
+        return num_scope_detach(num_clone(NUM_ZERO));
+    number_t value = num_is_exact(number) ? num_clone(number) : num_as_inexact_real_prec(number, bits + 64u);
+    number_t scaled = num_mul(value, scale);
+    number_t rounded = num_round(scaled);
+    number_t out = num_div(rounded, scale);
+    if (!num_is_exact(number))
+        num_set_prec_bits(&out, bits);
+    return num_scope_detach(out);
+}
+
+/* Count decimal digits from the magnitude, correcting logarithm rounding at powers of ten. */
+number_t num_rounds(const number_t number, unsigned int n)
+{
+    NUM_SCOPE(scope);
+    if (n == 0u)
+        return num_scope_detach(num_clone(NUM_NAN));
+    if (!num_is_finite(number) || num_is_zero(number))
+        return num_scope_detach(num_clone(number));
+    if (!num_is_real(number)) {
+        number_t real = num_rounds(num_real_part(number), n);
+        number_t imag = num_rounds(num_imag_part(number), n);
+        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+    }
+    number_t magnitude = num_abs(number);
+    number_t logarithm = num_floor(num_log10(magnitude));
+    double order_value = num_to_double(logarithm);
+    if (!isfinite(order_value) || order_value <= INT_MIN || order_value >= INT_MAX)
+        return num_scope_detach(num_clone(NUM_NAN));
+    int order = (int)order_value;
+    number_t ten = num_create_from_long(10L);
+    number_t base = order >= -4096 && order <= 4096 ? num_pow_int(ten, order) : num_pow10(order);
+    if (num_lt(magnitude, base))
+        --order;
+    else if (num_ge(magnitude, num_mul(base, ten)))
+        ++order;
+    double places = (double)n - 1.0 - order;
+    if (places > INT_MAX)
+        return num_scope_detach(num_clone(number));
+    if (places < INT_MIN)
+        return num_scope_detach(num_clone(NUM_NAN));
+    return num_scope_detach(num_roundn(number, (int)places));
+}
+
 number_t num_ceil(const number_t number)
 {
     NUM_SCOPE(scope);

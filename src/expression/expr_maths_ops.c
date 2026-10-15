@@ -17,9 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
-#include "string-t.h"
 
 static expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
 {
@@ -32,6 +33,36 @@ static expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
 static number_t eval_round(expr_t *expr)
 {
     return num_round(expr_eval_num_internal(expr->a));
+}
+
+static number_t eval_round_digits(expr_t *expr)
+{
+    number_t count = expr_eval_num_internal(expr->b);
+    bool significant = expr->ops == &ops_rounds;
+    double n = num_to_double(count);
+    if (!num_is_real(count) || !num_is_integer(count) || !isfinite(n) ||
+        n < (significant ? 1.0 : (double)INT_MIN) || n > (significant ? (double)UINT_MAX : (double)INT_MAX))
+        return num_clone(NUM_NAN);
+    number_t value = expr_eval_num_internal(expr->a);
+    return significant ? num_rounds(value, (unsigned int)n) : num_roundn(value, (int)n);
+}
+
+static expr_t *deriv_round_digits(expr_t *expr)
+{
+    expr_t *dn = expr_get_dx_internal(expr->b);
+    expr_t *simplified = expr_simplify(dn);
+    expr_t *out = expr_new_const(expr_is_const(simplified) && num_is_zero(simplified->c) ? NUM_ZERO : NUM_NAN);
+    expr_free(simplified);
+    expr_free(dn);
+    return out;
+}
+
+static void reverse_round_digits(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    (void)expr;
+    (void)out_bar;
+    *a_bar = num_clone(NUM_ZERO);
+    *b_bar = num_clone(NUM_NAN);
 }
 
 static int fold_round_const(const number_t *in, number_t *out)
@@ -4473,6 +4504,27 @@ const expr_ops_t ops_round = {.eval = eval_round,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
                               .fold_const_unary = fold_round_const};
+const expr_ops_t ops_roundn = {.eval = eval_round_digits,
+                               .deriv = deriv_round_digits,
+                               .reverse = reverse_round_digits,
+                               .kind = EXPR_KIND_ROUNDN,
+                               .arity = EXPR_OP_BINARY,
+                               .expression_name = "roundn",
+                               .function_name = "roundn",
+                               .TeX_name = "\\operatorname{roundn}",
+                               .apply_binary = expr_roundn,
+                               .integrate = expr_integrate_dispatch_primitive,
+                               .simplify = expr_simplify_binary_operator};
+const expr_ops_t ops_rounds = {.eval = eval_round_digits,
+                               .deriv = deriv_round_digits,
+                               .reverse = reverse_round_digits,
+                               .kind = EXPR_KIND_ROUNDS,
+                               .arity = EXPR_OP_BINARY,
+                               .expression_name = "rounds",
+                               .function_name = "rounds",
+                               .TeX_name = "\\operatorname{rounds}",
+                               .apply_binary = expr_rounds,
+                               .simplify = expr_simplify_binary_operator};
 const expr_ops_t ops_floor = {.eval = eval_floor,
                               .deriv = deriv_floor,
                               .reverse = expr_reverse_floor,
@@ -5501,6 +5553,8 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_CUBRT] = &ops_cubrt,
         [EXPR_KIND_FLOOR] = &ops_floor,
         [EXPR_KIND_ROUND] = &ops_round,
+        [EXPR_KIND_ROUNDN] = &ops_roundn,
+        [EXPR_KIND_ROUNDS] = &ops_rounds,
         [EXPR_KIND_CEIL] = &ops_ceil,
         [EXPR_KIND_ABS] = &ops_abs,
         [EXPR_KIND_CONJ] = &ops_conj,
@@ -5597,6 +5651,18 @@ expr_t *expr_lg(const expr_t *a)
 expr_t *expr_round(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_round, a);
+}
+
+/* Retain both arguments for symbolic decimal-place rounding. */
+expr_t *expr_roundn(const expr_t *a, const expr_t *n)
+{
+    return expr_math_wrap_binary(&ops_roundn, a, n);
+}
+
+/* Retain both arguments for symbolic significant-digit rounding. */
+expr_t *expr_rounds(const expr_t *a, const expr_t *n)
+{
+    return expr_math_wrap_binary(&ops_rounds, a, n);
 }
 
 expr_t *expr_floor(const expr_t *a)

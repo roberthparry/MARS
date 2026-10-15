@@ -29,6 +29,37 @@ affine arguments, integration uses the continuous primitive
 direct evaluation and symbolic upper bounds for small rational progressions;
 unsupported symbolic cases retain the formal operation.
 
+`roundn(x, n)` rounds to n decimal places; negative n rounds to tens, hundreds,
+and so on. `rounds(x, n)` rounds to n significant decimal digits. Both use halves
+away from zero and round complex components independently. Zero remains zero.
+The constructors are `expr_roundn(x, n)` and `expr_rounds(x, n)`. All three output
+styles retain these names. Decimal places must fit a signed C `int`; significant
+digits must be a positive integer fitting `unsigned int`. Invalid counts evaluate
+to NaN. Significant digits do not imply padded trailing zeroes in displayed values.
+
+```text
+roundn(1234.567,2)
+roundn(1234,-2)
+rounds(1234.567,2)
+rounds(0.001234,2)
+```
+
+Output, respectively:
+
+```text
+1234.57
+1200
+1200
+0.0012
+```
+
+For fixed valid counts, both functions have derivative zero almost everywhere;
+they are not differentiable at their jumps. Differentiation with respect to a
+varying digit count is undefined. Decimal-place rounding of an affine real
+argument has a scaled nearest-integer primitive. Significant-digit rounding
+retains a formal integral when no supported primitive exists. Finite sums can
+evaluate either function directly; unsupported symbolic sums remain formal.
+
 ## Cooperative calculation control
 
 For numerical curves, [`sampler_expression()`](sampler.md) evaluates private
