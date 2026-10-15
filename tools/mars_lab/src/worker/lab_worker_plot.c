@@ -55,6 +55,7 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     options.label_colour = 0xb8ccc5;
     options.legend = false;
     options.smart_y = !strcmp(scale, "auto");
+    options.guard_gaps = true;
     plot_t *plot = samples ? plot_new(&options) : NULL;
     bool ok = plot && plot_add_sampler(plot, samples, "", PLOT_LINES, 0x78d8cb);
     if (ok && manual)

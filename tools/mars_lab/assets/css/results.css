@@ -484,5 +484,6 @@ pre {
   background: #142921;
   color: #e6c778;
   font: 12px monospace;
+  white-space: pre-line;
   overflow-wrap: anywhere;
 }

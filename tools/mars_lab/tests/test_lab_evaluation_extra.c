@@ -648,6 +648,15 @@ static void test_lab_extra_solution_families(void)
     json_free(result);
     TEST_ASSERT_TRUE(ok, "unconditioned Emden plots a labelled two-constant family instead of failing");
     result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0\",\"action\":\"plot\","
+                     "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-5\",\"plot_upper\":\"5\","
+                     "\"plot_scale\":\"all\"}", &status);
+    const char *upper = strstr(test_lab_text(result, "plot_svg"), "data-y-max=\"");
+    double height = 0;
+    ok = status == 200 && upper && sscanf(upper, "data-y-max=\"%lf", &height) == 1 &&
+         height > 0 && height < 100;
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "Fit all protects solution families from sampled asymptote tails");
+    result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0\",\"action\":\"plot\","
                      "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-10\",\"plot_upper\":\"10\","
                      "\"plot_scale\":\"manual\",\"plot_y_lower\":\"-2\",\"plot_y_upper\":\"2\"}", &status);
     ok = status == 200 && contains(result, "plot_svg", ">-10</text>") &&

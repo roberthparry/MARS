@@ -54,6 +54,11 @@ intervals. Grid lines follow those ticks, not arbitrary subdivisions of the
 viewport.
 
 Set `options.smart_y = true` to opt into a robust automatic vertical range.
+Set `options.guard_gaps = true` to apply the same tail protection only when line
+series contain explicit discontinuities or invalid points. This avoids fitting
+extreme samples near asymptotes while retaining the full range of continuous
+curves. It is a viewing heuristic, not a proof of unboundedness. Explicit manual
+bounds override either policy. The default for this additional option is false.
 The default remains Fit all: every finite sampled value contributes to the
 bounds. Robust scaling takes at most one representative per horizontal bin
 (129 bins per series), so dense adaptive clusters near poles do not dominate

@@ -64,7 +64,7 @@ json_t *lab_cal_run(const char *name, const json_t *options, unsigned timeout, s
 /** @brief Read an environment variable or a named MARS configuration file value. */
 string_t *lab_cal_config(const char *filename, const char *key);
 
-/** @brief Add a browser label/value row. */
+/** @brief Add a browser label/value row with an English tooltip for recognised non-English observances. */
 void lab_cal_row(json_t *rows, const char *label, const char *value);
 
 /** @brief Add a browser section, copying the supplied rows. */

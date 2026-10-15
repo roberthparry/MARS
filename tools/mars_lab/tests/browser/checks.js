@@ -332,13 +332,13 @@
             check(touch(document.body, 'pointerdown', 100, 100) && !rendered.marsPlotDrag.active,
                   'Touching outside the plot must retain browser behaviour');
             check(!touch(path, 'pointerdown', 100, 100), 'A primary finger must start surface rotation');
-            touch(path, 'pointerdown', 150, 150, {pointerId: 12, isPrimary: false});
+            touch(document.body, 'pointerdown', 150, 150, {pointerId: 12, isPrimary: false});
             touch(window, 'pointermove', 200, 200, {pointerId: 12, isPrimary: false});
             touch(window, 'pointerup', 200, 200, {pointerId: 12, isPrimary: false});
             touch(window, 'pointercancel', 200, 200, {pointerId: 12, isPrimary: false});
             mouse(window, 'mousemove', 180, 180);
             check(values() === '45,30,0' && pending.length === 0 && rendered.marsPlotDrag.active,
-                  'Another finger or mouse must not move, release or cancel the active finger');
+                  'A finger outside the plot or a mouse must not move, release or cancel the active finger');
             check(!touch(window, 'pointermove', 140, 100) && values() === '65,30,0' && pending[0].preview,
                   'Horizontal finger dragging must change azimuth and request a coarse preview');
             touch(window, 'pointermove', 140, 140);
@@ -496,6 +496,77 @@
                   'Both wheel rotations must show a coarse native preview then restore the full 70-by-70 mesh');
         }
     }
+    async function checkPlotPinch() {
+        const chart = () => rendered.querySelector('[data-plot-chart][data-x-min]');
+        const surface = chart().hasAttribute('data-surface');
+        const original = ['xMin', 'xMax', 'yMin', 'yMax'].map(key => Number(chart().dataset[key]));
+        const card = rendered.closest('.result-card');
+        const wait = async previous => {
+            const deadline = performance.now() + 20000;
+            while ((rendered.marsPlotDrag.busy || chart() === previous) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(!rendered.marsPlotDrag.busy && chart() !== previous, 'Pinch finishes with a native redraw');
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        };
+        for (const factor of [0.5, 2]) {
+            const before = chart(), matrix = before.getScreenCTM(), view = before.viewBox.baseVal;
+            const camera = ['azimuth', 'elevation', 'roll'].map(key => before.dataset[key]);
+            const heightPolicy = document.getElementById('plotScale').value;
+            const cx = Math.round(matrix.e + (surface ? view.width / 2 :
+                Number(before.dataset.plotLeft) + Number(before.dataset.plotWidth) * 0.4) * matrix.a);
+            const cy = Math.round(matrix.f + (surface ? view.height / 2 :
+                Number(before.dataset.plotTop) + Number(before.dataset.plotHeight) * 0.55) * matrix.d);
+            const send = (target, type, id, x) => target.dispatchEvent(new PointerEvent(type,
+                {pointerId: id, pointerType: 'touch', isPrimary: id === 71, button: 0,
+                 buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: cy,
+                 bubbles: true, cancelable: true}));
+            check(!send(before, 'pointerdown', 71, cx - 30), 'First pinch finger starts the plot gesture');
+            check(!send(before, 'pointerdown', 72, cx + 30) && rendered.marsPlotDrag.pinch,
+                  'Second finger promotes dragging to pinch zoom');
+            const geometry = [...rendered.marsPlotDrag.pinchGeometry];
+            send(before, 'pointerdown', 73, cx);
+            send(window, 'pointermove', 73, cx + 90);
+            check(!rendered.marsPlotDrag.changed, 'A third finger does not alter pinch zoom');
+            send(window, 'pointermove', 71, cx - 30 / factor);
+            send(window, 'pointermove', 72, cx + 30 / factor);
+            send(window, 'pointerup', 72, cx + 30 / factor);
+            await wait(before);
+            for (const [lo, hi] of [['xMin', 'xMax'], ['yMin', 'yMax']])
+                check(Math.abs((Number(chart().dataset[hi]) - Number(chart().dataset[lo])) /
+                      (Number(before.dataset[hi]) - Number(before.dataset[lo])) - factor) < 1e-7,
+                      'Pinch changes axis ranges rather than image dimensions');
+            for (const [axis, lo, hi] of [[0, 'xMin', 'xMax'], [1, 'yMin', 'yMax']]) {
+                const fraction = geometry[4 + axis];
+                const anchor = Number(before.dataset[lo]) * (1 - fraction) + Number(before.dataset[hi]) * fraction;
+                const after = Number(chart().dataset[lo]) * (1 - fraction) + Number(chart().dataset[hi]) * fraction;
+                check(Math.abs(after - anchor) < 1e-7, 'Pinch preserves the midpoint anchor');
+            }
+            if (surface)
+                check(['azimuth', 'elevation', 'roll'].every((key, i) => chart().dataset[key] === camera[i]) &&
+                      document.getElementById('plotScale').value === heightPolicy,
+                      'Surface pinch preserves the camera and height policy');
+            check(!rendered.marsPlotDrag.active && !rendered.marsPlotDrag.pinch,
+                  'Releasing either finger ends pinch and restores full-detail rendering');
+            send(window, 'pointermove', 71, cx + 100);
+            check(!rendered.marsPlotDrag.active, 'The remaining finger cannot jump back into dragging');
+            send(window, 'pointerup', 71, cx + 100);
+            const zoomed = chart();
+            card.querySelector('[data-zoom-reset]').click();
+            await wait(zoomed);
+            check(['xMin', 'xMax', 'yMin', 'yMax'].every((key, i) =>
+                Math.abs(Number(chart().dataset[key]) - original[i]) < 1e-7), 'Reset restores the pre-pinch viewport');
+            const restored = chart();
+            send(restored, 'pointerdown', 71, cx - 30);
+            send(restored, 'pointerdown', 72, cx + 30);
+            send(window, 'pointermove', 72, cx + 60);
+            send(window, 'pointercancel', 72, cx + 60);
+            await wait(restored);
+            check(['xMin', 'xMax', 'yMin', 'yMax'].every((key, i) =>
+                Math.abs(Number(chart().dataset[key]) - original[i]) < 1e-7),
+                'Cancelling the second finger restores the pre-gesture ranges');
+            send(window, 'pointerup', 71, cx - 30);
+        }
+    }
     async function checkCurvePointerView() {
         const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         await settle();
@@ -623,6 +694,7 @@
               Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
               Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8,
               'Escape restores both original ranges even with a pan redraw in flight');
+        await checkPlotPinch();
     }
     async function checkPlotWheelZoom() {
         // Expansion and native markup insertion fit the fixed viewport on the next frame.
@@ -685,6 +757,7 @@
         check(Math.abs(Number(surface().dataset.xMin) - original[0]) < 1e-7 &&
               Math.abs(Number(surface().dataset.yMax) - original[3]) < 1e-7,
               'Surface Reset restores the original domain');
+        await checkPlotPinch();
     }
     async function checkFunctionRun() {
         await runFunctionCard();
@@ -1802,14 +1875,18 @@
                         check(active.getAttribute('aria-label') === active.querySelector('title').marsPlotLabel,
                               'Focused family curve retains its constant tooltip');
                         const tooltip = rendered.querySelector('.plot-pointer-tip');
+                        const lines = tooltip.textContent.split('\n');
+                        const constants = active.querySelector('title').marsPlotLabel.split(', ');
                         check(!tooltip.classList.contains('hidden') && tooltip.textContent.includes('x ≈ ') &&
-                              tooltip.textContent.includes(active.querySelector('title').marsPlotLabel),
-                              'The visible hover tooltip combines x with the selected curve constants');
+                              lines.length === constants.length + 1 &&
+                              constants.every((value, i) => lines[i + 1] === value) &&
+                              getComputedStyle(tooltip).whiteSpace === 'pre-line',
+                              'The visible hover tooltip puts x and each selected curve constant on separate lines');
                     }
                     chart.dispatchEvent(new PointerEvent('pointermove', point));
                     check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
                           'Moving between curves restores the whole solution family');
-                    check(!rendered.querySelector('.plot-pointer-tip').textContent.includes(' · '),
+                    check(!rendered.querySelector('.plot-pointer-tip').textContent.includes('\n'),
                           'Moving off a curve removes stale constants from the coordinate tooltip');
                     curves[0].querySelector('path').dispatchEvent(new PointerEvent('pointermove', point));
                     rendered.dispatchEvent(new PointerEvent('pointerleave'));
@@ -1972,6 +2049,20 @@
                 details.open = open;
                 check(element.dataset.fullText === calendarData[name].trim(), `Native ${name} clipboard text changed`);
             }
+            const englishHolidays = {
+                Genna: 'Ethiopian Christmas',
+                Timkat: 'Ethiopian Epiphany; commemorates the baptism of Jesus',
+                Fasika: 'Ethiopian Easter',
+                Enkutatash: 'Ethiopian New Year',
+                Meskel: 'Commemoration of the finding of the True Cross'
+            };
+            const holidayLabels = [...functionStyle.querySelectorAll('.datetime-row-label')];
+            for (const [name, translation] of Object.entries(englishHolidays)) {
+                const label = holidayLabels.find(node => node.textContent === name);
+                check(label?.title === translation, `${name} must retain its name and show its English tooltip`);
+            }
+            check(holidayLabels.filter(node => node.hasAttribute('title')).length === 17,
+                  'All non-English built-in observances have native English tooltips');
             // Use native-produced, Protobuf-encoded astronomy fixtures through the real
             // request/evaluation/installation path; do not mock the result installer.
             const beforeCalendarFetch = window.fetch;

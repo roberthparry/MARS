@@ -81,6 +81,7 @@ static int plot_curves(const char *input, const char *title_text, const char *ti
     options.label_colour = 0xb8ccc5;
     options.legend = !equation && !family && count > 1;
     options.smart_y = !strcmp(argv[7], "auto");
+    options.guard_gaps = true;
     plot_t *plot = ok && ranged ? plot_new(&options) : NULL;
     ok = ok && plot;
     static const unsigned colours[] = {

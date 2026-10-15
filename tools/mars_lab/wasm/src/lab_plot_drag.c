@@ -10,11 +10,12 @@
  * at a time; further movements replace the pending camera position. Cancellation
  * restores the original camera. Superseding requests and mode changes stop the gesture.
  * Browser-owned state retains real DOM objects, never transient bridge handles.
- * A primary pointer owns each drag; additional fingers cannot move or release it.
+ * A second touch promotes dragging to pinch zoom; further pointers are ignored.
  */
 #include "lab_dom.h"
 #include "lab_workspace.h"
 #include "lab_plot_pointer.h"
+#include "lab_plot_pinch.h"
 #include "lab_plot_drag.h"
 
 static const char *const controls[] = {"#plotAzimuth", "#plotElevation", "#plotRoll"};
@@ -40,9 +41,9 @@ static int current(int state)
                lab_dom_equal(lab_dom_get(state, "surface"),
                              lab_dom_query(0, "#rendered [data-plot-chart][data-x-min]:not([data-surface])")) &&
                lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
-    return !lab_workspace_mode() &&
+    return lab_workspace_mode() == (unsigned)read_number(state, "mode") &&
            lab_dom_equal(lab_dom_get(state, "surface"), lab_dom_query(0, "#rendered [data-surface]")) &&
-           lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotRange"), 3, "rotationVariable"));
+           lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
 }
 
 static void queue(int state, int calls)
@@ -72,6 +73,8 @@ static void stop(int state)
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 0));
     lab_dom_set(state, "dirty", lab_dom_scalar(1, 0));
     lab_dom_set(state, "pan", lab_dom_scalar(1, 0));
+    lab_dom_set(state, "pinch", lab_dom_scalar(1, 0));
+    lab_dom_delete(state, "secondId");
     lab_dom_delete(state, "surface");
     lab_dom_delete(state, "variable");
     lab_dom_delete(state, "pointerId");
@@ -96,7 +99,12 @@ static void cancel(int state, int calls)
         stop(state);
         return;
     }
-    if (lab_dom_truth(lab_dom_get(state, "pan"))) {
+    if (lab_dom_truth(lab_dom_get(state, "pinch"))) {
+        lab_plot_pinch_cancel(state);
+        if (!lab_dom_truth(lab_dom_get(state, "pan")))
+            for (unsigned axis = 0; axis < 3; ++axis)
+                set_angle(axis, read_number(state, angles[axis]));
+    } else if (lab_dom_truth(lab_dom_get(state, "pan"))) {
         lab_plot_pan_cancel(state);
         lab_dom_set(state, "panX", lab_dom_numeric(0));
         lab_dom_set(state, "panY", lab_dom_numeric(0));
@@ -117,7 +125,7 @@ static int start(int event, int state)
     int target = lab_dom_get(event, "target");
     if (lab_dom_truth(lab_dom_get(state, "busy")) || lab_dom_truth(lab_dom_get(state, "active")) ||
         lab_dom_truth(lab_dom_get(state, "wheel")) ||
-        (pan ? lab_workspace_mode() > 2 : lab_workspace_mode() != 0) || !surface ||
+        lab_workspace_mode() > 2 || !surface ||
         read_number(event, "button") != 0 ||
         !lab_dom_truth(lab_dom_get(event, "isPrimary")) ||
         lab_dom_truth(lab_dom_get(event, "ctrlKey")) || lab_dom_truth(lab_dom_get(event, "metaKey")) ||
@@ -133,8 +141,11 @@ static int start(int event, int state)
     lab_dom_set(state, "panDrawnY", lab_dom_numeric(0));
     lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
     lab_dom_set(state, "surface", surface);
-    lab_dom_set(state, "variable", pan ? lab_dom_read(lab_dom_id("plotFirst"), 5, "")
-                                       : lab_dom_read(lab_dom_id("plotRange"), 3, "rotationVariable"));
+    lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+    lab_dom_set(state, "touch", lab_dom_scalar(1,
+        lab_dom_equal(lab_dom_get(event, "pointerType"), lab_dom_string("touch"))));
+    lab_dom_set(state, "touchX", lab_dom_get(event, "clientX"));
+    lab_dom_set(state, "touchY", lab_dom_get(event, "clientY"));
     lab_dom_set(state, "active", lab_dom_scalar(1, 1));
     lab_dom_set(state, "pointerId", lab_dom_get(event, "pointerId"));
     lab_dom_set(state, "changed", lab_dom_scalar(1, 0));
@@ -187,7 +198,8 @@ static int wheel(int event, int state, int calls)
         lab_dom_set(state, "redrawn", lab_dom_scalar(1, 0));
     }
     lab_dom_set(state, "surface", surface);
-    lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotRange"), 3, "rotationVariable"));
+    lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+    lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 1));
     lab_dom_class(rendered, "plot-dragging", 1);
     set_angle(axis, value);
@@ -207,6 +219,15 @@ static int wheel(int event, int state, int calls)
 
 static void move(int event, int state)
 {
+    if (lab_dom_truth(lab_dom_get(state, "pinch"))) {
+        if (lab_plot_pinch_move(state, event)) {
+            lab_dom_set(state, "changed", lab_dom_scalar(1, 1));
+            lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
+        }
+        return;
+    }
+    lab_dom_set(state, "touchX", lab_dom_get(event, "clientX"));
+    lab_dom_set(state, "touchY", lab_dom_get(event, "clientY"));
     double dx = read_number(event, "clientX") - read_number(state, "x");
     double dy = read_number(event, "clientY") - read_number(state, "y");
     if (!lab_dom_truth(lab_dom_get(state, "changed")) && dx * dx + dy * dy < 9)
@@ -248,7 +269,9 @@ void lab_plot_drag_dispatch(unsigned action, int event, int state)
         return;
     if (action == 1 || action == 2 || action == 7) {
         if (!lab_dom_truth(lab_dom_get(state, "active")) ||
-            !lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "pointerId")))
+            (!lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "pointerId")) &&
+             !(lab_dom_truth(lab_dom_get(state, "pinch")) &&
+               lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "secondId")))))
             return;
         if (action == 7)
             action = 3;
@@ -269,7 +292,10 @@ void lab_plot_drag_dispatch(unsigned action, int event, int state)
         return;
     }
     if (!action) {
-        if (start(event, state))
+        if (lab_dom_truth(lab_dom_get(state, "active"))) {
+            if (current(state) && lab_plot_pinch_start(state, event))
+                lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
+        } else if (start(event, state))
             lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
         return;
     }
@@ -307,15 +333,14 @@ void lab_plot_drag_complete(int state, int accepted)
     int pan = lab_dom_truth(lab_dom_get(state, "pan"));
     int surface = lab_dom_query(0, pan ? "#rendered [data-plot-chart][data-x-min]:not([data-surface])"
                                       : "#rendered [data-surface]");
-    if (!accepted || (pan ? lab_workspace_mode() != (unsigned)read_number(state, "mode") : lab_workspace_mode() != 0) ||
+    if (!accepted || lab_workspace_mode() != (unsigned)read_number(state, "mode") ||
         !surface || !lab_dom_equal(lab_dom_get(state, "variable"),
-            pan ? lab_dom_read(lab_dom_id("plotFirst"), 5, "")
-                : lab_dom_read(lab_dom_id("plotRange"), 3, "rotationVariable"))) {
+            lab_dom_read(lab_dom_id("plotFirst"), 5, ""))) {
         stop(state);
         return;
     }
     lab_dom_set(state, "surface", surface);
-    if (pan) {
+    if (pan && !lab_dom_truth(lab_dom_get(state, "pinch"))) {
         lab_dom_set(state, "panDrawnX", lab_dom_get(state, "panRequestX"));
         lab_dom_set(state, "panDrawnY", lab_dom_get(state, "panRequestY"));
         lab_plot_pan_preview(state);

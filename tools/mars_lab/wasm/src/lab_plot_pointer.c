@@ -169,8 +169,11 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     int label = lab_dom_query(chart, ".plot-curve-active > title");
     if (label) {
         int constants = label_text(label);
-        if (lab_dom_truth(constants))
-            text = lab_dom_join(lab_dom_join(text, lab_dom_string(" · "), ""), constants, "");
+        if (lab_dom_truth(constants)) {
+            int values = lab_dom_split(constants, ", ");
+            for (unsigned i = 0; i < lab_dom_count(values); ++i)
+                text = lab_dom_join(lab_dom_join(text, lab_dom_string("\n"), ""), lab_dom_item(values, i), "");
+        }
     }
     lab_dom_write(tip, 0, "", text);
     lab_dom_class(line, "hidden", 0);

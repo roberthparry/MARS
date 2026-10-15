@@ -347,6 +347,9 @@ static void test_plot_smart_range(void)
     plot_options_t options = plot_options_default();
     options.smart_y = true;
     plot_t *smart = plot_new(&options), *full = plot_new(NULL);
+    options.smart_y = false;
+    options.guard_gaps = true;
+    plot_t *continuous = plot_new(&options), *broken = plot_new(&options);
     plot_point_t points[129];
     for (size_t i = 0; i < 129; ++i) {
         points[i].x = num_create_from_long((long)i);
@@ -355,6 +358,9 @@ static void test_plot_smart_range(void)
     }
     bool ok = smart && full && plot_add_points(smart, points, 129, "", PLOT_LINES, 0) &&
               plot_add_points(full, points, 129, "", PLOT_LINES, 0);
+    ok = ok && continuous && broken && plot_add_points(continuous, points, 129, "", PLOT_LINES, 0);
+    points[64].break_before = true;
+    ok = ok && plot_add_points(broken, points, 129, "", PLOT_LINES, 0);
     for (size_t i = 0; i < 129; ++i) {
         num_destroy(&points[i].y);
         num_destroy(&points[i].x);
@@ -365,6 +371,18 @@ static void test_plot_smart_range(void)
          strstr(string_c_str(b), ">100000</text>");
     string_free(a);
     string_free(b);
+    a = ok ? plot_to_svg(continuous) : NULL;
+    b = ok ? plot_to_svg(broken) : NULL;
+    ok = ok && a && b && strstr(string_c_str(a), ">100000</text>") &&
+         !strstr(string_c_str(b), ">100000</text>") && strstr(string_c_str(b), ">100</text>");
+    string_free(a);
+    string_free(b);
+    ok = ok && plot_set_bounds(broken, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ONE);
+    a = ok ? plot_to_svg(broken) : NULL;
+    ok = ok && a && strstr(string_c_str(a), ">0.2</text>");
+    string_free(a);
+    plot_free(broken);
+    plot_free(continuous);
     ok = ok && plot_set_bounds(smart, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ONE);
     a = ok ? plot_to_svg(smart) : NULL;
     ok = ok && a && strstr(string_c_str(a), ">0.2</text>");

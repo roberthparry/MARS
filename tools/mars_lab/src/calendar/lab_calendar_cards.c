@@ -7,6 +7,7 @@
  * are produced from the same sections, preserving native mathematical values.
  */
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -37,12 +38,48 @@ json_t *lab_cal_location_fields(const json_t *fields, const json_t *options)
     return response;
 }
 
-/* Append a labelled value to a browser card. */
+static int lab_cal_label_compare(const void *key, const void *entry)
+{
+    const char *const *pair = entry;
+    return strcmp(key, pair[0]);
+}
+
+static const char *lab_cal_label_english(const char *label)
+{
+    /* Sorted by exact native label for binary lookup, including observance qualifiers. */
+    static const char *const names[][2] = {
+        {"Asalha Puja / Dharma Day (estimated)", "Dharma Day; commemorates the Buddha's first sermon"},
+        {"Diwali (estimated)", "Festival of lights"},
+        {"Eid al-Fitr (civil Islamic)", "Festival of breaking the fast"},
+        {"Eid al-Fitr begins at sunset (local time)", "Festival of breaking the fast begins at sunset"},
+        {"Enkutatash", "Ethiopian New Year"},
+        {"Fasika", "Ethiopian Easter"},
+        {"Genna", "Ethiopian Christmas"},
+        {"Haab New Year", "New Year of the Maya 365-day calendar"},
+        {"Holi (estimated)", "Festival of colours"},
+        {"Meskel", "Commemoration of the finding of the True Cross"},
+        {"Nemontemi begins", "Beginning of the five extra days at the end of the Aztec 365-day calendar"},
+        {"Ramadan begins (civil Islamic)", "Beginning of the Islamic month of fasting"},
+        {"Ramadan begins at sunset (local time)", "The Islamic month of fasting begins at sunset"},
+        {"Timkat", "Ethiopian Epiphany; commemorates the baptism of Jesus"},
+        {"Vesak / Buddha Day (estimated)", "Buddha Day; commemorates the Buddha's birth, enlightenment and passing"},
+        {"Wayeb begins", "Beginning of the five-day period at the end of the Maya 365-day calendar"},
+        {"Xiuhpohualli New Year", "New Year of the Aztec 365-day calendar"},
+    };
+    const char *const *found = label ? bsearch(label, names, sizeof(names) / sizeof(*names), sizeof(*names),
+                                              lab_cal_label_compare) : NULL;
+    return found ? found[1] : NULL;
+}
+
+/* Append a labelled value and any English observance explanation to a browser card. */
 void lab_cal_row(json_t *rows, const char *label, const char *value)
 {
     json_t *row = json_new_object();
     lab_cal_set(row, "label", label);
     lab_cal_set(row, "value", value);
+    const char *english = lab_cal_label_english(label);
+    if (english)
+        lab_cal_set(row, "tooltip", english);
     lab_cal_append(rows, row);
 }
 

@@ -211,8 +211,37 @@ static void test_lab_calendar_datetime_cards(void)
                          "No daylight saving changes this year");
     json_free(response);
     json_free(fields);
+    static const char *const translations[][2] = {
+        {"Genna", "Ethiopian Christmas"},
+        {"Timkat", "Ethiopian Epiphany; commemorates the baptism of Jesus"},
+        {"Fasika", "Ethiopian Easter"},
+        {"Enkutatash", "Ethiopian New Year"},
+        {"Meskel", "Commemoration of the finding of the True Cross"},
+        {"Holi (estimated)", "Festival of colours"},
+        {"Diwali (estimated)", "Festival of lights"},
+        {"Vesak / Buddha Day (estimated)", "Buddha Day; commemorates the Buddha's birth, enlightenment and passing"},
+        {"Asalha Puja / Dharma Day (estimated)", "Dharma Day; commemorates the Buddha's first sermon"},
+        {"Eid al-Fitr (civil Islamic)", "Festival of breaking the fast"},
+        {"Eid al-Fitr begins at sunset (local time)", "Festival of breaking the fast begins at sunset"},
+        {"Ramadan begins (civil Islamic)", "Beginning of the Islamic month of fasting"},
+        {"Ramadan begins at sunset (local time)", "The Islamic month of fasting begins at sunset"},
+        {"Haab New Year", "New Year of the Maya 365-day calendar"},
+        {"Wayeb begins", "Beginning of the five-day period at the end of the Maya 365-day calendar"},
+        {"Xiuhpohualli New Year", "New Year of the Aztec 365-day calendar"},
+        {"Nemontemi begins", "Beginning of the five extra days at the end of the Aztec 365-day calendar"},
+        {"Christmas Day", ""},
+        {"Unknown observance", ""},
+    };
+    json_t *translated = json_new_array();
+    for (size_t i = 0; i < sizeof(translations) / sizeof(*translations); ++i) {
+        lab_cal_row(translated, translations[i][0], "2026-01-01");
+        const json_t *row = json_array_get(translated, i);
+        passed = passed && row_matches(translated, i, translations[i][0], "2026-01-01") &&
+                 !strcmp(test_lab_text(row, "tooltip"), translations[i][1]);
+    }
+    json_free(translated);
     TEST_ASSERT_TRUE(passed,
-                     "DateTime cards retain native values, observance order, DST text and unavailable-data notices");
+                     "DateTime cards retain values and order, with English tooltips for non-English observances");
 }
 
 static bool calendar_worker_fixture(const char *directory)
@@ -274,6 +303,17 @@ static bool calendar_worker_fixture(const char *directory)
 
     lab_cal_set(options, "cache_only", "1");
     json_t *cached = stored ? lab_cal_run("datetime_lab", options, 10000, NULL) : NULL;
+    json_t *cached_response = cached ? lab_cal_datetime(cached) : NULL;
+    const json_t *cached_sections = test_lab_member(cached_response, "calendar_sections");
+    size_t tooltips = 0;
+    for (size_t i = 0; i < json_array_size(cached_sections); ++i) {
+        const json_t *section = json_array_get(cached_sections, i);
+        const json_t *rows = test_lab_member(section, "rows");
+        for (size_t j = 0; j < json_array_size(rows); ++j)
+            tooltips += *test_lab_text(json_array_get(rows, j), "tooltip") != '\0';
+    }
+    ok = ok && tooltips == 17;
+    json_free(cached_response);
     string_t *original_text = fields ? json_to_string(fields) : NULL;
     string_t *cached_text = cached ? json_to_string(cached) : NULL;
     ok = original_text && cached_text && string_compare(original_text, cached_text) == 0 && ok;

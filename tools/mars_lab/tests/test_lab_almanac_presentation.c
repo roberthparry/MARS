@@ -305,11 +305,12 @@ static void test_lab_calendar_markup_escaping(void)
     ok = ok && html && !strcmp(string_c_str(html), "plain &amp; text");
     string_free(html);
     json_free(action);
-    json_t *rows = test_lab_json("[{\"label\":\" <label> \",\"value\":\" \"},"
+    json_t *rows = test_lab_json("[{\"label\":\" <label> \",\"value\":\" \",\"tooltip\":\"\\\"<script>&'\"},"
                                  "{\"label\":\" \",\"value\":\" \"},{\"value\":\" <script>&\\rμ \"}]");
     html = lab_cal_section_markup("", false, rows);
     ok = ok && html && strstr(string_c_str(html), "<details class=\"datetime-section\"><summary>Calendar</summary>") &&
          strstr(string_c_str(html), "&lt;label&gt;") && strstr(string_c_str(html), ">unavailable</span>") &&
+         strstr(string_c_str(html), "title=\"&quot;&lt;script&gt;&amp;&#39;\"") &&
          strstr(string_c_str(html), "&lt;script&gt;&amp;&#13;μ") && !strstr(string_c_str(html), "<script>");
     string_free(html);
     json_free(rows);

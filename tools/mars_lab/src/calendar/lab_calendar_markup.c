@@ -60,12 +60,18 @@ string_t *lab_cal_section_markup(const char *title, bool open, const json_t *row
         if (ok) {
             string_trim(label);
             string_trim(value);
-            if (string_byte_length(label) || string_byte_length(value))
-                ok = !string_append_cstr(out, "<div class=\"datetime-row\"><span class=\"datetime-row-label\">") &&
+            if (string_byte_length(label) || string_byte_length(value)) {
+                ok = !string_append_cstr(out, "<div class=\"datetime-row\"><span class=\"datetime-row-label\"");
+                const char *tooltip = lab_cal_text(row, "tooltip");
+                if (*tooltip)
+                    ok = ok && !string_append_cstr(out, " title=\"") && lab_cal_markup_text(out, tooltip) &&
+                         !string_append_char(out, '"');
+                ok = ok && !string_append_char(out, '>') &&
                      lab_cal_markup_text(out, string_c_str(label)) &&
                      !string_append_cstr(out, "</span><span class=\"datetime-row-value\">") &&
                      lab_cal_markup_text(out, string_byte_length(value) ? string_c_str(value) : "unavailable") &&
                      !string_append_cstr(out, "</span></div>");
+            }
         }
         string_free(label);
         string_free(value);

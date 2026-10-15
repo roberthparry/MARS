@@ -48,6 +48,7 @@ typedef struct {
     const char *z_label; /**< Surface height-axis endpoint name; default "f". Copied UTF-8 plain text. */
     bool grid, legend; /**< Draw grid and series legend. */
     bool smart_y; /**< Opt-in robust curve Y or surface height range; no visible clipping annotation. */
+    bool guard_gaps; /**< Use robust Y bounds for discontinuous line series even in Fit all; manual bounds win. */
     uint32_t axis_colour, grid_colour, label_colour; /**< 24-bit RGB colours for axes, grid and tick/axis labels. */
 } plot_options_t;
 

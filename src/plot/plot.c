@@ -289,13 +289,16 @@ static bool update_range(number_t bounds[2], number_t value)
 
 bool plot_ranges(const plot_t *plot, number_t bounds[4])
 {
-    bool found = false;
+    bool found = false, gaps = false;
     for (size_t i = 0; i < plot->count; ++i) {
         const plot_series_t *series = &plot->series[i];
         for (size_t j = 0; j < series->count; ++j) {
             if (!computation_step_current("plot.bounds"))
                 return false;
             const plot_point_t *point = &series->points[j];
+            if (j && series->style != PLOT_POINTS &&
+                (point->break_before || !valid_coordinate(point->x) || !valid_coordinate(point->y)))
+                gaps = true;
             if (!valid_coordinate(point->x) || !valid_coordinate(point->y))
                 continue;
             found = true;
@@ -309,7 +312,8 @@ bool plot_ranges(const plot_t *plot, number_t bounds[4])
         errno = ENODATA;
         return false;
     }
-    if (!plot->fixed && plot->options.smart_y && !plot_smart_range(plot, bounds))
+    if (!plot->fixed && (plot->options.smart_y || (plot->options.guard_gaps && gaps)) &&
+        !plot_smart_range(plot, bounds))
         return false;
     for (size_t axis = 0; axis < 4; axis += 2) {
         if (plot->fixed) {

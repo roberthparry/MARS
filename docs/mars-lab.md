@@ -1200,8 +1200,9 @@ restores the range controls captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
 hover readings or gesture anchors. A vertical hover guide shows
 an approximate x coordinate, calculated from renderer-owned viewport metadata,
-and includes the native integration-constant values when a solution-family curve is hovered,
-and disappears outside the chart. It does not obscure curve-identity tooltips or
+and includes the native integration-constant values when a solution-family curve is hovered.
+The coordinate and each constant appear on separate lines. The guide disappears
+outside the chart. It does not obscure curve-identity tooltips or
 appear in copied SVG output. Native SVG hover titles are suppressed in the interactive
 curve plot to avoid duplicate tooltips; their text remains accessible and is preserved
 in copied SVG output. Inspection and gesture arithmetic use browser-sized
@@ -1214,6 +1215,18 @@ an adaptive sampling budget of 513 evaluations per curve instead of 8193, with f
 no derivative construction; numerical precision checks remain enabled. Release
 finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
+Two-finger pinch zoom changes the plot ranges rather than magnifying the image.
+Spread fingers to zoom in and bring them together to zoom out. Curves track the
+finger midpoint, including two-finger panning; surfaces zoom both independent
+ranges about their centre without changing the camera or height policy. Pinching
+uses coarse previews and restores full sampling when either finger lifts. Further
+fingers are ignored. Lift the remaining finger before starting another drag.
+Pointer cancellation restores the pre-gesture controls, and Reset undoes the zoom.
+For curve plots, Fit all retains the complete sampled range of continuous curves.
+When the sampler marks discontinuities, it protects the view from extreme tails
+near asymptotes instead of flattening all other curves. This uses the same robust
+range policy as Auto; manual limits always take precedence. It does not assert
+that the function is bounded or that every discontinuity is a pole.
 The **2-D curve** choice is hidden while another plotting variable is unset.
 Fix the other variable's value to make a curve available; clearing that value
 returns an incompatible curve selection to **Auto**.
@@ -2424,6 +2437,14 @@ estimated festivals and local sunset-start times. Jurisdiction rules continue
 to supply local public holidays and time-zone policy. Older cached results that
 lack the full calendar sections are bypassed and recomputed; no jurisdiction
 database reinstall or deletion of existing cache records is required.
+
+Non-English observance names keep their original labels and show an English name
+or explanation on hover. This covers the Ethiopian, Hindu, Buddhist, Muslim,
+Mayan and Aztec sections, including local sunset-start rows. Descriptions explain
+the observance rather than claiming a literal translation of every proper name.
+The native presentation layer supplies and escapes these tooltips for fresh and
+cached results alike; copied text, dates and estimation qualifiers are unchanged.
+No database migration is needed, and unknown names receive no guessed translation.
 
 [![MARS Lab datetime mode showing calendar and astronomical results followed by asynchronously loaded weather](images/mars-lab/datetime.png?v=20260820-1)](images/mars-lab/datetime.png?v=20260820-1)
 
