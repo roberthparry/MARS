@@ -467,7 +467,7 @@ pre {
   z-index: 2;
 }
 
-#rendered [data-x-min]:has(.plot-curve-active) [data-series]:not(.plot-curve-active) {
+#plotRendered [data-x-min]:has(.plot-curve-active) [data-series]:not(.plot-curve-active) {
   opacity: 0.18;
 }
 

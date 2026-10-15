@@ -4,7 +4,8 @@
  *
  * Parses equation graphs without browser-side rewriting. Both algebraic sides
  * share one viewport; explicit ODE solution branches are sampled independently.
- * Two-variable PDE solutions use the shared surface renderer. Implicit solutions,
+ * Two-variable algebraic equations use real zero contours; PDE solutions use the
+ * shared surface renderer. Implicit ODE solutions,
  * unset authored parameters and unsupported dimensions are reported,
  * never replaced by guessed functions. Existing guarded sampling and clipping
  * policies apply to every curve in the isolated calculation process.
@@ -178,6 +179,33 @@ int lab_worker_solver_plot(int argc, char **argv)
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i)
             if (!expr_bindings_is_constant_at(bindings, i))
                 print_axis(expr_bindings_name_at(bindings, i));
+        expr_t *second = NULL;
+        bool unresolved = false;
+        /* The parsed binding catalogue is bounded by the authored expression; inspect each parameter once. */
+        for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+            expr_t *node = expr_bindings_get(bindings, expr_bindings_name_at(bindings, i));
+            if (node == variable)
+                continue;
+            number_t value = expr_eval(node);
+            bool fixed = num_is_real(value) && num_is_finite(value);
+            num_destroy(&value);
+            if (fixed)
+                continue;
+            if (expr_bindings_is_constant_at(bindings, i) || second)
+                unresolved = true;
+            else
+                second = node;
+        }
+        if (unresolved) {
+            equ_free(equ);
+            printf("error Bind remaining parameters; an equation plot supports at most two free coordinates.\n");
+            return 1;
+        }
+        if (second) {
+            int rc = lab_worker_equation_contour(equ, variable, second, argv);
+            equ_free(equ);
+            return rc;
+        }
         lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
         if (prepared && prepared->count == 2 && !prepared->family) {
             int rc = plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,

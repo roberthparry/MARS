@@ -46,7 +46,63 @@
         if (!condition)
             throw new Error(message);
     }
+    async function checkAsynchronousPlot() {
+        const original = fetchEvaluation;
+        let release, started;
+        try {
+            fetchEvaluation = (...args) => {
+                if (args[2] !== 'plot')
+                    return original(...args);
+                started = true;
+                return new Promise(resolve => release = resolve);
+            };
+            setExpressionEditor('sin(x)');
+            await evaluateExpression();
+            for (let i = 0; i < 100 && !started; ++i)
+                await new Promise(resolve => setTimeout(resolve, 10));
+            check(started && !labRequests.busy(), 'Evaluate must finish before the plot response');
+            check(rendered.querySelector('svg') && parsed.textContent && functionStyle.textContent,
+                  'Mathematical cards appear while the plot is pending');
+            const mathematics = rendered.innerHTML;
+            release({response: {ok: true}, data: {ok: false, error: 'Plot fixture unavailable'}});
+            await waitForAutomaticPlot();
+            check(document.getElementById('plotRendered').textContent.includes('Plot fixture unavailable') &&
+                  rendered.innerHTML === mathematics && !rendered.classList.contains('error'),
+                  'A plot failure must not replace successful mathematics');
+            started = false;
+            await evaluateExpression();
+            for (let i = 0; i < 100 && !started; ++i)
+                await new Promise(resolve => setTimeout(resolve, 10));
+            check(started, 'A fresh evaluation starts a fresh plot');
+            saveCurrentModeResultState();
+            setMode('matrix');
+            syncModeUI();
+            const previous = document.getElementById('plotRendered').innerHTML;
+            release({response: {ok: true}, data: {ok: false, error: 'Obsolete plot fixture'}});
+            await new Promise(resolve => setTimeout(resolve, 50));
+            check(document.getElementById('plotRendered').innerHTML === previous,
+                  'A late plot must not publish after switching modes');
+            setMode('expression');
+            syncModeUI();
+            restoreModeResultState();
+            check(document.getElementById('plotRendered').textContent.includes('Plot cancelled'),
+                  'Restoring cancelled background work must not leave a permanent loading message');
+        } finally {
+            if (release)
+                release({response: {ok: false}, data: {ok: false}});
+            fetchEvaluation = original;
+            setMode('expression');
+            syncModeUI();
+        }
+    }
+    async function waitForAutomaticPlot() {
+        const node = document.getElementById('plotRendered');
+        for (let i = 0; i < 1200 && (!node.textContent || node.textContent.includes('Generating plot')); ++i)
+            await new Promise(resolve => setTimeout(resolve, 25));
+        check(!node.textContent.includes('Generating plot'), 'Automatic plot must finish');
+    }
     function checkPlotLabelSpacing() {
+        const rendered = document.getElementById('plotRendered');
         const boxes = [...rendered.querySelectorAll('[data-plot-label]')].map(label => label.getBBox());
         check(boxes.length >= 3, 'Plot must retain readable axis numbers');
         for (let i = 0; i < boxes.length; ++i) {
@@ -59,6 +115,7 @@
         }
     }
     async function checkPlotChoices() {
+        const rendered = document.getElementById('plotRendered');
         check(!document.querySelector('#plotRange select, #plotRange .select-shell'),
               'Plot settings must not contain dropdowns');
         for (const id of ['plotKind', 'plotScale']) {
@@ -118,6 +175,7 @@
         }
     }
     async function checkLivePlotControls() {
+        const rendered = document.getElementById('plotRendered');
         check(!document.getElementById('plotUpdate') && !document.querySelector('#plotRange [data-plot-reset]'),
               'Live plot controls have no Update or Reset buttons');
         const lower = document.getElementById('plotLower'), upper = document.getElementById('plotUpper');
@@ -149,6 +207,7 @@
         await takePlot(document.getElementById('plotFirst').value);
     }
     function checkPlotRangeAlignment() {
+        const rendered = document.getElementById('plotRendered');
         const groups = [...document.querySelectorAll('.plot-ranges > .plot-group')]
             .filter(group => group.getClientRects().length);
         const bounds = groups.map(group => group.getBoundingClientRect());
@@ -167,6 +226,7 @@
         }
     }
     function checkPlotControls(surface) {
+        const rendered = document.getElementById('plotRendered');
         checkPlotRangeAlignment();
         const visible = id => document.getElementById(id).getClientRects().length > 0;
         check(visible('plotCamera') === surface && visible('plotVertical') &&
@@ -210,6 +270,7 @@
         }
     }
     async function checkPlotDrag() {
+        const rendered = document.getElementById('plotRendered');
         const controls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => document.getElementById(id));
         const saved = controls.map(control => control.value);
         const values = () => controls.map(control => Number(control.value)).join(',');
@@ -497,6 +558,7 @@
         }
     }
     async function checkPlotPinch() {
+        const rendered = document.getElementById('plotRendered');
         const chart = () => rendered.querySelector('[data-plot-chart][data-x-min]');
         const surface = chart().hasAttribute('data-surface');
         const original = ['xMin', 'xMax', 'yMin', 'yMax'].map(key => Number(chart().dataset[key]));
@@ -568,6 +630,7 @@
         }
     }
     async function checkCurvePointerView() {
+        const rendered = document.getElementById('plotRendered');
         const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         await settle();
         const card = rendered.closest('.result-card');
@@ -631,7 +694,9 @@
               Math.abs(Number(after.dataset.yMax) - Number(after.dataset.yMin) - (y1 - y0) * 0.8) < 1e-8,
               'Wheel zoom shrinks both axis ranges around the pointer: ' +
               JSON.stringify({x0, x1, y0, y1, wheelAnchor, bounds: {...after.dataset}}));
-        check(Math.abs(rendered.querySelector('svg').getBoundingClientRect().width - width) < 2,
+        const plotStyle = getComputedStyle(rendered);
+        const availableWidth = rendered.clientWidth - parseFloat(plotStyle.paddingLeft) - parseFloat(plotStyle.paddingRight);
+        check(Math.abs(rendered.querySelector('svg').getBoundingClientRect().width - availableWidth) < 2,
               'Viewport zoom must not enlarge the plot image: ' +
               JSON.stringify({before: width, after: rendered.querySelector('svg').getBoundingClientRect().width,
                               card: card.getBoundingClientRect().width, rendered: rendered.clientWidth}));
@@ -697,6 +762,7 @@
         await checkPlotPinch();
     }
     async function checkPlotWheelZoom() {
+        const rendered = document.getElementById('plotRendered');
         // Expansion and native markup insertion fit the fixed viewport on the next frame.
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         if (rendered.querySelector('[data-plot-chart][data-x-min]:not([data-surface])')) {
@@ -1453,12 +1519,14 @@
             check(parsed.dataset.fullText.includes('x'), 'Integral card lost its native expression');
             check(functionStyle.dataset.fullText.length > 0, 'Integral Function card missing');
             check(rendered.dataset.fullTex.length > 0, 'Integral TeX metadata missing');
+            await checkAsynchronousPlot();
+            const plotRendered = document.getElementById('plotRendered');
             setExpressionEditor('asin(x)');
             await evaluateExpression();
             document.getElementById('plotLower').value = '';
             document.getElementById('plotUpper').value = '';
             await takePlot('x');
-            check(!rendered.classList.contains('error') && !!rendered.querySelector('[data-series]') &&
+            check(!plotRendered.classList.contains('error') && !!plotRendered.querySelector('[data-series]') &&
                   document.getElementById('plotLower').value === '' &&
                   document.getElementById('plotUpper').value === '',
                   'Blank bounds must plot the native real domain without replacing Automatic controls with numbers');
@@ -1467,14 +1535,16 @@
             document.getElementById('plotLower').value = '-@pi';
             document.getElementById('plotUpper').value = '@pi';
             await takePlot('x');
-            check(!rendered.classList.contains('error'), 'Native plot request failed');
-            check(!!rendered.querySelector('svg [data-series="0"]'), 'Plot SVG was not displayed');
-            check(document.getElementById('renderedTitle').textContent === 'Plot', 'Plot card title missing');
-            check(!!rendered.querySelector('svg [data-plot-title] use') && rendered.dataset.displayTex.includes('\\sin'),
+            check(!plotRendered.classList.contains('error'), 'Native plot request failed');
+            check(!!plotRendered.querySelector('svg [data-series="0"]'), 'Plot SVG was not displayed');
+            check(document.querySelector('#plotCard .card-title > span').textContent === 'Plot', 'Plot card title missing');
+            check(!!plotRendered.querySelector('svg [data-plot-title] use') && plotRendered.dataset.displayTex.includes('\\sin'),
                   'Plot formula title must be rendered as TeX glyphs in the same SVG');
-            check(!rendered.textContent.includes('Function plot'), 'Generic plot title must be removed');
+            check(!plotRendered.textContent.includes('Function plot'), 'Generic plot title must be removed');
             check(parsed.dataset.fullText.includes('sin'), 'Plot lost its source expression');
-            const plotCard = rendered.closest('.result-card');
+            check(copyTextForTarget('plot').includes('data-series') && !rendered.querySelector('[data-series]'),
+                  'Plot copy and mathematical rendering belong to independent cards');
+            const plotCard = plotRendered.closest('.result-card');
             const plotExpand = plotCard.querySelector('[data-expand-card]');
             const nextLayout = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             setResultZoom(plotCard, 3);
@@ -1486,24 +1556,24 @@
                   'Expression plot type uses the compact settings card');
             await checkLivePlotControls();
             await window.checkLabMobileLayout('curve plot');
-            const curveDragTarget = rendered.querySelector('[data-series] path');
+            const curveDragTarget = plotRendered.querySelector('[data-series] path');
             check(curveDragTarget.dispatchEvent(new PointerEvent('pointerdown',
                   {button: 0, buttons: 1, pointerId: 11, pointerType: 'touch', isPrimary: true,
                    bubbles: true, cancelable: true})) &&
-                  !rendered.classList.contains('plot-dragging'), 'Curve plots must not enable surface rotation');
-            check(getComputedStyle(rendered.querySelector('svg')).touchAction === 'none',
+                  !plotRendered.classList.contains('plot-dragging'), 'Curve plots must not enable surface rotation');
+            check(getComputedStyle(plotRendered.querySelector('svg')).touchAction === 'none',
                   'Curve plots reserve finger movement for panning');
-            const formulaBox = rendered.querySelector('[data-plot-title]').getBoundingClientRect();
-            const axesBox = rendered.querySelector('[data-plot-chart] [data-plot-axes]').getBoundingClientRect();
+            const formulaBox = plotRendered.querySelector('[data-plot-title]').getBoundingClientRect();
+            const axesBox = plotRendered.querySelector('[data-plot-chart] [data-plot-axes]').getBoundingClientRect();
             check(formulaBox.width > 0 && formulaBox.height > 0 && formulaBox.bottom < axesBox.top,
                   'Rendered formula title must sit above the plot axes without overlap');
-            const figure = rendered.querySelector('[data-plot-figure]');
+            const figure = plotRendered.querySelector('[data-plot-figure]');
             const curve = figure.querySelector('[data-series] path');
             check(getComputedStyle(figure).filter === 'none' && getComputedStyle(curve).stroke === 'rgb(120, 216, 203)',
                   'Plot curves must retain their teal colour, without the monochrome formula filter');
             check(getComputedStyle(figure.querySelector('[data-plot-title] use')).fill === 'rgb(230, 199, 120)',
                   'Plot formula title must retain its gold colour');
-            check(!figure.querySelector('rect') && !rendered.textContent.includes('Vertical range clipped'),
+            check(!figure.querySelector('rect') && !plotRendered.textContent.includes('Vertical range clipped'),
                   'Plot must have no surrounding box or clipping annotation');
             const chart = figure.querySelector('[data-plot-chart]');
             const edgePaths = [...chart.querySelectorAll('[data-plot-axes] path')].map(path => path.getAttribute('d'));
@@ -1519,7 +1589,7 @@
                   'Bottom and left axes must be solid, with top and right edges open');
             check([...figure.querySelectorAll('[data-plot-chart] text')].every(label =>
                       !['x', 'y', 'f'].includes(label.textContent)), 'Plot must not display axis titles');
-            const smallPlotWidth = rendered.querySelector('svg').getBoundingClientRect().width;
+            const smallPlotWidth = plotRendered.querySelector('svg').getBoundingClientRect().width;
             plotExpand.click();
             await nextLayout();
             const expandedPanel = document.getElementById('resultWorkspacePanel').getBoundingClientRect();
@@ -1529,21 +1599,21 @@
             check(Math.abs(expandedPanel.left - workspaceBar.left) < 2 &&
                       Math.abs(expandedPanel.right - workspaceBar.right) < 2,
                   'Expanded plot must span both workspace columns');
-            const largePlotWidth = rendered.querySelector('svg').getBoundingClientRect().width;
-            const plotStyle = getComputedStyle(rendered);
-            const availablePlotWidth = rendered.clientWidth - parseFloat(plotStyle.paddingLeft) -
+            const largePlotWidth = plotRendered.querySelector('svg').getBoundingClientRect().width;
+            const plotStyle = getComputedStyle(plotRendered);
+            const availablePlotWidth = plotRendered.clientWidth - parseFloat(plotStyle.paddingLeft) -
                                        parseFloat(plotStyle.paddingRight);
             check(largePlotWidth > smallPlotWidth && Math.abs(largePlotWidth - availablePlotWidth) < 2,
                   'Expanded plot SVG must grow to fit the available width at 100%');
             await checkPlotChoices();
             plotExpand.click();
             await nextLayout();
-            const collapsedWidth = rendered.querySelector('svg').getBoundingClientRect().width;
-            const collapsedAvailable = rendered.clientWidth - parseFloat(plotStyle.paddingLeft) -
+            const collapsedWidth = plotRendered.querySelector('svg').getBoundingClientRect().width;
+            const collapsedAvailable = plotRendered.clientWidth - parseFloat(plotStyle.paddingLeft) -
                                        parseFloat(plotStyle.paddingRight);
             check(getComputedStyle(document.getElementById('workspacePanel')).display !== 'none' &&
                       collapsedWidth < largePlotWidth && Math.abs(collapsedWidth - collapsedAvailable) < 2 &&
-                      rendered.scrollWidth <= rendered.clientWidth + 1,
+                      plotRendered.scrollWidth <= plotRendered.clientWidth + 1,
                   'Collapsing a plot restores the editor and fits the current column without horizontal overflow');
             const plotHeading = rightPaneTitle.textContent;
             saveCurrentModeResultState();
@@ -1559,19 +1629,19 @@
             syncModeUI();
             restoreModeResultState();
             await nextLayout();
-            check(rightPaneTitle.textContent === plotHeading && renderedTitle.textContent === 'Plot' &&
-                      !!rendered.querySelector('svg [data-series="0"]'),
+            check(rightPaneTitle.textContent === plotHeading && renderedTitle.textContent === 'Rendered TeX' &&
+                      !!plotRendered.querySelector('svg [data-series="0"]'),
                   'Returning to Expression restores its plot and matching headings');
             document.getElementById('plotScale').value = 'manual';
             document.getElementById('plotYLower').value = '-1/2';
             document.getElementById('plotYUpper').value = '1/2';
             await takePlot('x');
-            check(!rendered.classList.contains('error'), 'Manual plot limits failed');
-            check(!rendered.textContent.includes('Vertical range clipped'), 'Manual clipping must be silent');
+            check(!plotRendered.classList.contains('error'), 'Manual plot limits failed');
+            check(!plotRendered.textContent.includes('Vertical range clipped'), 'Manual clipping must be silent');
             document.getElementById('plotScale').value = 'all';
             await takePlot('x');
-            check(!rendered.classList.contains('error'), 'Fit all failed');
-            check(!rendered.textContent.includes('Vertical range clipped'), 'Fit all retained manual limits');
+            check(!plotRendered.classList.contains('error'), 'Fit all failed');
+            check(!plotRendered.textContent.includes('Vertical range clipped'), 'Fit all retained manual limits');
             const plotPrecision = requestedValuePrecision();
             try {
                 setRequestedPrecisionBits(384);
@@ -1583,10 +1653,10 @@
                 document.getElementById('plotYLower').value = '-12';
                 document.getElementById('plotYUpper').value = '12';
                 await takePlot('x');
-                check(!rendered.classList.contains('error'), 'High-precision tangent plot failed');
-                const paths = rendered.querySelectorAll('svg [data-series="0"] path');
+                check(!plotRendered.classList.contains('error'), 'High-precision tangent plot failed');
+                const paths = plotRendered.querySelectorAll('svg [data-series="0"] path');
                 check(paths.length > 0, 'Tangent plot contains no visible curve');
-                const frame = rendered.querySelector('[data-plot-chart]');
+                const frame = plotRendered.querySelector('[data-plot-chart]');
                 const left = Number(frame.dataset.plotLeft), width = Number(frame.dataset.plotWidth);
                 for (const path of paths) {
                     const coordinates = path.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number);
@@ -1605,13 +1675,13 @@
             document.getElementById('plotUpper').value = '5';
             setExpressionEditor('1/1^x + 1/2^x + 1/3^x + ...');
             await takePlot('x');
-            check(!rendered.classList.contains('error') && !!rendered.querySelector('svg [data-series]'),
+            check(!plotRendered.classList.contains('error') && !!plotRendered.querySelector('svg [data-series]'),
                   'Reciprocal series must plot its convergent portion across -5 to 5');
-            check(rendered.dataset.displayTex.includes('\\sum'), 'Reciprocal series must retain its sigma title');
+            check(plotRendered.dataset.displayTex.includes('\\sum'), 'Reciprocal series must retain its sigma title');
             document.getElementById('plotUpper').value = '1';
             await takePlot('x');
-            check(rendered.classList.contains('error') && rendered.textContent.includes('No finite real points') &&
-                  !rendered.textContent.includes('NAN') && !rendered.textContent.includes('binding variable'),
+            check(plotRendered.classList.contains('error') && plotRendered.textContent.includes('No finite real points') &&
+                  !plotRendered.textContent.includes('NAN') && !plotRendered.textContent.includes('binding variable'),
                   'Wholly divergent range must show a clean calculation diagnostic');
             await window.checkLabMobileLayout('plot error');
             document.getElementById('plotLower').value = '-10';
@@ -1625,7 +1695,7 @@
             document.getElementById('plotSecondLower').value = '-2';
             document.getElementById('plotSecondUpper').value = '2';
             await takePlot('x');
-            check(!rendered.classList.contains('error') && !!rendered.querySelector('[data-surface]'),
+            check(!plotRendered.classList.contains('error') && !!plotRendered.querySelector('[data-surface]'),
                   'Automatic two-variable plot must display a surface');
             const curveOption = document.querySelector('#plotKindChoices input[value="curve"]');
             check(!curveOption.closest('label').getClientRects().length,
@@ -1644,10 +1714,10 @@
                   'Clearing the fixed value hides the curve option and removes its stale selection');
             check(document.getElementById('plotAzimuth').value === '315' &&
                   document.getElementById('plotAzimuthValue').textContent === '315°' &&
-                  !!rendered.querySelector('[data-surface][data-azimuth="315.000"]'),
+                  !!plotRendered.querySelector('[data-surface][data-azimuth="315.000"]'),
                   'Initial surface and camera controls must share the ascending-axis default');
             for (let axis = 0; axis < 3; ++axis) {
-                const positions = [...rendered.querySelectorAll(`[data-plot-tick="${axis}"] path`)].map(path => {
+                const positions = [...plotRendered.querySelectorAll(`[data-plot-tick="${axis}"] path`)].map(path => {
                     const point = path.getPointAtLength(0);
                     return axis === 2 ? -point.y : point.x;
                 });
@@ -1665,10 +1735,10 @@
             document.getElementById('plotYLower').value = '0';
             document.getElementById('plotYUpper').value = '1/2';
             await takePlot('x');
-            const heightLabels = [...rendered.querySelectorAll('[data-plot-label="2"]')]
+            const heightLabels = [...plotRendered.querySelectorAll('[data-plot-label="2"]')]
                 .map(label => Number(label.textContent));
             check(heightLabels.length > 1 && Math.max(...heightLabels) === 0.5 && Math.min(...heightLabels) >= 0 &&
-                  !!rendered.querySelector('[data-series] path'),
+                  !!plotRendered.querySelector('[data-series] path'),
                   'Manual height bounds must crop the rendered surface without losing its axes');
             document.querySelector('#plotScaleChoices input[value="auto"]').click();
             await takePlot('x');
@@ -1676,7 +1746,7 @@
                   document.querySelector('#plotScaleChoices input[value="auto"]').checked &&
                   document.getElementById('plotManual').getClientRects().length === 0,
                   'Reset must restore automatic surface scaling');
-            check(plotControls.closest('.result-card') === rendered.closest('.result-card') &&
+            check(plotControls.closest('.result-card') === plotRendered.closest('.result-card') &&
                   !document.getElementById('workspacePanel').contains(plotControls) &&
                   getComputedStyle(plotControls).display !== 'none',
                   'Plot controls must live inside the visible plot card');
@@ -1704,20 +1774,20 @@
                       document.getElementById('plotVertical').getBoundingClientRect().bottom,
                   'Expression camera settings use a compact card below the ranges');
             await window.checkLabMobileLayout('surface plot and height controls');
-            const facets = [...rendered.querySelectorAll('[data-surface] [data-series] path')];
+            const facets = [...plotRendered.querySelectorAll('[data-surface] [data-series] path')];
             check(facets.length === 2 * 69 * 69 && new Set(facets.map(path => path.getAttribute('fill'))).size > 4,
                   'Full surface must contain the shaded 70-by-70 mesh');
-            check(!!rendered.querySelector('[data-plot-title] use'), 'Surface must retain its rendered formula title');
+            check(!!plotRendered.querySelector('[data-plot-title] use'), 'Surface must retain its rendered formula title');
             checkPlotLabelSpacing();
             for (const [axis, name] of [[0, 'x'], [1, 'y'], [2, 'u']]) {
-                check(!!rendered.querySelector(`[data-axis-arrow="${axis}"]`) &&
-                      rendered.querySelector(`[data-axis-name="${axis}"]`).textContent.trim() === name,
+                check(!!plotRendered.querySelector(`[data-axis-arrow="${axis}"]`) &&
+                      plotRendered.querySelector(`[data-axis-name="${axis}"]`).textContent.trim() === name,
                       'Surface axes must identify their variables at increasing-value arrowheads');
             }
             for (const axis of [0, 1, 2])
-                check(rendered.querySelectorAll(`[data-plot-tick="${axis}"] path`).length >= 3,
+                check(plotRendered.querySelectorAll(`[data-plot-tick="${axis}"] path`).length >= 3,
                       'Every surface axis needs visible tick strokes');
-            const initialMesh = rendered.querySelector('[data-series]').innerHTML;
+            const initialMesh = plotRendered.querySelector('[data-series]').innerHTML;
             document.getElementById('plotAzimuth').value = '120';
             document.getElementById('plotElevation').value = '40';
             document.getElementById('plotRoll').value = '90';
@@ -1728,18 +1798,18 @@
                   document.getElementById('plotElevationValue').textContent === '40°' &&
                   document.getElementById('plotRollValue').textContent === '90°',
                   'Slider readouts must follow input before committing a redraw');
-            check(rendered.querySelector('[data-series]').innerHTML === initialMesh,
+            check(plotRendered.querySelector('[data-series]').innerHTML === initialMesh,
                   'Slider input alone must not launch repeated native requests');
             document.getElementById('plotRoll').dispatchEvent(new Event('change', {bubbles: true}));
             const rotationDeadline = performance.now() + 15000;
-            while (!rendered.querySelector('[data-surface][data-azimuth="120.000"][data-elevation="40.000"]') &&
+            while (!plotRendered.querySelector('[data-surface][data-azimuth="120.000"][data-elevation="40.000"]') &&
                    performance.now() < rotationDeadline)
                 await new Promise(resolve => setTimeout(resolve, 25));
-            check(!!rendered.querySelector('[data-surface][data-azimuth="120.000"][data-elevation="40.000"]'),
+            check(!!plotRendered.querySelector('[data-surface][data-azimuth="120.000"][data-elevation="40.000"]'),
                   'Changing a camera control must redraw the current surface automatically');
-            check(!!rendered.querySelector('[data-surface][data-roll="90.000"]'),
+            check(!!plotRendered.querySelector('[data-surface][data-roll="90.000"]'),
                   'Roll must reach the native camera');
-            check(rendered.querySelector('[data-series]').innerHTML !== initialMesh,
+            check(plotRendered.querySelector('[data-series]').innerHTML !== initialMesh,
                   'Rotation must change native projected geometry');
             checkPlotLabelSpacing();
             for (const [azimuth, elevation, roll] of [[45, 30, 0], [45, 5, 180], [225, 85, 270]]) {
@@ -1758,11 +1828,11 @@
                 check(style.backgroundColor !== 'rgb(255, 255, 255)' && style.color !== 'rgb(0, 0, 0)',
                       'Camera controls must retain the dark Lab theme');
             }
-            const surfaceExpand = rendered.closest('.result-card').querySelector('[data-expand-card]');
+            const surfaceExpand = plotRendered.closest('.result-card').querySelector('[data-expand-card]');
             surfaceExpand.click();
             check(labWorkspace.classList.contains('result-card-expanded'), 'Surface must expand across the workspace');
             check(plotControls.getBoundingClientRect().width > 0 &&
-                  rendered.closest('.expanded-card').contains(plotControls),
+                  plotRendered.closest('.expanded-card').contains(plotControls),
                   'Expanded plot must retain its controls');
             checkPlotRangeAlignment();
             await checkPlotWheelZoom();
@@ -1771,9 +1841,9 @@
             document.getElementById('plotAzimuth').dispatchEvent(new Event('input', {bubbles: true}));
             document.getElementById('plotAzimuth').dispatchEvent(new Event('change', {bubbles: true}));
             const updateDeadline = performance.now() + 15000;
-            while (!rendered.querySelector('[data-surface][data-azimuth="75.000"]') && performance.now() < updateDeadline)
+            while (!plotRendered.querySelector('[data-surface][data-azimuth="75.000"]') && performance.now() < updateDeadline)
                 await new Promise(resolve => setTimeout(resolve, 25));
-            check(!!rendered.querySelector('[data-surface][data-azimuth="75.000"]') &&
+            check(!!plotRendered.querySelector('[data-surface][data-azimuth="75.000"]') &&
                   labWorkspace.classList.contains('result-card-expanded'),
                   'Live plotting must work without leaving the expanded card');
             surfaceExpand.click();
@@ -1786,9 +1856,10 @@
             document.getElementById('plotSecondUpper').value = '10';
             setExpressionEditor('3+4');
             await evaluateExpression();
-            check(getComputedStyle(plotControls).display === 'none', 'Ordinary results must hide plot controls');
+            await waitForAutomaticPlot();
             for (const [mode, source, series, surface] of [
                 ['equation', 'x^2=1', 2, false],
+                ['equation', 'x^2+y^2=1', 1, false],
                 ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
                 ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
                 ['diffequation', "y''+6y*y'+4y^3=0; y(0)=1; y'(0)=0", 1, false],
@@ -1804,16 +1875,17 @@
                 await commitVisibleBindingInputs();
                 const button = document.getElementById('expressionPlot');
                 const authored = currentExpressionText();
-                check(button && button.getClientRects().length > 0, mode + ' exposes Plot after evaluation: ' +
-                      JSON.stringify({variables: currentVariables, buttons: derivativeButtons.outerHTML,
-                                      status: statusEl.textContent, error: rendered.textContent.slice(0, 200)}));
+                check(!button, mode + ' has no separate Plot button');
+                await waitForAutomaticPlot();
+                check(!!plotRendered.querySelector('[data-series]'), mode + ' evaluates an automatic plot');
+                check(!!rendered.innerHTML && !!functionStyle.textContent, mode + ' retains mathematical cards');
                 document.getElementById('plotLower').value = mode === 'equation' ? '' : '-2';
                 document.getElementById('plotUpper').value = mode === 'equation' ? '' : '2';
-                await takePlot(button.dataset.variable);
-                check(rendered.querySelectorAll('[data-series]').length === series, mode + ' plots all native curves: ' +
+                await takePlot(document.getElementById('plotFirst').value);
+                check(plotRendered.querySelectorAll('[data-series]').length === series, mode + ' plots all native curves: ' +
                       JSON.stringify({source, variables: currentVariables, status: statusEl.textContent,
-                                      error: rendered.textContent.slice(0, 400)}));
-                check(!!rendered.querySelector('[data-surface]') === surface, mode + ' selects native dimensionality');
+                                      error: plotRendered.textContent.slice(0, 400)}));
+                check(!!plotRendered.querySelector('[data-surface]') === surface, mode + ' selects native dimensionality');
                 if (document.getElementById('plotScale').value === 'auto')
                     check([...document.querySelectorAll('#plotRange .plot-bound-pair')]
                               .every(pair => pair.getClientRects().length === 0),
@@ -1832,6 +1904,24 @@
                 check((getComputedStyle(document.getElementById('plotCamera')).display !== 'none') === surface,
                       mode + ' shows camera controls only for a surface');
                 if (mode === 'equation') {
+                    if (source === 'x^2+y^2=1') {
+                        const chart = plotRendered.querySelector('[data-plot-chart]');
+                        const d = chart.dataset, quadrants = new Set();
+                        const paths = [...chart.querySelectorAll('[data-series] path')];
+                        check(paths.length > 100, 'The unit circle has a refined closed contour');
+                        for (const path of paths) {
+                            const point = path.getPointAtLength(path.getTotalLength() / 2);
+                            const x = Number(d.xMin) + (point.x - Number(d.plotLeft)) / Number(d.plotWidth) *
+                                (Number(d.xMax) - Number(d.xMin));
+                            const y = Number(d.yMax) - (point.y - Number(d.plotTop)) / Number(d.plotHeight) *
+                                (Number(d.yMax) - Number(d.yMin));
+                            check(Math.abs(x * x + y * y - 1) < 0.002,
+                                  'Every circle segment satisfies the implicit equation');
+                            quadrants.add((x >= 0 ? 1 : 0) + (y >= 0 ? 2 : 0));
+                        }
+                        check(quadrants.size === 4 && Math.abs(Number(d.plotWidth) - Number(d.plotHeight)) < 1,
+                              'The circle covers all quadrants with equal coordinate scales');
+                    }
                     const solutionCard = document.getElementById('valueCard');
                     check(solutionCard.getClientRects().length > 0 &&
                           document.getElementById('valueTitle').textContent === 'Solutions' && value.textContent.trim(),
@@ -1839,10 +1929,10 @@
                     if (source.includes('x^4'))
                         for (const root of ['-4.671042', '-0.489034', '0.633721', '5.526355'])
                             check(value.textContent.includes(root), 'Equation plot includes numerical root ' + root);
-                    check(!rendered.textContent.includes('Left side') && !rendered.textContent.includes('Right side'),
+                    check(!plotRendered.textContent.includes('Left side') && !plotRendered.textContent.includes('Right side'),
                           'Equation plots omit generic side labels');
                     if (source.includes('x^4')) {
-                        const ticks = [...rendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
+                        const ticks = [...plotRendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
                         check(ticks.includes(-200) && ticks.includes(200) && ticks.every(t => Math.abs(t) < 300),
                               'Automatic equation frame shows the quartic turning points without distant tails');
                         await checkCurvePointerView();
@@ -1850,18 +1940,18 @@
                     }
                 }
                 if (mode === 'diffequation' && !surface && series === 1)
-                    check(!rendered.textContent.includes('Solution 1'), 'A single solution does not need a legend');
+                    check(!plotRendered.textContent.includes('Solution 1'), 'A single solution does not need a legend');
                 if (mode === 'diffequation' && !surface && series > 1) {
-                    const titles = [...rendered.querySelectorAll('[data-series] > title')];
+                    const titles = [...plotRendered.querySelectorAll('[data-series] > title')];
                     check(titles.length === series && titles.every(title => title.marsPlotLabel.includes(' = ')),
                           'Every family curve has a native hover tooltip identifying its constants');
-                    check([...rendered.querySelectorAll('svg title')].every(title => !title.textContent) &&
-                          rendered.dataset.displaySvg.includes(titles[0].marsPlotLabel),
+                    check([...plotRendered.querySelectorAll('svg title')].every(title => !title.textContent) &&
+                          plotRendered.dataset.displaySvg.includes(titles[0].marsPlotLabel),
                           'Only the custom tooltip is active; copied native SVG retains its labels');
-                    check(![...rendered.querySelectorAll('text')].some(text => text.textContent.includes(' = ')),
+                    check(![...plotRendered.querySelectorAll('text')].some(text => text.textContent.includes(' = ')),
                           'Family constants must not clutter the plot with a visible legend');
-                    const curves = [...rendered.querySelectorAll('[data-series]')];
-                    const chart = rendered.querySelector('[data-x-min]');
+                    const curves = [...plotRendered.querySelectorAll('[data-series]')];
+                    const chart = plotRendered.querySelector('[data-x-min]');
                     const transform = chart.getScreenCTM();
                     const point = {
                         clientX: transform.e + (Number(chart.dataset.plotLeft) + Number(chart.dataset.plotWidth) / 2) * transform.a,
@@ -1874,7 +1964,7 @@
                               'Hovering a family curve dims only the other solutions');
                         check(active.getAttribute('aria-label') === active.querySelector('title').marsPlotLabel,
                               'Focused family curve retains its constant tooltip');
-                        const tooltip = rendered.querySelector('.plot-pointer-tip');
+                        const tooltip = plotRendered.querySelector('.plot-pointer-tip');
                         const lines = tooltip.textContent.split('\n');
                         const constants = active.querySelector('title').marsPlotLabel.split(', ');
                         check(!tooltip.classList.contains('hidden') && tooltip.textContent.includes('x ≈ ') &&
@@ -1886,10 +1976,10 @@
                     chart.dispatchEvent(new PointerEvent('pointermove', point));
                     check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
                           'Moving between curves restores the whole solution family');
-                    check(!rendered.querySelector('.plot-pointer-tip').textContent.includes('\n'),
+                    check(!plotRendered.querySelector('.plot-pointer-tip').textContent.includes('\n'),
                           'Moving off a curve removes stale constants from the coordinate tooltip');
                     curves[0].querySelector('path').dispatchEvent(new PointerEvent('pointermove', point));
-                    rendered.dispatchEvent(new PointerEvent('pointerleave'));
+                    plotRendered.dispatchEvent(new PointerEvent('pointerleave'));
                     check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
                           'Leaving a family plot clears curve focus');
                 }
@@ -1897,16 +1987,16 @@
                     document.querySelector('#plotScaleChoices input[value="manual"]').click();
                     document.getElementById('plotYLower').value = '-2';
                     document.getElementById('plotYUpper').value = '2';
-                    const beforeUpdate = rendered.querySelector('[data-series]');
+                    const beforeUpdate = plotRendered.querySelector('[data-series]');
                     document.getElementById('plotYUpper').dispatchEvent(new Event('input', {bubbles: true}));
                     const deadline = performance.now() + 15000;
-                    const updated = () => rendered.querySelector('[data-series]') &&
-                        rendered.querySelector('[data-series]') !== beforeUpdate &&
-                        rendered.querySelector('[data-plot-label="1"]');
+                    const updated = () => plotRendered.querySelector('[data-series]') &&
+                        plotRendered.querySelector('[data-series]') !== beforeUpdate &&
+                        plotRendered.querySelector('[data-plot-label="1"]');
                     while (!updated() && performance.now() < deadline)
                         await new Promise(resolve => setTimeout(resolve, 25));
-                    const ticks = [...rendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
-                    check(rendered.querySelector('[data-series]') !== beforeUpdate && ticks.includes(-1) &&
+                    const ticks = [...plotRendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
+                    check(plotRendered.querySelector('[data-series]') !== beforeUpdate && ticks.includes(-1) &&
                           ticks.includes(1) && ticks.every(t => t >= -2 && t <= 2),
                           mode + ' Update plot applies manual vertical bounds');
                     if (mode === 'equation')
@@ -1932,6 +2022,7 @@
                     for (const root of ['-4.671042', '-0.489034', '0.633721', '5.526355'])
                         check(value.textContent.includes(root), 'Re-evaluated quartic retains numerical root ' + root);
                 }
+                await waitForAutomaticPlot();
                 await window.checkLabMobileLayout(mode + ' restored solutions');
             }
             setExpressionEditor("y''+3y*y'+y^4=0; y(0)=1; y'(0)=0");

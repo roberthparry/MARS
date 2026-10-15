@@ -259,6 +259,8 @@ void lab_workspace_dom_mode(unsigned mode, int coverage)
     lab_workspace_dom_hidden("#derivativeButtons", !(flags & 8) && mode != 1 && mode != 2);
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
     lab_workspace_dom_hidden("#plotRange", mode > 2);
+    lab_workspace_dom_hidden("#plotCard", mode > 2 ||
+                             !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), 0));
     lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), 0, "", lab_view_text(mode, 0));
     int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");
     lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing_help ? "Help" : "Result");
@@ -500,16 +502,8 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
             lab_dom_release(mark);
         }
     }
-    if (plots && lab_dom_count(names)) {
-        int button = lab_dom_create("button");
-        lab_dom_class(button, "secondary", 1);
-        lab_workspace_dom_text(button, 2, "type", "button");
-        lab_workspace_dom_text(button, 2, "id", "expressionPlot");
-        lab_workspace_dom_text(button, 3, "calculusAction", "2");
-        lab_workspace_dom_text(button, 0, "", "Plot");
-        lab_dom_append(panel, button);
+    if (plots)
         lab_plot_controls_sync();
-    }
 }
 
 static int lab_workspace_dom_copy_object(int source)
@@ -585,7 +579,8 @@ int lab_workspace_dom_has_result(void)
 static const struct {
     const char *key, *selector;
     int button;
-} lab_workspace_dom_result_fields[] = {{"rendered", "#rendered", 0},           {"parsed", "#parsed", 0},
+} lab_workspace_dom_result_fields[] = {{"plotRendered", "#plotRendered", 0},
+                                       {"rendered", "#rendered", 0},           {"parsed", "#parsed", 0},
                                        {"functionStyle", "#functionStyle", 0}, {"value", "#value", 0},
                                        {"renderedMore", "#renderedMore", 1},   {"parsedMore", "#parsedMore", 1},
                                        {"functionMore", "#functionMore", 1},   {"valueMore", "#valueMore", 1}};
@@ -679,6 +674,11 @@ void lab_workspace_dom_result_restore(int state)
                                   lab_workspace_dom_result_fields[i].button);
         lab_dom_release(mark);
     }
+    lab_workspace_dom_hidden("#plotCard", !lab_workspace_dom_content(lab_dom_id("plotRendered"), 1));
+    if (lab_dom_equal(lab_dom_read(lab_dom_id("plotRendered"), 3, "plotPending"), lab_dom_string("true")))
+        lab_layout_plot(0, lab_dom_string("Plot cancelled when leaving this mode. Evaluate to generate it again."));
+    else
+        lab_dom_write(lab_dom_id("plotRendered"), 2, "aria-busy", lab_dom_string("false"));
     lab_result_solver_restore();
     lab_result_input_set(lab_dom_get(state, "resultInputText"));
     int metadata = lab_workspace_dom_result_metadata(state);

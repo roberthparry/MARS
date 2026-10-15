@@ -228,6 +228,8 @@ async function fetchDatetimeWeather(state, signal, request = null) {
 
 // Native continuations own calculus decisions; browser callbacks expose atomic capabilities.
 function takeCalculus(wrt, action, actionButton = null, preview = false, live = false) {
+    clearTimeout(plotControlsTimer);
+    plotControlsTimer = undefined;
     return labFlowContinue(7, {wrt, action, actionButton, preview, live});
 }
 
@@ -296,6 +298,13 @@ function refreshMobileAccess() {
 
 function refreshAlmanacLandTotality(data) {
     return labFlowContinue(9, {data});
+}
+
+/** Start independent background work without extending the evaluation's busy lifetime. */
+function scheduleAutomaticPlot(parent) {
+    void labRequests.run('plot', currentMode(), request =>
+        labFlowContinue(7, {action: 'plot', automatic: true, request}), {parent: parent.token})
+        .catch(error => console.error('Background plot failed', error));
 }
 
 /** Browser resources and atomic application access; native continuations select their order. */
@@ -376,6 +385,9 @@ function labRequestFlowServices() {
         matrixScalar: () => lastMatrixScalarExpression,
         expressionWithVisibleBindings: (...args) => expressionWithVisibleBindings(...args),
         calculusTitle: text => rightPaneTitle.textContent = text,
+        displayPlot: result => labDOM.call('lab_layout_plot', result, null),
+        plotError: error => labDOM.call('lab_layout_plot', null, error),
+        automaticPlot: parent => scheduleAutomaticPlot(parent),
         valueTitle: text => valueTitle.textContent = text,
         requestPresentation: (...args) => requestLabPresentation(...args),
         fetchCalculus: (text, wrt, action, request, preview) => fetchEvaluation(text, wrt, action, '', '', request, preview),

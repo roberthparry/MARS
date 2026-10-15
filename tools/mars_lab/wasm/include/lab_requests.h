@@ -50,7 +50,7 @@ unsigned lab_request_action(unsigned channel, uint32_t token);
 
 /**
  * @brief Cancel a channel and invalidate dependent work when cancelling the main channel.
- * @param channel Channel index in 0..8; invalid indices are ignored.
+ * @param channel Channel index in 0..9; invalid indices are ignored.
  */
 void lab_request_cancel(unsigned channel);
 

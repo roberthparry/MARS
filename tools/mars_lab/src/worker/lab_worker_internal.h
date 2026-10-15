@@ -22,8 +22,11 @@
 #include "sampler-t.h"
 #include "plot-t.h"
 
-/** @brief Plot both equation sides or explicit differential-equation solutions as native curves or surfaces. */
+/** @brief Plot equation sides, two-coordinate contours or explicit differential-equation curves and surfaces. */
 int lab_worker_solver_plot(int argc, char **argv);
+
+/** @brief Render a bounded real zero contour for an equation with two selected coordinates. */
+int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv);
 
 /** @brief Return owning worksheet-precision solution records, using the normal equation solution formatter. */
 string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision);

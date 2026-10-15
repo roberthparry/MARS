@@ -462,6 +462,33 @@ static void test_lab_extra_plot_preview(void)
 static void test_lab_extra_solver_plots(void)
 {
     unsigned status = 0;
+    json_t *circle = request("/eval", "{\"expression\":\"x^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                                     "\"plot_source_mode\":\"equation\"}", &status);
+    bool circle_ok = status == 200 && test_lab_ok(circle, true) &&
+                     contains(circle, "plot_svg", "data-series=\"0\"") &&
+                     !contains(circle, "plot_svg", "data-series=\"1\"") &&
+                     !contains(circle, "plot_svg", "data-surface") &&
+                     contains(circle, "plot_svg", ">y</text>");
+    if (!circle_ok)
+        show_failure(circle);
+    json_free(circle);
+    TEST_ASSERT_TRUE(circle_ok, "a two-coordinate equation plots its real contour, not two height functions");
+    expect_response("/eval", "{\"expression\":\"x*y=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 200u, "plot_svg", "data-series");
+    expect_response("/eval", "{\"expression\":\"(x-10)^2+(y+3)^2=4\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 200u, "plot_svg", "data-series");
+    expect_response("/eval", "{\"expression\":\"1/(x*y)=0\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 422u, "error", "No real contour");
+    expect_response("/eval", "{\"expression\":\"x^2+y^2=-1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 422u, "error", "No real contour");
+    expect_response("/eval", "{\"expression\":\"x+y+z=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 422u, "error", "parameters");
+    expect_response("/eval", "{\"expression\":\"x^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_lower\":\"2\",\"plot_upper\":\"-2\"}",
+                    422u, "error", "bounds");
+    expect_response("/eval", "{\"expression\":\"(x-10)^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_lower\":\"8\"}",
+                    200u, "plot_svg", "data-x-min=\"8\"");
     json_t *result = request("/eval", "{\"expression\":\"x^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                                      "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
     bool ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"1\"") &&
@@ -909,6 +936,17 @@ static void test_lab_auto_range_readme(void)
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README blank bounds plot inverse sine over its real interval");
     string_printf("Automatic curve: asin(x), x from -1 to 1\n");
+    /* README example in docs/mars-lab.md: a two-coordinate equation is a planar contour. */
+    fields = request("/eval", "{\"expression\":\"x^2+y^2=1\",\"action\":\"plot\",\"wrt\":\"x\","
+                              "\"plot_source_mode\":\"equation\"}", &status);
+    ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series=\"0\"") &&
+         contains(fields, "plot_svg", "data-x-min=\"-1.2\"") &&
+         contains(fields, "plot_svg", "data-y-max=\"1.2\"");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "README unit circle receives a padded equal-scale coordinate frame");
+    string_printf("Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2\n");
 }
 
 /* Run the documented plot inputs after the ordinary Lab regressions. */

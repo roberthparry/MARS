@@ -31,7 +31,10 @@ static int finite(double value)
 static int label_text(int title)
 {
     int saved = lab_dom_get(title, "marsPlotLabel");
-    return lab_dom_truth(saved) ? saved : lab_dom_read(title, 0, "");
+    if (lab_dom_truth(saved))
+        return saved;
+    int text = lab_dom_read(title, 0, "");
+    return lab_dom_truth(text) ? text : lab_dom_read(lab_dom_get(title, "parentNode"), 2, "aria-label");
 }
 
 /* Modify only the live DOM; native SVG retained in the result record remains copyable with its labels. */
@@ -143,7 +146,7 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
 {
     (void)context;
     lab_dom_return(lab_dom_object(5));
-    int rendered = lab_dom_id("rendered");
+    int rendered = lab_dom_id("plotRendered");
     int chart = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
     int line = lab_dom_query(rendered, ".plot-pointer-line"), tip = lab_dom_query(rendered, ".plot-pointer-tip");
     double box[4], bounds[4], x = number(event, "clientX"), y = number(event, "clientY");
@@ -191,7 +194,7 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
 /* Register without taking over scrolling, curve tooltips or surface dragging. */
 void lab_plot_pointer_install(void)
 {
-    int rendered = lab_dom_id("rendered");
+    int rendered = lab_dom_id("plotRendered");
     lab_dom_subscribe(rendered, "pointermove", "lab_plot_pointer_dispatch", 0, 0, 1);
     lab_dom_subscribe(rendered, "pointerleave", "lab_plot_pointer_dispatch", 1, 0, 1);
     lab_dom_subscribe(rendered, "pointercancel", "lab_plot_pointer_dispatch", 1, 0, 1);

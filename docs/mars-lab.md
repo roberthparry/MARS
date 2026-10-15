@@ -489,7 +489,7 @@ admission uses `lab_browser_base64_limit()`, derived from the encoded message
 bound including base64 padding. Host checks remain before container copying and
 base64 decoding; the native codec independently validates the resulting message.
 
-The browser ABI is version 34; mismatched assets require a rebuild/restart
+The browser ABI is version 35; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -1006,6 +1006,12 @@ requires it.
 
 ### Native function plots
 
+**Evaluate** in Expression, Equation and Differential Equation modes installs the
+mathematical result cards first, then generates a separate **Plot** card asynchronously.
+There is no separate Plot button. Plot failures remain local to that card; they do
+not hide successful mathematical results. New evaluations, editor changes and mode
+changes invalidate obsolete plot work. Plotting does not keep Evaluate busy.
+
 **Plot type** offers **Auto**, **2-D curve** and **3-D surface**.
 Auto chooses the type automatically. Automatic selection draws
 a surface when exactly one other non-constant variable is unset; otherwise
@@ -1014,7 +1020,7 @@ it draws a curve. Ambiguous additional variables require an explicit
 Explicit 3-D mode can sample two variables even when their worksheet values
 are already supplied. Constant bindings remain parameters, never automatic axes.
 
-For example, enter `x^2 + y^2`, leave both variables unset, and press **Plot**.
+For example, enter `x^2 + y^2`, leave both variables unset, and press **Evaluate**.
 With **From** −2 and **To** 2 in each variable group, the output is a shaded
 paraboloid titled \(u(x,y)=x^2+y^2\). At the default view, the rightward base axis is
 the first variable, the leftward base axis is the second, and height is the formula value.
@@ -1037,7 +1043,7 @@ Plot type, variables, ranges, Y scale and camera controls live inside the
 **Plot** card, below the image, including when the card is expanded. Changes
 redraw automatically after a short pause; no update button is needed.
 Choose variables using the compact radio buttons populated from native binding
-metadata. A single **Plot** button uses the selected first variable, initially the
+metadata. Automatic plotting uses the selected first variable, initially the
 first available variable in the native catalogue;
 the second is chosen automatically unless an explicit radio choice is selected. The same variable
 cannot occupy both axes. Each variable keeps its **From/To** pair together.
@@ -1119,8 +1125,7 @@ Neither sampled binding is changed in the worksheet. This surface view
 does not adaptively refine its mesh or guarantee detection of every
 pole or narrow feature. See [surface rendering limitations](plot.md#height-surfaces).
 
-Evaluate an expression with a variable, then use the single **Plot** button beside the
-derivative and integral actions. **From** and **To** select the parameter
+Evaluate an expression with a variable to generate its plot. **From** and **To** select the parameter
 range; bounds accept native mathematical text, including
 `-@pi` and `@pi`. Other parameters must have numerical bindings. The chosen
 variable is sampled independently of its worksheet value, which is preserved.
@@ -1138,7 +1143,7 @@ range selection failed and asks for explicit bounds. That failure does not prove
 the expression is unplottable. Explicit ranges bypass this range search.
 Plots retain gaps inside the chosen window.
 
-For example, enter `asin(x)`, leave both bounds blank, and press **Plot**.
+For example, enter `asin(x)`, leave both bounds blank, and press **Evaluate**.
 The output is the inverse-sine curve over its real interval:
 
 ```text
@@ -1178,14 +1183,13 @@ SVG. If title rendering is unavailable, an escaped plain-text formula remains
 alongside a rendering diagnostic. The image travels in the existing Protobuf
 response. No external plotting programme or browser-side mathematical evaluation
 is involved.
-The Expression card retains the plotted formula and bindings. Plot results
-do not supply a Function or numerical Value card.
+The Expression card retains the formula and bindings. The mathematical rendering,
+Function and any available numerical Value or Solutions cards remain independent of the plot.
 
 **Expand** uses both workspace columns, temporarily hiding the editor and the
 other result cards. At 100% zoom the plot fits the available width; **Collapse**
 restores the two-column workspace. Mode switches restore that mode's own result
-headings, including **Plot** when returning to a saved plot, rather than carrying
-a plotting heading into another mode.
+headings and its separate plot card rather than carrying a plotting heading into another mode.
 
 Hold **Ctrl** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
 or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
@@ -1252,10 +1256,24 @@ precision for very small ranges and up to 4,096 bits of the worksheet precision.
 The plotting limit is 32,768 working bits, with bounds and reference checks
 limited to 65,536 bits; unresolved precision requirements produce an error.
 
-Equation mode also offers **Plot** after evaluation. It draws the left and right
-sides as separately coloured curves on common axes; their intersections
+Equation mode generates a plot asynchronously after evaluation. It draws the left and right
+sides of a one-free-variable equation as separately coloured curves on common axes; their intersections
 represent real solutions within the plotted range. Select one equation variable
 and bind any remaining parameters. The equation in the editor is unchanged.
+With exactly two unset variable bindings, it instead draws the real zero contour
+of the residual in their coordinate plane. For example, evaluating `x^2+y^2=1`
+produces a unit circle centred at the origin, with both coordinate ranges initially
+about −1.2 to 1.2. This is a curve, not a height surface. The first-axis choice
+selects the horizontal coordinate; the vertical limits control the other coordinate.
+Bound parameters stay fixed, and more than two free coordinates require bindings.
+The bounded expanding grid search rejects non-finite samples and pole-like crossings,
+but cannot certify completeness or guarantee detection of tiny components, isolated
+points or zero sets without a sign change. Explicit bounds can focus the search.
+
+```text
+Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2
+```
+
 The **Solutions** card stays visible below the plot, including during live range
 updates. Its values are computed from the current equation using the same native
 solver and numerical formatter as Evaluate, rather than retained from an older result.
@@ -1270,7 +1288,7 @@ and **Fit all** bypasses feature cropping.
 Evaluating again after a plot restores the mathematical result heading and the
 Solutions card, including the numerical roots; plotting does not remove solver results.
 
-Differential Equation mode offers **Plot** for explicit ordinary differential-equation
+Differential Equation mode generates asynchronous plots for explicit ordinary differential-equation
 solutions, using the declared independent variable and the problem's initial
 conditions. All returned explicit branches are drawn (up to sixteen). The plot
 title shows the solved equation or equations; a single solution has no redundant
@@ -1304,8 +1322,8 @@ modes as well as Expression mode; manual vertical limits override automatic scal
 Authored parameters are never varied automatically: bind any unresolved problem
 parameters first. Implicit solutions, arbitrary functions and series-only results
 are not guessed or silently replaced; use an explicit expression in Expression
-mode where appropriate. The Plot button is hidden for implicit,
-series-only and unsupported-dimensional results. A PDE with two independent variables and
+mode where appropriate. The plot card explains unsupported implicit,
+series-only and unsupported-dimensional results without removing the solver cards. A PDE with two independent variables and
 one explicit solution is plotted as a refinable surface, including solutions constant
 along either coordinate. The surface retains the usual camera controls, touch
 gestures, previews and automatic/manual height limits. Higher-dimensional problems

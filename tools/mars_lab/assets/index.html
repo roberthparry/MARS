@@ -316,6 +316,19 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </span>
           </div>
           <div class="rendered" id="rendered"></div>
+        </div>
+        <div class="card result-card plot-card hidden" id="plotCard">
+          <div class="card-title expandable-title">
+            <span>Plot</span>
+            <span class="card-actions top-card-actions">
+              <button class="card-action zoom-action" type="button" data-zoom-step="-1" title="Zoom out">−</button>
+              <button class="card-action zoom-action zoom-reset" type="button" data-zoom-reset title="Reset zoom">Reset</button>
+              <button class="card-action zoom-action" type="button" data-zoom-step="1" title="Zoom in">+</button>
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="plot">Copy</button>
+            </span>
+          </div>
+          <div class="rendered" id="plotRendered"></div>
           <div class="target-row plot-range" id="plotRange">
             <div class="plot-group plot-options-card" id="plotKindGroup" role="group" aria-labelledby="plotKindTitle">
               <span class="plot-options-title" id="plotKindTitle">Plot type</span>

@@ -31,6 +31,10 @@ void lab_layout_expand(int card, unsigned operation);
 /** @brief Install native rendered output. @param svg Scoped SVG string. @param fallback Scoped text fallback. */
 void lab_layout_content(int svg, int fallback);
 
+/** @brief Install a standalone plot without changing evaluation cards; zero arguments show pending work.
+ * @param result Scoped native plot result, or zero. @param error Scoped diagnostic, or zero. */
+void lab_layout_plot(int result, int error);
+
 /** @brief Fit rendered output using native variant metadata and current browser geometry. */
 void lab_layout_fit(void);
 

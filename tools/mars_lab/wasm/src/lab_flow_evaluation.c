@@ -10,6 +10,7 @@
  */
 #include "lab_dom.h"
 #include "lab_flow.h"
+#include "lab_layout.h"
 
 enum {
     lab_flow_eval_start,
@@ -33,6 +34,7 @@ enum {
     lab_flow_eval_commit,
     lab_flow_eval_ready,
     lab_flow_eval_weather_state,
+    lab_flow_eval_plot_scheduled,
     lab_flow_eval_weather,
     lab_flow_eval_finally,
     lab_flow_eval_finish,
@@ -161,10 +163,18 @@ int lab_flow_evaluation(int frame, int view)
             return lab_flow_call(frame, lab_flow_eval_weather_state, "setStatus", 0, 0, 1,
                                  lab_dom_get(lab_dom_get(frame, "responsePlan"), "status"));
         case lab_flow_eval_weather_state:
+            if (lab_dom_number(mode) <= 2 &&
+                lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "install")) &&
+                lab_dom_truth(lab_dom_get(frame, "current"))) {
+                lab_layout_plot(0, 0);
+                return lab_flow_call(frame, lab_flow_eval_plot_scheduled, "automaticPlot", 0, 0, 1, request);
+            }
             if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "weather")))
                 return lab_flow_call(frame, lab_flow_eval_weather, "native", "weatherState", 0, 3,
                                      lab_dom_string("lab_evaluation_weather_state"), lab_dom_get(context, "state"),
                                      data);
+            return lab_flow_eval_current(frame, lab_flow_eval_finish);
+        case lab_flow_eval_plot_scheduled:
             return lab_flow_eval_current(frame, lab_flow_eval_finish);
         case lab_flow_eval_weather:
             return lab_flow_call(frame, lab_flow_eval_finally, "refreshWeather", 0, 0, 3, lab_dom_get(request, "token"),

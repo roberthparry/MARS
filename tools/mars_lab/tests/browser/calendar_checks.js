@@ -18,7 +18,7 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         check(
             retired.status === 404 && !labDefinitionScripts.includes('almanac'),
             'retired almanac script remains served or loaded');
-        equal(native.lab_browser_abi_version(), 34, 'current browser ABI is required');
+        equal(native.lab_browser_abi_version(), 35, 'current browser ABI is required');
         equal(native.lab_browser_message_limit(), 8388608, 'native message limit is 8 MiB');
         equal(native.lab_browser_member_limit(), 65536, 'native member bound preserves container admission');
         equal(native.lab_browser_handle_capacity(), 131073, 'native handle capacity preserves host admission');

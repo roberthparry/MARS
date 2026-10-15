@@ -121,6 +121,7 @@ function labInitialiseBrowserWidgets() {
     labDOM.services(labDOM.call('lab_bootstrap_widgets'), {enhance: (...args) => enhanceRoundedSelect(...args)});
     if (typeof ResizeObserver === 'function') {
         new ResizeObserver(scheduleRenderedTeXFit).observe(rendered);
+        new ResizeObserver(scheduleRenderedTeXFit).observe(document.getElementById('plotRendered'));
         new ResizeObserver(scheduleSolverTexFit).observe(functionStyle);
     } else {
         window.addEventListener('resize', scheduleRenderedTeXFit);

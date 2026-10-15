@@ -57,7 +57,6 @@ void lab_plot_controls_sync(void)
     lab_dom_class(lab_dom_closest(curve_option, "label"), "hidden", !curve_allowed);
     if (!curve_allowed && lab_dom_equal(value("plotKind"), lab_dom_string("curve")))
         lab_dom_write(lab_dom_id("plotKind"), 5, "", lab_dom_string("auto"));
-    lab_dom_write(lab_dom_id("expressionPlot"), 3, "variable", first);
     if (lab_dom_length(first) && lab_dom_equal(first, second)) {
         second = lab_dom_string("");
         lab_dom_write(lab_dom_id("plotSecond"), 5, "", second);
@@ -78,8 +77,8 @@ void lab_plot_controls_sync(void)
     int kind = solver ? lab_dom_string(pde ? "surface" : "curve") : value("plotKind");
     int curve = lab_dom_equal(kind, lab_dom_string("curve"));
     int surface = lab_dom_equal(kind, lab_dom_string("surface"));
-    if (lab_dom_query(0, "#rendered [data-series]"))
-        lab_dom_set(range, "marsPlotSurface", lab_dom_scalar(1, !!lab_dom_query(0, "#rendered [data-surface]")));
+    if (lab_dom_query(0, "#plotRendered [data-series]"))
+        lab_dom_set(range, "marsPlotSurface", lab_dom_scalar(1, !!lab_dom_query(0, "#plotRendered [data-surface]")));
     if (!curve && !surface)
         surface = lab_dom_truth(lab_dom_get(range, "marsPlotSurface")) || lab_dom_length(second);
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
@@ -136,7 +135,7 @@ void lab_plot_controls_variables(int names, int labels)
     lab_plot_controls_sync();
 }
 
-/* The Plot action and the card's radio selection share one first-axis value. */
+/* Automatic plotting and live redraws share the card's selected first-axis value. */
 void lab_plot_controls_prepare(int variable)
 {
     lab_dom_write(lab_dom_id("plotFirst"), 5, "", variable);

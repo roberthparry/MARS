@@ -12,7 +12,7 @@
 
 #include "lab_requests.h"
 
-enum { lab_request_modes = 7, lab_request_channels = 9, lab_request_operations = 15 };
+enum { lab_request_modes = 7, lab_request_channels = 10, lab_request_operations = 15 };
 enum {
     lab_request_main,
     lab_request_function,
@@ -22,7 +22,8 @@ enum {
     lab_request_datetime_location,
     lab_request_almanac_location,
     lab_request_holidays,
-    lab_request_solver
+    lab_request_solver,
+    lab_request_plot_channel
 };
 enum {
     lab_request_evaluate,
@@ -63,7 +64,7 @@ static const lab_request_policy_t lab_request_policy[lab_request_operations] = {
     [lab_request_local_holidays] = {32, lab_request_holidays, 0, 0, 0, 0, "holidays", 6, 0},
     [lab_request_solver_render] = {4, lab_request_solver, 1, 0, 0, 0, "solverRender", 14, 0},
     [lab_request_solver_restore_render] = {4, lab_request_solver, 1, 0, 0, 45000, "solverRestoreRender", 14, 0},
-    [lab_request_plot] = {7, lab_request_main, 1, 1, 1, 0, "plot", 1, 3}};
+    [lab_request_plot] = {7, lab_request_plot_channel, 1, 0, 0, 0, "plot", 1, 3}};
 
 static const char *const lab_request_paths[] = {"",
                                                 "/eval",
@@ -133,6 +134,8 @@ void lab_request_cancel(unsigned channel)
             lab_request_slots[lab_request_land].token = 0;
             lab_request_slots[lab_request_solver].active = 0;
             lab_request_slots[lab_request_solver].token = 0;
+            lab_request_slots[lab_request_plot_channel].active = 0;
+            lab_request_slots[lab_request_plot_channel].token = 0;
         }
     }
 }
@@ -175,6 +178,7 @@ uint32_t lab_request_begin(unsigned mode, unsigned operation, unsigned has_text,
     if (operation == lab_request_solver_restore_render && parent)
         return 0;
     if ((operation == lab_request_forecast || operation == lab_request_solver_render ||
+         (operation == lab_request_plot && parent) ||
          (operation == lab_request_land_totality && parent)) &&
         (!parent || parent != lab_request_slots[lab_request_main].token ||
          lab_request_slots[lab_request_main].mode != mode ||

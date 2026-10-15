@@ -482,6 +482,7 @@ static int lab_flow_request_calculus(int frame)
         BUTTONS,
         COMMIT_STATE,
         READY,
+        PLOT_COMMIT,
         DONE,
         ERROR_CURRENT,
         ERROR_CLEAR,
@@ -511,6 +512,10 @@ static int lab_flow_request_calculus(int frame)
             lab_dom_set(frame, "solverPlot", lab_dom_scalar(1, plot &&
                 (lab_dom_equal(mode, lab_dom_string("equation")) ||
                  lab_dom_equal(mode, lab_dom_string("diffequation")))));
+            if (lab_flow_request_truth(frame, "automatic")) {
+                lab_dom_set(frame, "wrt", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+                return lab_flow_call(frame, CURRENT, "calculusCapture", "snapshot", 0, 0);
+            }
             int options = lab_dom_object(5);
             lab_dom_set(options, "button", lab_dom_get(frame, "actionButton"));
             lab_dom_set(options, "variable", lab_dom_scalar(1, lab_dom_truth(wrt)));
@@ -549,6 +554,8 @@ static int lab_flow_request_calculus(int frame)
                 return lab_flow_done(0);
             return lab_flow_call(frame, TITLE, "showResults", 0, 0, 0);
         case TITLE:
+            if (plot)
+                return lab_flow_request_current(frame, FETCH);
             return lab_flow_call(frame, STATUS, "calculusTitle", 0, 0, 1,
                                  lab_dom_join(lab_dom_join(lab_dom_text(wrt), lab_dom_string(" "), ""),
                                               lab_dom_text(action), " RESULT"));
@@ -606,8 +613,15 @@ static int lab_flow_request_calculus(int frame)
                 if (!lab_dom_truth(error))
                     error = lab_dom_join(lab_dom_join(lab_dom_string("No "), lab_dom_text(action), " for "),
                                          lab_dom_text(wrt), "");
-                return lab_flow_call(frame, DONE, "fail", 0, 0, 1, error);
+                if (plot && lab_flow_request_truth(frame, "live")) {
+                    lab_dom_write(lab_dom_id("plotFeedback"), 0, "", error);
+                    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
+                    return lab_flow_done(0);
+                }
+                return lab_flow_call(frame, plot ? PLOT_COMMIT : DONE, plot ? "plotError" : "fail", 0, 0, 1, error);
             }
+            if (plot)
+                return lab_flow_call(frame, PLOT_COMMIT, "displayPlot", 0, 0, 1, result);
             int options = lab_dom_object(5);
             lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
             return lab_flow_call(frame, CLEAR_ERROR, "clearResultDetails", 0, 0, 1, options);
@@ -655,6 +669,10 @@ static int lab_flow_request_calculus(int frame)
             return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
         case READY:
             return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
+        case PLOT_COMMIT:
+            if (lab_flow_request_truth(frame, "preview"))
+                return lab_flow_done(0);
+            return lab_flow_call(frame, DONE, "commitModeState", 0, 0, 0);
         case ERROR_CURRENT:
             return lab_flow_request_current(frame, ERROR_CLEAR);
         case ERROR_CLEAR: {
@@ -663,8 +681,10 @@ static int lab_flow_request_calculus(int frame)
             if (lab_flow_request_truth(frame, "live")) {
                 lab_dom_write(lab_dom_id("plotFeedback"), 0, "", lab_dom_get(frame, "error"));
                 lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
-                return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Check plot settings"));
+                return lab_flow_done(0);
             }
+            if (plot)
+                return lab_flow_call(frame, PLOT_COMMIT, "plotError", 0, 0, 1, lab_dom_get(frame, "error"));
             int options = lab_dom_object(5);
             lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
             return lab_flow_call(frame, matrix ? ERROR_VARIABLES : ERROR_RENDER, "clearResultDetails", 0, 0, 1,

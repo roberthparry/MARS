@@ -39,10 +39,10 @@ static int current(int state)
     if (lab_dom_truth(lab_dom_get(state, "pan")))
         return lab_workspace_mode() == (unsigned)read_number(state, "mode") &&
                lab_dom_equal(lab_dom_get(state, "surface"),
-                             lab_dom_query(0, "#rendered [data-plot-chart][data-x-min]:not([data-surface])")) &&
+                             lab_dom_query(0, "#plotRendered [data-plot-chart][data-x-min]:not([data-surface])")) &&
                lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
     return lab_workspace_mode() == (unsigned)read_number(state, "mode") &&
-           lab_dom_equal(lab_dom_get(state, "surface"), lab_dom_query(0, "#rendered [data-surface]")) &&
+           lab_dom_equal(lab_dom_get(state, "surface"), lab_dom_query(0, "#plotRendered [data-surface]")) &&
            lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
 }
 
@@ -78,14 +78,14 @@ static void stop(int state)
     lab_dom_delete(state, "surface");
     lab_dom_delete(state, "variable");
     lab_dom_delete(state, "pointerId");
-    lab_dom_class(lab_dom_id("rendered"), "plot-dragging", 0);
+    lab_dom_class(lab_dom_id("plotRendered"), "plot-dragging", 0);
 }
 
 static void finish(int state, int calls)
 {
     lab_dom_set(state, "active", lab_dom_scalar(1, 0));
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 0));
-    lab_dom_class(lab_dom_id("rendered"), "plot-dragging", 0);
+    lab_dom_class(lab_dom_id("plotRendered"), "plot-dragging", 0);
     if (lab_dom_truth(lab_dom_get(state, "redrawn")))
         lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
     queue(state, calls);
@@ -118,7 +118,7 @@ static void cancel(int state, int calls)
 
 static int start(int event, int state)
 {
-    int rendered = lab_dom_id("rendered"), surface = lab_dom_query(rendered, "[data-surface]");
+    int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
     int pan = !surface;
     if (pan)
         surface = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
@@ -174,7 +174,7 @@ static double limited(unsigned axis, double value)
 
 static int wheel(int event, int state, int calls)
 {
-    int rendered = lab_dom_id("rendered"), surface = lab_dom_query(rendered, "[data-surface]");
+    int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
     int target = lab_dom_get(event, "target");
     int shift = lab_dom_truth(lab_dom_get(event, "shiftKey"));
     int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
@@ -331,8 +331,8 @@ void lab_plot_drag_complete(int state, int accepted)
         return;
     lab_dom_set(state, "busy", lab_dom_scalar(1, 0));
     int pan = lab_dom_truth(lab_dom_get(state, "pan"));
-    int surface = lab_dom_query(0, pan ? "#rendered [data-plot-chart][data-x-min]:not([data-surface])"
-                                      : "#rendered [data-surface]");
+    int surface = lab_dom_query(0, pan ? "#plotRendered [data-plot-chart][data-x-min]:not([data-surface])"
+                                      : "#plotRendered [data-surface]");
     if (!accepted || lab_workspace_mode() != (unsigned)read_number(state, "mode") ||
         !surface || !lab_dom_equal(lab_dom_get(state, "variable"),
             lab_dom_read(lab_dom_id("plotFirst"), 5, ""))) {
@@ -354,7 +354,7 @@ void lab_plot_drag_complete(int state, int accepted)
 /* Window subscriptions retain releases outside the plot; blur cancels releases outside the browser. */
 void lab_plot_drag_install(int document, int window)
 {
-    int rendered = lab_dom_id("rendered");
+    int rendered = lab_dom_id("plotRendered");
     if (!rendered)
         return;
     int state = lab_dom_get(rendered, "marsPlotDrag");

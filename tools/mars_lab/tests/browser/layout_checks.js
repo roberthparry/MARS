@@ -163,7 +163,7 @@ window.checkLabLayout = async function checkLabLayout() {
         equal(view.lab_view_card_toggle(0), -2, 'released card cannot expand');
 
         view.lab_view_cards_reset(resultCards.length);
-        const first = resultCards[0], second = resultCards[1];
+        const first = resultCards[0], second = parsed.closest('.result-card');
         setResultZoom(first, 5);
         stepResultZoom(first, 1);
         equal(resultZoomIndex(first), 6, 'DOM zoom adapter changes native state');

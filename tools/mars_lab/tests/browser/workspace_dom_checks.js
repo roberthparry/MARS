@@ -436,8 +436,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
               !document.getElementById('plotFirstChoices').querySelector('literal'),
               'radio variables preserve native Unicode names and escape opaque display text');
         const buttons = [...derivativeButtons.querySelectorAll('button')];
-        check(buttons.length === 5 && buttons[4].textContent === 'Plot',
-              'variables retain calculus actions but share one Plot button');
+        check(buttons.length === 4 && !document.getElementById('expressionPlot'),
+              'variables retain calculus actions without a separate Plot button');
         check(
             buttons[0].textContent.endsWith(' derivative') && buttons[2].textContent.endsWith(' integral'),
             'calculus ordering');
@@ -445,24 +445,22 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             buttons[1].dataset.variable === names[1] && !buttons[1].querySelector('literal'), 'names stay opaque text');
         buttons.forEach(button => button.click());
         check(
-            calls.length === 5 && calls[0][0] === 'derivative' && calls[0][1] === names[0] &&
-                calls[3][0] === 'integral' && calls[3][1] === names[1] && calls[3][2] === buttons[3] &&
-                calls[4][0] === 'plot' && calls[4][1] === names[0],
+            calls.length === 4 && calls[0][0] === 'derivative' && calls[0][1] === names[0] &&
+                calls[3][0] === 'integral' && calls[3][1] === names[1] && calls[3][2] === buttons[3],
             'browser callbacks forward C action metadata and actual button');
         radioNames[1].click();
-        buttons[4].click();
-        check(calls.length === 6 && calls[5][0] === 'plot' && calls[5][1] === names[1],
-              'the single Plot button follows the selected first-axis radio');
+        check(document.getElementById('plotFirst').value === names[1],
+              'the first-axis radio retains its selected variable');
         renderDerivativeButtons(['x']);
         derivativeButtons.querySelector('button').click();
-        check(calls.length === 7, 'rerender does not duplicate event callbacks');
+        check(calls.length === 5, 'rerender does not duplicate event callbacks');
         currentDifferentiable = false;
         renderDerivativeButtons(names);
-        check(derivativeButtons.children.length === 1 && derivativeButtons.textContent === 'Plot',
-            'non-differentiable expression results still permit plotting');
+        check(derivativeButtons.children.length === 0,
+            'non-differentiable expression results have no separate action buttons');
         const manyNames = Array.from({length: 600}, (_, index) => `v${index}`);
         labDOM.call('lab_workspace_dom_derivatives', manyNames, manyNames, 1);
-        check(derivativeButtons.children.length === 1201, 'large action list has exactly one Plot action');
+        check(derivativeButtons.children.length === 1200, 'large action list contains only calculus actions');
         labDOM.call('lab_workspace_dom_derivatives', [], [], 1);
         check(derivativeButtons.children.length === 0, 'no plot action without a variable');
         document.getElementById('plotRange').classList.add('hidden');

@@ -33,7 +33,7 @@ int lab_plot_pinch_start(int state, int event)
         return 0;
     int chart = lab_dom_get(state, "surface"), curve = lab_dom_truth(lab_dom_get(state, "pan"));
     if (!lab_dom_has(chart, "data-x-min") ||
-        !lab_dom_node_contains(lab_dom_id("rendered"), lab_dom_get(event, "target")))
+        !lab_dom_node_contains(lab_dom_id("plotRendered"), lab_dom_get(event, "target")))
         return 0;
     double x = value(event, "clientX"), y = value(event, "clientY");
     double dx = x - value(state, "touchX"), dy = y - value(state, "touchY");
@@ -109,7 +109,7 @@ int lab_plot_pinch_move(int state, int event)
             bounds[axis * 2] >= bounds[axis * 2 + 1])
             return 0;
     }
-    int range = lab_dom_id("plotRange"), title_node = lab_dom_query(0, "#rendered [data-plot-figure] > title");
+    int range = lab_dom_id("plotRange"), title_node = lab_dom_query(0, "#plotRendered [data-plot-figure] > title");
     int title = lab_dom_get(title_node, "marsPlotLabel");
     if (!lab_dom_truth(title))
         title = lab_dom_read(title_node, 0, "");

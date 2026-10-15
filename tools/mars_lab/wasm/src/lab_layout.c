@@ -184,9 +184,8 @@ void lab_layout_expand(int card, unsigned operation)
 }
 
 /* Install only native markup, or an ordinary text fallback, and fit it on the next frame. */
-void lab_layout_content(int svg, int fallback)
+static void lab_layout_content_at(int rendered, int svg, int fallback)
 {
-    int rendered = lab_dom_query(0, "#rendered");
     lab_layout_text(rendered, 0, "", "");
     if (lab_dom_length(svg)) {
         int frame = lab_dom_create("div");
@@ -203,9 +202,32 @@ void lab_layout_content(int svg, int fallback)
         lab_dom_schedule(1, card);
 }
 
+/* Keep mathematical rendering independent of the optional plot card. */
+void lab_layout_content(int svg, int fallback)
+{
+    lab_layout_content_at(lab_dom_id("rendered"), svg, fallback);
+}
+
+/* Only native plot output and diagnostics enter the standalone plot card. */
+void lab_layout_plot(int result, int error)
+{
+    int node = lab_dom_id("plotRendered"), svg = lab_dom_get(result, "svg");
+    lab_dom_class(lab_dom_id("plotCard"), "hidden", 0);
+    lab_dom_class(node, "error", lab_dom_truth(error));
+    lab_dom_write(node, 2, "aria-busy", lab_dom_string(!result && !error ? "true" : "false"));
+    lab_dom_write(node, 3, "plotPending", lab_dom_string(!result && !error ? "true" : "false"));
+    lab_dom_write(node, 3, "displaySvg", lab_dom_truth(error) ? lab_dom_string("") : svg);
+    lab_dom_write(node, 3, "displayTex", lab_dom_get(result, "TeX"));
+    lab_layout_content_at(node, lab_dom_truth(error) ? lab_dom_string("") : svg,
+                          !result && !error ? lab_dom_string("Generating plot…") : error);
+    lab_dom_class(lab_dom_id("plotCard"), "plot-card", 1);
+    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
+}
+
 /* Update rendered source and markup together, only when native metadata enables fitting. */
 void lab_layout_fit(void)
 {
+    lab_layout_zoom(lab_dom_id("plotCard"));
     int rendered = lab_dom_query(0, "#rendered");
     if (lab_dom_query(rendered, "svg [data-series]")) {
         lab_layout_zoom(lab_dom_closest(rendered, ".result-card"));

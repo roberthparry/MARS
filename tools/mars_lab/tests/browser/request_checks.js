@@ -7,7 +7,7 @@ window.checkLabRequests = async function checkLabRequests() {
             throw new Error(`C requests: ${message}`);
     };
     const clear = () => {
-        for (let channel = 0; channel < 9; ++channel) native.lab_request_cancel(channel);
+        for (let channel = 0; channel < 10; ++channel) native.lab_request_cancel(channel);
     };
     const begin = (mode, operation, scalar = 0, parent = 0) =>
         native.lab_request_begin(mode, operation, 1, 1, scalar, parent) >>> 0;
@@ -58,6 +58,18 @@ window.checkLabRequests = async function checkLabRequests() {
                 }
             }
         }
+        native.lab_request_set_mode(0);
+        const evaluation = begin(0, 0);
+        const plot = begin(0, 14, 0, evaluation);
+        const plotChannel = native.lab_request_channel(14);
+        check(plotChannel !== 0 && plot, 'plot owns a separate channel');
+        native.lab_request_finish(0, evaluation);
+        check(!native.lab_request_busy() && native.lab_request_live(plotChannel, plot),
+              'evaluation completes while its asynchronous plot remains active');
+        begin(0, 0);
+        check(!native.lab_request_live(plotChannel, plot), 'new evaluation invalidates its old plot');
+        check(!begin(0, 14, 0, evaluation), 'obsolete evaluation cannot start a plot');
+        clear();
         const endpoints = [1, 3, 4, 2, 5, 6, 7];
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_request_set_mode(mode);

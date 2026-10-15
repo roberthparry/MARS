@@ -493,6 +493,9 @@ void lab_result_copy(int target, int last_TeX)
     if (lab_dom_equal(target, lab_dom_string("rendered"))) {
         int rendered = lab_dom_query(0, "#rendered");
         text = lab_dom_has_class(rendered, "error") ? lab_dom_read(rendered, 0, "") : last_TeX;
+    } else if (lab_dom_equal(target, lab_dom_string("plot"))) {
+        int plot = lab_dom_id("plotRendered");
+        text = lab_dom_has_class(plot, "error") ? lab_dom_read(plot, 0, "") : lab_result_data(plot, "displaySvg");
     } else if (lab_dom_equal(target, lab_dom_string("expression"))) {
         text = lab_result_parsed();
     } else if (lab_dom_equal(target, lab_dom_string("function")) || lab_dom_equal(target, lab_dom_string("value"))) {
@@ -566,6 +569,9 @@ void lab_result_pretty_finish(int element, int request, int data)
 /* Clear the rendered pane as well as exclusive expansion, leaving request/state recovery to its owner. */
 void lab_result_pane_clear(void)
 {
+    lab_dom_write(lab_dom_id("plotRendered"), 0, "", lab_dom_string(""));
+    lab_dom_remove(lab_dom_id("plotRendered"), "data-plot-pending");
+    lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
     lab_layout_expand(0, 2);
     lab_result_render_invalidate();
     lab_result_text(lab_dom_query(0, "#rendered"), "");
@@ -576,8 +582,11 @@ void lab_result_pane_clear(void)
 /* Clear card metadata and pending identities together; no stale copy source survives. */
 void lab_result_details_clear(int caches, int mode)
 {
+    lab_dom_write(lab_dom_id("plotRendered"), 0, "", lab_dom_string(""));
+    lab_dom_remove(lab_dom_id("plotRendered"), "data-plot-pending");
+    lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
     lab_result_solver_invalidate();
-    static const char *const nodes[] = {"#parsed", "#functionStyle", "#value", "#rendered"};
+    static const char *const nodes[] = {"#parsed", "#functionStyle", "#value", "#rendered", "#plotRendered"};
     static const char *const classes[] = {"matrix-pretty", "matrix-expression-pretty", "matrix-expression-text",
                                           "equation-function", "matrix-tex-value"};
     static const char *const attributes[] = {
@@ -587,7 +596,7 @@ void lab_result_details_clear(int caches, int mode)
         "data-responsive-fit",     "data-responsive-variant", "data-display-tex",       "data-full-tex",
         "data-display-svg",        "data-full-svg",           "data-render-error",      "data-full-render-error"};
     lab_result_render_invalidate();
-    /* Four cards and fixed attribute/class sets make these bounded projection loops deliberate. */
+    /* Fixed cards and attribute/class sets make these bounded projection loops deliberate. */
     for (unsigned i = 0; i < sizeof nodes / sizeof *nodes; ++i) {
         unsigned mark = lab_dom_mark();
         int node = lab_dom_query(0, nodes[i]);
