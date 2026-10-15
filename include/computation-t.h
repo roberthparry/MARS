@@ -88,6 +88,9 @@ void computation_free(computation_t *computation);
  * Exactly using the limit is allowed; the next positive reservation exhausts it.
  * Unlimited counters saturate at UINT64_MAX. Concurrent stopping may leave already
  * reserved work counted even when it is not executed; the counter is not a completion count.
+ * Cancellation and budgets are checked on every call. Deadline clock reads are batched
+ * every 64 polls, so expiry can permit up to 63 further checkpoints. Use computation_status()
+ * for a fresh deadline check; computation_run() boundaries and computation_complete() do this too.
  * False sets EINVAL, EALREADY, ECANCELED, ETIMEDOUT, E2BIG or EIO according to status.
  */
 bool computation_checkpoint(computation_t *computation, uint64_t work);

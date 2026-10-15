@@ -40,6 +40,14 @@ by the consuming algorithm, not elapsed time or a universal cost estimate.
 All references share the counter. `computation_work_used()` reads reserved work,
 which may include operations stopped after reservation but before execution.
 
+Cancellation and work budgets are checked at every checkpoint. Deadline clock
+reads occur on the first poll and every 64 polls thereafter, avoiding expensive
+clock reads in tight numerical loops. Expiry may therefore allow up to 63 more
+checkpoints; this is a checkpoint bound, not a wall-time guarantee.
+Explicit status queries, scope entry and return, successful completion attempts,
+and progress observer calls check the deadline freshly. Reports without an
+observer use the batched checkpoint path.
+
 A reservation must fit in full. Consuming the last allowed unit is permitted;
 the next positive reservation stops the calculation without consuming more.
 An unlimited counter saturates at `UINT64_MAX` instead of wrapping. Algorithms

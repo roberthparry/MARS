@@ -3,7 +3,8 @@
  * @brief Atomic shared work accounting and cooperative calculation termination.
  *
  * Keeps immutable options beside reference-counted atomic counters and a sticky
- * status. Deadlines are polled against the native monotonic clock. Reports call
+ * status. Batched checkpoints amortise monotonic clock reads, while scope and
+ * completion boundaries always check the deadline freshly. Reports call
  * application observers directly without locks; this module neither schedules
  * work nor tries to interrupt mathematical operations or reclaim their resources.
  */
@@ -20,11 +21,14 @@ struct _computation_t {
     atomic_uint_fast64_t references;
     atomic_uint_fast64_t work_used;
     atomic_int status;
+    atomic_uint_fast64_t deadline_polls;
     uint64_t deadline_ns;
     computation_options_t options;
 };
 
 static _Thread_local computation_t *computation_scope;
+
+enum { COMPUTATION_DEADLINE_POLL_INTERVAL = 64 };
 
 static bool computation_now(uint64_t *now)
 {
@@ -85,6 +89,7 @@ computation_t *computation_new(const computation_options_t *options)
     atomic_init(&computation->references, 1);
     atomic_init(&computation->work_used, 0);
     atomic_init(&computation->status, COMPUTATION_ACTIVE);
+    atomic_init(&computation->deadline_polls, 0);
     return computation;
 }
 
@@ -112,8 +117,8 @@ void computation_free(computation_t *computation)
         free(computation);
 }
 
-/* Deadlines are observed cooperatively, without a timer or helper thread. */
-computation_status_t computation_status(computation_t *computation)
+/* Cancellation remains eager; only repeated deadline reads are amortised. */
+static computation_status_t computation_poll(computation_t *computation, bool force_clock)
 {
     if (!computation) {
         errno = EINVAL;
@@ -122,7 +127,9 @@ computation_status_t computation_status(computation_t *computation)
     if (atomic_load(&computation->status) == COMPUTATION_ACTIVE && computation->options.cancelled &&
         computation->options.cancelled(computation->options.argument))
         computation_transition(computation, COMPUTATION_CANCELLED);
-    if (atomic_load(&computation->status) == COMPUTATION_ACTIVE && computation->deadline_ns) {
+    if (atomic_load(&computation->status) == COMPUTATION_ACTIVE && computation->deadline_ns &&
+        (force_clock || (atomic_fetch_add_explicit(&computation->deadline_polls, 1, memory_order_relaxed) %
+                        COMPUTATION_DEADLINE_POLL_INTERVAL) == 0)) {
         uint64_t now;
         if (!computation_now(&now))
             computation_transition(computation, COMPUTATION_FAILED);
@@ -132,10 +139,16 @@ computation_status_t computation_status(computation_t *computation)
     return atomic_load(&computation->status);
 }
 
+/* Explicit inspection always observes the current monotonic deadline. */
+computation_status_t computation_status(computation_t *computation)
+{
+    return computation_poll(computation, true);
+}
+
 /* Reserve before work starts, with a single shared bound across concurrent callers. */
 bool computation_checkpoint(computation_t *computation, uint64_t work)
 {
-    if (!computation_active(computation_status(computation)))
+    if (!computation_active(computation_poll(computation, false)))
         return false;
     if (work) {
         uint_fast64_t used = atomic_load(&computation->work_used);
@@ -143,16 +156,16 @@ bool computation_checkpoint(computation_t *computation, uint64_t work)
         do {
             if (limit && work > limit - used) {
                 computation_transition(computation, COMPUTATION_BUDGET_EXHAUSTED);
-                return computation_active(computation_status(computation));
+                return computation_active(atomic_load(&computation->status));
             }
             uint64_t next = work > UINT64_MAX - used ? UINT64_MAX : used + work;
             if (atomic_compare_exchange_weak(&computation->work_used, &used, next))
                 break;
-            if (!computation_active(computation_status(computation)))
+            if (!computation_active(computation_poll(computation, false)))
                 return false;
         } while (true);
     }
-    return computation_active(computation_status(computation));
+    return computation_active(atomic_load(&computation->status));
 }
 
 /* Cancellation never overwrites a previously published terminal result. */
@@ -172,7 +185,7 @@ void computation_fail(computation_t *computation)
 /* Only the owner of the whole operation should publish successful completion. */
 bool computation_complete(computation_t *computation)
 {
-    if (!computation_checkpoint(computation, 0))
+    if (!computation_active(computation_status(computation)))
         return false;
     if (computation_transition(computation, COMPUTATION_COMPLETED))
         return true;
@@ -196,6 +209,8 @@ bool computation_report(computation_t *computation, const char *stage, uint64_t 
         errno = EINVAL;
         return false;
     }
+    if (!computation->options.progress)
+        return computation_checkpoint(computation, 0);
     computation_progress_t progress = {
         .stage = stage,
         .completed = completed,
@@ -203,9 +218,8 @@ bool computation_report(computation_t *computation, const char *stage, uint64_t 
         .work_used = computation_work_used(computation),
         .status = computation_status(computation),
     };
-    if (computation->options.progress)
-        computation->options.progress(&progress, computation->options.argument);
-    return computation_checkpoint(computation, 0);
+    computation->options.progress(&progress, computation->options.argument);
+    return computation_active(computation_status(computation));
 }
 
 /* Scope native work without allowing a nested caller to replace its outer allowance. */
@@ -219,12 +233,12 @@ bool computation_run(computation_t *computation, computation_callback_t callback
         errno = EBUSY;
         return false;
     }
-    if (!computation_checkpoint(computation, 0) || !computation_retain(computation))
+    if (!computation_active(computation_status(computation)) || !computation_retain(computation))
         return false;
     computation_t *previous = computation_scope;
     computation_scope = computation;
     bool ok = callback(argument);
-    bool active = computation_checkpoint(computation, 0);
+    bool active = computation_active(computation_status(computation));
     int error = errno;
     computation_scope = previous;
     computation_free(computation);
@@ -242,7 +256,8 @@ computation_t *computation_current(void)
 bool computation_step_current(const char *stage)
 {
     return !computation_scope || (computation_checkpoint(computation_scope, 1) &&
-        computation_report(computation_scope, stage, computation_work_used(computation_scope), 0));
+        (!computation_scope->options.progress ||
+         computation_report(computation_scope, stage, computation_work_used(computation_scope), 0)));
 }
 
 /* Consumers discard stopped outputs before returning to their caller. */

@@ -95,6 +95,17 @@ static void test_computation_invalid(void)
     computation_fail(NULL);
 }
 
+static bool computation_wait_past_deadline(void *argument)
+{
+    computation_require(!lock_wait_for(argument, 75) && errno == ETIMEDOUT);
+    return true;
+}
+
+static bool computation_cancel_flag(void *argument)
+{
+    return *(bool *)argument;
+}
+
 static void test_computation_deadline(void)
 {
     computation_options_t options = {.timeout_ms = 1};
@@ -107,6 +118,40 @@ static void test_computation_deadline(void)
     TEST_ASSERT_TRUE(!computation_complete(control) && errno == ETIMEDOUT, "deadline prevents success");
     computation_cancel(control);
     TEST_ASSERT_TRUE(computation_status(control) == COMPUTATION_TIMED_OUT, "deadline reason preserved");
+    computation_free(control);
+
+    options.timeout_ms = 50;
+    control = computation_new(&options);
+    computation_require(control && computation_checkpoint(control, 1));
+    computation_wait_past_deadline(delay);
+    unsigned continued = 0;
+    while (continued < 64 && computation_checkpoint(control, 1))
+        ++continued;
+    TEST_ASSERT_TRUE(continued <= 63 && errno == ETIMEDOUT, "batched deadline stops within 64 polls");
+    TEST_ASSERT_TRUE(computation_work_used(control) == continued + 1, "only accepted work is reserved");
+    computation_free(control);
+
+    control = computation_new(&options);
+    computation_require(control && computation_checkpoint(control, 0));
+    computation_wait_past_deadline(delay);
+    TEST_ASSERT_TRUE(!computation_complete(control) && errno == ETIMEDOUT, "completion forces fresh deadline check");
+    computation_free(control);
+
+    control = computation_new(&options);
+    computation_require(control && computation_checkpoint(control, 0));
+    TEST_ASSERT_TRUE(!computation_run(control, computation_wait_past_deadline, delay) && errno == ETIMEDOUT,
+                     "scope return rejects late result without further checkpoints");
+    computation_free(control);
+
+    bool cancelled = false;
+    options.timeout_ms = 1000;
+    options.cancelled = computation_cancel_flag;
+    options.argument = &cancelled;
+    control = computation_new(&options);
+    computation_require(control && computation_checkpoint(control, 1));
+    cancelled = true;
+    TEST_ASSERT_TRUE(!computation_checkpoint(control, 1) && errno == ECANCELED, "cancellation is never batched");
+    TEST_ASSERT_TRUE(computation_work_used(control) == 1, "cancelled checkpoint reserves no work");
     computation_free(control);
     computation_require(lock_free(delay));
 }
