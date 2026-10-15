@@ -2022,6 +2022,31 @@ static void test_equation_future_reduces_exp_sin_to_periodic_family(void)
 
 static void test_equation_future_keeps_periodic_sin_family_symbolic(void)
 {
+    const char *residuals[] = {"cos(z)-sin(pi-x*y)=0", "0=cos(z)-sin(pi-x*y)",
+                              "sin(pi-x*y)-cos(z)=0"};
+    for (size_t i = 0; i < sizeof(residuals) / sizeof(*residuals); ++i) {
+        equation_t *problem = equ_from_string(residuals[i]);
+        equation_solutions_t *family = equ_derive_solutions(problem);
+        ASSERT_NOT_NULL(family);
+        ASSERT_TRUE(equ_solutions_count(family) >= 2);
+        ASSERT_TRUE(test_equation_result_has_solution_for(family, equ_binding(problem, "z")));
+        ASSERT_TRUE(test_equation_result_has_rhs_text_containing(family, style_UNBOUND, "acos"));
+        const char *names[] = {"x", "y", "z"};
+        for (unsigned j = 0; j < 3; ++j) {
+            number_t value = expr_get_val(equ_binding(problem, names[j]));
+            ASSERT_TRUE(num_is_nan(value));
+            num_destroy(&value);
+        }
+        equ_solutions_free(family);
+        equ_free(problem);
+    }
+    equation_t *implicit = equ_from_string("sin(x*y)+x+y=0");
+    equation_solutions_t *unsolved = equ_derive_solutions(implicit);
+    ASSERT_NOT_NULL(unsolved);
+    ASSERT_EQ_INT((int)equ_solutions_count(unsolved), 0);
+    ASSERT_TRUE(!equ_solutions_proven_empty(unsolved));
+    equ_solutions_free(unsolved);
+    equ_free(implicit);
     equation_t *equation = equ_from_string("{ sin(x) = sqrt(0.2) | x = NAN }");
     expr_t *x;
     ASSERT_NEW_RESULT(result);

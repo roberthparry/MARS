@@ -2414,6 +2414,46 @@ cleanup_no_goal:
     return rc < 0 ? -1 : 0;
 }
 
+static equation_t *equ_separate_independent_terms(const equation_t *equation, const expr_t *wrt)
+{
+    const expr_t *dependent = equation->lhs, *other = equation->rhs;
+    if (!equ_expr_uses_wrt(dependent, wrt)) {
+        dependent = equation->rhs;
+        other = equation->lhs;
+    }
+    if (equ_expr_uses_wrt(other, wrt))
+        return NULL;
+    expr_t *target = expr_clone(other);
+    bool changed = false;
+    const expr_t *left = NULL, *right = NULL;
+    bool subtract = false;
+    while (target) {
+        const expr_t *positive = NULL;
+        if (expr_match_neg_expr(dependent, &positive)) {
+            expr_t *moved = expr_neg(target);
+            expr_free(target);
+            target = expr_simplify_owned(moved);
+            dependent = positive;
+            changed = true;
+            continue;
+        }
+        if (!expr_match_add_sub_expr(dependent, &left, &right, &subtract))
+            break;
+        bool uses_left = equ_expr_uses_wrt(left, wrt), uses_right = equ_expr_uses_wrt(right, wrt);
+        if (uses_left == uses_right)
+            break;
+        expr_t *moved = uses_left ? (subtract ? expr_add(target, right) : expr_sub(target, right)) :
+                                  (subtract ? expr_sub(left, target) : expr_sub(target, left));
+        expr_free(target);
+        target = expr_simplify_owned(moved);
+        dependent = uses_left ? left : right;
+        changed = true;
+    }
+    equation_t *result = changed && target ? equ_new(dependent, target) : NULL;
+    expr_free(target);
+    return result;
+}
+
 /* Try the fixed ordered solver pipeline; stop before any fallback after cancellation. */
 int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
 {
@@ -2429,6 +2469,14 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
     equ_solutions_reset(solutions);
     if (!equation || !wrt || !equ_computation_step("equation.solve"))
         return -1;
+    equation_t *separated = equ_separate_independent_terms(equation, wrt);
+    equation_t view;
+    if (separated) {
+        /* Borrow the original bindings and domain metadata while replacing only the sides. */
+        view = *equation;
+        view.lhs = separated->lhs;
+        view.rhs = separated->rhs;
+    }
     solutions->status = EQUATION_SOLVE_UNSOLVED;
     int rc = 1;
     if (equ_is_solved_for(equation, wrt))
@@ -2440,10 +2488,13 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
             rc = -1;
             break;
         }
-        rc = solvers[i](equation, wrt, solutions);
+        /* Unary inversion needs an isolated function; polynomial solvers retain their original form. */
+        bool unary = solvers[i] == equ_try_solve_unary_inverse || solvers[i] == equ_try_solve_unary_periodic;
+        rc = solvers[i](unary && separated ? &view : equation, wrt, solutions);
         if (!equ_computation_active())
             rc = -1;
     }
+    equ_free(separated);
     if (!equ_computation_active() || rc < 0) {
         equ_solutions_clear(solutions);
         equ_computation_active();
@@ -2474,7 +2525,16 @@ static equation_solutions_t *equ_derive_solutions_impl(const equation_t *equatio
     if (equ_derive_symbolic_solutions(equation, bindings, solutions) != 0)
         goto error;
 
-    if (equ_solutions_count(solutions) == 0u && equ_variable_binding_count(bindings) > 0u) {
+    size_t variables = equ_variable_binding_count(bindings);
+    bool seeded = true;
+    for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+        if (expr_bindings_is_constant_at(bindings, i))
+            continue;
+        number_t value = expr_get_val(expr_bindings_expr_at(bindings, i));
+        seeded = seeded && num_is_finite(value);
+        num_destroy(&value);
+    }
+    if (equ_solutions_count(solutions) == 0u && variables > 0u && (variables == 1u || seeded)) {
         int search_rc = equ_try_search_zeta_roots(equation, solutions);
 
         if (search_rc < 0)

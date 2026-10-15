@@ -1225,6 +1225,21 @@ static void test_lab_extra_gaussian_integral(void)
 
 static void test_lab_extra_equation(void)
 {
+    expect_response("/equation-eval", "{\"equation\":\"cos(z)-sin(pi-xy)=0\",\"precision\":78}",
+                    200u, "svg", "<svg");
+    unsigned trig_status = 0;
+    json_t *trig = request("/equation-eval", "{\"equation\":\"cos(z)-sin(pi-xy)=0\",\"precision\":78}",
+                           &trig_status);
+    const json_t *bindings = test_lab_member(trig, "binding_values");
+    bool trig_ok = trig_status == 200u && contains(trig, "solutions_TeX", "\\mathbb{Z}") &&
+                   contains(trig, "svg", "<svg") && !*lab_eval_text(trig, "render_error") &&
+                   json_array_size(bindings) == 3u;
+    for (size_t i = 0; i < json_array_size(bindings); ++i)
+        trig_ok = trig_ok && !strcmp(test_lab_text(json_array_get(bindings, i), "value"), "NAN");
+    if (!trig_ok)
+        show_failure(trig);
+    json_free(trig);
+    TEST_ASSERT_TRUE(trig_ok, "implicit trigonometric families render without assigning free coordinates");
     expect_response("/equation-eval", "{\"equation\":\"x^2=4\",\"precision\":40}", 200u, "solutions", "2");
     unsigned status = 0;
     json_t *sphere = request("/equation-eval", "{\"equation\":\"x^2+y^2+z^2=1\"}", &status);

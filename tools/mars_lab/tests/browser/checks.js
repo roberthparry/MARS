@@ -1861,6 +1861,7 @@
                 ['equation', 'x^2=1', 2, false],
                 ['equation', 'x^2+y^2=1', 1, false],
                 ['equation', 'x^2+y^2+z^2=1', 1, true],
+                ['equation', 'cos(z)-sin(pi-xy)=0', 1, true],
                 ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
                 ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
                 ['diffequation', "y''+6y*y'+4y^3=0; y(0)=1; y'(0)=0", 1, false],
@@ -1880,6 +1881,10 @@
                 await waitForAutomaticPlot();
                 check(!!plotRendered.querySelector('[data-series]'), mode + ' evaluates an automatic plot');
                 check(!!rendered.innerHTML && !!functionStyle.textContent, mode + ' retains mathematical cards');
+                if (source === 'cos(z)-sin(pi-xy)=0') {
+                    check(!!rendered.querySelector('svg') && !rendered.textContent.includes('rendering failed'),
+                          'Implicit trigonometric solution families render as mathematics');
+                }
                 document.getElementById('plotLower').value = mode === 'equation' ? '' : '-2';
                 document.getElementById('plotUpper').value = mode === 'equation' ? '' : '2';
                 await takePlot(document.getElementById('plotFirst').value);

@@ -121,6 +121,12 @@ The binding section is significant:
   cannot finish cleanly
 
 That means the equation text itself can express both intent and seed values.
+Independent additive terms are moved across the equality before symbolic
+isolation, including when a trigonometric function is written as part of a
+residual equal to zero. Automatic numerical fallback for multiple variables
+requires finite starting values for every variable. Without those seeds, an
+unsolved implicit family remains undetermined rather than becoming one sampled
+point; explicit numerical goal seeking remains available.
 
 Additive ellipses use the same native series recogniser as `expr_t`; the
 equation client does not expand them. MARS first tries exact geometric and

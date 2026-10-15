@@ -168,6 +168,10 @@ void equ_solutions_free(equation_solutions_t *solutions);
  * falls back to numeric goal-seeking across the equation's variable bindings.
  * Any current values already stored on those variable bindings are used as the
  * numeric starting point.
+ * Independent additive terms are moved across the equality before isolation.
+ * For multiple variable bindings, automatic numerical fallback requires a finite
+ * starting value for every variable; an unseeded implicit family is not replaced
+ * by an arbitrary sampled point. An empty unproved result remains undetermined.
  * An unseeded real affine zeta equation uses a bounded multi-start search;
  * consult equ_solutions_search_note() for its bounds and limitations, and
  * equ_solutions_family_note() for any separate exact family.
