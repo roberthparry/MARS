@@ -67,6 +67,7 @@ static const field_t field_table[] = {
     {"kind", "kind", false},
     {"max_intervals", "max_intervals", false},
     {"numeric", "numeric", true},
+    {"numeric_indices", "numeric_indices", true},
     {"operand", "operand", false},
     {"operation", "operation", false},
     {"operation_function", "operation_function", true},
@@ -424,6 +425,7 @@ static void lab_eval_equation_fields(json_t *fields)
     string_free(count);
     json_free(solutions);
     lab_eval_put(fields, "numeric_solutions", lab_eval_line_array(fields, "numeric"));
+    lab_eval_put(fields, "numeric_solution_indices", lab_eval_line_array(fields, "numeric_indices"));
     lab_eval_render_field(fields, "display_TeX", "svg", "render_error");
 }
 

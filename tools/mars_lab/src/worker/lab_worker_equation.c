@@ -566,6 +566,24 @@ static char *solution_symbolic_pair_text(const equation_solutions_t *solutions, 
     bool numeric_pair = first && second && expr_match_const_value(equ_rhs(first), &literal) &&
                         expr_match_const_value(equ_rhs(second), &other_literal);
     num_destroy(&other_literal);
+    if (first && second && !numeric_pair && expr_struct_eq(equ_lhs(first), equ_lhs(second))) {
+        const expr_t *base = NULL, *positive = NULL, *radicand = NULL;
+        if (expr_match_neg_expr(equ_rhs(first), &base) && expr_struct_eq(base, equ_rhs(second)))
+            positive = equ_rhs(second);
+        else if (expr_match_neg_expr(equ_rhs(second), &base) && expr_struct_eq(base, equ_rhs(first)))
+            positive = equ_rhs(first);
+        if (positive) {
+            char *body = use_TeX ? expr_to_TeX_body(positive) : expr_text_dup(positive, style_UNBOUND);
+            bool root = expr_match_sqrt_expr(positive, &radicand);
+            size_t size = body ? strlen(body) + 32 : 0;
+            text = size ? malloc(size) : NULL;
+            if (text)
+                snprintf(text, size, use_TeX ? (root ? "\\pm %s" : "\\pm\\left(%s\\right)") :
+                                             (root ? "±%s" : "±(%s)"), body);
+            free(body);
+            goto cleanup;
+        }
+    }
     /* Pair expression trees, never approximate values or parameterised families. */
     if (!first || !second || numeric_pair || !expr_struct_eq(equ_lhs(first), equ_lhs(second)) ||
         expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
@@ -997,6 +1015,13 @@ static string_t *solution_numerics(const equation_solutions_t *solutions, expr_b
         char note[64];
         number_t value = eval_solution_rhs_with_sampled_indices(equ_rhs(shown), branch_parameter, &sampled_k,
                                                                 &sampled_branch, &exact);
+        if (!num_is_finite(value)) {
+            num_destroy(&value);
+            equ_free(display);
+            continue;
+        }
+        if (!strncmp(prefix, "numeric ", 8))
+            string_append_format(text, "numeric_indices %zu\n", i);
         char *value_text = number_precision_text_dup(value, precision);
         const char *relation = exact ? "=" : "≈";
 

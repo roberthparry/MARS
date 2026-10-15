@@ -1290,6 +1290,9 @@ Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2
 The **Solutions** card stays visible below the plot, including during live range
 updates. Its values are computed from the current equation using the same native
 solver and numerical formatter as Evaluate, rather than retained from an older result.
+Structurally opposite symbolic branches share a single ± row in plain text and
+rendered mathematics. Unavailable or non-finite numerical approximations are omitted;
+the symbolic solutions remain visible when their parameters are unset.
 There is no generic left/right legend; hovering over a curve identifies its native
 expression. Automatic equation framing samples both sides and their residual,
 using connected crossings and detected turning points to choose padded horizontal

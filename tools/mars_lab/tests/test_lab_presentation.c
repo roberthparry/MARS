@@ -347,6 +347,9 @@ static void test_lab_presentation_equation_solution_text(void)
          " Note \n\nx = 1\ny = π\ny ≈ 3.14\n\n Search \n\n Family "},
         {"{\"solutions\":\"x = π\\ny = π\",\"numeric_solutions\":[\"x ≈ 3.14\",\"y ≈ 3.14\"]}",
          "x = π\ny = π\n\nx ≈ 3.14\ny ≈ 3.14"},
+        {"{\"solutions\":\"x = y\\ny = 2\\nz = π\",\"numeric_solutions\":[\"y = 2\",\"z ≈ 3.14\"],"
+         "\"numeric_solution_indices\":[\"1\",\"2\"]}",
+         "x = y\ny = 2\nz = π\n\nz ≈ 3.14"},
         {"{\"status\":\"no solutions\",\"interpretation_note\":\"ignored\",\"search_note\":\"ignored\"}",
          "No solutions"},
         {"{\"status\":\"undetermined\",\"solutions\":\" \\n \",\"search_note\":\"search\\nnext\"}",

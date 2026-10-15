@@ -10,6 +10,7 @@
  * server owns transport and deadlines; no browser mathematical parsing is needed.
  */
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "number-t.h"
@@ -307,6 +308,7 @@ static string_t *lab_pres_equation_solution_text(const json_t *fields, const jso
     }
     string_split_free(lines, line_count);
     const json_t *numeric = lab_eval_get(fields, "numeric_solutions");
+    const json_t *indices = lab_eval_get(fields, "numeric_solution_indices");
     size_t index = 0u;
     for (size_t i = 0u; ok && json_type(numeric) == JSON_ARRAY && i < json_array_size(numeric); ++i) {
         const string_t *value = json_string_value(json_array_get(numeric, i));
@@ -315,7 +317,10 @@ static string_t *lab_pres_equation_solution_text(const json_t *fields, const jso
         string_trim(line);
         if (string_byte_length(line)) {
             bool literal = false;
-            json_bool_value(lab_eval_get(json_array_get(solutions, index++), "numeric"), &literal);
+            const string_t *source_index = json_string_value(json_array_get(indices, i));
+            size_t solution_index = source_index ? strtoul(string_c_str(source_index), NULL, 10) : index;
+            ++index;
+            json_bool_value(lab_eval_get(json_array_get(solutions, solution_index), "numeric"), &literal);
             if (!literal) {
                 if (count && !has_blank) {
                     ok = lab_pres_solution_line(text, &count, blank);

@@ -1226,6 +1226,19 @@ static void test_lab_extra_gaussian_integral(void)
 static void test_lab_extra_equation(void)
 {
     expect_response("/equation-eval", "{\"equation\":\"x^2=4\",\"precision\":40}", 200u, "solutions", "2");
+    unsigned status = 0;
+    json_t *sphere = request("/equation-eval", "{\"equation\":\"x^2+y^2+z^2=1\"}", &status);
+    bool adapted = sphere && lab_presentation_adapt(sphere);
+    const char *shown = test_lab_text(test_lab_member(sphere, "presentation"), "equation_solution_text");
+    bool ok = adapted && status == 200u && strstr(shown, "x = ±√(1 - y² - z²)") &&
+              strstr(shown, "y = ±√(1 - x² - z²)") && strstr(shown, "z = ±√(1 - x² - y²)") &&
+              !strstr(shown, "nan") && !strstr(shown, "NAN") &&
+              json_array_size(test_lab_member(sphere, "numeric_solutions")) == 0u &&
+              contains(sphere, "solutions_TeX", "\\pm");
+    if (!ok)
+        show_failure(sphere);
+    json_free(sphere);
+    TEST_ASSERT_TRUE(ok, "symbolic opposite branches use plus-minus without unavailable numerical rows");
 }
 
 static void test_lab_extra_equation_real_surd_numerics(void)
